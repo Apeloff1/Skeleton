@@ -8,12 +8,13 @@ VerificationCheck must be supplied or the result remains UNKNOWN.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
 import hashlib
+import inspect
 import json
-from typing import Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import Enum
 from uuid import NAMESPACE_URL, uuid5
 
 from skeleton.contracts.verification import (
@@ -34,11 +35,14 @@ from skeleton.intelligence.verification_policy import (
 from skeleton.provider_runtime import (
     ProviderAdapter,
     ProviderError,
+    ProviderPolicyError,
+    ProviderProtocolViolationError,
     ProviderRequest,
     ProviderResponse,
+    _await_bounded_provider_call,
+    _validate_request,
 )
 from skeleton.retrieval.verification import (
-    CitationIntegrityResult,
     GroundingAssessment,
     ground_claim,
 )
@@ -73,20 +77,12 @@ def _receipt_id(
             "policy_level": int(assessment.policy.level),
             "required_modes": list(assessment.policy.required_modes),
             "policy_satisfied": assessment.policy_satisfied,
-            "check_id": (
-                None if assessment.check is None else assessment.check.check_id
-            ),
+            "check_id": (None if assessment.check is None else assessment.check.check_id),
             "verified_at": assessment.verified_at.isoformat(),
             "verifier_id": assessment.verifier_id,
-            "supporting_evidence_ids": list(
-                assessment.grounding.supporting_evidence_ids
-            ),
-            "contradicting_evidence_ids": list(
-                assessment.grounding.contradicting_evidence_ids
-            ),
-            "rejected_evidence_ids": list(
-                assessment.grounding.rejected_evidence_ids
-            ),
+            "supporting_evidence_ids": list(assessment.grounding.supporting_evidence_ids),
+            "contradicting_evidence_ids": list(assessment.grounding.contradicting_evidence_ids),
+            "rejected_evidence_ids": list(assessment.grounding.rejected_evidence_ids),
             "issues": list(assessment.issues),
         },
         sort_keys=True,
@@ -137,9 +133,7 @@ def materialize_verification_receipt(
         supporting_evidence_ids=assessment.grounding.supporting_evidence_ids,
         contradicting_evidence_ids=assessment.grounding.contradicting_evidence_ids,
         rejected_evidence_ids=assessment.grounding.rejected_evidence_ids,
-        postcondition_observation_ids=(
-            () if check is None else check.postcondition_observation_ids
-        ),
+        postcondition_observation_ids=(() if check is None else check.postcondition_observation_ids),
         independent=False if check is None else check.independent,
         issues=assessment.issues,
     )
@@ -148,7 +142,7 @@ def materialize_verification_receipt(
 def _utc(value: datetime) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("verified_at must be timezone-aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _valid_independent_checks(
@@ -174,10 +168,7 @@ def _valid_postconditions(
         item
         for item in observations
         if item.tenant_id == claim.tenant_id
-        and (
-            claim.operation_id is None
-            or item.operation_id == claim.operation_id
-        )
+        and (claim.operation_id is None or item.operation_id == claim.operation_id)
     )
 
 
@@ -236,10 +227,7 @@ class VerificationRuntime:
 
         for citation in grounding.citation_results:
             if not citation.accepted:
-                issues.extend(
-                    f"citation:{citation.evidence_id}:{reason}"
-                    for reason in citation.reasons
-                )
+                issues.extend(f"citation:{citation.evidence_id}:{reason}" for reason in citation.reasons)
 
         outcome = VerificationOutcome.PASSED
         if grounding.has_authoritative_contradiction:
@@ -250,10 +238,7 @@ class VerificationRuntime:
                 outcome = VerificationOutcome.FAILED
                 issues.append("authoritative_evidence_contradicts_claim")
 
-        if (
-            outcome is VerificationOutcome.PASSED
-            and policy.level >= VerificationLevel.EVIDENCE
-        ):
+        if outcome is VerificationOutcome.PASSED and policy.level >= VerificationLevel.EVIDENCE:
             if not grounding.has_authoritative_support:
                 outcome = VerificationOutcome.UNKNOWN
                 issues.append("authoritative_support_missing")
@@ -271,10 +256,7 @@ class VerificationRuntime:
             issues.append("independent_verification_required")
 
         valid_postconditions = _valid_postconditions(claim, postconditions)
-        if (
-            outcome is VerificationOutcome.PASSED
-            and policy.require_postcondition
-        ):
+        if outcome is VerificationOutcome.PASSED and policy.require_postcondition:
             if claim.operation_id is None:
                 outcome = VerificationOutcome.UNKNOWN
                 issues.append("postcondition_operation_identity_missing")
@@ -289,9 +271,7 @@ class VerificationRuntime:
         check: VerificationCheck | None = None
         if policy_satisfied:
             evidence_ids = (
-                grounding.supporting_evidence_ids
-                if policy.level >= VerificationLevel.EVIDENCE
-                else ()
+                grounding.supporting_evidence_ids if policy.level >= VerificationLevel.EVIDENCE else ()
             )
             observation_ids = (
                 tuple(item.observation_id for item in valid_postconditions)
@@ -459,9 +439,7 @@ def _evidence_payload(
     for item in evidence:
         text = evidence_text.get(item.evidence_id)
         if text is None:
-            raise ValueError(
-                "semantic verification requires materialized evidence text"
-            )
+            raise ValueError("semantic verification requires materialized evidence text")
         if not isinstance(text, str) or not text:
             raise ValueError("semantic verification evidence text must be non-empty")
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -517,15 +495,16 @@ def _parse_semantic_response(
 ) -> SemanticRound:
     raw = response.structured_output
     if not isinstance(raw, Mapping):
-        raise ValueError("semantic verifier returned no structured output")
+        raise ValueError(  # noqa: TRY004 -- preserve public parse-failure handling
+            "semantic verifier returned no structured output"
+        )
     try:
         verdict = SemanticVerdict(str(raw.get("verdict")))
     except ValueError as exc:
         raise ValueError("semantic verifier verdict is invalid") from exc
     raw_issues = raw.get("issues")
     if not isinstance(raw_issues, list) or any(
-        not isinstance(item, str) or not item.strip()
-        for item in raw_issues
+        not isinstance(item, str) or not item.strip() for item in raw_issues
     ):
         raise ValueError("semantic verifier issues must be a string list")
     issues = tuple(item.strip() for item in raw_issues[:32])
@@ -572,9 +551,7 @@ def _repair_claim(
             + ":"
             + str(semantic.round_index)
             + ":"
-            + hashlib.sha256(
-                semantic.revised_claim.encode("utf-8")
-            ).hexdigest(),
+            + hashlib.sha256(semantic.revised_claim.encode("utf-8")).hexdigest(),
         )
     )
     provenance = tuple(
@@ -582,10 +559,7 @@ def _repair_claim(
             (
                 *claim.provenance_refs,
                 "repair-of:" + claim.claim_id,
-                "semantic-verifier:"
-                + semantic.provider
-                + ":"
-                + semantic.model,
+                "semantic-verifier:" + semantic.provider + ":" + semantic.model,
             )
         )
     )
@@ -637,17 +611,12 @@ def _independent_semantic_check(
         )
     )
     return VerificationCheck(
-        check_id=str(
-            uuid5(NAMESPACE_URL, "semantic-verification-check:" + material)
-        ),
+        check_id=str(uuid5(NAMESPACE_URL, "semantic-verification-check:" + material)),
         claim_id=claim.claim_id,
         tenant_id=claim.tenant_id,
         level=VerificationLevel.INDEPENDENT,
         outcome=VerificationOutcome.PASSED,
-        verifier_id="semantic-provider:"
-        + semantic.provider
-        + ":"
-        + semantic.model,
+        verifier_id="semantic-provider:" + semantic.provider + ":" + semantic.model,
         verified_at=verified_at,
         evidence_ids=evidence_ids,
         independent=True,
@@ -665,12 +634,21 @@ class SemanticVerificationRuntime:
         max_rounds: int = 2,
         max_repairs: int = 1,
         max_output_tokens: int = 800,
+        request_binder: (
+            Callable[[ProviderRequest], ProviderRequest | Awaitable[ProviderRequest]] | None
+        ) = None,
+        response_observer: (
+            Callable[[ProviderRequest, ProviderResponse], None | Awaitable[None]] | None
+        ) = None,
+        response_resolver: (
+            Callable[[ProviderRequest], ProviderResponse | None | Awaitable[ProviderResponse | None]] | None
+        ) = None,
     ) -> None:
         if not isinstance(adapter, ProviderAdapter):
             raise TypeError("adapter must implement ProviderAdapter")
-        if not 1 <= max_rounds <= 4:
+        if type(max_rounds) is not int or not 1 <= max_rounds <= 4:
             raise ValueError("max_rounds must be within [1, 4]")
-        if not 0 <= max_repairs <= 2 or max_repairs >= max_rounds + 1:
+        if type(max_repairs) is not int or not 0 <= max_repairs <= 2 or max_repairs >= max_rounds + 1:
             raise ValueError("max_repairs is invalid")
         if (
             isinstance(max_output_tokens, bool)
@@ -678,11 +656,116 @@ class SemanticVerificationRuntime:
             or not 64 <= max_output_tokens <= 4096
         ):
             raise ValueError("max_output_tokens must be within [64, 4096]")
+        if request_binder is not None and not callable(request_binder):
+            raise TypeError("request_binder must be callable or None")
+        if response_observer is not None and not callable(response_observer):
+            raise TypeError("response_observer must be callable or None")
+        if response_resolver is not None and not callable(response_resolver):
+            raise TypeError("response_resolver must be callable or None")
         self.adapter = adapter
         self.max_rounds = max_rounds
         self.max_repairs = max_repairs
         self.max_output_tokens = max_output_tokens
+        self.request_binder = request_binder
+        self.response_observer = response_observer
+        self.response_resolver = response_resolver
         self.deterministic = VerificationRuntime()
+
+    async def _bind_request(self, request: ProviderRequest) -> ProviderRequest:
+        """Bind parent authority/accounting immediately before model dispatch.
+
+        The callback may narrow budgets and bind lineage/context/deadlines. It
+        cannot replace the verification question, protocol or selected adapter.
+        """
+        expected_schema = json.dumps(request.structured_output_schema, sort_keys=True, allow_nan=False)
+        bound = request
+        if self.request_binder is not None:
+            result = self.request_binder(request)
+            bound = await result if inspect.isawaitable(result) else result
+        if not isinstance(bound, ProviderRequest):
+            raise TypeError("semantic request_binder must return ProviderRequest")
+        if (
+            bound.instructions != request.instructions
+            or bound.prompt != request.prompt
+            or bound.history != request.history
+            or bound.tools
+            or bound.tool_schemas
+            or bound.tool_choice != "none"
+            or bound.specific_tool_id is not None
+            or json.dumps(bound.structured_output_schema, sort_keys=True, allow_nan=False) != expected_schema
+        ):
+            raise ProviderPolicyError("semantic request binding changed the admitted verification protocol")
+        if (
+            type(bound.max_output_tokens) is not int
+            or not 1 <= bound.max_output_tokens <= self.max_output_tokens
+        ):
+            raise ProviderPolicyError("semantic request binding widened its output reservation")
+        selected_model = _validate_request(bound, default_model=self.adapter.model)
+        if selected_model != self.adapter.model:
+            raise ProviderPolicyError("semantic request binding changed the selected verifier model")
+        return bound
+
+    async def _observe_response(self, request: ProviderRequest, response: ProviderResponse) -> None:
+        if not isinstance(response, ProviderResponse):
+            raise ProviderProtocolViolationError("semantic verifier returned an invalid response type")
+        if self.response_observer is not None:
+            result = self.response_observer(request, response)
+            observed = await result if inspect.isawaitable(result) else result
+            if observed is not None:
+                raise TypeError("semantic response_observer must return None")
+
+    async def _resolve_response(self, request: ProviderRequest) -> ProviderResponse | None:
+        """Read an exact canonical response through the parent's durable owner.
+
+        The optional resolver must not dispatch models. Its caller owns source,
+        claim, request and receipt binding, plus idempotent response accounting.
+        This seam permits crash recovery without a second physical invocation.
+        """
+        if self.response_resolver is None:
+            return None
+        result = self.response_resolver(request)
+        response = await result if inspect.isawaitable(result) else result
+        if response is None:
+            return None
+        if not isinstance(response, ProviderResponse):
+            raise TypeError("semantic response_resolver must return ProviderResponse or None")
+        if response.tool_calls:
+            raise ProviderProtocolViolationError("resolved semantic responses must remain tool-free")
+        if response.text is not None and (
+            not isinstance(response.text, str) or len(response.text.encode("utf-8")) > 4 * 1024 * 1024
+        ):
+            raise ProviderProtocolViolationError("resolved semantic response text exceeds its bound")
+        if response.structured_output is not None and not isinstance(response.structured_output, Mapping):
+            raise ProviderProtocolViolationError("resolved semantic response has invalid structured output")
+        try:
+            encoded = json.dumps(
+                {
+                    "text": response.text,
+                    "structured_output": response.structured_output,
+                    "provider": response.provider,
+                    "model": response.model,
+                    "request_id": response.request_id,
+                    "response_id": response.response_id,
+                    "execution_receipt_digest": response.execution_receipt_digest,
+                    "usage": response.usage.as_dict(),
+                    "data_class": response.data_class,
+                    "context_id": response.context_id,
+                    "context_digest": response.context_digest,
+                    "context_source_snapshot": response.context_source_snapshot,
+                    "context_compiler_version": response.context_compiler_version,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        except (AttributeError, TypeError, ValueError, RecursionError) as exc:
+            raise ProviderProtocolViolationError(
+                "resolved semantic response is not bounded canonical JSON"
+            ) from exc
+        if len(encoded) > 4 * 1024 * 1024:
+            raise ProviderProtocolViolationError("resolved semantic response exceeds its byte bound")
+        return response
 
     async def finalize(
         self,
@@ -698,7 +781,9 @@ class SemanticVerificationRuntime:
     ) -> SemanticFinalization:
         instant = _utc(verified_at)
         if not isinstance(force_semantic, bool):
-            raise ValueError("force_semantic must be boolean")
+            raise ValueError(  # noqa: TRY004 -- preserve public validation error
+                "force_semantic must be boolean"
+            )
 
         base = self.deterministic.verify(
             claim,
@@ -708,23 +793,25 @@ class SemanticVerificationRuntime:
             action_effect=action_effect,
             externally_observable_action=externally_observable_action,
         )
-        semantic_required = (
-            force_semantic
-            or base.policy.level >= VerificationLevel.INDEPENDENT
-        )
+        semantic_required = force_semantic or base.policy.level >= VerificationLevel.INDEPENDENT
 
         semantic_prereq_issues = tuple(
             issue
             for issue in base.issues
-            if issue not in {
+            if issue
+            not in {
                 "independent_verification_required",
                 "postcondition_observation_required",
             }
         )
-        if base.outcome in {
-            VerificationOutcome.FAILED,
-            VerificationOutcome.CONTESTED,
-        } or semantic_prereq_issues:
+        if (
+            base.outcome
+            in {
+                VerificationOutcome.FAILED,
+                VerificationOutcome.CONTESTED,
+            }
+            or semantic_prereq_issues
+        ):
             disposition = _safe_disposition(
                 claim,
                 base.outcome,
@@ -740,9 +827,7 @@ class SemanticVerificationRuntime:
                 semantic_rounds=(),
                 repair_lineage=(),
                 independent_check=None,
-                issues=tuple(
-                    dict.fromkeys((*base.issues, "semantic_verifier_not_admitted"))
-                ),
+                issues=tuple(dict.fromkeys((*base.issues, "semantic_verifier_not_admitted"))),
             )
 
         if not semantic_required:
@@ -768,9 +853,7 @@ class SemanticVerificationRuntime:
             for item in base.grounding.citation_results
             if item.accepted and item.authoritative
         }
-        admitted_evidence = tuple(
-            item for item in evidence if item.evidence_id in authoritative_ids
-        )
+        admitted_evidence = tuple(item for item in evidence if item.evidence_id in authoritative_ids)
         try:
             materialized = _evidence_payload(
                 admitted_evidence,
@@ -820,10 +903,7 @@ class SemanticVerificationRuntime:
             semantic_turn_id = claim.turn_id or str(
                 uuid5(
                     NAMESPACE_URL,
-                    "semantic-verification-turn:"
-                    + claim.claim_id
-                    + ":"
-                    + str(round_index),
+                    "semantic-verification-turn:" + claim.claim_id + ":" + str(round_index),
                 )
             )
             request = ProviderRequest(
@@ -841,19 +921,27 @@ class SemanticVerificationRuntime:
                 admission_operation_id=str(
                     uuid5(
                         NAMESPACE_URL,
-                        "semantic-verification-admission:"
-                        + claim.claim_id
-                        + ":"
-                        + str(round_index),
+                        "semantic-verification-admission:" + claim.claim_id + ":" + str(round_index),
                     )
                 ),
                 execution_id=semantic_execution_id,
                 turn_id=semantic_turn_id,
-                structured_output_schema=_SEMANTIC_SCHEMA,
+                structured_output_schema=json.loads(json.dumps(_SEMANTIC_SCHEMA)),
                 tool_choice="none",
             )
             try:
-                response = await self.adapter.generate(request)
+                request = await self._bind_request(request)
+                response = await self._resolve_response(request)
+                if response is None:
+                    response = await _await_bounded_provider_call(
+                        lambda bound_request=request: self.adapter.generate(bound_request),
+                        deadline=request.deadline,
+                        configured_timeout=request.resource_budget.max_wall_seconds,
+                        label="semantic verification provider",
+                    )
+                # Charge/record every actual provider response before parsing.
+                # A malformed semantic verdict is still consumed model work.
+                await self._observe_response(request, response)
                 semantic = _parse_semantic_response(
                     response,
                     round_index=round_index,
@@ -1022,9 +1110,7 @@ class SemanticVerificationRuntime:
                 semantic_rounds=tuple(rounds),
                 repair_lineage=(),
                 independent_check=semantic_check,
-                issues=tuple(
-                    dict.fromkeys((*final_assessment.issues, *semantic.issues))
-                ),
+                issues=tuple(dict.fromkeys((*final_assessment.issues, *semantic.issues))),
             )
 
         disposition = (

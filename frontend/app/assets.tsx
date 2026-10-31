@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /assets — Asset Pipeline
  * POST /api/assets/generate/sprite → sprite prompt + dalle/sd/midjourney pack
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const CATEGORIES = ['characters', 'environment', 'ui', 'items', 'effects'];

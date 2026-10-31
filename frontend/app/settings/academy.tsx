@@ -2,13 +2,13 @@ import { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettings, ACADEMY_DNA_GROUPS } from '../../state/settingsStore';
-import { Section, SwitchRow, SliderRow, ChoiceRow, ActionButton } from '../../features/Settings/components';
-import DnaCockpit from '../../features/Settings/DnaCockpit';
-import { ttsSpeak, ttsStop, ttsAvailableVoices, pickPreferredVoice } from '../../features/Academy/tts';
-import { jeevesSpeak, jeevesCatchphrase, getRandomQuote } from '../../features/Academy/jeevesTts';
-import { actionSheet } from '../../components/ActionSheet';
-import { toast } from '../../components/Toast';
+import { useSettings, ACADEMY_DNA_GROUPS } from '../../src/state/settingsStore';
+import { Section, SwitchRow, SliderRow, ChoiceRow, ActionButton } from '../../src/features/Settings/components';
+import DnaCockpit from '../../src/features/Settings/DnaCockpit';
+import { ttsSpeak, ttsStop, ttsAvailableVoices, pickPreferredVoice } from '../../src/features/Academy/tts';
+import { jeevesSpeak, jeevesCatchphrase, getRandomQuote } from '../../src/features/Academy/jeevesTts';
+import { actionSheet } from '../../src/components/ActionSheet';
+import { toast } from '../../src/components/AppToast';
 
 export default function AcademySettings() {
   const router = useRouter();

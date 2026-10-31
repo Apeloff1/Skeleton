@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * app/boot-log.tsx — full boot diagnostic log viewer.
  *
@@ -21,7 +21,7 @@ import * as Clipboard from 'expo-clipboard';
 import {
   getLastTrace, getMemoryTrace, getCrashCount, getLastCleanBoot,
   resetBootState, getSessionArchive, TraceStep, ArchivedSession,
-} from '../utils/bootTracer';
+} from '../src/utils/bootTracer';
 import { trail } from '../src/utils/breadcrumbs';
 
 type Crumb = { ts: number; category: string; message: string; level?: string; data?: any };

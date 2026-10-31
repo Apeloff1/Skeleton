@@ -10,33 +10,15 @@
  * fanning out to N separate health endpoints.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import api from '../utils/apiClient';
+import { useQuery } from '../foundation/useQuery';
+import {
+  failingSubsystems, getJson, healthColour, overviewKey,
+} from '../foundation/queries';
+import type { OverviewPayload, OverviewSlot } from '../foundation/queries';
 
-export interface OverviewSlot {
-  ok: boolean;
-  error?: string;
-  [k: string]: any;
-}
-
-export interface OverviewPayload {
-  process: {
-    pid: number;
-    python: string;
-    started_at: number;
-    uptime_s: number;
-    deploy_env: 'dev' | 'production';
-  };
-  elapsed_ms: number;
-  all_green: boolean;
-  registry: OverviewSlot;
-  watchdog: OverviewSlot;
-  cold_storage: OverviewSlot;
-  databases: OverviewSlot;
-  feature_flags: OverviewSlot;
-  deprecations: OverviewSlot;
-  boot: OverviewSlot;
-}
+export type { OverviewPayload, OverviewSlot };
 
 export interface UseOverviewOptions {
   /** Poll interval in ms. Default 15000 (15s). Set to 0 to disable polling. */
@@ -45,60 +27,37 @@ export interface UseOverviewOptions {
   enabled?: boolean;
 }
 
+const fetchOverview = () => getJson<OverviewPayload>(api, '/api/health/overview');
+
+/**
+ * Backed by the shared foundation query cache: every caller shares one
+ * request and one cached payload, with uniform loading/error state.
+ */
 export function useOverview(opts: UseOverviewOptions = {}) {
   const { intervalMs = 15_000, enabled = true } = opts;
-  const [data, setData] = useState<OverviewPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const mounted = useRef(true);
+  const query = useQuery(overviewKey, fetchOverview, { enabled, staleTimeMs: Math.max(1_000, intervalMs || 15_000) });
+  const { refetch } = query;
 
-  const fetchOnce = async () => {
-    if (!mounted.current) return;
-    setLoading(true);
-    const res = await api.get('/api/health/overview');
-    if (!mounted.current) return;
-    setLoading(false);
-    if (res.ok) {
-      setData(res.data as OverviewPayload);
-      setError(null);
-    } else {
-      setError(res.error || `HTTP ${res.status}`);
-    }
-  };
-
+  // REST poll is the fallback. Home passes intervalMs=0 while the
+  // realtime stream (src/foundation/realtime) is open.
   useEffect(() => {
-    mounted.current = true;
-    if (!enabled) return;
-    fetchOnce();  // initial
-    if (intervalMs <= 0) return;
-    const t = setInterval(fetchOnce, intervalMs);
-    return () => { mounted.current = false; clearInterval(t); };
-     
-  }, [enabled, intervalMs]);
+    if (!enabled || intervalMs <= 0) return;
+    const timer = setInterval(() => { void refetch(); }, intervalMs);
+    return () => clearInterval(timer);
+  }, [enabled, intervalMs, refetch]);
 
-  /** Refresh immediately without waiting for the next poll tick. */
-  const refresh = () => fetchOnce();
-
-  /** Derived: count of failing subsystems (0 when all_green). */
-  const failingCount = data
-    ? (['registry', 'watchdog', 'cold_storage', 'databases', 'feature_flags', 'deprecations', 'boot'] as const)
-        .filter((k) => !data[k]?.ok).length
-    : 0;
-
-  /** Derived: colour token for a status pill. */
-  const colour: 'green' | 'yellow' | 'red' | 'grey' =
-    !data ? 'grey'
-      : data.all_green ? 'green'
-      : failingCount >= 3 ? 'red'
-      : 'yellow';
-
+  const data = query.data ?? null;
   return {
     data,
-    error,
-    loading,
-    refresh,
-    failingCount,
-    colour,
+    error: query.error ? query.error.message : null,
+    loading: query.fetching || query.status === 'loading',
+    /** Refresh immediately without waiting for the next poll tick. */
+    refresh: refetch,
+    /** Derived: count of failing subsystems (0 when all_green). */
+    failingCount: failingSubsystems(data).length,
+    /** Derived: colour token for a status pill. */
+    colour: healthColour(data),
+    query,
   };
 }
 

@@ -77,13 +77,15 @@ def test_exit_status_is_preserved_and_external_plugins_disabled(tmp_path: Path, 
     monkeypatch.setenv("PYTEST_ADDOPTS", "--ignore=tests")
     captured = {}
 
-    def fake_run(command, *, cwd, env, check):
-        captured.update(command=command, cwd=cwd, env=env, check=check)
+    def fake_run(command, *, cwd, env, check, timeout):
+        captured.update(command=command, cwd=cwd, env=env, check=check, timeout=timeout)
         return SimpleNamespace(returncode=5)
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     assert runner.main(["--feature", "security", "--junitxml", "report.xml"]) == 5
     assert captured["cwd"] == tmp_path
+    assert captured["timeout"] is None  # Zero is the documented unlimited default.
+    assert captured["check"] is False
     assert captured["env"]["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] == "1"
     assert "PYTEST_ADDOPTS" not in captured["env"]
     assert "--junitxml=report.xml" in captured["command"]

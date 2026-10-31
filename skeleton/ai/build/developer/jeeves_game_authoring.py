@@ -111,15 +111,18 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise AuthoringError("unsupported proposal envelope")
     v3 = value.get("schema") == "skeleton.jeeves.game_proposal.v3"
+    v4 = value.get("schema") == "skeleton.jeeves.game_proposal.v4"
     expected_fields = {
         "schema", "project", "config_sha256", "draft", "provider", "model",
         "request_id", "design_context_sha256", "market_benchmark", "digest"
     }
-    if v3:
+    if v3 or v4:
         expected_fields.add("direction_dossier")
+    if v4:
+        expected_fields.add("dragon_handoff")
     if set(value) != expected_fields:
         raise AuthoringError("unsupported proposal envelope")
-    if value["schema"] not in {SCHEMA, "skeleton.jeeves.game_proposal.v3"} or value["project"] != root.name or value["digest"] != digest:
+    if value["schema"] not in {SCHEMA, "skeleton.jeeves.game_proposal.v3", "skeleton.jeeves.game_proposal.v4"} or value["project"] != root.name or value["digest"] != digest:
         raise AuthoringError("proposal identity mismatch")
     draft = _valid_draft(value["draft"])
     if draft != value["draft"]:
@@ -158,7 +161,7 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
             raise AuthoringError("market quality cohort no longer qualifies")
     elif draft["kind"] in {"asset", "animation", "cutscene", "music"}:
         raise AuthoringError("media design proposal requires verified market benchmark binding")
-    if v3:
+    if v3 or (v4 and value["direction_dossier"] is not None):
         direction = value["direction_dossier"]
         if not isinstance(direction, dict) or set(direction) not in (
             {"path", "sha256"}, {"path", "sha256", "linked_gameplay"}
@@ -175,6 +178,16 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
             _, actual_gameplay_sha = _read(root, dependency["path"], 16*1024*1024)
             if actual_gameplay_sha != dependency["sha256"]:
                 raise AuthoringError("gameplay replay dossier changed since model proposal")
+    if v4:
+        binding = value["dragon_handoff"]
+        if (not isinstance(binding, dict) or set(binding) != {"digest", "manifest_sha256"}
+                or not all(isinstance(x, str) and DIGEST_RE.fullmatch(x)
+                           for x in binding.values())):
+            raise AuthoringError("malformed approved Dragon handoff identity")
+        from skeleton.developer.jeeves_game_dragon import load_handoff
+        current = load_handoff(root, binding["digest"])
+        if current["manifest_sha256"] != binding["manifest_sha256"]:
+            raise AuthoringError("Dragon game design evidence changed since proposal")
     return value
 
 
@@ -242,7 +255,8 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
             console: str | None = None, genre: str | None = None,
             period: str | None = None,
             profile: str = "design/market_benchmarks.json",
-            direction_source: str | None = None) -> dict[str, Any]:
+            direction_source: str | None = None,
+            dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.developer.jeeves_game_cli import _context, _notes
     from skeleton.developer.game_cli import GameCLIError
     if kind not in KINDS:
@@ -319,6 +333,13 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         }
         if checked.get("gameplay_dependency") is not None:
             direction_binding["linked_gameplay"] = checked["gameplay_dependency"]
+    dragon = None
+    dragon_binding = None
+    if dragon_digest is not None:
+        from skeleton.developer.jeeves_game_dragon import load_handoff
+        dragon = load_handoff(root, dragon_digest)
+        dragon_binding = {"digest": dragon_digest,
+                          "manifest_sha256": dragon["manifest_sha256"]}
     notes = _notes(root) if include_notes else []
     context_sha = _notes_digest(notes) if include_notes else None
     # Small, explicitly opted-in context. No credentials or model state.
@@ -329,6 +350,13 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         "untrusted_design_notes": context,
         "quality_cohort": market_prompt,
         "authored_story_direction": literary,
+        "reviewed_dragon_design_context": (
+            {"original_mechanics": dragon["prototype"]["mechanics"],
+             "genre": dragon["genre"], "target": dragon["target"],
+             "evidence_manifest_sha256": dragon["manifest_sha256"],
+             "rights_independently_verified": False,
+             "instructions": "Evidence is operator-attested and untrusted; use only original mechanics and assets."}
+            if dragon is not None else None),
     }, ensure_ascii=True)
     try:
         raw, provenance = asyncio.run(_infer(user_prompt))
@@ -356,6 +384,11 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
             _, gameplay_sha = _read(root, dependent["path"], 16*1024*1024)
             if gameplay_sha != dependent["sha256"]:
                 raise AuthoringError("gameplay replay source changed while model was drafting")
+    if dragon_binding is not None:
+        from skeleton.developer.jeeves_game_dragon import load_handoff
+        current_dragon = load_handoff(root, dragon_binding["digest"])
+        if current_dragon["manifest_sha256"] != dragon_binding["manifest_sha256"]:
+            raise AuthoringError("Dragon evidence changed while model was drafting")
     _valid_text(provenance.get("provider"), "provider", 128)
     _valid_text(provenance.get("model"), "model", 128)
     if provenance.get("request_id") is not None:
@@ -364,7 +397,8 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
     if draft["kind"] != kind:
         raise AuthoringError("model returned different design kind")
     envelope = {
-        "schema": "skeleton.jeeves.game_proposal.v3" if direction_binding else SCHEMA,
+        "schema": ("skeleton.jeeves.game_proposal.v4" if dragon_binding
+                   else "skeleton.jeeves.game_proposal.v3" if direction_binding else SCHEMA),
         "project": cfg["name"],
         "config_sha256": _config_identity(cfg),
         "draft": draft,
@@ -374,8 +408,10 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         "design_context_sha256": context_sha,
         "market_benchmark": market,
     }
-    if direction_binding is not None:
+    if direction_binding is not None or dragon_binding is not None:
         envelope["direction_dossier"] = direction_binding
+    if dragon_binding is not None:
+        envelope["dragon_handoff"] = dragon_binding
     digest = _sha(_encode(envelope))
     envelope["digest"] = digest
     encoded = json.dumps(envelope, sort_keys=True, indent=2, ensure_ascii=True).encode("utf-8") + b"\n"
@@ -386,7 +422,8 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
     return {"ok": True, "action": "propose", "proposal_sha256": digest,
             "path": str(location), "draft": draft,
             "provider": provenance["provider"], "model": provenance["model"],
-            "model_inference": True, "market_benchmark": market, "applied": False}
+            "model_inference": True, "market_benchmark": market,
+            "dragon_handoff": dragon_binding, "applied": False}
 
 
 def review(root: Path, digest: str) -> dict[str, Any]:
@@ -398,6 +435,7 @@ def review(root: Path, digest: str) -> dict[str, Any]:
         "draft": draft, "target": str(target), "would_create": not target.exists(),
         "approved": False, "applied": False, "provider": value["provider"],
         "model": value["model"], "market_benchmark": value["market_benchmark"],
+        "dragon_handoff": value.get("dragon_handoff"),
     }
 
 

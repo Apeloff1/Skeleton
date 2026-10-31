@@ -2,13 +2,13 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { withScreenGuard } from '../components/withScreenGuard';
-import { queueGameBuilderArtifact } from '../features/GameFactory/gameBuilderHandoff';
-import theme from '../theme/tokens';
+import { withScreenGuard } from '../src/components/withScreenGuard';
+import { queueGameBuilderArtifact } from '../src/features/GameFactory/gameBuilderHandoff';
+import theme from '../src/theme/tokens';
 import { LazyMount } from '../src/utils/lazyMount';
 
 const LazyAIGameGeneratorModal = React.lazy(() =>
-  import('../features/AIGameGenerator/AIGameGeneratorModal').then((module) => ({
+  import('../src/features/AIGameGenerator/AIGameGeneratorModal').then((module) => ({
     default: module.AIGameGeneratorModal,
   })),
 );

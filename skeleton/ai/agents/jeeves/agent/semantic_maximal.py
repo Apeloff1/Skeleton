@@ -125,7 +125,7 @@ class MaximalSemanticRuntime:
         requested: Sequence[str] = (),
         max_lenses: int = 28,
     ) -> LensSelection:
-        maximum = positive_int("max_lenses", max_lenses, maximum=100)
+        maximum = positive_int("max_lenses", max_lenses, maximum=200)
         return self.router.select_maximal(observations, requested=requested, max_lenses=maximum)
 
     def _scientific_weights(self, findings: Sequence[SemanticFinding]) -> dict[str, float]:

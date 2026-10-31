@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useAutosave } from '../../utils/useAutosave';
+import { useAutosave } from '../utils/useAutosave';
 
 type Note = { id: string; text: string };
 

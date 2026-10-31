@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /build-hub — Build · Code · AI Powerhouse Hub.
  *
@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Skeleton from '../components/UI/Skeleton';
-import RetryBanner from '../components/UI/RetryBanner';
+import Skeleton from '../src/components/UI/Skeleton';
+import RetryBanner from '../src/components/UI/RetryBanner';
 
 const BACKEND = CANONICAL_API_BASE || '';
 

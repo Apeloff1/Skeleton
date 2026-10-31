@@ -19,15 +19,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useModalStore, ModalType } from '../store/modalStore';
-import theme from '../theme/tokens';
-import { Screen, AppHeader, SearchBar, Chip, FeatureCard, SectionHeader } from '../components/UI';
-import { useNotesCount } from '../utils/useNotesCount';
-import * as haptics from '../utils/haptics';
-import { toast } from '../components/Toast';
-import { actionSheet } from '../components/ActionSheet';
-import { useMenuPrefs, togglePin, toggleHide } from '../utils/menuPrefs';
-import { useFeatureFlag } from '../utils/featureFlags';
+import { useModalStore, ModalType } from '../src/store/modalStore';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader, SearchBar, Chip, FeatureCard, SectionHeader } from '../src/components/UI';
+import { useNotesCount } from '../src/utils/useNotesCount';
+import * as haptics from '../src/utils/haptics';
+import { toast } from '../src/components/AppToast';
+import { actionSheet } from '../src/components/ActionSheet';
+import { useMenuPrefs, togglePin, toggleHide } from '../src/utils/menuPrefs';
+import { useFeatureFlag } from '../src/utils/featureFlags';
 
 // ─────────────────────────────────────────────────────────────────────
 // FEATURE CATALOG — single source of truth for what the APK contains.
@@ -97,7 +97,8 @@ const CATEGORIES: { name: string; icon: string; color: string; cards: FeatureCar
       { id: 'stageBuilder', title: 'Stage Builder', desc: 'Lay out the game spine — 63 distinct stage types (boss, cutscene, interlude…). Building a stage mints the first gamefiles', icon: 'layers', color: '#3B82F6', route: '/stages', hot: true },
       { id: 'itemFoundry', title: 'Item Foundry', desc: 'Every agent forges a full item — skin, code, placement — into gamefiles', icon: 'hammer', color: '#A78BFA', route: '/item-foundry', hot: true },
       { id: 'constructForge', title: 'Construct Forge', desc: 'Forge large buildings, cities & castles + materials in 3D · 504 presets/era · Vault mount', icon: 'business', color: '#6c8cff', route: '/construct-forge', hot: true },
-      { id: 'skeletonForge', title: 'Skeleton Forge Cockpit', desc: 'Guided questionnaire · live compose graph · forge-run pipeline · era viewer · cockpit console', icon: 'construct', color: '#22c55e', route: '/skeleton-forge', hot: true },
+      { id: 'skeletonForge', title: 'Skeleton Forge Cockpit', desc: 'Questionnaire · build plan · forge run · era viewer · cockpit console', icon: 'construct', color: '#22c55e', route: '/skeleton-forge', hot: true },
+      { id: 'skeletonStudio', title: 'Skeleton Studio', desc: 'First-run, sign-in, projects from a brief, build status, and settings', icon: 'albums', color: '#22c55e', route: '/skeleton-studio', hot: true },
       { id: 'forgeHub', title: 'Forge Hub', desc: '215 live forges in 3D — characters, npcs, creatures, plants, vehicles, weapons, world, FX & more · AI-enriched · Vault mount', icon: 'apps', color: '#34D399', route: '/forge-hub', hot: true },
       { id: 'netcode', title: 'Netcode Studio', desc: 'Generate multiplayer scaffolds · rollback · lockstep · authoritative', icon: 'wifi', color: '#3B82F6', route: '/multiplayer', hot: true },
       { id: 'trophy', title: 'Trophy Case', desc: 'Champion rewards earned across the arenas', icon: 'trophy', color: '#fbbf24', route: '/trophy-case' },

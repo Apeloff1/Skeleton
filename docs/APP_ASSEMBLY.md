@@ -27,6 +27,46 @@ and one operator command.
 | `mongo` | durable state | local-only host binding |
 | `chroma` | optional vector store | `http://localhost:8000` with `--full` |
 
+**Chroma persistence is not ready for durable use.** The pinned Chroma 1.5.9
+image loads `/config.yaml` with `persist_path: /data`. Its configuration loader
+does not use the Compose `PERSIST_DIRECTORY` setting, and the existing
+`chroma_data` volume is mounted at `/chroma/chroma`, not `/data`. Data written
+to `/data` can therefore reside in the container's writable layer and be lost
+when that container is removed. Health checks do not establish persistence.
+The default profile does not start the optional Chroma service.
+
+If Chroma has been used, preserve its existing container and the legacy
+`chroma_data` volume before starting, recreating or removing services. Quiesce
+clients and stop Chroma gracefully; retain a complete, consistent backup of its
+`/data` directory, including SQLite journals, and a separate backup of the
+legacy volume. Verify the backups and their integrity before planning migration.
+Do not automatically combine or overwrite the two stores. App-owned `app down`
+and the Windows launcher Stop now stop declared services without removing their
+containers. App-owned Compose calls also disable automatic orphan removal even
+when `COMPOSE_REMOVE_ORPHANS` is set in the environment. Direct `docker compose down`, older app versions and Compose
+recreation can still remove the container and its writable-layer data. App-owned
+`up --full` and `install --full --start` are blocked until a durable `/data`
+layout and migration are qualified; ordinary default-profile startup is available.
+Preserve both sources until their authority is resolved.
+
+For an existing installation, a **non-destructive custody backup** command
+is available after an operator quiesces all Chroma writers and stops the old
+Chroma container. Keep the backup outside the repository:
+
+```bash
+docker stop tutolage-chroma
+python scripts/chroma_backup.py --output "$HOME/chroma-custody-backup"
+```
+
+This reads the stopped container's `/data` and legacy
+`/chroma/chroma` mount separately, records bounded SHA-256 file manifests,
+rechecks container identity and mounts, and refuses existing destinations,
+links, unsafe state and unexpected mounts. It does **not** remove the
+container, change volume mounts, restore data, prove SQLite consistency or
+authorize `--full` startup. Verified restore, database integrity, writer
+fencing and recreation evidence remain mandatory before migration acceptance.
+Keep the original container and both stores after backup success.
+
 The backend and Skeleton API remain separate processes during consolidation.
 Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
@@ -128,6 +168,16 @@ python -m skeleton app doctor
 python -m skeleton app doctor --live --json
 ```
 
+On a live full installation, the installer now requires both reachable service
+health endpoints and the backend's canonical critical-router inventory. The
+`critical-api-routes` receipt phase fails if any designated first-party API
+router failed to mount or registration cannot be observed. Inspect
+`/api/health/registry` and `app doctor --live --json`: the
+`critical_routes.observed` and `critical_routes.ready` fields must both be
+`true`, with `critical_routes.missing` empty and `services_ready` true.
+This is separate from trained-model availability, crawler admission, native
+Windows binary verification, and first-install/playthrough acceptance.
+
 The installer does not silently install Docker or elevate privileges. Missing
 host dependencies fail closed with a remediation message. Setup writes only to
 the ignored local `.env` file; installer receipts contain key names and phase
@@ -138,8 +188,9 @@ Older installations with a missing, placeholder or invalid-length
 preflight requires a normalized token of 32–4096 characters, matching the
 engine client contract. Both services receive the same generated value from
 Compose. After explicitly rotating secrets, restart backend and engine together
-so their authentication values agree. Secret rotation also changes local Mongo
-credentials; existing databases require coordinated credential migration.
+so their authentication values agree. Generic secret rotation preserves local
+Mongo credentials, GameForge account signing and persistent seal/signing keys.
+Changing database credentials requires a coordinated authenticated migration.
 Keep the previous private environment backup for rollback; never attach it to
 diagnostic reports. Setup alone does not install trained AI weights or prove
 model readiness.
@@ -255,8 +306,9 @@ service names do not resolve in the browser. Production exports embed these
 public endpoints at build time, so rebuild the frontend after changing them;
 restarting an existing static image cannot change its bundle. Set
 `CORS_ORIGINS` to the explicit browser origin(s), including custom ports.
-A normal `app down` retains
-application and database volumes. Ordinary startup failures do not require
+A normal `app down` stops all declared profiles and retains their containers,
+writable layers and database volumes. It does not remove orphans. Direct Compose
+teardown is not protected by this app-owned behavior. Ordinary startup failures do not require
 deleting volumes or rotating secrets.
 
 ### Pre-compilation readiness
@@ -345,7 +397,7 @@ python -m skeleton app check --runtime
 python -m skeleton app up
 # app up waits for frontend + backend + engine readiness before success
 
-# Include optional Chroma
+# Full-profile startup is blocked until the persistence warning is resolved
 python -m skeleton app up --full
 
 # Inspect / operate
@@ -354,6 +406,7 @@ python -m skeleton app smoke
 python -m skeleton app logs backend
 python -m skeleton app logs -f
 python -m skeleton app config
+# Stops declared services while preserving containers and their writable layers
 python -m skeleton app down
 ```
 
@@ -422,7 +475,7 @@ identity is attached there as `canonical_application` while new clients use
 
 ## Frontend endpoint boundary
 
-`frontend/utils/apiBase.ts` is the single endpoint resolver for browser and
+`frontend/src/utils/apiBase.ts` is the single endpoint resolver for browser and
 native clients. Backend clients consume `API_BASE`; Skeleton-engine clients
 consume `SKELETON_API_BASE`.
 

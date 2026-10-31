@@ -12,6 +12,8 @@ Endpoints (prefix /api/camera):
   GET  /export/{pid}      — engine-ready camera config (JSON)
   POST /narrate/{pid}     — voiced walkthrough of the camera plan (real HD TTS)
 """
+
+from routes.playable_access import project_router, scoped_database
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
@@ -19,8 +21,9 @@ import os
 
 from core.databases import client as _MONGO
 
-router = APIRouter(prefix="/api/camera", tags=["camera-director"])
+router = project_router(prefix="/api/camera", tags=["camera-director"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 
 # Cinematic rig presets the director draws from — reference catalog for the UI.

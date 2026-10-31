@@ -5,8 +5,8 @@ const { load } = require('./harness.cjs');
 const S = load('src/foundation/strings.ts');
 const A = load('src/foundation/a11y.ts');
 const RN = { Platform: { select: (o) => o.default } };
-const themeTokens = load('theme/tokens.ts', { 'react-native': RN });
-const T = load('src/foundation/tokens.ts', { '../../theme/tokens': themeTokens });
+const themeTokens = load('src/theme/tokens.ts', { 'react-native': RN });
+const T = load('src/foundation/tokens.ts', { '../theme/tokens': themeTokens });
 
 test('t() returns en strings and interpolates params', () => {
   assert.equal(S.t('app.name'), 'Skeleton');
@@ -51,7 +51,7 @@ test('contrastRatio matches WCAG reference values', () => {
 test('foundation tokens alias the canonical palette and meet contrast', () => {
   const hex = new Set();
   const walk = (o) => Object.values(o).forEach(v => (typeof v === 'string' ? hex.add(v.toUpperCase()) : walk(v)));
-  walk(themeTokens.palette);
+  walk(themeTokens.default.palette);
   for (const [k, v] of Object.entries(T.color)) assert.ok(hex.has(v.toUpperCase()), k + ' not from palette');
   assert.ok(A.contrastRatio(T.color.text, T.color.bg) >= 7, 'text AAA on bg');
   assert.ok(A.contrastRatio(T.color.textMuted, T.color.bg) >= 4.5, 'muted AA on bg');

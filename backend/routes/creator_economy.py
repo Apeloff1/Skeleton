@@ -11,6 +11,8 @@ there is no true Stripe Connect payout or recurring subscription here. Instead:
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
+
 import os
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -21,8 +23,9 @@ from pydantic import BaseModel, Field
 from core.databases import client as _SHARED_MONGO_CLIENT
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
 
-router = APIRouter(prefix="/api", tags=["creator-economy"])
+router = project_router(prefix="/api", tags=["creator-economy"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "") or None
@@ -301,6 +304,7 @@ async def premium_checkout(body: PremiumCheckoutBody, request: Request):
 
 @router.get("/premium/status/session/{session_id}")
 async def premium_session_status(session_id: str, request: Request):
+    await reauthorize_project_context(mutate=True)
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn:
         return {"error": "unknown session"}

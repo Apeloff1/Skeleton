@@ -4,9 +4,11 @@ import asyncio
 import hashlib
 import json
 from dataclasses import replace
-from types import MethodType
+from types import MappingProxyType, MethodType
 
 import pytest
+
+from skeleton.testing.local_inference_fixtures import local_serving_resources  # noqa: F401
 
 from skeleton.ai.runtime.inference import LocalInferenceResult
 from skeleton.ai.runtime.training.cli import build_governed_artifact
@@ -202,6 +204,29 @@ def _evaluate(runner, sources, *, run_id="measured", suite=None, **kwargs):
 
 def _qualify(runner, receipt, sources):
     return runner.qualify(receipt, **dict(zip(("candidate", "baseline", "verifier"), sources)))
+
+
+def test_issued_immutable_weights_bind_without_exposing_mutable_authority():
+    registry = ModelDevelopmentRegistry()
+    source = _source(
+        registry,
+        "immutable-verifier",
+        (json.dumps({"answer": "right", "decision": "accept"}),),
+        _VoteTrainer(),
+    )
+    artifact = registry.artifact(source.model.model_digest)
+    assert isinstance(artifact.payload, MappingProxyType)
+    assert isinstance(artifact.payload["votes"], MappingProxyType)
+    source.assert_current()
+
+    exported = artifact.as_dict()["payload"]
+    exported["votes"]["right"]["accept"] = 99
+    assert artifact.payload["votes"]["right"]["accept"] == 1
+    source.assert_current()
+
+    source.model.votes["right"]["accept"] = 99
+    with pytest.raises(MeasuredVerifierError, match="does not match issued training receipt"):
+        source.assert_current()
 
 
 def test_actual_independent_verifier_qualifies_and_proposes_without_gold(tmp_path):

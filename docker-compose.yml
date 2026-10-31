@@ -60,15 +60,19 @@ services:
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
       - SKELETON_MASTER_SECRET=${SKELETON_MASTER_SECRET:?SKELETON_MASTER_SECRET must be initialized by Skeleton setup}
       # Runtime model selection is owned by the Skeleton engine process.
-      # Local mode requires an explicit trained artifact or pinned deployment.
+      # Local mode requires one artifact, deployment or multi-model catalog.
       # Empty paths keep AI unavailable while application services can boot.
       - AI_PROVIDER=${AI_PROVIDER:-local}
       - AI_MODEL=${AI_MODEL:-}
       - AI_LOCAL_MODEL_PATH=${AI_LOCAL_MODEL_PATH:-}
       - AI_LOCAL_DEPLOYMENT_PATH=${AI_LOCAL_DEPLOYMENT_PATH:-}
+      - AI_LOCAL_MODEL_CATALOG_PATH=${AI_LOCAL_MODEL_CATALOG_PATH:-}
       - AI_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-120}
       - AI_LOCAL_MODEL_CACHE_SIZE=${AI_LOCAL_MODEL_CACHE_SIZE:-128}
       - AI_LOCAL_MODEL_SEED=${AI_LOCAL_MODEL_SEED:-0}
+      - AI_LOCAL_MODEL_MAX_CONCURRENCY=${AI_LOCAL_MODEL_MAX_CONCURRENCY:-1}
+      - AI_LOCAL_MODEL_MAX_QUEUE_SIZE=${AI_LOCAL_MODEL_MAX_QUEUE_SIZE:-256}
+      - AI_LOCAL_MODEL_MAX_BATCH_SIZE=${AI_LOCAL_MODEL_MAX_BATCH_SIZE:-256}
       - AI_VERIFICATION_MODEL=${AI_VERIFICATION_MODEL:-}
       - AI_SECONDARY_API_KEY=${AI_SECONDARY_API_KEY:-}
       - AI_SECONDARY_BASE_URL=${AI_SECONDARY_BASE_URL:-}
@@ -116,6 +120,8 @@ services:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Explicit trusted browser origin; never build share links from Host headers.
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
       - DEBUG=${DEBUG:-false}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
@@ -125,6 +131,8 @@ services:
       - GAMEFORGE_SEED_ADMIN_EMAIL=${GAMEFORGE_SEED_ADMIN_EMAIL:-}
       - GAMEFORGE_SEED_ADMIN_PASSWORD=${GAMEFORGE_SEED_ADMIN_PASSWORD:-}
       - SKIP_HEAVY_SEED=${SKIP_HEAVY_SEED:-true}
+      # Durable build artifacts share the backend_data volume, never the 64MiB /tmp tmpfs.
+      - GALAXY_BUILDS_VAULT_DIR=/app/data/builds_vault
       - CURIOSITY_DATA_ROOT=/app/data/curiosity
       - CURIOSITY_IDLE_ENABLED=${CURIOSITY_IDLE_ENABLED:-false}
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
@@ -227,6 +235,11 @@ services:
     # This service has no auth boundary here, so never bind it publicly.
     ports:
       - "127.0.0.1:${CHROMA_PORT:-8000}:8000"
+    # IMPORTANT: The pinned image persists at /data. This legacy mount is
+    # deliberately retained until existing containers' /data has been exported,
+    # verified and restored to chroma_data. Never recreate an existing Chroma
+    # container to apply a mount correction without that migration.
+    # See docs/APP_ASSEMBLY.md for the data-recovery hold.
     volumes:
       - chroma_data:/chroma/chroma
     environment:

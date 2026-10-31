@@ -229,6 +229,25 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
 
+
+def test_windows_payload_includes_chroma_recovery_and_local_ai_guides():
+    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    paths = source.split("$RuntimePaths = @(\n", 1)[1].split(") + @($SourceManifest.required_paths)", 1)[0]
+    assert '"docs/APP_ASSEMBLY.md"' in paths
+    assert '"docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md"' in paths
+    assert '"docs/ai/LOCAL_CODING_PROFILE.md"' in paths
+
+
+def test_windows_installer_workflow_is_manual_and_read_only():
+    source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    triggers = source.split("\npermissions:", 1)[0]
+    assert "workflow_dispatch:" in triggers
+    assert "pull_request:" not in triggers and "push:" not in triggers
+    assert "pull_request_target:" not in source
+    assert "permissions:\n  contents: read\n" in source
+    artifact = source.split("      - name: Upload Windows installer\n", 1)[1]
+    assert "if: always()" not in artifact
+
 def test_windows_installer_packages_jeeves_curriculum_and_mirror_routes():
     workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
     launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
@@ -440,6 +459,25 @@ def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
     assert not success
     assert "exit 5" in detail
     assert secret not in detail
+
+
+def test_windows_stop_preserves_containers_and_chroma_writable_data(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    calls = []
+    monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+
+    def runner(command, **kwargs):
+        calls.append((command, kwargs["env"]))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(launcher, "_hidden_runner", runner)
+    ok, detail = launcher.stop_runtime(tmp_path)
+    assert ok and "stopped" in detail.lower()
+    assert len(calls) == 1 and calls[0][0][-1] == "stop"
+    assert "--profile" in calls[0][0] and "full" in calls[0][0]
+    assert "down" not in calls[0][0] and "--remove-orphans" not in calls[0][0]
+    assert calls[0][1]["COMPOSE_REMOVE_ORPHANS"] == "0"
 
 def test_disk_preflight_fails_closed_when_installation_drive_disappears(tmp_path, monkeypatch):
     monkeypatch.setattr("skeleton.app.preloader.preflight", lambda *args, **kwargs: ())

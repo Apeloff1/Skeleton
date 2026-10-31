@@ -22,6 +22,18 @@ export function classifyBuildJob(result: unknown): BuildJobPhase {
     ? response.data as Record<string, unknown> : response;
   const raw = data.job_status ?? data.status ?? data.state;
   const state = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (data.execution !== undefined) {
+    if (!data.execution || typeof data.execution !== 'object' || Array.isArray(data.execution)) return 'pending';
+    const execution = data.execution as Record<string, unknown>;
+    if (['runner_live', 'stop_requested', 'drain_pending', 'partial_artifacts', 'storage_failed'].some(key => typeof execution[key] !== 'boolean')
+      || !Number.isSafeInteger(execution.physical_workers) || Number(execution.physical_workers) < 0
+      || !Number.isSafeInteger(execution.unflushed_files) || Number(execution.unflushed_files) < 0) return 'pending';
+    // A terminal label cannot release observation while physical work remains.
+    if (execution.runner_live || Number(execution.physical_workers) > 0 || execution.drain_pending) return 'pending';
+    // partial_artifacts reports retained artifact presence, including a
+    // successful vault. Stop, write failure and pending flushes block success.
+    if (SUCCESS.has(state) && (execution.stop_requested || execution.storage_failed || Number(execution.unflushed_files) > 0)) return 'pending';
+  }
   if (CANCELLED.has(state)) return 'cancelled';
   if (FAILURE.has(state)) return 'failed';
   if (SUCCESS.has(state)) return data.ok === false || data.error ? 'failed' : 'completed';

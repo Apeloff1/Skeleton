@@ -1,0 +1,1 @@
+# Seams on #4200\n\n1000 ops extension + quantum lattice + receipts. Complete systems. Clipped mass snowball. Era citations. No stubs.

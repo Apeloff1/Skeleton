@@ -66,7 +66,9 @@ def test_b011_plan_projects_to_queryable_typed_graph() -> None:
     assert graph.revision == plan.revision
     assert graph.source_plan_digest == plan.digest()
     assert graph.node_map()["n_world"].kind == "world"
-    assert graph.node_map()["n_stealth"].kind == "mechanic"
+    # The source B011 manifest declares this as a system; graph projection
+    # must not silently invent a different type during canonical conversion.
+    assert graph.node_map()["n_stealth"].kind == "system"
 
     dependencies = graph.outgoing("n_stealth", kind="depends_on")
     assert tuple(edge.target for edge in dependencies) == ("n_world",)

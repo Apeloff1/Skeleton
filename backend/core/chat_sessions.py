@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from core.conversations import ConversationConflict, conversation_authority
 from core.engine_client import EngineExecutionCommand, EngineProtocolError
+from core.loop_local_asyncio import LoopLocalAsyncPrimitive
 from skeleton.context.sources import conversation_message_segment
 
 PREPARED_SCHEMA = "backend.ai.chat-execution.v1"
@@ -24,7 +25,7 @@ MAX_PREPARED_BYTES = 2 * 1024 * 1024
 
 
 _indexes_ready = False
-_index_lock = asyncio.Lock()
+_index_lock = LoopLocalAsyncPrimitive(asyncio.Lock)
 
 
 async def initialize_chat_runtime():
@@ -32,7 +33,7 @@ async def initialize_chat_runtime():
     global _indexes_ready
     if _indexes_ready:
         return
-    async with _index_lock:
+    async with _index_lock.get():
         if not _indexes_ready:
             from core.chat_turns import chat_turn_authority
 
@@ -55,6 +56,60 @@ def canonical_bytes(value: object) -> bytes:
 
 def digest(value: object) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
+
+
+def cooperation_result_projection(result, *, policy, source_snapshot, expected_brief_digest=None):
+    """Expose only canonical, receipt-bound public review progress metadata."""
+
+    if policy is None:
+        return None
+    from skeleton.intelligence.cooperation import validate_cooperation_summary
+
+    try:
+        return validate_cooperation_summary(
+            result.usage.get("cooperation"),
+            policy,
+            source_snapshot,
+            result.provider_receipts,
+            expected_brief_digest=expected_brief_digest,
+        )
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise EngineProtocolError("canonical cooperation result evidence is invalid") from exc
+
+
+def cooperation_progress_projection(status, *, command):
+    """Read real engine checkpoint progress without creating another journal."""
+
+    if command is None or status.get("cooperation") is None:
+        return None
+    policy = command.execution_request.context_policy.get("cooperation")
+    if policy is None:
+        raise EngineProtocolError("engine returned unrequested cooperation progress")
+    if (
+        status.get("operation_id") != command.operation.operation_id
+        or status.get("execution_id") != command.execution_request.execution_id
+    ):
+        raise EngineProtocolError("engine cooperation progress belongs to a different execution")
+    receipts = status.get("provider_receipts")
+    if (
+        not isinstance(receipts, list)
+        or len(receipts) > 64
+        or any(not isinstance(ref, str) or not ref or len(ref) > 2048 for ref in receipts)
+    ):
+        raise EngineProtocolError("engine cooperation progress receipts are invalid")
+    from skeleton.intelligence.cooperation import validate_cooperation_summary
+
+    try:
+        return validate_cooperation_summary(
+            status["cooperation"],
+            policy,
+            command.compiled_context.source_snapshot,
+            receipts,
+            require_complete=False,
+            expected_brief_digest=command.execution_request.context_policy.get("cooperation_brief_digest"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise EngineProtocolError("canonical cooperation progress evidence is invalid") from exc
 
 
 def prepare_metadata(
@@ -130,17 +185,46 @@ def checked_command(
 
 
 async def read_prepared(
-    *, thread, user_message, tenant_id: str, owner_id: str, expected_request_digest: str | None = None
+    *,
+    thread,
+    user_message,
+    tenant_id: str,
+    owner_id: str,
+    expected_request_digest: str | None = None,
+    authority: Any | None = None,
 ):
-    refs = await conversation_authority.user_request_refs(
-        thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
-    )
+    """Read the frozen command from the same canonical conversation owner.
+
+    In production the default and the route authority are identical. Passing
+    the admission owner explicitly preserves that invariant in isolated
+    recovery, deterministic SQLite fixtures and alternate deployments; never
+    silently switch to a different database for a prepared turn.
+    """
+    owner = conversation_authority if authority is None else authority
+    refs_lookup = getattr(owner, "user_request_refs", None)
+    if refs_lookup is None:
+        # Persisted user request refs are authoritative only when storage
+        # supports that separate collection. SQLite reference repositories
+        # persist them immutably on the canonical message itself.
+        refs = tuple(user_message.attachment_refs or ())
+    else:
+        refs = await refs_lookup(
+            thread.thread_id,
+            user_message.message_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
     if refs != user_message.attachment_refs:
         from dataclasses import replace
 
         user_message = replace(user_message, attachment_refs=refs)
-    metadata = await conversation_authority.chat_execution(
-        thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
+    execution_lookup = getattr(owner, "chat_execution", None)
+    metadata = (
+        await execution_lookup(
+            thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
+        )
+        if execution_lookup is not None
+        else None
     )
     if metadata is None:
         if "chat-prepared-execution:v1" in user_message.attachment_refs:
@@ -364,7 +448,11 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
     return tuple(segments), dependencies
 
 
-async def assert_current_dependencies(metadata, *, user, tenant_id, owner_id):
+async def assert_current_dependencies(
+    metadata, *, user, tenant_id, owner_id, authority: Any | None = None
+):
+    """Revalidate pinned sources through the admission owner's conversation scope."""
+    owner = conversation_authority if authority is None else authority
     from fastapi import HTTPException
     from core.canonical_memory import canonical_memory_repository
 
@@ -444,10 +532,10 @@ async def assert_current_dependencies(metadata, *, user, tenant_id, owner_id):
                 or len(pin["query"]) > 512
             ):
                 raise ValueError("Dragon binding schema differs")
-            thread = await conversation_authority.get_thread(
+            thread = await owner.get_thread(
                 pin["thread_id"], tenant_id=tenant_id, owner_id=owner_id
             )
-            current = await conversation_authority.dragon_context_segments(thread, pin["query"])
+            current = await owner.dragon_context_segments(thread, pin["query"])
             if (pin["source_id"], pin["content_digest"]) not in {
                 (segment.source_id, segment.content_digest) for segment in current
             }:
@@ -484,8 +572,10 @@ async def inherit_history_dependencies(
     tenant_id,
     owner_id,
     current_message=None,
+    authority: Any | None = None,
 ):
     """Preserve causal source obligations through newly selected chat history."""
+    owner = conversation_authority if authority is None else authority
     selected_ids = {
         segment.source_id for segment in selected_segments if segment.source_type == "conversation"
     }
@@ -571,7 +661,7 @@ async def inherit_history_dependencies(
             raise ConversationConflict(
                 "selected context exceeds its causal source bound; start a fresh conversation"
             )
-    inherited = await conversation_authority.chat_history_dependencies(
+    inherited = await owner.chat_history_dependencies(
         thread.thread_id, causal_ids, tenant_id=tenant_id, owner_id=owner_id
     )
     checked_dependencies = []
@@ -633,7 +723,7 @@ async def inherit_history_dependencies(
                 )
             unknown = snapshots - known
             if unknown:
-                current_dragon = await conversation_authority.dragon_context_segments(
+                current_dragon = await owner.dragon_context_segments(
                     thread, message.content or ""
                 )
                 for segment in current_dragon:

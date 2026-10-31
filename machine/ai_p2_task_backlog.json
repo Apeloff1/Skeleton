@@ -32,7 +32,8 @@
         "tests/flgb/test_masterplan_closure.py",
         "git-head:ccc03953bd1261087df6e54054dfa525baa41dba"
       ],
-      "masterplan_obligations": []
+      "masterplan_obligations": [],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-ARCH-01",
@@ -470,7 +471,8 @@
             "planned:waiver expiry audit"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-TRACE-01",
@@ -896,7 +898,8 @@
             "planned:delay/reorder protocol faults"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-REPO-01",
@@ -1354,7 +1357,8 @@
             "planned:stale-signoff invalidation evaluation"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-QUAL-01",
@@ -1542,7 +1546,8 @@
             "planned:compound-fault final campaign"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-DOC-01",
@@ -1640,7 +1645,8 @@
             "skeleton/testing/test_vol089_090_documentation_engine.py"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-NATIVE-01",
@@ -1775,7 +1781,8 @@
             ".github/workflows/vol033-jvm-protocol.yml"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-T1-DATA-01",
@@ -1964,7 +1971,8 @@
             "planned:crash-between-state-and-publish drill"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-T1-SEC-01",
@@ -2222,7 +2230,8 @@
             "planned:cross-tenant red-team campaign"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-T1-INFER-01",
@@ -2314,7 +2323,8 @@
             "scripts/verify_vol007_inference.py"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-T1-RECOVERY-01",
@@ -2419,7 +2429,8 @@
             "skeleton/testing/test_vs000_foundation_recovery.py"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P2-T1-FUNCTIONAL-01",
@@ -2529,7 +2540,8 @@
             "skeleton/testing/test_functional_ai_acceptance.py"
           ]
         }
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     }
   ],
   "summary": {

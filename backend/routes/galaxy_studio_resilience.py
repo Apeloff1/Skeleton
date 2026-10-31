@@ -10,16 +10,16 @@
 ║                                                                            ║
 ║  When the process RSS crosses GALAXY_RSS_SOFT_MB we sleep between batches  ║
 ║  to let GC / disk flush reclaim memory. When it crosses GALAXY_RSS_HARD_MB ║
-║  the caller flushes to vault + freezes heavy file generation (writes only  ║
-║  a metadata stub) so a small prod pod completes the build without an OOM   ║
-║  kill. All limits are env-configurable per-pod.                            ║
+║  the caller stops dispatch and retains partial artifacts. A resource      ║
+║  limit never substitutes a metadata stub for completed generation.        ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
+
 import os
 
 # ═══ Memory thresholds (env-tunable per pod) ═══
 #   GALAXY_RSS_SOFT_MB   default 600   — pause briefly between batches
-#   GALAXY_RSS_HARD_MB   default 850   — flush + freeze generation, skip remaining
+#   GALAXY_RSS_HARD_MB   default 850   — stop further generation
 #   GALAXY_WATCHDOG      default on    — set to "off" to disable entirely
 #   GALAXY_RSS_AUTOCAL   default on    — self-calibrate limits from the cgroup
 #                                        memory ceiling (see below)
@@ -35,8 +35,7 @@ def _read_cgroup_limit_mb():
     kernels report 2^63 for "no limit"). This makes the watchdog portable:
     the same image self-tunes on a 512 MB pod and on an 8 GB pod.
     """
-    for path in ("/sys/fs/cgroup/memory.max",
-                 "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+    for path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
         try:
             with open(path) as f:
                 raw = f.read().strip()
@@ -54,8 +53,8 @@ def _read_cgroup_limit_mb():
 # A prior tuning hard-coded SOFT=315 / HARD=450 MB for a tiny pod. The pod now
 # has an 8 GB cgroup ceiling, so freezing at 450 MB throttled every build down
 # to ~1 file. We now derive pod-appropriate limits from the cgroup ceiling and
-# take max(env_floor, calibrated) — so the stale env values can only RAISE
-# safety, never cripple a large pod, while a small pod still auto-shrinks.
+# keep the large-pod caps while clamping smaller pods below their actual
+# ceiling. An environment floor must not raise a 512 MiB pod to 850 MiB.
 _AUTOCAL = os.environ.get("GALAXY_RSS_AUTOCAL", "on").lower() not in ("off", "0", "false", "no")
 _CGROUP_LIMIT_MB = _read_cgroup_limit_mb()
 if _AUTOCAL and _CGROUP_LIMIT_MB:
@@ -64,12 +63,18 @@ if _AUTOCAL and _CGROUP_LIMIT_MB:
     # loop (slow /api/health) and risks thrash. Files stream to the vault, so a
     # ~1.2/2.0 GB working buffer already sustains 20k+ file builds while keeping
     # the process responsive. Small pods scale down via the %s.
-    _cal_soft = min(int(_CGROUP_LIMIT_MB * 0.30), 1200)   # pause + flush
-    _cal_hard = min(int(_CGROUP_LIMIT_MB * 0.45), 2000)   # freeze generation
-    _RSS_SOFT_MB = max(_RSS_SOFT_MB, _cal_soft)
-    _RSS_HARD_MB = max(_RSS_HARD_MB, _cal_hard)
-    print(f"[GALAXY watchdog] auto-calibrated to cgroup={_CGROUP_LIMIT_MB:.0f}MB "
-          f"→ SOFT={_RSS_SOFT_MB}MB HARD={_RSS_HARD_MB}MB")
+    _cal_soft = min(int(_CGROUP_LIMIT_MB * 0.30), 1200)
+    _cal_hard = min(int(_CGROUP_LIMIT_MB * 0.45), 2000)
+    # Reserve at least 20% for Python overhead, native buffers and the API.
+    # The calibrated working limits are intentionally stricter than this
+    # final ceiling. Explicit AUTOCAL=off retains operator-supplied limits.
+    _ceiling_hard = max(2, int(_CGROUP_LIMIT_MB * 0.80))
+    _RSS_HARD_MB = min(max(_RSS_HARD_MB, _cal_hard), 2000, _ceiling_hard)
+    _RSS_SOFT_MB = min(max(_RSS_SOFT_MB, _cal_soft), 1200, max(1, int(_RSS_HARD_MB * 0.75)))
+    print(
+        f"[GALAXY watchdog] auto-calibrated to cgroup={_CGROUP_LIMIT_MB:.0f}MB "
+        f"→ SOFT={_RSS_SOFT_MB}MB HARD={_RSS_HARD_MB}MB"
+    )
 
 # ═══ Worker cooldown (stagger) ═══
 # Sleep between successive batch submissions so GC + malloc_trim can reclaim
@@ -82,6 +87,7 @@ def _malloc_trim() -> None:
     """Force glibc to return freed heap to the OS. No-op on non-Linux or musl."""
     try:
         import ctypes
+
         libc = ctypes.CDLL("libc.so.6")
         libc.malloc_trim(0)
     except Exception:
@@ -90,6 +96,7 @@ def _malloc_trim() -> None:
 
 try:
     import resource as _resource  # stdlib, Linux/macOS
+
     _RSS_PROC_STATUS = "/proc/self/status"
     _HAS_PROC_STATUS = os.path.exists(_RSS_PROC_STATUS)
 
@@ -114,7 +121,9 @@ try:
             return kb / 1024
         except Exception:
             return 0.0
+
 except Exception:
+
     def _get_rss_mb() -> float:
         return 0.0
 
@@ -127,6 +136,7 @@ def _worker_cooldown(context: str = "") -> None:
     if _WORKER_COOLDOWN_MS <= 0 and not _WATCHDOG_ON:
         return
     import gc, time as _t
+
     gc.collect()
     _malloc_trim()
     base = max(0, _WORKER_COOLDOWN_MS) / 1000.0
@@ -138,7 +148,9 @@ def _worker_cooldown(context: str = "") -> None:
             overshoot_ratio = min(2.0, (rss - _RSS_SOFT_MB) / max(1, _RSS_HARD_MB - _RSS_SOFT_MB))
             base += 0.5 + 1.5 * overshoot_ratio  # up to +2s additional
             if context:
-                print(f"[GALAXY cooldown] {context} RSS={rss:.0f}MB over soft {_RSS_SOFT_MB}MB → extended sleep {base:.2f}s")
+                print(
+                    f"[GALAXY cooldown] {context} RSS={rss:.0f}MB over soft {_RSS_SOFT_MB}MB → extended sleep {base:.2f}s"
+                )
     except Exception:
         pass
     if base > 0:
@@ -152,15 +164,21 @@ def _memory_check(context: str = "batch") -> str:
     rss = _get_rss_mb()
     if rss >= _RSS_HARD_MB:
         import gc
+
         gc.collect()
         rss_after = _get_rss_mb()
         if rss_after >= _RSS_HARD_MB:
-            print(f"[GALAXY watchdog] HARD limit hit in {context}: RSS={rss_after:.0f}MB >= {_RSS_HARD_MB}MB — freezing further file generation")
+            print(
+                f"[GALAXY watchdog] HARD limit hit in {context}: RSS={rss_after:.0f}MB >= {_RSS_HARD_MB}MB — freezing further file generation"
+            )
             return "hard"
         rss = rss_after
     if rss >= _RSS_SOFT_MB:
         import time as _t
-        print(f"[GALAXY watchdog] SOFT limit in {context}: RSS={rss:.0f}MB >= {_RSS_SOFT_MB}MB — pausing 0.5s for GC")
+
+        print(
+            f"[GALAXY watchdog] SOFT limit in {context}: RSS={rss:.0f}MB >= {_RSS_SOFT_MB}MB — pausing 0.5s for GC"
+        )
         _t.sleep(0.5)
         return "soft"
     return "ok"

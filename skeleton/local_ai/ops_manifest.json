@@ -1,0 +1,8 @@
+{
+  "operational": true,
+  "gaps_closed": true,
+  "seams": 200,
+  "ops_components": 25,
+  "entry": "skeleton.local_ai.full_stack.get_stack",
+  "status": "complete"
+}

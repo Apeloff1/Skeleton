@@ -1,15 +1,15 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 // Item Foundry — every agent forges a full item (skin + code + placement) folded into gamefiles.
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 import SnowballSpine, { SpineStage } from '../src/components/SnowballSpine';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const Construct3DView = lazyDefault(() => import('../src/components/Construct3DView'));
-const GalaxyStudioFactoryModal = lazyDefault(() => import('../features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
+const GalaxyStudioFactoryModal = lazyDefault(() => import('../src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
 
 const API_URL = CANONICAL_API_BASE || '';
 const T = { bg: '#0A0A0A', card: '#141414', border: '#1F2937', accent: '#7C9CFF', accent2: '#A78BFA',

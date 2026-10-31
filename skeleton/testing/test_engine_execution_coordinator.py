@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import pytest
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
     EngineAuthorityRegistry,
@@ -42,7 +44,9 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+    # The coordinator executes against its real clock, so requests must start
+    # inside their own bounded wall budget instead of a historical test date.
+    return datetime.now(timezone.utc)
 
 
 def test_engine_tool_runtime_factory_preserves_canonical_dependencies(tmp_path) -> None:
@@ -124,6 +128,12 @@ class FakeRegistry:
 
             raise ProviderUnavailableError("not configured")
         return self.provider
+
+    def require_for_context(self, _context_policy):
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        return ()
 
 
 def _bundle(*, execution_id: str = "exec-golden"):
@@ -342,7 +352,7 @@ async def test_coordinator_golden_trace_preserves_compiled_context_lineage(
     await coordinator.ensure_started(command)
     result = await _wait_result(service, command.execution_request.execution_id)
 
-    assert result.status == "completed"
+    assert result.status == "completed", result.usage.get("error_code")
     assert result.final_output == "engine answer"
     assert result.verification_receipt["outcome"] == "passed"
     assert len(provider.requests) == 1
@@ -944,3 +954,148 @@ async def test_coordinator_rehydrates_execution_admission_after_local_restart(
         == first_lease.quota_reservation.reservation_id
     )
     assert ledger.snapshot("tenant-a")["active_reservations"] == 1
+
+
+@pytest.mark.asyncio
+async def test_shutdown_keeps_control_presence_until_failed_local_owner_drains(tmp_path, monkeypatch) -> None:
+    from skeleton.api.engine_runtime import EngineExecutionCoordinatorError
+
+    service = _service(tmp_path)
+    registry = FakeRegistry(FakeProvider())
+    close_attempts = []
+
+    class ServingOwner:
+        async def close(self):
+            close_attempts.append(True)
+            if len(close_attempts) == 1:
+                raise RuntimeError("native drain unconfirmed")
+
+    owner = ServingOwner()
+    registry.runtime_serving_engines = lambda: (owner,)
+    coordinator = EngineExecutionCoordinator(service, provider_registry=registry)
+    control_closes = []
+    original_close = coordinator.runtime_control.close
+
+    def close_control():
+        control_closes.append(True)
+        original_close()
+
+    monkeypatch.setattr(coordinator.runtime_control, "close", close_control)
+    try:
+        with pytest.raises(EngineExecutionCoordinatorError, match="physical drain"):
+            await coordinator.shutdown()
+        assert not coordinator.physical_shutdown_complete
+        assert not control_closes
+        assert not coordinator.runtime_control._closed
+        coordinator._database_owner.require_current()
+        # A retry may retain the original supervision fault while it safely
+        # closes the owners; AppState can then retire the drained resources.
+        with pytest.raises(EngineExecutionCoordinatorError):
+            await coordinator.shutdown()
+        assert coordinator.physical_shutdown_complete
+        assert len(close_attempts) == 2
+        assert control_closes == [True]
+    finally:
+        if not coordinator.physical_shutdown_complete:
+            try:
+                await coordinator.shutdown()
+            except EngineExecutionCoordinatorError:
+                pass
+        service.repository.close()
+        service.submissions.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pending_owner", [False, True])
+async def test_shutdown_retries_exact_lifecycle_release_custody(tmp_path, monkeypatch, pending_owner) -> None:
+    from skeleton.api.engine_runtime import EngineExecutionCoordinatorError
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle, RuntimeSupervisionError
+
+    service = _service(tmp_path)
+    lifecycle = RuntimeServiceLifecycle("lease-retry")
+    lifecycle.mark_ready()
+    registry = FakeRegistry(FakeProvider())
+    registry.runtime_serving_engines = lambda: ()
+    coordinator = EngineExecutionCoordinator(service, provider_registry=registry, lifecycle=lifecycle)
+    task = asyncio.create_task(asyncio.sleep(0))
+    await task
+    lease = lifecycle.acquire_work("retained-maintenance" if pending_owner else "retained-execution")
+    if pending_owner:
+        coordinator._pending_lifecycle_leases[lease.work_id] = lease
+    else:
+        coordinator._lifecycle_leases[task] = lease
+    release_attempts = []
+    original_release = lifecycle.release_work
+
+    def release_work(actual):
+        assert actual is lease
+        release_attempts.append(True)
+        if len(release_attempts) == 1:
+            raise RuntimeSupervisionError("temporary exact lease release failure")
+        return original_release(actual)
+
+    monkeypatch.setattr(lifecycle, "release_work", release_work)
+    try:
+        if pending_owner:
+            coordinator._release_pending_lifecycle_lease(lease)
+            assert coordinator._pending_lifecycle_leases[lease.work_id] is lease
+        else:
+            coordinator._release_lifecycle_lease(task)
+            assert coordinator._lifecycle_leases[task] is lease
+        assert lifecycle.active_work() == (lease,)
+        with pytest.raises(EngineExecutionCoordinatorError, match="lease release"):
+            await coordinator.shutdown()
+        assert coordinator.physical_shutdown_complete
+        assert not coordinator._lifecycle_leases
+        assert not coordinator._pending_lifecycle_leases
+        assert lifecycle.active_work() == ()
+        assert len(release_attempts) == 2
+    finally:
+        if not coordinator.physical_shutdown_complete:
+            try:
+                await coordinator.shutdown()
+            except EngineExecutionCoordinatorError:
+                pass
+        service.repository.close()
+        service.submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_app_state_keeps_unconfirmed_engine_and_dependency_handles_for_retry() -> None:
+    from types import SimpleNamespace
+    from skeleton.api.server import ServerState
+
+    closes = []
+
+    class Coordinator:
+        shutdown_started = False
+        physical_shutdown_complete = False
+
+        async def shutdown(self):
+            self.shutdown_started = True
+            if not self.physical_shutdown_complete:
+                raise RuntimeError("native worker still owned")
+
+    state = ServerState()
+    coordinator = Coordinator()
+    repository = SimpleNamespace(close=lambda: closes.append("repository"))
+    submissions = SimpleNamespace(close=lambda: closes.append("submissions"))
+    service = SimpleNamespace(repository=repository, submissions=submissions)
+    writer = object()
+    state.engine_execution_coordinator = coordinator
+    state.engine_execution_service = service
+    state.canonical_memory_writer = writer
+    with pytest.raises(RuntimeError, match="physical drain"):
+        await state.close_engine_execution_service()
+    assert state.engine_execution_coordinator is coordinator
+    assert state.engine_execution_service is service
+    assert state.canonical_memory_writer is writer
+    assert not closes
+    with pytest.raises(RuntimeError, match="shutdown must finish"):
+        state.bind_engine_execution_service()
+    coordinator.physical_shutdown_complete = True
+    await state.close_engine_execution_service()
+    assert closes == ["repository", "submissions"]
+    assert state.engine_execution_coordinator is None
+    assert state.engine_execution_service is None
+    assert not state._engine_shutdown_pending

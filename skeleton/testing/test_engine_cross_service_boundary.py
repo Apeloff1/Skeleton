@@ -21,7 +21,9 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import (
     FinishReason,
     ProviderResponse,
+    ProviderUnavailableError,
     ProviderUsage,
+    provider_context_selection,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -73,11 +75,51 @@ class _Provider:
 
 
 class _Registry:
+    active_id = "fake"
+    available = True
+
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
     def require_active(self):
         return self.provider
+
+    def require_for_context(self, context_policy):
+        # Mirror the engine's sealed exact provider/model selection without
+        # silently accepting an unknown provider or cross-model override.
+        selection = provider_context_selection(context_policy)
+        if selection is not None and (
+            selection["provider_id"], selection["model_id"]
+        ) != (self.provider.provider_id, self.provider.model):
+            raise ProviderUnavailableError("fixture model selection is unavailable")
+        return self.provider
+
+    def runtime_serving_engines(self) -> tuple[()]:
+        # This fixture represents a hosted adapter, with no local serving
+        # engine to close during coordinator shutdown.
+        return ()
+
+    def statuses(self) -> list[dict[str, object]]:
+        # Match the authenticated, model-specific engine inventory contract.
+        # A require_active-only test double hides real cross-service custody.
+        return [{
+            "id": self.active_id,
+            "model": self.provider.model,
+            "available": self.provider.available,
+            "active": True,
+            "fallback": False,
+            "configured": True,
+            "architecture_acknowledged": True,
+            "execution_mode": "hosted",
+            "credential_free": False,
+            "context_window": 128_000,
+            "max_output_tokens": 8_192,
+            "default_output_tokens": 512,
+            "limits_source": "engine_chat_policy",
+            "tokenizer": "approximate_text",
+            "capabilities": ["text-generation"],
+            "supports_temperature": True,
+        }]
 
 
 def _service(tmp_path, *, tenant_ids=frozenset({"tenant-a"}), scopes=None):
@@ -238,7 +280,9 @@ async def test_cross_service_tenant_and_scope_denial_never_reach_provider(tmp_pa
     )
     tenant_client = _client(_app(tenant_service, tenant_coordinator))
 
-    with pytest.raises(EngineTextError, match="canonical engine text execution failed"):
+    # The tenant-scoped inventory blocks unauthorized model selection before
+    # execution admission; a missing submit scope is checked separately below.
+    with pytest.raises(EngineTextError, match="canonical model selection or context settings are unavailable"):
         await execute_engine_text(
             _request(tenant_id="tenant-b", key="tenant-denied"),
             client=tenant_client,

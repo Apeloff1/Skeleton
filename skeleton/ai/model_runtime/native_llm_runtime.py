@@ -724,6 +724,7 @@ class NativeLLMRuntime:
                     temperature=config.temperature,
                     top_k=config.top_k,
                     top_p=config.top_p,
+                    min_p=config.min_p,
                 )
             )
             if not 0 <= next_id < self.tokenizer.vocab_size:

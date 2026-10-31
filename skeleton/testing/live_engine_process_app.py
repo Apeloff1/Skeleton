@@ -98,12 +98,20 @@ class _DeterministicProvider:
             ),
         ]
 
-    async def generate(self, _request):
+    async def generate(self, request):
         if not self._responses:
             raise AssertionError(
                 "deterministic container provider received an extra turn"
             )
-        return self._responses.pop(0)
+        from dataclasses import replace
+
+        return replace(
+            self._responses.pop(0),
+            context_id=request.context_id,
+            context_digest=request.context_digest,
+            context_source_snapshot=request.context_source_snapshot,
+            context_compiler_version=request.context_compiler_version,
+        )
 
 
 class _DeterministicRegistry:
@@ -112,6 +120,23 @@ class _DeterministicRegistry:
 
     def require_active(self):
         return self._provider
+
+    def require_for_context(self, context_policy):
+        """Match the production selection API for this single-provider harness.
+
+        An explicit provider switch is not supported by the fixture and must
+        never fall back silently to the injected provider.
+        """
+        if context_policy.get("provider_selection"):
+            raise AssertionError("the test registry cannot select an alternate provider")
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        # The harness injects a hosted deterministic fake, not a local engine.
+        return ()
+
+    def runtime_serving_routes(self):
+        return ()
 
 
 def _verification(_request, candidate, _context_digest):

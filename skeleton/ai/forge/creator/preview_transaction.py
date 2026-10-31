@@ -796,7 +796,26 @@ def validate_preview_outcome(
         _fail("preview outcome belongs to another transaction", reason="transaction_mismatch")
     if outcome.status not in {"committed", "rolled_back"}:
         _fail("preview outcome has invalid status", reason="outcome_status")
-    if not outcome.steps or len(outcome.steps) > len(EXECUTION_PHASES):
+    # A failed begin can raise or violate its contract before it produces a
+    # receipt. Preserve that empty execution prefix; rollback still has to
+    # prove restoration below, and committed outcomes still require all phases.
+    empty_begin_failure = (
+        outcome.status == "rolled_back"
+        and outcome.failure_phase == "begin"
+        and isinstance(outcome.failure_reason, str)
+        and (
+            outcome.failure_reason == "backend_contract"
+            or (
+                outcome.failure_reason.startswith("backend_exception:")
+                and len(outcome.failure_reason) > len("backend_exception:")
+            )
+        )
+    )
+    if (
+        not isinstance(outcome.steps, tuple)
+        or len(outcome.steps) > len(EXECUTION_PHASES)
+        or (not outcome.steps and not empty_begin_failure)
+    ):
         _fail("preview outcome has invalid execution evidence", reason="outcome_evidence")
 
     expected_phases = EXECUTION_PHASES[: len(outcome.steps)]

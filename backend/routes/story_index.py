@@ -9,6 +9,8 @@ bounded projections over the current user's project and a single story branch.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 from datetime import datetime, timezone
 from hashlib import sha256
 import logging
@@ -27,7 +29,7 @@ from routes.gameforge_auth import require_role
 from routes.playable import _db
 
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["Jeeves story continuity"])
+router = project_router(tags=["Jeeves story continuity"])
 _ID_PATTERN = r"^[A-Za-z0-9:_-]{1,96}$"
 _GAME_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 

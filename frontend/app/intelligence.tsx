@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /intelligence — Code Intelligence
  * Auto-document, generate-tests, predict-bugs, analyze-architecture, etc.
@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouteHistory } from '../utils/routeHistory';
-import { shareResult, copyToClipboard } from '../utils/shareResult';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
+import { useRouteHistory } from '../src/utils/routeHistory';
+import { shareResult, copyToClipboard } from '../src/utils/shareResult';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const LANGS = ['python','javascript','typescript','rust','go','java','cpp','c'];

@@ -1,0 +1,200 @@
+{
+  "schema": "skeleton.studio_cooperation.operator_qualification.v1",
+  "recorded_at": "2026-10-18T04:46:51.677714+00:00",
+  "source_base_commit": "f511c704ec07816697a9df34c5fc622c02565b21",
+  "working_tree_source_pins": [
+    {
+      "path": "skeleton/ai/game_builder/studio_role_triad.py",
+      "bytes": 30158,
+      "sha256": "2f8c2f7a81193e725a76a69fc93ff6e978197cefd32398061b7e0c1cf2c8e3ef"
+    },
+    {
+      "path": "skeleton/ai/game_builder/jeeves_app_runtime.py",
+      "bytes": 59253,
+      "sha256": "287fa82f3fdbf7112773aaef7f44e2b9490ac755843d2783bd77ee322a64ec2d"
+    },
+    {
+      "path": "skeleton/ai/game_builder/jeeves_appwide_fabric.py",
+      "bytes": 36429,
+      "sha256": "d146cfd636c5fd7b4bc3f813e7a39fd508dd5ebac90c2a739f4bdfec51911d05"
+    },
+    {
+      "path": "skeleton/ai/game_builder/game_workspace_server.py",
+      "bytes": 41668,
+      "sha256": "d28992ba508efefaaee7e7ea3d004a8734fd961735343164859da3fff75691d2"
+    },
+    {
+      "path": "skeleton/ai/game_builder/game_workspace_ui.py",
+      "bytes": 181803,
+      "sha256": "576206c160358f84777e68226b7a0b82ddf65095e985292312d19a9d5863bbd9"
+    }
+  ],
+  "capability_catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+  "scope": "actual loopback browser/API workspace operations; no enterprise qualification or model-training claim",
+  "facts": {
+    "canonical_actions": 29,
+    "appwide_adapters": 36,
+    "catalog_declared_source_owners": 46,
+    "triad_declared_source_owners": 16,
+    "triad_parts": 8,
+    "triad_mirror_attempts": 64,
+    "triad_reference_rows": 350000,
+    "triad_reference_decoded_bytes": 47138613,
+    "native_artwork_request_fields": 14,
+    "browser_page_errors": 0,
+    "independent_model_reviews": 0,
+    "model_calls_performed": 0,
+    "native_toolchain_executed": false,
+    "native_emulator_executed": false,
+    "source_proposals_committed": false,
+    "weights_changed": false,
+    "automated_test_suites_run": false
+  },
+  "static_checks": {
+    "python_ast_five_owners": "pass",
+    "scoped_ruff_five_owners": "pass",
+    "rendered_javascript_node_check": "pass",
+    "rendered_duplicate_ids": 0,
+    "git_diff_check": "pass"
+  },
+  "retirement": {
+    "owned_pid": 5613,
+    "pid_alive": false,
+    "port_open": false,
+    "private_workspace_and_review_proposals_preserved": true
+  },
+  "artifacts": [
+    {
+      "path": "browser-operator-session.json",
+      "bytes": 1874,
+      "sha256": "6d3fa20c7ee0e65eecbe9a096b1126caa2df6aff9662b1d974ebddf271692d7d"
+    },
+    {
+      "path": "browser-native-compile.json",
+      "bytes": 2800,
+      "sha256": "39eac8ecec77871793fb79607cae291ee85c8a883f7f736bd959e062e0c3d78e"
+    },
+    {
+      "path": "browser-forge-discovery.json",
+      "bytes": 1239,
+      "sha256": "96c3d409d565b309d86e172616c8e720ee5cb32ebc9e1b0d0ccd7e82825a2c32"
+    },
+    {
+      "path": "browser-appwide-mirror.json",
+      "bytes": 3157,
+      "sha256": "be9bd7e6f5a0330ea7e7c5d2ee6cac35391eae0175399db169e1cc689cd8fbd3"
+    },
+    {
+      "path": "browser-system-triad.json",
+      "bytes": 39816,
+      "sha256": "d9e92ca73cbb89a170b97919fc85e193875b2da651d98ffb9639f7feca2af2ab"
+    },
+    {
+      "path": "api-operator-session.json",
+      "bytes": 1756,
+      "sha256": "a951447826a38a9973e964ddc63499ef292d48e54ae82897994b80d9b7f5d61a"
+    },
+    {
+      "path": "api-capability-atlas.json",
+      "bytes": 37222,
+      "sha256": "7de0005427191e5e737e2334e270ebf2fba0bb8cc9057d4e9f395a9b1cbc512d"
+    },
+    {
+      "path": "api-current-catalog-read.json",
+      "bytes": 1162,
+      "sha256": "f5cfd7a3b6607d0b2dc60597157325de2ef88f5dfd086d1b83fcab26495dc8c2"
+    },
+    {
+      "path": "api-stale-catalog-refusal.json",
+      "bytes": 158,
+      "sha256": "75a1e7f7a2e97979a13d36db4cb93ba586e4b7aaa2e07b9eb2310ff2ee0c2b8c"
+    },
+    {
+      "path": "api-session-is-not-confirmation.json",
+      "bytes": 166,
+      "sha256": "360ab8b6be9f090f742815cb7ed0a87d0ce1ac2c131b237ff6108266c09087c6"
+    },
+    {
+      "path": "api-duplicate-json-refusal.json",
+      "bytes": 134,
+      "sha256": "df6bcf748b4ea2e0f6f288a131b82d19fe1c76f8c2cdb655e9872a195e07f5e9"
+    },
+    {
+      "path": "api-nonfinite-json-refusal.json",
+      "bytes": 134,
+      "sha256": "97a1a6af7ce36878628878fa70d7e7434dc8a134e361636693c4155661e31a99"
+    },
+    {
+      "path": "api-structural-budget-refusal.json",
+      "bytes": 147,
+      "sha256": "190332317121865e0264b229bc24e38a81deec1df2d4c8d2d5647f69dbea7e4a"
+    },
+    {
+      "path": "api-fourteen-field-native-art-proposal.json",
+      "bytes": 2754,
+      "sha256": "ea8f1be4f9830c982360224cad66ff5993e8248496a29092b34858d3d74e31b6"
+    },
+    {
+      "path": "source-freshness-operator-session.json",
+      "bytes": 5846,
+      "sha256": "3c4320bdd6a539b6f5b78630b3e0799cef899bad0cf3a0651c2933c8c262f3cd"
+    },
+    {
+      "path": "canonical-capability-cockpit.png",
+      "bytes": 114844,
+      "sha256": "5f79c49cdbee63dd9a82fe430af7510a5d391ac9906dd28203a44e40a421fb6f"
+    },
+    {
+      "path": "appwide-capability-cockpit.png",
+      "bytes": 119256,
+      "sha256": "553143364d8c1cef49c739a609ce9ffb463e88caa476a8c6c4f9163cdefe7ede"
+    }
+  ],
+  "limits": [
+    "Deterministic triad adapters do not provide independent model review.",
+    "Source identity covers listed files, not arbitrary transitive code/loaded runtime/standard-library attestation.",
+    "Reference ingestion verifies generated data integrity; it does not authorize training or prove design/gameplay quality.",
+    "Universal console emulation, transformer weight improvement and enterprise superiority are not claimed."
+  ],
+  "distribution": {
+    "schema": "skeleton.studio_cooperation.public_evidence_distribution.v1",
+    "prepared_at": "2026-10-18T04:58:36.114422+00:00",
+    "original_qualification_record_sha256": "649757acaffcb9fd6eba43d1d68969dffbea078d2b925200d53bd14e23850a8c",
+    "original_observation_timestamp_and_source_pins_preserved": true,
+    "retained_byte_exact_json_artifacts": [
+      "browser-operator-session.json",
+      "browser-native-compile.json",
+      "browser-forge-discovery.json",
+      "browser-appwide-mirror.json",
+      "browser-system-triad.json",
+      "api-operator-session.json",
+      "api-capability-atlas.json",
+      "api-current-catalog-read.json",
+      "api-stale-catalog-refusal.json",
+      "api-session-is-not-confirmation.json",
+      "api-duplicate-json-refusal.json",
+      "api-nonfinite-json-refusal.json",
+      "api-structural-budget-refusal.json",
+      "api-fourteen-field-native-art-proposal.json",
+      "source-freshness-operator-session.json"
+    ],
+    "off_repository_artifacts": [
+      {
+        "path": "canonical-capability-cockpit.png",
+        "bytes": 114844,
+        "sha256": "5f79c49cdbee63dd9a82fe430af7510a5d391ac9906dd28203a44e40a421fb6f",
+        "retention": "off_repository_image_hash_only",
+        "available_in_this_bundle": false
+      },
+      {
+        "path": "appwide-capability-cockpit.png",
+        "bytes": 119256,
+        "sha256": "553143364d8c1cef49c739a609ce9ffb463e88caa476a8c6c4f9163cdefe7ede",
+        "retention": "off_repository_image_hash_only",
+        "available_in_this_bundle": false
+      }
+    ],
+    "private_files_session_tokens_logs_and_media_copied": false,
+    "new_execution_or_later_head_attestation": false
+  }
+}

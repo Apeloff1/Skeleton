@@ -21,6 +21,7 @@ from skeleton.cortex.attn import add, add_outer, dot, matvec, matvec_T, softmax,
 from skeleton.cortex.heads import (
     BiasHead,
     NumericHead,
+    PacingHead,
     PolicyHead,
     RouteHead,
     VetoHead,
@@ -59,15 +60,38 @@ class Router:
         self.dim = dim
         self.n = n
         self.steps = 0
+        self._last_h: Optional[Vec] = None
 
     def gate(self, h: Sequence[float]) -> Vec:
         v = list(h)[: self.dim] + [0.0] * max(0, self.dim - len(h))
+        self._last_h = list(v)
         logits = [dot(self.W[i], v) + self.b[i] for i in range(self.n)]
         return softmax(logits)
 
-    def credit(self, index: int, *, lr: float = 0.02) -> None:
+    def entropy(self, h: Sequence[float]) -> float:
+        probs = self.gate(h)
+        return -sum(p * math.log(max(p, 1e-12)) for p in probs)
+
+    def credit(
+        self,
+        index: int,
+        *,
+        lr: float = 0.02,
+        hidden: Optional[Sequence[float]] = None,
+    ) -> None:
         if 0 <= index < self.n:
             self.b[index] += lr
+            ctx = list(hidden)[: self.dim] + [0.0] * max(0, self.dim - len(hidden)) if hidden is not None else self._last_h
+            if ctx is not None and len(ctx) == self.dim:
+                norm = math.sqrt(sum(x * x for x in ctx))
+                if norm > 1e-9:
+                    scale = lr * 0.5 / max(1.0, norm)
+                    for d in range(self.dim):
+                        self.W[index][d] += scale * ctx[d]
+            # Keep biases centered within a bounded range to prevent expert collapse.
+            mean_b = sum(self.b) / max(1, self.n)
+            for i in range(self.n):
+                self.b[i] = max(-2.0, min(2.0, self.b[i] - 0.05 * mean_b))
             self.steps += 1
 
     def snapshot(self) -> Dict[str, Any]:
@@ -97,7 +121,12 @@ class Expert:
         self.W: Mat = _rand_mat(D, D, 0.05, rng)
         self.b: Vec = zeros(D)
         self.head = _head_for(slot, D, seed)
-        self.aux = PolicyHead(dim=D, seed=seed + 31) if slot == "pfc" else None
+        if slot == "pfc":
+            self.aux = PolicyHead(dim=D, seed=seed + 31)
+        elif slot == "left":
+            self.aux = PacingHead(dim=D, seed=seed + 37)
+        else:
+            self.aux = None
         self.acquired = 0
         self.distills = 0
 
@@ -146,7 +175,7 @@ class Expert:
         if (data or {}).get("head"):
             ex.head = head_from_snapshot(data["head"])
         if (data or {}).get("aux"):
-            ex.aux = PolicyHead.from_snapshot(data["aux"])
+            ex.aux = head_from_snapshot(data["aux"])
         ex.acquired = int((data or {}).get("acquired") or 0)
         ex.distills = int((data or {}).get("distills") or 0)
         return ex
@@ -230,9 +259,50 @@ class ExpertBank:
         mixed, _ = self.forward(h)
         return aux.predict(mixed)
 
-    def credit(self, slot: str, *, lr: float = 0.02) -> None:
+    def predict_pacing(self, h: Sequence[float]) -> Optional[Dict[str, float]]:
+        ex = self.experts["left"]
+        aux = ex.aux
+        if aux is None or int(getattr(aux, "fitted", 0) or 0) < MIN_FITTED:
+            return None
+        mixed, _ = self.forward(h)
+        return aux.predict(mixed)
+
+    def credit(
+        self,
+        slot: str,
+        *,
+        lr: float = 0.02,
+        hidden: Optional[Sequence[float]] = None,
+    ) -> None:
         if slot in SLOTS:
-            self.router.credit(SLOTS.index(slot), lr=lr)
+            self.router.credit(SLOTS.index(slot), lr=lr, hidden=hidden)
+
+    def cooperate(self, h: Sequence[float]) -> Dict[str, Any]:
+        """Run all fitted specialist heads over the gated residual mixture in one pass."""
+        mixed, gates = self.forward(h)
+        ent = -sum(g * math.log(max(g, 1e-12)) for g in gates)
+        ex_left = self.experts["left"]
+        ex_right = self.experts["right"]
+        ex_mid = self.experts["midbrain"]
+        ex_pfc = self.experts["pfc"]
+        return {
+            "gates": {slot: round(gates[i], 4) for i, slot in enumerate(SLOTS)},
+            "entropy": round(ent, 4),
+            "mix": ex_left.head.predict(mixed) if int(getattr(ex_left.head, "fitted", 0) or 0) >= MIN_FITTED else None,
+            "bias": ex_right.head.predict(mixed) if int(getattr(ex_right.head, "fitted", 0) or 0) >= MIN_FITTED else None,
+            "route": ex_mid.head.predict(mixed) if int(getattr(ex_mid.head, "fitted", 0) or 0) >= MIN_FITTED else None,
+            "veto": bool(ex_pfc.head.predict(mixed)) if int(getattr(ex_pfc.head, "fitted", 0) or 0) >= MIN_FITTED else None,
+            "policy": (
+                ex_pfc.aux.predict(mixed)
+                if ex_pfc.aux is not None and int(getattr(ex_pfc.aux, "fitted", 0) or 0) >= MIN_FITTED
+                else None
+            ),
+            "pacing": (
+                ex_left.aux.predict(mixed)
+                if ex_left.aux is not None and int(getattr(ex_left.aux, "fitted", 0) or 0) >= MIN_FITTED
+                else None
+            ),
+        }
 
     def fingerprint(self) -> str:
         guts = {

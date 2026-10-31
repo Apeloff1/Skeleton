@@ -112,9 +112,12 @@ citation identifiers are syntactically recognized.
 ### A-05 · Useful trained local weights and GGUF execution — OPEN / release-critical
 
 **Gap:** native TinyTransformer CI fixtures prove transport but are
-**untrained**. The GGUF integration admits operator-installed digest-pinned
-local weights/executable; a real trained model has not been demonstrated
-against an agreed quality benchmark within this PR.
+**untrained**. `skeleton/app/offline_local_scorecard.py` now runs that
+transport and records `trained_model_quality.quality_state = unqualified`
+with reason `untrained_transport_only`. It does not invent accuracy scores.
+The GGUF integration admits operator-installed digest-pinned local
+weights/executable; a real trained model has not been demonstrated against
+an agreed quality benchmark within this PR.
 
 **Exit:** licensed operator-supplied GGUF, measured chat quality, real
 `--local-gguf-smoke`, model/executable integrity during generation, CPU/GPU
@@ -123,8 +126,13 @@ profiles, bounded latency/context and visible accuracy results.
 ### A-06 · Model-safe read/write tools — OPEN / product capability partial
 
 **Gap:** `assistant.tool_read` and `assistant.tool_write` remain registry
-partial. Offline chat must not silently gain filesystem, shell or external
-network execution by ingesting an untrusted source.
+partial. The offline workspace now has one granted library read
+(`local.reference.read`) and one approved reversible library write
+(`local.reference.write`). Missing approval returns a resumable denial and
+does not call `add_text`. Rollback deletes only the document that receipt
+created. Filesystem paths, shell syntax, and URLs in the title are refused
+before either tool runs. Offline chat must not silently gain filesystem,
+shell, or external network execution by ingesting an untrusted source.
 
 **Exit:** explicit user-granted tool scopes, typed admission, prompt injection
 containment, least-privilege sandbox, rollback, refusal and approval tests.
@@ -152,10 +160,17 @@ determinism, controls, performance and license constraints.
 
 ### A-09 · Background autonomy, media and enterprise controls — OPEN
 
-**Gap:** `assistant.background_agent` is planned, while image generation,
-image editing and speech synthesis are partial product capabilities. Offline
-GUI work does not complete them. Enterprise assurance volumes are still
-recorded designed.
+**Gap:** `assistant.background_agent` is partial. A deterministic local job
+can take one granted library read and, only when writes are explicitly
+allowed, one approved library write. The canonical agent still blocks nested
+fan-out and stops at its step budget. Durable jobs, reconnect, media
+pipelines, and enterprise qualification are not done. Image generation,
+image editing, and speech synthesis remain partial product capabilities.
+`measure_local_system` censuses VOL-000..VOL-420 from the enterprise
+contract and records `promotion_performed = false`. Those volumes stay at
+their stored grades. A complete enterprise claim still requires every volume
+to be enterprise-qualified and every dedicated profile superior on exact-head
+evidence. That evidence was not produced.
 
 **Exit:** independently executable and policy-bound agents/media pipelines,
 native asset and model provenance, recovery/security controls, active

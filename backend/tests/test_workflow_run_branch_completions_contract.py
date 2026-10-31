@@ -15,10 +15,22 @@ from scripts.check_workflow_run_branch_completions import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
-REPAIR = WORKFLOWS / "repair-intake.yml"
-AUTOMATION = WORKFLOWS / "pr-automation-index.yml"
-DRAIN = WORKFLOWS / "pr-obsolete-run-drain.yml"
-IDLE = WORKFLOWS / "idle-studio.yml"
+ARCHIVED_WORKFLOWS = REPO_ROOT / ".github" / "workflows-archive"
+
+
+def _event_consumer_source(name: str) -> Path:
+    """Exercise active completion consumers, or their retained retired contract."""
+    active = WORKFLOWS / name
+    archived = ARCHIVED_WORKFLOWS / name
+    if active.is_file() and "  workflow_run:" in active.read_text(encoding="utf-8"):
+        return active
+    return archived if archived.is_file() else active
+
+
+REPAIR = _event_consumer_source("repair-intake.yml")
+AUTOMATION = _event_consumer_source("pr-automation-index.yml")
+DRAIN = _event_consumer_source("pr-obsolete-run-drain.yml")
+IDLE = _event_consumer_source("idle-studio.yml")
 QUEUE_DRAIN = WORKFLOWS / "queue-drain.yml"
 
 
@@ -57,25 +69,26 @@ def test_queue_drain_may_wake_only_from_guarded_default_branch() -> None:
     source = QUEUE_DRAIN.read_text(encoding="utf-8")
     messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
     assert "every completing head" not in messages
-    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in source
+    # No completion event is admitted: recovery happens hourly instead.
+    assert "  workflow_run:" not in source
+    assert 'cron: "7 * * * *"' in source
 
 
 def test_rejects_queue_drain_broader_or_unguarded_branch_filter() -> None:
-    source = _replace_once(
-        QUEUE_DRAIN.read_text(encoding="utf-8"),
-        "    branches: [main]\n",
-        "    branches: [release/**]\n",
-    )
-    messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
-    assert "every completing head" in messages
-
-    source = _replace_once(
-        QUEUE_DRAIN.read_text(encoding="utf-8"),
-        "github.event.workflow_run.head_branch == github.event.repository.default_branch",
-        "true",
-    )
-    messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
-    assert "every completing head" in messages
+    current = QUEUE_DRAIN.read_text(encoding="utf-8")
+    assert "  workflow_run:" not in current
+    # A future accidental completion-event trigger must fail closed, even
+    # when pointed at main; archived workflow contracts cannot bypass this.
+    for branch_filter in ("branches: [release/**]", "branches: [main]"):
+        source = _replace_once(
+            current,
+            "  push:\n",
+            '  workflow_run:\n    workflows: ["Merge Readiness"]\n'
+            f"    types: [completed]\\n    {branch_filter}\\n".replace("\\n", "\n")
+            + "  push:\n",
+        )
+        messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
+        assert "every completing head" in messages
 
 
 def test_rejects_automation_identity_from_first_pull_request_only() -> None:
@@ -207,8 +220,11 @@ def test_default_branch_only_completion_consumers_require_trusted_job_guards() -
     from scripts.check_workflow_run_branch_completions import DEFAULT_BRANCH_CONSUMERS
 
     for name in sorted(DEFAULT_BRANCH_CONSUMERS):
-        source = (WORKFLOWS / name).read_text(encoding="utf-8")
+        source = _event_consumer_source(name).read_text(encoding="utf-8")
         assert violations_for_text(name, source) == []
+        if "  workflow_run:" not in source:
+            # A retired/manual-only definition has no completion trust gate.
+            continue
         unguarded = source.replace(
             "github.event.workflow_run.head_repository.full_name == github.repository",
             "true",
@@ -222,7 +238,8 @@ def test_default_branch_only_completion_consumers_require_trusted_job_guards() -
 def test_unlisted_completion_consumer_cannot_restrict_to_main_without_exemption() -> None:
     from scripts.check_workflow_run_branch_completions import DEFAULT_BRANCH_CONSUMERS
 
-    source = (WORKFLOWS / "branch-clean.yml").read_text(encoding="utf-8")
+    source = IDLE.read_text(encoding="utf-8")
+    assert "  workflow_run:" in source
     assert "branch-clean-fake.yml" not in DEFAULT_BRANCH_CONSUMERS
     messages = "\n".join(violations_for_text("branch-clean-fake.yml", source))
     assert "every completing head" in messages

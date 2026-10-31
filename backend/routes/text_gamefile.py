@@ -29,12 +29,13 @@ def generate(key: str, req: GenReq):
 
 
 class PruneReq(BaseModel):
-    build_id: str | None = None      # None → prune ALL forged gamefiles
+    build_id: str = Field(..., min_length=1, max_length=128)
 
 
 @router.post("/prune")
-def prune(req: PruneReq | None = None):
-    return tg.prune_gamefiles((req.build_id if req else None))
+def prune(req: PruneReq):
+    """Delete only the explicitly authorized build's forged source/history."""
+    return tg.prune_gamefiles(req.build_id)
 
 
 @router.get("/{build_id}/list")

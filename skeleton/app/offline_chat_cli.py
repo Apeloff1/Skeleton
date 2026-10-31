@@ -18,7 +18,8 @@ from skeleton.ai.model_runtime.offline_chat import (
 )
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.app.offline_grounding import (
-    audit_answer_citations, grounded_request_digest, prepare_evidence,
+    audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
+    prepare_evidence,
 )
 from skeleton.app.offline_knowledge import (
     OfflineKnowledgeLibrary, read_reference_file as _read_reference_file,
@@ -49,16 +50,27 @@ def _result(answer, session_id: str, *, as_json: bool,
         if evidence is not None:
             body["evidence"] = evidence
             body["citation_audit"] = audit_answer_citations(answer.text, evidence)
+            body["faithfulness"] = audit_answer_faithfulness(answer.text, evidence)
         print(json.dumps(body, sort_keys=True, ensure_ascii=False))
     else:
-        print("Local AI>", answer.text)
+        visible = answer.text
         if evidence is not None:
-            print("Sources supplied to model (accuracy not verified):")
+            faithfulness = audit_answer_faithfulness(answer.text, evidence)
+            visible = faithfulness["published_text"]
+        print("Local AI>", visible)
+        if evidence is not None:
+            print(
+                "Faithfulness:", faithfulness["disposition"],
+                "(deterministic atom check, not semantic verification)",
+            )
+            if visible != answer.text:
+                print("Unverified model draft withheld from the grounded answer.")
+            print("Sources supplied to model:")
             for source in evidence["citations"]:
                 print(" ", source["title"], source["citation"])
             print("Citation IDs:",
                   audit_answer_citations(answer.text, evidence)["status"],
-                  "(not factual verification)")
+                  "(identifier check only)")
 
 
 def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
@@ -125,10 +137,21 @@ def _submit_turn(chat: DurableOfflineAISession, message: str, *,
             if evidence is not None:
                 payload["evidence"] = evidence
                 payload["citation_audit"] = audit_answer_citations(replay.text, evidence)
+                payload["faithfulness"] = audit_answer_faithfulness(replay.text, evidence)
             # Output digest is not mislabeled as an inference execution receipt.
             print(json.dumps(payload, sort_keys=True, ensure_ascii=False))
         else:
-            print("Local AI>", replay.text)
+            visible = replay.text
+            if evidence is not None:
+                faithfulness = audit_answer_faithfulness(replay.text, evidence)
+                visible = faithfulness["published_text"]
+                print("Local AI>", visible)
+                print(
+                    "Faithfulness:", faithfulness["disposition"],
+                    "(deterministic atom check, not semantic verification)",
+                )
+            else:
+                print("Local AI>", visible)
             print("Recovered saved turn", replay.revision, "without new generation.")
         return
     if grounded:

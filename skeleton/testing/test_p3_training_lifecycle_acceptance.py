@@ -3,7 +3,8 @@
 import hashlib
 import json
 from dataclasses import asdict, replace
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 
 import pytest
 

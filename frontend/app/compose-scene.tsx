@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert,
@@ -9,11 +9,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   SCENE_CHAT_HANDOFF_KEY, SCENE_RECIPES,
   readSceneChatHandoff, sceneHandoffItems,
-} from '../features/Jeeves/sceneHandoff';
+} from '../src/features/Jeeves/sceneHandoff';
 import { validProjectId, projectHref } from '../src/product/worldWorkspace';
 import { acceptSceneForgeResponse } from '../src/product/sceneForgeAcceptance';
 import { Ionicons } from '@expo/vector-icons';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const Construct3DView = lazyDefault(() => import('../src/components/Construct3DView'));
 

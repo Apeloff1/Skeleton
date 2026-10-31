@@ -1,6 +1,6 @@
 import pytest
 from skeleton.ai.webcrawler.video_adapter import VideoSourceGrant,VideoAdapterFrame,ingest_authorized_video
-from skeleton.ai.webcrawler.video_memory_bridge import VideoIndexReceipt,commit_video_knowledge
+from skeleton.ai.webcrawler.video_memory_bridge import VideoIndexReceipt,commit_video_knowledge,seal_video_distillation
 from skeleton.ai.webcrawler.dragon_journal import DragonEventJournal
 import sqlite3
 
@@ -29,3 +29,10 @@ def test_video_memory_requires_real_persistence():
     assert receipts[0].persisted
     assert journal.verify("s")
     assert journal.page("s")["events"][-1]["payload"]["persisted"] is True
+    with pytest.raises(RuntimeError, match="distillation receipt"):
+        seal_video_distillation(journal, "s", source_url=chunks[0].source_url, chunk_id=chunks[0].chunk_id, distilled=False, now=3)
+    sealed = seal_video_distillation(journal, "s", source_url=chunks[0].source_url, chunk_id=chunks[0].chunk_id, distilled=True, now=3)
+    assert sealed.kind == "distill_complete"
+    assert journal.verify("s")
+    with pytest.raises(RuntimeError, match="already sealed"):
+        seal_video_distillation(journal, "s", source_url=chunks[0].source_url, chunk_id=chunks[0].chunk_id, distilled=True, now=4)

@@ -396,3 +396,162 @@ def test_stop_dispatcher_is_idempotent_and_flushes_pending_rows(
     assert again is not None
     assert again.remaining == 0
     runtime.close()
+
+
+
+def test_outbox_drain_serializes_background_and_foreground_publication(tmp_path: Path):
+    """Two simultaneous drains may not both append one pending event."""
+    from threading import Event, Thread
+
+    class PausingStream:
+        def __init__(self, inner):
+            self.inner = inner
+            self.entered = Event()
+            self.release = Event()
+            self.append_calls = 0
+
+        def append(self, *args, **kwargs):
+            self.append_calls += 1
+            self.entered.set()
+            assert self.release.wait(3), "test stream held beyond deadline"
+            return self.inner.append(*args, **kwargs)
+
+    store = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    inner = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    pausing = PausingStream(inner)
+    runtime = DurableOperationRuntime(_Reasoner(), store, pausing)
+    now = datetime.now(timezone.utc)
+    operation_id = str(uuid4())
+    store.create(OperationEnvelope(
+        operation_id=operation_id, tenant_id="tenant-a", actor_id="actor-a",
+        capability="intelligence.reason",
+        created_at=now, deadline=now + timedelta(minutes=1),
+        idempotency_key="one-dispatch-only", trace_id="trace-drain-race",
+    ), now=now)
+
+    reports = []
+    errors = []
+
+    def drain():
+        try:
+            reports.append(runtime.dispatch_outbox(operation_id=operation_id))
+        except Exception as exc:
+            errors.append(exc)
+
+    first = Thread(target=drain)
+    second = Thread(target=drain)
+    first.start()
+    try:
+        assert pausing.entered.wait(2), "foreground dispatcher did not begin"
+        second.start()
+    finally:
+        pausing.release.set()
+        first.join(timeout=4)
+        if second.ident is not None:
+            second.join(timeout=4)
+    assert not first.is_alive() and not second.is_alive()
+    assert not errors
+    assert pausing.append_calls == 1
+    assert sum(row.published for row in reports) == 1
+    assert store.pending_outbox() == ()
+    assert len(inner.replay(ReplayCursor(operation_id))) == 1
+    store.close()
+    inner.close()
+
+
+@pytest.mark.parametrize("invalid", (True, -1, 0, 4097, 1.2, "100"))
+def test_drain_limit_refuses_unsafe_or_unbounded_values(tmp_path: Path, invalid):
+    runtime = _runtime(tmp_path)
+    with pytest.raises(ValueError, match="between 1 and 4096"):
+        runtime.dispatch_outbox(limit=invalid)
+    runtime.close()
+
+
+@pytest.mark.parametrize("invalid", (0, -1, 4097))
+def test_dispatcher_configuration_rejects_excessive_batch(tmp_path: Path, invalid):
+    operations = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    events = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    with pytest.raises(ValueError, match="between 1 and 4096"):
+        DurableOperationRuntime(
+            _Reasoner(), operations, events, outbox_batch_size=invalid,
+        )
+    operations.close()
+    events.close()
+
+
+
+def test_expired_operations_are_failed_without_reexecuting_reasoning(tmp_path: Path):
+    initial = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    now = initial + timedelta(days=2)
+    reasoner = _Reasoner()
+    runtime = _runtime(tmp_path, reasoner)
+    store = runtime.operations
+    dead = []
+    for i in range(2):
+        operation_id = str(uuid4())
+        dead.append(operation_id)
+        store.create(
+            OperationEnvelope(
+                operation_id=operation_id, tenant_id="tenant-a",
+                actor_id="worker", capability="intelligence.reason",
+                created_at=initial, deadline=initial + timedelta(hours=1),
+                idempotency_key=f"expired-{i}", trace_id=f"expire-{i}",
+            ), now=initial,
+        )
+        for state in (OperationState.VALIDATED, OperationState.AUTHORIZED,
+                      OperationState.ADMITTED, OperationState.RUNNING):
+            store.transition(operation_id, state, now=initial)
+    future = str(uuid4())
+    store.create(OperationEnvelope(
+        operation_id=future, tenant_id="tenant-a", actor_id="worker",
+        capability="intelligence.reason", created_at=initial,
+        deadline=now + timedelta(hours=2),
+        idempotency_key="future-unexpired", trace_id="future-trace",
+    ), now=initial)
+
+    first = runtime.recover_expired_operations(now=now, limit=1)
+    assert len(first) == 1
+    assert first[0].envelope.state is OperationState.FAILED
+    second = runtime.recover_expired_operations(now=now, limit=1)
+    assert len(second) == 1
+    assert second[0].envelope.state is OperationState.FAILED
+    assert {first[0].envelope.operation_id, second[0].envelope.operation_id} == set(dead)
+    assert runtime.recover_expired_operations(now=now, limit=3) == ()
+    assert store.get(future).envelope.state is OperationState.CREATED
+    assert reasoner.calls == 0
+    assert store.pending_outbox() == ()
+    for operation_id in dead:
+        stream = runtime.stream.replay(ReplayCursor(operation_id))
+        assert stream[-1].type == "operation.failed"
+        assert [event.sequence for event in stream] == list(range(1, len(stream) + 1))
+    runtime.close()
+
+
+def test_expired_recovery_will_not_rewrite_terminal_operation(tmp_path: Path):
+    initial = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    runtime = _runtime(tmp_path)
+    operation_id = str(uuid4())
+    runtime.operations.create(OperationEnvelope(
+        operation_id=operation_id, tenant_id="tenant",
+        actor_id="actor", capability="intelligence.reason",
+        created_at=initial, deadline=initial + timedelta(minutes=10),
+        idempotency_key="terminal-idem", trace_id="terminal-trace",
+    ), now=initial)
+    terminal = runtime.operations.transition(
+        operation_id, OperationState.FAILED, now=initial,
+    )
+    assert runtime.recover_expired_operations(
+        now=initial + timedelta(days=1),
+    ) == ()
+    current = runtime.operations.get(operation_id)
+    assert current.version == terminal.version
+    assert current.envelope.state is OperationState.FAILED
+    runtime.close()
+
+
+@pytest.mark.parametrize("invalid", (0, -1, 4097, True, 0.5))
+def test_expired_recovery_rejects_unbounded_batches(tmp_path: Path, invalid):
+    runtime = _runtime(tmp_path)
+    with pytest.raises(ValueError, match="between 1 and 4096"):
+        runtime.recover_expired_operations(limit=invalid)
+    runtime.close()

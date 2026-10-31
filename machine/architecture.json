@@ -311,14 +311,14 @@
       "from": "frontend",
       "to": "backend",
       "transport": "http",
-      "contract": "frontend/utils/apiBase.ts -> /api/*"
+      "contract": "frontend/src/utils/apiBase.ts -> /api/*"
     },
     {
       "id": "frontend-engine",
       "from": "frontend",
       "to": "skeleton",
       "transport": "http",
-      "contract": "frontend/utils/apiBase.ts -> /api/v1/*"
+      "contract": "frontend/src/utils/apiBase.ts -> /api/v1/*"
     },
     {
       "id": "engine-health",
@@ -531,7 +531,7 @@
   "invariants": [
     "frontend is the only canonical human-interface root",
     "backend and skeleton remain separate API processes until route and dependency ownership converge",
-    "browser clients resolve endpoints through frontend/utils/apiBase.ts",
+    "browser clients resolve endpoints through frontend/src/utils/apiBase.ts",
     "runtime service dependencies match skeleton/app/manifest.json",
     "every architecture node and interface reference resolves to a declared node",
     "zone dependency graph is acyclic",

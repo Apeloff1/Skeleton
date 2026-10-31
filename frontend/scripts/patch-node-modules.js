@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -195,12 +196,6 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version === '4.3.0') {
-    // 4.3.0 is the reviewed patched line resolved by the frozen lockfile.
-    // Do not rewrite patched upstream code; keep future version drift fail-closed.
-    skipped++;
-    return;
-  }
   // 4.3.0 includes the upstream Vary wildcard/prototype hardening, but the
   // max-stale branch still has the same reviewed shape as 4.2.0. Keep this
   // allow-list exact so future package drift still fails closed before patching.
@@ -220,19 +215,91 @@ function patchHttpCacheSemanticsMaxStale() {
   );
 }
 
+function patchDeepmergePrototypePoisoning() {
+  const pkgPath = path.join(ROOT, 'node_modules/deepmerge/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  for (const dir of [path.dirname(pkgPath), path.join(path.dirname(pkgPath), 'dist')]) {
+    if (!fs.lstatSync(dir).isDirectory()) {
+      throw new Error('[patch-node-modules] deepmerge package directory is unsafe');
+    }
+  }
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  if (version !== '4.3.1') {
+    throw new Error(`[patch-node-modules] deepmerge ${version} requires security patch review`);
+  }
+  const expoMetadata = path.join(ROOT, 'node_modules/@expo/config/package.json');
+  if (fs.existsSync(expoMetadata)) {
+    const expoDeepmerge = require.resolve('deepmerge/package.json', { paths: [path.dirname(expoMetadata)] });
+    if (fs.realpathSync(expoDeepmerge) !== fs.realpathSync(pkgPath)) {
+      throw new Error('[patch-node-modules] Expo resolves an unreviewed deepmerge copy');
+    }
+  }
+
+  // GHSA-gcqx-w48m-w2h4: copying an own __proto__ key into the ordinary
+  // destination object invokes its prototype setter. Guard both the target
+  // copy and source merge in each published distribution. Validate every file
+  // before writing so an unfamiliar or partially modified package fails closed.
+  const rels = ['node_modules/deepmerge/index.js', 'node_modules/deepmerge/dist/cjs.js',
+    'node_modules/deepmerge/dist/umd.js'];
+  const plan = rels.map(rel => {
+    const abs = path.join(ROOT, rel);
+    if (!fs.existsSync(abs) || !fs.lstatSync(abs).isFile()) {
+      throw new Error(`[patch-node-modules] security target missing or unsafe: ${rel}`);
+    }
+    const source = fs.readFileSync(abs, 'utf8');
+    const target = /^([ \t]*)getKeys\(target\)\.forEach\(function\(key\) \{\r?\n/gm;
+    const input = /^([ \t]*)getKeys\(source\)\.forEach\(function\(key\) \{\r?\n/gm;
+    const guard = "if (key === '__proto__') throw new Error('[deepmerge] unsafe __proto__ key'); // skeleton GHSA-gcqx-w48m-w2h4";
+    const guardCount = source.split(guard).length - 1;
+    const targetMatches = [...source.matchAll(target)];
+    const inputMatches = [...source.matchAll(input)];
+    const writes = [...source.matchAll(/\bdestination\[key\]\s*=/g)];
+    if (targetMatches.length !== 1 || inputMatches.length !== 1 || writes.length !== 3) {
+      throw new Error(`[patch-node-modules] deepmerge target changed shape; review required: ${rel}`);
+    }
+    const follows = match => source.slice(match.index + match[0].length).startsWith(match[1] + '\t' + guard);
+    const targetGuarded = follows(targetMatches[0]);
+    const inputGuarded = follows(inputMatches[0]);
+    if (guardCount !== (targetGuarded ? 1 : 0) + (inputGuarded ? 1 : 0) || targetGuarded !== inputGuarded) {
+      throw new Error(`[patch-node-modules] deepmerge mixed prototype-guard state: ${rel}`);
+    }
+    if (targetGuarded) return { abs, rel, source, output: source };
+    const addGuard = (match, indent) => match + indent + '\t' + guard + '\n';
+    return { abs, rel, source, output: source.replace(target, addGuard).replace(input, addGuard) };
+  });
+  for (const item of plan) {
+    if (item.source === item.output) { skipped++; continue; }
+    fs.writeFileSync(item.abs, item.output, 'utf8');
+    patched++;
+    console.log(`[patch-node-modules] ✓ security ${item.rel}`);
+  }
+}
+
 function patchNodeForgeNestedDigestAlgorithm() {
   const pkgPath = path.join(ROOT, 'node_modules/node-forge/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '1.4.0') {
+  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
+  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
+  // Never silently trust a version bump as proof of this security fix.
+  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
-  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: node-forge 1.4.0 checks the
-  // outer DigestInfo element count but not the nested DigestAlgorithm count.
-  // This is the upstream #1152 fix shape, applied fail-closed until a patched
-  // npm release exists.
+  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
+  // nested-count patch for both vulnerable upstream parser shapes.
+  // patchSecurityFile rejects unrecognized source before any security bypass.
+  // Reject ambiguous mixed sources: a stray hardened marker must not hide
+  // another original vulnerable conditional behind the idempotence shortcut.
+  const rsaSource = fs.readFileSync(
+    path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+  const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
+  const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
+  if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
+    throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
+  }
+
   patchSecurityFile(
     'node_modules/node-forge/lib/rsa.js',
     /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
@@ -242,6 +309,66 @@ function patchNodeForgeNestedDigestAlgorithm() {
               (('parameters' in capture) ? 2 : 1)) {`,
     /obj\.value\[0\]\.value\.length !==/,
   );
+}
+
+function patchSprintfFormatBounds() {
+  const pkgPath = path.join(ROOT, 'node_modules/sprintf-js/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  if (version !== '1.0.3') {
+    throw new Error(`[patch-node-modules] sprintf-js ${version} requires security patch review`);
+  }
+
+  // CVE-2026-97058 / GHSA-hp3w-g68c-fv3c has no patched npm release.
+  // Cap numeric precision before native Number formatting can throw for an
+  // otherwise valid format string. Cap width before invoking argument functions
+  // or the width-dependent Array(...).join allocation. Ordinary argparse help
+  // formatting remains inside the numeric 100 / width 16 KiB limits. General
+  // precision has a minimum of 1; exponential/fixed precision may be zero.
+  const rel = 'node_modules/sprintf-js/src/sprintf.js';
+  const target = path.join(ROOT, rel);
+  const source = fs.readFileSync(target, 'utf8');
+  const before = 'match = parse_tree[i] // convenience purposes only';
+  const after = `${before}
+                match = match.slice(0)
+                if (match[6] !== undefined) {
+                    if (!/^\\d+$/.test(match[6])) {
+                        throw new RangeError('[sprintf] invalid format width')
+                    }
+                    match[6] = String(Math.min(16384, Number(match[6])))
+                }
+                if (/^[efg]$/.test(match[8]) && match[7] !== undefined) {
+                    if (!/^\\d+$/.test(match[7])) {
+                        throw new RangeError('[sprintf] invalid numeric precision')
+                    }
+                    match[7] = String(Math.min(100, Math.max(match[8] === 'g' ? 1 : 0, Number(match[7]))))
+                }`;
+  const digest = value => crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+  const hardenedDigest = 'b84000c68153570c8cdc4e0f62b8f96327ec34a1e7665cdf06d3cd3ca0770821';
+  const sourceDigest = digest(source);
+  if (sourceDigest === hardenedDigest) {
+    skipped++;
+    return;
+  }
+  const pristineDigest = '9904b0d448280bfdfcb0329bdac995883033597727404f9c058d051d9174b7c7';
+  const previousDigest = '06e1ea7943ecf8d5cc342d816240156476d11effe844f6fd6504c266b2d70a1b';
+  if (sourceDigest !== pristineDigest && sourceDigest !== previousDigest) {
+    throw new Error('[patch-node-modules] sprintf-js security source changed; review required');
+  }
+  // Upgrade only the exact earlier local patch; the resulting full source must
+  // still match the final digest. All other source variants fail closed.
+  const hardened = sourceDigest === previousDigest
+    ? source.replace(
+      'match[7] = String(Math.min(100, Number(match[7])))',
+      "match[7] = String(Math.min(100, Math.max(match[8] === 'g' ? 1 : 0, Number(match[7]))))",
+    )
+    : source.replace(before, after);
+  if (hardened === source || digest(hardened) !== hardenedDigest) {
+    throw new Error('[patch-node-modules] failed to harden sprintf-js formatting bounds');
+  }
+  fs.writeFileSync(target, hardened, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ security ${rel}`);
 }
 
 function patchWorkletsStaticRendering() {
@@ -353,16 +480,34 @@ function patchExpoStaticIndexPath() {
   const pkgPath = path.join(ROOT, 'node_modules/@expo/cli/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const version = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
-  if (version !== '54.0.27') throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  // SDK 54 shipped both CLI versions with the same guarded static-index path.
+  // Future releases still require an explicit exact-version and source review.
+  if (!new Set(['54.0.27', '54.0.28']).has(version)) {
+    throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  }
   const target = path.join(ROOT, 'node_modules/@expo/cli/build/src/export/exportStaticAsync.js');
   const source = fs.readFileSync(target, 'utf8');
   // The upstream optional-slash regex strips "index" from "story-index",
   // rendering /story- into story-index.html and breaking root hydration.
   const before = "pathname: filePathLocation.replace(/(\\/?index)?$/, '')";
   const after = "pathname: filePathLocation === 'index' ? '' : filePathLocation.replace(/\\/index$/, '')";
-  if (source.includes(after)) { skipped++; return; }
-  if (!source.includes(before)) throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
-  fs.writeFileSync(target, source.replace(before, after), 'utf8');
+  if (source.includes(after)) {
+    // A mixed or duplicated result is not an idempotent hardened source.
+    // Refuse partial rewrites rather than leaving an unsafe route behind.
+    if (source.includes(before) || source.split(after).length !== 2) {
+      throw new Error('[patch-node-modules] Expo static path contains ambiguous mixed patch states');
+    }
+    skipped++;
+    return;
+  }
+  if (source.split(before).length !== 2) {
+    throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
+  }
+  const hardened = source.replace(before, after);
+  if (!hardened.includes(after) || hardened.includes(before)) {
+    throw new Error('[patch-node-modules] Expo static path patch postcondition failed');
+  }
+  fs.writeFileSync(target, hardened, 'utf8');
   patched++;
   console.log('[patch-node-modules] ✓ Expo static index path segment');
 }
@@ -370,7 +515,9 @@ function patchExpoStaticIndexPath() {
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
+patchDeepmergePrototypePoisoning();
 patchNodeForgeNestedDigestAlgorithm();
+patchSprintfFormatBounds();
 patchWorkletsStaticRendering();
 patchReactNativeRnGetPolyfillsExport();
 patchExpoStaticIndexPath();

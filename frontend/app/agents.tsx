@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /agents — Multi-Agent Systems
  * GET /api/agents/systems • POST /api/agents/run/{system_id}
@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouteHistory } from '../utils/routeHistory';
-import { shareResult, copyToClipboard } from '../utils/shareResult';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import Skeleton from '../components/UI/Skeleton';
-import RetryBanner from '../components/UI/RetryBanner';
+import { useRouteHistory } from '../src/utils/routeHistory';
+import { shareResult, copyToClipboard } from '../src/utils/shareResult';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import Skeleton from '../src/components/UI/Skeleton';
+import RetryBanner from '../src/components/UI/RetryBanner';
 
 const BACKEND = CANONICAL_API_BASE || '';
 

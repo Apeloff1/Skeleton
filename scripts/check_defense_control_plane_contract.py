@@ -38,6 +38,13 @@ REQUIRED_FILES = (
     "scripts/quality-gates.sh",
 )
 
+# Workflows archived by the slim CI policy (.github/CI_SLIM_POLICY.md). When the
+# active file is absent, the inert archived definition must exist and still pass
+# every marker check, so restoring it cannot reintroduce an unsafe runner.
+ARCHIVE_FALLBACKS = {
+    ".github/workflows/pr-automation-index.yml": ".github/workflows-archive/pr-automation-index.yml",
+}
+
 REQUIRED_TESTS = (
     "skeleton/testing/test_scanner_integrity.py",
     "skeleton/testing/test_defense_plane.py",
@@ -181,7 +188,11 @@ def audit(root: Path = DEFAULT_ROOT) -> list[Finding]:
     texts: dict[str, str] = {}
 
     for relative in (*REQUIRED_FILES, *REQUIRED_TESTS):
-        text, file_findings = _read_control(root, relative)
+        archived = ARCHIVE_FALLBACKS.get(relative)
+        if archived and not (root / relative).exists() and (root / archived).exists():
+            text, file_findings = _read_control(root, archived)
+        else:
+            text, file_findings = _read_control(root, relative)
         findings.extend(file_findings)
         if text is not None:
             texts[relative] = text

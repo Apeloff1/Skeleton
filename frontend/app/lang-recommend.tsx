@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/LanguageRecommend/LanguageRecommendModal'), 'LanguageRecommendRoute', 'LanguageRecommendModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/LanguageRecommend/LanguageRecommendModal'), 'LanguageRecommendRoute', 'LanguageRecommendModal');

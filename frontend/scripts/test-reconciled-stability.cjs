@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,7 +20,7 @@ function moduleTS(filename, mocks = {}) {
   });
   assert.equal((compilation.diagnostics || []).length, 0, filename + ' transpile diagnostics');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', compilation.outputText)(
+  compileFunction(compilation.outputText, ['require', 'module', 'exports'])(
     name => {
       assert.ok(Object.prototype.hasOwnProperty.call(mocks, name), 'unexpected import: ' + name);
       return mocks[name];
@@ -117,7 +118,7 @@ test('observer snapshots are independent of the authoritative runner', () => {
 });
 
 test('retry never fabricates a clean boot or leaves earlier callbacks authoritative', () => {
-  const launcher = read('components/BootLauncher.tsx');
+  const launcher = read('src/components/BootLauncher.tsx');
   assert.doesNotMatch(launcher, /safeSetItem\('@boot\/crash_count',\s*'0'\)/);
   assert.match(launcher, /attemptEpochRef\.current \+= 1/);
   assert.match(launcher, /epoch !== attemptEpochRef\.current/);
@@ -151,7 +152,7 @@ test('native network listeners are never registered after unmount', () => {
 });
 
 test('changed release code is TypeScript syntax-valid', () => {
-  for (const filename of ['components/BootLauncher.tsx', 'src/boot/runner.ts',
+  for (const filename of ['src/components/BootLauncher.tsx', 'src/boot/runner.ts',
     'src/boot/stages.ts', 'app/safe-mode.tsx', 'src/hooks/useNetworkStatus.ts']) {
     const result = ts.transpileModule(read(filename), {
       fileName: filename,

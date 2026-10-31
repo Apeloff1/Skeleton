@@ -12,8 +12,10 @@ from scripts.check_automerge_contract import (
     MODULES,
     PACKAGE,
     REQUIRED_RECONCILE_PERMISSIONS,
+    REQUIRED_WORKFLOW_TRIGGERS,
     ROOT,
     WORKFLOW,
+    _PIPE_TO_SHELL,
     _cross_file_findings,
     _defined_symbols,
     _imports,
@@ -131,8 +133,30 @@ def test_active_policy_disables_review_gates():
     assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "false"' in reconcile
 
 
-def test_workflow_has_periodic_reconciliation_trigger():
-    assert "schedule:" in _workflow_text()
+def test_periodic_schedule_is_optional():
+    """The schedule sweep was removed by CI fanout reduction; it must not be required."""
+    assert "schedule:" not in REQUIRED_WORKFLOW_TRIGGERS
+    text = _workflow_text()
+    without = "\n".join(
+        line for line in text.splitlines() if "schedule:" not in line and "cron:" not in line
+    )
+    assert _workflow_findings(without) == []
+    with_schedule = text.replace(
+        "\nconcurrency:", '\n  schedule:\n    - cron: "8 3 * * *"\n\nconcurrency:', 1
+    )
+    assert _workflow_findings(with_schedule) == []
+
+
+def test_missing_workflow_run_trigger_is_rejected():
+    text = _workflow_text().replace("workflow_run:", "workflow_xrun:")
+    codes = {f.code for f in _workflow_findings(text)}
+    assert "missing-trigger" in codes
+
+
+def test_missing_merge_readiness_wake_source_is_rejected():
+    text = _workflow_text().replace('"Merge Readiness"', '"Something Else"')
+    codes = {f.code for f in _workflow_findings(text)}
+    assert "missing-wake-source" in codes
 
 
 def test_workflow_wakes_on_merge_readiness_completion():
@@ -175,8 +199,8 @@ def test_workflow_installs_pytest_before_test_run():
         "persist-credentials: true",
         "permissions: write-all",
         "permissions: read-all",
-        "curl | sh",
-        "wget | sh",
+        "curl " + _PIPE_TO_SHELL,
+        "wget " + _PIPE_TO_SHELL,
         "sudo ",
     ],
 )
@@ -341,3 +365,31 @@ def test_workflow_path_is_under_repository_root():
     assert WORKFLOW.relative_to(ROOT) == Path(
         ".github/workflows/automerge-control-plane.yml"
     )
+
+
+
+def test_automatic_merge_refuses_unprotected_default_branch_before_mutating() -> None:
+    """A policy document alone must not authorize direct/squash merging."""
+    reconcile = _line_block(_workflow_text(), "reconcile:")
+    assert (
+        'gh api --method GET "/repos/${GITHUB_REPOSITORY}/branches/${AUTOMERGE_DEFAULT_BRANCH}"'
+        in reconcile
+    )
+    assert '--jq \'.protected\'' in reconcile
+    assert 'if [[ "$protected" != "true" ]]; then' in reconcile
+    assert "exit 1" in reconcile
+    assert reconcile.index('if [[ "$protected" != "true" ]]') < reconcile.index(
+        "python -m skeleton.pr_automation.automerge_cli"
+    )
+
+
+
+def test_cli_reconciliation_checks_live_branch_protection_before_mutation() -> None:
+    """Direct CLI entry must reject unprotected base even outside Actions."""
+    source = (PACKAGE / "automerge_cli.py").read_text(encoding="utf-8")
+    guard = "branch_policy = client.branch_policy(default_branch)"
+    denial = "auto-merge mutation denied: default branch protection is not enabled"
+    assert guard in source
+    assert denial in source
+    assert "if policy.mode is not MergeMode.OBSERVE:" in source
+    assert source.index(guard) < source.index("report = reconcile(")

@@ -21,6 +21,7 @@ from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     ExecutionState,
+    execution_failure_code,
 )
 from skeleton.contracts.operation import (
     OperationEnvelope,
@@ -37,6 +38,13 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionLease,
     AdmissionRuntime,
     AdmissionRuntimeError,
+)
+from skeleton.intelligence.cooperation import (
+    CooperationPolicyError,
+    cooperation_stages,
+    cooperation_summary,
+    normalize_cooperation_policy,
+    validate_cooperation_state,
 )
 from skeleton.intelligence.quota import QuotaError
 from skeleton.persistence.execution_repository import (
@@ -628,6 +636,30 @@ class EngineExecutionCommand:
             )
         context_policy = dict(self.execution_request.context_policy)
         try:
+            cooperation = normalize_cooperation_policy(context_policy.get("cooperation"))
+        except CooperationPolicyError as exc:
+            raise EngineServiceError("execution cooperation policy is malformed") from exc
+        if cooperation is not None:
+            if context_policy.get("cooperation") != cooperation:
+                raise EngineServiceError("execution cooperation policy must be canonical")
+            brief_digest = hashlib.sha256(handoff.prompt.strip().encode()).hexdigest()
+            history_digest = hashlib.sha256(json.dumps(
+                [{"role": role, "content": content} for role, content in handoff.history],
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+            ).encode()).hexdigest()
+            if context_policy.get("cooperation_brief_digest") != brief_digest or context_policy.get("cooperation_history_digest") != history_digest:
+                raise EngineServiceError("cooperation brief/history are not bound to compiled context")
+            stage_count = len(cooperation_stages(cooperation))
+            for key, minimum in (("max_model_turns", stage_count), ("max_provider_attempts", stage_count), ("max_output_tokens", 64 * stage_count)):
+                value = self.execution_request.resource_budget.get(key)
+                if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                    raise EngineServiceError("cooperation stages do not fit the admitted operation budget")
+            provider_input_limit = context_policy.get("provider_input_limit")
+            if isinstance(provider_input_limit, bool) or not isinstance(provider_input_limit, int) or provider_input_limit <= 0:
+                raise EngineServiceError("cooperation requires an explicit per-provider input limit")
+            if self.execution_request.tool_policy.get("allowed_tool_ids", []):
+                raise EngineServiceError("cooperative response pipeline must be tool-free")
+        try:
             provider_context_selection(context_policy)
             provider_context_temperature(context_policy)
         except ProviderUnavailableError as exc:
@@ -930,6 +962,9 @@ class EngineExecutionStatus:
     updated_at: datetime
     cancellation_requested: bool = False
     schema_version: int = 1
+    cooperation: Mapping[str, Any] | None = None
+    provider_receipts: tuple[str, ...] = ()
+    result_status: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -943,6 +978,9 @@ class EngineExecutionStatus:
             "failure_code": self.failure_code,
             "updated_at": self.updated_at.isoformat(),
             "cancellation_requested": self.cancellation_requested,
+            "cooperation": None if self.cooperation is None else dict(self.cooperation),
+            "provider_receipts": list(self.provider_receipts),
+            "result_status": self.result_status,
         }
 
 
@@ -1153,14 +1191,32 @@ class SQLiteEngineSubmissionStore:
             try:
                 command_payload = json.loads(row["command_json"])
                 ack_payload = json.loads(row["ack_json"])
-            except json.JSONDecodeError as exc:
+                command = EngineExecutionCommand.from_dict(command_payload)
+                ack = self._ack_from_dict(ack_payload)
+            except (
+                json.JSONDecodeError,
+                EngineServiceError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 raise EngineServiceError(
                     "stored engine submission is corrupt"
                 ) from exc
+            if (
+                command.submission_digest != row["command_digest"]
+                or ack.execution_id != row["execution_id"]
+                or ack.execution_id != command.execution_request.execution_id
+                or ack.operation_id != command.operation.operation_id
+                or ack.trace_id != command.operation.trace_id
+            ):
+                raise EngineServiceError(
+                    "stored engine submission is corrupt"
+                )
             return _StoredSubmission(
                 principal=row["service_principal"],
-                command=EngineExecutionCommand.from_dict(command_payload),
-                ack=self._ack_from_dict(ack_payload),
+                command=command,
+                ack=ack,
             )
 
     def get_by_execution_id(
@@ -1204,7 +1260,7 @@ class SQLiteEngineSubmissionStore:
             try:
                 row = self._connection.execute(
                     """
-                    SELECT command_digest, ack_json
+                    SELECT command_digest, command_json, ack_json
                     FROM engine_submission
                     WHERE namespace = ?
                       AND service_principal = ?
@@ -1220,7 +1276,13 @@ class SQLiteEngineSubmissionStore:
                         stored_command = EngineExecutionCommand.from_dict(
                             stored_payload
                         )
-                    except (json.JSONDecodeError, EngineServiceError) as exc:
+                    except (
+                        json.JSONDecodeError,
+                        EngineServiceError,
+                        KeyError,
+                        TypeError,
+                        ValueError,
+                    ) as exc:
                         raise EngineServiceError(
                             "stored engine submission is corrupt"
                         ) from exc
@@ -2490,6 +2552,32 @@ class EngineExecutionService:
                 "engine execution belongs to a different actor or tenant"
             )
         handoff = stored.command.compiled_context
+        execution = self.repository.get(handoff.execution_id)
+        if (
+            execution.request.identity_digest
+            != stored.command.execution_request.identity_digest
+            or execution.operation_id != operation.operation_id
+        ):
+            raise EngineServiceError(
+                "stored engine execution binding is corrupt"
+            )
+        checkpoint = self.repository.latest_checkpoint(execution.execution_id)
+        if checkpoint is not None:
+            payload = checkpoint.payload
+            if not isinstance(payload, Mapping):
+                raise EngineServiceError(
+                    "stored engine checkpoint binding is corrupt"
+                )
+            if (
+                "context_digest" in payload
+                and payload.get("context_digest") != handoff.context_digest
+            ) or (
+                "tenant_id" in payload
+                and payload.get("tenant_id") != operation.tenant_id
+            ):
+                raise EngineServiceError(
+                    "stored engine checkpoint binding is corrupt"
+                )
         return {
             "operation_id": handoff.operation_id,
             "execution_id": handoff.execution_id,
@@ -2832,10 +2920,30 @@ class EngineExecutionService:
         execution = self.repository.get(execution_id)
         result = self.repository.result(execution_id)
         failure_code = None
-        if result is not None and result.status in {"failed", "cancelled"}:
-            raw = result.usage.get("error_code")
-            if isinstance(raw, str):
-                failure_code = raw
+        cooperation = None
+        provider_receipts = ()
+        policy = normalize_cooperation_policy(stored.command.execution_request.context_policy.get("cooperation"))
+        if policy is not None:
+            checkpoint = self.repository.latest_checkpoint(execution_id)
+            if checkpoint is not None:
+                context = stored.command.execution_request.context_policy
+                try:
+                    state = validate_cooperation_state(
+                        checkpoint.payload.get("cooperation"), policy,
+                        context_digest=str(context.get("context_digest")),
+                        source_snapshot=context.get("source_snapshot", []),
+                        expected_brief_digest=context.get("cooperation_brief_digest"),
+                        expected_history_digest=context.get("cooperation_history_digest"),
+                    )
+                except CooperationPolicyError as exc:
+                    raise EngineServiceError("cooperative progress checkpoint is invalid") from exc
+                cooperation = cooperation_summary(state)
+                raw_refs = checkpoint.payload.get("provider_receipts", [])
+                if not isinstance(raw_refs, list) or any(not isinstance(ref, str) for ref in raw_refs):
+                    raise EngineServiceError("cooperative progress provider receipts are invalid")
+                provider_receipts = tuple(raw_refs)
+        if result is not None:
+            failure_code = execution_failure_code(result.as_dict())
         return EngineExecutionStatus(
             operation_id=stored.command.operation.operation_id,
             execution_id=execution.execution_id,
@@ -2850,6 +2958,9 @@ class EngineExecutionService:
             failure_code=failure_code,
             updated_at=execution.updated_at,
             cancellation_requested=execution.cancellation_requested,
+            cooperation=cooperation,
+            provider_receipts=provider_receipts,
+            result_status=None if result is None else result.status,
         )
 
     def cancel(

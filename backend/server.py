@@ -1450,7 +1450,7 @@ async function* fetchPaginated(baseUrl, options = {}) {
     
     try {
         while (hasMore) {
-            console.log(\`Fetching page \${page}...\`);
+            console.log(`Fetching page ${page}...`);
             await new Promise(r => setTimeout(r, 100));
             const data = Array.from({length: 5}, (_, i) => ({
                 id: (page - 1) * 5 + i + 1,
@@ -1470,10 +1470,10 @@ async function* fetchPaginated(baseUrl, options = {}) {
 async function processData() {
     const results = [];
     for await (const { page, data } of fetchPaginated('/api')) {
-        console.log(\`Page \${page}: \${data.length} items\`);
+        console.log(`Page ${page}: ${data.length} items`);
         results.push(...data);
     }
-    console.log(\`Total: \${results.length} items\`);
+    console.log(`Total: ${results.length} items`);
 }
 
 processData();''',
@@ -1504,7 +1504,7 @@ function createReactive(target, onChange) {
 const state = createReactive(
     { user: { name: 'Dev', level: 1 }, items: [] },
     (prop, newVal, oldVal) => {
-        console.log(\`Changed: \${prop} = \${JSON.stringify(newVal)}\`);
+        console.log(`Changed: ${prop} = ${JSON.stringify(newVal)}`);
     }
 );
 
@@ -1545,15 +1545,15 @@ class PromisePool {
 
 const simulateTask = async (id) => {
     const duration = Math.random() * 300 + 100;
-    console.log(\`Task \${id} started\`);
+    console.log(`Task ${id} started`);
     await new Promise(r => setTimeout(r, duration));
-    console.log(\`Task \${id} done\`);
+    console.log(`Task ${id} done`);
     return { id, duration };
 };
 
 const pool = new PromisePool(3);
 pool.map([1,2,3,4,5,6], simulateTask).then(r => {
-    console.log(\`All done: \${r.length} tasks\`);
+    console.log(`All done: ${r.length} tasks`);
 });''',
             "description": "Concurrent task execution with limit",
             "complexity": CodeComplexity.COMPLEX
@@ -1734,7 +1734,7 @@ int main() {
             }
             connectedCallback() { this.render(); }
             render() {
-                this.shadowRoot.innerHTML = \`
+                this.shadowRoot.innerHTML = `
                     <style>
                         .counter { background: linear-gradient(135deg, #667eea, #764ba2);
                             padding: 1.5rem; border-radius: 12px; display: flex; align-items: center; gap: 1rem; }
@@ -1744,9 +1744,9 @@ int main() {
                     </style>
                     <div class="counter">
                         <button id="dec">-</button>
-                        <span id="val">\${this.count}</span>
+                        <span id="val">${this.count}</span>
                         <button id="inc">+</button>
-                    </div>\`;
+                    </div>`;
                 this.shadowRoot.getElementById('inc').onclick = () => { this.count++; this.update(); };
                 this.shadowRoot.getElementById('dec').onclick = () => { this.count--; this.update(); };
             }
@@ -3535,6 +3535,20 @@ async def health_ready():
         checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
         overall_ok = False
 
+    # A running process is not ready to serve the product if mandatory
+    # first-party endpoints were skipped during registry mounting. This is
+    # process-local inspection only; it makes no network or database calls.
+    try:
+        from routes.registry_health import critical_router_readiness
+
+        checks["critical_routes"] = critical_router_readiness()
+        if not checks["critical_routes"]["ok"]:
+            overall_ok = False
+    except Exception as exc:
+        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
+        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
+        overall_ok = False
+
     _probe_event("readiness", "ok" if overall_ok else "degraded",
                  failing=",".join(k for k, v in checks.items() if not v.get("ok")) or "none")
 
@@ -3703,6 +3717,26 @@ async def system_info():
         "languages_available": len(LANGUAGE_DOCK_REGISTRY)
     }
 
+# Read language add-ons through the shared thread-safe sync pool. The legacy
+# module-global Motor client binds to the first event loop that uses it; a
+# second TestClient/lifespan loop otherwise raises "Event loop is closed".
+# Run PyMongo I/O outside the async request loop, without hiding DB failures.
+async def _read_language_addons(limit: int = 100):
+    from core.databases import get_sync_db
+
+    return await asyncio.to_thread(
+        lambda: list(get_sync_db().language_addons.find().limit(limit))
+    )
+
+
+async def _read_language_addon(language_key: str):
+    from core.databases import get_sync_db
+
+    return await asyncio.to_thread(
+        get_sync_db().language_addons.find_one, {"language_key": language_key}
+    )
+
+
 # Languages & Dock System
 @api_router.get("/languages")
 async def get_languages():
@@ -3716,7 +3750,7 @@ async def get_languages():
             "templates_available": lang_type in CODE_TEMPLATES
         })
     
-    addons = await db.language_addons.find().to_list(100)
+    addons = await _read_language_addons()
     for addon in addons:
         addon['_id'] = str(addon['_id'])
         addon['type'] = 'addon'
@@ -3740,7 +3774,7 @@ async def get_language(language_key: str):
     except ValueError:
         pass
     
-    addon = await db.language_addons.find_one({"language_key": language_key})
+    addon = await _read_language_addon(language_key)
     if addon:
         addon['_id'] = str(addon['_id'])
         return addon
@@ -4005,21 +4039,34 @@ async def delete_file(file_id: str):
 # Addons
 @api_router.post("/addons", response_model=LanguageAddon)
 async def create_addon(data: dict):
-    existing = await db.language_addons.find_one({"language_key": data.get("language_key")})
-    if existing:
-        raise HTTPException(status_code=400, detail="Addon exists")
+    from core.databases import get_sync_db
+    from pymongo.errors import DuplicateKeyError
+
     addon = LanguageAddon(**data)
-    await db.language_addons.insert_one(addon.dict())
+
+    def insert_unique_addon():
+        collection = get_sync_db().language_addons
+        # Serialize duplicate detection with the database's unique index rather
+        # than racing a separate find and insert from concurrent requests.
+        collection.create_index("language_key", unique=True)
+        collection.insert_one(addon.dict())
+
+    try:
+        await asyncio.to_thread(insert_unique_addon)
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=400, detail="Addon exists") from exc
     return addon
 
 @api_router.get("/addons")
 async def get_addons():
-    addons = await db.language_addons.find().to_list(100)
+    addons = await _read_language_addons()
     return {"addons": [LanguageAddon(**a) for a in addons]}
 
 @api_router.delete("/addons/{addon_id}")
 async def delete_addon(addon_id: str):
-    await db.language_addons.delete_one({"id": addon_id})
+    from core.databases import get_sync_db
+
+    await asyncio.to_thread(get_sync_db().language_addons.delete_one, {"id": addon_id})
     return {"success": True}
 
 # Preferences
@@ -5128,8 +5175,8 @@ def _kick_build_watchdog_start():
     """Galaxy Studio build watchdog — self-heals stuck/orphaned builds.
 
     Called from lifespan() via ``_kick(30, "build-watchdog", ...)``. Scans
-    every 20s, resurrects orphaned runners, snapshots to vault, and
-    force-completes builds that have run past their target duration.
+    every 20s, recovers orphaned runners within admission limits, and
+    requests expired builds to stop while preserving partial work until drain.
     """
     try:
         from core.build_watchdog import start_watchdog

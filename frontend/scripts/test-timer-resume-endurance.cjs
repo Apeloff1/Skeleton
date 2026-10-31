@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,7 +8,7 @@ const ts = require('typescript');
 
 function fixture() {
   const output = ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, '../utils/safeTimers.ts'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, '../src/utils/safeTimers.ts'), 'utf8'),
     { fileName: 'safeTimers.ts', compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
     }, reportDiagnostics: true },
@@ -41,7 +42,7 @@ function fixture() {
     useEffect: fn => { effects.push(fn); },
   };
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(id => {
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(id => {
     if (id === 'react') return react;
     if (id === 'react-native') return { AppState: app };
     throw new Error('Unexpected import ' + id);

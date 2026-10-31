@@ -4,11 +4,11 @@ import test from 'node:test';
 import {
   createOperationClientState,
   reduceOperationEvent,
-} from '../services/operationStreamReducer.ts';
+} from '../src/services/operationStreamReducer.ts';
 import {
   PRODUCT_PROJECTION_SCHEMA_VERSION,
   projectWorkspaceOperation,
-} from '../services/productProjection.ts';
+} from '../src/services/productProjection.ts';
 
 function event(sequence, type, payload = {}) {
   return {

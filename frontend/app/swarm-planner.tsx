@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 // ─────────────────────────────────────────────────────────────────────────
 //  Hierarchical Swarm Planner — visualises the director→leads→platoons→
 //  workers task DAG with provable 100% coverage, dependency waves and a
@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 
 const API_URL = CANONICAL_API_BASE || '';
 

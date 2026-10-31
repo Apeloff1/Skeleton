@@ -1,0 +1,7 @@
+{
+  "operation": "api-nonfinite-json-refusal",
+  "http_status": 400,
+  "response": {
+    "error": "malformed local editor JSON"
+  }
+}

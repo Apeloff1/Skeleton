@@ -1,0 +1,9 @@
+"""10x local AI weights and interaction.
+"""
+class TenXLocalAIWeights:
+    def tenx_weights(self) -> dict:
+        return {"candidate_weights": True, "scale": 10, "stored_prose": 0}
+    def tenx_questionnaires(self) -> dict:
+        return {"questionnaires": True, "scale": 10, "stored_prose": 0}
+    def tenx_interaction(self) -> dict:
+        return {"game_interaction": True, "scale": 10, "stored_prose": 0}

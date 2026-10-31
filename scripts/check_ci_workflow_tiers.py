@@ -35,6 +35,15 @@ def events(source: str) -> set[str]:
     return found
 
 
+def independently_triggered(found: set[str]) -> bool:
+    """Count only independent Actions admissions, not manually dispatched or called jobs.
+
+    workflow_call never subscribes to repository events. Its caller consumes
+    the existing PR workflow admission, while required native checks still run.
+    """
+    return bool(found - {"workflow_dispatch", "workflow_call"})
+
+
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
@@ -45,20 +54,37 @@ def audit(root: Path = ROOT) -> list[str]:
         return ["unrecognized CI tier registry schema"]
     specialised = policy.get("specialized_manual_only")
     core = policy.get("core_automatic_pr")
-    if (not isinstance(specialised, list) or not isinstance(core, list)
-            or not specialised or not core
-            or any(not isinstance(p, str) or not p.endswith(".yml") or "/" in p
-                   for p in specialised + core)):
+    reusable = policy.get("required_reusable_workflows")
+    tiers = (specialised, core, reusable)
+    if (any(not isinstance(group, list) or not group for group in tiers)
+            or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
+                   for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    if len(set(specialised + core)) != len(specialised + core):
+    names = specialised + core + reusable
+    if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
         failures.append("release rules must preserve explicit qualification")
     active = sorted((root / WORKFLOWS).glob("*.yml"))
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
-    if not active or len(active) > 20:
-        failures.append(f"unexpected active workflow count: {len(active)}")
+    if not active:
+        failures.append("unexpected active workflow count: 0")
+    # Signed evidence workflows may sit beside the compact PR set when they
+    # cannot run automatically. Only non-manual triggers consume the cap.
+    automatic = 0
+    for path in active:
+        try:
+            found = events(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(
+                f"{path.name}: cannot inspect active workflow ({exc})"
+            )
+            continue
+        if independently_triggered(found):
+            automatic += 1
+    if automatic > 20:
+        failures.append(f"unexpected active workflow count: {automatic}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():
@@ -73,6 +99,22 @@ def audit(root: Path = ROOT) -> list[str]:
                 failures.append(f"{name}: archived specialist must retain manual-only definition; got {sorted(found)}")
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: cannot inspect archived specialist ({exc})")
+    for name in reusable:
+        try:
+            found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
+            if found != {"workflow_call", "workflow_dispatch"}:
+                failures.append(
+                    f"{name}: required reusable workflow must be callable and manually dispatchable, "
+                    f"without standalone push/PR triggers; got {sorted(found)}"
+                )
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: cannot inspect required reusable workflow ({exc})")
+        try:
+            archived = (root / ARCHIVE / name).read_text(encoding="utf-8")
+            if events(archived) != {"workflow_dispatch"}:
+                failures.append(f"{name}: archived predecessor must remain dispatch-only")
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: missing archived reusable predecessor ({exc})")
     for name in core:
         try:
             found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
@@ -86,10 +128,16 @@ def audit(root: Path = ROOT) -> list[str]:
                 or "python -m compileall -q skeleton" not in readiness
                 or "  pull_request:" not in readiness):
             failures.append("fast Merge Readiness smoke contract missing")
+        for name in reusable:
+            if f"uses: ./.github/workflows/{name}" not in readiness:
+                failures.append(f"{name}: required reusable workflow not called by Merge Readiness")
     except (OSError, UnicodeError) as exc:
         failures.append(f"Merge Readiness missing ({exc})")
     try:
         backend = (root / WORKFLOWS / "backend-quality.yml").read_text(encoding="utf-8")
+        # Backend Quality declares defaults.run.working-directory: backend.
+        # Scanner commands are correctly relative to that working directory;
+        # require the actual invocations rather than impossible backend/backend paths.
         for required in (
             "python scripts/check_ci_workflow_tiers.py",
             "python scripts/check_workflow_permissions.py",

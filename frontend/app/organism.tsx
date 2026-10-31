@@ -3,8 +3,8 @@
  */
 import React from 'react';
 import { View, StyleSheet, ScrollView, Text } from 'react-native';
-import { OrganismPreviewPanel } from '../features/GalaxyStudioFactory/OrganismPreviewPanel';
-import theme from '../theme/tokens';
+import { OrganismPreviewPanel } from '../src/features/GalaxyStudioFactory/OrganismPreviewPanel';
+import theme from '../src/theme/tokens';
 
 export default function OrganismRoute() {
   return (

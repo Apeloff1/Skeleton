@@ -9,14 +9,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api } from '../utils/apiController';
+import { api } from '../src/utils/apiController';
 import {
   useEnrolmentsLive, setWeekStatus, saveQuiz, enrolClass, unenrolClass,
   isClassCompleted, classCompletionPercent,
-} from '../utils/classStore';
-import theme from '../theme/tokens';
-import { Screen, AppHeader, Button, EmptyState, SectionHeader } from '../components/UI';
-import { toast } from '../components/Toast';
+} from '../src/utils/classStore';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader, Button, EmptyState, SectionHeader } from '../src/components/UI';
+import { toast } from '../src/components/AppToast';
 
 export default function MyClassesScreen() {
   const router = useRouter();

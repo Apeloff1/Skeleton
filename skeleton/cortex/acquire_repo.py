@@ -34,6 +34,15 @@ SPREE: Tuple[Dict[str, Any], ...] = (
     {"appid": 413150, "title": "Stardew Valley", "era": "cozy"},
 )
 
+GAME_ADJACENT_SPREE: Tuple[Dict[str, Any], ...] = (
+    {"appid": 1086940, "title": "Baldurs Gate 3", "era": "crpg"},
+    {"appid": 292030, "title": "The Witcher 3", "era": "modern_aaa"},
+    {"appid": 782330, "title": "DOOM Eternal", "era": "boomer_shooter"},
+    {"appid": 1794680, "title": "Vampire Survivors", "era": "bullet_heaven"},
+    {"appid": 255710, "title": "Cities Skylines", "era": "city_builder"},
+    {"appid": 590380, "title": "Into the Breach", "era": "tactics_grid"},
+)
+
 
 def repo_root(start: Optional[Path] = None) -> Path:
     here = Path(start or Path(__file__).resolve())

@@ -23,6 +23,12 @@ _chroma_client = None
 _collections: Dict[str, Any] = {}
 
 
+def _matches_projection(metadata: Dict, where: Dict) -> bool:
+    if "$and" in where:
+        return all(_matches_projection(metadata, clause) for clause in where["$and"])
+    return all(metadata.get(key) == value for key, value in where.items())
+
+
 def get_chroma_client():
     """Get or create ChromaDB client (lazy initialization)."""
     global _chroma_client
@@ -84,7 +90,7 @@ class MockCollection:
         filtered = self._documents
         if where:
             filtered = [d for d in self._documents 
-                       if all(d["metadata"].get(k) == v for k, v in where.items())]
+                       if _matches_projection(d["metadata"], where)]
         
         results = filtered[-n_results:]
         return {
@@ -102,7 +108,7 @@ class MockCollection:
             results = [d for d in self._documents if d["id"] in ids]
         elif where:
             results = [d for d in self._documents 
-                      if all(d["metadata"].get(k) == v for k, v in where.items())]
+                      if _matches_projection(d["metadata"], where)]
         else:
             results = self._documents
         
@@ -117,7 +123,7 @@ class MockCollection:
             self._documents = [d for d in self._documents if d["id"] not in ids]
         elif where:
             self._documents = [d for d in self._documents 
-                             if not all(d["metadata"].get(k) == v for k, v in where.items())]
+                             if not _matches_projection(d["metadata"], where)]
 
 
 # =============================================================================
@@ -476,12 +482,15 @@ class RAGService:
         pipeline: str,
         context: str,
         code_snippets: List[str],
-        decisions: List[str]
+        decisions: List[str],
+        *,
+        tenant_id: str | None = None,
     ) -> str:
         """Commit co-coding state to Mongo before semantic projection."""
         row = self.state.put_cocoding_context(
             session_id=session_id,
             user_id=user_id,
+            tenant_id=tenant_id,
             pipeline=pipeline,
             context=context,
             code_snippets=code_snippets,
@@ -494,6 +503,7 @@ class RAGService:
             metadata={
                 "session_id": row["session_id"],
                 "user_id": row["user_id"],
+                "tenant_id": row["tenant_id"],
                 "pipeline": row["pipeline"],
                 "snippet_count": len(row["code_snippets"]),
                 "decision_count": len(row["decisions"]),
@@ -509,13 +519,20 @@ class RAGService:
         user_id: str,
         query: str,
         pipeline: Optional[str] = None,
-        limit: int = 3
+        limit: int = 3,
+        *,
+        tenant_id: str | None = None,
     ) -> List[Dict]:
         """Retrieve via Chroma but validate every hit against Mongo authority."""
+        if not isinstance(tenant_id, str) or not tenant_id.strip() or not isinstance(user_id, str) or not user_id.strip():
+            return []
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
+            return []
         collection = self._get_collection("cocoding_context")
-        where_filter = {"user_id": user_id}
+        clauses = [{"user_id": user_id}, {"tenant_id": tenant_id}]
         if pipeline:
-            where_filter["pipeline"] = pipeline
+            clauses.append({"pipeline": pipeline})
+        where_filter = {"$and": clauses}
 
         try:
             results = collection.query(
@@ -534,8 +551,11 @@ class RAGService:
             canonical = self.state.get_cocoding_context(
                 str(projected_id),
                 user_id=user_id,
+                tenant_id=tenant_id,
             )
             if canonical is None:
+                continue
+            if canonical.get("user_id") != user_id or canonical.get("tenant_id") != tenant_id:
                 continue
             if pipeline and canonical.get("pipeline") != pipeline:
                 continue
@@ -544,6 +564,7 @@ class RAGService:
                 "metadata": {
                     "session_id": canonical["session_id"],
                     "user_id": canonical["user_id"],
+                    "tenant_id": canonical["tenant_id"],
                     "pipeline": canonical["pipeline"],
                     "timestamp": canonical["timestamp"],
                     "authority": "mongo",
@@ -558,6 +579,7 @@ class RAGService:
             user_id,
             pipeline=pipeline,
             limit=limit,
+            tenant_id=tenant_id,
         )
         return [
             {
@@ -565,6 +587,7 @@ class RAGService:
                 "metadata": {
                     "session_id": row["session_id"],
                     "user_id": row["user_id"],
+                    "tenant_id": row["tenant_id"],
                     "pipeline": row["pipeline"],
                     "timestamp": row["timestamp"],
                     "authority": "mongo",
@@ -572,6 +595,8 @@ class RAGService:
                 "relevance": 0.0,
             }
             for row in rows
+            if row.get("user_id") == user_id and row.get("tenant_id") == tenant_id
+            and (not pipeline or row.get("pipeline") == pipeline)
         ]
 
     def store_feedback(
@@ -713,27 +738,10 @@ class RAGService:
             except Exception:
                 migrated["skipped"] += 1
 
-        for record_id, document, meta in legacy_rows("cocoding_context"):
-            try:
-                user_id = str(meta.get("user_id") or "")
-                pipeline = str(meta.get("pipeline") or "unknown")
-                if not user_id:
-                    migrated["skipped"] += 1
-                    continue
-                self.state.put_cocoding_context(
-                    session_id=record_id,
-                    user_id=user_id,
-                    pipeline=pipeline,
-                    context=document,
-                    code_snippets=[],
-                    decisions=[],
-                    timestamp=str(meta.get("timestamp") or self._utc_now()),
-                )
-                migrated["cocoding_context"] += 1
-            except RAGStateConflict:
-                migrated["conflicts"] += 1
-            except Exception:
-                migrated["skipped"] += 1
+        for _ in legacy_rows("cocoding_context"):
+            # A retrieval projection cannot attest a legacy record's tenant.
+            # Private co-coding state requires an independently scoped write.
+            migrated["skipped"] += 1
 
         for record_id, document, meta in legacy_rows("feedback"):
             try:
@@ -805,12 +813,15 @@ class RAGService:
             rebuilt["concepts" if ok else "failed"] += 1
 
         for row in inventory["cocoding_context"]:
+            if not row.get("tenant_id") or not row.get("user_id"):
+                continue
             ok = self._project_add(
                 "cocoding_context",
                 document=self._canonical_cocoding_content(row),
                 metadata={
                     "session_id": row["session_id"],
                     "user_id": row["user_id"],
+                    "tenant_id": row["tenant_id"],
                     "pipeline": row["pipeline"],
                     "snippet_count": len(row.get("code_snippets") or []),
                     "decision_count": len(row.get("decisions") or []),

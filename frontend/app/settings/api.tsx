@@ -16,9 +16,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { api, TelemetrySnapshot } from '../../utils/apiController';
-import { toast } from '../../components/Toast';
-import { actionSheet } from '../../components/ActionSheet';
+import { api, TelemetrySnapshot } from '../../src/utils/apiController';
+import { toast } from '../../src/components/AppToast';
+import { actionSheet } from '../../src/components/ActionSheet';
 
 interface ServerStats {
   uptime_seconds: number;

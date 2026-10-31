@@ -1,7 +1,7 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
 
 export default makeLazyModalRoute(
-  () => import('../features/GameFactory/GameFactoryRouteModal'),
+  () => import('../src/features/GameFactory/GameFactoryRouteModal'),
   'GameFactoryRoute',
   'GameFactoryRouteModal',
 );

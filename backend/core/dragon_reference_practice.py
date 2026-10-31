@@ -135,9 +135,22 @@ def _source_pin(candidate):
             "request_digest",
             "consent_id",
         }
-        or pin["source_ref"].get("schema_version") != "skeleton.dragon.crawler_reference.v1"
+        | (
+            {"source_use_version"}
+            if pin["source_ref"].get("schema_version") == "skeleton.dragon.crawler_reference.v2"
+            else set()
+        )
+        or pin["source_ref"].get("schema_version")
+        not in {"skeleton.dragon.crawler_reference.v1", "skeleton.dragon.crawler_reference.v2"}
         or any(
-            not isinstance(value, str) or not 1 <= len(value) <= 256 for value in pin["source_ref"].values()
+            not isinstance(value, str) or not 1 <= len(value) <= 256
+            for key, value in pin["source_ref"].items()
+            if key != "source_use_version"
+        )
+        or pin["source_ref"].get("schema_version") == "skeleton.dragon.crawler_reference.v2"
+        and (
+            type(pin["source_ref"]["source_use_version"]) is not int
+            or not 0 <= pin["source_ref"]["source_use_version"] <= 2**31 - 1
         )
         or not isinstance(pin["source_digest"], str)
         or len(pin["source_digest"]) != 64

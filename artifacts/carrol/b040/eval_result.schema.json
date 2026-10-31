@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skeleton/b040/eval_result.schema.json",
+  "title": "B040 eval arena run result (S2, draft)",
+  "type": "object",
+  "required": ["run_id", "set_version", "candidate", "git_sha", "started_at", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,80}$"},
+    "set_version": {"type": "integer", "minimum": 1},
+    "candidate": {"type": "string", "minLength": 1},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+    "started_at": {"type": "string", "minLength": 1},
+    "provenance": {"type": ["object", "null"]},
+    "cases": {"type": "array", "items": {"$ref": "#/$defs/case_result"}}
+  },
+  "$defs": {
+    "score": {
+      "type": "object",
+      "required": ["value", "passed"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": ["number", "null"]},
+        "passed": {"type": ["boolean", "null"]},
+        "reason": {"type": "string"}
+      }
+    },
+    "case_result": {
+      "type": "object",
+      "required": ["case_id", "version", "seed", "status", "scores"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^B040-[A-Z]{2,8}-[0-9]{3}$"},
+        "version": {"type": "integer", "minimum": 1},
+        "seed": {"type": "integer", "minimum": 0},
+        "status": {"enum": ["passed", "failed", "error", "skipped"]},
+        "build_id": {"type": ["string", "null"]},
+        "scores": {
+          "type": "object",
+          "required": ["correctness", "editability", "latency", "cost", "safety"],
+          "additionalProperties": false,
+          "properties": {
+            "correctness": {"$ref": "#/$defs/score"},
+            "editability": {"$ref": "#/$defs/score"},
+            "latency": {"$ref": "#/$defs/score"},
+            "cost": {"$ref": "#/$defs/score"},
+            "safety": {"$ref": "#/$defs/score"}
+          }
+        }
+      }
+    }
+  }
+}

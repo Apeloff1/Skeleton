@@ -44,11 +44,12 @@ from core.collection_agents import (
 from core.compressed_vault import sample_shard, get_shard_entry
 from core import agent_ledger as ledger
 from core import whisper_network as whispers
-from core.databases import get_sync_db
+from core.databases import lazy_sync_collection
 
-_db = get_sync_db()
-_legion = _db["legion_discourse_logs"]
-_legion.create_index([("build_id", 1), ("created_at", -1)])
+_legion = lazy_sync_collection(
+    "legion_discourse_logs",
+    ([("build_id", 1), ("created_at", -1)], {}),
+)
 
 MOVES_TEAM = ["proposes", "counters", "qualifies", "warns", "extends"]
 MOVES_LEGION = ["escalates", "synthesizes", "arbitrates", "mandates", "concedes"]

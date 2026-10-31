@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import threading
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from uuid import NAMESPACE_URL, uuid4, uuid5
@@ -20,7 +21,7 @@ from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
-from core.engine_client import EngineClient, EngineClientError
+from core.engine_client import EngineAuthorizationError, EngineClient, EngineClientError
 
 log = logging.getLogger(__name__)
 MAX_SNAPSHOT = 4 * 1024 * 1024
@@ -30,6 +31,8 @@ LEASE_SECONDS = 120
 MAX_CONCURRENT_SLICES = 4
 MAX_AUTO_SLICES = 64
 MAX_AUTO_SECONDS = 3600
+MAX_SOURCE_AGE_SECONDS = 86400
+MAX_SOURCE_POLICIES = 64
 TERMINAL_STATES = {"completed", "budget_exhausted", "cancelled", "deleted"}
 
 
@@ -193,6 +196,8 @@ class DragonCrawlerApplication:
                 "finite_autonomous_crawl": available and scheduled,
                 "durable_resume": available,
                 "source_export": available,
+                "source_use_control": available,
+                "capture_age_limits": available,
                 "automatic_review": False,
                 "model_training": False,
                 "trusted_device_idle": False,
@@ -222,30 +227,109 @@ class DragonCrawlerApplication:
                 "crawler_admission_unconfigured", "Canonical storage admission is not configured.", 503
             )
         raw = _encoded(payload)
+        write_id = identifier + ":" + hashlib.sha256(raw).hexdigest()
+        # Use the canonical engine's external-storage operation identity so a
+        # receipt for another attester/write cannot be relabelled as this one.
+        operation_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                "\x1f".join(
+                    (
+                        "skeleton-external-storage",
+                        self.engine.config.service_principal,
+                        scope["tenant_id"],
+                        "dragon-crawler-persistence",
+                        identifier,
+                        write_id,
+                    )
+                ),
+            )
+        )
         try:
             receipt = await self.engine.admit_storage_write(
                 tenant_id=scope["tenant_id"],
                 capability="dragon-crawler-persistence",
                 resource_id=identifier,
-                write_id=identifier + ":" + hashlib.sha256(raw).hexdigest(),
+                write_id=write_id,
                 storage_bytes=len(raw),
             )
+        except EngineAuthorizationError as exc:
+            raise CrawlerError(
+                "crawler_admission_scope_denied",
+                "The engine storage grant does not admit this account scope. Configure the attester's tenant and crawler-persistence grant; existing captures keep their original scope.",
+                503,
+            ) from exc
         except Exception as exc:
             raise CrawlerError(
                 "crawler_admission_unavailable",
                 "Canonical storage admission rejected the crawler write.",
                 503,
             ) from exc
+        invalid = CrawlerError(
+            "crawler_admission_invalid", "Storage admission did not bind the exact crawler write.", 503
+        )
+        if not isinstance(receipt, Mapping):
+            raise invalid
+        receipt = dict(receipt)
+        _encoded(receipt, 64 * 1024)
+        fields = {
+            "schema_version",
+            "receipt_id",
+            "operation_id",
+            "tenant_id",
+            "capability",
+            "resource_id",
+            "write_id",
+            "storage_bytes",
+            "admitted_at",
+            "quota_reservation_id",
+            "admission_decision_id",
+            "replayed",
+        }
+
+        def identifier_text(value: object) -> bool:
+            return (
+                isinstance(value, str)
+                and 1 <= len(value) <= 512
+                and value == value.strip()
+                and all(ord(char) >= 32 and ord(char) != 127 for char in value)
+            )
+
         if (
-            not isinstance(receipt, Mapping)
+            set(receipt) != fields
+            or type(receipt.get("schema_version")) is not int
+            or receipt["schema_version"] != 1
+            or receipt.get("tenant_id") != scope["tenant_id"]
+            or receipt.get("capability") != "dragon-crawler-persistence"
+            or receipt.get("resource_id") != identifier
+            or receipt.get("write_id") != write_id
             or type(receipt.get("storage_bytes")) is not int
-            or receipt["storage_bytes"] < len(raw)
+            or receipt["storage_bytes"] != len(raw)
+            or type(receipt.get("replayed")) is not bool
+            or receipt.get("operation_id") != operation_id
+            or not identifier_text(receipt.get("receipt_id"))
+            or any(
+                receipt.get(key) is not None and not identifier_text(receipt[key])
+                for key in ("quota_reservation_id", "admission_decision_id")
+            )
+        ):
+            raise invalid
+        try:
+            admitted_at = receipt["admitted_at"]
+            if not isinstance(admitted_at, str) or not 1 <= len(admitted_at) <= 64 or "T" not in admitted_at:
+                raise ValueError("invalid admission timestamp")
+            admitted = datetime.fromisoformat(admitted_at.replace("Z", "+00:00"))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise invalid from exc
+        if (
+            receipt["receipt_id"] != "storage-admission:" + hashlib.sha256(operation_id.encode()).hexdigest()
+            or admitted.tzinfo is None
+            or admitted.utcoffset() is None
         ):
             raise CrawlerError(
-                "crawler_admission_invalid", "Storage admission did not cover the crawler snapshot.", 503
+                "crawler_admission_invalid", "Storage admission identity or timestamp is invalid.", 503
             )
-        _encoded(dict(receipt), 64 * 1024)
-        return dict(receipt)
+        return receipt
 
     async def _owned(self, scope: dict[str, str], identifier: str) -> dict:
         if not isinstance(identifier, str) or not 1 <= len(identifier) <= 128:
@@ -267,6 +351,9 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_integrity", "Crawler snapshot owner does not match its durable scope.", 503
             )
+        policies = self._source_policies(row)
+        if set(policies) - set(snapshot["sources"]):
+            raise CrawlerError("crawler_integrity", "Source-use policies refer to missing captures.", 503)
         return row
 
     def _worker_state(self, row: dict) -> dict:
@@ -354,7 +441,9 @@ class DragonCrawlerApplication:
                 if key not in {"principal_email", "scope", "consent_id", "request_digest"}
             }
             if grant
-            else {"enabled": False, "state": "not_authorized", "slices_started": 0}
+            else {"enabled": False, "state": "not_authorized", "epoch": 0,
+                  "slices_started": 0, "max_slices": 0, "expires_at": None,
+                  "next_run_at": None, "stop_reason": None}
         )
         current = status["consent_current"]
         status["capabilities"] = {
@@ -796,6 +885,145 @@ class DragonCrawlerApplication:
             await self._grant_principal(scope, grant)
         return row
 
+    async def _settle_unstarted(
+        self,
+        scope: dict[str, str],
+        row: dict,
+        token: str,
+        epoch: int,
+        operation: str,
+        digest: str,
+        code: str,
+        automation_epoch: int | None,
+    ) -> None:
+        """Fence a claim before dispatch or after a rejected runner drained.
+
+        A cancelled Mongo await can still commit. Fence the original revision
+        first, so a late claim cannot resurrect running state after cleanup.
+        If that claim already won, settle only its exact token and epoch.
+        A submission exception alone never authorizes this settlement.
+        """
+        receipt = {
+            "request_digest": digest,
+            "action": "run",
+            "state": "interrupted",
+            "error_code": code,
+        }
+        unset = {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""}
+        interrupted = {
+            "status": "interrupted",
+            "worker_epoch": epoch,
+            "updated_at": _now(),
+            "operations." + operation: receipt,
+            "last_worker_exit_confirmed": True,
+            "error": {
+                "code": code,
+                "message": "The slice did not start. Its accepted checkpoint is unchanged; reload before starting a new slice.",
+            },
+        }
+        original = {"_id": row["_id"], **scope, "version": row["version"], "status": row["status"]}
+        if automation_epoch is not None:
+            original.update(
+                {
+                    "automation.enabled": True,
+                    "automation.epoch": automation_epoch,
+                    "automation.slices_started": row["automation"]["slices_started"],
+                }
+            )
+            interrupted.update(
+                {"automation.state": "waiting", "automation.next_run_at": _now() + timedelta(seconds=10)}
+            )
+        fenced = await self.sessions.update_one(
+            original,
+            {
+                "$set": interrupted,
+                "$inc": {
+                    "version": 1,
+                    # The unresolved original claim may still be in flight.
+                    # Reserve this attempted automatic key exactly once; an
+                    # already committed claim has consumed this credit itself.
+                    **(
+                        {"automation.slices_started": 1, "automation_slices_total": 1}
+                        if automation_epoch is not None
+                        else {}
+                    ),
+                },
+                "$unset": unset,
+            },
+        )
+        if fenced.matched_count:
+            return
+        owned_worker = {"_id": row["_id"], **scope, "worker_token": token, "worker_epoch": epoch}
+        settled = await self.sessions.update_one(
+            {**owned_worker, "status": "running"},
+            {"$set": interrupted, "$inc": {"version": 1}, "$unset": unset},
+        )
+        if settled.matched_count:
+            return
+        # Pause/cancel may have won the revision race. Keep their status and
+        # grants; only discharge the claim that never started a physical worker.
+        await self.sessions.update_one(
+            {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+            {
+                "$set": {
+                    "updated_at": _now(),
+                    "operations." + operation: receipt,
+                    "last_worker_exit_confirmed": True,
+                },
+                "$inc": {"version": 1},
+                "$unset": unset,
+            },
+        )
+        await self.sessions.update_one(
+            {**owned_worker, "status": "deleted"},
+            {"$set": {"last_worker_exit_confirmed": True}, "$unset": unset},
+        )
+
+    async def _abort_dispatch(
+        self,
+        scope: dict[str, str],
+        row: dict,
+        token: str,
+        epoch: int,
+        operation: str,
+        digest: str,
+        failure: BaseException,
+        automation_epoch: int | None,
+        *,
+        claim_pending: bool,
+    ) -> None:
+        async def cleanup():
+            try:
+                if claim_pending:
+                    await self._settle_unstarted(
+                        scope, row, token, epoch, operation, digest, _safe_error(failure), automation_epoch
+                    )
+            finally:
+                # Callers prove either dispatch was never attempted, or the
+                # rejected runner actually exited without entering the crawl.
+                # Other tokens' capacity is never released.
+                await self.limits.update_many(
+                    {"worker_token": token},
+                    {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
+                )
+
+        finishing = asyncio.create_task(cleanup())
+        while not finishing.done():
+            try:
+                await asyncio.shield(finishing)
+            except asyncio.CancelledError:
+                # Request cancellation cannot cancel an uncertain database
+                # claim's fence; retain custody until bounded driver completion.
+                continue
+            except Exception:
+                break
+        try:
+            finishing.result()
+        except (Exception, asyncio.CancelledError):
+            # Preserve the initiating failure. Database outages retain the
+            # existing finite lease rather than claiming settlement succeeded.
+            log.warning("Crawler pre-dispatch settlement unavailable", exc_info=False)
+
     async def run(
         self, scope: dict[str, str], identifier: str, body: dict, *, automation_epoch: int | None = None
     ) -> dict:
@@ -803,7 +1031,11 @@ class DragonCrawlerApplication:
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = self._prior(row, operation, digest)
         if previous:
-            return {"ok": True, "session": self._projection(row), "run": previous}
+            return {
+                "ok": previous.get("state") == "completed",
+                "session": self._projection(row),
+                "run": previous,
+            }
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the current crawler revision before running.", 409)
         if row["status"] not in {"queued", "interrupted"}:
@@ -842,27 +1074,28 @@ class DragonCrawlerApplication:
         if sum(not handle[1].done() for handle in self._workers.values()) >= MAX_CONCURRENT_SLICES:
             raise CrawlerError("crawler_capacity", "Local physical crawler capacity is occupied.", 429)
         now, epoch = _now(), int(row["worker_epoch"]) + 1
-        credit = await self.limits.find_one_and_update(
-            {
-                "_id": quota_id,
-                **scope,
-                "$or": [{"lease_until": {"$exists": False}}, {"lease_until": {"$lt": now}}],
-            },
-            {
-                "$set": {
-                    "worker_token": token,
-                    "active_session_id": identifier,
-                    "lease_until": now + timedelta(seconds=LEASE_SECONDS),
-                }
-            },
-            return_document=ReturnDocument.AFTER,
-        )
-        if credit is None:
-            raise CrawlerError(
-                "crawler_capacity", "This account already has an active bounded crawler slice.", 429
-            )
-        global_credit = None
+        claim_pending = False
         try:
+            credit = await self.limits.find_one_and_update(
+                {
+                    "_id": quota_id,
+                    **scope,
+                    "$or": [{"lease_until": {"$exists": False}}, {"lease_until": {"$lt": now}}],
+                },
+                {
+                    "$set": {
+                        "worker_token": token,
+                        "active_session_id": identifier,
+                        "lease_until": now + timedelta(seconds=LEASE_SECONDS),
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+            if credit is None:
+                raise CrawlerError(
+                    "crawler_capacity", "This account already has an active bounded crawler slice.", 429
+                )
+            global_credit = None
             for index in range(MAX_CONCURRENT_SLICES):
                 slot = "crawler-slice:" + str(index)
                 await self.limits.update_one(
@@ -904,59 +1137,64 @@ class DragonCrawlerApplication:
                     "The bounded crawler worker capacity is occupied; retry after a slice drains.",
                     429,
                 )
-        except BaseException:
-            await self.limits.update_many(
-                {"worker_token": token},
-                {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
+            claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
+            if automation_epoch is not None:
+                claim.update(
+                    {
+                        "automation.enabled": True,
+                        "automation.epoch": automation_epoch,
+                        "automation.slices_started": grant["slices_started"],
+                        "$expr": {"$gt": ["$automation.expires_at", {"$add": ["$$NOW", 15000]}]},
+                    }
+                )
+            claim_pending = True
+            changed = await self.sessions.update_one(
+                claim,
+                {
+                    "$set": {
+                        "status": "running",
+                        "worker_token": token,
+                        "worker_epoch": epoch,
+                        "lease_until": now + timedelta(seconds=LEASE_SECONDS),
+                        "updated_at": now,
+                        "operations."
+                        + operation: {"request_digest": digest, "action": "run", "state": "running"},
+                        **(
+                            {"worker_automation_epoch": automation_epoch, "automation.state": "running"}
+                            if automation_epoch is not None
+                            else {}
+                        ),
+                    },
+                    "$inc": {
+                        "version": 1,
+                        **(
+                            {"automation.slices_started": 1, "automation_slices_total": 1}
+                            if automation_epoch is not None
+                            else {}
+                        ),
+                    },
+                    "$unset": {
+                        "error": "",
+                        **({"worker_automation_epoch": ""} if automation_epoch is None else {}),
+                    },
+                },
+            )
+            if not changed.modified_count:
+                claim_pending = False
+                raise CrawlerError("crawler_conflict", "Crawler changed before the worker was claimed.", 409)
+        except BaseException as exc:
+            await self._abort_dispatch(
+                scope,
+                row,
+                token,
+                epoch,
+                operation,
+                digest,
+                exc,
+                automation_epoch,
+                claim_pending=claim_pending,
             )
             raise
-        claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
-        if automation_epoch is not None:
-            claim.update(
-                {
-                    "automation.enabled": True,
-                    "automation.epoch": automation_epoch,
-                    "automation.slices_started": grant["slices_started"],
-                    "$expr": {"$gt": ["$automation.expires_at", {"$add": ["$$NOW", 15000]}]},
-                }
-            )
-        changed = await self.sessions.update_one(
-            claim,
-            {
-                "$set": {
-                    "status": "running",
-                    "worker_token": token,
-                    "worker_epoch": epoch,
-                    "lease_until": now + timedelta(seconds=LEASE_SECONDS),
-                    "updated_at": now,
-                    "operations."
-                    + operation: {"request_digest": digest, "action": "run", "state": "running"},
-                    **(
-                        {"worker_automation_epoch": automation_epoch, "automation.state": "running"}
-                        if automation_epoch is not None
-                        else {}
-                    ),
-                },
-                "$inc": {
-                    "version": 1,
-                    **(
-                        {"automation.slices_started": 1, "automation_slices_total": 1}
-                        if automation_epoch is not None
-                        else {}
-                    ),
-                },
-                "$unset": {
-                    "error": "",
-                    **({"worker_automation_epoch": ""} if automation_epoch is None else {}),
-                },
-            },
-        )
-        if not changed.modified_count:
-            await self.limits.update_many(
-                {"worker_token": token},
-                {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
-            )
-            raise CrawlerError("crawler_conflict", "Crawler changed before the worker was claimed.", 409)
         loop, cancelled = asyncio.get_running_loop(), threading.Event()
 
         def bridge(coroutine):
@@ -1024,16 +1262,163 @@ class DragonCrawlerApplication:
             )
             return runtime.snapshot(), _plain(summary)
 
-        # Keep the executor Future rather than wrapping it in a child Task:
-        # shutdown cancels all Tasks, including a shielded to_thread Task.
-        # The Future remains joinable while the actual HTTP thread drains.
-        worker = loop.run_in_executor(None, work)
+        # Own custody before calling the executor. ThreadPoolExecutor.submit
+        # queues work before starting a thread, so a raised submission can
+        # leave runnable work behind without returning its executor Future.
+        # Only our runner may complete this Future; executor acknowledgement
+        # is neither evidence of entry nor proof that physical work drained.
+        worker = loop.create_future()
+        dispatch_ready, dispatch_accepted, runner_exited = (
+            threading.Event(),
+            threading.Event(),
+            threading.Event(),
+        )
         self._workers[token] = (cancelled, worker)
+
+        def complete(result, error):
+            if not worker.done():
+                if error is None:
+                    worker.set_result(result)
+                else:
+                    worker.set_exception(error)
+
+        def runner():
+            result, error = None, None
+            try:
+                # Never enter the crawl body until submit returns positively.
+                # An orphan queued before a submission failure can only drain
+                # this rejected gate; it cannot fetch or publish checkpoints.
+                dispatch_ready.wait()
+                if not dispatch_accepted.is_set():
+                    raise CrawlerError(
+                        "crawler_dispatch_uncertain", "Crawler executor submission was not acknowledged.", 503
+                    )
+                result = work()
+            except BaseException as exc:
+                error = exc
+            finally:
+                runner_exited.set()
+                try:
+                    loop.call_soon_threadsafe(complete, result, error)
+                except RuntimeError:
+                    # A closed event loop cannot publish physical-exit proof;
+                    # durable recovery retains the existing finite lease.
+                    pass
+
+        def discard_executor_result(future):
+            if not future.cancelled():
+                future.exception()
+
+        def rejected_runner_drained(future):
+            if future.cancelled() or not runner_exited.is_set():
+                return
+            future.exception()
+            finishing = loop.create_task(
+                self._abort_dispatch(
+                    scope,
+                    row,
+                    token,
+                    epoch,
+                    operation,
+                    digest,
+                    CrawlerError(
+                        "crawler_dispatch_uncertain", "Crawler submission was not acknowledged.", 503
+                    ),
+                    automation_epoch,
+                    claim_pending=True,
+                )
+            )
+            # Keep the same token in custody until its bounded durable cleanup
+            # finishes. The physical runner has now actually exited.
+            self._workers[token] = (cancelled, finishing)
+
+            def settled(done):
+                if self._workers.get(token, (None, None))[1] is done:
+                    self._workers.pop(token, None)
+                if not done.cancelled():
+                    done.exception()
+
+            finishing.add_done_callback(settled)
+
+        async def retain_uncertain():
+            cancelled.set()
+            dispatch_accepted.clear()
+            dispatch_ready.set()
+            worker.add_done_callback(rejected_runner_drained)
+            # Unknown submission keeps its physical token/lease and local
+            # handle. A queued runner may enter later; absent actual runner
+            # exit, neither request failure nor lease expiry proves quiescence.
+            owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
+            receipt = {
+                "request_digest": digest,
+                "action": "run",
+                "state": "interrupted",
+                "error_code": "crawler_dispatch_uncertain",
+            }
+            metadata = {
+                "updated_at": _now(),
+                "last_worker_exit_confirmed": False,
+                "operations." + operation: receipt,
+            }
+            try:
+                changed = await self.sessions.update_one(
+                    {**owned_worker, "status": "running"},
+                    {
+                        "$set": {
+                            **metadata,
+                            "status": "interrupted",
+                            "error": {
+                                "code": "crawler_dispatch_uncertain",
+                                "message": "Executor submission failed without physical-exit proof. Capacity remains held until the rejected runner drains or the backend is restarted.",
+                            },
+                        },
+                        "$inc": {"version": 1},
+                    },
+                )
+                if not changed.matched_count:
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+                        {"$set": metadata, "$inc": {"version": 1}},
+                    )
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": "deleted"},
+                        {"$set": {"last_worker_exit_confirmed": False}},
+                    )
+            except (PyMongoError, asyncio.CancelledError):
+                log.warning("Crawler uncertain-dispatch publication unavailable", exc_info=False)
+            return receipt
+
+        try:
+            submitted = loop.run_in_executor(None, runner)
+        except BaseException as exc:
+            await retain_uncertain()
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            raise CrawlerError(
+                "crawler_dispatch_uncertain",
+                "Crawler executor submission was not acknowledged; physical capacity remains held until runner exit is observed. Reload the session before retrying.",
+                503,
+            ) from exc
+        else:
+            submitted.add_done_callback(discard_executor_result)
+            dispatch_accepted.set()
+            dispatch_ready.set()
         failure: BaseException | None = None
         interrupted = False
         try:
             while True:
                 try:
+                    # A pool initializer can reject the queued item before
+                    # calling runner. Observe that acknowledgement separately
+                    # from physical custody so it cannot hang this request or
+                    # fabricate runner-exit evidence.
+                    await asyncio.wait({worker, submitted}, return_when=asyncio.FIRST_COMPLETED)
+                    if submitted.done() and not runner_exited.is_set():
+                        raise CrawlerError(
+                            "crawler_dispatch_uncertain",
+                            "The executor stopped before runner exit was observed.",
+                            503,
+                        )
                     snapshot, summary = await asyncio.shield(worker)
                     break
                 except asyncio.CancelledError:
@@ -1141,72 +1526,75 @@ class DragonCrawlerApplication:
         except BaseException as exc:
             failure = exc
             cancelled.set()
-            while not worker.done():
-                try:
-                    await asyncio.shield(worker)
-                except asyncio.CancelledError:
-                    cancelled.set()
-                except BaseException:
-                    break
-            if worker.done() and not worker.cancelled():
-                # Retrieve an exception even when another control command won.
-                worker.exception()
-            code = _safe_error(exc)
-            operation_receipt = {
-                "request_digest": digest,
-                "action": "run",
-                "state": "interrupted",
-                "error_code": code,
-            }
-            owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
-            settled = await self.sessions.update_one(
-                {**owned_worker, "status": "running"},
-                {
-                    "$set": {
-                        "status": "interrupted",
-                        "updated_at": _now(),
-                        "operations." + operation: operation_receipt,
-                        "last_worker_exit_confirmed": True,
-                        "error": {
-                            "code": code,
-                            "message": "The slice stopped; only accepted checkpoints remain.",
-                        },
-                    },
-                    "$inc": {"version": 1},
-                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
-                },
-            )
-            if not settled.matched_count:
-                # A safety control may have won while this real worker drained.
-                # Preserve its status and grant while settling the old receipt.
-                await self.sessions.update_one(
-                    {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+            if submitted.done() and not runner_exited.is_set():
+                operation_receipt = await retain_uncertain()
+            else:
+                while not worker.done():
+                    try:
+                        await asyncio.shield(worker)
+                    except asyncio.CancelledError:
+                        cancelled.set()
+                    except BaseException:
+                        break
+                if worker.done() and not worker.cancelled():
+                    # Retrieve an exception even when another control command won.
+                    worker.exception()
+                code = _safe_error(exc)
+                operation_receipt = {
+                    "request_digest": digest,
+                    "action": "run",
+                    "state": "interrupted",
+                    "error_code": code,
+                }
+                owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
+                settled = await self.sessions.update_one(
+                    {**owned_worker, "status": "running"},
                     {
                         "$set": {
+                            "status": "interrupted",
                             "updated_at": _now(),
                             "operations." + operation: operation_receipt,
                             "last_worker_exit_confirmed": True,
+                            "error": {
+                                "code": code,
+                                "message": "The slice stopped; only accepted checkpoints remain.",
+                            },
                         },
                         "$inc": {"version": 1},
                         "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
                     },
                 )
-                # Erasure keeps only its tombstone and physical-exit metadata;
-                # never recreate an operations journal after source deletion.
-                await self.sessions.update_one(
-                    {**owned_worker, "status": "deleted"},
-                    {
-                        "$set": {"last_worker_exit_confirmed": True},
-                        "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
-                    },
-                )
+                if not settled.matched_count:
+                    # A safety control may have won while this real worker drained.
+                    # Preserve its status and grant while settling the old receipt.
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+                        {
+                            "$set": {
+                                "updated_at": _now(),
+                                "operations." + operation: operation_receipt,
+                                "last_worker_exit_confirmed": True,
+                            },
+                            "$inc": {"version": 1},
+                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                        },
+                    )
+                    # Erasure keeps only its tombstone and physical-exit metadata;
+                    # never recreate an operations journal after source deletion.
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": "deleted"},
+                        {
+                            "$set": {"last_worker_exit_confirmed": True},
+                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                        },
+                    )
         finally:
-            if worker.done():
+            if runner_exited.is_set() and worker.done():
                 self._workers.pop(token, None)
-            await self.limits.update_many(
-                {"worker_token": token},
-                {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
-            )
+                await self.limits.update_many(
+                    {"worker_token": token},
+                    {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
+                )
         if isinstance(failure, asyncio.CancelledError):
             raise failure
         current = await self.get(scope, identifier)
@@ -1257,6 +1645,7 @@ class DragonCrawlerApplication:
                     "automation": "",
                     "worker_automation_epoch": "",
                     "safety_control": "",
+                    "source_use_policies": "",
                 },
             },
         )
@@ -1290,6 +1679,65 @@ class DragonCrawlerApplication:
             "history_truncated": bool(events and after_sequence < events[0]["sequence"] - 1),
         }
 
+    async def companion_feed(
+        self,
+        scope: dict[str, str],
+        *,
+        after_sequence: int = 0,
+        limit: int = 100,
+        expected_digest: str | None = None,
+    ) -> dict[str, Any]:
+        """Project the account's latest crawl checkpoint into companion wire events.
+
+        Cursor mismatches fail closed. A missing or unreadable checkpoint is a
+        storage error so the academy journal can remain available.
+        """
+        from skeleton.ai.webcrawler.dragon_capture_projection import (
+            CompanionCursorError,
+            project_companion_feed,
+            validate_companion_cursor,
+        )
+        from skeleton.ai.webcrawler.operations import CrawlOperationError
+
+        validate_companion_cursor(after_sequence, limit, expected_digest)
+        row = await self.sessions.find_one(
+            {**scope, "status": {"$ne": "deleted"}},
+            sort=[("updated_at", DESCENDING), ("_id", DESCENDING)],
+        )
+        if row is None:
+            return {
+                "session_id": None,
+                "active": False,
+                "events": [],
+                "next_cursor": None,
+                "has_more": False,
+                "history_truncated": False,
+                "source": "canonical_crawler_checkpoint",
+            }
+        try:
+            _, run_type = _core()
+            snapshot = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()
+            request = row.get("request")
+            seeds = request.get("seed_urls") if isinstance(request, dict) else ()
+            fallback = seeds[0] if isinstance(seeds, (list, tuple)) and seeds else None
+            projected = project_companion_feed(
+                str(row["_id"]),
+                snapshot["events"],
+                fallback_url=fallback,
+                after_sequence=after_sequence,
+                limit=limit,
+                expected_digest=expected_digest,
+            )
+        except CompanionCursorError:
+            raise
+        except CrawlerError:
+            raise
+        except (CrawlOperationError, KeyError, TypeError, ValueError) as exc:
+            raise CrawlerError(
+                "crawler_integrity", "Crawler checkpoint is not companion-replayable.", 503
+            ) from exc
+        return {"session_id": str(row["_id"]), "active": True, **projected}
+
     @staticmethod
     def _source_use(row: dict) -> None:
         if row["status"] in {"cancelled", "deleted"} or _utc(row["consent_expires_at"]) <= _now():
@@ -1300,7 +1748,207 @@ class DragonCrawlerApplication:
             )
 
     @staticmethod
-    def _source_projection(source: dict, *, text: bool = True) -> dict:
+    def _source_policies(row: dict) -> dict:
+        policies = row.get("source_use_policies", {})
+        if not isinstance(policies, dict) or len(policies) > MAX_SOURCE_POLICIES:
+            raise CrawlerError("crawler_integrity", "Source-use policy storage exceeds its bound.", 503)
+        for source_id, policy in policies.items():
+            if (
+                not isinstance(source_id, str)
+                or len(source_id) != 64
+                or any(char not in "0123456789abcdef" for char in source_id)
+                or not isinstance(policy, dict)
+                or set(policy) != {"version", "enabled", "max_age_seconds", "changed_at"}
+                or type(policy["version"]) is not int
+                or not 1 <= policy["version"] <= 2**31 - 1
+                or type(policy["enabled"]) is not bool
+                or type(policy["max_age_seconds"]) is not int
+                or not 60 <= policy["max_age_seconds"] <= MAX_SOURCE_AGE_SECONDS
+                or not isinstance(policy["changed_at"], str)
+                or len(policy["changed_at"]) > 64
+            ):
+                raise CrawlerError("crawler_integrity", "Stored source-use policy is invalid.", 503)
+            try:
+                changed = datetime.fromisoformat(policy["changed_at"])
+                if changed.tzinfo is None:
+                    raise ValueError("timezone required")
+            except ValueError as exc:
+                raise CrawlerError(
+                    "crawler_integrity", "Stored source-use timestamp is invalid.", 503
+                ) from exc
+        return policies
+
+    def _capture_policy(self, row: dict, source: dict) -> dict:
+        return self._source_policies(row).get(
+            source["source_id"],
+            {
+                "version": 0,
+                "enabled": True,
+                "max_age_seconds": MAX_SOURCE_AGE_SECONDS,
+                "changed_at": None,
+            },
+        )
+
+    def _capture_freshness(self, row: dict, source: dict) -> dict:
+        policy = self._capture_policy(row, source)
+        now = _now()
+        expiry = min(
+            _utc(row["consent_expires_at"]).timestamp(), source["fetched_at"] + policy["max_age_seconds"]
+        )
+        state = (
+            "session_revoked"
+            if row["status"] in {"cancelled", "deleted"}
+            else (
+                "consent_expired"
+                if _utc(row["consent_expires_at"]) <= now
+                else (
+                    "withdrawn"
+                    if not policy["enabled"]
+                    else (
+                        "capture_time_invalid"
+                        if source["fetched_at"] > now.timestamp() + 300
+                        else "stale" if expiry <= now.timestamp() else "current"
+                    )
+                )
+            )
+        )
+        return {
+            "usable": state == "current",
+            "state": state,
+            "capture_age_seconds": max(0, int(now.timestamp() - source["fetched_at"])),
+            "valid_until": datetime.fromtimestamp(expiry, tz=timezone.utc).isoformat(),
+            "remote_freshness_verified": False,
+        }
+
+    def _assert_source_use(self, row: dict, source: dict) -> None:
+        self._source_use(row)
+        state = self._capture_freshness(row, source)["state"]
+        if state != "current":
+            raise CrawlerError(
+                (
+                    "crawler_source_stale"
+                    if state in {"stale", "capture_time_invalid"}
+                    else "crawler_source_withdrawn"
+                ),
+                "This captured source is withdrawn or outside its current capture-age limit.",
+                403,
+            )
+
+    def _source_reference(self, row: dict, source: dict) -> dict:
+        self._assert_source_use(row, source)
+        return {
+            "schema_version": "skeleton.dragon.crawler_reference.v2",
+            "session_id": row["_id"],
+            "source_id": source["source_id"],
+            "source_digest": _digest(source),
+            "request_digest": row["request_digest"],
+            "consent_id": row["consent"]["consent_id"],
+            "source_use_version": self._capture_policy(row, source)["version"],
+        }
+
+    async def configure_source_use(
+        self, scope: dict[str, str], identifier: str, source_id: str, body: dict, *, principal: dict
+    ) -> dict:
+        if authenticated_scope(principal) != scope:
+            raise CrawlerError("crawler_source_use_denied", "The current source owner is required.", 403)
+        if (
+            set(body) != {"expected_version", "idempotency_key", "enabled", "max_age_seconds"}
+            or type(body.get("expected_version")) is not int
+            or body["expected_version"] < 1
+            or type(body.get("enabled")) is not bool
+            or type(body.get("max_age_seconds")) is not int
+            or not 60 <= body["max_age_seconds"] <= MAX_SOURCE_AGE_SECONDS
+        ):
+            raise CrawlerError(
+                "crawler_source_use_invalid", "Choose an explicit source-use setting and capture-age limit."
+            )
+        row = await self._owned(scope, identifier)
+        _, run_type = _core()
+        try:
+            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+        except ValueError:
+            raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
+        current = self._capture_policy(row, source)
+        if principal.get("role") not in {"editor", "admin"} and (
+            body["enabled"] or body["max_age_seconds"] != current["max_age_seconds"]
+        ):
+            raise CrawlerError(
+                "crawler_source_use_denied",
+                "Editor permission is required to enable source use or change its capture-age limit.",
+                403,
+            )
+        operation = _operation(body["idempotency_key"])
+        digest = _digest({"action": "source_use", "source_id": source_id, **body})
+        previous = self._prior(row, operation, digest, safety=body["enabled"] is False)
+        if previous is None:
+            if row["version"] != body["expected_version"]:
+                raise CrawlerError(
+                    "crawler_conflict", "Reload current source settings before changing them.", 409
+                )
+            if body["enabled"]:
+                self._source_use(row)
+            if current["version"] >= 2**31 - 1:
+                raise CrawlerError(
+                    "crawler_source_use_limit", "This source reached its policy revision bound.", 409
+                )
+            now = _now()
+            policy = {
+                "version": current["version"] + 1,
+                "enabled": body["enabled"],
+                "max_age_seconds": body["max_age_seconds"],
+                "changed_at": now.isoformat(),
+            }
+            receipt = await self._admit(
+                scope,
+                identifier,
+                {
+                    "source_id": source_id,
+                    "source_use_policy": policy,
+                    "source_digest": _digest(source),
+                    "request_digest": row["request_digest"],
+                },
+            )
+            result = await self.sessions.update_one(
+                {
+                    "_id": identifier,
+                    **scope,
+                    "version": row["version"],
+                    "status": {"$ne": "deleted"},
+                    **({"$expr": {"$gt": ["$consent_expires_at", "$$NOW"]}} if body["enabled"] else {}),
+                },
+                {
+                    "$set": {
+                        "source_use_policies." + source_id: policy,
+                        "updated_at": now,
+                        "storage_receipt": receipt,
+                        (
+                            "safety_control"
+                            if len(row.get("operations", {})) >= MAX_OPERATIONS
+                            else "operations." + operation
+                        ): {
+                            "operation": operation,
+                            "request_digest": digest,
+                            "action": "source_use",
+                            "state": "completed",
+                            "source_id": source_id,
+                            "source_use_version": policy["version"],
+                        },
+                    },
+                    "$inc": {"version": 1},
+                },
+            )
+            if not result.modified_count:
+                raise CrawlerError(
+                    "crawler_conflict", "The crawl changed before source-use settings were committed.", 409
+                )
+            row = await self._owned(scope, identifier)
+        return {
+            "ok": True,
+            "session": self._projection(row),
+            "source": self._source_projection(source, row=row, text=False),
+        }
+
+    def _source_projection(self, source: dict, *, row: dict | None = None, text: bool = True) -> dict:
         result = dict(source)
         result.update(
             url=source["canonical_url"],
@@ -1311,6 +1959,9 @@ class DragonCrawlerApplication:
         )
         if not text:
             result.pop("text", None)
+        if row is not None:
+            result["use_policy"] = self._capture_policy(row, source)
+            result["freshness"] = self._capture_freshness(row, source)
         return result
 
     async def sources(
@@ -1348,7 +1999,7 @@ class DragonCrawlerApplication:
             "ok": True,
             "sources": [
                 {
-                    **self._source_projection(source, text=False),
+                    **self._source_projection(source, row=row, text=False),
                     "capture_sequence": captures.get(source["source_id"]),
                 }
                 for source in page
@@ -1371,19 +2022,12 @@ class DragonCrawlerApplication:
             source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
-        reference = {
-            "schema_version": "skeleton.dragon.crawler_reference.v1",
-            "session_id": identifier,
-            "source_id": source_id,
-            "source_digest": _digest(source),
-            "request_digest": row["request_digest"],
-            "consent_id": row["consent"]["consent_id"],
-        }
+        reference = self._source_reference(row, source)
         await self.assert_context(scope, [reference])
         return {
-            "source": self._source_projection(source),
+            "source": self._source_projection(source, row=row),
             "reference": reference,
-            "valid_until": _utc(row["consent_expires_at"]).isoformat(),
+            "valid_until": self._capture_freshness(row, source)["valid_until"],
         }
 
     async def source_chunk(
@@ -1427,27 +2071,73 @@ class DragonCrawlerApplication:
             "captured_at": source["fetched_at"],
         }
 
+    def _search_current(
+        self, row: dict, runtime, query: str, *, limit: int = 8, distinct_sources: bool = False
+    ) -> dict:
+        """Apply current source authority before the canonical passage ranker."""
+        from skeleton.ai.webcrawler.dragon_mission_quality import (
+            rank_query_passages,
+            scan_untrusted_instructions,
+        )
+
+        if (
+            not isinstance(query, str)
+            or not query.strip()
+            or len(query) > 512
+            or len(query.encode("utf-8")) > 1024
+            or any(ord(char) < 32 and char not in "\n\t" for char in query)
+            or type(limit) is not int
+            or not 1 <= limit <= 8
+        ):
+            raise CrawlerError("crawler_search_bounds", "Choose a bounded source query and result limit.")
+        self._source_use(row)
+        hits = []
+        for source in runtime.sources():
+            if not self._capture_freshness(row, source)["usable"]:
+                continue
+            for passage in rank_query_passages(source["text"], query, limit=1 if distinct_sources else limit):
+                span = passage.span
+                hits.append(
+                    {
+                        "source_id": source["source_id"],
+                        "canonical_url": source["canonical_url"],
+                        "title": source["title"],
+                        "content_hash": source["content_hash"],
+                        "preserved_text_hash": source["preserved_text_hash"],
+                        "passage_hash": hashlib.sha256(span.text.encode()).hexdigest(),
+                        "start": span.start,
+                        "end": span.end,
+                        "text": span.text,
+                        "lexical_score": passage.weighted_score,
+                        "review_state": "unreviewed",
+                        "authority": "external_evidence_only",
+                    }
+                )
+            hits.sort(key=lambda hit: (-hit["lexical_score"], hit["source_id"], hit["start"]))
+            del hits[limit:]
+        for hit in hits:
+            hit["instruction_risks"] = [
+                asdict(risk) for risk in scan_untrusted_instructions(hit["text"], limit=16)
+            ]
+        evidence = {
+            "schema_version": "skeleton.ai.dragon.crawl_evidence.v1",
+            "run_id": row["snapshot"]["run_id"],
+            "query": query,
+            "hits": hits,
+            "verified_knowledge": False,
+            "training_permission": False,
+        }
+        evidence["evidence_digest"] = _digest(evidence)
+        return evidence
+
     async def search(self, scope: dict[str, str], identifier: str, query: str, *, limit: int = 8) -> dict:
         row = await self._owned(scope, identifier)
-        if row["status"] == "cancelled" or _utc(row["consent_expires_at"]) <= _now():
-            raise CrawlerError(
-                "crawler_context_revoked", "Current capture/use consent is required for retrieval.", 403
-            )
         _, run_type = _core()
         runtime = run_type.from_snapshot(_plain(row["snapshot"]))
-        evidence = runtime.search(query, limit=limit)
+        evidence = self._search_current(row, runtime, query, limit=limit)
         references = []
         for source_id in dict.fromkeys(hit["source_id"] for hit in evidence["hits"]):
-            references.append(
-                {
-                    "schema_version": "skeleton.dragon.crawler_reference.v1",
-                    "session_id": identifier,
-                    "source_id": source_id,
-                    "source_digest": _digest(runtime.source_read(source_id)),
-                    "request_digest": row["request_digest"],
-                    "consent_id": row["consent"]["consent_id"],
-                }
-            )
+            references.append(self._source_reference(row, runtime.source_read(source_id)))
         await self.assert_context(scope, references)
         return {**evidence, "session_id": identifier, "version": int(row["version"])}
 
@@ -1479,14 +2169,14 @@ class DragonCrawlerApplication:
         _, run_type = _core()
         search_query = " ".join(terms)[:512]
         async for row in rows:
-            await self._owned(scope, row["_id"])
+            row = await self._owned(scope, row["_id"])
             runtime = run_type.from_snapshot(_plain(row["snapshot"]))
-            for hit in runtime.search(search_query, limit=8)["hits"]:
+            for hit in self._search_current(row, runtime, search_query, limit=8, distinct_sources=True)[
+                "hits"
+            ]:
                 # Re-capturing one page in multiple sessions is not several
                 # independent sources, and must not create duplicate context
                 # segment IDs for the same source/passage.
-                if any(item[3]["content_hash"] == hit["content_hash"] for item in candidates):
-                    continue
                 source = runtime.source_read(hit["source_id"])
                 if (
                     source["text"][hit["start"] : hit["end"]] != hit["text"]
@@ -1497,7 +2187,15 @@ class DragonCrawlerApplication:
                         "Selected evidence is not the exact captured source passage.",
                         503,
                     )
-                candidates.append((hit["lexical_score"], source["fetched_at"], row, source, hit))
+                candidate = (hit["lexical_score"], source["fetched_at"], row, source, hit)
+                duplicate = next(
+                    (item for item in candidates if item[3]["content_hash"] == hit["content_hash"]), None
+                )
+                if duplicate is not None:
+                    if candidate[:2] <= duplicate[:2]:
+                        continue
+                    candidates.remove(duplicate)
+                candidates.append(candidate)
                 candidates.sort(key=lambda value: (value[0], value[1]), reverse=True)
                 # Retain only the selected bounded source records, rather
                 # than every account snapshot while scanning history.
@@ -1509,14 +2207,7 @@ class DragonCrawlerApplication:
                 break
             text = hit["text"][:remaining]
             remaining -= len(text)
-            reference = {
-                "schema_version": "skeleton.dragon.crawler_reference.v1",
-                "session_id": row["_id"],
-                "source_id": source["source_id"],
-                "source_digest": _digest(source),
-                "request_digest": row["request_digest"],
-                "consent_id": row["consent"]["consent_id"],
-            }
+            reference = self._source_reference(row, source)
             documents.append(
                 {
                     "source_id": source["source_id"],
@@ -1526,6 +2217,8 @@ class DragonCrawlerApplication:
                     "source_ref": "dragon-crawl://" + row["_id"] + "/" + source["source_id"],
                     "source_url": source["canonical_url"],
                     "captured_at": source["fetched_at"],
+                    "valid_until": self._capture_freshness(row, source)["valid_until"],
+                    "source_use_version": reference["source_use_version"],
                     "review_state": "unreviewed",
                     "source_classification": "untrusted_external_material",
                     "authority": "external_evidence_only",
@@ -1534,7 +2227,9 @@ class DragonCrawlerApplication:
                     "passage_start": hit["start"],
                     "passage_end": hit["start"] + len(text),
                     "instruction_risks": [
-                        risk for risk in hit["instruction_risks"] if risk["start"] < len(text)
+                        {**risk, "end": min(risk["end"], len(text))}
+                        for risk in hit["instruction_risks"]
+                        if risk["start"] < len(text)
                     ],
                 }
             )
@@ -1547,20 +2242,31 @@ class DragonCrawlerApplication:
             raise CrawlerError("crawler_reference_bounds", "Crawler source references exceed their bound.")
         _, run_type = _core()
         for reference in references:
+            legacy_fields = {
+                "schema_version",
+                "session_id",
+                "source_id",
+                "source_digest",
+                "request_digest",
+                "consent_id",
+            }
+            is_v2 = (
+                isinstance(reference, dict)
+                and reference.get("schema_version") == "skeleton.dragon.crawler_reference.v2"
+            )
             if (
                 not isinstance(reference, dict)
-                or set(reference)
-                != {
-                    "schema_version",
-                    "session_id",
-                    "source_id",
-                    "source_digest",
-                    "request_digest",
-                    "consent_id",
-                }
-                or reference["schema_version"] != "skeleton.dragon.crawler_reference.v1"
+                or set(reference) != legacy_fields | ({"source_use_version"} if is_v2 else set())
+                or reference["schema_version"]
+                not in {"skeleton.dragon.crawler_reference.v1", "skeleton.dragon.crawler_reference.v2"}
                 or any(
-                    not isinstance(value, str) or not 1 <= len(value) <= 256 for value in reference.values()
+                    not isinstance(reference[key], str) or not 1 <= len(reference[key]) <= 256
+                    for key in legacy_fields
+                )
+                or is_v2
+                and (
+                    type(reference["source_use_version"]) is not int
+                    or not 0 <= reference["source_use_version"] <= 2**31 - 1
                 )
             ):
                 raise CrawlerError("crawler_reference_invalid", "Crawler source reference is invalid.", 403)
@@ -1582,6 +2288,14 @@ class DragonCrawlerApplication:
                 ) from None
             if _digest(source) != reference["source_digest"]:
                 raise CrawlerError("crawler_context_changed", "The captured source evidence changed.", 403)
+            self._assert_source_use(row, source)
+            version = self._capture_policy(row, source)["version"]
+            if version != (reference["source_use_version"] if is_v2 else 0):
+                raise CrawlerError(
+                    "crawler_source_policy_changed",
+                    "Source-use settings changed; select the current source and review any design reference again.",
+                    403,
+                )
 
     async def _defer_recovery(self, row: dict) -> bool:
         """Rotate a bounded busy/skipped page without changing execution authority."""

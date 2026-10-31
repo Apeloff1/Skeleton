@@ -37,8 +37,29 @@ function validate(manifest, lockText) {
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     throw new Error("A valid frontend package manifest is required");
   }
-  const deps = {...(manifest.dependencies || {}), ...(manifest.devDependencies || {})};
+  const production = manifest.dependencies ?? {};
+  const development = manifest.devDependencies ?? {};
+  if (!production || typeof production !== "object" || Array.isArray(production) ||
+      !development || typeof development !== "object" || Array.isArray(development)) {
+    return ["Frontend dependencies and devDependencies must be objects"];
+  }
+  // A devDependency must never shadow an incompatible production runtime pin.
+  // Require one unambiguous declaration for every dependency name.
   const errors = [];
+  for (const name of Object.keys(production)) {
+    if (Object.prototype.hasOwnProperty.call(development, name)) {
+      errors.push(name + " is duplicated across dependencies and devDependencies");
+      // Report the shadowed production value too. Merely validating the
+      // merged map could conceal a forbidden native upgrade behind a valid
+      // devDependency of the same name.
+      if (Object.prototype.hasOwnProperty.call(EXPECTED, name) &&
+          production[name] !== EXPECTED[name]) {
+        errors.push(name + " expected " + EXPECTED[name] +
+                    ", found production pin " + String(production[name]));
+      }
+    }
+  }
+  const deps = {...production, ...development};
   for (const [name, version] of Object.entries(EXPECTED)) {
     if (deps[name] !== version) {
       errors.push(name + " expected " + version + ", found " + String(deps[name]));

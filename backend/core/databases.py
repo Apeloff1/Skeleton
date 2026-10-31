@@ -25,6 +25,7 @@ For code that doesn't know up-front which DB a collection lives in, use the
 """
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -42,6 +43,25 @@ CORE_DB_NAME: str = _DB_NAME
 CONTENT_DB_NAME: str = f"{_DB_NAME}_content"
 SWARM_DB_NAME: str = f"{_DB_NAME}_swarm"
 
+class _ActiveLoopMotorClient(AsyncIOMotorClient):
+    """Reuse one PyMongo pool while binding each async request to its own loop.
+
+    Motor 3.7 caches the first event loop on a normal AsyncIOMotorClient. When
+    a TestClient/lifespan restart closes that loop, the same global database
+    handles otherwise schedule futures on a closed loop. Motor collection and
+    database operations delegate get_io_loop() to their owning client; using
+    the active loop preserves the canonical Mongo client and database owners.
+    """
+
+    def get_io_loop(self):
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            # Retain Motor's documented synchronous loop lookup for callers
+            # outside a coroutine; active async I/O never reuses that cache.
+            return super().get_io_loop()
+
+
 # Single shared async client for all three logical databases.
 # ★ DEPLOYMENT FIX (2026-02): K8s liveness/readiness probes were timing out
 # because Motor was attempting eager SRV DNS resolution at module import time
@@ -49,7 +69,7 @@ SWARM_DB_NAME: str = f"{_DB_NAME}_swarm"
 # aggressive timeouts ensure failures fast-fail to JSON 5xx instead of hanging
 # the event loop. The values below preserve normal operation while keeping
 # import-time work essentially zero.
-client: AsyncIOMotorClient = AsyncIOMotorClient(
+client: AsyncIOMotorClient = _ActiveLoopMotorClient(
     MONGO_URL,
     maxPoolSize=100,
     minPoolSize=0,                       # don't pre-warm pool at startup
@@ -136,6 +156,42 @@ def get_sync_db(db_name: str | None = None):
     elif name == "swarm":
         name = SWARM_DB_NAME
     return get_sync_client()[name]
+
+
+class _LazySyncCollection:
+    """Collection proxy that opens Mongo and creates indexes on first use."""
+
+    def __init__(self, name: str, indexes: tuple[tuple[object, dict], ...], db_name: str | None = None):
+        self._name = name
+        self._indexes = indexes
+        self._db_name = db_name
+        self._coll = None
+        self._ready = _threading.Lock()
+
+    def _materialize(self):
+        if self._coll is not None:
+            return self._coll
+        with self._ready:
+            if self._coll is None:
+                coll = get_sync_db(self._db_name)[self._name]
+                for keys, options in self._indexes:
+                    coll.create_index(keys, **options)
+                self._coll = coll
+        return self._coll
+
+    def __getattr__(self, item: str):
+        if item.startswith("_"):
+            raise AttributeError(item)
+        return getattr(self._materialize(), item)
+
+
+def lazy_sync_collection(name: str, *indexes: tuple[object, dict], db_name: str | None = None):
+    """Return a sync collection that does no I/O until a method is called.
+
+    Each index is ``(keys, options)``. Options may be an empty dict.
+    """
+    return _LazySyncCollection(name, indexes, db_name)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COLLECTION ROUTING

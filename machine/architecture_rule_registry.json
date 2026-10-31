@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.architecture.rule_registry.v1",
-  "registry_version": "0.4.0",
+  "registry_version": "0.5.0",
   "status": "active",
   "purpose": "Canonical inventory for architecture fitness checks, ownership, ADR change control, and time-bounded waivers.",
   "authority": {
@@ -289,6 +289,32 @@
       "waiver_policy": {
         "allowed": true,
         "max_ttl_days": 7,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-LOGICAL-LAYERS",
+      "title": "Domain application infrastructure and interface import direction",
+      "validator_path": "scripts/check_architecture_logical_layers.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_logical_layers.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
         "require_adr": true
       }
     },

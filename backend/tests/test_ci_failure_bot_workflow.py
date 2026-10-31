@@ -6,7 +6,10 @@ import sys
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci-failure-bot.yml"
+ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci-failure-bot.yml"
+ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "ci-failure-bot.yml"
+# Preserve token-scope/runner contract assertions even while scheduling is retired.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 SCRIPT = REPO_ROOT / "skeleton" / "automation" / "ci_failure_bot.py"
 
 

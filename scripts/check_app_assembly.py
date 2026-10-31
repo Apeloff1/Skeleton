@@ -254,7 +254,7 @@ def audit_no_competing_root_launchers() -> None:
 
 def audit_endpoint_boundary() -> None:
     allowed = {
-        (ROOT / "frontend/utils/apiBase.ts").resolve(),
+        (ROOT / "frontend/src/utils/apiBase.ts").resolve(),
         (ROOT / "frontend/app.config.js").resolve(),
     }
     forbidden = (
@@ -281,9 +281,9 @@ def audit_endpoint_boundary() -> None:
         for token in forbidden:
             if token in text:
                 relative = path.relative_to(ROOT).as_posix()
-                FAILURES.append(f"{relative} bypasses frontend/utils/apiBase.ts with {token!r}")
+                FAILURES.append(f"{relative} bypasses frontend/src/utils/apiBase.ts with {token!r}")
 
-    resolver = read("frontend/utils/apiBase.ts")
+    resolver = read("frontend/src/utils/apiBase.ts")
     check("export const API_BASE" in resolver, "canonical backend endpoint export missing")
     check(
         "export const SKELETON_API_BASE" in resolver,
@@ -623,8 +623,8 @@ def audit_production_ingress() -> None:
 
 
 def audit_launcher_convergence() -> None:
-    launch = read("frontend/components/LaunchCascade.tsx")
-    boot = read("frontend/components/BootLauncher.tsx")
+    launch = read("frontend/src/components/LaunchCascade.tsx")
+    boot = read("frontend/src/components/BootLauncher.tsx")
     stages = read("frontend/src/boot/stages.ts")
     welcome = read("frontend/app/welcome.tsx")
     safe_mode = read("frontend/app/safe-mode.tsx")
@@ -853,13 +853,21 @@ def audit_public_app_bootstrap_contract() -> None:
         "aggregate app readiness route must use manifest contract",
     )
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
-    check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
+    check(
+        "async def _probe_engine" in route
+        and "async with asyncio.timeout(timeout_s)" in route
+        and "async with client.stream(" in route,
+        "aggregate app status does not use a bounded asynchronous engine probe",
+    )
     check('"identity mismatch"' in route, "aggregate app status does not validate engine identity")
-    check("identity.get(key) == value" in route, "engine identity verification is incomplete")
+    check("candidate.get(key) != value" in route, "engine identity verification is incomplete")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
-    check("public_readiness()" in route, "aggregate app status omits product readiness")
+    check(
+        "await asyncio.to_thread(public_readiness)" in route,
+        "aggregate app status must observe product readiness outside the event loop",
+    )
     check('"product": product_readiness' in route, "aggregate app status product summary missing")
     check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
@@ -976,7 +984,7 @@ def audit_product_control_contract() -> None:
 
 
 def audit_product_route_registry() -> None:
-    registry_text = read("frontend/utils/routeRegistry.ts")
+    registry_text = read("frontend/src/utils/routeRegistry.ts")
     catalog = read("frontend/src/product/productCatalog.ts")
     registered = set(re.findall(r"path:\s*'([^']+)'", registry_text))
 

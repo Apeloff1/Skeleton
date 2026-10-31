@@ -17,19 +17,21 @@ the async-job pattern (`_run_job` → playable_jobs, polled at /api/playable/job
 """
 from __future__ import annotations
 
+from routes.playable_access import project_identity, project_router, reauthorize_project_context, scoped_database
+
 import json
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from routes.playable import _db, _GAME_ENSEMBLE, _llm_in_thread, _run_job
 from core.director_agent import director  # SOTA Item 14 — Director facade wiring
 from core.stage_vault import vault_for_stage
 
-router = APIRouter(prefix="/api/pipeline", tags=["Studio Pipeline"])
+router = project_router(prefix="/api/pipeline", tags=["Studio Pipeline"])
 
 _EDITABLE = {"core_specs", "lore_graph", "quest_db", "mechanics_config",
              "procedural_config", "build_manifest", "launch_manifest"}
@@ -108,6 +110,8 @@ async def _llm_json(prompt: str, system: str, required_key: str, attempts: int =
     if pid and stage:
         try:
             prompt = (await _augment_for_forge(pid, stage)) + "\n\n" + prompt
+        except HTTPException:
+            raise
         except Exception:
             pass
     sys = system + "\n\n" + QUALITY_DIRECTIVE + "\n\n" + _EXHAUSTIVE_DIRECTIVE
@@ -262,7 +266,8 @@ async def _forge_narrative(pid: str, instruction: str = "") -> dict:
     arts = (kb or {}).get("artifacts") or {}
     ctx = json.dumps({"spec": arts.get("core_specs"), "lore": arts.get("lore_graph")})[:1800]
     from routes.canon_rag import _recall, recall_block
-    recalled = recall_block(await _recall(pid, f"{g.get('title','')} characters factions quests story", 5))
+    recalled = recall_block(await _recall(pid, f"{g.get('title','')} characters factions quests story", 5,
+                                         scope=project_identity()))
     prompt = (f"Game: {g.get('title','')} ({g.get('genre','')})\nBrief: {g.get('brief','')}\n"
               f"context: {ctx}\n{recalled}\n\nProduce quest_db.json.")
     data, routed = await _llm_json(_with_instruction(prompt, instruction), _QUEST_SYS, "quests", pid=pid, stage="narrative")
@@ -677,11 +682,13 @@ async def _stamped(pid: str, stage: str, coro):
     INVALIDATION: mark every downstream artifact stale, and clear this one's stale flag.
     SOTA Item 14/19 — the Director observes every forge: it plans the stage, then
     records the result + reflects on quality (non-breaking; failures are swallowed)."""
+    await reauthorize_project_context(mutate=True)
     try:
         director.plan_stage(pid, stage)
     except Exception:
         pass
     res = await coro
+    await reauthorize_project_context(mutate=True)
     if isinstance(res, dict) and res.get("ok"):
         art = res.get("artifact")
         now = _now()

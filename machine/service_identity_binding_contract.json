@@ -1,0 +1,25 @@
+{
+  "schema_version": "skeleton.ai.service_identity_binding.v1",
+  "gap_id": "G161",
+  "title": "internal service impersonation can bypass capability assumptions if service identity is not cryptographically bound",
+  "canonical_runtime": "skeleton/security/zero_trust.py",
+  "ai_mirror": "skeleton/ai/runtime/security/zero_trust.py",
+  "mirror_mode": "byte_identical",
+  "invariants": [
+    "authorize and revalidate require a verifier-checked proof of the presented identity and grant",
+    "the proof payload is canonical JSON kind internal_service_identity",
+    "a non-true verifier result is identity_unbound",
+    "a verifier exception is identity_verifier_failed",
+    "structural denials remain reachable only after the presented pair verifies",
+    "a prior decision for a different grant id is rejected before reauthorization",
+    "implementation state cannot self-grant verification or completion"
+  ],
+  "acceptance_tests": [
+    "skeleton/testing/test_zero_trust_internal.py"
+  ],
+  "closure": {
+    "implementation_is_not_verification": true,
+    "independent_exact_head_evidence_required": true,
+    "self_signing_forbidden": true
+  }
+}

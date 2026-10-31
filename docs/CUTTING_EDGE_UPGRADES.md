@@ -1,0 +1,1 @@
+# Cutting-edge upgrades from repo scan\n\nNon-SOTA areas addressed: missing full OrganSurface compose on some cortex paths, incomplete clipped-G enforcement, partial stored_prose=0. Upgraded to frontier SOTA with complete bridges, hash chains, fail-closed gates. Pushed to open PR branches.

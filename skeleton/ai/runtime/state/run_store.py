@@ -5,9 +5,17 @@ transactions as the authoritative coordination boundary, leases to prevent two
 workers from owning the same live run, idempotency keys to protect external
 side effects during replay, and explicit checkpoints to make crash recovery
 observable rather than implicit.
+
+FROZEN (issue #4122): ``skeleton.state`` is frozen in place. New code must
+import only ``skeleton.persistence``; migration into the canonical package is
+tracked in issue #4122. Docstring-only notice: no behaviour change, no warning.
+
+Deprecated: use skeleton.persistence.state.run_store
+(planned target; the move is tracked in the #4122 storage/state follow-up issue).
 """
 
 from __future__ import annotations
+__deprecated__ = "skeleton.persistence"  # issue #4122: docstring-only deprecation, no warning
 
 import json
 import math

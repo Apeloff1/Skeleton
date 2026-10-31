@@ -235,11 +235,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.collect_only:
         command.append("--collect-only")
     print(f"SELECTED {len(paths)} of {pre_shard_count} test files", flush=True)
-    kwargs = {"cwd": ROOT, "env": env, "check": False}
-    if args.timeout_seconds:
-        kwargs["timeout"] = args.timeout_seconds
     try:
-        return subprocess.run(command, **kwargs).returncode
+        return subprocess.run(
+            command,
+            cwd=ROOT,
+            env=env,
+            check=False,
+            timeout=args.timeout_seconds or None,
+        ).returncode
     except subprocess.TimeoutExpired:
         print("ERROR: pytest exceeded the wall-time limit", file=sys.stderr)
         return 124

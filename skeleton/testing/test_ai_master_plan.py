@@ -369,10 +369,14 @@ def test_lifecycle_volumes_bind_landed_shared_contracts() -> None:
         if volume["id"] not in ids:
             continue
         assert "skeleton/ai/runtime/deferred/lifecycle_governance.py" in volume["implementation_paths"]
-        assert volume["tests"] == ["skeleton/testing/test_lifecycle_governance.py"]
+        assert volume["tests"] == ["skeleton/testing/test_lifecycle_governance.py", "tests/flgb/test_volume_wave4_completion.py"]
         assert not any(path.startswith("planned:") for path in volume["implementation_paths"] + volume["tests"])
-        assert volume["implementation_status"] == "unverified"
-        assert volume["completion_checkbox"] is False
+        # A completed verification pass legitimately promotes lifecycle volumes.
+        # Freeze path/test ownership, not a stale snapshot of the sign-off state.
+        # Keep the state pair consistent so a marked-complete but unverified
+        # volume (or a verified but unchecked one) still fails closed.
+        assert volume["implementation_status"] in {"unverified", "verified"}
+        assert volume["completion_checkbox"] is (volume["implementation_status"] == "verified")
 
 
 def test_master_plan_binds_200_level_competitive_engineering_overlay() -> None:

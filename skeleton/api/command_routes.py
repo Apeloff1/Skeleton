@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, Header
 from fastapi.responses import JSONResponse
 
 from skeleton.api.hmac_seal import require_seal
-from skeleton.api.server import get_state
 from skeleton.application import (
     build_runtime_command_service,
     command_specs,
@@ -21,6 +20,8 @@ _AUTH_REQUIRED = {spec.name for spec in command_specs() if spec.auth_required}
 
 
 def _state():
+    from skeleton.api.server import get_state
+
     return get_state()
 
 

@@ -58,9 +58,17 @@ def test_welch_mann_whitney_and_anova_reference_cases() -> None:
 
 
 def test_golden_section_and_nelder_mead_find_known_minima() -> None:
+    # The unshifted quadratic retains enough binary64 resolution to check
+    # positional accuracy at the optimizer's configured tolerance.
+    unshifted = golden_section_minimize(lambda x: (x - 2.5) ** 2, -10.0, 10.0)
+    assert unshifted.converged
+    assert unshifted.minimizer == pytest.approx(2.5, abs=1e-8)
+
+    # Adding 3.0 rounds nearby objective values to the same binary64 number:
+    # positional error of a few 1e-8 is then unavoidable for comparisons.
     golden = golden_section_minimize(lambda x: (x - 2.5) ** 2 + 3.0, -10.0, 10.0)
     assert golden.converged
-    assert golden.minimizer == pytest.approx(2.5, abs=1e-8)
+    assert golden.minimizer == pytest.approx(2.5, abs=1e-7)
     assert golden.objective == pytest.approx(3.0, abs=1e-12)
 
     nelder = nelder_mead(

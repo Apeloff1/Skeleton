@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -10,7 +11,7 @@ const compiled = ts.transpileModule(src, { compilerOptions: {
 }, reportDiagnostics: true });
 assert.equal(compiled.diagnostics.length, 0);
 const mod = { exports: {} };
-new Function('require', 'module', 'exports', compiled.outputText)(require, mod, mod.exports);
+compileFunction(compiled.outputText, ['require', 'module', 'exports'])(require, mod, mod.exports);
 const { classifyBuildJob, watchBuildJob } = mod.exports;
 
 test('known backend states classify terminal truth without accepting unknown as complete', () => {

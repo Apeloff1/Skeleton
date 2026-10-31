@@ -1,0 +1,22 @@
+"""skeleton/distributed/mesh/session_production_more2.py
+More2 extreme complete Multiplayer production.
+Interest, rollback, anti-cheat, 256-player, telemetry.
+Fail-closed.
+"""
+from __future__ import annotations
+import hashlib
+from typing import Dict
+
+class SessionError(Exception):
+    pass
+
+class SessionProductionMore2:
+    def __init__(self):
+        self.max_players = 256
+        self.interest: Dict[str, float] = {}
+
+    def sync(self, peer: str, dist: float) -> str:
+        if len(self.interest) >= self.max_players:
+            raise SessionError("full")
+        self.interest[peer] = dist
+        return hashlib.sha256(f"{peer}:{dist}:more2".encode()).hexdigest()

@@ -6,7 +6,10 @@ import sys
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "night-shift.yml"
+ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "night-shift.yml"
+ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "night-shift.yml"
+# Preserve the sole-scheduler contract without restarting the retired bot.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 LEGACY_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "night-shift-bots.yml"
 SCRIPT = REPO_ROOT / "skeleton" / "automation" / "night_shift.py"
 

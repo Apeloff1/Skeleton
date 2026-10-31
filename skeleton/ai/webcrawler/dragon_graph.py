@@ -15,7 +15,7 @@ class CrawlGraphProjection:
    self.nodes[event.url]=CrawlGraphNode(event.url,int(p.get("depth",0)),"discovered")
    if p.get("parent"):self.edges.add((p["parent"],event.url))
   elif event.url in self.nodes:
-   old=self.nodes[event.url];state={"fetch_started":"acquiring","policy_rejected":"rejected","acquisition_accepted":"accepted","burn_complete":"indexed"}.get(kind,old.state)
+   old=self.nodes[event.url];state={"fetch_started":"acquiring","policy_rejected":"rejected","acquisition_accepted":"accepted","burn_complete":"indexed","distill_complete":"distilled"}.get(kind,old.state)
    self.nodes[event.url]=CrawlGraphNode(old.url,old.depth,state,p.get("content_hash",old.content_hash))
  def snapshot(self):
   return (tuple(sorted(self.nodes.values(),key=lambda x:(x.depth,x.url))),tuple(CrawlGraphEdge(*x) for x in sorted(self.edges)))

@@ -11,6 +11,12 @@ FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d75060
 
 WORKDIR /app
 
+# Fail closed before dependency installation if this build stage is advanced
+# beyond the last verified Python version. LiteLLM excludes Python >=3.15,
+# while its FastUUID dependency lacks CPython 3.15/musllinux wheels.
+# Remove this bound only after an exact Python 3.15 install/import/e2e proof.
+RUN python -c 'import sys; assert (3, 10) <= sys.version_info[:2] < (3, 15), "backend dependencies require supported Python <3.15"'
+
 # Copy dependency metadata before installing the build toolchain. Keeping the
 # toolchain and dependency transaction in one layer avoids repeatedly copying
 # a large intermediate filesystem on Docker daemons that use the vfs driver.
@@ -67,7 +73,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     ENVIRONMENT=production \
+    GALAXY_BUILDS_VAULT_DIR=/app/data/builds_vault \
     CORS_ORIGINS=https://cors.invalid
+
+# Release version (from the repo-root VERSION file, passed by the release
+# workflow). Exposed as APP_VERSION so /api/metrics codedock_build_info reports it.
+ARG APP_VERSION=dev
+ARG VCS_REF=unknown
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.source=https://github.com/Apeloff1/Skeleton \
+      org.opencontainers.image.title=skeleton-backend
 
 WORKDIR /app
 

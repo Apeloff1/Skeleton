@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Switch, Platform,
@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { apiFetch } from '../../utils/apiController';
+import { apiFetch } from '../utils/apiController';
 
 const API = CANONICAL_API_BASE;
 const GATES = `${API}/api/galaxy-studio/gates`;

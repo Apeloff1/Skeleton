@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /collab — Live Collaboration session UI.
  *
@@ -14,10 +14,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouteHistory } from '../utils/routeHistory';
-import { shareResult, copyToClipboard } from '../utils/shareResult';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import { toast } from '../components/Toast';
+import { useRouteHistory } from '../src/utils/routeHistory';
+import { shareResult, copyToClipboard } from '../src/utils/shareResult';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import { toast } from '../src/components/AppToast';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';

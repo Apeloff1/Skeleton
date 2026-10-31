@@ -130,6 +130,16 @@ def _safe_pkg(build_id: str) -> str:
 
 def _build_files_iter(build: dict):
     """Yield unique (relpath, content) tuples — dedup keeps first occurrence."""
+    factory = build.get("generated_files_factory")
+    if callable(factory):
+        seen = set()
+        for path, content in factory():
+            relpath = _sanitize_path(path)
+            if relpath in seen:
+                continue
+            seen.add(relpath)
+            yield relpath, content
+        return
     gen = build.get("generated_files") or build.get("files") or {}
     seen = set()
     if isinstance(gen, dict):
@@ -816,7 +826,9 @@ def build_apk(build: dict) -> dict:
             "error": execution_disabled_message("APK packaging"),
         }
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    out_path = _ensure_artifacts_root() / f"{build_id}.apk"
+    token = build.get("artifact_output_token")
+    suffix = "-" + _safe_build_id(str(token)) if token else ""
+    out_path = _ensure_artifacts_root() / f"{build_id}{suffix}.apk"
     is_real = False
     sig_info = ""
     file_count = 0
@@ -834,7 +846,7 @@ def build_apk(build: dict) -> dict:
             is_real = False
             file_count = 0
             total_bytes = 0
-    
+
     if not is_real:
         # Placeholder fallback only — should never hit if toolchain is installed
         with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:

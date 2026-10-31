@@ -1,6 +1,7 @@
 """Mirror Room: bounded offline learning without production self-mutation."""
 
 from .adaptation import (
+    AdaptiveLearningPolicy,
     DeterministicCoordinateLearner,
     NumericDimension,
 )
@@ -52,7 +53,7 @@ from .engine import (
     MirrorRoom,
     MirrorRunReceipt,
 )
-from .memory import TrainingLearningArchive, TrainingLesson
+from .memory import LearnerCheckpoint, TrainingLearningArchive, TrainingLesson, TrainingObservation
 from .evaluation import (
     ComparisonReport,
     MetricComparison,
@@ -79,6 +80,7 @@ from .sandbox import EpisodeReceipt, MirrorSandbox, SandboxExecutor, SandboxUsag
 
 __all__ = [
     "ADVERSARIAL_ATTEMPTS_REQUIRED",
+    "AdaptiveLearningPolicy",
     "AdversarialAttemptReceipt",
     "AdversarialCampaignReceipt",
     "AdversarialChallengeContext",
@@ -105,6 +107,7 @@ __all__ = [
     "HighEndContentDeliveryDossier",
     "IndependentQualityJudgeReceipt",
     "LearningFeedback",
+    "LearnerCheckpoint",
     "MetricComparison",
     "MirrorBudget",
     "MirrorCandidate",
@@ -133,6 +136,7 @@ __all__ = [
     "SplitIntegrityReport",
     "TrainingLearningArchive",
     "TrainingLesson",
+    "TrainingObservation",
     "build_curriculum",
     "get_default_observatory",
     "inspect_split_integrity",

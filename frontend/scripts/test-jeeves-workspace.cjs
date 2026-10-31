@@ -8,8 +8,8 @@ require.extensions['.ts'] = (module, filename) => {
   const result = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } });
   module._compile(result.outputText, filename);
 };
-const W = require('../features/Jeeves/workspace.ts');
-const { WorkspaceController } = require('../features/Jeeves/WorkspaceController.ts');
+const W = require('../src/features/Jeeves/workspace.ts');
+const { WorkspaceController } = require('../src/features/Jeeves/WorkspaceController.ts');
 
 function deferred() {
   let resolve, reject;
@@ -830,7 +830,7 @@ test('reattachment recovers a committed answer without a second generation', asy
 
 test('Jeeves Markdown renderer is inert, bounded to display primitives, and JSX syntax-valid', () => {
   const path = require('node:path');
-  const fileName = path.join(__dirname, '..', 'features', 'Jeeves', 'MessageContent.tsx');
+  const fileName = path.join(__dirname, '..', 'src', 'features', 'Jeeves', 'MessageContent.tsx');
   const source = fs.readFileSync(fileName, 'utf8');
   const result = ts.transpileModule(source, {
     fileName,

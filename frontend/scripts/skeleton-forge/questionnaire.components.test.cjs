@@ -66,6 +66,9 @@ test('review step summarises the run request, era source and shadowed facets', (
   assert.match(t, /Era is voted by your design beats/);
   assert.match(t, /overrides the brief answer for: combat/);
   assert.match(t, /⚒ Forge it/);
+  assert.doesNotMatch(html, /data-testid="q-view-plan"/);
+  const linked = view(state, { onViewPlan: () => {} });
+  assert.match(linked, /data-testid="q-view-plan"/);
   const busy = view(state, { forging: true });
   assert.match(text(busy), /⚒ Forge it…/);
   assert.match(busy.match(/<button[^>]*data-testid="q-forge"[^>]*>/)[0], /aria-busy="true"/);

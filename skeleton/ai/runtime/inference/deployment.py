@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
-import threading
 import tempfile
+import threading
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 
 from .llama_cpp import (
+    COMPLETION_CHAT_FLAGS,
+    QWEN3_COMPLETION_CHAT_TEMPLATE,
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
@@ -26,21 +28,27 @@ from .local import (
     LocalModelAdapter,
 )
 
-
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
-QWEN3_COMPLETION_CHAT_TEMPLATE = (
-    "{% for message in messages %}"
-    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
-    "{% endfor %}{% if add_generation_prompt %}"
-    "{{ '<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' }}"
-    "{% endif %}"
-)
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_MAX_MANIFEST_BYTES = 1024 * 1024
 
 
 class LocalModelDeploymentError(RuntimeError):
     """A local-model deployment manifest or artifact failed closed."""
+
+
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise LocalModelDeploymentError("deployment manifest contains duplicate JSON keys")
+        result[key] = value
+    return result
+
+
+def _reject_constant(value: str) -> None:
+    raise LocalModelDeploymentError("deployment manifest contains non-finite JSON values")
 
 
 def _sha256_file(path: Path) -> str:
@@ -77,15 +85,13 @@ def _resolve(
     path = Path(value).expanduser()
     if not path.is_absolute():
         path = base / path
-    lexical=Path(os.path.abspath(path))
+    lexical = Path(os.path.abspath(path))
     try:
         resolved = path.resolve(strict=True)
-    except OSError as exc:
+    except (OSError, RuntimeError) as exc:
         raise LocalModelDeploymentError(f"{field} does not exist: {path}") from exc
-    if reject_symlink and lexical!=resolved:
-        raise LocalModelDeploymentError(
-            f"{field} symlinked path component is forbidden"
-        )
+    if reject_symlink and lexical != resolved:
+        raise LocalModelDeploymentError(f"{field} symlinked path component is forbidden")
     if not resolved.is_file():
         raise LocalModelDeploymentError(f"{field} must reference a regular file")
     return resolved
@@ -120,23 +126,48 @@ class LocalModelDeployment:
     extra_args: tuple[str, ...]
     manifest_digest: str
     output_framing: str = "raw"
+    runtime_scratch_bytes: int = 512 * 1024 * 1024
+    kv_bytes_per_token: int | None = None
 
     @classmethod
-    def load(cls, manifest_path: str | Path) -> "LocalModelDeployment":
+    def load(
+        cls,
+        manifest_path: str | Path,
+        *,
+        expected_sha256: str | None = None,
+        max_artifact_bytes: int | None = None,
+    ) -> LocalModelDeployment:
+        if expected_sha256 is not None:
+            _digest_field(expected_sha256, "expected_sha256")
+        if max_artifact_bytes is not None and (
+            type(max_artifact_bytes) is not int or not 1 <= max_artifact_bytes <= 1024**4
+        ):
+            raise LocalModelDeploymentError("deployment artifact byte budget must be an integer in [1, 1 TiB]")
         source = Path(manifest_path).expanduser()
         try:
             resolved_manifest = source.resolve(strict=True)
         except OSError as exc:
             raise LocalModelDeploymentError(f"deployment manifest not found: {source}") from exc
         try:
-            payload = json.loads(resolved_manifest.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            size = resolved_manifest.stat().st_size
+            if not resolved_manifest.is_file() or not 1 <= size <= _MAX_MANIFEST_BYTES:
+                raise LocalModelDeploymentError("deployment manifest violates file/byte bounds")
+            with resolved_manifest.open("rb") as stream:
+                raw = stream.read(_MAX_MANIFEST_BYTES + 1)
+            if len(raw) != size or len(raw) > _MAX_MANIFEST_BYTES:
+                raise LocalModelDeploymentError("deployment manifest changed or exceeds its byte bound")
+            if expected_sha256 is not None and hashlib.sha256(raw).hexdigest() != expected_sha256:
+                raise LocalModelDeploymentError("deployment manifest differs from its expected digest pin")
+            payload = json.loads(
+                raw.decode("utf-8"), object_pairs_hook=_strict_object, parse_constant=_reject_constant
+            )
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
             raise LocalModelDeploymentError("deployment manifest is not valid JSON") from exc
         if not isinstance(payload, dict):
             raise LocalModelDeploymentError("deployment manifest root must be an object")
         if payload.get("schema_version") != SCHEMA:
             raise LocalModelDeploymentError("unsupported deployment manifest schema")
-        allowed_top_level={
+        allowed_top_level = {
             "schema_version",
             "runtime_kind",
             "model_id",
@@ -146,11 +177,10 @@ class LocalModelDeployment:
             "model_sha256",
             "config",
         }
-        unknown_top_level=set(payload)-allowed_top_level
+        unknown_top_level = set(payload) - allowed_top_level
         if unknown_top_level:
             raise LocalModelDeploymentError(
-                "unsupported deployment manifest key(s): "
-                + ", ".join(sorted(map(str,unknown_top_level)))
+                "unsupported deployment manifest key(s): " + ", ".join(sorted(map(str, unknown_top_level)))
             )
         if payload.get("runtime_kind") != "llama.cpp-cli":
             raise LocalModelDeploymentError("runtime_kind must be llama.cpp-cli")
@@ -165,9 +195,11 @@ class LocalModelDeployment:
             "model_path",
             reject_symlink=True,
         )
-        executable_digest = _digest_field(
-            payload.get("executable_sha256"), "executable_sha256"
-        )
+        if max_artifact_bytes is not None:
+            referenced = {path: path.stat().st_size for path in (resolved_manifest, executable, model)}
+            if sum(referenced.values()) > max_artifact_bytes:
+                raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
+        executable_digest = _digest_field(payload.get("executable_sha256"), "executable_sha256")
         model_digest = _digest_field(payload.get("model_sha256"), "model_sha256")
         config = payload.get("config", {})
         if not isinstance(config, dict):
@@ -183,20 +215,17 @@ class LocalModelDeployment:
             "temperature",
             "extra_args",
             "output_framing",
+            "runtime_scratch_bytes",
+            "kv_bytes_per_token",
         }
         unknown = set(config) - allowed_config
         if unknown:
             raise LocalModelDeploymentError(
-                "unsupported deployment config key(s): "
-                + ", ".join(sorted(map(str, unknown)))
+                "unsupported deployment config key(s): " + ", ".join(sorted(map(str, unknown)))
             )
         extra_args = config.get("extra_args", [])
-        if not isinstance(extra_args, list) or not all(
-            isinstance(item, str) for item in extra_args
-        ):
-            raise LocalModelDeploymentError(
-                "config.extra_args must be a list of strings"
-            )
+        if not isinstance(extra_args, list) or not all(isinstance(item, str) for item in extra_args):
+            raise LocalModelDeploymentError("config.extra_args must be a list of strings")
         try:
             validated = LlamaCppConfig(
                 executable=str(executable),
@@ -212,13 +241,13 @@ class LocalModelDeployment:
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
+                runtime_scratch_bytes=config.get("runtime_scratch_bytes", 512 * 1024 * 1024),
+                kv_bytes_per_token=config.get("kv_bytes_per_token"),
                 reject_model_symlink=True,
                 rehash_artifacts_each_run=False,
             )
         except (TypeError, ValueError, OSError) as exc:
-            raise LocalModelDeploymentError(
-                f"invalid llama.cpp deployment config: {exc}"
-            ) from exc
+            raise LocalModelDeploymentError(f"invalid llama.cpp deployment config: {exc}") from exc
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
@@ -226,9 +255,7 @@ class LocalModelDeployment:
         try:
             gguf = inspect_gguf(model)
         except LlamaCppRuntimeError as exc:
-            raise LocalModelDeploymentError(
-                f"invalid GGUF model artifact: {exc}"
-            ) from exc
+            raise LocalModelDeploymentError(f"invalid GGUF model artifact: {exc}") from exc
         deployment = cls(
             manifest_path=resolved_manifest,
             runtime_kind="llama.cpp-cli",
@@ -250,9 +277,19 @@ class LocalModelDeployment:
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
+            runtime_scratch_bytes=validated.runtime_scratch_bytes,
+            kv_bytes_per_token=validated.kv_bytes_per_token,
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
+        if expected_sha256 is not None:
+            try:
+                with resolved_manifest.open("rb") as stream:
+                    admitted_raw = stream.read(_MAX_MANIFEST_BYTES + 1)
+            except OSError as exc:
+                raise LocalModelDeploymentError("pinned deployment manifest became unavailable") from exc
+            if len(admitted_raw) > _MAX_MANIFEST_BYTES or hashlib.sha256(admitted_raw).hexdigest() != expected_sha256:
+                raise LocalModelDeploymentError("pinned deployment manifest changed during admission")
         return deployment
 
     def verify_artifacts(self) -> None:
@@ -281,6 +318,8 @@ class LocalModelDeployment:
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
+            runtime_scratch_bytes=self.runtime_scratch_bytes,
+            kv_bytes_per_token=self.kv_bytes_per_token,
             reject_model_symlink=True,
             rehash_artifacts_each_run=rehash_artifacts_each_run,
         )
@@ -291,13 +330,21 @@ class LocalModelDeployment:
         cache_size: int = 0,
         default_seed: int = 0,
         rehash_artifacts_each_run: bool = False,
+        max_concurrency: int = 1,
+        max_queue_size: int = 256,
+        max_batch_size: int = 256,
+        require_guarded_inference: bool = False,
+        guarded_components: Any | None = None,
     ) -> LocalModelAdapter:
         adapter = build_llama_cpp_adapter(
-            self.llama_cpp_config(
-                rehash_artifacts_each_run=rehash_artifacts_each_run
-            ),
+            self.llama_cpp_config(rehash_artifacts_each_run=rehash_artifacts_each_run),
             cache_size=cache_size,
             default_seed=default_seed,
+            max_concurrency=max_concurrency,
+            max_queue_size=max_queue_size,
+            max_batch_size=max_batch_size,
+            require_guarded_inference=require_guarded_inference,
+            guarded_components=guarded_components,
         )
         model = adapter.engine.model
         if not isinstance(model, LlamaCppModel):
@@ -310,6 +357,8 @@ class LocalModelDeployment:
         return LocalModelAdapter(
             adapter.engine,
             default_seed=default_seed,
+            guarded_service=adapter.guarded_service,
+            require_guarded_inference=adapter.require_guarded_inference,
             artifact_status={
                 "schema": SCHEMA,
                 "model_id": model.model_id,
@@ -336,6 +385,8 @@ def create_local_model_deployment(
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
+    runtime_scratch_bytes: int = 512 * 1024 * 1024,
+    kv_bytes_per_token: int | None = None,
 ) -> LocalModelDeployment:
     """Prepare a pinned configuration from existing files, without execution.
 
@@ -344,16 +395,15 @@ def create_local_model_deployment(
     publication is create-only: an existing destination is never replaced.
     """
     if not isinstance(runtime_profile, str) or runtime_profile not in {
-        "raw", "llama-completion-chat", "qwen3-completion-chat"
+        "raw",
+        "llama-completion-chat",
+        "qwen3-completion-chat",
     }:
         raise LocalModelDeploymentError("unsupported local runtime profile")
     extra_args: tuple[str, ...] = ()
     completion_profile = runtime_profile in {"llama-completion-chat", "qwen3-completion-chat"}
     if completion_profile:
-        extra_args = (
-            "--conversation", "--single-turn", "--simple-io", "--no-perf",
-            "--no-escape", "--color", "off", "--jinja", "--reasoning", "off",
-        )
+        extra_args = COMPLETION_CHAT_FLAGS
         output_framing = "llama_completion_eog"
         if runtime_profile == "qwen3-completion-chat":
             extra_args += ("--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE)
@@ -372,29 +422,52 @@ def create_local_model_deployment(
     if not isinstance(identity, str) or not identity.strip() or len(identity.encode("utf-8")) > 256:
         raise LocalModelDeploymentError("model_id must contain 1–256 UTF-8 bytes")
     validated = LlamaCppConfig(
-        executable=str(executable), model_path=str(model), model_id=identity.strip(),
-        context_size=context_size, threads=threads, gpu_layers=gpu_layers,
-        timeout_seconds=timeout_seconds, output_framing=output_framing, reject_model_symlink=True,
+        executable=str(executable),
+        model_path=str(model),
+        model_id=identity.strip(),
+        context_size=context_size,
+        threads=threads,
+        gpu_layers=gpu_layers,
+        timeout_seconds=timeout_seconds,
+        output_framing=output_framing,
+        reject_model_symlink=True,
         extra_args=extra_args,
         batch_size=512 if completion_profile else None,
+        runtime_scratch_bytes=runtime_scratch_bytes,
+        kv_bytes_per_token=kv_bytes_per_token,
     )
     payload = {
-        "schema_version": SCHEMA, "runtime_kind": "llama.cpp-cli",
+        "schema_version": SCHEMA,
+        "runtime_kind": "llama.cpp-cli",
         "model_id": validated.model_id,
-        "executable_path": str(executable), "executable_sha256": _sha256_file(executable),
-        "model_path": str(model), "model_sha256": _sha256_file(model),
-        "config": {"context_size": validated.context_size, "threads": validated.threads,
-                   "gpu_layers": validated.gpu_layers, "timeout_seconds": validated.timeout_seconds,
-                   "temperature": 0.0, "extra_args": list(validated.extra_args),
-                   "output_framing": validated.output_framing},
+        "executable_path": str(executable),
+        "executable_sha256": _sha256_file(executable),
+        "model_path": str(model),
+        "model_sha256": _sha256_file(model),
+        "config": {
+            "context_size": validated.context_size,
+            "threads": validated.threads,
+            "gpu_layers": validated.gpu_layers,
+            "timeout_seconds": validated.timeout_seconds,
+            "temperature": 0.0,
+            "extra_args": list(validated.extra_args),
+            "output_framing": validated.output_framing,
+            "runtime_scratch_bytes": validated.runtime_scratch_bytes,
+            "kv_bytes_per_token": validated.kv_bytes_per_token,
+        },
     }
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json",
-                                         prefix=".skeleton-model-", dir=target.parent,
-                                         delete=False) as handle:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".json",
+            prefix=".skeleton-model-",
+            dir=target.parent,
+            delete=False,
+        ) as handle:
             candidate = Path(handle.name)
             json.dump(payload, handle, indent=2, ensure_ascii=False, allow_nan=False)
             handle.write("\n")
@@ -416,11 +489,21 @@ def load_local_model_adapter(
     cache_size: int = 0,
     default_seed: int = 0,
     rehash_artifacts_each_run: bool = False,
+    max_concurrency: int = 1,
+    max_queue_size: int = 256,
+    max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelAdapter:
     return LocalModelDeployment.load(manifest_path).adapter(
         cache_size=cache_size,
         default_seed=default_seed,
         rehash_artifacts_each_run=rehash_artifacts_each_run,
+        max_concurrency=max_concurrency,
+        max_queue_size=max_queue_size,
+        max_batch_size=max_batch_size,
+        require_guarded_inference=require_guarded_inference,
+        guarded_components=guarded_components,
     )
 
 
@@ -436,14 +519,10 @@ def _qualification_request(
         or not isinstance(max_output_tokens, int)
         or not 1 <= max_output_tokens <= 256
     ):
-        raise LocalModelDeploymentError(
-            "qualification max_output_tokens must be in [1, 256]"
-        )
+        raise LocalModelDeploymentError("qualification max_output_tokens must be in [1, 256]")
     return LocalInferenceRequest(
         prompt=prompt,
-        instructions=(
-            "Offline local model qualification. Do not use external services."
-        ),
+        instructions=("Offline local model qualification. Do not use external services."),
         max_output_tokens=max_output_tokens,
         seed=0,
     )
@@ -458,28 +537,16 @@ def _qualification_receipt(
 ) -> dict[str, Any]:
     if not hasattr(result, "model_digest") or not hasattr(result, "text"):
         raise LocalModelDeploymentError("qualification produced invalid result")
-    if (
-        result.model_digest != deployment.model_sha256
-        or result.model_id != deployment.model_id
-    ):
-        raise LocalModelDeploymentError(
-            "qualification result model identity drift"
-        )
-    if result.finish_reason!="completed":
-        raise LocalModelDeploymentError(
-            "qualification did not reach a completed model response"
-        )
+    if result.model_digest != deployment.model_sha256 or result.model_id != deployment.model_id:
+        raise LocalModelDeploymentError("qualification result model identity drift")
+    if result.finish_reason != "completed":
+        raise LocalModelDeploymentError("qualification did not reach a completed model response")
     if result.text is None or not result.text.strip():
         raise LocalModelDeploymentError("qualification produced no textual output")
     response_id = getattr(result, "response_id", None)
     if not isinstance(response_id, str) or not response_id.strip():
-        raise LocalModelDeploymentError(
-            "qualification result is missing response identity"
-        )
-    if (
-        deployment.executable_sha256 not in response_id
-        or deployment.model_sha256 not in response_id
-    ):
+        raise LocalModelDeploymentError("qualification result is missing response identity")
+    if deployment.executable_sha256 not in response_id or deployment.model_sha256 not in response_id:
         raise LocalModelDeploymentError(
             "qualification response identity is not bound to runtime and model digests"
         )
@@ -495,9 +562,7 @@ def _qualification_receipt(
         "gguf_tensor_count": model.gguf_header.tensor_count,
         "gguf_metadata_count": model.gguf_header.metadata_count,
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-        "output_sha256": hashlib.sha256(
-            result.text.encode("utf-8")
-        ).hexdigest(),
+        "output_sha256": hashlib.sha256(result.text.encode("utf-8")).hexdigest(),
         "response_id": response_id,
         "provider": "local",
         "network_required": False,
@@ -514,9 +579,7 @@ async def qualify_local_model_deployment(
     max_output_tokens: int = 32,
 ) -> dict[str, Any]:
     deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(
-        deployment.llama_cpp_config(rehash_artifacts_each_run=True)
-    )
+    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
     try:
         result = await LocalInferenceEngine(model, cache_size=0).generate(
             _qualification_request(
@@ -525,9 +588,7 @@ async def qualify_local_model_deployment(
             )
         )
     except (LlamaCppRuntimeError, OSError, TimeoutError) as exc:
-        raise LocalModelDeploymentError(
-            f"local model qualification execution failed: {exc}"
-        ) from exc
+        raise LocalModelDeploymentError(f"local model qualification execution failed: {exc}") from exc
     return _qualification_receipt(
         deployment,
         model,
@@ -543,9 +604,7 @@ def qualify_local_model_deployment_sync(
     max_output_tokens: int = 32,
 ) -> dict[str, Any]:
     deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(
-        deployment.llama_cpp_config(rehash_artifacts_each_run=True)
-    )
+    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
     try:
         result = model.infer(
             _qualification_request(
@@ -555,9 +614,7 @@ def qualify_local_model_deployment_sync(
             threading.Event(),
         )
     except (LlamaCppRuntimeError, OSError, TimeoutError) as exc:
-        raise LocalModelDeploymentError(
-            f"local model qualification execution failed: {exc}"
-        ) from exc
+        raise LocalModelDeploymentError(f"local model qualification execution failed: {exc}") from exc
     return _qualification_receipt(
         deployment,
         model,
@@ -567,11 +624,11 @@ def qualify_local_model_deployment_sync(
 
 
 __all__ = [
-    "LocalModelDeployment",
-    "LocalModelDeploymentError",
     "QUALIFICATION_SCHEMA",
     "QWEN3_COMPLETION_CHAT_TEMPLATE",
     "SCHEMA",
+    "LocalModelDeployment",
+    "LocalModelDeploymentError",
     "create_local_model_deployment",
     "load_local_model_adapter",
     "qualify_local_model_deployment",

@@ -1,0 +1,1098 @@
+{
+  "operation": "api-capability-atlas",
+  "http_status": 200,
+  "response": {
+    "all_source_modules_executable": false,
+    "catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+    "catalog_source_owners": [
+      {
+        "bytes": 59253,
+        "path": "skeleton/ai/game_builder/jeeves_app_runtime.py",
+        "sha256": "287fa82f3fdbf7112773aaef7f44e2b9490ac755843d2783bd77ee322a64ec2d"
+      },
+      {
+        "bytes": 36429,
+        "path": "skeleton/ai/game_builder/jeeves_appwide_fabric.py",
+        "sha256": "d146cfd636c5fd7b4bc3f813e7a39fd508dd5ebac90c2a739f4bdfec51911d05"
+      },
+      {
+        "bytes": 13026,
+        "path": "skeleton/ai/game_builder/studio_tool_fabric.py",
+        "sha256": "b89cd5ae4a95adc2dcb0496a883b867a286995734303b7996fe656f562c1a34d"
+      },
+      {
+        "bytes": 22493,
+        "path": "skeleton/ai/game_builder/studio_execution_plane.py",
+        "sha256": "64f3bd88da71e53236f5d034228dc036c06c7cee234b150e5bbc9a52d7d10290"
+      },
+      {
+        "bytes": 30158,
+        "path": "skeleton/ai/game_builder/studio_role_triad.py",
+        "sha256": "2f8c2f7a81193e725a76a69fc93ff6e978197cefd32398061b7e0c1cf2c8e3ef"
+      },
+      {
+        "bytes": 150889,
+        "path": "skeleton/ai/game_builder/system_editors.py",
+        "sha256": "d209d74de4dde0f8fd86e267912cba0030776c6b668d78e3b8d1b6f6ccbcf3f3"
+      },
+      {
+        "bytes": 41668,
+        "path": "skeleton/ai/game_builder/game_workspace_server.py",
+        "sha256": "d28992ba508efefaaee7e7ea3d004a8734fd961735343164859da3fff75691d2"
+      },
+      {
+        "bytes": 181803,
+        "path": "skeleton/ai/game_builder/game_workspace_ui.py",
+        "sha256": "576206c160358f84777e68226b7a0b82ddf65095e985292312d19a9d5863bbd9"
+      },
+      {
+        "bytes": 36251,
+        "path": "skeleton/ai/game_builder/contracts.py",
+        "sha256": "fe03e27a9b3a284601bbd53c49aa21e0d78fe30a39f56462ae04e173e129721c"
+      },
+      {
+        "bytes": 24920,
+        "path": "skeleton/ai/game_builder/game_project_workspace.py",
+        "sha256": "5479594458c50d3365d2c859b60ccf0e8cba16b7896f6b39afb81285a069f261"
+      },
+      {
+        "bytes": 12660,
+        "path": "skeleton/ai/game_builder/game_prompt_router.py",
+        "sha256": "6c3b95b528a08f03d563d8c7ec25ee9bcf9a960e2238302bc95c9ba10f38b97e"
+      },
+      {
+        "bytes": 14252,
+        "path": "skeleton/ai/game_builder/system_editor_assembly.py",
+        "sha256": "25ca1fc19944ae1a889e324309854913de356d900e7fdaab61eeffeb6d4cf163"
+      },
+      {
+        "bytes": 11973,
+        "path": "skeleton/ai/game_builder/jeeves_production_director.py",
+        "sha256": "0d94b081d1d622ffbaf2d86572733c3533a003f517cf62570c4a3076a44c3262"
+      },
+      {
+        "bytes": 4210,
+        "path": "skeleton/ai/game_builder/jeeves_chapter_chat.py",
+        "sha256": "9cec14b4efd634174fc0757d3a35e88696a9314a4ca686a584d8642f42115167"
+      },
+      {
+        "bytes": 17396,
+        "path": "skeleton/ai/game_builder/jeeves_capability_intelligence.py",
+        "sha256": "3c70077dab7d9851691b979b566ec04e5e144692b2661e80d006cab7da2d3483"
+      },
+      {
+        "bytes": 20594,
+        "path": "skeleton/ai/game_builder/jeeves_completion_census.py",
+        "sha256": "5da2a15873085be52d6c825c1624c3a7015519f56a7ad1e26a5e55327583d6e2"
+      },
+      {
+        "bytes": 7674,
+        "path": "skeleton/ai/game_builder/advanced_rpg_planner.py",
+        "sha256": "b37d0fb4ea072ae49b4799dfe603231ac9d83c2e39087ecc8df008994355166d"
+      },
+      {
+        "bytes": 6660,
+        "path": "skeleton/ai/game_builder/advanced_world_planner.py",
+        "sha256": "904c4c13e1f6b5e3b4c06c5de96f9bfef3599c0dfda72cf2db34a39c4a436c3d"
+      },
+      {
+        "bytes": 8433,
+        "path": "skeleton/ai/game_builder/playable_compiler.py",
+        "sha256": "9f8c4f9d0aec22f84e796b37b962e4bef43c3770267515df51593905b19b5302"
+      },
+      {
+        "bytes": 22808,
+        "path": "skeleton/ai/game_builder/playable_simulation.py",
+        "sha256": "8cc1122ddb0df0b5b712ce6eec67256bc5422f137de5342005cdc724978714c4"
+      },
+      {
+        "bytes": 15512,
+        "path": "skeleton/ai/game_builder/playable_world.py",
+        "sha256": "852110942db688845d0756a12f08e935eff23be0a3beeaff3c3eccda9f553ee6"
+      },
+      {
+        "bytes": 28295,
+        "path": "skeleton/ai/game_builder/playable_export.py",
+        "sha256": "1eb5c71c378ebc3df6acb2bc08975af71edef7f519d4aa0b74bc73ffc501a115"
+      },
+      {
+        "bytes": 17147,
+        "path": "skeleton/ai/game_builder/tile_editor_export.py",
+        "sha256": "3fb60743fd563ec08a37dc741f9e99e820b218410a6b6ada3a4f041b635acecc"
+      },
+      {
+        "bytes": 37892,
+        "path": "skeleton/ai/game_builder/dual_runtime_export.py",
+        "sha256": "1b172a07fc249c78acee9c101ae724f419610ccb24077739c01897b2392a1f91"
+      },
+      {
+        "bytes": 40916,
+        "path": "skeleton/ai/game_builder/advanced_gameplay_runtime.py",
+        "sha256": "ead1fe79f57f1f73019226cb2f1638981ec75bb0f4698f99e33027b39f261599"
+      },
+      {
+        "bytes": 11209,
+        "path": "skeleton/ai/game_builder/mirror_room_runtime.py",
+        "sha256": "0d8181b1c1dc8c9c185aeeb216c16a25647e4515052ee9fa47c977799da506aa"
+      },
+      {
+        "bytes": 8583,
+        "path": "skeleton/ai/game_builder/companion_curriculum.py",
+        "sha256": "5a3bb6426f64601f0b6c8799d639a16836f1403a2404a76b557a4ea1741b102d"
+      },
+      {
+        "bytes": 21853,
+        "path": "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "sha256": "8ff88776f471e5207a962f0475037d816b15146873e42564dfa54be145307197"
+      },
+      {
+        "bytes": 6666,
+        "path": "skeleton/ai/game_builder/studio_sprite_authoring.py",
+        "sha256": "78817e8ca0616e954bcd2437a938f1bfd97e87d1ff5a8efde0acb2e7952b63a0"
+      },
+      {
+        "bytes": 5457,
+        "path": "skeleton/ai/game_builder/studio_native_psg.py",
+        "sha256": "9687b6605130e6b7971bbe5f0282251096d3668fe5265e21fc33b9770b6b5d86"
+      },
+      {
+        "bytes": 20977,
+        "path": "skeleton/ai/game_builder/game_boy_native_export.py",
+        "sha256": "b753e1e2debe4be32bbfb1a8f5b9c1d94afb65caabb11104a5238a7b7fb5e1d5"
+      },
+      {
+        "bytes": 8110,
+        "path": "skeleton/ai/game_builder/game_boy_color_native_export.py",
+        "sha256": "0e16aeef5ec132769c4a4dc34114f0da4c48fadca496008d471c3d1c7a6cef31"
+      },
+      {
+        "bytes": 21416,
+        "path": "skeleton/ai/game_builder/nes_native_export.py",
+        "sha256": "ac5f50af5926a12baeab8927c79f3804318b856243132a731e5a75bbc023d6a2"
+      },
+      {
+        "bytes": 18905,
+        "path": "skeleton/ai/game_builder/sms_native_export.py",
+        "sha256": "ff09cad8270d88f9d65c1006ca5323e24f4eee8dc09991ccbfe2f33912b80e31"
+      },
+      {
+        "bytes": 40594,
+        "path": "skeleton/ai/game_builder/sega_8bit_native_export.py",
+        "sha256": "bab8a4e5a41adcbfd8e09a3da46949e35c6defba4fd7570251204f72bcd232a6"
+      },
+      {
+        "bytes": 17109,
+        "path": "skeleton/ai/game_builder/port_planner.py",
+        "sha256": "b866e39dc12ee3f219dc222fa80aa2f5fec69be3f7a9a271a89efece893cb084"
+      },
+      {
+        "bytes": 8118,
+        "path": "skeleton/ai/game_builder/platform_registry.py",
+        "sha256": "2d67ff26c6713d68222ccf63662872c1cb526cad986ad0e7b68ce73ad7e55d91"
+      },
+      {
+        "bytes": 28500,
+        "path": "skeleton/ai/forge/universal.py",
+        "sha256": "3d7960501c09de5a36c7ea3284d4a24bd37aef5132b15f33d8e828f85bc0b9de"
+      },
+      {
+        "bytes": 10609,
+        "path": "skeleton/ai/webcrawler/dragon_companion_runtime.py",
+        "sha256": "9423e7ead16de641fd360e3cc38ec051520739d814b819e034ca635c7dd444f0"
+      },
+      {
+        "bytes": 1211,
+        "path": "skeleton/ai/webcrawler/dragon_visual_state.py",
+        "sha256": "d5037bfa7a5c61af75af10d89187942f68828beae78a224027d2143eac447ebd"
+      },
+      {
+        "bytes": 1243,
+        "path": "skeleton/ai/webcrawler/active_research.py",
+        "sha256": "822d59d6e24e78bb48c8667bd05ac76840a2af7090469b23bba1362fc073d738"
+      },
+      {
+        "bytes": 3810,
+        "path": "skeleton/ai/webcrawler/dragon_chip_music.py",
+        "sha256": "a6de083deeaf7969def73afa472b8e6d88656e272d80a01cc85443f179fb85d4"
+      },
+      {
+        "bytes": 12578,
+        "path": "skeleton/ai/webcrawler/dragon_game_blueprints.py",
+        "sha256": "fafb0af143294c5b028cde8e5c82478428a8fa4bb1dbe5a52b17208a6aaf00f3"
+      },
+      {
+        "bytes": 10135,
+        "path": "skeleton/ai/webcrawler/game_scale_assets.py",
+        "sha256": "a4a4026deddd10a1b7443e41558ff84fce26f8283b53367df75954078cdfc440"
+      },
+      {
+        "bytes": 18275,
+        "path": "skeleton/developer/jeeves_game_upscale.py",
+        "sha256": "eee44cb487dbda132b183809f56271bb2f2c99b1d044c7908012014933e6b08b"
+      },
+      {
+        "bytes": 45829,
+        "path": "skeleton/jeeves/game_console_assets.py",
+        "sha256": "eca3b1206286b34990ac80bc79eba56dc6b9bbcfa404afb79014f03c0683ad4f"
+      }
+    ],
+    "coverage_interpretation": "cataloged != wired != tested != publishable",
+    "digest": "fa20f2c9ff7298e26ab6fc9c32b297c33cbf25baafc14185299952723b7ba923",
+    "families": [
+      {
+        "description": "typed AI agents and orchestration",
+        "id": "ai_agents",
+        "path": "skeleton/ai/agents",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "application entry points and UI",
+        "id": "app",
+        "path": "skeleton/app",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "local original assets",
+        "id": "assets",
+        "path": "skeleton/assets",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "product chat, tooling and continuity",
+        "id": "assistant",
+        "path": "skeleton/ai/assistant",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "sound and voice stack",
+        "id": "audio",
+        "path": "skeleton/audio",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "background supervision and builders",
+        "id": "automation",
+        "path": "skeleton/automation",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "API, model services and native gameforge",
+        "id": "backend",
+        "path": "backend",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "backend gameforge adapters",
+        "id": "backend_gameforge",
+        "path": "backend/gameforge",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "app-facing API route implementations",
+        "id": "backend_routes",
+        "path": "backend/routes",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "backend service orchestration",
+        "id": "backend_services",
+        "path": "backend/services",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "idle companion and consent-bound Dragon planning",
+        "id": "companion",
+        "path": "skeleton/ai/webcrawler",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "global supervisor and activation security",
+        "id": "core_services",
+        "path": "core",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "research sources and Dragon acquisition planes",
+        "id": "crawler",
+        "path": "skeleton/ai/webcrawler",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "original creator graph, proposals and approvals",
+        "id": "creator",
+        "path": "skeleton/creator",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "engine and era-specific code under Jeeves",
+        "id": "engines",
+        "path": "skeleton/jeeves",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "original game forges, composers, planners and verifiers",
+        "id": "forge",
+        "path": "skeleton/ai/forge",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "React / React Native app, presentation and navigation",
+        "id": "frontend",
+        "path": "frontend",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "shared visual/editor components",
+        "id": "frontend_components",
+        "path": "frontend/src/components",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "user-visible UI feature implementations",
+        "id": "frontend_features",
+        "path": "frontend/src/features",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "typed client app services",
+        "id": "frontend_services",
+        "path": "frontend/src/services",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "app state and user/session interactions",
+        "id": "frontend_state",
+        "path": "frontend/src/state",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "native game systems",
+        "id": "game",
+        "path": "skeleton/game",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "Jeeves knowledge display, cards and verification",
+        "id": "hoag",
+        "path": "skeleton/hoag",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "AI runtime, context, contracts and plugins",
+        "id": "internal_runtime",
+        "path": "skeleton/ai/runtime",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "native Java physics, observability and vector",
+        "id": "java_accelerators",
+        "path": "java-accelerators",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "existing Jeeves runtime, knowledge, evidence and planners",
+        "id": "jeeves",
+        "path": "skeleton/jeeves",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "standalone Jeeves application entry point",
+        "id": "jeeves_app",
+        "path": "apps/jeeves",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "knowledge index and retrieval",
+        "id": "knowledge",
+        "path": "skeleton/knowledge",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "holdouts, candidate review and promotion",
+        "id": "learning",
+        "path": "skeleton/ai/learning",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "engine-neutral forge and blueprint components",
+        "id": "legacy_forge",
+        "path": "skeleton/forge",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "internal machine-readable app feature and milestone catalogs",
+        "id": "machine_index",
+        "path": "machine",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "signed milestone and volume registers",
+        "id": "masterplan",
+        "path": "skeleton/masterplan",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "native model chat, serving and weights",
+        "id": "model_runtime",
+        "path": "skeleton/ai/model_runtime",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "scheduler, app governance and idle maintenance",
+        "id": "organism",
+        "path": "skeleton/organism",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "active human-reviewed workspace files",
+        "id": "project_files",
+        "path": "skeleton/ai/game_builder",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "provider runtime and credentials (not exposed)",
+        "id": "providers",
+        "path": "skeleton/providers",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "shipping/signing tools (not granted)",
+        "id": "release",
+        "path": "skeleton/release",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "independent research",
+        "id": "research",
+        "path": "skeleton/research",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "the installed Skeleton application source taxonomy",
+        "id": "root",
+        "path": "skeleton",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "Rust/gameforge middleware and satellite components",
+        "id": "satellite_gameforge",
+        "path": "satellites",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "security gates and authority",
+        "id": "security",
+        "path": "skeleton/security",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "policy-governed execution (not granted to Jeeves)",
+        "id": "shells",
+        "path": "skeleton/shells",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "system editor families and reviewed game sources",
+        "id": "studio",
+        "path": "skeleton/ai/game_builder",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "engineering and regression test suites",
+        "id": "test_suites",
+        "path": "tests",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "adapters, evaluation, controlled promotion",
+        "id": "training",
+        "path": "skeleton/ai/training",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "movie/visual analysis stack",
+        "id": "video",
+        "path": "skeleton/video",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "render and vision stack",
+        "id": "vision",
+        "path": "skeleton/vision",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "existing volume and milestone compiler",
+        "id": "volume_forge",
+        "path": "volume_forge",
+        "present": true,
+        "source_executable_by_name": false
+      },
+      {
+        "description": "native Windows packaging and installer",
+        "id": "windows_packaging",
+        "path": "packaging/windows",
+        "present": true,
+        "source_executable_by_name": false
+      }
+    ],
+    "family_count": 49,
+    "local_executable_game_tools": [
+      "companion.practice",
+      "game.browser",
+      "game.editor",
+      "game.godot",
+      "game.simulate",
+      "mirror.fuzz",
+      "package.source",
+      "release.assess",
+      "story.generate",
+      "story.mirror",
+      "story.native",
+      "story.simulate",
+      "world.authored",
+      "world.generate",
+      "world.tiled"
+    ],
+    "operator_adapters": [
+      {
+        "description": "Discover installed app families and executable adapters",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "atlas.summary",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Page verified module names in an app family",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "atlas.family",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "family",
+          "offset",
+          "limit"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Search installed capability names and source-tree taxonomy",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "atlas.search",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "family",
+          "query",
+          "offset",
+          "limit"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Inventory nested real modules in a bounded app subsystem",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "atlas.deep",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "family",
+          "query",
+          "offset",
+          "limit",
+          "max_depth"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Inspect an actual typed system editor and its full knobs",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "atlas.editor",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "editor"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Inspect the current/previous/demo workspace tree",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.tree",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Read bounded reviewed current-project source",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.source",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "path"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Discover all typed game system editors",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.editor.catalog",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Validate editor configuration and run existing deterministic preview",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.editor.preview",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "editor",
+          "settings"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Prepare a single exact-source system edit requiring human commit",
+        "effect": "propose",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.editor.stage",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "editor",
+          "settings",
+          "reason"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Stage any project-scoped editor/director/forge file under exact-SHA human review",
+        "effect": "propose",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.source.propose",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "path",
+          "content",
+          "expected_sha256",
+          "reason"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Compile reviewed game systems with explicit missing runtime gates",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.assembly",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Map creative request to exact module/source targets",
+        "effect": "plan",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "studio.route",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "prompt"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Plan a phase-correct original Jeeves game production task",
+        "effect": "plan",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "jeeves.director",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "prompt",
+          "cast",
+          "region",
+          "act",
+          "scene"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Recall approved chapter history and prepare one governed chat turn",
+        "effect": "plan",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "jeeves.chapter_chat",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "prompt",
+          "session",
+          "cast",
+          "region"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Inspect the real registered universal forge component kinds",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "forge.kinds",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Compose and structurally verify an original universal forge graph",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "forge.graph",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "name",
+          "components",
+          "wires"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Actually compile a small original playable browser game with winning replay",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "game.compile.original",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "intent"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Actually compile original browser plus Godot source with bounded replay proof",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "game.compile.native",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "intent"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "List real console native source and sprite integration targets",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "game.console.catalog",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Generate authentic console assembly/C and stage one exact source for human approval",
+        "effect": "propose",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "game.console.source.stage",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [
+          "animation_fps",
+          "music_density"
+        ],
+        "required_parameters": [
+          "intent",
+          "target",
+          "source_platform",
+          "rights_evidence_sha256",
+          "creative_identity",
+          "style",
+          "contrast",
+          "animation_frames",
+          "source_file",
+          "expected_sha256",
+          "reason"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Compile six exact original 8x8 sprite tile arrays into reviewed native console source",
+        "effect": "propose",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "game.console.source.stage.artwork",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [
+          "animation_fps",
+          "music_density"
+        ],
+        "required_parameters": [
+          "intent",
+          "target",
+          "source_platform",
+          "rights_evidence_sha256",
+          "creative_identity",
+          "style",
+          "contrast",
+          "animation_frames",
+          "source_file",
+          "expected_sha256",
+          "reason",
+          "artist_tiles"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Run original game browser/native replay plus the independent adversarial mirror",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "game.mirror.review",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "intent"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Exercise bounded gameplay, assets, music and reference integrity through deterministic role adapters",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "system.triad",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "seed",
+          "mirror_attempts"
+        ],
+        "runtime_dependencies": [
+          {
+            "available_by_metadata": true,
+            "content_verified_at_execution": true,
+            "kind": "optional_installed_reference_pack"
+          }
+        ]
+      },
+      {
+        "description": "Inspect actual game tool contracts versus executable handlers",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "tool.fabric",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Validate a finite typed Jeeves tool plan without executing it",
+        "effect": "plan",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "tool.plan",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": true,
+        "optional_parameters": [],
+        "required_parameters": [
+          "phase",
+          "tools",
+          "input_digest",
+          "rationale"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Rehearse consent-bound Dragon growth and idle state transitions",
+        "effect": "simulate",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "companion.simulate",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "owner",
+          "events"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Inspect installed acquisition/research workers and their adapter status",
+        "effect": "read",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "crawler.catalog",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "offset",
+          "limit"
+        ],
+        "runtime_dependencies": []
+      },
+      {
+        "description": "Prepare an evidence-bound shadow/model enhancement review, never promote weights",
+        "effect": "propose",
+        "executable_local_adapter": true,
+        "human_source_commit_delegated": false,
+        "id": "model.improvement",
+        "model_invocation_by_adapter": false,
+        "network_or_provider_access": false,
+        "operator_authorization_required": false,
+        "optional_parameters": [],
+        "required_parameters": [
+          "target_family",
+          "baseline_sha256",
+          "candidate_sha256",
+          "hypothesis",
+          "metrics",
+          "rollback_plan"
+        ],
+        "runtime_dependencies": []
+      }
+    ],
+    "schema": "skeleton.game_builder.jeeves_app_atlas.v1",
+    "typed_game_editor_count": 43
+  }
+}

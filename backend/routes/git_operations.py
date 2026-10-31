@@ -14,14 +14,56 @@ from pathlib import Path
 import asyncio
 import os
 import re
+import tempfile
+import threading
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 router = APIRouter(prefix="/api/git", tags=["git"])
 
-# Persistent-ish workspace root for per-project repos.
-GIT_WORKSPACE_BASE = Path(os.environ.get(
-    "GIT_WORKSPACE_BASE", "/app/backend/.git_workspaces"))
-GIT_WORKSPACE_BASE.mkdir(parents=True, exist_ok=True)
+# Resolved on first use. Import must not create /app or any other directory.
+_workspace_base: Path | None = None
+_workspace_lock = threading.Lock()
+
+
+def workspace_base() -> Path:
+    """Return the process's singleton Git sandbox, allocating it lazily and safely."""
+    global _workspace_base
+    if _workspace_base is not None:
+        return _workspace_base
+    # Threadpool route handlers can resolve the first workspace concurrently.
+    # The fallback must be allocated exactly once for a process, not once per
+    # simultaneous request (which would split projects across repositories).
+    with _workspace_lock:
+        if _workspace_base is not None:
+            return _workspace_base
+        configured = os.environ.get("GIT_WORKSPACE_BASE", "").strip()
+        preferred = Path(configured) if configured else Path("/app/backend/.git_workspaces")
+        try:
+            # Do not permit an attacker-controlled workspace root to redirect
+            # an otherwise confined Git repository through a directory symlink.
+            # Explicit operator paths fail closed; the default falls back to a
+            # private directory if its configured location is compromised.
+            if preferred.is_symlink():
+                raise PermissionError("Git workspace root must not be a symlink")
+            preferred.mkdir(parents=True, exist_ok=True)
+            if preferred.is_symlink():
+                raise PermissionError("Git workspace root became a symlink")
+            # Exclusive random probe: never clobber a pre-existing file or
+            # follow a predictable .writable symlink in a shared workspace.
+            with tempfile.NamedTemporaryFile(
+                dir=preferred, prefix=".writable-", delete=True
+            ):
+                pass
+        except OSError:
+            if configured:
+                # Explicit operator configuration is authoritative: do not
+                # redirect repositories to unrelated temporary storage.
+                raise
+            # mkdtemp creates an unpredictable owner-only (0700 on POSIX)
+            # fallback, instead of reusing a shared fixed /tmp path.
+            preferred = Path(tempfile.mkdtemp(prefix="skeleton-git-workspaces-"))
+        _workspace_base = preferred.resolve()
+        return _workspace_base
 
 # The "active" project repo (set by /init, defaults to a sandbox project).
 _active = {"project": "default"}
@@ -58,10 +100,13 @@ def _repo_dir(project: Optional[str] = None) -> Path:
     # _safe_segment → _resolve_under (CodeQL: never joinpath raw/regex-only).
     name = _SAFE.sub("_", (project or _active["project"]) or "default") or "default"
     try:
+        root = workspace_base()
         safe = _safe_segment(name, what="project")
-        return _resolve_under(GIT_WORKSPACE_BASE, safe)
+        return _resolve_under(root, safe)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="invalid project path") from e
+    except OSError as e:
+        raise HTTPException(status_code=503, detail="git workspace unavailable") from e
 
 
 async def _git(args: List[str], project: Optional[str] = None, cwd: Optional[Path] = None) -> dict:

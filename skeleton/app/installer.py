@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from skeleton.app.assembly import (
+    CHROMA_FULL_PROFILE_BLOCKED,
     checks_ok,
     compose_command,
     find_repo_root,
@@ -139,6 +140,12 @@ def install_application(
     root = (root or find_repo_root()).resolve()
     phases: list[InstallPhase] = []
 
+    if full and start:
+        return InstallReceipt(
+            root=root,
+            phases=(InstallPhase("chroma-persistence", False, CHROMA_FULL_PROFILE_BLOCKED),),
+        )
+
     if production and hot:
         return InstallReceipt(
             root=root,
@@ -222,7 +229,7 @@ def install_application(
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
-    compose_env = {**os.environ, **manifest.mode_env(mode)}
+    compose_env = {**os.environ, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
     compose_validate = _run(
         compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
@@ -241,13 +248,17 @@ def install_application(
         phases.append(InstallPhase("public-endpoints", False, str(exc)))
         return InstallReceipt(root=root, phases=tuple(phases))
 
-    command = compose_command(
-        "up",
-        manifest=manifest,
-        full=full,
-        build=True,
-        hot=hot,
-    )
+    try:
+        command = compose_command(
+            "up",
+            manifest=manifest,
+            full=full,
+            build=True,
+            hot=hot,
+        )
+    except ValueError as exc:
+        phases.append(InstallPhase("start", False, str(exc)))
+        return InstallReceipt(root=root, phases=tuple(phases))
     try:
         completed = runner(
             list(command),
@@ -291,6 +302,22 @@ def install_application(
                 ),
             )
         )
+        if healthy:
+            from skeleton.app.first_install import critical_backend_route_report
+
+            route_status = critical_backend_route_report(host_urls["backend"], timeout=3.0)
+            routes_ready = route_status["ready"] is True
+            phases.append(
+                InstallPhase(
+                    "critical-api-routes",
+                    routes_ready,
+                    (
+                        "required application API routers are registered"
+                        if routes_ready
+                        else "required API routes missing or unverified; inspect app doctor --live and /api/health/registry"
+                    ),
+                )
+            )
 
     return InstallReceipt(root=root, phases=tuple(phases))
 

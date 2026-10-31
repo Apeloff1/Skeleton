@@ -1,16 +1,16 @@
-import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../../src/utils/apiBase';
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSettings } from '../../state/settingsStore';
-import theme from '../../theme/tokens';
-import { Screen, AppHeader, Button } from '../../components/UI';
-import { actionSheet } from '../../components/ActionSheet';
-import { toast } from '../../components/Toast';
-import { getHapticsLevel, setHapticsLevel } from '../../utils/haptics';
-import { getMenuPrefs, resetMenuPrefs } from '../../utils/menuPrefs';
+import { useSettings } from '../../src/state/settingsStore';
+import theme from '../../src/theme/tokens';
+import { Screen, AppHeader, Button } from '../../src/components/UI';
+import { actionSheet } from '../../src/components/ActionSheet';
+import { toast } from '../../src/components/AppToast';
+import { getHapticsLevel, setHapticsLevel } from '../../src/utils/haptics';
+import { getMenuPrefs, resetMenuPrefs } from '../../src/utils/menuPrefs';
 import api from '../../src/utils/apiClient';
 import * as Clipboard from 'expo-clipboard';
 

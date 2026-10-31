@@ -332,7 +332,7 @@ class SemanticLensRouter:
         max_per_family: int = 3,
         perpendicular: bool = True,
     ) -> LensSelection:
-        max_lenses = positive_int("max_lenses", max_lenses, maximum=100)
+        max_lenses = positive_int("max_lenses", max_lenses, maximum=200)
         max_per_family = positive_int("max_per_family", max_per_family, maximum=20)
         if not observations:
             return LensSelection((), {}, (), perpendicular)

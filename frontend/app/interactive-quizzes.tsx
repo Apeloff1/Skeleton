@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/InteractiveQuizzes/InteractiveQuizzesModal'), 'InteractiveQuizzesRoute', 'InteractiveQuizzesModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/InteractiveQuizzes/InteractiveQuizzesModal'), 'InteractiveQuizzesRoute', 'InteractiveQuizzesModal');

@@ -96,22 +96,20 @@ class Harness:
         return result
 
     def serve(self, host: str = "0.0.0.0", port: int = 8000) -> "Harness":
-        """Start the API server in a background thread."""
+        """Start the API server in a background thread.
+
+        ``create_app`` is the only HTTP entry. The unmounted
+        ``gameforge_routes`` router is not attached here.
+        """
         if self.genesis is None:
             raise RuntimeError("Genesis not booted. Call boot() first.")
 
         try:
-            from fastapi import FastAPI
             from uvicorn import Config as UvicornConfig, Server
-            from skeleton.api.routes import router
-            from skeleton.api.gameforge_routes import router as gameforge_router
-            from skeleton.api.server import get_state
+            from skeleton.api.server import create_app, get_state
 
             get_state().wire_from_genesis(self.genesis)
-
-            app = FastAPI(title="Skeleton API", version="16.0.0")
-            app.include_router(router, prefix="/api/v1")
-            app.include_router(gameforge_router, prefix="/api/v1")
+            app = create_app()
 
             config = UvicornConfig(app, host=host, port=port, log_level="info")
             server = Server(config)

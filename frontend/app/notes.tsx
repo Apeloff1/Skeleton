@@ -32,14 +32,14 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeInDown, FadeOut, Layout, useSharedValue, useAnimatedStyle, withTiming,
 } from 'react-native-reanimated';
-import { useAutosave } from '../utils/useAutosave';
-import { withScreenGuard } from '../components/withScreenGuard';
-import Skeleton from '../components/UI/Skeleton';
-import * as haptics from '../utils/haptics';
-import { toast } from '../components/Toast';
-import { actionSheet } from '../components/ActionSheet';
-import { copyToClipboard } from '../utils/shareResult';
-import { useNotesFilters } from '../state/notesFiltersStore';
+import { useAutosave } from '../src/utils/useAutosave';
+import { withScreenGuard } from '../src/components/withScreenGuard';
+import Skeleton from '../src/components/UI/Skeleton';
+import * as haptics from '../src/utils/haptics';
+import { toast } from '../src/components/AppToast';
+import { actionSheet } from '../src/components/ActionSheet';
+import { copyToClipboard } from '../src/utils/shareResult';
+import { useNotesFilters } from '../src/state/notesFiltersStore';
 
 interface Note {
   id:      string;

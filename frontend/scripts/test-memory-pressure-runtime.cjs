@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -13,7 +14,7 @@ function loadTS(name, mocks = {}) {
   });
   assert.equal(compiled.diagnostics.length, 0, name + ' parse');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', compiled.outputText)(id => {
+  compileFunction(compiled.outputText, ['require', 'module', 'exports'])(id => {
     assert.ok(Object.hasOwn(mocks, id), name + ': unexpected dependency ' + id);
     return mocks[id];
   }, mod, mod.exports);
@@ -22,7 +23,7 @@ function loadTS(name, mocks = {}) {
 function guardFixture() {
   const events = [];
   let removed = 0;
-  const mem = loadTS('utils/memoryGuard.ts', {
+  const mem = loadTS('src/utils/memoryGuard.ts', {
     'react-native': { AppState: { addEventListener: (name, callback) => {
       events.push({ name, callback });
       return { remove: () => { removed++; } };
@@ -118,7 +119,7 @@ test('sustained slow frames trigger stress but healthy frames do not', () => {
   assert.equal(mem.getStress(), 1);
 });
 test('thermal pressure purge does not instantiate an unused guard', () => {
-  const thermal = loadTS('utils/thermalGuard.ts');
+  const thermal = loadTS('src/utils/thermalGuard.ts');
   thermal.purgeThermalCachesIfPresent();
   const guard = thermal.getThermalGuard();
   try {

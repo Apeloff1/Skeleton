@@ -56,12 +56,31 @@ _LAZY_EXPORTS = {
 __all__ = list(_LAZY_EXPORTS)
 
 
+def _load_reviewed_export_owner(module_name: str):
+    """Keep import side effects limited to explicitly reviewed modules."""
+    if module_name == ".session":
+        return import_module(".session", __name__)
+    if module_name == ".provider_bridge":
+        return import_module(".provider_bridge", __name__)
+    if module_name == ".replay":
+        return import_module(".replay", __name__)
+    if module_name == ".async_runtime":
+        return import_module(".async_runtime", __name__)
+    if module_name == ".flgb_runtime":
+        return import_module(".flgb_runtime", __name__)
+    if module_name == ".batching":
+        return import_module(".batching", __name__)
+    if module_name == ".speculation":
+        return import_module(".speculation", __name__)
+    raise ImportError("unregistered lazy export owner")
+
+
 def __getattr__(name: str) -> Any:
     target = _LAZY_EXPORTS.get(name)
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = target
-    value = getattr(import_module(module_name, __name__), attribute)
+    value = getattr(_load_reviewed_export_owner(module_name), attribute)
     globals()[name] = value
     return value
 

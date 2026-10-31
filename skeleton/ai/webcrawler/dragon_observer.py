@@ -12,4 +12,8 @@ class DragonCrawlObserver:
   self.stream.emit("burn_started",doc.canonical_url,at=at,payload={"content_hash":doc.content_hash,"chunks":len(chunks)})
   for i,c in enumerate(chunks):self.stream.emit("burn_chunk",doc.canonical_url,at=at,payload={"ordinal":i,"chunk_id":c.chunk_id})
   return self.stream.emit("burn_complete",doc.canonical_url,at=at,payload={"content_hash":doc.content_hash,"chunks":len(chunks)})
+ def distill(self,doc,*,at,receipt_id):
+  if not isinstance(receipt_id,str) or not receipt_id or len(receipt_id)>128:
+   raise ValueError("distillation receipt required")
+  return self.stream.emit("distill_complete",doc.canonical_url,at=at,payload={"distilled":True,"content_hash":doc.content_hash,"receipt_id":receipt_id})
  def rejected(self,url,reason,*,at):return self.stream.emit("policy_rejected",url,at=at,payload={"reason":reason})

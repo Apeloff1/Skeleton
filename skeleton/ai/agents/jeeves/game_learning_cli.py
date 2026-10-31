@@ -678,6 +678,48 @@ def _deep_emulator(args) -> dict[str, Any]:
     }
 
 
+def _emulator_lens_review(args) -> dict[str, Any]:
+    """Review every canonical lens in pages against saved, source-bound lab output."""
+    from .game_emulator_lens_review import review_verified_training_report
+
+    if args.lens_review_file.exists():
+        raise FileExistsError("Review output exists; provide a new destination")
+    input_paths = {
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.lens_review_file.resolve(strict=False),
+    }
+    if len(input_paths) != 3:
+        raise ValueError("Policy, evidence and review paths must differ")
+    evidence = _json_read(args.evidence_file)
+    policy = _json_read(args.policy_file)
+    seal = evidence.pop("evidence_digest", None)
+    if not isinstance(seal, str) or hashlib.sha256(
+        json.dumps(evidence, sort_keys=True, separators=(",", ":"),
+                   ensure_ascii=False, allow_nan=False).encode("utf-8")
+    ).hexdigest() != seal:
+        raise ValueError("Evidence-file export digest is absent or has changed")
+    policy_digest = evidence.pop("policy_snapshot_digest", None)
+    if not isinstance(policy_digest, str) or policy.get("snapshot_digest") != policy_digest:
+        raise ValueError("Policy-file identity differs from the training evidence")
+    evidence["policy_snapshot"] = policy
+    reviewed = review_verified_training_report(
+        evidence, offset=args.offset, limit=args.limit,
+    )
+    _write_json(args.lens_review_file, reviewed, replace=False)
+    return {
+        "status": "research_review_tasks_created_not_training",
+        "review_file": str(args.lens_review_file),
+        "training_report_digest": reviewed["source_report_digest"],
+        "catalog_lens_count": reviewed["catalog_lens_count"],
+        "page_review_lens_count": reviewed["review_lens_count"],
+        "next_offset": reviewed["next_offset"],
+        "review_digest": reviewed["review_digest"],
+        "actual_neural_weight_updates": 0,
+        "production_promotion_authorized": False,
+    }
+
+
 def _native(args) -> dict[str, Any]:
     from .game_rom_generation import build_original_dmg_game
 
@@ -866,6 +908,15 @@ def parser() -> argparse.ArgumentParser:
     deep.add_argument("--evidence-file", type=Path, required=True)
     deep.add_argument("--checkpoint-file", type=Path, required=True)
     deep.add_argument("--rights-acknowledged", action="store_true")
+    lens_review = commands.add_parser(
+        "review-emulator-lenses",
+        help="Schedule all canonical semantic lenses for Jeeves/Dragon/adversary research review (no model promotion)",
+    )
+    lens_review.add_argument("--policy-file", required=True, type=Path)
+    lens_review.add_argument("--evidence-file", required=True, type=Path)
+    lens_review.add_argument("--lens-review-file", required=True, type=Path)
+    lens_review.add_argument("--offset", type=int, default=0)
+    lens_review.add_argument("--limit", type=int, default=512)
     for name in ("train", "evaluate"):
         command = commands.add_parser(name)
         command.add_argument("--target", required=True)
@@ -909,6 +960,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _train(args)
         elif args.command == "evaluate":
             result = _evaluate(args)
+        elif args.command == "review-emulator-lenses":
+            result = _emulator_lens_review(args)
         elif args.command == "train-emulator-deep":
             result = _deep_emulator(args)
         elif args.command == "experiment-emulator":

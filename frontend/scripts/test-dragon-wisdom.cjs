@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-const root = path.resolve(__dirname, '../features/Jeeves/companion');
+const root = path.resolve(__dirname, '../src/features/Jeeves/companion');
 const source = fs.readFileSync(path.join(root, 'dragonWisdomReview.ts'), 'utf8');
 const result = ts.transpileModule(source, { compilerOptions: {
   module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,

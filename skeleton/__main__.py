@@ -52,6 +52,9 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    game        Build a playable Godot project from a natural-language brief
+                game <brief> [--out DIR] [--overwrite]
+                    [--playtest off|auto|require] [--max-rounds N] [--json]
     forge       Blueprint compilation and materialization
     test        Run test suites
     dev         Developer CLI (scaffold, wizard, health, visualize)
@@ -613,6 +616,7 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
               "[--overwrite] [--playtest off|auto|require] "
               "[--repair-mode apply|suggest] [--blend ERA1 ERA2 --t 0..1] "
               "[--generation ID] [--json]")
+        print("Operator pipeline only. Playable builds use: python -m skeleton game <brief>")
         return 0
     try:
         (vision, era, out, overwrite, as_json, blend, generation, answers,
@@ -732,6 +736,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "game":
+        from skeleton.forge.game_builder import cli as game_cli
+        return game_cli(rest)
     if cmd == "forge":
         from skeleton.forge.universal import Forge
         forge = Forge(); print("Forge ready.")

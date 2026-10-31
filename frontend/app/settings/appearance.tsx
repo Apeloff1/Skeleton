@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SKINS, SKIN_BY_ID, DEFAULT_SKIN } from '../../theme/skins';
+import { SKINS, SKIN_BY_ID, DEFAULT_SKIN } from '../../src/theme/skins';
 import { applySkin, useActiveSkin } from '../../src/utils/skinStore';
 
 export default function Appearance() {

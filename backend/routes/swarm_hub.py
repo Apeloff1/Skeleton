@@ -21,9 +21,11 @@
 ╚════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
+import asyncio
 from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
+from routes.galaxy_studio_access import visible_build_rows
 
 from core.swarm_agents import SWARM_DOMAINS, BY_ID, BY_CATEGORY, find_relevant, pick_balanced
 from core.compressed_vault import (
@@ -163,8 +165,9 @@ def discourse_simulate(req: DiscourseReq) -> dict:
 
 
 @router.get("/discourse/latest")
-def discourse_latest_endpoint(limit: int = 10) -> dict:
-    return {"logs": discourse_latest(min(max(limit, 1), 100))}
+async def discourse_latest_endpoint(limit: int = 10) -> dict:
+    rows = await asyncio.to_thread(discourse_latest, min(max(limit, 1), 100))
+    return {"logs": await visible_build_rows(rows)}
 
 
 @router.get("/discourse/build/{build_id}")

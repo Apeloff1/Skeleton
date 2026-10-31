@@ -8,12 +8,12 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../theme/tokens';
-import { Screen, AppHeader, SectionHeader } from '../../components/UI';
-import { withScreenGuard } from '../../components/withScreenGuard';
-import * as haptics from '../../utils/haptics';
-import type { HapticsLevel } from '../../utils/haptics';
-import { toast } from '../../components/Toast';
+import theme from '../../src/theme/tokens';
+import { Screen, AppHeader, SectionHeader } from '../../src/components/UI';
+import { withScreenGuard } from '../../src/components/withScreenGuard';
+import * as haptics from '../../src/utils/haptics';
+import type { HapticsLevel } from '../../src/utils/haptics';
+import { toast } from '../../src/components/AppToast';
 
 const OPTIONS: { key: HapticsLevel; title: string; desc: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'off',   title: 'Off',   desc: 'Silent. Use when in meetings or asleep.', icon: 'volume-mute-outline' },

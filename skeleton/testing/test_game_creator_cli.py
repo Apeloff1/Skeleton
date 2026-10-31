@@ -164,41 +164,75 @@ def test_required_playtest_uses_existing_playtest_gate(tmp_path: Path, monkeypat
 
 
 
-def test_build_delegates_to_canonical_gameforge_without_replacement(tmp_path: Path, monkeypatch):
-    import sys
-    from types import SimpleNamespace
-
+def test_build_delegates_to_playable_game_builder(tmp_path: Path, monkeypatch):
     root = workspace(tmp_path)
     captured: dict[str, object] = {}
 
-    class FakeForge:
-        @staticmethod
-        def live():
-            return FakeForge()
+    def fake_build(brief, **kwargs):
+        captured["brief"] = brief
+        captured.update(kwargs)
+        return {
+            "ok": True,
+            "playtest": {"status": "unavailable", "passed": False},
+            "project": {"source_sha256": "a" * 64},
+            "marker": "cleared:1:gold:1",
+        }
 
-        def execute(self, vision, **kwargs):
-            captured["vision"] = vision
-            captured.update(kwargs)
-            return {
-                "succeeded": True,
-                "source_manifest": {"sha256": "a" * 64},
-                "run": {"stages": []},
-                "playtest": {"status": "unavailable", "passed": False},
-            }
-
-    monkeypatch.setitem(sys.modules, "skeleton.context.pipeline",
-                        SimpleNamespace(GameForgeRun=FakeForge))
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", fake_build)
     result = run_game_cli(["build", "--project", str(root), "--overwrite",
                            "--playtest", "auto", "--repair-mode", "suggest"])
     assert result["ok"]
-    assert captured["vision"] == "Original forest exploration"
+    assert captured["brief"] == "Original forest exploration"
     assert captured["era"] == "extraction_now"
     assert captured["archetype"] == "auto"
-    assert captured["target"] == "godot"
     assert captured["overwrite"] is True
-    assert captured["playtest"] == "auto"
+    assert captured["playtest_mode"] == "auto"
     assert captured["repair_mode"] == "suggest"
-    assert captured["project_root"] == str(root / "build" / "godot")
+    assert captured["out"] == str(root / "build" / "godot")
+    assert result["marker"] == "cleared:1:gold:1"
+    assert result["source_manifest"] == {"sha256": "a" * 64}
+
+
+def test_unmounted_gameforge_run_delegates_to_playable_builder(monkeypatch):
+    import asyncio
+
+    from skeleton.api import gameforge_routes
+
+    captured: dict[str, object] = {}
+
+    def fake_build(brief, **kwargs):
+        captured["brief"] = brief
+        captured["playtest_mode"] = kwargs.get("playtest_mode")
+        captured["runner"] = kwargs.get("runner")
+        return {
+            "ok": True,
+            "files": {"project.godot": "config_version=5\n"},
+            "spec": {"genre": "platformer"},
+            "playtest": None,
+        }
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", fake_build)
+
+    class _Request:
+        headers: dict[str, str] = {}
+
+    body = asyncio.run(gameforge_routes.gameforge_run(_Request(), {"vision": "A small platformer"}, object()))
+    assert captured["brief"] == "A small platformer"
+    assert captured["playtest_mode"] == "off"
+    assert captured["runner"] is not None
+    assert body["succeeded"] is True
+    assert body["file_names"] == ["project.godot"]
+    assert "files" not in body
+
+
+def test_harness_serves_only_create_app():
+    import inspect
+
+    from skeleton.deploy.harness import Harness
+
+    source = inspect.getsource(Harness.serve)
+    assert "create_app" in source
+    assert "gameforge_routes" not in source.split('"""', 2)[-1]
 
 
 def test_cli_integration_and_exit_codes(tmp_path: Path, capsys):

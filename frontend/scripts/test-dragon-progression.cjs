@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const ts=require('typescript');
-const dir=path.resolve(__dirname,'../features/Jeeves/companion');
+const dir=path.resolve(__dirname,'../src/features/Jeeves/companion');
 const load=(name)=>{
  const source=fs.readFileSync(path.join(dir,name),'utf8');
  const result=ts.transpileModule(source,{fileName:name,reportDiagnostics:true,

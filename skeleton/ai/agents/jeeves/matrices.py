@@ -65,6 +65,39 @@ class SamMatrix:
         due.sort(key=lambda r: r.decayed_mastery())
         return [r.concept for r in due[:limit]]
 
+    def export_records(self) -> list[dict[str, float | int | str]]:
+        """Raw records for a checkpoint. Snapshot mastery is decayed; these are not."""
+        return [
+            {
+                "concept": record.concept,
+                "mastery": record.mastery,
+                "successes": record.successes,
+                "attempts": record.attempts,
+                "last_seen": record.last_seen,
+            }
+            for record in self._records.values()
+        ]
+
+    def load_records(self, records: list[dict[str, object]]) -> None:
+        loaded: dict[str, MasteryRecord] = {}
+        for row in records:
+            if not isinstance(row, dict):
+                raise ValueError("sam record must be an object")
+            concept = str(row["concept"]).strip()
+            if not concept:
+                raise ValueError("sam concept is empty")
+            mastery = float(row["mastery"])
+            if not math.isfinite(mastery):
+                raise ValueError("sam mastery is not finite")
+            loaded[concept] = MasteryRecord(
+                concept=concept,
+                mastery=min(1.0, max(0.0, mastery)),
+                successes=max(0, int(row["successes"])),
+                attempts=max(0, int(row["attempts"])),
+                last_seen=float(row["last_seen"]),
+            )
+        self._records = loaded
+
     def snapshot(self) -> dict[str, float]:
         return {c: round(r.decayed_mastery(), 4) for c, r in self._records.items()}
 

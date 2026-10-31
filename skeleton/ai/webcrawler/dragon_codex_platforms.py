@@ -18,7 +18,7 @@ import json
 
 from .dragon_native_targets import CATALOG
 from .dragon_world_codex import (
-    CodexAddress,DOMAIN_AXIS,DOMAINS,validate,
+    CodexAddress,DOMAIN_AXIS,DOMAINS,EXTENSION_DOMAIN_AXIS,ALL_DOMAINS,validate,
 )
 from .dragon_world_codex_runtime import (
     SCHEMA as GAME_SCHEMA,gate_catalog,start,witness_to_gate,
@@ -119,9 +119,10 @@ def _target(id:str):
 def _domain_sort(address:CodexAddress)->list[str]:
     # Deterministically select domains most expressive *for this source*.
     # Ties use canonical order, not nondeterministic hash iteration.
-    levels=address.values
+    extended=any(address.extension_values)
+    levels=address.values+(address.extension_values if extended else ())
     scored=[]
-    for n,domain in enumerate(DOMAINS):
+    for n,domain in enumerate(ALL_DOMAINS if extended else DOMAINS):
         intensity=max(levels[n*8:n*8+8])
         diversity=len(set(levels[n*8:n*8+8]))
         scored.append((-intensity,-diversity,n,domain))
@@ -136,11 +137,14 @@ def compile_content(address:CodexAddress,target_id:str,
         raise ValueError("original world adapter supports only 1..64 bounded chunks")
     group=cohort(target_id)
     max_domains,axes_per_domain,levels,rooms,gates,strategy=COHORTS[group]
+    extended=any(address.extension_values)
+    domain_axes={**DOMAIN_AXIS,**EXTENSION_DOMAIN_AXIS} if extended else DOMAIN_AXIS
+    domains=ALL_DOMAINS if extended else DOMAINS
     active_domains=_domain_sort(address)[:max_domains]
     axis_names=[]
     original_levels=[]
     for domain in active_domains:
-        selected=sorted(DOMAIN_AXIS[domain],
+        selected=sorted(domain_axes[domain],
                         key=lambda axis:(-genome.level(axis),axis))[:axes_per_domain]
         for axis in selected:
             axis_names.append(axis)
@@ -151,20 +155,15 @@ def compile_content(address:CodexAddress,target_id:str,
         min(levels-1,(level*levels)//256)
         for level in original_levels
     )
-    active_routes=tuple(
-        "travel_"+domain for domain in active_domains[:gates]
+    # Wire real runtime gates for both versions; no phantom travel_* names.
+    from .dragon_world_codex_runtime import GATE_MODES,ALL_GATE_MODES
+    modes=ALL_GATE_MODES if extended else GATE_MODES
+    real_routes=tuple(modes[domains.index(domain)] for domain in active_domains[:gates])
+    all_routes=tuple(modes)
+    missing=tuple(
+        axis for domain in domains for axis in domain_axes[domain]
+        if axis not in axis_names
     )
-    # Wire exactly the production runtime's actual gate names.
-    from .dragon_world_codex_runtime import GATE_MODES,DOMAIN_INDEX
-    real_routes=tuple(
-        GATE_MODES[DOMAIN_INDEX[domain]]
-        for domain in active_domains[:gates]
-    )
-    all_routes=tuple(GATE_MODES)
-    missing=tuple(name for name in (
-        axis for domain in DOMAINS for axis in DOMAIN_AXIS[domain]
-    ) if name not in axis_names)
-    _,current=parent,genome
     content={
         "schema":SCHEMA,"source":address.codex_digest,"target":target_id,
         "cohort":group,"hardware":[target.max_width,target.max_height,
@@ -185,7 +184,7 @@ def compile_content(address:CodexAddress,target_id:str,
         chosen_axes=tuple(axis_names),
         quantized_levels=quantized,
         source_levels=tuple(original_levels),
-        original_axis_count=len(genome.values),
+        original_axis_count=len(genome.values)+(len(genome.extension_values) if extended else 0),
         active_axes=len(axis_names),
         deferred_axes=missing,
         source_route_gates=all_routes,
@@ -218,7 +217,16 @@ def content_pack(address:CodexAddress,target_id:str, *,
                 for n,axis in enumerate(plan.chosen_axes)
                 if (int(digest[n%16],16)+n+index)%7==0
             )[:8]
+            # Sky-island geometry and routes are authored parameters, not
+            # merely a label placed on the old ground-world projection.
+            aerial="aerial_realms" in plan.chosen_domain_names
+            sky_level=(address.extension_values[0] if aerial else 0)
+            island=(aerial and int(digest[4:6],16)<sky_level)
             rooms.append({
+                "sky_island":island,
+                "altitude_layer":(
+                    1+int(digest[6:8],16)//32 if island else 0
+                ),
                 "room":chunk*plan.rooms_per_chunk+index,
                 "original_local_seed":digest[:16],
                 "biome_class":int(digest[:2],16)%12,
@@ -226,6 +234,7 @@ def content_pack(address:CodexAddress,target_id:str, *,
                 "active_features":rules,
                 "entrances":(
                     "previous","next","explore" if index%3==0 else "return",
+                    * (("skybridge","glide") if island else ()),
                 ),
             })
         source.append({

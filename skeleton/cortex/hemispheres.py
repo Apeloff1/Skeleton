@@ -108,6 +108,78 @@ class LeftHemisphere:
             numbers=nums + dps_n + mix,
         )
 
+    def analyze_game_math(self, stimulus: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """Compute deterministic combat, thermal, fixed-tick, and economy envelopes for game creation."""
+        ctx = dict(context or {})
+        thought = self.think(stimulus, ctx)
+        era = str(ctx.get("era") or "extraction_now")
+        from skeleton.forge.eras import ERA_IDS, compile_era
+
+        era_key = era if era in ERA_IDS else "extraction_now"
+        for candidate in ERA_IDS:
+            if candidate in (stimulus or "").lower() or candidate.replace("_", " ") in (stimulus or "").lower():
+                era_key = candidate
+                break
+        pack = compile_era(era_key)
+        dps = float(ctx.get("pack_dps") or pack["primary_dps"])
+        ttk_map = dict(pack["ttk"])
+        if isinstance(ctx.get("pack_ttk"), dict):
+            for k, v in ctx["pack_ttk"].items():
+                if isinstance(v, (int, float)) and float(v) > 0:
+                    ttk_map[k] = float(v)
+        heat_cfg = pack["heat"]
+        rec = pack["recipes"][0]
+        shot_heat_per_sec = float(rec["heat"]) * (float(rec["rpm"]) / 60.0)
+        passive_cool = float(heat_cfg["passive_cool"])
+        net_heat_rate = max(0.0, shot_heat_per_sec - passive_cool)
+        vent_duty_cycle = round(
+            net_heat_rate / max(shot_heat_per_sec, 1e-6) if net_heat_rate > 0 else 0.0,
+            4,
+        )
+        thermal_multiplier = round(1.0 / max(0.25, 1.0 - 0.5 * vent_duty_cycle), 4)
+        mix = thought.numbers[-3:] if len(thought.numbers) >= 3 else (2.0, 1.0, 0.0)
+        trash_n, elite_n, boss_n = int(round(mix[0])), int(round(mix[1])), int(round(mix[2]))
+        ideal_wave_s = (
+            trash_n * float(ttk_map.get("trash", 1.0))
+            + elite_n * float(ttk_map.get("elite", 5.0))
+            + boss_n * float(ttk_map.get("boss", 60.0))
+        )
+        thermal_wave_s = round(ideal_wave_s * thermal_multiplier, 3)
+        collapse_max = float(ctx.get("collapse_max") or pack["session"]["collapse_max"])
+        wave_budget_ratio = round(thermal_wave_s / max(collapse_max, 1.0), 4)
+        # Fixed-tick 60Hz budget split (ms): input + sim + collision + audio + render <= 16.67ms
+        tick_hz = int(ctx.get("tick_hz") or 60)
+        frame_budget_ms = round(1000.0 / max(15, tick_hz), 2)
+        # Economy tap/sink equilibrium: sink ratio targeted in [0.75, 0.92] to avoid runaway inflation
+        tap_sink_ratio = round(min(0.92, max(0.72, 0.78 + 0.04 * elite_n + 0.06 * boss_n)), 4)
+        return {
+            "era": era_key,
+            "primary_dps": round(dps, 2),
+            "ttk_targets": {k: round(float(v), 3) for k, v in ttk_map.items()},
+            "enemy_hp": {
+                "trash": round(dps * float(ttk_map.get("trash", 1.0)), 1),
+                "elite": round(dps * float(ttk_map.get("elite", 5.0)), 1),
+                "boss": round(dps * float(ttk_map.get("boss", 60.0)), 1),
+            },
+            "encounter_mix": {"trash": trash_n, "elite": elite_n, "boss": boss_n},
+            "vent_duty_cycle": vent_duty_cycle,
+            "thermal_multiplier": thermal_multiplier,
+            "ideal_wave_s": round(ideal_wave_s, 3),
+            "thermal_wave_s": thermal_wave_s,
+            "collapse_max_s": round(collapse_max, 2),
+            "wave_budget_ratio": wave_budget_ratio,
+            "fixed_tick": {
+                "hz": tick_hz,
+                "dt_s": round(1.0 / max(15, tick_hz), 6),
+                "frame_budget_ms": frame_budget_ms,
+                "max_catchup_ticks": 4,
+            },
+            "economy_equilibrium": {
+                "tap_sink_ratio": tap_sink_ratio,
+                "inflation_guarded": 0.70 <= tap_sink_ratio <= 0.95,
+            },
+        }
+
 
 class RightHemisphere:
     """Gestalt tract. Analogies, spatial bias, era grain."""
@@ -206,6 +278,77 @@ class RightHemisphere:
             tags=("gestalt", "spatial", "right", bias),
             numbers=tuple(v for _, v in top),
         )
+
+    def synthesize_spatial_aesthetic_profile(
+        self,
+        stimulus: str,
+        context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        """Synthesize level topology, art-scale ladder, silhouette contrast, and audio cadence."""
+        ctx = dict(context or {})
+        thought = self.think(stimulus, ctx)
+        text = (stimulus or "").lower()
+        era = str(ctx.get("era") or "")
+        if not era:
+            for candidate in ERA_IDS:
+                if candidate in text or candidate.replace("_", " ") in text:
+                    era = candidate
+                    break
+        era = era or "extraction_now"
+        bias = next((b for b in ("loot", "combat", "heat", "balanced") if b in thought.tags), "balanced")
+
+        if era in {"metroidvania", "immersive_sim", "stealth"} or "backtrack" in text or "lock" in text:
+            topology = "ability_gated_lattice"
+        elif era in {"soulslike", "horror_survival", "extraction_now"} or bias == "heat":
+            topology = "hub_and_extraction_loop"
+        elif era in {"boomer_shooter", "arcade_golden_age", "bullet_heaven", "fighting_game"} or bias == "combat":
+            topology = "arena_combat_gauntlet"
+        elif era in {"jrpg", "crpg", "visual_novel", "deckbuilder"}:
+            topology = "branching_act_hub"
+        else:
+            topology = "landmark_spoke_region"
+
+        if era in {"boomer_shooter", "fighting_game", "bullet_heaven", "arcade_golden_age"}:
+            bpm = 148
+            telegraph_ticks = 14
+        elif era in {"soulslike", "horror_survival", "stealth"}:
+            bpm = 84
+            telegraph_ticks = 24
+        elif era in {"cozy_wholesome", "walking_sim", "visual_novel", "city_builder"}:
+            bpm = 96
+            telegraph_ticks = 30
+        else:
+            bpm = 116
+            telegraph_ticks = 18
+
+        palette_map = {
+            "heat": "dusk_copper_high_contrast",
+            "combat": "harbor_gold_silhouette",
+            "loot": "field_gold_landmark",
+            "balanced": "hearth_linen_readable",
+        }
+        return {
+            "era": era,
+            "spatial_bias": bias,
+            "level_topology": topology,
+            "art_scale_ladder": {
+                "plan_tiers": (32768, 16384, 8192, 4096, 2048, 1024, 512, 256),
+                "authoring_divisor": 2,
+                "allocates_65536_buffer": False,
+                "palette_profile": palette_map.get(bias, "hearth_linen_readable"),
+                "silhouette_contrast": "shape_plus_value",
+            },
+            "combat_readability": {
+                "telegraph_ticks": telegraph_ticks,
+                "phases_order": ("approach", "threat", "choice", "resolution", "rest"),
+                "max_slice_boss_phases": 2,
+            },
+            "audio_cadence": {
+                "bpm": bpm,
+                "quarter_note_s": round(60.0 / float(bpm), 4),
+                "sync_to_fixed_tick": True,
+            },
+        }
 
 
 def ttk_oracle(stimulus: str, context: Dict[str, Any]) -> Thought:

@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /collections — Creator Marketplace Collections / Playlists.
  *
@@ -10,13 +10,14 @@ import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, SafeAreaView, TextInput, Image, RefreshControl, Alert, Platform,
+  StyleSheet, SafeAreaView, TextInput, RefreshControl, Alert, Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import api from '../src/utils/apiClient';
+import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
-import theme from '../theme/tokens';
+import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { colors: C, spacing: S, radii: R } = { colors: theme.colors, spacing: theme.spacing, radii: theme.radii };
@@ -31,8 +32,8 @@ function Cover({ g, size }: { g: Game; size: number }) {
     return <View style={[styles.coverFallback, { width: size, height: size }]}><Text style={{ fontSize: size * 0.4 }}>🎮</Text></View>;
   }
   return (
-    <Image
-      source={{ uri: `${BACKEND}/api/playable/${g.playable_id}/cover.png` }}
+    <PrivateImage
+      uri={`${BACKEND}/api/playable/${g.playable_id}/cover.png`}
       style={{ width: size, height: size, borderRadius: 10, backgroundColor: '#141414' }}
       resizeMode="cover"
       onError={() => setErr(true)}

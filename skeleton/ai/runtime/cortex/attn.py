@@ -237,6 +237,7 @@ def sample_logits(
     temperature: float = 1.0,
     top_k: int = 0,
     top_p: float = 1.0,
+    min_p: float = 0.0,
 ) -> int:
     """Sample finite logits, allowing -inf only as an explicit token mask."""
     n = len(logits)
@@ -246,6 +247,13 @@ def sample_logits(
         raise ValueError("sampling logits contain NaN or positive infinity")
     if not any(math.isfinite(x) for x in logits):
         raise ValueError("sampling policy masks every token")
+    if (
+        isinstance(min_p, bool)
+        or not isinstance(min_p, (int, float))
+        or not math.isfinite(float(min_p))
+        or not 0.0 <= float(min_p) <= 1.0
+    ):
+        raise ValueError("min_p must be within [0, 1]")
     if temperature is None or float(temperature) <= 1e-8 or int(top_k) == 1:
         return max(range(n), key=lambda i: logits[i])
     t = max(1e-6, float(temperature))
@@ -260,6 +268,14 @@ def sample_logits(
         p = [p[i] if i in keep else 0.0 for i in range(n)]
         s = sum(p) or 1.0
         p = [x / s for x in p]
+    mp = float(min_p)
+    if mp > 0.0:
+        floor = mp * max(p)
+        p = [x if x >= floor and x > 0.0 else 0.0 for x in p]
+        total = sum(p)
+        if total <= 0.0:
+            return max(range(n), key=lambda i: logits[i])
+        p = [x / total for x in p]
     tp = float(top_p)
     if 0.0 < tp < 1.0:
         order = sorted(range(n), key=lambda i: -p[i])

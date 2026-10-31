@@ -6,9 +6,11 @@ const runFixture = require('./fixtures/run.json');
 
 const Panel = load('src/skeletonForge/components/ForgeRunPanel.tsx').default;
 
-test('idle panel explains what will appear', () => {
+test('idle panel explains what will appear and can open the plan', () => {
   const t = text(render(h(Panel, { phase: 'idle', payload: null })));
   assert.match(t, /No run yet/);
+  const linked = render(h(Panel, { phase: 'idle', payload: null, onViewPlan: () => {} }));
+  assert.match(linked, /data-testid="run-view-plan"/);
 });
 
 test('running panel shows elapsed clock, queued stages and cancel', () => {
@@ -20,11 +22,16 @@ test('running panel shows elapsed clock, queued stages and cancel', () => {
   assert.equal(stages.length, 10);
   assert.ok(stages.every((l) => l.endsWith(': queued')));
   assert.match(html, /data-testid="run-cancel"/);
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /data-testid="stage-ingest"[^>]*tabindex="0"|tabindex="0"[^>]*data-testid="stage-ingest"/);
+  const quiet = render(h(Panel, { phase: 'running', payload: null, startedAt: 1000, now: 13500, reduceMotion: true }));
+  assert.ok(!attrs(quiet, 'aria-label').includes('Forge running'));
+  assert.match(text(quiet), /Forging… 12s/);
   assert.doesNotMatch(html, /data-testid="run-result"/);
 });
 
 test('done panel: stage track, era, blueprint, verify and repair', () => {
-  const html = render(h(Panel, { phase: 'done', payload: runFixture, startedAt: 0, finishedAt: 2300, onViewEra: () => {}, onRetry: () => {} }));
+  const html = render(h(Panel, { phase: 'done', payload: runFixture, startedAt: 0, finishedAt: 2300, onViewEra: () => {}, onViewPlan: () => {}, onRetry: () => {} }));
   const t = text(html);
   const labels = attrs(html, 'aria-label');
   assert.match(t, /Forged in 2s/);
@@ -40,6 +47,7 @@ test('done panel: stage track, era, blueprint, verify and repair', () => {
   assert.ok(labels.includes('Headless playtest off'));
   assert.ok(labels.includes('Composed systems: crafting, collapse, extraction, companion'));
   assert.match(html, /data-testid="run-view-era"/);
+  assert.match(html, /data-testid="run-view-plan"/);
   assert.match(t, /Jeeves/);
 });
 
@@ -63,4 +71,24 @@ test('failed run: error banner, failed stage, repair unresolved, score history',
   assert.match(text(err), /unknown archetype/);
   assert.match(err, /role="alert"/);
   assert.match(err, /data-testid="run-retry"/);
+  const errPlan = render(h(Panel, { phase: 'error', payload: null, error: 'unknown archetype', onViewPlan: () => {} }));
+  assert.match(errPlan, /data-testid="run-view-plan"/);
+});
+
+test('stage keys walk the pipeline as a single column', () => {
+  const mod = load('src/skeletonForge/components/ForgeRunPanel.tsx');
+  assert.equal(mod.stageKeyTarget(0, { key: 'ArrowDown' }, 10), 1);
+  assert.equal(mod.stageKeyTarget(3, { key: 'End' }, 10), 9);
+  assert.equal(mod.stageKeyTarget(3, { key: 'Home' }, 10), 0);
+  assert.equal(mod.stageKeyTarget(9, { key: 'ArrowDown' }, 10), null);
+  assert.equal(mod.stageKeyTarget(1, { key: 'Enter' }, 10), null);
+});
+
+test('reduced-motion press feedback drops the scale', () => {
+  const theme = load('src/skeletonForge/components/theme.ts');
+  assert.deepEqual(theme.pressFeedback(false, false), null);
+  assert.deepEqual(theme.pressFeedback(true, true), { opacity: 0.85 });
+  const full = theme.pressFeedback(true, false);
+  assert.equal(full.opacity, 0.75);
+  assert.deepEqual(full.transform, [{ scale: 0.98 }]);
 });

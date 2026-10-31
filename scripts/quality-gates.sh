@@ -14,6 +14,14 @@ python scripts/check_toolchain_contract.py
 printf '\n== Canonical local/CI quality parity ==\n'
 python scripts/check_quality_gate_parity.py
 
+# Fail quickly on missing canonical AI-tree owners before long provider and
+# architecture suites. This is an order-only change; it does not skip a gate.
+printf '\n== Canonical AI file tree ==\n'
+python scripts/check_ai_file_tree.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_file_tree.py \
+  skeleton/testing/test_ci_ai_tree_failfast.py
+
 printf '\n== Provider runtime boundary ==\n'
 python scripts/check_provider_runtime_boundary.py
 python scripts/check_provider_bootstrap.py
@@ -28,8 +36,11 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
 
 printf '\n== Architecture boundaries ==\n'
 python scripts/check_architecture_boundaries.py
+python scripts/check_architecture_logical_layers.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  tests/test_architecture_boundaries.py
+  tests/test_architecture_boundaries.py \
+  tests/test_architecture_logical_layers.py \
+  skeleton/testing/test_projects_contract.py
 
 printf '\n== AI master plan ==\n'
 python scripts/check_ai_master_plan.py
@@ -60,11 +71,6 @@ printf '\n== Master build sequence ==\n'
 python scripts/check_ai_master_build_sequence.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_master_build_sequence.py
-
-printf '\n== Canonical AI file tree ==\n'
-python scripts/check_ai_file_tree.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  skeleton/testing/test_ai_file_tree.py
 
 printf '\n== Masterplan engineering pass ==\n'
 python scripts/check_ai_engineering_pass.py
@@ -127,14 +133,19 @@ printf '\n== Shell worker runtime regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_worker_*.py
 
-printf '\n== Backend Ruff ==\n'
-(
-  cd backend
-  python -m ruff check . --output-format=github
-)
+if [ "${QUALITY_GATES_SKIP_BACKEND_LINT:-}" = "true" ] || [ "${QUALITY_GATES_SKIP_BACKEND_LINT:-}" = "1" ]; then
+  printf '\n== Backend Ruff ==\n'
+  printf 'skipped: CI/CD Backend Lint owns backend ruff and compileall for this head\n'
+else
+  printf '\n== Backend Ruff ==\n'
+  (
+    cd backend
+    python -m ruff check . --output-format=github
+  )
 
-printf '\n== Backend syntax ==\n'
-python -m compileall -q backend
+  printf '\n== Backend syntax ==\n'
+  python -m compileall -q backend
+fi
 
 printf '\n== Provider timeout/failure chaos ==\n'
 (
@@ -348,7 +359,10 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_webhook_cron_security.py \
   backend/tests/test_audit_framing_stack.py
 
-if command -v yarn >/dev/null 2>&1; then
+if [ "${QUALITY_GATES_SKIP_FRONTEND:-}" = "true" ] || [ "${QUALITY_GATES_SKIP_FRONTEND:-}" = "1" ]; then
+  printf '\n== Frontend lint ==\n'
+  printf 'skipped: CI/CD Frontend owns yarn lint:ci and yarn typecheck for this head\n'
+elif command -v yarn >/dev/null 2>&1; then
   printf '\n== Frontend lint ==\n'
   yarn --cwd frontend lint:ci
 

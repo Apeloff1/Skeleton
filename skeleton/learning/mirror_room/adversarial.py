@@ -17,7 +17,7 @@ Nothing in this module has production mutation authority.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence, runtime_checkable
@@ -43,10 +43,15 @@ from .contracts import (
 from .engine import (
     CandidateGenerator,
     MirrorRoom,
+    _bind_training_learner,
+    _learner_archive,
+    _learner_curriculum,
     _merge_hard_examples,
+    _observe_training_outcome,
     _sealed_split_digest,
 )
 from .evaluation import ComparisonReport, PairedEvaluator
+from .memory import TrainingLearningArchive
 from .sandbox import MirrorSandbox, SandboxExecutor, SandboxUsage
 from .observability import MirrorRoomObservatory, get_default_observatory
 
@@ -173,6 +178,30 @@ class AdversarialRatchetPolicy:
             self.final_minimum_strict_metric_gain
             - self.minimum_strict_metric_gain
         ) * shaped
+
+    def adaptive_thresholds(
+        self,
+        attempt: int,
+        *,
+        accepted_upgrades: int = 0,
+        consecutive_rejections: int = 0,
+        velocity_ewma: float = 0.0,
+    ) -> tuple[float, float]:
+        """Compute adaptive monotonic gain thresholds bounded by policy floors.
+
+        High acceptance momentum or positive utility velocity tightens the bar
+        above the base curve, while rejection pressure relaxes the adaptive
+        bonus back toward (never below) the canonical attempt floor.
+        """
+        base_w = self.weighted_gain_threshold(attempt)
+        base_s = self.strict_metric_gain_threshold(attempt)
+        acc = max(0, int(accepted_upgrades))
+        rej = max(0, int(consecutive_rejections))
+        vel = max(0.0, float(velocity_ewma)) if math.isfinite(float(velocity_ewma)) else 0.0
+        streak_boost = min(0.50, 0.03 * acc + min(0.25, vel * 50.0))
+        rejection_relief = 1.0 / (1.0 + 0.35 * rej)
+        multiplier = 1.0 + streak_boost * rejection_relief
+        return (base_w * multiplier, base_s * multiplier)
 
     @property
     def digest(self) -> str:
@@ -729,8 +758,11 @@ class AdversarialCampaignReceipt:
     delivery_ready: bool
     production_authority: bool = False
     direct_self_modify: bool = False
+    training_archive: TrainingLearningArchive = field(default_factory=TrainingLearningArchive)
 
     def __post_init__(self) -> None:
+        if not isinstance(self.training_archive, TrainingLearningArchive):
+            raise MirrorRoomError("campaign learner checkpoint must use TRAIN-only archive")
         if not isinstance(self.policy, AdversarialRatchetPolicy):
             raise MirrorRoomError(
                 "policy must be AdversarialRatchetPolicy"
@@ -958,6 +990,7 @@ class AdversarialCampaignReceipt:
                     "cost_units": self.usage.cost_units,
                 },
                 "delivery_ready": self.delivery_ready,
+                "training_archive_digest": self.training_archive.digest,
                 "production_authority": False,
                 "direct_self_modify": False,
             }
@@ -1369,6 +1402,7 @@ class AdversarialMirrorRoom:
 
         base_room = MirrorRoom(self.spec, self.executor)
         train, validation, holdout = base_room._partition(scenarios)
+        _bind_training_learner(generator, spec=self.spec, executor_id=executor_id, scenarios=train)
         self._validate_full_campaign_capacity(
             train_count=len(train),
             validation_count=len(validation),
@@ -1410,10 +1444,12 @@ class AdversarialMirrorRoom:
             required_strict_metric_gain = (
                 self.policy.strict_metric_gain_threshold(attempt)
             )
+            train_ids = {item.scenario_id for item in train}
+            curriculum = _learner_curriculum(generator, train, tuple(item for item in hard_examples if item.scenario_id in train_ids))
             feedback = LearningFeedback(
                 generation=attempt,
                 champion=baseline,
-                training_scenarios=train,
+                training_scenarios=curriculum.scenarios,
                 hard_examples=hard_examples,
                 prior_candidate_id=prior_candidate_id,
             )
@@ -1462,13 +1498,17 @@ class AdversarialMirrorRoom:
                 baseline=baseline,
                 candidate=candidate,
                 scenarios=(
-                    *train,
+                    *curriculum.scenarios,
                     *tuple(adversarial_corpus),
                 ),
                 split=ScenarioSplit.TRAIN,
                 enforce_gate=True,
                 comparison_family_size=self.policy.attempts_required,
             )
+            # Learn from every real challenge attempt before independent
+            # validation. The learner extracts its fixed TRAIN subset, so
+            # growing adversarial corpora do not change reward semantics.
+            _observe_training_outcome(generator, generation=attempt, parent=baseline, candidate=candidate, report=challenge_report)
             validation_report = evaluator.compare(
                 run_id=f"{run_id}:ratchet-validation",
                 baseline=baseline,
@@ -1675,6 +1715,7 @@ class AdversarialMirrorRoom:
             sealed_holdout_digest=_sealed_split_digest(holdout),
             usage=sandbox.usage,
             delivery_ready=delivery_ready,
+            training_archive=_learner_archive(generator),
         )
         self._observe("finish", campaign)
         return campaign
@@ -1765,6 +1806,7 @@ def qualify_adversarial_delivery(
 
 __all__ = [
     "ADVERSARIAL_ATTEMPTS_REQUIRED",
+    "AdaptiveRatchetController",
     "AdversarialAttemptReceipt",
     "AdversarialCampaignReceipt",
     "AdversarialChallengeContext",
@@ -1776,3 +1818,54 @@ __all__ = [
     "FixedAdversarialSuite",
     "qualify_adversarial_delivery",
 ]
+
+
+class AdaptiveRatchetController:
+    """Stateful adaptive ratchet tracker with monotonic floor guarantees."""
+
+    def __init__(self, policy: AdversarialRatchetPolicy | None = None) -> None:
+        self.policy = policy or AdversarialRatchetPolicy()
+        self.accepted_upgrades: int = 0
+        self.consecutive_rejections: int = 0
+        self.velocity_ewma: float = 0.0
+        self.high_water_weighted: float = self.policy.minimum_weighted_gain
+        self.high_water_strict: float = self.policy.minimum_strict_metric_gain
+
+    def thresholds_for_attempt(self, attempt: int) -> tuple[float, float]:
+        w, s = self.policy.adaptive_thresholds(
+            attempt,
+            accepted_upgrades=self.accepted_upgrades,
+            consecutive_rejections=self.consecutive_rejections,
+            velocity_ewma=self.velocity_ewma,
+        )
+        base_w = self.policy.weighted_gain_threshold(attempt)
+        base_s = self.policy.strict_metric_gain_threshold(attempt)
+        return (max(base_w, w), max(base_s, s))
+
+    def record_outcome(
+        self,
+        *,
+        attempt: int,
+        accepted: bool,
+        observed_weighted_gain: float = 0.0,
+    ) -> dict[str, float | int | bool]:
+        w_req, s_req = self.thresholds_for_attempt(attempt)
+        if accepted:
+            self.accepted_upgrades += 1
+            self.consecutive_rejections = 0
+            gain = max(0.0, float(observed_weighted_gain))
+            self.velocity_ewma = 0.7 * self.velocity_ewma + 0.3 * gain
+            self.high_water_weighted = max(self.high_water_weighted, w_req)
+            self.high_water_strict = max(self.high_water_strict, s_req)
+        else:
+            self.consecutive_rejections += 1
+            self.velocity_ewma *= 0.85
+        return {
+            "attempt": attempt,
+            "accepted": accepted,
+            "accepted_upgrades": self.accepted_upgrades,
+            "consecutive_rejections": self.consecutive_rejections,
+            "velocity_ewma": round(self.velocity_ewma, 6),
+            "required_weighted_gain": round(w_req, 6),
+            "required_strict_metric_gain": round(s_req, 6),
+        }

@@ -9,13 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useUser, ACHIEVEMENT_CATALOG } from '../utils/userStore';
-import { api } from '../utils/apiController';
-import { openModalFromRoute } from '../utils/openModalFromRoute';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import { Screen, AppHeader } from '../components/UI';
-import Skeleton from '../components/UI/Skeleton';
-import RetryBanner from '../components/UI/RetryBanner';
+import { useUser, ACHIEVEMENT_CATALOG } from '../src/utils/userStore';
+import { api } from '../src/utils/apiController';
+import { openModalFromRoute } from '../src/utils/openModalFromRoute';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import { Screen, AppHeader } from '../src/components/UI';
+import Skeleton from '../src/components/UI/Skeleton';
+import RetryBanner from '../src/components/UI/RetryBanner';
 
 const greetings = ['Welcome back', 'Good to see you', 'Ready to learn', 'Let’s keep going'];
 

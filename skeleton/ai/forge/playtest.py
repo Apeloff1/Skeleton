@@ -123,7 +123,8 @@ def _run(cmd: List[str], cwd: Path, timeout: float) -> Tuple[int, str, bool]:
 
 def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
              frames: int = DEFAULT_FRAMES, timeout: float = DEFAULT_TIMEOUT_S,
-             workdir: Optional[str | Path] = None, keep: bool = False) -> Dict[str, Any]:
+             workdir: Optional[str | Path] = None, keep: bool = False,
+             deadline: Optional[float] = None) -> Dict[str, Any]:
     """Boot the emitted project headless and report whether it is playable.
 
     Returns ``{"status": "passed"|"failed"|"unavailable", "passed": bool, ...}``.
@@ -152,13 +153,24 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
             ("import", [path, "--headless", "--path", str(root), "--import"]),
             ("boot", [path, "--headless", "--path", str(root), "--quit-after", str(frames)]),
         ):
-            code, log, timed_out = _run(cmd, root, timeout)
+            step_timeout = timeout
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    errors.append("deadline exceeded")
+                    steps.append({
+                        "step": name, "returncode": None, "timed_out": True,
+                        "errors": ["deadline exceeded"], "log_tail": "",
+                    })
+                    break
+                step_timeout = min(timeout, remaining)
+            code, log, timed_out = _run(cmd, root, step_timeout)
             found = scan_log(log)
             steps.append({"step": name, "returncode": code, "timed_out": timed_out,
                           "errors": found[:20], "log_tail": log[-2000:]})
             errors.extend(found)
             if timed_out:
-                errors.append(f"{name}: timed out after {timeout:.0f}s")
+                errors.append(f"{name}: timed out after {step_timeout:.0f}s")
             if name == "import" and (timed_out or found):
                 break
         boot = next((s for s in steps if s["step"] == "boot"), None)

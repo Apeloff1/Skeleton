@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /physics-studio — 🧲 Physics System.
  * Forge a complete physics system (world/gravity, materials, bodies, colliders,

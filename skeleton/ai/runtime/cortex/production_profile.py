@@ -39,14 +39,71 @@ PROFILES: dict[str, ModelCapacityProfile] = {
     "workstation": ModelCapacityProfile("workstation", "torch-stack", 256, 256, 6, 8, 1024),
 }
 
+ENTERPRISE_PROFILES: dict[str, ModelCapacityProfile] = {
+    "enterprise": ModelCapacityProfile("enterprise", "torch-stack", 512, 512, 8, 8, 2048),
+    "sovereign": ModelCapacityProfile("sovereign", "torch-stack", 1024, 1024, 12, 16, 4096),
+}
+
+CAPACITY_LADDER: tuple[str, ...] = (
+    "legacy",
+    "mobile",
+    "desktop",
+    "workstation",
+    "enterprise",
+    "sovereign",
+)
+
+
+def plan_capacity_escalation(
+    current: str = "legacy",
+    *,
+    genos_g: float = 1.0,
+    ratchet_streak: int = 0,
+    target_tier: str | None = None,
+) -> dict[str, Any]:
+    """Governed model-increase plan along the canonical capacity ladder."""
+    all_profiles = {**PROFILES, **ENTERPRISE_PROFILES}
+    cur_name = str(current or "legacy").strip().lower()
+    if cur_name not in all_profiles:
+        raise ValueError(f"unknown capacity tier: {current}")
+    cur_idx = CAPACITY_LADDER.index(cur_name)
+    if target_tier is not None:
+        tgt_name = str(target_tier).strip().lower()
+        if tgt_name not in all_profiles:
+            raise ValueError(f"unknown target capacity tier: {target_tier}")
+        tgt_idx = max(cur_idx, CAPACITY_LADDER.index(tgt_name))
+    else:
+        steps_up = 0
+        if genos_g >= 2.0 or ratchet_streak >= 3:
+            steps_up += 1
+        if genos_g >= 5.0 or ratchet_streak >= 8:
+            steps_up += 1
+        if genos_g >= 10.0 or ratchet_streak >= 16:
+            steps_up += 1
+        tgt_idx = min(len(CAPACITY_LADDER) - 1, cur_idx + steps_up)
+    recommended = all_profiles[CAPACITY_LADDER[tgt_idx]]
+    current_prof = all_profiles[cur_name]
+    return {
+        "current": current_prof.to_dict(),
+        "recommended": recommended.to_dict(),
+        "escalated": recommended.name != current_prof.name,
+        "ladder_position": tgt_idx,
+        "parameter_scale_ratio": round(
+            (recommended.dim * recommended.layers * recommended.feedforward)
+            / max(1, current_prof.dim * current_prof.layers * current_prof.feedforward),
+            2,
+        ),
+    }
+
 
 def configured_profile() -> ModelCapacityProfile:
     raw = os.environ.get("SKELETON_JEEVES_PROFILE", "legacy").strip().lower()
-    if raw not in PROFILES:
+    all_profiles = {**PROFILES, **ENTERPRISE_PROFILES}
+    if raw not in all_profiles:
         raise ValueError(
-            "unsupported SKELETON_JEEVES_PROFILE; use legacy, mobile, desktop or workstation"
+            "unsupported SKELETON_JEEVES_PROFILE; use legacy, mobile, desktop, workstation, enterprise or sovereign"
         )
-    return PROFILES[raw]
+    return all_profiles[raw]
 
 
 def _torch_device() -> str:
@@ -95,4 +152,12 @@ def build_initial_speaking_model(
     )
 
 
-__all__ = ["ModelCapacityProfile", "PROFILES", "configured_profile", "build_initial_speaking_model"]
+__all__ = [
+    "CAPACITY_LADDER",
+    "ENTERPRISE_PROFILES",
+    "ModelCapacityProfile",
+    "PROFILES",
+    "build_initial_speaking_model",
+    "configured_profile",
+    "plan_capacity_escalation",
+]

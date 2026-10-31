@@ -519,10 +519,6 @@ class AuthorityRevocationReceipt:
         }
 
     @property
-    def aggregate_usage(self) -> ResourceUsage:
-        return self.final_usage.add(self.descendant_usage)
-
-    @property
     def digest(self) -> str:
         return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
 
@@ -590,6 +586,11 @@ class AuthorityEvidenceBundle:
         object.__setattr__(self, "sealed_at", _aware_utc(self.sealed_at, "sealed_at"))
         if self.schema_version != EXECUTION_AUTHORITY_SCHEMA_VERSION:
             raise ExecutionAuthorityError("unsupported authority-evidence schema")
+
+    @property
+    def aggregate_usage(self) -> ResourceUsage:
+        """Return sealed direct and descendant resource consumption together."""
+        return self.final_usage.add(self.descendant_usage)
 
     def canonical_payload(self) -> dict[str, Any]:
         return {

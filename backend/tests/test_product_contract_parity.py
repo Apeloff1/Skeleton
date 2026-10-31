@@ -40,7 +40,20 @@ def test_direct_navigation_is_not_admitted_as_a_governed_operation() -> None:
     governed_ids = re.findall(r"operation:\s*'([^']+)'", source)
     charter = {action for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions}
 
-    assert len(navigation_ids) == 15
+    # The consolidated product surface now exposes additional world, Dragon,
+    # Jeeves and Academy screens. Navigation can grow but must not silently
+    # lose its original breadth or essential live entrypoints.
+    assert len(navigation_ids) >= 15
+    assert {
+        "studio.galaxy.unified",
+        "studio.skeleton.foundation",
+        "studio.snowball",
+        "dragon.worlds.living",
+        "jeeves.cockpit",
+        "jeeves.chat.governed",
+        "academy.mega",
+        "ops.control",
+    } <= set(navigation_ids)
     assert len(navigation_ids) == len(set(navigation_ids))
     assert set(navigation_ids).isdisjoint(charter)
     assert set(governed_ids) == charter

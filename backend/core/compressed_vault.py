@@ -1,7 +1,7 @@
 """
-╔════════════════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════════════╗
 ║  HYPERSCALE COMPRESSED VAULT                                           ║
-║  ────────────────────────────────────────────────────────────────────  ║
+║  ──────────────────────────────────────────────────────────────────────  ║
 ║  Stores massive knowledge databases as zstd-level-22 compressed        ║
 ║  JSONL archives on disk (typical 15-25× compression ratio).            ║
 ║  MongoDB only holds tiny manifest pointers, so the 9.8G volume         ║
@@ -13,7 +13,7 @@
 ║    • iter_shard(name)                 → streaming iterator             ║
 ║    • vault_stats()                    → on-disk + decompressed totals  ║
 ║    • list_shards()                    → all manifest entries           ║
-╚════════════════════════════════════════════════════════════════════════╝
+╚═════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
 import os
@@ -26,7 +26,31 @@ import re
 from pathlib import Path
 from typing import Iterable, Iterator, Any
 
-import zstandard as zstd
+_COMPRESSOR_OBJ = None
+_DECOMPRESSOR_OBJ = None
+
+
+def _ensure_zstd():
+    """Import zstandard on first shard read/write, not at module import."""
+    global _COMPRESSOR_OBJ, _DECOMPRESSOR_OBJ
+    if _COMPRESSOR_OBJ is not None and _DECOMPRESSOR_OBJ is not None:
+        return
+    import zstandard as zstd
+
+    _COMPRESSOR_OBJ = zstd.ZstdCompressor(
+        level=_COMPRESSION_LEVEL, threads=-1, write_content_size=True
+    )
+    _DECOMPRESSOR_OBJ = zstd.ZstdDecompressor()
+
+
+class _CodecProxy:
+    def __init__(self, kind: str):
+        self._kind = kind
+
+    def __getattr__(self, name: str):
+        _ensure_zstd()
+        target = _COMPRESSOR_OBJ if self._kind == "c" else _DECOMPRESSOR_OBJ
+        return getattr(target, name)
 
 
 def _json_default(obj: Any):
@@ -47,7 +71,7 @@ def _json_default(obj: Any):
         return None
 
 
-# ── Paths ───────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
@@ -62,19 +86,30 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
         return fp
 
 
-VAULT_ROOT = _resolve_writable_dir(
-    os.environ.get("HYPERSCALE_VAULT_DIR", "/app/backend/data/vault/compressed"),
-    "/tmp/hyperscale_vault",
-)
+# Route imports must not create directories or read on-disk vault manifests.
+# Resolve the writable configured location only at the first storage operation.
+VAULT_ROOT = Path(os.environ.get("HYPERSCALE_VAULT_DIR", "/app/backend/data/vault/compressed"))
+SCRATCH_ROOT = Path(os.environ.get("HYPERSCALE_SCRATCH_DIR", "/tmp/hyperscale_scratch"))
+_STORAGE_LOCK = threading.Lock()
+_STORAGE_READY = False
 
-SCRATCH_ROOT = _resolve_writable_dir(
-    os.environ.get("HYPERSCALE_SCRATCH_DIR", "/tmp/hyperscale_scratch"),
-    "/tmp/hyperscale_scratch",
-)
+def _ensure_storage() -> None:
+    global VAULT_ROOT, SCRATCH_ROOT, _MANIFEST_FILE, _STORAGE_READY
+    if _STORAGE_READY:
+        return
+    with _STORAGE_LOCK:
+        if _STORAGE_READY:
+            return
+        vault = _resolve_writable_dir(str(VAULT_ROOT), "/tmp/hyperscale_vault")
+        scratch = _resolve_writable_dir(str(SCRATCH_ROOT), "/tmp/hyperscale_scratch")
+        VAULT_ROOT, SCRATCH_ROOT = vault, scratch
+        _MANIFEST_FILE = vault / "_manifest.json"
+        _load_manifest()
+        _STORAGE_READY = True
 
 _COMPRESSION_LEVEL = int(os.environ.get("HYPERSCALE_ZSTD_LEVEL", "21"))
-_COMPRESSOR = zstd.ZstdCompressor(level=_COMPRESSION_LEVEL, threads=-1, write_content_size=True)
-_DECOMPRESSOR = zstd.ZstdDecompressor()
+_COMPRESSOR = _CodecProxy("c")
+_DECOMPRESSOR = _CodecProxy("d")
 
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -96,12 +131,13 @@ def _load_manifest() -> None:
 
 
 def _save_manifest() -> None:
+    _ensure_storage()
     tmp = _MANIFEST_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(_MANIFEST, separators=(",", ":")))
     tmp.replace(_MANIFEST_FILE)
 
 
-_load_manifest()
+# No on-disk manifest reads during import.
 
 
 _SAFE_SHARD_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}")
@@ -117,17 +153,27 @@ def _safe_name(name: str) -> str:
 
 
 def _shard_path(name: str, scratch: bool = False) -> Path:
+    """Return a path that is guaranteed to stay inside the vault/scratch root.
+    CodeQL path-injection mitigation: normalize, then verify containment.
+    """
     safe = _safe_name(name)
+    _ensure_storage()
     root = (SCRATCH_ROOT if scratch else VAULT_ROOT).resolve()
+    # Build candidate, normalize, then prove it is under root.
     candidate = (root / f"{safe}.jsonl.zst").resolve()
     try:
         candidate.relative_to(root)
     except ValueError as exc:
         raise ValueError("invalid shard path") from exc
+    # Extra explicit prefix check for static analysis.
+    root_str = str(root)
+    cand_str = str(candidate)
+    if not cand_str.startswith(root_str):
+        raise ValueError("path escapes root")
     return candidate
 
 
-# ── Core write/read ─────────────────────────────────────────────────────
+# ── Core write/read ───────────────────────────────────────────────
 def write_shard(
     name: str,
     rows: Iterable[dict[str, Any]],
@@ -187,6 +233,7 @@ def _cache_evict_if_needed() -> None:
 
 
 def _load_full(name: str) -> list[dict]:
+    _ensure_storage()
     name = _safe_name(name)
     if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
@@ -224,6 +271,7 @@ def read_shard(name: str, limit: int = 50, offset: int = 0) -> list[dict]:
 
 
 def iter_shard(name: str) -> Iterator[dict]:
+    _ensure_storage()
     name = _safe_name(name)
     if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
@@ -251,14 +299,17 @@ def sample_shard(name: str, k: int = 5) -> list[dict]:
 
 
 def list_shards() -> list[dict]:
+    _ensure_storage()
     return sorted(_MANIFEST.values(), key=lambda e: e["name"])
 
 
 def get_shard_entry(name: str) -> dict | None:
+    _ensure_storage()
     return _MANIFEST.get(_safe_name(name))
 
 
 def vault_stats() -> dict:
+    _ensure_storage()
     _load_manifest()
     shards = list(_MANIFEST.values())
     total_raw = sum(s.get("raw_bytes", 0) for s in shards)
@@ -284,6 +335,7 @@ def purge_cache() -> int:
 
 
 def delete_shard(name: str) -> bool:
+    _ensure_storage()
     name = _safe_name(name)
     entry = _MANIFEST.pop(name, None)
     if not entry:

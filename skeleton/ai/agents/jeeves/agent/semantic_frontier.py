@@ -538,7 +538,7 @@ class FrontierLensRouter(SemanticLensRouter):
         max_per_family: int = 4,
         minimum_rare_when_supported: int = 2,
     ) -> LensSelection:
-        maximum = positive_int("max_lenses", max_lenses, maximum=100)
+        maximum = positive_int("max_lenses", max_lenses, maximum=200)
         rare_min = positive_int("minimum_rare_when_supported", minimum_rare_when_supported, maximum=20)
         base = self.select(
             observations,

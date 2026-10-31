@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/KnowledgeDatabases/KnowledgeDatabasesModal'), 'KnowledgeDatabasesRoute', 'KnowledgeDatabasesModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/KnowledgeDatabases/KnowledgeDatabasesModal'), 'KnowledgeDatabasesRoute', 'KnowledgeDatabasesModal');

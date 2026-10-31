@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * ═══════════════════════════════════════════════════════════════════════
  *  My Builds Gallery — every completed Galaxy Studio build, auto-saved.
@@ -23,11 +23,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Screen, AppHeader, EmptyState, Chip } from '../components/UI';
-import theme from '../theme/tokens';
-import { apiFetch } from '../utils/apiController';
+import { Screen, AppHeader, EmptyState, Chip } from '../src/components/UI';
+import theme from '../src/theme/tokens';
+import { apiFetch } from '../src/utils/apiController';
 import { LinearGradient } from 'expo-linear-gradient';
-import { toast } from '../components/Toast';
+import { toast } from '../src/components/AppToast';
 
 const BACKEND =
   (typeof window !== 'undefined' ? window.location.origin : '') ||

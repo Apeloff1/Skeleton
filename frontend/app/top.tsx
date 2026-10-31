@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /top — Public, shareable Top Games leaderboard (Creator Marketplace).
  *
@@ -10,13 +10,14 @@ import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, SafeAreaView, Platform, RefreshControl, Image, TextInput,
+  StyleSheet, SafeAreaView, Platform, RefreshControl, TextInput,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
+import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
-import theme from '../theme/tokens';
+import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { colors: C, spacing: S, radii: R } = { colors: theme.colors, spacing: theme.spacing, radii: theme.radii };
@@ -59,8 +60,8 @@ function Cover({ row, size }: { row: BoardRow; size: number }) {
   const [err, setErr] = React.useState(false);
   if (row.has_cover && !err) {
     return (
-      <Image
-        source={{ uri: `${BACKEND}/api/playable/${row.playable_id}/cover.png` }}
+      <PrivateImage
+        uri={`${BACKEND}/api/playable/${row.playable_id}/cover.png`}
         style={{ width: size, height: size, borderRadius: R.md, backgroundColor: '#141414' }}
         onError={() => setErr(true)}
       />

@@ -569,6 +569,55 @@ class SQLiteOperationStore:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def recover_expired(
+        self, *, now: datetime | None = None, limit: int = 128,
+    ) -> tuple[StoredOperation, ...]:
+        """Fail expired unfinished operations through the canonical state machine.
+
+        This operation is explicit and bounded. An expired *queued, running or
+        waiting* operation must not be silently resurrected after a crash.
+        The ordinary version-checked transition creates its durable outbox
+        event. A concurrent worker that changed a row wins its version race;
+        recovery never overwrites that new state.
+        """
+        instant = _aware(now or _utc_now(), "now")
+        if type(limit) is not int or not 1 <= limit <= 4096:
+            raise ValueError("recovery limit must be between 1 and 4096")
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT *
+                FROM operation_state
+                WHERE namespace = ? AND deadline <= ?
+                  AND state NOT IN (?, ?, ?)
+                ORDER BY deadline ASC, created_at ASC, operation_id ASC
+                LIMIT ?
+                """,
+                (
+                    self.namespace, instant.isoformat(),
+                    OperationState.COMPLETED.value,
+                    OperationState.FAILED.value,
+                    OperationState.CANCELLED.value,
+                    limit,
+                ),
+            ).fetchall()
+            candidates = tuple(self._stored_from_row(row) for row in rows)
+        completed: list[StoredOperation] = []
+        for current in candidates:
+            try:
+                updated = self.transition(
+                    current.envelope.operation_id,
+                    OperationState.FAILED,
+                    expected_version=current.version,
+                    now=instant,
+                )
+            except OperationStoreConflict:
+                # Another writer may have completed, cancelled or advanced it.
+                # Its canonical transition, not this snapshot, is authoritative.
+                continue
+            completed.append(updated)
+        return tuple(completed)
+
     def pending_outbox(
         self,
         *,

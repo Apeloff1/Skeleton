@@ -18,6 +18,7 @@ from skeleton.application import (
 
 _ROW_KEYS = {"path", "domain", "mapped", "architecture_documented"}
 _UNUSED = [
+    ("/api/v1/projects", "projects"),  # mounted by create_app; documented in docs/architecture/contracts/projects.md, not in main-router API_ROUTES
     ("/api/v1/cortex", "cognition"),
     ("/api/fabric", "fabric"),
     ("/api/legions", "legions"),

@@ -9,6 +9,7 @@ import re
 import stat
 from collections import defaultdict
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
 from .config import MachineConfig, load_machine_config
@@ -305,18 +306,30 @@ class RepositoryModelBuilder:
         paths, truncated = self._iter_files()
         records: list[FileRecord] = []
         findings: list[Finding] = []
-        for path in paths:
+        # File reads and metadata checks are independent. Scan in small,
+        # bounded batches so large monorepos do not serialize disk latency
+        # across tens of thousands of tracked files. executor.map retains
+        # input order, preserving stable findings and repository fingerprints.
+        # A batch bound also prevents creating one future per repository file.
+        def scan(path: Path) -> FileRecord | None:
             try:
-                record = self._record(path)
+                return self._record(path)
             except (OSError, ValueError):
-                rel = _posix(path, self.root)
-                zone, _owner, _criticality = self._zone(rel)
-                findings.append(Finding(
-                    code="scan.unreadable", severity="medium", zone=zone,
-                    path=rel, detail="file could not be safely indexed",
-                ))
-                continue
-            records.append(record)
+                return None
+
+        with ThreadPoolExecutor(max_workers=8, thread_name_prefix="repo-scan") as executor:
+            for offset in range(0, len(paths), 128):
+                batch = paths[offset:offset + 128]
+                for path, record in zip(batch, executor.map(scan, batch)):
+                    if record is None:
+                        rel = _posix(path, self.root)
+                        zone, _owner, _criticality = self._zone(rel)
+                        findings.append(Finding(
+                            code="scan.unreadable", severity="medium", zone=zone,
+                            path=rel, detail="file could not be safely indexed",
+                        ))
+                    else:
+                        records.append(record)
 
         path_set = {record.path for record in records}
         by_path = {record.path: record for record in records}

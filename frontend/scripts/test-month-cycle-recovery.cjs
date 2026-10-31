@@ -1,11 +1,12 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 function load(name, mocks = {}) {
-  const source = fs.readFileSync(path.join(__dirname, '../services', name), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../src/services', name), 'utf8');
   const output = ts.transpileModule(source, {
     fileName: name, compilerOptions: { module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2020, esModuleInterop: true },
@@ -13,7 +14,7 @@ function load(name, mocks = {}) {
   });
   assert.equal(output.diagnostics.length, 0);
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(id => {
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(id => {
     assert.ok(Object.hasOwn(mocks, id), name + ': unexpected module ' + id);
     return mocks[id];
   }, mod, mod.exports);

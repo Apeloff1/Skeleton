@@ -212,41 +212,9 @@ async def download_build_apk(build_id: str):
     if not build:
         raise HTTPException(404, "Build not found")
 
-    from core import build_vault as _bv
-    from services import binary_builder
-    vault_count = _bv.get_file_count(build_id)
-    mem_files   = build.get("files") or {}
-    if vault_count == 0 and not mem_files:
-        raise HTTPException(400, "No files. Complete build first.")
+    from routes.galaxy_studio import _build_native_apk
 
-    _BIN_PREFIX = get_binary_prefix()
-
-    files_list: list[dict] = []
-    seen: set[str] = set()
-    for path, content in _bv.iter_files(build_id):
-        if path in seen: continue
-        seen.add(path)
-        if isinstance(content, str) and content.startswith(_BIN_PREFIX):
-            import base64
-            content = base64.b64decode(content[len(_BIN_PREFIX):])
-        files_list.append({"path": path, "content": content})
-    for path, content in mem_files.items():
-        if path in seen: continue
-        seen.add(path)
-        if isinstance(content, str) and content.startswith(_BIN_PREFIX):
-            import base64
-            content = base64.b64decode(content[len(_BIN_PREFIX):])
-        files_list.append({"path": path, "content": content})
-
-    apk_build = {
-        "build_id": build_id,
-        "title":    build.get("title") or "Galaxy Game",
-        "files":    files_list,
-    }
-    import asyncio as _a
-    art = await _a.get_event_loop().run_in_executor(None, binary_builder.build_apk, apk_build)
-    if not art.get("is_installable"):
-        raise HTTPException(503, "APK toolchain unavailable")
+    art = await _build_native_apk(build)
     filename = f"{(build.get('title') or 'game').lower().replace(' ', '-')[:20]}-galaxy.apk"
     return FileResponse(
         art["path"],

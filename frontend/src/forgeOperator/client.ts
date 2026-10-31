@@ -9,7 +9,7 @@
  * because apiClient already accepts paths that start with `http`.
  */
 import api, { type ApiResult } from '../utils/apiClient';
-import { SKELETON_API_BASE } from '../../utils/apiBase';
+import { SKELETON_API_BASE } from '../utils/apiBase';
 import { toOperatorError, type OperatorError } from './errors';
 import type {
   Beat,

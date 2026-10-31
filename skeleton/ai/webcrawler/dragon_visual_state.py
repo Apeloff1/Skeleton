@@ -16,6 +16,7 @@ _MAP={
  "burn_started":("breath","fire","Burning into knowledge",.72),
  "burn_chunk":("breath","ember_stream","Extracting chunks",.85),
  "burn_complete":("proud","ash_to_stars","Extraction complete",1.),
+ "distill_complete":("study","sealed_ledger","Distillation sealed",1.),
  "retry_wait":("curl","smoke","Waiting politely",.25),
  "crawl_complete":("sleep","warm_embers","Crawl complete",1.),
 }

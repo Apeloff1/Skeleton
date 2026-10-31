@@ -1,8 +1,11 @@
-"""
-Skeleton API — GameForge route handlers
+"""Unmounted GameForge compatibility handlers.
 
-/gameforge/run      — full intake → blueprint → pipelines generation
-/gameforge/intake   — questionnaire answers → structured intake only
+``create_app`` is the only HTTP entry and does not include this router.
+``POST /gameforge/run`` re-exports the mounted adapter in
+``skeleton.api.routes`` (``build_playable_game``) and uses the same
+``require_charter("forge", "run")`` gate. ``POST /gameforge/intake`` remains
+so existing intake callers and sidecar audits keep a module to import.
+Delete this module only after those imports are gone.
 """
 
 from __future__ import annotations
@@ -11,11 +14,10 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from skeleton.api.charter_gate import require_charter
 from skeleton.api.command_routes import router as command_router
-from skeleton.api.hmac_seal import require_seal
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
-from skeleton.application import build_runtime_command_service
 
 router = APIRouter()
 router.include_router(command_router)
@@ -47,21 +49,19 @@ async def gameforge_run(
     http_request: Request,
     request: Dict[str, Any],
     state=Depends(_state),
-    attester: str = Depends(require_seal),
+    attester: str = Depends(require_charter("forge", "run")),
 ) -> Dict[str, Any]:
-    """Run GameForge through the shared API/CLI application command service."""
+    """Re-export the mounted ``/gameforge/run`` adapter. This router is not mounted."""
+    del attester
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
+    from skeleton.api.routes import run_gameforge_adapter
+    from starlette.concurrency import run_in_threadpool
 
-    result = build_runtime_command_service(state).execute("run", request)
-    if not result.ok:
-        error = result.error
-        raise HTTPException(
-            status_code=result.http_status,
-            detail=error.to_dict() if error is not None else {"code": "internal_error", "message": "run failed"},
-        )
-
-    response = dict(result.data)
+    try:
+        response = await run_in_threadpool(run_gameforge_adapter, request, state)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     _idempotency.remember(dict(http_request.headers), response)
     return response

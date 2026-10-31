@@ -6,10 +6,10 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api } from '../utils/apiController';
-import { openModalFromRoute } from '../utils/openModalFromRoute';
-import theme from '../theme/tokens';
-import { Screen, AppHeader, SearchBar, SectionHeader, EmptyState } from '../components/UI';
+import { api } from '../src/utils/apiController';
+import { openModalFromRoute } from '../src/utils/openModalFromRoute';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader, SearchBar, SectionHeader, EmptyState } from '../src/components/UI';
 
 interface Hit { type: 'book' | 'bible' | 'track' | 'class' | 'feature' | 'capability' | 'dataset' | 'pipeline'; id: string; title: string; subtitle?: string; route?: string; }
 

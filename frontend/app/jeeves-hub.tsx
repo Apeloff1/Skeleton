@@ -1,5 +1,5 @@
 import { LazyMount } from '../src/utils/lazyMount';
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /jeeves-hub — Jeeves operator console.
  *
@@ -22,9 +22,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useFeatureFlag } from '../utils/featureFlags';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import JeevesRuntimeStatus from '../features/Jeeves/JeevesRuntimeStatus';
+import { useFeatureFlag } from '../src/utils/featureFlags';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import JeevesRuntimeStatus from '../src/features/Jeeves/JeevesRuntimeStatus';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';

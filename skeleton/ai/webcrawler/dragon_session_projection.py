@@ -72,7 +72,8 @@ class DragonSessionProjection:
             return changed.rowcount==1
 
     def read(self,owner:str,*,authorized:bool,
-             after_sequence:int=0,limit:int=100) -> DragonCrawlFeed:
+             after_sequence:int=0,limit:int=100,
+             expected_digest:str|None=None) -> DragonCrawlFeed:
         self._owner(owner)
         if not authorized:
             raise PermissionError("crawler feed requires owner authority")
@@ -80,6 +81,10 @@ class DragonSessionProjection:
             raise ValueError("invalid feed cursor")
         if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=250:
             raise ValueError("invalid feed page limit")
+        if expected_digest is not None and (
+            not isinstance(expected_digest,str) or len(expected_digest)!=64
+            or any(char not in "0123456789abcdef" for char in expected_digest)):
+            raise ValueError("invalid feed digest cursor")
         row=self.db.execute("""SELECT session_id FROM dragon_crawl_session_owners
             WHERE owner=? AND active=1 ORDER BY created_at DESC,session_id LIMIT 1""",
             (owner,)).fetchone()
@@ -90,6 +95,16 @@ class DragonSessionProjection:
         # blindly turning a corrupted replay into UI-visible achievements.
         if not self.journal.verify(session_id):
             raise ValueError("crawler journal integrity check failed")
+        if after_sequence==0:
+            if expected_digest not in (None,"0"*64):
+                raise ValueError("feed cursor does not match the journal head")
+        elif expected_digest is not None:
+            cursor=self.db.execute(
+                """SELECT digest FROM dragon_companion_events
+                   WHERE session_id=? AND sequence=?""",
+                (session_id,after_sequence)).fetchone()
+            if cursor is None or cursor[0]!=expected_digest:
+                raise ValueError("feed cursor does not match the journal head")
         p=self.journal.page(session_id,after=after_sequence,limit=limit)
         return DragonCrawlFeed(session_id,True,tuple(p["events"]),
                               p["nextCursor"],p["hasMore"])

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/merge-readiness.yml"
 PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
-RUFF_VERSION = "0.9.10"
+RUFF_VERSION = "0.17.2"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
 REQUIRED_NEEDS = (
     "quarantine_policy",
@@ -18,6 +18,7 @@ REQUIRED_NEEDS = (
     "integration_smoke",
     "quality_security",
     "pr_automation",
+    "ci",
 )
 PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_pr_automation.py",
@@ -32,8 +33,8 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_runner_v2_engine.py",
     "tests/test_required_checks_policy.py",
 )
-CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.ref }}"
-CANCEL_POLICY = "cancel-in-progress: true"
+CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
+CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
 READINESS_GUARD = (
     "if: ${{ !cancelled() && (github.event_name != 'pull_request' || "
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
@@ -88,17 +89,17 @@ def main() -> int:
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
-        "merge-readiness must deduplicate PRs and supersede stale main runs",
+        "merge-readiness must isolate each PR and preserve per-SHA main evidence",
         failures,
     )
     require(
         CANCEL_POLICY in text,
-        "superseded PR and main readiness runs must be cancellable",
+        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
         failures,
     )
     require(
-        "github.event.pull_request.number || github.sha" not in text,
-        "SHA-scoped main readiness causes unbounded redundant runs",
+        "cancel-in-progress: true" not in text,
+        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
         failures,
     )
     require(

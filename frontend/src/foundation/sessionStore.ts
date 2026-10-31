@@ -1,6 +1,9 @@
 /**
  * App-wide session store (zustand) bridging the existing GameForge auth client
  * (`/api/auth/me` public contract) to the pure gating rules in sessionGate.ts.
+ *
+ * `checkMe` and `logout` are the session operations on src/utils/apiClient.ts,
+ * the single TypeScript HTTP transport. This store does not call fetch itself.
  */
 import { create } from 'zustand';
 import { checkMe, logout } from '../auth/gameforgeAuth';

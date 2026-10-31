@@ -42,6 +42,12 @@
       "name": "PR Automation Tests",
       "result_env": "PR_AUTOMATION_RESULT",
       "covers": ["auto-merge and runner-v2 privileged contracts", "repository machine contracts", "filesystem/tool transaction boundaries"]
+    },
+    {
+      "job_id": "ci",
+      "name": "CI/CD",
+      "result_env": "CI_RESULT",
+      "covers": ["restored ci.yml (#4104): Frontend lint/typecheck/test suites/export", "Backend Lint, Backend Test, Backend Import Smoke", "Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke", "Docker Build (build-only)"]
     }
   ],
   "protection": {

@@ -10,19 +10,44 @@ from routes.gameforge_auth import get_current_user
 router = APIRouter(prefix="/game-studio-agent", tags=["Jeeves studio assistant"])
 
 
+class StudioQualityGate(Request):
+    """Operator-selected measured acceptance, never a subjective quality score."""
+
+    schema_version: Literal["skeleton.game.studio_quality_policy.v1"] = (
+        "skeleton.game.studio_quality_policy.v1"
+    )
+    baseline_review_job_id: str | None = Field(default=None, min_length=1, max_length=128)
+    max_refinement_rounds: int = Field(default=2, ge=1, le=4, strict=True)
+    min_available_frames: int = Field(default=2, ge=1, le=25, strict=True)
+    min_executed_steps: int = Field(default=1, ge=1, le=512, strict=True)
+    max_error_findings: int = Field(default=0, ge=0, le=128, strict=True)
+    max_warning_findings: int = Field(default=128, ge=0, le=128, strict=True)
+    require_no_regression: bool = Field(default=True, strict=True)
+    restore_on_regression: bool = Field(default=True, strict=True)
+    adaptive_ranking: bool = Field(default=False, strict=True)
+    numeric_memory_policy: Literal["goal_only", "reuse_compatible", "reset"] = "goal_only"
+
+    @model_validator(mode="after")
+    def numeric_memory_grant(self):
+        if self.numeric_memory_policy != "goal_only" and not self.adaptive_ranking:
+            raise ValueError("shared numeric memory requires the explicit adaptive-ranking grant")
+        return self
+
+
 class GoalCreate(WriteRequest):
     goal: str = Field(min_length=1, max_length=8000)
     max_steps: int = Field(default=8, ge=1, le=16, strict=True)
     execution_mode: Literal["plan", "run"] = "plan"
     allow_edits: bool = Field(default=False, strict=True)
     authorization_seconds: int = Field(default=600, ge=60, le=3600, strict=True)
-    max_model_calls: int = Field(default=4, ge=1, le=8, strict=True)
+    max_model_calls: int = Field(default=4, ge=1, le=16, strict=True)
     max_output_tokens: int = Field(default=1024, ge=256, le=4096, strict=True)
-    max_jobs: int = Field(default=2, ge=0, le=4, strict=True)
+    max_jobs: int = Field(default=2, ge=0, le=8, strict=True)
     completion_mode: Literal["native", "original"] = "native"
     completion_requirements: (
         list[Literal["edit", "build", "preview", "export", "simulate", "review", "package"]] | None
     ) = Field(default=None, max_length=5)
+    quality_gate: StudioQualityGate | None = None
 
     @model_validator(mode="after")
     def normalized_goal(self):
@@ -42,6 +67,15 @@ class GoalCreate(WriteRequest):
                 raise ValueError("verified workflow requirements need run mode")
             if "edit" in self.completion_requirements and not self.allow_edits:
                 raise ValueError("the edit requirement needs explicit edit authorization")
+        if self.quality_gate is not None:
+            if (
+                self.completion_mode != "original"
+                or self.execution_mode != "run"
+                or not {"simulate", "review"}.issubset(self.completion_requirements or [])
+            ):
+                raise ValueError("measured quality requires an original run with simulation and review")
+            if self.quality_gate.restore_on_regression and not self.allow_edits:
+                raise ValueError("incumbent restoration requires explicit edit authorization")
         return self
 
 
@@ -49,6 +83,15 @@ class GoalAdvance(Request):
     expected_goal_version: int = Field(ge=1, strict=True)
     idempotency_key: str = Field(min_length=1, max_length=512)
     steps: int = Field(default=1, ge=1, le=4, strict=True)
+    max_planner_decisions: int = Field(default=1, ge=1, le=4, strict=True)
+    wait_for_work_seconds: int = Field(default=0, ge=0, le=10, strict=True)
+
+
+class GoalSourceRefresh(Request):
+    expected_goal_version: int = Field(ge=1, strict=True)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+    expected_project_version: int = Field(ge=1, strict=True)
+    expected_tree_digest: str = Field(pattern="^[a-f0-9]{64}$")
 
 
 class GoalControl(Request):
@@ -60,7 +103,7 @@ class GoalControl(Request):
 class GoalRetry(Request):
     expected_goal_version: int = Field(ge=1, strict=True)
     idempotency_key: str = Field(min_length=1, max_length=512)
-    target: Literal["planner", "action", "job", "play", "reconcile"]
+    target: Literal["planner", "action", "job", "play", "reconcile", "restore_incumbent"]
     new_planner_attempt: bool = Field(default=False, strict=True)
 
     @model_validator(mode="after")
@@ -110,6 +153,8 @@ async def create_goal(project_id: str, body: GoalCreate, user=Depends(get_curren
         payload.pop("completion_requirements")
     if "completion_mode" not in body.model_fields_set:
         payload.pop("completion_mode")
+    if "quality_gate" not in body.model_fields_set:
+        payload.pop("quality_gate")
     return {"goal": await _call(agent.create(_scope(user), project_id, payload))}
 
 
@@ -121,6 +166,7 @@ async def list_goals(project_id: str, user=Depends(get_current_user)):
 @router.get("/goals/{goal_id}")
 async def get_goal(goal_id: str, user=Depends(get_current_user)):
     return {"goal": await _call(agent.inspect(_scope(user), goal_id))}
+
 
 @router.get("/goals/{goal_id}/dragon-observation")
 async def dragon_observation(
@@ -150,10 +196,20 @@ async def dragon_observation(
         raise HTTPException(status_code=503, detail="Studio observation evidence unavailable") from exc
 
 
-
 @router.post("/goals/{goal_id}/advance")
 async def advance_goal(goal_id: str, body: GoalAdvance, user=Depends(get_current_user)):
-    return {"goal": await _call(agent.advance(_scope(user), goal_id, body.model_dump()))}
+    payload = body.model_dump()
+    # Preserve exact historical request keys when the additive controls were
+    # omitted; a retry may never silently become a larger batch.
+    for field in ("max_planner_decisions", "wait_for_work_seconds"):
+        if field not in body.model_fields_set:
+            payload.pop(field)
+    return {"goal": await _call(agent.advance(_scope(user), goal_id, payload))}
+
+
+@router.post("/goals/{goal_id}/source-refresh")
+async def refresh_goal_source(goal_id: str, body: GoalSourceRefresh, user=Depends(get_current_user)):
+    return {"goal": await _call(agent.refresh_source(_scope(user), goal_id, body.model_dump()))}
 
 
 @router.post("/goals/{goal_id}/control")

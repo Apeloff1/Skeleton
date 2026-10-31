@@ -115,6 +115,8 @@ class AppwideCapabilityTests(unittest.TestCase):
         self.assertFalse(tools["result"]["any_tool_executed"])
         dragon=self.run.invoke("companion.visual",{"event_kind":"burn_complete"})
         self.assertEqual(dragon["result"]["pose"],"proud")
+        sealed=self.run.invoke("companion.visual",{"event_kind":"distill_complete"})
+        self.assertEqual(sealed["result"]["label"],"Distillation sealed")
         crawler=self.run.invoke("crawler.plan",{})
         self.assertEqual(crawler["result"]["targets"],[])
         self.assertFalse(crawler["result"]["crawl_started"])

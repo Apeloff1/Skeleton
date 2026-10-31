@@ -11,7 +11,7 @@ require.extensions['.ts'] = (module, filename) => {
   module._compile(result.outputText, filename);
 };
 
-const root = path.resolve(__dirname, '../../features/Jeeves/workbench');
+const root = path.resolve(__dirname, '../../src/features/Jeeves/workbench');
 const load = name => require(path.join(root, `${name}.ts`));
 const { createWorkbench, applyCommand } = load('domain');
 const { validateWorkbench } = load('validation');

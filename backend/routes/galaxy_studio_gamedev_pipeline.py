@@ -319,8 +319,8 @@ def get_pipeline_catalog() -> dict:
     }
 
 
-def generate_gamedev_pipeline(build: dict, title: str, genre: str) -> Dict[str, str]:
-    files: Dict[str, str] = {}
+def generate_gamedev_pipeline(build: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
+    files: Dict[str, str] = files_factory() if files_factory is not None else {}
     try:
         files["pipeline/TaskGraph.ts"] = _gen_task_graph(title, genre)
         files["pipeline/QualityGate.ts"] = _gen_quality_gate(title, genre)
@@ -333,5 +333,7 @@ def generate_gamedev_pipeline(build: dict, title: str, genre: str) -> Dict[str, 
             build["pipeline_stage_count"] = len(PIPELINE_STAGES)
             build["pipeline_files"] = len(files)
     except Exception as e:
+        if isinstance(build, dict) and build.get("_bg_stop_requested"):
+            raise
         print(f"[GALAXY gamedev-pipeline] generation failed ({type(e).__name__})")
     return files

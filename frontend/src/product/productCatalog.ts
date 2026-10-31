@@ -37,6 +37,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/gameforge-studio',
     actions: [
       { id: 'unified-galaxy', title: 'Galaxy Studio · unified', description: 'Open the existing idea-to-build workflow with Snowball and export handoffs.', navigationId: 'studio.galaxy.unified', href: '/studio' },
+      { id: 'skeleton-studio', title: 'Skeleton studio', description: 'Open the Skeleton forge from a brief: first-run, account, projects, build status, and settings.', navigationId: 'studio.skeleton.foundation', href: '/skeleton-studio' },
       { id: 'classic-galaxy', title: 'Galaxy Studio Factory', description: 'Use the classic questionnaire and 100-phase builder.', navigationId: 'studio.galaxy.classic', href: '/galaxy' },
       { id: 'snowball-flow', title: 'Snowball Flow', description: 'Review, refine and lock forge stages with the growing game design document.', navigationId: 'studio.snowball', href: '/snowball' },
       { id: 'world-workbench', title: 'World Workbench', description: 'Inspect and author persistent world systems for the current build.', navigationId: 'studio.world.workbench', href: '/world-workbench' },
@@ -170,6 +171,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
  */
 export const PRODUCT_HOME_SHORTCUT_IDS = [
   'studio.galaxy.unified',
+  'studio.skeleton.foundation',
   'studio.snowball',
   'academy.mega',
   'jeeves.cockpit',

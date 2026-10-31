@@ -5,12 +5,22 @@ It cannot start learning, mutate candidates, approve promotion, or change
 production behavior.
 """
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 
-from skeleton.learning.mirror_room.observability import (
-    get_default_observatory,
-    mirror_room_file_tree,
-)
+
+def _observatory_exports():
+    """Load optional learning internals on request, never during route mount."""
+    try:
+        from skeleton.learning.mirror_room.observability import (
+            get_default_observatory,
+            mirror_room_file_tree,
+        )
+    except (ImportError, AttributeError, RuntimeError) as exc:
+        # Do not expose dependency paths or internal exception text in HTTP.
+        raise HTTPException(
+            status_code=503, detail="Mirror Room observatory unavailable"
+        ) from exc
+    return get_default_observatory, mirror_room_file_tree
 
 
 router = APIRouter(prefix="/api/mirror-room", tags=["mirror-room"])
@@ -19,18 +29,21 @@ router = APIRouter(prefix="/api/mirror-room", tags=["mirror-room"])
 @router.get("/status")
 async def mirror_room_status(response: Response) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
+    get_default_observatory, _ = _observatory_exports()
     return get_default_observatory().snapshot()
 
 
 @router.get("/file-tree")
 async def mirror_room_tree(response: Response) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
+    _, mirror_room_file_tree = _observatory_exports()
     return dict(mirror_room_file_tree())
 
 
 @router.get("/observatory")
 async def mirror_room_observatory(response: Response) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
+    get_default_observatory, mirror_room_file_tree = _observatory_exports()
     return {
         "status": get_default_observatory().snapshot(),
         "file_tree": dict(mirror_room_file_tree()),

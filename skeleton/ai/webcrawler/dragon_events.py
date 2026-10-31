@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass,asdict
 import hashlib,json
-_ALLOWED={"frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","retry_wait","crawl_complete"}
+_ALLOWED={"frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","distill_complete","retry_wait","crawl_complete"}
 @dataclass(frozen=True)
 class DragonCrawlEvent:
  sequence:int;kind:str;url:str;at:float;payload:dict

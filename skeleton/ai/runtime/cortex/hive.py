@@ -81,6 +81,61 @@ def consensus(a, b, *, texts=None) -> Dict[str, Any]:
     return info
 
 
+def fleet_consensus(
+    peers: list[Any] | tuple[Any, ...],
+    *,
+    texts=None,
+    gossip_alpha: float = 0.2,
+) -> Dict[str, Any]:
+    """Coordinate a multi-peer cortex network via perplexity ranking and merkle sync."""
+    from skeleton.cortex.curriculum import CORE_PAIRS
+    from skeleton.cortex.gossip import adaptive_gossip
+
+    valid = [p for p in (peers or ()) if p is not None]
+    if len(valid) < 2:
+        return {"consensus": 0, "reason": "insufficient-peers", "peers": len(valid)}
+    corpus = list(texts or [s for s, _ in list(CORE_PAIRS)[:6]])
+
+    def _p(neo) -> float:
+        xf = getattr(neo, "transformer", None)
+        if xf is None or not hasattr(xf, "perplexity"):
+            return float("inf")
+        try:
+            return float(xf.perplexity(corpus))
+        except Exception:
+            return float("inf")
+
+    scored = [(idx, peer, _p(peer)) for idx, peer in enumerate(valid)]
+    scored.sort(key=lambda item: (item[2], item[0]))
+    leader_idx, leader, leader_ppl = scored[0]
+    gossip_receipts: list[Dict[str, Any]] = []
+    if gossip_alpha > 0.0 and len(scored) >= 2:
+        runner_up = scored[1][1]
+        g_xf = adaptive_gossip(
+            getattr(leader, "transformer", None),
+            getattr(runner_up, "transformer", None),
+            corpus,
+            max_alpha=gossip_alpha,
+        )
+        gossip_receipts.append(g_xf)
+        leader_ppl = _p(leader)
+
+    leader_bundle = bundle(leader)
+    pulls = 0
+    for idx, peer, _ppl in scored[1:]:
+        res = pull(peer, leader_bundle)
+        pulls += int(res.get("pulled", 0))
+    return {
+        "consensus": 1,
+        "peers": len(valid),
+        "leader_index": leader_idx,
+        "leader_ppl": leader_ppl,
+        "pulls": pulls,
+        "gossip": gossip_receipts,
+        "card": merkle_card(leader),
+    }
+
+
 def bundle(neo) -> Dict[str, Any]:
     """Guts a hive peer can pull. Merkle first, then the nets."""
     card = merkle_card(neo)

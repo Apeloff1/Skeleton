@@ -8,20 +8,23 @@ can render the conversation. Sequential, resumable, fully automatic.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_identity, project_router, reauthorize_project_context, scoped_database
+
 import os
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from core.databases import client as _MONGO
 from routes.game_kb import _FORGES, _stamped, _AGENT_BY_STAGE
 from routes.canon_rag import _recall
 from routes.jeeves_voice import AGENT_CAST  # 🎙️ per-agent voice cast (War-Room)
 
-router = APIRouter(prefix="/api/groupchat", tags=["groupchat"])
+router = project_router(prefix="/api/groupchat", tags=["groupchat"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 _LADDER = ["spec", "world", "narrative", "mechanics", "procedural", "assets", "qa", "build", "launch"]
 _LABEL = {"spec": "Core Specs", "world": "WorldForge", "narrative": "Narrative & Quests",
@@ -71,7 +74,7 @@ async def _run_groupchat(pid: str, job_id: str, only_missing: bool, only_stale: 
             {"job_id": job_id}, {"$set": {"current": stage, "done": done, "total": len(_LADDER)}})
         await _say(job_id, transcript, "Orchestrator", f"@{agent}, please build {_LABEL[stage]}.", "handoff")
         # RAG: the agent recalls relevant canon before generating
-        hits = await _recall(pid, _LABEL[stage] + " " + stage, 4)
+        hits = await _recall(pid, _LABEL[stage] + " " + stage, 4, scope=project_identity())
         if hits:
             await _say(job_id, transcript, agent,
                        "Recalled canon: " + ", ".join(f"{h['type']}:{h['name']}" for h in hits),
@@ -83,10 +86,14 @@ async def _run_groupchat(pid: str, job_id: str, only_missing: bool, only_stale: 
             await _say(job_id, transcript, agent, "🧠 " + vb, "vault")
             await _db.game_kb.update_one(
                 {"game_id": pid}, {"$set": {f"vault_context.{stage}": vb}}, upsert=True)
+        except HTTPException:
+            raise
         except Exception:
             pass
         try:
             res = await _stamped(pid, stage, _FORGES[stage](pid))
+        except HTTPException:
+            raise
         except Exception:  # noqa
             res = {"ok": False, "error": "forge_step_failed"}
         if res.get("ok"):

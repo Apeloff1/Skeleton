@@ -15,6 +15,31 @@ if str(ROOT) not in sys.path:
 from skeleton.ai.runtime.deferred.catalog import DEFERRED_165_SPECS
 
 
+def _registered_handler_module(module_name: str):
+    """Admit only implementation owners from the pinned deferred-165 catalog."""
+    if module_name == "skeleton.ai.runtime.deferred.compute":
+        return importlib.import_module("skeleton.ai.runtime.deferred.compute")
+    if module_name == "skeleton.ai.runtime.deferred.contract_fuzzing":
+        return importlib.import_module("skeleton.ai.runtime.deferred.contract_fuzzing")
+    if module_name == "skeleton.ai.runtime.deferred.contracts":
+        return importlib.import_module("skeleton.ai.runtime.deferred.contracts")
+    if module_name == "skeleton.ai.runtime.deferred.knowledge":
+        return importlib.import_module("skeleton.ai.runtime.deferred.knowledge")
+    if module_name == "skeleton.ai.runtime.deferred.operations_experience":
+        return importlib.import_module("skeleton.ai.runtime.deferred.operations_experience")
+    if module_name == "skeleton.ai.runtime.deferred.platform_control":
+        return importlib.import_module("skeleton.ai.runtime.deferred.platform_control")
+    if module_name == "skeleton.ai.runtime.deferred.reliability_release":
+        return importlib.import_module("skeleton.ai.runtime.deferred.reliability_release")
+    if module_name == "skeleton.ai.runtime.deferred.research_evaluation":
+        return importlib.import_module("skeleton.ai.runtime.deferred.research_evaluation")
+    if module_name == "skeleton.ai.runtime.deferred.simulation_mode":
+        return importlib.import_module("skeleton.ai.runtime.deferred.simulation_mode")
+    if module_name == "skeleton.ai.runtime.deferred.tooling_security":
+        return importlib.import_module("skeleton.ai.runtime.deferred.tooling_security")
+    raise ImportError("handler module is not registered in the deferred catalog")
+
+
 def _load(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -101,7 +126,7 @@ def main() -> int:
             continue
         module_name, attribute = handler.rsplit(".", 1)
         try:
-            module = importlib.import_module(module_name)
+            module = _registered_handler_module(module_name)
         except Exception as exc:
             _fail(errors, f"{volume_id}: handler module import failed: {exc}")
             continue

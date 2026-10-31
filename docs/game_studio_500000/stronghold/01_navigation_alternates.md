@@ -1,0 +1,221 @@
+# Book 074 of 100 — STRONGHOLD: Navigable alternatives
+
+**Implementation:** navigation_alternates over stronghold · **PR:** #4200 · **Audience:** game director, Jeeves editor, original-world production, native Godot integrator.
+
+## Mission and real production capability
+
+Fortified routes, garrisons, dungeons and defensive layouts. The director authors crossing corridors and alternate transit paths via genuine `StudioProject` mutations. Approachable gate routes, collision implications and tactical coherence. This is one of **90 director/domain technical books** alongside the previous ten original-domain volumes. Together they form 100 technical volumes across ten world-production domains.
+
+The count represents **4,500 distinct composition workflows for this director/domain** (50 validated source archetypes × nine treatments × ten gameplay systems). Each executes the underlying source producer, one gameplay-layer tile/event transform, and a navigation_alternates tile/event director. It is not a claim of 4,500 independent game engines or finished commercial games.
+
+## Exact authoritative source archetypes
+
+These fifty identifiers originate from the real `skeleton/forge/game_frontier_studio_structure_factory.py` implementation:
+
+| # | Existing executable blueprint | Representative exact composed command |
+|---:|---|---|
+| 1 | `structure_village_square` | `direct_stronghold_village_square__waterways___wayfinding____navigation_alternates` |
+| 2 | `structure_market_stalls` | `direct_stronghold_market_stalls__waterways___wayfinding____navigation_alternates` |
+| 3 | `structure_courtyard` | `direct_stronghold_courtyard__waterways___wayfinding____navigation_alternates` |
+| 4 | `structure_town_grid` | `direct_stronghold_town_grid__waterways___wayfinding____navigation_alternates` |
+| 5 | `structure_radial_city` | `direct_stronghold_radial_city__waterways___wayfinding____navigation_alternates` |
+| 6 | `structure_harbor_piers` | `direct_stronghold_harbor_piers__waterways___wayfinding____navigation_alternates` |
+| 7 | `structure_farm_fields` | `direct_stronghold_farm_fields__waterways___wayfinding____navigation_alternates` |
+| 8 | `structure_orchard_rows` | `direct_stronghold_orchard_rows__waterways___wayfinding____navigation_alternates` |
+| 9 | `structure_house_cluster` | `direct_stronghold_house_cluster__waterways___wayfinding____navigation_alternates` |
+| 10 | `structure_canal_district` | `direct_stronghold_canal_district__waterways___wayfinding____navigation_alternates` |
+| 11 | `structure_castle_keep` | `direct_stronghold_castle_keep__waterways___wayfinding____navigation_alternates` |
+| 12 | `structure_outer_wall` | `direct_stronghold_outer_wall__waterways___wayfinding____navigation_alternates` |
+| 13 | `structure_gatehouse` | `direct_stronghold_gatehouse__waterways___wayfinding____navigation_alternates` |
+| 14 | `structure_corner_bastions` | `direct_stronghold_corner_bastions__waterways___wayfinding____navigation_alternates` |
+| 15 | `structure_moat_bridge` | `direct_stronghold_moat_bridge__waterways___wayfinding____navigation_alternates` |
+| 16 | `structure_watchtowers` | `direct_stronghold_watchtowers__waterways___wayfinding____navigation_alternates` |
+| 17 | `structure_wall_walk` | `direct_stronghold_wall_walk__waterways___wayfinding____navigation_alternates` |
+| 18 | `structure_arrow_slits` | `direct_stronghold_arrow_slits__waterways___wayfinding____navigation_alternates` |
+| 19 | `structure_turret_ring` | `direct_stronghold_turret_ring__waterways___wayfinding____navigation_alternates` |
+| 20 | `structure_fortified_crossroads` | `direct_stronghold_fortified_crossroads__waterways___wayfinding____navigation_alternates` |
+| 21 | `structure_dungeon_rooms` | `direct_stronghold_dungeon_rooms__waterways___wayfinding____navigation_alternates` |
+| 22 | `structure_dungeon_corridors` | `direct_stronghold_dungeon_corridors__waterways___wayfinding____navigation_alternates` |
+| 23 | `structure_spiral_vault` | `direct_stronghold_spiral_vault__waterways___wayfinding____navigation_alternates` |
+| 24 | `structure_treasure_chambers` | `direct_stronghold_treasure_chambers__waterways___wayfinding____navigation_alternates` |
+| 25 | `structure_pillar_hall` | `direct_stronghold_pillar_hall__waterways___wayfinding____navigation_alternates` |
+| 26 | `structure_prison_cells` | `direct_stronghold_prison_cells__waterways___wayfinding____navigation_alternates` |
+| 27 | `structure_cathedral_nave` | `direct_stronghold_cathedral_nave__waterways___wayfinding____navigation_alternates` |
+| 28 | `structure_catacomb_grid` | `direct_stronghold_catacomb_grid__waterways___wayfinding____navigation_alternates` |
+| 29 | `structure_trap_gauntlet` | `direct_stronghold_trap_gauntlet__waterways___wayfinding____navigation_alternates` |
+| 30 | `structure_boss_arena` | `direct_stronghold_boss_arena__waterways___wayfinding____navigation_alternates` |
+| 31 | `structure_factory_floor` | `direct_stronghold_factory_floor__waterways___wayfinding____navigation_alternates` |
+| 32 | `structure_conveyor_lanes` | `direct_stronghold_conveyor_lanes__waterways___wayfinding____navigation_alternates` |
+| 33 | `structure_power_grid` | `direct_stronghold_power_grid__waterways___wayfinding____navigation_alternates` |
+| 34 | `structure_storage_racks` | `direct_stronghold_storage_racks__waterways___wayfinding____navigation_alternates` |
+| 35 | `structure_warehouse_aisles` | `direct_stronghold_warehouse_aisles__waterways___wayfinding____navigation_alternates` |
+| 36 | `structure_rail_depot` | `direct_stronghold_rail_depot__waterways___wayfinding____navigation_alternates` |
+| 37 | `structure_shipyard_slips` | `direct_stronghold_shipyard_slips__waterways___wayfinding____navigation_alternates` |
+| 38 | `structure_mining_shafts` | `direct_stronghold_mining_shafts__waterways___wayfinding____navigation_alternates` |
+| 39 | `structure_pipeline_array` | `direct_stronghold_pipeline_array__waterways___wayfinding____navigation_alternates` |
+| 40 | `structure_reactor_chamber` | `direct_stronghold_reactor_chamber__waterways___wayfinding____navigation_alternates` |
+| 41 | `structure_suspension_bridge` | `direct_stronghold_suspension_bridge__waterways___wayfinding____navigation_alternates` |
+| 42 | `structure_stepping_stones` | `direct_stronghold_stepping_stones__waterways___wayfinding____navigation_alternates` |
+| 43 | `structure_ramp_switchbacks` | `direct_stronghold_ramp_switchbacks__waterways___wayfinding____navigation_alternates` |
+| 44 | `structure_cliff_stairs` | `direct_stronghold_cliff_stairs__waterways___wayfinding____navigation_alternates` |
+| 45 | `structure_tunnel_bore` | `direct_stronghold_tunnel_bore__waterways___wayfinding____navigation_alternates` |
+| 46 | `structure_treetop_walks` | `direct_stronghold_treetop_walks__waterways___wayfinding____navigation_alternates` |
+| 47 | `structure_sky_platforms` | `direct_stronghold_sky_platforms__waterways___wayfinding____navigation_alternates` |
+| 48 | `structure_rope_bridge` | `direct_stronghold_rope_bridge__waterways___wayfinding____navigation_alternates` |
+| 49 | `structure_portal_plaza` | `direct_stronghold_portal_plaza__waterways___wayfinding____navigation_alternates` |
+| 50 | `structure_island_airfield` | `direct_stronghold_island_airfield__waterways___wayfinding____navigation_alternates` |
+
+## Nine spatial production treatments
+
+1. **waterways:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+2. **highlands:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+3. **fortified:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+4. **nightfall:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+5. **festival:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+6. **circuit:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+7. **secrets:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+8. **skyreach:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+9. **wilderness:** source-bound structure authoring changes, seeded according to the selected archetype; its geometry, actor poses, quest DAG branches or environmental page inputs remain editable. In this stronghold book, the `navigation_alternates` pass follows that transformation and adds further authored world/gameplay data.
+
+## Game-layer contracts and native acceptance
+
+### Game layer 1: `wayfinding`
+
+Purpose: Connect traversable central and secondary corridors. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Compass/fog proposals. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 2: `seasons`
+
+Purpose: Retile winter/spring bands and authored climate transition. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Ground ice / temperature lighting. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 3: `destructibles`
+
+Purpose: Lay breakable cover props as authored collision-adjacent tile masks. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Impact / structure-integrity action proposal. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 4: `weather`
+
+Purpose: Provide shelter and weather-appropriate routes. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Wind/rain weather transition. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 5: `combat`
+
+Purpose: Shape tactical engagement perimeter and cover. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Observed contact / party combat proposal. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 6: `commerce`
+
+Purpose: Write traffic and service lanes. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Reputation/progress merchant access. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 7: `stealth`
+
+Purpose: Build concealed alternate routes and cover. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Occlusion/daylight stealth flag. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 8: `verticality`
+
+Purpose: Write sky-platform ring and shift newly created cast altitude. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Updraft/altitude lift proposal. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+### Game layer 9: `migration`
+
+Purpose: Create wildlife corridors with new cast redistribution. Here in **stronghold**, the action first authors **fortified routes, garrisons, dungeons and defensive layouts** using an existing validated native world producer and the selected spatial treatment, then performs its own deterministic tile edit.
+
+Runtime reading: Humidity/habitat foliage response. The gameplay proposal uses two canonical sensors; no proposed action may be applied as an unauthorized state mutation. Native collision, UI feedback, NPC navigation and audio/video presentation require platform-specific execution evidence. The navigation_alternates overlay further creates **crossing corridors and alternate transit paths**. This establishes distinct source state even when the input game already has matching tiles.
+
+A test should compare the complete before/after source digest; inspect the actual tile region; then verify generated quests and actor poses where applicable. The native export should contain relevant changed layer/source files, while unrelated existing canon remains intact.
+
+
+## Representative distinct composed commands
+
+| # | Game production command | Visible, authored result |
+|---:|---|---|
+| 1 | `direct_stronghold_village_square__waterways___wayfinding____navigation_alternates` | Connect traversable central and secondary corridors; Compass/fog proposals |
+| 2 | `direct_stronghold_market_stalls__highlands___seasons____navigation_alternates` | Retile winter/spring bands and authored climate transition; Ground ice / temperature lighting |
+| 3 | `direct_stronghold_courtyard__fortified___destructibles____navigation_alternates` | Lay breakable cover props as authored collision-adjacent tile masks; Impact / structure-integrity action proposal |
+| 4 | `direct_stronghold_town_grid__nightfall___weather____navigation_alternates` | Provide shelter and weather-appropriate routes; Wind/rain weather transition |
+| 5 | `direct_stronghold_radial_city__festival___combat____navigation_alternates` | Shape tactical engagement perimeter and cover; Observed contact / party combat proposal |
+| 6 | `direct_stronghold_harbor_piers__circuit___commerce____navigation_alternates` | Write traffic and service lanes; Reputation/progress merchant access |
+| 7 | `direct_stronghold_farm_fields__secrets___stealth____navigation_alternates` | Build concealed alternate routes and cover; Occlusion/daylight stealth flag |
+| 8 | `direct_stronghold_orchard_rows__skyreach___verticality____navigation_alternates` | Write sky-platform ring and shift newly created cast altitude; Updraft/altitude lift proposal |
+| 9 | `direct_stronghold_house_cluster__wilderness___migration____navigation_alternates` | Create wildlife corridors with new cast redistribution; Humidity/habitat foliage response |
+
+## Source-to-native execution sequence
+
+1. Read the game-learning project's authorized revision and SHA-256; use the existing app's editor, not a parallel workspace.
+2. Inspect real map layers, palettes, prefab catalog, placed actor references and quest graph identifiers.
+3. Search `/api/game-frontier-authoring/recipes?generation=directed&domain=stronghold&director=navigation_alternates&offset=0&limit=32` for an exact enumerated command.
+4. Choose the native source producer, one of nine production treatments and one of ten game-system overlays.
+5. Supply finite, bounded parameters, a deterministic integer seed and a unique stable instance ID. Do not submit arbitrary code or nested tools.
+6. Execute the authoritative `edit_recipe` and `edit_expansion` source mutations under the existing typed Forge dispatcher.
+7. Construct this book's director tiles and event page using the ten fixed, server-defined direction algorithms.
+8. If new actors were produced, redirect **only those new instances**; do not overwrite the existing cast or its physics/index binding.
+9. If a new quest was produced, append a distinct reachable side stage with an owned story objective and valid termination.
+10. Recompute the complete source digest; on failure, abort the entire immutable batch and preserve the previous revision.
+11. Commit through the existing authenticated compare-and-set source owner; retain receipt hashes and stable chapter metadata.
+12. Export actual palette geometry, expedition traversal graph, source actors, native quests and observed environmental pages through the existing Godot source producer.
+13. Qualify at least one real native playthrough before calling the design release-ready.
+
+## Safety, long-run stability and IP ownership
+
+- Inspect path continuity and bridge approaches.
+- The authored RPG event is a typed proposal; no observed sensor reading, damage outcome, currency purchase, ability, music asset or approval is fabricated by the editor.
+- No existing actor or quest may silently change to make a new recipe fit; new story branches must be reachable and respect all source-stable IDs.
+- The catalog is **virtual** and indexed arithmetically; startup must not materialize 450,000 names. Discovery is paginated to at most 64 server-described results.
+- Projects keep an immutable source hash and authorized version. Repeated chapters use separate instance identifiers. Duplicate pages/quests are errors.
+- Native collision, real-time combat, animated environmental FX, spatial sound and device-specific memory performance require separate engine validation.
+- Original creative authorship is mandatory. Direct copyrighted art, sound, scenes or game assets may not be repurposed without the necessary rights.
+- Production progress must be recorded via source evidence and an actual transformed project. A registered command name alone does not prove playable gameplay.
+
+## Twenty measurable sign-off probes
+
+1. All 50 source archetypes resolve to real editable content.
+2. All nine spatial production treatments retain separate exact action names.
+3. All ten gameplay systems produce an accepted nonempty plan.
+4. This director appends an actual authored MapLayer edit.
+5. This director appends an actual typed RPGEventPage.
+6. Each event has two valid independent sensors and an allowed response.
+7. No sensor facts are synthesized by the authoring compiler.
+8. Original source digest differs from edited source digest.
+9. Identical inputs yield identical changed source digests.
+10. Unknown command names fail closed before mutation.
+11. Malformed instance identifiers fail closed before persistence.
+12. Two unique instances coexist without overriding event identifiers.
+13. Repeated used instance IDs return a collision error.
+14. Original actor IDs, poses and quest canon are preserved.
+15. Newly placed actors preserve their authored interaction event target.
+16. Newly authored quest side stages are reachable and terminal-safe.
+17. Typed source JSON survives save/load without changing its digest.
+18. Bounded search returns at most 64 records and stable offsets.
+19. Native Godot output reflects actual changed tiles and links.
+20. Real target-engine playthrough, security and IP rights are independently signed.
+
+## Completion boundary
+
+**Implemented:** source producer execution, ten-domain composition, nine treatment choices, ten gameplay layers and directed gameplay overlays, all within the original app. **Unverified until CI/native acceptance:** all target-device gameplay, 450,000 individual gameplay trials, combat/commerce runtime effects, animation/assets and multi-month endurance. See `docs/game_studio_50000/README.md` for the previous ten volumes and `skeleton/testing/test_game_frontier_studio_production_500000.py` for current source regression.

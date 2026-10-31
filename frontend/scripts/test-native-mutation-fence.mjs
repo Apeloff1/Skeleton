@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MAX_NATIVE_MUTATION_KEYS, NativeMutationFence } from '../utils/NativeMutationFence.ts';
+import { MAX_NATIVE_MUTATION_KEYS, NativeMutationFence } from '../src/utils/NativeMutationFence.ts';
 
 function deferred() {
   let resolve;
