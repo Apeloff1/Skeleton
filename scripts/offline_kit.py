@@ -260,6 +260,79 @@ def verify(root: str | Path) -> dict[str, object]:
     return data
 
 
+
+def _snapshot_wheels(kit: Path, manifest: dict[str, object], snapshot: Path) -> None:
+    """Copy only pinned wheel bytes into a private resolver input directory.
+
+    POSIX uses directory-relative nofollow descriptors. Other platforms
+    still verify every copied byte and reject visible symlinks.
+    """
+    expected = {
+        entry["path"][len("wheelhouse/"):]: entry
+        for entry in manifest["files"]
+        if entry["path"].startswith("wheelhouse/")
+    }
+    source_root = kit / "wheelhouse"
+    if source_root.is_symlink() or not source_root.is_dir() or not expected:
+        raise OfflineKitError("missing or unsafe offline wheelhouse")
+    directory_fd = None
+    try:
+        if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+            directory_fd = os.open(
+                source_root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+            )
+        names = sorted(os.listdir(
+            directory_fd if directory_fd is not None else source_root
+        ))
+        if set(names) != set(expected):
+            raise OfflineKitError("wheelhouse differs from pinned manifest")
+        snapshot.mkdir(mode=0o700)
+        for name in names:
+            if not _WHEEL.fullmatch(name):
+                raise OfflineKitError("invalid wheel filename")
+            if directory_fd is None:
+                source = source_root / name
+                if source.is_symlink():
+                    raise OfflineKitError("wheelhouse contains a symlink")
+                fd = os.open(source, os.O_RDONLY)
+            else:
+                fd = os.open(
+                    name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd,
+                )
+            with os.fdopen(fd, "rb") as reader:
+                before = os.fstat(reader.fileno())
+                if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                        or before.st_size != expected[name]["size_bytes"]):
+                    raise OfflineKitError("unsafe or changed pinned wheel")
+                digest = hashlib.sha256()
+                with (snapshot / name).open("xb") as writer:
+                    while True:
+                        chunk = reader.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        digest.update(chunk)
+                        writer.write(chunk)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                after = os.fstat(reader.fileno())
+                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns
+                        ) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                    raise OfflineKitError("wheel changed during private snapshot")
+                if digest.hexdigest() != expected[name]["sha256"]:
+                    raise OfflineKitError("private wheel snapshot digest mismatch")
+                if directory_fd is None and (source_root / name).is_symlink():
+                    raise OfflineKitError("wheel became a symlink during snapshot")
+        if set(os.listdir(
+            directory_fd if directory_fd is not None else source_root
+        )) != set(names):
+            raise OfflineKitError("wheelhouse changed during snapshot")
+    except OSError as exc:
+        raise OfflineKitError("unable to create verified private wheel snapshot") from exc
+    finally:
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
 def install(root: str | Path, destination: str | Path) -> Path:
     """Install into a new venv, rolling back incomplete local installations.
 
@@ -277,13 +350,6 @@ def install(root: str | Path, destination: str | Path) -> Path:
     if not target.parent.is_dir() or target == kit or kit in target.parents:
         raise OfflineKitError("install outside the verified bundle into an existing parent")
 
-    command = [
-        "-m", "pip", "--isolated", "install",
-        "--no-index", "--no-input", "--no-cache-dir",
-        "--disable-pip-version-check", "--only-binary=:all:",
-        "--find-links", str(kit / "wheelhouse"),
-        f"skeleton[local-inference]=={manifest['version']}",
-    ]
     # Isolation is enforced at the package resolver, not claimed as an OS
     # egress sandbox for arbitrary executable wheel-install hooks.
     env = dict(os.environ)
@@ -293,9 +359,21 @@ def install(root: str | Path, destination: str | Path) -> Path:
         "PYTHONNOUSERSITE": "1",
     })
     try:
-        venv.EnvBuilder(with_pip=True, clear=False).create(target)
-        python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        subprocess.run([str(python), *command], check=True, env=env, shell=False)
+        with tempfile.TemporaryDirectory(
+            prefix=".skeleton-wheels-", dir=target.parent,
+        ) as temporary:
+            snapshot = Path(temporary) / "wheelhouse"
+            _snapshot_wheels(kit, manifest, snapshot)
+            command = [
+                "-m", "pip", "--isolated", "install",
+                "--no-index", "--no-input", "--no-cache-dir",
+                "--disable-pip-version-check", "--only-binary=:all:",
+                "--find-links", str(snapshot),
+                f"skeleton[local-inference]=={manifest['version']}",
+            ]
+            venv.EnvBuilder(with_pip=True, clear=False).create(target)
+            python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            subprocess.run([str(python), *command], check=True, env=env, shell=False)
 
         # The verified source bundle must remain byte-identical while pip
         # resolves it. An altered wheel or model invalidates the installation.

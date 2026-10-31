@@ -1,0 +1,97 @@
+"""The offline installer must feed pip only independently pinned private wheel bytes."""
+from __future__ import annotations
+
+import hashlib
+import os
+from pathlib import Path
+
+import pytest
+
+from scripts import offline_kit
+
+
+def _kit(tmp_path: Path) -> tuple[Path, dict[str, object], Path]:
+    root = tmp_path / "kit"
+    wheels = root / "wheelhouse"
+    wheels.mkdir(parents=True)
+    wheel = wheels / "skeleton-1.0-py3-none-any.whl"
+    wheel.write_bytes(b"original pinned wheel bytes")
+    payload = wheel.read_bytes()
+    manifest = {
+        "version": "1.0",
+        "environment": offline_kit._environment(),
+        "gguf_included": False,
+        "files": [{
+            "path": "wheelhouse/" + wheel.name,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "size_bytes": len(payload),
+        }],
+    }
+    return root, manifest, wheel
+
+
+def test_private_snapshot_preserves_exact_pinned_wheel_bytes(tmp_path):
+    root, manifest, wheel = _kit(tmp_path)
+    snapshot = tmp_path / "private" / "wheelhouse"
+    snapshot.parent.mkdir()
+    offline_kit._snapshot_wheels(root, manifest, snapshot)
+    assert (snapshot / wheel.name).read_bytes() == wheel.read_bytes()
+    assert snapshot.stat().st_mode & 0o077 == 0
+
+
+def test_private_snapshot_rejects_changed_and_unlisted_wheels(tmp_path):
+    root, manifest, wheel = _kit(tmp_path)
+    wheel.write_bytes(b"modified wheel contents")
+    with pytest.raises(offline_kit.OfflineKitError, match="digest|changed"):
+        offline_kit._snapshot_wheels(root, manifest, tmp_path / "first")
+    wheel.write_bytes(b"original pinned wheel bytes")
+    (wheel.parent / "other-1.0-py3-none-any.whl").write_bytes(b"unexpected")
+    with pytest.raises(offline_kit.OfflineKitError, match="differs"):
+        offline_kit._snapshot_wheels(root, manifest, tmp_path / "second")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow and hardlink contract")
+def test_private_snapshot_rejects_symlink_and_hardlink_wheels(tmp_path):
+    root, manifest, wheel = _kit(tmp_path)
+    original = tmp_path / "outside.whl"
+    original.write_bytes(wheel.read_bytes())
+    wheel.unlink()
+    wheel.symlink_to(original)
+    with pytest.raises(offline_kit.OfflineKitError):
+        offline_kit._snapshot_wheels(root, manifest, tmp_path / "link")
+    wheel.unlink()
+    os.link(original, wheel)
+    with pytest.raises(offline_kit.OfflineKitError, match="unsafe"):
+        offline_kit._snapshot_wheels(root, manifest, tmp_path / "hardlink")
+
+
+def test_installer_resolves_only_private_snapshot_not_original_kit(tmp_path, monkeypatch):
+    root, manifest, wheel = _kit(tmp_path)
+    target = tmp_path / "installed"
+    seen = []
+
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+
+    def fake_create(self, destination):
+        executable = Path(destination) / (
+            "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        )
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"test python")
+
+    def fake_run(command, **kwargs):
+        assert kwargs["shell"] is False
+        assert "--no-index" in command and "--isolated" in command
+        directory = Path(command[command.index("--find-links") + 1])
+        assert directory != wheel.parent
+        wheel.write_bytes(b"attacker-modified original while pip is running")
+        assert (directory / wheel.name).read_bytes() == b"original pinned wheel bytes"
+        seen.append(directory)
+        return None
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fake_create)
+    monkeypatch.setattr(offline_kit.subprocess, "run", fake_run)
+    assert offline_kit.install(root, target) == target
+    assert len(seen) == 1
+    assert not seen[0].exists()
+    assert target.is_dir()
