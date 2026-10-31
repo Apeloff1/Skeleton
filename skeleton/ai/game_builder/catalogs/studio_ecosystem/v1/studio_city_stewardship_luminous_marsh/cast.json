@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_city_stewardship_luminous_marsh",
+  "genre": "city_stewardship",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Rika Rowan",
+    "role": "planner",
+    "skill": "district budgeting",
+    "objective": "repair shared urban infrastructure",
+    "weakness": "Personal responsibility for the bioluminescent flooding aftermath",
+    "development": "Shares ownership of the remedy with residents"
+  },
+  "support": [
+    {
+      "id": "guide",
+      "name": "Ari Yun",
+      "knows": "Safe routes through glowing reed fields",
+      "trust": "earned_by_documented_aid"
+    },
+    {
+      "id": "antagonist",
+      "name": "Tavi Talas",
+      "affiliation": "an exclusionary syndicate",
+      "agenda": "Privatize access to reeds and peat",
+      "trust": "conditional_on_public_agreement"
+    }
+  ],
+  "factions": [
+    {
+      "id": "settlers",
+      "objective": "public welfare",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "objective": "scarce resource security",
+      "reputation": 0
+    }
+  ],
+  "dialogue_branches": [
+    {
+      "choice": "disclose_proof",
+      "reputation_delta": {
+        "settlers": 2,
+        "claimants": -1
+      }
+    },
+    {
+      "choice": "exclusive_license",
+      "reputation_delta": {
+        "settlers": -2,
+        "claimants": 2
+      }
+    }
+  ],
+  "rights": "original_story_material_only"
+}
