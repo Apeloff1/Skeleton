@@ -76,6 +76,11 @@ class JeevesGameOrchestrator:
         from .studio_walk_tool import execute_canon_proof_tool
         return execute_canon_proof_tool(request, authorized=authorized)
 
+    def authoritative_canon_revision(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Preview source-leased authored prose edits with canonical compilation."""
+        from .studio_walk_tool import execute_author_revision_tool
+        return execute_author_revision_tool(request, authorized=authorized)
+
     def model_card(self) -> str:
         return (
             "Jeeves game orchestrator: one call produces unified brief, advanced systems, "

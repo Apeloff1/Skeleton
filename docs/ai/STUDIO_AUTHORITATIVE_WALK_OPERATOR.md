@@ -410,3 +410,21 @@ Jeeves exposes the same read-only operation through
 `studio_canon_proof` tool schema. Contradictions are explicit deterministic
 issue records; unproven ending predicates remain external evidence obligations,
 not earned rewards. No authoring audit certifies rights, native gameplay or release.
+
+
+### Source-leased original canon revisions (Studio A)
+
+The operator-authorized offline CLI supports original prose edits without
+mutating registered catalog sources. First obtain the source_digest from
+--project PROJECT --audit-canon. Then use --project PROJECT --author-revision
+--revision-request JSON --output NEW_DIRECTORY. The typed request contains
+schema=skeleton.game_builder.studio_author_revision_request.v1, project_id,
+expected_source_digest and edits (section/path/value records). The output
+directory must not exist. It receives source.json, canonical interactive
+story.html and receipt.json with exact base/revised digests and non-certification.
+
+Only bounded original narrative, cast and scene presentation text may change.
+Quest predicates, source IDs, runtime authority, release status and rights
+cannot be edited. The original catalog remains unchanged. Jeeves exposes
+studio_author_revision for the same typed, source-leased preview under operator
+authorization, but it never writes files on the model's behalf.

@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Search authored narrative/quest/asset/audio sections as well")
     ap.add_argument("--limit", type=int, default=20,
                     help="Maximum deterministic search results, 1..100")
+    ap.add_argument("--author-revision", action="store_true",
+                    help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--revision-request", metavar="JSON",
+                    help="Typed original-world revision with expected source digest")
     ap.add_argument("--audit-canon", action="store_true",
                     help="Audit original scene/era/cast continuity and ending obligations")
     ap.add_argument("--play-quest", action="store_true",
@@ -168,6 +172,46 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.author_revision:
+        if (not args.project or args.revision_request is None or args.output is None
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.compile_preview or args.materialize_batch
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--author-revision requires --project, --revision-request and new --output directory")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            MAX_REQUEST_BYTES, preview_canon_revision, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.revision_request.encode("utf-8", "strict")
+            if len(encoded) > MAX_REQUEST_BYTES:
+                raise StudioQuestError("authored revision request exceeds byte budget")
+            def unique(pairs):
+                obj = {}
+                for key, value in pairs:
+                    if key in obj:
+                        raise StudioQuestError("duplicate authored revision JSON key")
+                    obj[key] = value
+                return obj
+            request = json.loads(
+                encoded, object_pairs_hook=unique,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite authored revision JSON")),
+            )
+            source, html, receipt = preview_canon_revision(
+                read_blueprint(args.project), request, authorized=True,
+            )
+            write_revision_bundle(args.output, source, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"receipt": receipt, "output": str(args.output)},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.revision_request is not None:
+        ap.error("--revision-request requires --author-revision")
     if args.audit_canon:
         if (not args.project or args.play_walk or args.play_quest
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin

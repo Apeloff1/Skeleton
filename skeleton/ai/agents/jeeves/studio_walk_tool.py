@@ -390,3 +390,52 @@ def execute_canon_proof_tool(request: Mapping[str, Any], *,
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+AUTHOR_REVISION_REQUEST_SCHEMA = "skeleton.jeeves.studio_author_revision_request.v1"
+AUTHOR_REVISION_RESULT_SCHEMA = "skeleton.jeeves.studio_author_revision_result.v1"
+
+def author_revision_tool_schema() -> dict[str, object]:
+    """Typed operator-authorized prose editor preview; no model-owned file writes."""
+    return {
+        "name": "studio_author_revision",
+        "description": "Preview canon-safe original edits and compile an offline playable story",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": AUTHOR_REVISION_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                          "items": {"type": "object"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "edits"],
+        },
+    }
+
+def execute_author_revision_tool(request: Mapping[str, Any], *,
+                                 authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves authored revision requires operator authorization")
+    if (type(request) is not dict
+            or set(request) != {"schema", "project_id", "expected_source_digest", "edits"}
+            or request.get("schema") != AUTHOR_REVISION_REQUEST_SCHEMA):
+        raise StudioQuestError("invalid typed Jeeves authored revision request")
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+        REVISION_SCHEMA, preview_canon_revision,
+    )
+    source_request = dict(request)
+    source_request["schema"] = REVISION_SCHEMA
+    _, _, receipt = preview_canon_revision(
+        read_blueprint(request["project_id"]), source_request, authorized=True,
+    )
+    payload = {
+        "schema": AUTHOR_REVISION_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": receipt,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
