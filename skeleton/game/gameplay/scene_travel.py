@@ -343,6 +343,128 @@ def _json(text: str, label: str) -> Any:
         raise SceneTravelError(f"invalid {label} JSON") from exc
 
 
+def parse_player_command(line: str) -> dict[str, str]:
+    """Parse accessible local verbs or strict JSON without executing content."""
+    if type(line) is not str:
+        raise SceneTravelError("player command must be text")
+    try:
+        size = len(line.encode("utf-8"))
+    except UnicodeError as exc:
+        raise SceneTravelError("invalid player command encoding") from exc
+    if size > MAX_JSON_BYTES:
+        raise SceneTravelError("player command exceeds 128 KiB")
+    value = line.strip()
+    if value.startswith("{"):
+        return _action(_json(value, "player action"))
+    words = value.split()
+    if len(words) == 2 and words[0] in ("collect", "travel"):
+        field = "pickup_id" if words[0] == "collect" else "exit_id"
+        return _action({"kind": words[0], field: words[1]})
+    raise SceneTravelError("use collect PICKUP, travel EXIT or JSON")
+
+
+def _emit(writer: Any, payload: dict[str, Any]) -> None:
+    writer.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+    writer.flush()
+
+
+def _checkpoint(writer: Any, snapshot: dict[str, Any], reason: str) -> None:
+    _emit(writer, {
+        "event": "checkpoint", "reason": reason,
+        "source_digest": snapshot["source_digest"],
+        "state_digest": snapshot["state_digest"], "session": snapshot,
+    })
+
+
+def play_interactive(
+    world: Any = None, *,
+    session: Any = None,
+    expected_source_digest: str | None = None,
+    checkpoint_every: int = 8,
+    input_stream: Any = None,
+    output_stream: Any = None,
+) -> dict[str, Any]:
+    """Play an authored offline journey with verifiable resume checkpoints.
+
+    EOF and repeated invalid input fail closed after emitting the latest
+    valid checkpoint. The engine never reads or writes local files itself.
+    """
+    if (world is None) == (session is None):
+        raise SceneTravelError("supply exactly one authored world or saved session")
+    if type(checkpoint_every) is not int or not 1 <= checkpoint_every <= 64:
+        raise SceneTravelError("checkpoint interval outside 1..64")
+    snapshot = new_session(world) if session is None else verify_session(session)
+    if expected_source_digest is not None:
+        if (
+            type(expected_source_digest) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", expected_source_digest) is None
+            or snapshot["source_digest"] != expected_source_digest
+        ):
+            raise SceneTravelError("source does not match trusted digest")
+    reader = sys.stdin if input_stream is None else input_stream
+    writer = sys.stdout if output_stream is None else output_stream
+    _emit(writer, {
+        "event": "started", "source_digest": snapshot["source_digest"],
+        "state_digest": snapshot["state_digest"],
+        "scene_id": snapshot["state"]["scene_id"],
+    })
+    while snapshot["state"]["phase"] == "active":
+        scene = _scene(snapshot["world"], snapshot["state"]["scene_id"])
+        available = [
+            item for item in scene["pickups"]
+            if scene["id"] + ":" + item["id"] not in snapshot["state"]["collected"]
+        ]
+        _emit(writer, {
+            "event": "scene", "scene_id": scene["id"],
+            "tick": snapshot["state"]["tick"],
+            "exits": scene["exits"], "pickups": available,
+            "inventory": snapshot["state"]["inventory"],
+            "state_digest": snapshot["state_digest"],
+            "commands": ["collect PICKUP", "travel EXIT"],
+        })
+        for attempt in range(3):
+            line = reader.readline(MAX_JSON_BYTES + 1)
+            if not line:
+                _checkpoint(writer, snapshot, "input_eof")
+                raise SceneTravelError(
+                    "input ended before ending; verified checkpoint emitted"
+                )
+            try:
+                action = parse_player_command(line)
+                updated = _advance(snapshot, action)
+            except SceneTravelError as exc:
+                _emit(writer, {
+                    "event": "rejected", "error": str(exc),
+                    "remaining_retries": 2 - attempt,
+                })
+                if attempt == 2:
+                    _checkpoint(writer, snapshot, "invalid_commands")
+                    raise SceneTravelError(
+                        "three invalid commands; verified checkpoint emitted"
+                    ) from exc
+            else:
+                snapshot = updated
+                _emit(writer, {
+                    "event": "accepted", "action": action,
+                    "tick": snapshot["state"]["tick"],
+                    "state_digest": snapshot["state_digest"],
+                })
+                break
+        if (
+            snapshot["state"]["phase"] == "active"
+            and snapshot["state"]["tick"] % checkpoint_every == 0
+        ):
+            _checkpoint(writer, snapshot, "interval")
+    _checkpoint(writer, snapshot, "terminal")
+    _emit(writer, {
+        "event": "terminal", "phase": snapshot["state"]["phase"],
+        "ending": snapshot["state"]["ending"],
+        "scene_id": snapshot["state"]["scene_id"],
+        "state_digest": snapshot["state_digest"],
+    })
+    return snapshot
+
+
 def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton.game.gameplay.scene_travel",
@@ -357,8 +479,31 @@ def cli(argv: Sequence[str]) -> int:
     resume = sub.add_parser("resume")
     resume.add_argument("--session-json", required=True)
     resume.add_argument("--actions-json", required=True)
+    play = sub.add_parser("play")
+    source = play.add_mutually_exclusive_group(required=True)
+    source.add_argument("--demo", action="store_true")
+    source.add_argument("--world-json")
+    source.add_argument("--session-json")
+    play.add_argument("--source-digest")
+    play.add_argument("--checkpoint-every", type=int, default=8)
     args = parser.parse_args(list(argv))
     try:
+        if args.command == "play":
+            world = (
+                original_demo()[0] if args.demo else
+                _json(args.world_json, "world")
+                if args.world_json is not None else None
+            )
+            session = (
+                _json(args.session_json, "session")
+                if args.session_json is not None else None
+            )
+            play_interactive(
+                world, session=session,
+                expected_source_digest=args.source_digest,
+                checkpoint_every=args.checkpoint_every,
+            )
+            return 0
         if args.command == "demo":
             world, actions = original_demo()
             result = simulate(world, actions)
