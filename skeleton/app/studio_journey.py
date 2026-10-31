@@ -33,7 +33,7 @@ from skeleton.ai.game_builder.secure_export_publication import (
 )
 from skeleton.ai.game_builder.playable_compiler import PlayableCompilationError
 from skeleton.ai.game_builder.playable_simulation import GameplayError
-from skeleton.ai.game_builder.playable_world import PlayableWorldError
+from skeleton.ai.game_builder.playable_world import GameBuildIntent, PlayableWorldError
 from skeleton.ai.game_builder.mirror_room_runtime import MirrorRoomError
 from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
 
@@ -48,7 +48,7 @@ class FirstPlayableJourneyError(ValueError):
 
 
 def build_first_playable_journey(
-    intent_path: str | Path, destination: str | Path, *,
+    intent_path: str | Path | GameBuildIntent, destination: str | Path, *,
     authorized: bool, mirror_attempts: int = 64,
     practice_games: int = 0,
     receipt_destination: str | Path | None = None,
@@ -73,7 +73,8 @@ def build_first_playable_journey(
         preflight_receipt_destination(
             receipt_destination, protected_roots=(destination,), authorized=True,
         )
-    intent = _intent(_read_json(str(intent_path), MAX_INPUT_BYTES))
+    intent = (intent_path if isinstance(intent_path, GameBuildIntent)
+              else _intent(_read_json(str(intent_path), MAX_INPUT_BYTES)))
     run = run_original_game_studio(
         intent, authorized=True, mirror_attempts=mirror_attempts,
         companion_practice_games=practice_games,
@@ -220,6 +221,16 @@ def _parser() -> argparse.ArgumentParser:
         description="Build an original game, export browser/Godot source and replay-verify it offline.",
     )
     parser.add_argument("--intent", help="bounded original game intent JSON for new builds")
+    parser.add_argument("--onboard", action="store_true",
+                        help="build an original offline game from typed first-run CLI inputs")
+    parser.add_argument("--project-id", help="stable original game project ID for --onboard")
+    parser.add_argument("--title", help="original game title for --onboard")
+    parser.add_argument("--subtitle", help="original game subtitle for --onboard")
+    parser.add_argument("--seed", type=int, help="deterministic world seed for --onboard")
+    parser.add_argument("--theme", help="canonical original-game theme for --onboard")
+    parser.add_argument("--width", type=int, help="odd game width for --onboard")
+    parser.add_argument("--height", type=int, help="odd game height for --onboard")
+    parser.add_argument("--levels", type=int, help="level count for --onboard")
     parser.add_argument("--verify-existing", action="store_true",
                         help="read-only re-verification of an existing exported game")
     parser.add_argument("--inspect-receipt", action="store_true",
@@ -244,8 +255,13 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        onboarding_values = (
+            args.project_id, args.title, args.subtitle, args.seed,
+            args.theme, args.width, args.height, args.levels,
+        )
         if args.inspect_receipt:
-            if (args.verify_existing or args.output is not None
+            if (args.verify_existing or args.onboard or args.output is not None
+                    or any(value is not None for value in onboarding_values)
                     or args.intent is not None or args.expected_manifest_sha256 is not None
                     or args.receipt is None or args.expected_receipt_sha256 is None
                     or args.mirror_attempts != 64 or args.practice_games != 0):
@@ -255,7 +271,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.verify_existing:
-            if (args.output is None or args.intent is not None
+            if (args.output is None or args.intent is not None or args.onboard
+                    or any(value is not None for value in onboarding_values)
                     or args.expected_receipt_sha256 is not None
                     or args.mirror_attempts != 64 or args.practice_games != 0):
                 raise FirstPlayableJourneyError(
@@ -267,14 +284,38 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
         else:
-            if (args.output is None or args.intent is None
-                    or args.expected_manifest_sha256 is not None
+            if (args.output is None or args.expected_manifest_sha256 is not None
                     or args.expected_receipt_sha256 is not None):
                 raise FirstPlayableJourneyError(
-                    "new game builds require --intent and --output and reject verification pins"
+                    "new game builds require --output and reject verification pins"
                 )
+            if args.onboard:
+                if (args.intent is not None or args.project_id is None
+                        or args.title is None or args.seed is None):
+                    raise FirstPlayableJourneyError(
+                        "onboarding requires --project-id, --title, --seed and no --intent"
+                    )
+                source_intent = GameBuildIntent(
+                    project_id=args.project_id, title=args.title,
+                    subtitle=(args.subtitle if args.subtitle is not None
+                              else "An original offline adventure"),
+                    seed=args.seed,
+                    theme=args.theme if args.theme is not None else "forest",
+                    width=args.width if args.width is not None else 9,
+                    height=args.height if args.height is not None else 9,
+                    levels=args.levels if args.levels is not None else 1,
+                    collectibles_per_level=1, hazards_per_level=0,
+                    starting_health=3,
+                )
+            else:
+                if (args.intent is None
+                        or any(value is not None for value in onboarding_values)):
+                    raise FirstPlayableJourneyError(
+                        "JSON builds require --intent and reject onboarding options"
+                    )
+                source_intent = args.intent
             receipt = build_first_playable_journey(
-                args.intent, args.output,
+                source_intent, args.output,
                 authorized=args.trusted_local_operator,
                 mirror_attempts=args.mirror_attempts,
                 practice_games=args.practice_games,

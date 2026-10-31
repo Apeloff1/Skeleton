@@ -109,3 +109,24 @@ the independent SHA-256 and schema, and reports receipt integrity without
 opening or executing the game. A historical replay record is not proof of
 present gameplay, native hardware, legal rights, or release qualification.
 The inspection mode rejects build/verify options and never writes a receipt.
+
+## First-run offline game onboarding
+
+Operators no longer need to hand-author JSON to create their first original
+playable game. The app validates a typed canonical intent in memory, compiles
+and adversarially reviews the original game, exports browser/Godot source
+without clobbering files, then reexecutes the winning trace from disk:
+
+```sh
+python -m skeleton app studio-journey --onboard \
+  --project-id my-first-original-game --title "Moonlit Compass" \
+  --seed 1729 --output ./first-original-game \
+  --receipt ./private-first-replay.json --trusted-local-operator
+```
+
+Optional `--subtitle`, `--theme`, `--width`, `--height`, and `--levels`
+are validated by the canonical `GameBuildIntent` contract; defaults use a
+small, offline-friendly one-level puzzle. The same first-run security and
+verification pipeline is used as JSON-based builds. This is deterministic
+source authoring, **not** evidence that a model was invoked or that a consumer
+device, native Godot binary, rights, or release were qualified.

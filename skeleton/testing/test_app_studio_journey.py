@@ -349,3 +349,60 @@ def test_app_archived_receipt_rejects_bad_pin_authority_and_mode_mix(tmp_path, c
         assert run_app_cli(["studio-journey", *args]) == 2
         assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert (output / "release.json").is_file()
+
+def test_first_run_onboarding_builds_original_game_without_intent_file(tmp_path, capsys):
+    output = tmp_path / "first-game"
+    receipt = tmp_path / "first-game-receipt.json"
+    assert run_app_cli([
+        "studio-journey", "--onboard", "--project-id", "new-original-001",
+        "--title", "Moonlit Compass", "--seed", "1729",
+        "--output", str(output), "--receipt", str(receipt),
+        "--trusted-local-operator",
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["project_id"] == "new-original-001"
+    assert result["offline_gameplay_reexecuted"] is True
+    assert result["native_device_qualified"] is False
+    assert result["model_inference_observed"] is False
+    assert result["release_certified"] is False
+    assert (output / "index.html").is_file()
+    assert (output / "godot" / "project.godot").is_file()
+    assert receipt.is_file()
+
+
+@pytest.mark.parametrize("args", [
+    ["--onboard", "--project-id", "bad id", "--title", "Original", "--seed", "7"],
+    ["--onboard", "--project-id", "safe", "--title", "Original",
+     "--seed", "7", "--width", "10"],
+    ["--onboard", "--project-id", "safe", "--title", "Original",
+     "--seed", "-1"],
+    ["--onboard", "--project-id", "safe", "--title", "Original",
+     "--seed", "7", "--theme", "unapproved"],
+    ["--onboard", "--project-id", "safe", "--title", "Original"],
+])
+def test_first_run_onboarding_rejects_invalid_input_before_export(
+    tmp_path, capsys, args,
+):
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", *args, "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert not output.exists()
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_onboarding_rejects_unauthorized_or_ambiguous_modes(tmp_path, capsys):
+    output = tmp_path / "game"
+    source = _intent(tmp_path)
+    base = [
+        "studio-journey", "--onboard", "--project-id", "original",
+        "--title", "Original", "--seed", "9", "--output", str(output),
+    ]
+    assert run_app_cli(base) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert run_app_cli(base + [
+        "--intent", str(source), "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()
