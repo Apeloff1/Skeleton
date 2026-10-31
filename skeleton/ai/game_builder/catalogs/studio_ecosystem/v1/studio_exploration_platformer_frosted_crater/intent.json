@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_frosted_crater",
+  "title": "Frosted Crater: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610301127,
+  "width": 23,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_luminous_marsh",
+  "title": "Luminous Marsh: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610301076,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 6
+}

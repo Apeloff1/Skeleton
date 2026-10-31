@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_salt_dunes",
+  "title": "Salt Dunes: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610301144,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 6
+}
