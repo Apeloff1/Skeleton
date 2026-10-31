@@ -152,3 +152,11 @@ def test_cli_rejects_invalid_json_and_untrusted_actions(capsys) -> None:
         "--actions-json", json.dumps([{"kind": "script"}]),
     ]) == 2
     assert json.loads(capsys.readouterr().err)["ok"] is False
+
+
+def test_installed_skeleton_scene_cli(capsys) -> None:
+    from skeleton.__main__ import main
+    assert main(["scene-travel", "demo"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["state"]["phase"] == "won"
+    assert verify_session(result)["state"]["scene_id"] == "sanctuary"
