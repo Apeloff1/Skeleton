@@ -79,3 +79,60 @@ def test_canonical_parent_directory_symlink_fails_closed(tmp_path: Path) -> None
     result = check_parity(tmp_path)
     assert result["status"] == "blocked"
     assert all(item["status"] == "symlink" for item in result["files"])
+
+
+def test_file_swap_to_symlink_at_open_boundary_is_rejected(tmp_path: Path, monkeypatch) -> None:
+    """A path swapped immediately before open cannot redirect the read."""
+    import os
+    import scripts.check_jeeves_agent_mirror as parity
+
+    _fixture(tmp_path)
+    original = tmp_path / CANONICAL / REQUIRED[0]
+    mirror = tmp_path / MIRROR / REQUIRED[0]
+    real_open = os.open
+    swapped = False
+
+    def swap_at_open(path, flags, *args, **kwargs):
+        nonlocal swapped
+        if not swapped and path == REQUIRED[0] and kwargs.get("dir_fd") is not None:
+            swapped = True
+            original.unlink()
+            original.symlink_to(mirror)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(parity.os, "open", swap_at_open)
+    result = check_parity(tmp_path)
+    assert swapped
+    assert result["status"] == "blocked"
+    assert result["files"][0]["status"] == "symlink"
+
+
+def test_nonregular_fifo_is_rejected_without_blocking(tmp_path: Path) -> None:
+    import os
+
+    _fixture(tmp_path)
+    target = tmp_path / CANONICAL / REQUIRED[0]
+    target.unlink()
+    os.mkfifo(target)
+    result = check_parity(tmp_path)
+    assert result["status"] == "blocked"
+    assert result["files"][0]["status"] == "unsafe"
+
+
+def test_oversized_source_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    import scripts.check_jeeves_agent_mirror as parity
+
+    _fixture(tmp_path)
+    monkeypatch.setattr(parity, "MAX_SOURCE_BYTES", 8)
+    result = check_parity(tmp_path)
+    assert result["status"] == "blocked"
+    assert result["files"][0]["status"] == "unsafe"
+
+
+def test_symlinked_root_is_rejected(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    alias = tmp_path.parent / (tmp_path.name + "-alias")
+    alias.symlink_to(tmp_path, target_is_directory=True)
+    result = check_parity(alias)
+    assert result["status"] == "blocked"
+    assert all(item["status"] == "symlink" for item in result["files"])
