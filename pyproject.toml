@@ -17,6 +17,7 @@ testpaths = [
     "tests/game_builder",
     "tests/gate_plane_core_mount",
     "tests/gate_plane_hooks_wire",
+    "tests/gate_plane_s2s_auth",
     "tests/perf_profiler",
     "tests/test_api_v1_reference_drift.py",
     "tests/test_architecture_current_docs_refs.py",
