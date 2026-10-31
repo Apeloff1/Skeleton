@@ -111,3 +111,13 @@ def test_unobserved_success_cannot_reset_guard_to_available():
     assert guard.status().stopped
     with pytest.raises(NativePressureInterrupted, match="not available"):
         guard.start(P)
+
+
+def test_one_callback_is_not_proof_of_postflight_and_model_probes(monkeypatch):
+    probe(monkeypatch, [budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    interrupt = guard.start(P)
+    interrupt()
+    with pytest.raises(NativePressureInterrupted, match="unverified"):
+        guard.finish(success=True)
+    assert guard.status().stopped

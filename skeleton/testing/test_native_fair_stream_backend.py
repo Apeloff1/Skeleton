@@ -240,3 +240,39 @@ def test_postflight_pressure_hold_fences_attested_native_output(monkeypatch):
     assert guard.status().stopped
     assert guard.status().samples == 2
     assert registry.status()["consumed_or_revoked"] == 1
+
+
+def test_forged_native_output_digest_never_reaches_result_vault(monkeypatch):
+    """Result bytes must match the signed native output trajectory."""
+    from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
+    from skeleton.ai.model_runtime.fair_stream_queue import MeasuredStreamBudget
+    from skeleton.ai.model_runtime.native_token_pressure import NativeTokenPressureGuard
+    from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
+
+    runtime, registry, _ = setup()
+    original = runtime.generate("hello", GenerationConfig(max_new_tokens=2))
+    forged = replace(original, text=original.text + "forged")
+
+    def sample(self, *, token_budget, storage_path):
+        return MeasuredStreamBudget(
+            available_ram_bytes=4096, reserved_ram_bytes=0,
+            token_budget=token_budget, stream_slots=1,
+            pressure_ppm=0, thermal_hold=False, measurement="os_probe",
+        ), {
+            "measurement": "os_probe", "gpu_device_qualified": False,
+            "physical_memory_reserved": False,
+            "auxiliary_telemetry_incomplete": True,
+        }
+
+    def tampered(self, sequence, config, *, interrupt=None):
+        interrupt()
+        return forged
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", tampered)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    backend = NativeFairStreamBackend(runtime, registry, pressure_guard=guard)
+    with pytest.raises(NativeFairStreamDenied, match="attestation mismatch"):
+        backend.generate(permit(), state())
+    assert guard.status().stopped
+    assert registry.status()["consumed_or_revoked"] == 1

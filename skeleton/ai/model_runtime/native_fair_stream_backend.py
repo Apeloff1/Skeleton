@@ -14,6 +14,7 @@ from threading import RLock
 from typing import Mapping
 
 from .fair_stream_result_vault import MAX_RESULT_BYTES
+from .flgb_model_runtime import digest_json
 from .fair_stream_session import DispatchPermit
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig
@@ -293,14 +294,34 @@ class NativeFairStreamBackend:
                     if type(result) is not GenerationResult:
                         raise NativeFairStreamDenied("untrusted native generation result")
                     receipt = result.replay_receipt
-                    if (receipt.model_digest != model
-                            or receipt.tokenizer_digest != tokenizer
-                            or receipt.device_digest != self.runtime.device.digest
-                            or result.prompt_sequence.token_ids != sequence.token_ids
+                    if (type(result.text) is not str
+                            or type(result.finish_reason) is not str
+                            or type(result.generated_ids) is not tuple
+                            or any(type(token_id) is not int
+                                   or not 0 <= token_id < self.runtime.tokenizer.vocab_size
+                                   for token_id in result.generated_ids)
                             or type(result.usage.generated_tokens) is not int
                             or result.usage.generated_tokens != len(result.generated_ids)
                             or result.usage.generated_tokens > permit.tokens
-                            or type(result.text) is not str):
+                            or result.usage.prompt_tokens != len(sequence.token_ids)
+                            or result.usage.total_tokens != (
+                                len(sequence.token_ids) + len(result.generated_ids)
+                            )
+                            or receipt.model_digest != model
+                            or receipt.tokenizer_digest != tokenizer
+                            or receipt.architecture_digest != self.runtime.architecture.digest
+                            or receipt.device_digest != self.runtime.device.digest
+                            or receipt.config_digest != self.runtime._config_digest(config)
+                            or receipt.request_digest != self.runtime._request_digest(
+                                sequence, config,
+                            )
+                            or receipt.seed != config.seed
+                            or receipt.output_digest != digest_json({
+                                "generated_ids": list(result.generated_ids),
+                                "text": result.text,
+                                "finish_reason": result.finish_reason,
+                            })
+                            or result.prompt_sequence.token_ids != sequence.token_ids):
                         raise NativeFairStreamDenied("native output attestation mismatch")
                     try:
                         output = result.text.encode("utf-8", errors="strict")

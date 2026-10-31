@@ -105,10 +105,10 @@ class NativeTokenPressureGuard:
         with self._lock:
             if type(success) is not bool:
                 raise ValueError("explicit completion outcome required")
-            # A success with zero callbacks or an already tripped guard
+            # A success without a model callback AND postflight probe, or a tripped guard
             # cannot be promoted to a reusable CPU execution permit.
             if success and (
-                self._active is None or self._samples == 0 or self._stopped
+                self._active is None or self._samples < 2 or self._stopped
             ):
                 self._active = None
                 self._stopped = True
