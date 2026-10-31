@@ -10,9 +10,10 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
 
 from skeleton.ai.model_runtime import LongContextSpool
+from skeleton.cortex.transformer import TinyTransformer
+from skeleton.ai.model_runtime.tokenization import NativeTokenizer
 from skeleton.ai.model_runtime.flgb_model_runtime import TokenSequence
 from skeleton.ai.model_runtime.long_context_cli import main as cli_main
 from skeleton.ai.model_runtime.long_context_spool import LongContextSpoolError
@@ -32,6 +33,23 @@ class TestLongContextSpool(unittest.TestCase):
 
     def stage(self):
         return self.spool.stage(self.sequence)
+
+    def test_canonical_native_tokenizer_can_stage_and_resume(self):
+        model = TinyTransformer(
+            vocab=("hello", "world"), dim=8, ctx=8, seed=7,
+            n_heads=2, n_layers=2, d_ff=16,
+        )
+        tokenizer = NativeTokenizer(model)
+        checkpoint = tokenizer.stage_text("hello world", self.spool)
+        receipt, sequence = self.spool.load(
+            checkpoint, expected_tokenizer_digest=tokenizer.digest,
+        )
+        self.assertEqual(receipt.sequence_digest, sequence.digest)
+        self.assertEqual(sequence, tokenizer.encode_sequence("hello world"))
+        self.assertEqual(self.spool.next_window(
+            checkpoint, expected_tokenizer_digest=tokenizer.digest,
+            max_tokens=8,
+        ).token_ids, sequence.token_ids)
 
     def test_stage_and_resume_across_process_object(self):
         start = self.stage()
