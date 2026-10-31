@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
+from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.native_game_cli import build_game
 
 
@@ -70,7 +72,24 @@ def test_native_game_cli_produces_real_source_for_target_without_shell(tmp_path,
     assert result["rights_independently_verified"] is False
     assert len(result["winning_replay_digest"]) == 64
     assert result["source_kind"].startswith("native_")
-    assert {p.name for p in output.iterdir()} == files
+    # Every exported source now includes an integrity attestation. Verify its
+    # binding rather than silently excluding it from the expected file set.
+    assert {p.name for p in output.iterdir()} == files | {"source_attestation.json"}
+    attestation = json.loads((output / "source_attestation.json").read_text())
+    assert attestation["schema"] == "skeleton.game_builder.source_attestation.v1"
+    assert attestation["target"] == target
+    assert attestation["project_id"] == "fully-original"
+    assert attestation["world_digest"] == result["world_digest"]
+    assert attestation["reference_replay_digest"] == result["winning_replay_digest"]
+    assert attestation["source_content_digest"] == result["source_content_digest"]
+    assert attestation["rights_independently_verified"] is False
+    assert attestation["binary_compiled"] is False
+    for name, digest in attestation["input_files"].items():
+        assert name in files
+        assert sha256((output / name).read_bytes()).hexdigest() == digest
+    assert attestation["attestation_digest"] == canonical_digest(
+        {key: value for key, value in attestation.items() if key != "attestation_digest"}
+    )
     assert json.loads((output / "manifest.json").read_text())["world_digest"] == result["world_digest"]
     with pytest.raises(FileExistsError):
         build_game(

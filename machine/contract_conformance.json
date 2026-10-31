@@ -511,6 +511,153 @@
       ],
       "consumer_derivation": "capability_interface_incoming_edges",
       "override_rationale": null
+    },
+    {
+      "contract": "AIWorkflowCatalogEnvelope",
+      "schema_version": 1,
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "AIWorkflowTemplate",
+      "schema_version": 1,
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "GalaxyArtifactExecutionObservation",
+      "schema_version": 1,
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "LocalInferenceExecutionContract",
+      "schema_version": 1,
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "MaintenanceReadOnlyInspection",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeLearningCheckpointControl",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeLearningDatasetEnvelope",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeLearningDatasetExport",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeLearningExplanation",
+      "schema_version": 1,
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeMaintenanceCircuitReset",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeMaintenanceRetry",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "RuntimeOptimizationPolicyPatch",
+      "schema_version": 1,
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
     }
   ],
   "vectors": [
@@ -545,7 +692,7 @@
     {
       "id": "JSON-UNICODE-ROUNDTRIP",
       "kind": "raw_json",
-      "payload": "{\"text\":\"\u00c5ngstr\u00f6m \u2014 \u6771\u4eac \u2014 \ud83d\ude00\"}",
+      "payload": "{\"text\":\"Ångström — 東京 — 😀\"}",
       "expected": "accept",
       "reason": "UTF-8 Unicode round-trips without authority changes"
     },

@@ -439,10 +439,13 @@ def test_gameforge_lane_collects_the_studio_suite():
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     start = workflow.index('name: "Skeleton GameForge"')
     job = workflow[start:workflow.index('name: "Java Batch Accelerators"', start)]
-    listed = job.index("skeleton/testing/test_game_studio_swarm.py")
-    godot = job.index("Install Godot 4.4.1")
-    booted = job.index("skeleton/testing/test_game_studio_swarm.py", godot)
-    assert listed < godot < booted
+    # Studio integration runs in this required lane before generated Godot
+    # sources are materialised and checked. Native headless execution is
+    # independently exercised by the Game Frontier focused workflow.
+    suite = job.index("python -m pytest -q skeleton/testing/test_game_studio_swarm.py")
+    materialise = job.index("python scripts/gameforge_materialise_smoke.py")
+    tree_check = job.index("python scripts/check_godot_tree.py")
+    assert suite < materialise < tree_check
 
 
 def test_fast_benchmark_scores_studio_against_the_bare_builder(tmp_path: Path):

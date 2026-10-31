@@ -119,12 +119,12 @@ def test_admit_write_audit_locks_mutating_methods(monkeypatch) -> None:
     payload = admit_write_audit_snapshot()
     assert payload["mutating"] == ["POST", "PUT", "PATCH", "DELETE"]
     assert payload["uncovered_mutating_live"] == []
-    assert payload["unused_mutating_methods"] == ["PATCH"]
+    assert payload["unused_mutating_methods"] == []
     rows = {row["method"]: row for row in payload["methods"]}
     assert rows["POST"]["mutating"] is True
     assert rows["POST"]["live_count"] > 0
     assert rows["GET"]["mutating"] is False
-    assert rows["PATCH"]["live_count"] == 0
+    assert rows["PATCH"]["live_count"] > 0
 
 
 def test_gate_limit_audit_locks_body_and_header_names(monkeypatch) -> None:
