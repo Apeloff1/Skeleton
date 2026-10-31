@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-from typing import Any, Mapping, Sequence
+from typing import Sequence
 
 from .flgb_gameplay_runtime import GameplayContractError, EconomyRule, req_id, req_digest
 
