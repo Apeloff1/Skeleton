@@ -308,13 +308,17 @@ class RequestSealMiddleware:
         *,
         policy: Optional[GatePolicy] = None,
         replay_cache: Any = None,
+        nonce_store: Any = None,
     ) -> None:
         from skeleton.api.hmac_seal import InMemoryReplayCache
+        from skeleton.api.nonce_store import InMemoryNonceStore
 
         self.app = app
         self.policy = policy or GatePolicy()
         # Seal v2 nonce store (pluggable port; in-memory per process by default).
         self.replay_cache = replay_cache if replay_cache is not None else InMemoryReplayCache()
+        # Seal v3 nonce store (skeleton.api.nonce_store.NonceStore port, scope "seal").
+        self.nonce_store = nonce_store if nonce_store is not None else InMemoryNonceStore()
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -355,19 +359,68 @@ class RequestSealMiddleware:
             resp = _json_response(503, {"error": "seal_unavailable"})
             await resp(scope, receive, send_with_seal)
             return
+        raw_seal = request.headers.get("x-gf-seal")
+        seal_request = None
+        downstream_receive = receive
+        if isinstance(raw_seal, str) and raw_seal.startswith("v3."):
+            # Request-bound seal: hash the exact body, then replay it downstream.
+            from skeleton.api.hmac_seal import MAX_SEALED_BODY_BYTES, TENANT_HEADER, SealRequest
+
+            tenants = request.headers.getlist(TENANT_HEADER)
+            body_chunks = []
+            total = 0
+            too_big = len(tenants) > 1
+            while not too_big:
+                message = await receive()
+                if message["type"] != "http.request":
+                    break
+                chunk = message.get("body") or b""
+                total += len(chunk)
+                if total > MAX_SEALED_BODY_BYTES:
+                    too_big = True
+                    break
+                body_chunks.append(chunk)
+                if not message.get("more_body", False):
+                    break
+            if too_big:
+                resp = _json_response(401, {"error": "invalid_seal"})
+                await resp(scope, receive, send_with_seal)
+                return
+            body = b"".join(body_chunks)
+            seal_request = SealRequest(
+                scope.get("method", ""),
+                path,
+                (scope.get("query_string") or b"").decode("latin-1"),
+                body,
+                tenants[0] if tenants else None,
+            )
+            replayed = False
+
+            async def downstream_receive():
+                nonlocal replayed
+                if not replayed:
+                    replayed = True
+                    return {"type": "http.request", "body": body, "more_body": False}
+                return await receive()
+
         try:
             attester = verify_seal(
-                request.headers.get("x-gf-seal"),
+                raw_seal,
                 domain=self.policy.required_domain(path),
                 replay_cache=self.replay_cache,
                 enforce_domain=True,
+                request=seal_request,
+                nonce_store=self.nonce_store,
             )
         except AuthError:
             resp = _json_response(401, {"error": "invalid_seal"})
             await resp(scope, receive, send_with_seal)
             return
         request.state.attester = attester
-        await self.app(scope, receive, send_with_seal)
+        if seal_request is not None:
+            request.state.seal_v3_header = raw_seal
+            request.state.seal_tenant = seal_request.tenant
+        await self.app(scope, downstream_receive, send_with_seal)
 
 
 class _BodyLimitExceeded(Exception):

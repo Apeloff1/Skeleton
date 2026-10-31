@@ -18,6 +18,10 @@ Secrets:
         v2.{principal}.{attester}.{domain}.{unix_expiry}.{nonce}.{hex_hmac_sha256(canonical, key)}
         canonical = "gf-seal/v2\n{principal}\n{attester}\n{domain}\n{unix_expiry}\n{nonce}"
 
+    v3 request-bound + nonce + skew window (Jenkins #4594 follow-up)::
+        v3.{principal}.{attester}.{domain}.{tenant}.{unix_ts}.{nonce}.{hex_hmac_sha256(canonical, key)}
+        canonical = "gf-seal/v3\n{METHOD}\n{path}\n{query}\n{sha256(body)}\n{principal}\n{attester}\n{domain}\n{tenant}\n{unix_ts}\n{nonce}"
+
 Empty/missing keyring+secret → fail closed (503).
 Missing/malformed/expired/bad signature → 401 AuthError (opaque).
 v2: domain mismatch / replayed nonce → 401 AuthError (opaque).
@@ -36,7 +40,7 @@ import threading
 import time
 from typing import Dict, FrozenSet, List, Optional, Protocol, Tuple
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 from skeleton.api.middleware import AuthError
 
@@ -340,6 +344,9 @@ def verify_seal(
     replay_cache: Optional[ReplayCache] = None,
     legacy: Optional[str] = None,
     enforce_domain: bool = False,
+    request: Optional["SealRequest"] = None,
+    skew_secs: Optional[int] = None,
+    nonce_store: Optional[object] = None,
 ) -> str:
     """Verify seal header; return attester. Raises AuthError on any auth failure.
 
@@ -361,6 +368,18 @@ def verify_seal(
 
     ts = int(now if now is not None else time.time())
 
+    if raw_header.startswith(V3_PREFIX):
+        if enforce_domain and not domain:
+            raise AuthError(_OPAQUE)
+        return _verify_v3(
+            raw_header,
+            ring,
+            ts=ts,
+            expected_domain=domain if enforce_domain else (domain or None),
+            nonce_store=nonce_store,
+            request=request,
+            skew_secs=SEAL_SKEW_SECS if skew_secs is None else skew_secs,
+        )
     if raw_header.startswith(V2_PREFIX):
         if enforce_domain and not domain:
             raise AuthError(_OPAQUE)  # unchartered path: a v2 seal binds nothing here
@@ -433,10 +452,23 @@ def verify_seal(
 
 def require_seal(
     x_gf_seal: Optional[str] = Header(default=None, alias="x-gf-seal"),
+    request: Request = None,  # type: ignore[assignment]  # injected by FastAPI
 ) -> str:
-    """FastAPI dependency: gate mutate routes on a valid ``x-gf-seal``."""
+    """FastAPI dependency: gate mutate routes on a valid ``x-gf-seal``.
+
+    v3 (request-bound) seals can only be checked against the full request, which
+    ``RequestSealMiddleware`` does; here a v3 seal is accepted only if the
+    middleware already verified this exact header on this request.
+    """
     if not load_keyring():
         raise HTTPException(status_code=503, detail="seal unavailable")
+    if isinstance(x_gf_seal, str) and x_gf_seal.startswith(V3_PREFIX):
+        state = getattr(request, "state", None) if request is not None else None
+        verified = getattr(state, "seal_v3_header", None) if state is not None else None
+        attester = getattr(state, "attester", None) if state is not None else None
+        if verified and attester and hmac.compare_digest(verified, x_gf_seal):
+            return attester
+        raise AuthError(_OPAQUE)
     return verify_seal(x_gf_seal)
 
 
@@ -469,3 +501,170 @@ class HMACSeal:
 
     def stats(self) -> dict:
         return {"algorithm": "HMAC-SHA256", "version": "v1", "forge_seal": "attester|principal"}
+
+
+# ---------------------------------------------------------------------------
+# v3: request-bound seal (method, path, query, body hash, tenant, timestamp)
+# ---------------------------------------------------------------------------
+
+V3_PREFIX = "v3."
+V3_CANONICAL_TAG = "gf-seal/v3"
+#: Accept a v3 seal only when ``|now - unix_ts| <= SEAL_SKEW_SECS``.
+SEAL_SKEW_SECS = 300
+MAX_SEAL_SKEW_SECS = 3600
+#: Tenant field value meaning "no tenant" (request must then carry no tenant header).
+NO_TENANT = "-"
+TENANT_HEADER = "x-gf-tenant"
+#: Largest body RequestSealMiddleware buffers to hash for a v3 seal.
+MAX_SEALED_BODY_BYTES = 8 * 1024 * 1024
+#: ``NonceStore`` scope for v3 seal nonces.
+NONCE_SCOPE = "seal"
+_V3_TENANT_RE = re.compile(r"^(?:-|[A-Za-z0-9_:-]{1,128})$")
+_V3_METHOD_RE = re.compile(r"^[A-Z]{1,16}$")
+_UNRESERVED = "-._~"
+
+
+class SealRequest:
+    """The request facts a v3 seal binds (immutable value object)."""
+
+    __slots__ = ("method", "path", "query", "body_sha256", "tenant")
+
+    def __init__(self, method: str, path: str, query: str, body: bytes, tenant: Optional[str]) -> None:
+        self.method = (method or "").upper()
+        self.path = canonical_path(path)
+        self.query = canonical_query(query)
+        self.body_sha256 = hashlib.sha256(body or b"").hexdigest()
+        self.tenant = tenant if tenant else NO_TENANT
+
+
+def canonical_path(path: str) -> str:
+    """Percent-decode once, then re-encode everything but unreserved and ``/``."""
+    from urllib.parse import quote, unquote
+
+    raw = path or "/"
+    return quote(unquote(raw), safe="/" + _UNRESERVED)
+
+
+def canonical_query(query: str) -> str:
+    """Sorted ``k=v`` pairs (blank values kept), RFC 3986 encoded, ``&``-joined."""
+    from urllib.parse import parse_qsl, quote
+
+    if not query:
+        return ""
+    pairs = parse_qsl(query, keep_blank_values=True, strict_parsing=False)
+    enc = sorted((quote(k, safe=_UNRESERVED), quote(v, safe=_UNRESERVED)) for k, v in pairs)
+    return "&".join(f"{k}={v}" for k, v in enc)
+
+
+def v3_canonical(
+    req: SealRequest, principal: str, attester: str, domain: str, tenant: str, ts: int, nonce: str
+) -> bytes:
+    return "\n".join(
+        (
+            V3_CANONICAL_TAG,
+            req.method,
+            req.path,
+            req.query,
+            req.body_sha256,
+            principal,
+            attester,
+            domain,
+            tenant,
+            str(ts),
+            nonce,
+        )
+    ).encode("utf-8")
+
+
+def mint_seal_v3(
+    attester: str,
+    domain: str,
+    *,
+    method: str,
+    path: str,
+    query: str = "",
+    body: bytes = b"",
+    tenant: Optional[str] = None,
+    secret: Optional[str] = None,
+    principal: Optional[str] = None,
+    now: Optional[float] = None,
+    nonce: Optional[str] = None,
+) -> Optional[str]:
+    """Mint a single-use, request-bound v3 seal. ``None`` if no key configured."""
+    principal = principal or attester
+    nonce = nonce or new_nonce()
+    tenant_f = tenant if tenant else NO_TENANT
+    for value in (principal, attester, domain):
+        if not isinstance(value, str) or not _V2_FIELD_RE.fullmatch(value):
+            raise ValueError("principal/attester/domain must match [A-Za-z0-9_:-]{1,128}")
+    if not _V3_TENANT_RE.fullmatch(tenant_f):
+        raise ValueError("tenant must match [A-Za-z0-9_:-]{1,128}")
+    if not _V2_NONCE_RE.fullmatch(nonce):
+        raise ValueError("nonce must match [A-Za-z0-9_-]{16,128}")
+    if not _V3_METHOD_RE.fullmatch((method or "").upper()):
+        raise ValueError("method must be an HTTP token")
+    ring = load_keyring(secret=secret)
+    if not ring:
+        return None
+    key = ring.get("default") or next(iter(ring.values()))
+    ts = int(now if now is not None else time.time())
+    req = SealRequest(method, path, query, body, tenant_f)
+    mac = hmac.new(key, v3_canonical(req, principal, attester, domain, tenant_f, ts, nonce), hashlib.sha256).hexdigest()
+    return f"{V3_PREFIX}{principal}.{attester}.{domain}.{tenant_f}.{ts}.{nonce}.{mac}"
+
+
+def _verify_v3(
+    raw_header: str,
+    ring: Dict[str, bytes],
+    *,
+    ts: int,
+    expected_domain: Optional[str],
+    nonce_store: Optional[object],
+    request: Optional[SealRequest],
+    skew_secs: int,
+) -> str:
+    if request is None:
+        raise AuthError(_OPAQUE)  # a request-bound seal binds nothing without the request
+    if isinstance(skew_secs, bool) or not isinstance(skew_secs, int) or not 0 < skew_secs <= MAX_SEAL_SKEW_SECS:
+        raise AuthError(_OPAQUE)
+    parts = raw_header[len(V3_PREFIX):].split(".")
+    if len(parts) != 7:
+        raise AuthError(_OPAQUE)
+    principal, attester, domain, tenant, ts_s, nonce, mac = parts
+    if not all(_V2_FIELD_RE.fullmatch(v) for v in (principal, attester, domain)):
+        raise AuthError(_OPAQUE)
+    if not _V3_TENANT_RE.fullmatch(tenant):
+        raise AuthError(_OPAQUE)
+    if not _V2_NONCE_RE.fullmatch(nonce) or not _HEX64_RE.fullmatch(mac):
+        raise AuthError(_OPAQUE)
+    if not ts_s.isdigit() or len(ts_s) > 12:
+        raise AuthError(_OPAQUE)
+    issued = int(ts_s)
+    if abs(ts - issued) > skew_secs:
+        raise AuthError(_OPAQUE)
+    if not _V3_METHOD_RE.fullmatch(request.method):
+        raise AuthError(_OPAQUE)
+    # MAC over the server's own view of the request: any change to method, path,
+    # query, body, tenant or timestamp changes the canonical bytes.
+    canonical = v3_canonical(request, principal, attester, domain, request.tenant, issued, nonce)
+    ok = False
+    for key in ring.values():
+        if _ct_hex_eq(hmac.new(key, canonical, hashlib.sha256).hexdigest(), mac):
+            ok = True
+    if not ok:
+        raise AuthError(_OPAQUE)
+    if not hmac.compare_digest(tenant, request.tenant):
+        raise AuthError(_OPAQUE)
+    if expected_domain is not None and not hmac.compare_digest(domain, expected_domain):
+        raise AuthError(_OPAQUE)
+    if nonce_store is not None:
+        try:
+            # Retain past the far edge of the skew window (+ replica drift margin).
+            fresh = nonce_store.check_and_record(
+                NONCE_SCOPE, f"{principal}.{attester}.{nonce}", issued, skew_secs + REPLAY_SKEW_SECS
+            )
+        except Exception:
+            raise AuthError(_OPAQUE)
+        if not fresh:
+            raise AuthError(_OPAQUE)
+    return attester

@@ -80,6 +80,81 @@ Replay cache (`skeleton.api.hmac_seal.ReplayCache` port,
 Mint: `mint_seal(attester, ttl_secs, *, domain="projects", principal=..., secret=...)`
 (server) or `skeleton.client.seal.mint_seal_token(..., domain=...)` (SDK).
 
+## Seal v3 (request-bound, single-use, skew window)
+
+Closes the remaining Jenkins #4594 finding: v2 binds a domain but not the
+request, so a captured v2 seal could be re-pointed at a different method, path,
+query, body or tenant within its domain before the nonce was consumed. v3 binds
+all of them. v1/v2 are unchanged.
+
+Wire (8 dot-separated fields, literal `v3` prefix):
+
+```
+v3.{principal}.{attester}.{domain}.{tenant}.{unix_ts}.{nonce}.{mac}
+```
+
+Canonical MAC input (UTF-8, `\n`-separated, version-tagged, 11 lines):
+
+```
+gf-seal/v3
+{METHOD}            upper-case HTTP method
+{canonical_path}    percent-decode once, re-encode all but unreserved (A-Z a-z 0-9 - . _ ~) and "/"
+{canonical_query}   parse k=v pairs (blank values kept), RFC 3986-encode, sort, join with "&"; "" if none
+{sha256(body)}      lowercase hex SHA-256 of the exact body bytes ("" body → e3b0c442…)
+{principal}
+{attester}
+{domain}
+{tenant}            value of x-gf-tenant, or "-" when the request has none
+{unix_ts}           issue time, integer seconds (UTC)
+{nonce}
+```
+
+`mac = lowercase hex(HMAC_SHA256(key, canonical))`, same keys/keyring as v1/v2.
+
+- `tenant`: `-` or `[A-Za-z0-9_:-]{1,128}`. Sent as header `x-gf-tenant`; the
+  server MACs over its own view of the header (absent → `-`), so adding,
+  removing or changing it fails. More than one `x-gf-tenant` → 401. The verified
+  tenant is exposed as `request.state.seal_tenant`.
+- Timestamp: accepted iff `|now - unix_ts| <= SEAL_SKEW_SECS` (300 s).
+- Nonce: `[A-Za-z0-9_-]{16,128}`, 128 random bits, one per seal. Recorded via
+  the `NonceStore` port with scope `"seal"` and key `principal.attester.nonce`,
+  retained for `SEAL_SKEW_SECS + REPLAY_SKEW_SECS` past `unix_ts`, so any replay
+  that still passes the skew check is rejected.
+- Body: `RequestSealMiddleware` buffers at most `MAX_SEALED_BODY_BYTES`
+  (8 MiB) to hash, only for v3 seals, then replays the same bytes downstream.
+  Larger → 401.
+- Order: format → skew → MAC (all keys, `hmac.compare_digest`) → tenant and
+  domain (`hmac.compare_digest`) → nonce record. Every failure is opaque 401
+  `{"error":"invalid_seal"}`.
+- `verify_seal(..., request=SealRequest(...), nonce_store=...)`. A v3 seal with
+  no `request` is rejected. `require_seal` accepts a v3 seal only when
+  `RequestSealMiddleware` already verified that exact header on the request.
+- Any header starting `v3.` is parsed only as v3.
+
+### Nonce store port (`skeleton/api/nonce_store.py`)
+
+```python
+class NonceStore(Protocol):
+    def check_and_record(self, scope: str, nonce: str, ts: float, ttl_s: float) -> bool: ...
+```
+
+True means fresh, and the nonce is recorded until `ts + ttl_s`. False means replay
+(or an invalid argument). `scope` namespaces callers (`"seal"`, `"s2s:<service>"`).
+The default `InMemoryNonceStore(max_entries=100_000)` is thread-safe and bounded:
+it drops expired entries first, then evicts the least recently used entry. Size it
+above the peak number of nonces per TTL so that live nonces are never evicted.
+Multi-replica deployments pass a shared store, for example
+`RequestSealMiddleware(app, nonce_store=...)` backed by Redis `SET NX EXAT`.
+
+### Mint
+
+- Server: `hmac_seal.mint_seal_v3(attester, domain, method=, path=, query=, body=, tenant=)`.
+- SDK: `skeleton.client.seal.mint_request_seal_token(...)`, which produces the same bytes (parity-tested).
+  `RequestSealer(..., domain=, bind_request=True, tenant=)` /
+  `GatewayClient(seal_domain=, seal_bind_request=True, seal_tenant=)` build the
+  httpx request first and seal the exact method, path, query and body bytes that
+  are sent, with a fresh nonce on every request and on every retry.
+
 ### Legacy (v1) policy: `GF_SEAL_LEGACY`
 
 | Value | v1 3/4-part seals |
@@ -118,6 +193,7 @@ v1 traffic is gone.
 | No signing key configured | `503 {"error":"seal_unavailable"}` | `503 "seal unavailable"` |
 | Missing / malformed / expired / bad signature | `401 {"error":"invalid_seal"}` | `401` (opaque) |
 | v2 domain mismatch, replayed nonce, missing/bad nonce, expiry too far out, replay cache full | `401 {"error":"invalid_seal"}` | `401` (MAC/expiry/format only) |
+| v3 method/path/query/body/tenant mismatch, timestamp outside skew, replayed nonce, body > 8 MiB, duplicate tenant header | `401 {"error":"invalid_seal"}` | `401` unless middleware verified it |
 | v1 seal on a domain refused by `GF_SEAL_LEGACY` | `401 {"error":"invalid_seal"}` | n/a |
 
 Failure reasons are deliberately opaque.
