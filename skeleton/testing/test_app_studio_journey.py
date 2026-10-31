@@ -406,3 +406,45 @@ def test_onboarding_rejects_unauthorized_or_ambiguous_modes(tmp_path, capsys):
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert not output.exists()
+
+@pytest.mark.parametrize("kind", ["final_symlink", "ancestor_symlink", "hardlink"])
+def test_untrusted_intent_path_rejected_before_game_build(tmp_path, capsys, kind):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    if kind == "final_symlink":
+        incoming = tmp_path / "alias.json"
+        incoming.symlink_to(source)
+    elif kind == "ancestor_symlink":
+        private = tmp_path / "private"
+        private.mkdir()
+        nested = private / "intent.json"
+        nested.write_bytes(source.read_bytes())
+        alias = tmp_path / "alias"
+        alias.symlink_to(private, target_is_directory=True)
+        incoming = alias / "intent.json"
+    else:
+        incoming = tmp_path / "hardlink.json"
+        incoming.hardlink_to(source)
+    assert run_app_cli([
+        "studio-journey", "--intent", str(incoming), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert not output.exists()
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+@pytest.mark.parametrize("raw", [
+    '{"project_id":"a","project_id":"b"}',
+    '{"seed":NaN}',
+    '{"project_id":"a"}',
+])
+def test_untrusted_intent_json_rejected_without_game_export(tmp_path, capsys, raw):
+    source = tmp_path / "malformed.json"
+    source.write_text(raw, encoding="utf-8")
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert not output.exists()
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"

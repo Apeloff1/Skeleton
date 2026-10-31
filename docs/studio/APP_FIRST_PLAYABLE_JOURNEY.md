@@ -130,3 +130,14 @@ small, offline-friendly one-level puzzle. The same first-run security and
 verification pipeline is used as JSON-based builds. This is deterministic
 source authoring, **not** evidence that a model was invoked or that a consumer
 device, native Godot binary, rights, or release were qualified.
+
+## Secure first-run JSON intent import
+
+The existing `--intent` route now reads original game JSON through pinned
+POSIX directory/file descriptors, rejecting symlinked parents, final symlinks,
+hardlinks, unstable or oversized input files, duplicate object members,
+nonfinite JSON, and malformed canonical `GameBuildIntent` records. This closes
+the stat/read replacement window of a pathname-only import. Unsupported hosts
+remain fail-closed; a Windows consumer install is not certified by POSIX tests.
+`--onboard` avoids file import entirely by constructing the same typed intent
+in memory, then runs the same game build, export and replay verification path.

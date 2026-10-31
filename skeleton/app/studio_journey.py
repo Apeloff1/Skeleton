@@ -10,13 +10,14 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Sequence
 
 from skeleton.ai.game_builder.dual_runtime_export import DualRuntimeExportError
 from skeleton.ai.game_builder.dual_runtime_verify import (
-    DualRuntimeVerificationError, verify_exported_package,
+    DualRuntimeVerificationError, _read, _root_fd, verify_exported_package,
 )
 from skeleton.ai.game_builder.offline_receipt_inspection import (
     ReceiptInspectionError, inspect_verified_receipt,
@@ -27,7 +28,9 @@ from skeleton.ai.game_builder.offline_receipt_publication import (
 from skeleton.ai.game_builder.original_game_studio import (
     StudioError, export_studio_run, run_original_game_studio,
 )
-from skeleton.ai.game_builder.playable_cli import MAX_INPUT_BYTES, _intent, _read_json
+from skeleton.ai.game_builder.playable_cli import (
+    MAX_INPUT_BYTES, _intent, _object_pairs,
+)
 from skeleton.ai.game_builder.secure_export_publication import (
     AtomicDirectoryPublicationError, preflight_generated_tree_destination,
 )
@@ -45,6 +48,39 @@ INSPECT_SCHEMA = "skeleton.app.first_playable_receipt_inspection.v1"
 
 class FirstPlayableJourneyError(ValueError):
     """An original game could not be built and replay-verified for handoff."""
+
+
+
+def _load_operator_intent(path: str | Path) -> GameBuildIntent:
+    """Read a bounded original intent from stable nofollow file descriptors.
+
+    The shared game CLI's path-based JSON helper is not used here: a normal
+    stat/read path can race a symlink replacement during first-run import.
+    """
+    source = Path(path).expanduser().absolute()
+    if source.name in ("", ".", ".."):
+        raise FirstPlayableJourneyError("invalid intent filename")
+    try:
+        parent_fd = _root_fd(source.parent)
+    except (OSError, TypeError, ValueError) as exc:
+        raise FirstPlayableJourneyError("unsafe intent parent") from exc
+    try:
+        raw = _read(parent_fd, source.name, MAX_INPUT_BYTES)
+    finally:
+        os.close(parent_fd)
+    try:
+        payload = json.loads(
+            raw.decode("utf-8", "strict"),
+            object_pairs_hook=_object_pairs,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                FirstPlayableJourneyError("nonfinite intent value")
+            ),
+        )
+    except (UnicodeError, ValueError, TypeError) as exc:
+        raise FirstPlayableJourneyError("invalid bounded intent JSON") from exc
+    if type(payload) is not dict:
+        raise FirstPlayableJourneyError("original intent must be a JSON object")
+    return _intent(payload)
 
 
 def build_first_playable_journey(
@@ -74,7 +110,7 @@ def build_first_playable_journey(
             receipt_destination, protected_roots=(destination,), authorized=True,
         )
     intent = (intent_path if isinstance(intent_path, GameBuildIntent)
-              else _intent(_read_json(str(intent_path), MAX_INPUT_BYTES)))
+              else _load_operator_intent(intent_path))
     run = run_original_game_studio(
         intent, authorized=True, mirror_attempts=mirror_attempts,
         companion_practice_games=practice_games,
