@@ -448,3 +448,42 @@ def test_untrusted_intent_json_rejected_without_game_export(tmp_path, capsys, ra
     ]) == 2
     assert not output.exists()
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_first_run_rejects_world_writable_intent_without_export(tmp_path, capsys):
+    source = _intent(tmp_path)
+    source.chmod(0o666)
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()
+
+
+def test_first_run_rejects_intent_changed_between_descriptor_reads(
+    tmp_path, capsys, monkeypatch,
+):
+    from skeleton.app import studio_journey
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    real_read = studio_journey._read
+    reads = 0
+
+    def replace_after_first(fd, path, budget, **kwargs):
+        nonlocal reads
+        value = real_read(fd, path, budget, **kwargs)
+        reads += 1
+        if reads == 1:
+            source.write_bytes(value + b" ")
+        return value
+
+    monkeypatch.setattr(studio_journey, "_read", replace_after_first)
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert reads == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()

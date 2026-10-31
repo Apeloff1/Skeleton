@@ -132,12 +132,15 @@ def _child_fd(root: int, parts: tuple[str, ...], *, directory: bool) -> int:
         raise
 
 
-def _read(root: int, path: str, limit: int) -> bytes:
+def _read(root: int, path: str, limit: int, *, owner_controlled: bool = False) -> bytes:
     with_fd = _child_fd(root, _parts(path), directory=False)
     try:
         info = os.fstat(with_fd)
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
-                or info.st_size < 0 or info.st_size > limit):
+                or info.st_size < 0 or info.st_size > limit
+                or (owner_controlled and (
+                    info.st_uid != os.geteuid() or info.st_mode & 0o022
+                ))):
             raise DualRuntimeVerificationError("unsafe or oversized package file")
         with os.fdopen(os.dup(with_fd), "rb", closefd=True) as stream:
             data = stream.read(limit + 1)

@@ -17,7 +17,7 @@ from typing import Sequence
 
 from skeleton.ai.game_builder.dual_runtime_export import DualRuntimeExportError
 from skeleton.ai.game_builder.dual_runtime_verify import (
-    DualRuntimeVerificationError, _read, _root_fd, verify_exported_package,
+    DualRuntimeVerificationError, _assert_original_root, _read, _root_fd, verify_exported_package,
     load_verified_playable_world,
 )
 from skeleton.ai.game_builder.offline_receipt_inspection import (
@@ -74,7 +74,14 @@ def _load_operator_intent(path: str | Path) -> GameBuildIntent:
     except (OSError, TypeError, ValueError) as exc:
         raise FirstPlayableJourneyError("unsafe intent parent") from exc
     try:
-        raw = _read(parent_fd, source.name, MAX_INPUT_BYTES)
+        raw = _read(
+            parent_fd, source.name, MAX_INPUT_BYTES, owner_controlled=True,
+        )
+        if _read(
+            parent_fd, source.name, MAX_INPUT_BYTES, owner_controlled=True,
+        ) != raw:
+            raise FirstPlayableJourneyError("original game intent changed during import")
+        _assert_original_root(source.parent, parent_fd)
     finally:
         os.close(parent_fd)
     try:

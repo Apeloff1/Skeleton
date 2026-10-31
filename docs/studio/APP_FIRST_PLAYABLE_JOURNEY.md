@@ -221,3 +221,11 @@ a **new** no-clobber save. The original save remains unchanged. A fork beyond
 the verified action history, a negative step, or a fork without a loaded save
 is rejected before a new save is published. This is deterministic local
 choice exploration, not a networked save synchronization service.
+
+### Stable owner-controlled first-run intent import
+
+JSON onboarding now requires the opened source intent to be owner-controlled
+and not writable by group or other users. Two bounded descriptor reads must
+agree, and the original parent path must still resolve to the pinned directory
+inode before typed intent construction. A changed, swapped or concurrently
+rewritten source is blocked before the costly game build or export.
