@@ -52,7 +52,8 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
-    combat      Run and replay deterministic offline turn combat encounters\n    game        Build a playable Godot project from a natural-language brief
+    combat      Run and replay deterministic offline turn combat encounters
+    combat-inspect  Inspect verified combat timelines and compare saved branches\n    game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
     forge       Blueprint compilation and materialization
@@ -736,7 +737,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
-    if cmd == "combat":\n        from skeleton.game.gameplay.turn_combat import cli as combat_cli\n        return combat_cli(rest)\n    if cmd == "game":
+    if cmd == "combat":\n        from skeleton.game.gameplay.turn_combat import cli as combat_cli\n        return combat_cli(rest)\n    if cmd == "combat-inspect":
+        from skeleton.game.gameplay.combat_inspector import cli as inspect_cli
+        return inspect_cli(rest)
+    if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
     if cmd == "forge":
