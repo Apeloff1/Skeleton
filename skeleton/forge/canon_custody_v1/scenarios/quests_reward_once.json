@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.canon_scenario.v1",
+  "policy": "quests_reward_once",
+  "domain": "quests",
+  "topic": "reward_once",
+  "evidence_kind": "custodian",
+  "limits": {
+    "max_records": 96,
+    "max_tick_gap": 8
+  },
+  "commands": [
+    {
+      "id": "quests_reward_once:a",
+      "entity": "hero",
+      "action": "establish",
+      "value": "reward_once:origin",
+      "predecessor": "",
+      "evidence": "verified-world-event:1",
+      "world": "primary",
+      "tick": 1,
+      "expected_revision": 0
+    },
+    {
+      "id": "quests_reward_once:b",
+      "entity": "hero",
+      "action": "amend",
+      "value": "reward_once:revision",
+      "predecessor": "quests_reward_once:a",
+      "evidence": "verified-world-event:2",
+      "world": "primary",
+      "tick": 2,
+      "expected_revision": 1
+    },
+    {
+      "id": "quests_reward_once:c",
+      "entity": "hero",
+      "action": "reconcile",
+      "value": "reward_once:canon",
+      "predecessor": "quests_reward_once:b",
+      "evidence": "verified-world-event:3",
+      "world": "primary",
+      "tick": 3,
+      "expected_revision": 2
+    }
+  ],
+  "expected": {
+    "revision": 3,
+    "records": 3,
+    "all_accepted": true,
+    "world": "primary"
+  },
+  "negative_cases": [
+    "unknown-parent",
+    "duplicate-event",
+    "revision-stale",
+    "cross-world",
+    "entity-lineage-mismatch",
+    "unjustified-clock-gap",
+    "missing-evidence"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "world_provenance_authenticated": false,
+    "release_certified": false
+  }
+}
