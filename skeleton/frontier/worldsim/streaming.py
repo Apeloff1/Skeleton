@@ -31,8 +31,18 @@ class StreamPlan:
 
 
 def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, int],
-              budget: StreamBudget) -> StreamPlan:
-    """Load nearest-first within radius under memory and per-tick load budgets."""
+              budget: StreamBudget, heading: tuple[float, float] | None = None,
+              path: Iterable[CellId] = (), ahead_bias: float = 1.5,
+              behind_radius: int | None = None) -> StreamPlan:
+    """Load within radius under memory and per-tick load budgets.
+
+    With ``heading`` (or a nav ``path``), cells ahead of the player and on the
+    path load first (see ``plan_tick_directed``). Without them: nearest-first.
+    """
+    path = tuple(path)
+    if heading is not None or path:
+        return plan_tick_directed(focus, heading or (0.0, 0.0), resident, sizes, budget,
+                                  ahead_bias=ahead_bias, path=path, behind_radius=behind_radius)
     fx, fy = focus
     dist = lambda c: max(abs(c[0] - fx), abs(c[1] - fy))  # noqa: E731
     wanted = sorted((c for c in sizes if dist(c) <= budget.radius), key=lambda c: (dist(c), c))
