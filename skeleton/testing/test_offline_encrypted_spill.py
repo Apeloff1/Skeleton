@@ -189,5 +189,61 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
         self.assertEqual(main(["--store", str(self.root), "--key-file", str(keyfile), "list"]), 1)
 
 
+    def test_lockfile_replacement_cannot_bypass_directory_lock(self):
+        if os.name != "posix":
+            self.skipTest("POSIX directory flock contract")
+        from threading import Event, Thread
+        entered, acquired = Event(), Event()
+        other = EncryptedSpillStore(self.root, self.key)
+
+        def contender():
+            entered.set()
+            with other._lock():
+                acquired.set()
+
+        with self.store._lock():
+            (self.root / ".lock").unlink()
+            worker = Thread(target=contender, daemon=True)
+            worker.start()
+            self.assertTrue(entered.wait(1))
+            self.assertFalse(acquired.wait(0.15), "replaced lock bypassed custody")
+        self.assertTrue(acquired.wait(2), "store lock was not released")
+        worker.join(timeout=2)
+
+    def test_manifest_publication_never_clobbers_existing_record(self):
+        original = self.store._new_member
+        sentinel = b"independent-existing-manifest"
+        targets = []
+
+        def inject_collision(name, payload):
+            original(name, payload)
+            if name.startswith(".tmp-") and payload.startswith(b'{"'):
+                target = self.root / (name.split("-")[1] + ".json")
+                target.write_bytes(sentinel)
+                targets.append(target)
+
+        with patch.object(self.store, "_new_member", side_effect=inject_collision):
+            with self.assertRaises(FileExistsError):
+                self.store.put(b"no-clobber", IDENTITY)
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].read_bytes(), sentinel)
+
+    def test_disk_full_before_manifest_keeps_only_pruneable_orphan(self):
+        import errno
+        original = self.store._new_member
+
+        def fail_manifest(name, payload):
+            if name.startswith(".tmp-") and payload.startswith(b'{"'):
+                raise OSError(errno.ENOSPC, "simulated disk full")
+            original(name, payload)
+
+        with patch.object(self.store, "_new_member", side_effect=fail_manifest):
+            with self.assertRaises(OSError):
+                self.store.put(b"interrupted", IDENTITY)
+        self.assertEqual(self.store.verify(),
+                         {"verified": 0, "orphan_data": 1, "temp_files": 0})
+        self.assertEqual(self.store.prune_orphans()["orphan_data_removed"], 1)
+        self.assertEqual(self.store.verify()["verified"], 0)
+
 if __name__ == "__main__":
     unittest.main()

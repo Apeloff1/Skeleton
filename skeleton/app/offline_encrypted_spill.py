@@ -204,7 +204,22 @@ class EncryptedSpillStore:
                 ):
                     raise SpillError("spill store permissions changed")
                 self._dir_fd = root_fd
+                directory_locked = False
                 try:
+                    # Lock the pinned directory inode first. A named .lock alone can
+                    # be unlinked and recreated while another process holds its fd.
+                    if os.name == "posix":
+                        import fcntl
+                        try:
+                            fcntl.flock(root_fd, fcntl.LOCK_EX)
+                        except OSError as exc:
+                            raise SpillError("directory inode locking unavailable") from exc
+                        directory_locked = True
+                        # A rename while waiting must not silently redirect custody.
+                        with _directory_fd(self.root) as live_fd:
+                            live = os.fstat(live_fd)
+                        if (live.st_dev, live.st_ino) != self._root_identity:
+                            raise SpillError("spill store root identity changed")
                     lock = self.root / ".lock"
                     fd = os.open(
                         ".lock" if root_fd is not None else lock,
@@ -241,7 +256,11 @@ class EncryptedSpillStore:
                     finally:
                         os.close(fd)
                 finally:
-                    self._dir_fd = None
+                    try:
+                        if directory_locked:
+                            fcntl.flock(root_fd, fcntl.LOCK_UN)
+                    finally:
+                        self._dir_fd = None
 
     def _read_member(self, name: str, limit: int) -> bytes:
         if self._dir_fd is None:
@@ -265,12 +284,16 @@ class EncryptedSpillStore:
         finally:
             os.close(fd)
 
-    def _replace_member(self, source: str, destination: str) -> None:
+    def _publish_member(self, source: str, destination: str) -> None:
+        """Publish an fsynced temp inode without ever replacing a live record."""
         if self._dir_fd is None:
-            os.replace(self.root / source, self.root / destination)
+            os.link(self.root / source, self.root / destination,
+                    follow_symlinks=False)
         else:
-            os.replace(source, destination,
-                       src_dir_fd=self._dir_fd, dst_dir_fd=self._dir_fd)
+            os.link(source, destination, src_dir_fd=self._dir_fd,
+                    dst_dir_fd=self._dir_fd, follow_symlinks=False)
+        # Crash between link and unlink leaves a pruneable temp hard link.
+        self._unlink_member(source)
 
     def _unlink_member(self, name: str, *, missing_ok: bool = False) -> None:
         try:
@@ -394,10 +417,10 @@ class EncryptedSpillStore:
             temp_meta = ".tmp-" + record_id + "-" + secrets.token_hex(8)
             try:
                 self._new_member(temp_data, ciphertext)
-                self._replace_member(temp_data, record_id + ".bin")
+                self._publish_member(temp_data, record_id + ".bin")
                 self._sync_store()
                 self._new_member(temp_meta, _canonical(meta))
-                self._replace_member(temp_meta, record_id + ".json")
+                self._publish_member(temp_meta, record_id + ".json")
                 self._sync_store()
             finally:
                 self._unlink_member(temp_data, missing_ok=True)
