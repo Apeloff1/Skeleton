@@ -61,6 +61,11 @@ class JeevesGameOrchestrator:
         from .studio_walk_tool import execute_walk_tool
         return execute_walk_tool(request, authorized=authorized)
 
+    def authoritative_walk_catalog(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Run bounded canonical catalog choice assurance under operator authority."""
+        from .studio_walk_tool import execute_catalog_audit_tool
+        return execute_catalog_audit_tool(request, authorized=authorized)
+
     def model_card(self) -> str:
         return (
             "Jeeves game orchestrator: one call produces unified brief, advanced systems, "

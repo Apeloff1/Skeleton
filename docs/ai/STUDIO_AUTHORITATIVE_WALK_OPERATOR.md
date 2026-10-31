@@ -297,3 +297,13 @@ accepts caller-supplied authority or certification flags. A forged receipt,
 invalid project or untrusted request fails before any game-state mutation.
 The operation is a read-only authoring diagnostic, not a provider call or
 native-game certification.
+
+## Typed Jeeves catalog audit
+
+`JeevesGameOrchestrator.authoritative_walk_catalog()` accepts a distinct
+versioned `studio_authoritative_walk_catalog` tool request with bounded
+`offset`, `limit` (1..4), and optional `genre`/`biome` filters. The tool
+rejects unknown fields, invalid numbers, forged authority and oversized
+requests before reading the canonical index. It delegates to the same source
+assurance engine as `--walk-audit-catalog`, returns index/source/coverage
+receipts and never claims a completed original game or release approval.
