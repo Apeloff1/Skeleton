@@ -137,11 +137,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inspect-tick", type=int, help="Inspect NPC presence at a given tick")
     parser.add_argument("--solve-ending", help="Find replayable commands for an authored ending")
     parser.add_argument("--audit-endings", action="store_true", help="Replay-qualify all authored endings")
+    parser.add_argument("--calendar", action="store_true", help="Show replay-verified future NPC interactions")
+    parser.add_argument("--calendar-limit", type=int, default=64)
+    parser.add_argument("--verify-calendar", help="Verify exported NPC calendar JSON")
     parser.add_argument("--max-search-nodes", type=int, default=1024)
     parser.add_argument("--max-search-depth", type=int, default=24)
     args = parser.parse_args(argv)
     try:
         schedule = NpcSchedule.parse(read_json(args.schedule))
+        if args.calendar or args.verify_calendar:
+            if any((args.solve_ending is not None, args.audit_endings,
+                    args.save, args.interactive, args.inspect_tick is not None)):
+                raise GameplayContractError("NPC calendar forbids conflicting options")
+            if args.verify_calendar and any((args.commands, args.resume, args.calendar)):
+                raise GameplayContractError("calendar verification forbids playback")
+            from skeleton.game.gameplay.npc_calendar import forecast_calendar, verify_calendar
+            if args.verify_calendar:
+                result = verify_calendar(schedule, read_json(args.verify_calendar))
+            else:
+                session = (NpcSession.restore(schedule, read_json(args.resume))
+                           if args.resume else NpcSession.start(schedule))
+                if args.commands:
+                    commands = read_json(args.commands)
+                    if type(commands) is not list:
+                        raise GameplayContractError("commands must be a JSON list")
+                    session = play(schedule, commands, session)
+                result = forecast_calendar(
+                    schedule, session, player_id=args.player_id,
+                    max_entries=args.calendar_limit,
+                )
+            print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return 0
+        if args.calendar_limit != 64:
+            raise GameplayContractError("calendar-limit requires --calendar")
         if args.audit_endings:
             if any((args.solve_ending is not None, args.commands, args.resume,
                     args.save, args.interactive, args.inspect_tick is not None)):
