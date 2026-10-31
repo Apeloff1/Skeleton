@@ -40,6 +40,86 @@ def _sha(value: object, name: str) -> str:
     return value
 
 
+ATTESTATION_SCHEMA = "skeleton.ai.tail-observation-attestation.v1"
+
+
+def _attestation_body(
+    *, policy: "TailAdmissionPolicy", session_id: str, generation: int,
+    profile_digest: str, current_ram_available_bytes: int,
+) -> dict[str, object]:
+    if not isinstance(policy, TailAdmissionPolicy):
+        raise ValueError("canonical tail admission policy required")
+    return {
+        "schema": ATTESTATION_SCHEMA,
+        "session_id": _sha(session_id, "session_id")[:32],
+        "generation": _int("generation", generation),
+        "profile_digest": _sha(profile_digest, "profile_digest"),
+        "current_ram_available_bytes": _int(
+            "current_ram_available_bytes", current_ram_available_bytes,
+        ),
+        "policy_digest": _digest(policy.body()),
+    }
+
+
+def sign_tail_observation(
+    *, attestation_key: bytes, policy: "TailAdmissionPolicy",
+    session_id: str, generation: int, profile_digest: str,
+    current_ram_available_bytes: int,
+) -> dict[str, object]:
+    """Trusted local measurement owner signs ONLY after real OS observation.
+
+    A signature binds an observation to one session, policy, generation and
+    RAM sample; it does not independently prove the hardware sensor is real.
+    """
+    if type(attestation_key) is not bytes or not 32 <= len(attestation_key) <= 128:
+        raise ValueError("independent tail attestation key required")
+    if type(session_id) is not str or len(session_id) != 32 or any(
+        c not in "0123456789abcdef" for c in session_id
+    ):
+        raise ValueError("invalid session_id")
+    body = _attestation_body(
+        policy=policy, session_id=session_id + "0" * 32,
+        generation=generation, profile_digest=profile_digest,
+        current_ram_available_bytes=current_ram_available_bytes,
+    )
+    mac = hmac.new(attestation_key, _digest(body).encode("ascii"), sha256).hexdigest()
+    return {**body, "mac": mac}
+
+
+def verify_tail_observation(
+    *, attestation: Mapping[str, object] | None,
+    attestation_key: bytes | None, policy: "TailAdmissionPolicy",
+    session_id: str | None, generation: int, profile_digest: str,
+    current_ram_available_bytes: int,
+) -> bool:
+    """Missing proof holds admission; forged proof is rejected."""
+    if attestation is None or attestation_key is None or session_id is None:
+        return False
+    if type(attestation_key) is not bytes or not 32 <= len(attestation_key) <= 128:
+        raise ValueError("invalid tail attestation key")
+    if type(session_id) is not str or len(session_id) != 32 or any(
+        c not in "0123456789abcdef" for c in session_id
+    ):
+        raise ValueError("invalid session_id")
+    body = _attestation_body(
+        policy=policy, session_id=session_id + "0" * 32,
+        generation=generation, profile_digest=profile_digest,
+        current_ram_available_bytes=current_ram_available_bytes,
+    )
+    if not isinstance(attestation, Mapping) or set(attestation) != set(body) | {"mac"}:
+        raise ValueError("invalid tail attestation shape")
+    if any(attestation[key] != value for key, value in body.items()):
+        raise ValueError("tail attestation context mismatch")
+    expected = hmac.new(
+        attestation_key, _digest(body).encode("ascii"), sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(
+        _sha(attestation["mac"], "attestation MAC"), expected,
+    ):
+        raise ValueError("tail attestation authentication failed")
+    return True
+
+
 @dataclass(frozen=True, slots=True)
 class TailAdmissionPolicy:
     max_slots: int
@@ -127,6 +207,9 @@ class TailAdmissionGovernor:
     def observe(
         self, profile: Mapping[str, object], *, expected_generation: int,
         current_ram_available_bytes: int,
+        attestation: Mapping[str, object] | None = None,
+        attestation_key: bytes | None = None,
+        session_id: str | None = None,
     ) -> dict[str, object]:
         if _int("expected_generation", expected_generation) != self.generation:
             raise ValueError("stale tail admission generation")
@@ -147,8 +230,15 @@ class TailAdmissionGovernor:
         tail = profile.get("tail")
         if not isinstance(identity, Mapping) or not isinstance(resource, Mapping) or not isinstance(tail, Mapping):
             raise ValueError("incomplete tail profile")
+        verified = verify_tail_observation(
+            attestation=attestation, attestation_key=attestation_key,
+            policy=self.policy, session_id=session_id,
+            generation=expected_generation, profile_digest=digest,
+            current_ram_available_bytes=ram,
+        )
         measured = (
-            identity.get("evidence") == "measured"
+            verified
+            and identity.get("evidence") == "measured"
             and profile.get("qualification") == "measured_tail_profile"
             and profile.get("minimum_tail_sample_count_met") is True
             and _int("requests", profile.get("requests"), maximum=10000) >= 100
