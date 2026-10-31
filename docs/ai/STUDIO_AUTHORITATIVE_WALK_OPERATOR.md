@@ -428,3 +428,10 @@ Quest predicates, source IDs, runtime authority, release status and rights
 cannot be edited. The original catalog remains unchanged. Jeeves exposes
 studio_author_revision for the same typed, source-leased preview under operator
 authorization, but it never writes files on the model's behalf.
+
+
+To continue a previously exported original revision, pass --revision-source
+EXISTING_DIRECTORY alongside --author-revision, --revision-request and a
+different new --output directory. The previous source, receipt and playable
+HTML are revalidated against their canonical digests before any further edit.
+These digests prove consistency, not cryptographic authorship or asset rights.

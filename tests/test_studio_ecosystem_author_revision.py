@@ -78,3 +78,43 @@ def test_revision_rejects_duplicate_noop_malformed_and_contradictory_edits():
             preview_canon_revision(docs, request(docs, [
                 {"section": "narrative", "path": ["premise"], "value": bad}
             ]), authorized=True)
+
+
+def test_reopen_revision_bundle_for_second_authored_edit(tmp_path):
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+    docs = read_blueprint(PROJECT)
+    first, html, receipt = preview_canon_revision(docs, request(docs), authorized=True)
+    out = tmp_path / "first"
+    write_revision_bundle(out, first, html, receipt)
+    imported, imported_receipt = load_revision_bundle(out, authorized=True, project_id=PROJECT)
+    assert imported == first
+    assert imported_receipt == receipt
+    second_req = request(imported, [
+        {"section": "cast", "path": ["protagonist", "name"],
+         "value": "Miro Rook, independent archive custodian"}
+    ])
+    second, second_html, second_receipt = preview_canon_revision(
+        imported, second_req, authorized=True)
+    assert second_receipt["base_source_digest"] == receipt["revised_source_digest"]
+    assert second["cast"]["protagonist"]["name"].startswith("Miro Rook")
+    assert second_html != html
+
+def test_reopen_rejects_tampering_and_symlink(tmp_path):
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+    docs = read_blueprint(PROJECT)
+    source, html, receipt = preview_canon_revision(docs, request(docs), authorized=True)
+    out = tmp_path / "original"
+    write_revision_bundle(out, source, html, receipt)
+    (out / "story.html").write_bytes(b"forged")
+    with pytest.raises(StudioQuestError):
+        load_revision_bundle(out, authorized=True, project_id=PROJECT)
+    (out / "story.html").write_bytes(html)
+    (out / "receipt.json").write_text('{"schema":"forged"}')
+    with pytest.raises(StudioQuestError):
+        load_revision_bundle(out, authorized=True, project_id=PROJECT)
+    with pytest.raises(PermissionError):
+        load_revision_bundle(out, authorized=False, project_id=PROJECT)
+    link = tmp_path / "linked"
+    link.symlink_to(out, target_is_directory=True)
+    with pytest.raises(StudioQuestError):
+        load_revision_bundle(link, authorized=True, project_id=PROJECT)

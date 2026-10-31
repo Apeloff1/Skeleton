@@ -181,3 +181,81 @@ def write_revision_bundle(
     finally:
         if fd is not None:
             os.close(fd)
+
+
+def load_revision_bundle(
+    source_dir: Path, *, authorized: bool, project_id: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Reopen a bounded authored revision for another edit, never as signed evidence.
+
+    Digests detect accidental/tampered content; they do not authenticate an
+    external author or grant asset rights. Caller still supplies authorization.
+    """
+    import stat
+    if authorized is not True:
+        raise PermissionError("authored revision import requires operator authorization")
+    if (not isinstance(source_dir, Path) or ".." in source_dir.parts
+            or source_dir.is_symlink() or not source_dir.is_dir()):
+        raise StudioQuestError("invalid authored revision directory")
+    if type(project_id) is not str or not project_id:
+        raise StudioQuestError("invalid authored revision project")
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise StudioQuestError("duplicate revision bundle JSON key")
+            value[key] = item
+        return value
+    fd = os.open(source_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        payloads: dict[str, bytes] = {}
+        for name in ("source.json", "story.html", "receipt.json"):
+            handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+            with os.fdopen(handle, "rb") as stream:
+                status = os.fstat(stream.fileno())
+                if not stat.S_ISREG(status.st_mode) or status.st_size > MAX_ARTIFACT_BYTES:
+                    raise StudioQuestError("invalid authored revision artifact type or size")
+                raw = stream.read(MAX_ARTIFACT_BYTES + 1)
+                if len(raw) > MAX_ARTIFACT_BYTES:
+                    raise StudioQuestError("authored revision artifact grew during read")
+                payloads[name] = raw
+    finally:
+        os.close(fd)
+    try:
+        source = json.loads(
+            payloads["source.json"].decode("utf-8", "strict"),
+            object_pairs_hook=unique,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                StudioQuestError("nonfinite authored revision JSON")),
+        )
+        receipt = json.loads(
+            payloads["receipt.json"].decode("utf-8", "strict"),
+            object_pairs_hook=unique,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                StudioQuestError("nonfinite authored revision receipt")),
+        )
+    except (ValueError, UnicodeError, TypeError, RecursionError) as exc:
+        raise StudioQuestError("invalid authored revision bundle JSON") from exc
+    if type(source) is not dict or type(receipt) is not dict:
+        raise StudioQuestError("invalid authored revision bundle objects")
+    digest = receipt.get("receipt_digest")
+    if (receipt.get("schema") != RECEIPT_SCHEMA
+            or receipt.get("project_id") != project_id
+            or type(digest) is not str or len(digest) != 64
+            or receipt.get("release_certified") is not False
+            or receipt.get("originality_rights_verified") is not False):
+        raise StudioQuestError("invalid authored revision bundle receipt")
+    unsigned = dict(receipt)
+    del unsigned["receipt_digest"]
+    if _digest(unsigned) != digest:
+        raise StudioQuestError("authored revision receipt digest mismatch")
+    proof = audit_canon_source(source, authorized=True)
+    if (not proof["canon_consistent"] or proof["project_id"] != project_id
+            or proof["source_digest"] != receipt.get("revised_source_digest")
+            or proof["proof_digest"] != receipt.get("revised_proof_digest")):
+        raise StudioQuestError("authored revision source/proof mismatch")
+    html = payloads["story.html"]
+    if (sha256(html).hexdigest() != receipt.get("playable_html_sha256")
+            or html != render_story_html(source)):
+        raise StudioQuestError("authored revision playable HTML drift")
+    return source, receipt

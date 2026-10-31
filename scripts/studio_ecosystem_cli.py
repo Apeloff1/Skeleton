@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--revision-source", type=Path,
+                    help="Reopen a previously verified authored revision directory")
     ap.add_argument("--revision-request", metavar="JSON",
                     help="Typed original-world revision with expected source digest")
     ap.add_argument("--audit-canon", action="store_true",
@@ -183,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
             ap.error("--author-revision requires --project, --revision-request and new --output directory")
         from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
             MAX_REQUEST_BYTES, preview_canon_revision, write_revision_bundle,
+            load_revision_bundle,
         )
         from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
         try:
@@ -201,8 +204,12 @@ def main(argv: list[str] | None = None) -> int:
                 parse_constant=lambda _: (_ for _ in ()).throw(
                     StudioQuestError("nonfinite authored revision JSON")),
             )
+            original = (load_revision_bundle(args.revision_source, authorized=True,
+                                              project_id=args.project)[0]
+                        if args.revision_source is not None
+                        else read_blueprint(args.project))
             source, html, receipt = preview_canon_revision(
-                read_blueprint(args.project), request, authorized=True,
+                original, request, authorized=True,
             )
             write_revision_bundle(args.output, source, html, receipt)
         except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
@@ -210,8 +217,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"receipt": receipt, "output": str(args.output)},
                          sort_keys=True, separators=(",", ":")))
         return 0
-    if args.revision_request is not None:
-        ap.error("--revision-request requires --author-revision")
+    if args.revision_request is not None or args.revision_source is not None:
+        ap.error("--revision-request and --revision-source require --author-revision")
     if args.audit_canon:
         if (not args.project or args.play_walk or args.play_quest
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
