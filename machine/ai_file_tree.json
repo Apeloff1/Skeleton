@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "396186a610cd2ad3296216efa953e72e280d2084",
+      "source_git_object_sha": "71254e28e9a4f7914987f635f39249bc64f7e08f",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -6235,7 +6235,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "ce8c9c6fe748cd6ddf0b039e44c091da225cfcb5",
+      "source_git_object_sha": "6dfaaf3dfaf2bc21217b6e245f295ceccd23c9d2",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",

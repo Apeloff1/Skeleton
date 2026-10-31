@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import NAMESPACE_URL, uuid5
 import pytest
 
 from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
@@ -8,7 +9,7 @@ from skeleton.persistence.memory_version_governance import export_history, gover
 NOW=datetime(2026,10,6,tzinfo=timezone.utc)
 
 def proposal(key,content,target=None,version=None):
-    return MemoryWriteProposal(tenant_id="t",namespace="n",subject_id="s",kind=MemoryKind.SEMANTIC,idempotency_key=key,content=content,provenance_refs=("source:x",),target_memory_id=target,expected_version=version,data_class="internal")
+    return MemoryWriteProposal(proposal_id=str(uuid5(NAMESPACE_URL, f"memory-versioning:{key}")), proposed_at=NOW, tenant_id="t",namespace="n",subject_id="s",kind=MemoryKind.SEMANTIC,idempotency_key=key,content=content,provenance_refs=("source:x",),target_memory_id=target,expected_version=version,data_class="internal")
 
 def seeded():
     r=SQLiteMemoryRepository()
