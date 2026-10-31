@@ -39,7 +39,7 @@ class FabricTests(unittest.TestCase):
         # Deterministic simulated host: real CI cgroup PSI is not test input.
         for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
-                          return_value=None)
+                          return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()
             self.addCleanup(guard.stop)
 
@@ -651,7 +651,7 @@ class CgroupPressureTests(unittest.TestCase):
         # Deterministic simulated host: real CI cgroup PSI is not test input.
         for name in ['probe_io_pressure','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
-                          return_value=None)
+                          return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()
             self.addCleanup(guard.stop)
 
@@ -769,7 +769,7 @@ class IOPressureTests(unittest.TestCase):
         # Deterministic simulated host: real CI cgroup PSI is not test input.
         for name in ['probe_cgroup_events','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
-                          return_value=None)
+                          return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()
             self.addCleanup(guard.stop)
 
@@ -851,7 +851,7 @@ class CPUThrottleTests(unittest.TestCase):
         # Deterministic simulated host: real CI cgroup PSI is not test input.
         for name in ['probe_cgroup_events','probe_io_pressure','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
-                          return_value=None)
+                          return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()
             self.addCleanup(guard.stop)
 
@@ -931,7 +931,7 @@ class SwapChurnTests(unittest.TestCase):
         super().setUp()
         for name in ('probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_cpu_thermal'):
             guard = patch("skeleton.app.offline_resource_fabric." + name,
-                          return_value=None)
+                          return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()
             self.addCleanup(guard.stop)
 
@@ -1016,7 +1016,7 @@ class CPUThermalTests(unittest.TestCase):
         for name in ('probe_cgroup_events','probe_io_pressure','probe_cpu_throttle',
                      'probe_swap_counters'):
             guard = patch("skeleton.app.offline_resource_fabric." + name,
-                          return_value=None)
+                          return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()
             self.addCleanup(guard.stop)
 
