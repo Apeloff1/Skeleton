@@ -145,3 +145,23 @@ def test_terminal_cli_fails_closed_on_invalid_flags_and_existing_output(tmp_path
         "--terminal-play-capsule", str(source), "--save-session", str(tmp_path / "new.json"),
         "--terminal-max-frames", "0",
     ]) == 2
+
+
+def test_terminal_gracefully_saves_last_admissible_frame():
+    from skeleton.ai.runtime.game_play_session import resume_play_session
+
+    capsule = _capsule()
+    idle = {"left": False, "right": False, "jump": False}
+    prior = start_play_session(capsule, [idle] * 64)
+    for _ in range(14):
+        prior = resume_play_session(capsule, prior, [idle] * 64)
+    prior = resume_play_session(capsule, prior, [idle] * 63)
+    assert prior["frame_count"] == 1023
+    stream = StringIO(".\n" * 5)
+    result = run_terminal_play(capsule, prior, stream, StringIO(), max_frames=5)
+    assert result["total_frames"] == 1024
+    assert result["frames_played"] == 1
+    assert verify_play_session(capsule, result["session"])["source_bound_replay_verified"]
+    assert stream.read().startswith(".\n")
+    with pytest.raises(GamePlaySessionError):
+        run_terminal_play(capsule, result["session"], StringIO(".\n"), StringIO())

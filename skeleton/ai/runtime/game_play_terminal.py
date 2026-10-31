@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Mapping, TextIO
 
 from .game_play_session import (
-    GamePlaySessionError, MAX_BATCH_FRAMES, render_play_session,
+    GamePlaySessionError, MAX_BATCH_FRAMES, MAX_FRAMES, render_play_session,
     resume_play_session, start_play_session, verify_play_session,
 )
 from .game_project_capsule import verify_game_capsule
@@ -54,11 +54,12 @@ def run_terminal_play(
         verify_play_session(capsule, saved)
         if saved["victory_frame"] is not None:
             raise GamePlaySessionError("terminal victory cannot be resumed")
-        if saved["frame_count"] >= 1024:
+        if saved["frame_count"] >= MAX_FRAMES:
             raise GamePlaySessionError("terminal history exhausted its frame budget")
+    remaining = MAX_FRAMES - (saved["frame_count"] if saved is not None else 0)
     session = saved
     played = 0
-    for _ in range(max_frames):
+    for _ in range(min(max_frames, remaining)):
         output_stream.write("Controls: a=left d=right w=jump .=wait q=quit > ")
         output_stream.flush()
         line = input_stream.readline(MAX_COMMAND_BYTES + 1)
