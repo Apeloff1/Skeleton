@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "game_id": "lantern-harbor",
+  "title": "Lantern Harbor",
+  "license": "CC0-1.0",
+  "author": "Skeleton original gameplay studio",
+  "rows": [
+    "#########",
+    "#S..#...#",
+    "#...#...#",
+    "#.......#",
+    "#....G..#",
+    "#########"
+  ],
+  "objects": [
+    {
+      "id": "lantern",
+      "kind": "item",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "id": "keeper",
+      "kind": "npc",
+      "x": 3,
+      "y": 1
+    }
+  ],
+  "quests": [
+    {
+      "id": "lightkeeper",
+      "requires_items": [
+        "lantern"
+      ],
+      "requires_npcs": [
+        "keeper"
+      ],
+      "requires_quests": []
+    }
+  ],
+  "endings": [
+    {
+      "id": "homecoming",
+      "requires_quests": [
+        "lightkeeper"
+      ],
+      "outcome": "victory"
+    },
+    {
+      "id": "wanderer",
+      "requires_quests": [],
+      "outcome": "alternate"
+    }
+  ]
+}
