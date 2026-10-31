@@ -39,6 +39,7 @@ from skeleton.ai.runtime.game_play_bundle import (
     GamePlayBundleError, pack_play_bundle, verify_play_bundle,
     resume_play_bundle, fork_play_bundle,
 )
+from skeleton.ai.runtime.game_play_terminal import run_terminal_play
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -148,6 +149,10 @@ def _parser() -> argparse.ArgumentParser:
                             help="replay a saved session against its original capsule")
     operations.add_argument("--render-play-session", type=Path,
                             help="show verified offline game state as an ASCII grid")
+    operations.add_argument("--terminal-play-capsule", type=Path,
+                            help="play an original capsule with accessible turn-by-turn keyboard controls")
+    operations.add_argument("--terminal-resume-session", type=Path,
+                            help="reopen a verified save and continue offline terminal play")
     operations.add_argument("--inspect-play-frame", type=Path,
                             help="replay and render a verified saved frame without changing it")
     operations.add_argument("--fork-play-session", type=Path,
@@ -170,6 +175,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="verify portable project and recalculate scene digests")
     operations.add_argument("--demo-project", type=Path,
                             help="write a new small original portable game capsule")
+    parser.add_argument("--terminal-max-frames", type=int,
+                        help="terminal frames this invocation (1-64, default 32)")
     parser.add_argument("--at-frame", type=int,
                         help="zero-based replay seek/fork frame; zero is the original spawn")
     parser.add_argument("--controls-file", type=Path,
@@ -197,10 +204,13 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    terminal = (args.terminal_play_capsule is not None
+                or args.terminal_resume_session is not None)
     playing = any(value is not None for value in (
         args.play_capsule, args.resume_play_session,
         args.verify_play_session, args.render_play_session,
         args.inspect_play_frame, args.fork_play_session,
+        args.terminal_play_capsule, args.terminal_resume_session,
     ))
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
@@ -211,6 +221,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     ))
     if (seeking != (args.at_frame is not None)):
         print("--at-frame is required only for timeline inspection or forks", file=sys.stderr)
+        return 2
+    if (args.terminal_max_frames is not None and not terminal):
+        print("--terminal-max-frames requires a terminal play operation", file=sys.stderr)
+        return 2
+    if (args.terminal_max_frames is not None
+            and not 1 <= args.terminal_max_frames <= 64):
+        print("terminal frame budget must be between 1 and 64", file=sys.stderr)
         return 2
     if not playing and not bundling and any(value is not None for value in (
         args.controls_file, args.session_capsule, args.save_session, args.bundle_output,
@@ -235,9 +252,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         needs_actions = any(value is not None for value in (
             args.play_capsule, args.resume_play_session, args.fork_play_session,
         ))
-        needs_source = args.play_capsule is None
+        needs_output = needs_actions or terminal
+        needs_source = (args.play_capsule is None
+                        and args.terminal_play_capsule is None)
         if (needs_actions != (args.controls_file is not None)
-                or needs_actions != (args.save_session is not None)
+                or needs_output != (args.save_session is not None)
                 or needs_source != (args.session_capsule is not None)):
             print("play-session source, controls and output arguments mismatch", file=sys.stderr)
             return 2
@@ -285,8 +304,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                     report["fork_frame"] = args.at_frame
                     report["forked_from_bundle_sha256"] = bundle["bundle_sha256"]
         elif playing:
-            capsule = _read_json(args.play_capsule or args.session_capsule)
-            if args.verify_play_session is not None:
+            capsule = _read_json(
+                args.play_capsule or args.terminal_play_capsule or args.session_capsule,
+            )
+            if terminal:
+                previous = (
+                    _read_json(args.terminal_resume_session)
+                    if args.terminal_resume_session is not None else None
+                )
+                terminal_result = run_terminal_play(
+                    capsule, previous, sys.stdin, sys.stderr,
+                    max_frames=args.terminal_max_frames or 32,
+                )
+                session = terminal_result["session"]
+                output_path = _write_new(args.save_session, session)
+                report = {
+                    **{key: value for key, value in terminal_result.items()
+                       if key != "session"},
+                    "output_path": output_path,
+                    "rendered_grid": render_play_session(capsule, session)["grid"],
+                }
+            elif args.verify_play_session is not None:
                 report = verify_play_session(capsule, _read_json(args.verify_play_session))
             elif args.render_play_session is not None:
                 report = render_play_session(capsule, _read_json(args.render_play_session))

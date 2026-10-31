@@ -90,3 +90,30 @@ The resulting bundle embeds the same original capsule with the new verified
 session. Input files must be regular non-symlinks and output files must not
 already exist. Frame inspection is read-only. No network, native renderer,
 legal clearance, signature, or native target binary is produced.
+
+
+## Actual turn-by-turn offline terminal play
+
+For keyboard/screen-reader-friendly gameplay without preparing a controller
+JSON file, open a verified original capsule and enter one command per frame:
+
+`python -m skeleton app game-project --terminal-play-capsule project.json --save-session terminal-save.json`
+
+The prompt accepts `a` (left), `d` (right), `w` (jump), `aw`/`dw`
+(combined move and jump), `.` (wait), or `q` (quit). Commands are case
+insensitive. Each accepted command advances one **actual deterministic**
+simulation frame and prints the current ASCII map; the save contains the
+canonical input history, not a self-declared player position. Contradictory,
+duplicate, oversized or unknown commands fail closed. An empty or immediate
+quit does not create a fake save. Victory ends the session.
+
+Continue from a prior save (without overwriting it):
+
+`python -m skeleton app game-project --terminal-resume-session terminal-save.json --session-capsule project.json --save-session terminal-next.json --terminal-max-frames 32`
+
+A single terminal invocation admits 1–64 new frames; a complete play history
+is limited to 1,024 frames. Keyboard prompts and map frames go to stderr,
+leaving stdout as one machine-readable JSON completion receipt. Standard input
+can be an interactive terminal or a bounded piped command stream; no network,
+GPU, audio, live AI, third-party assets or native exporter is used. This is
+**turn-based ASCII gameplay**, not a continuous real-time graphics engine.
