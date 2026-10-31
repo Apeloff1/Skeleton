@@ -128,6 +128,9 @@ class LocalModelDeployment:
     output_framing: str = "raw"
     runtime_scratch_bytes: int = 512 * 1024 * 1024
     kv_bytes_per_token: int | None = None
+    kv_cache_location: str = "backend"
+    kv_cache_type_k: str | None = None
+    kv_cache_type_v: str | None = None
 
     @classmethod
     def load(
@@ -212,6 +215,9 @@ class LocalModelDeployment:
             "threads",
             "batch_size",
             "gpu_layers",
+            "kv_cache_location",
+            "kv_cache_type_k",
+            "kv_cache_type_v",
             "temperature",
             "extra_args",
             "output_framing",
@@ -238,6 +244,9 @@ class LocalModelDeployment:
                 threads=config.get("threads"),
                 batch_size=config.get("batch_size"),
                 gpu_layers=config.get("gpu_layers"),
+                kv_cache_location=config.get("kv_cache_location", "backend"),
+                kv_cache_type_k=config.get("kv_cache_type_k"),
+                kv_cache_type_v=config.get("kv_cache_type_v"),
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
@@ -274,6 +283,9 @@ class LocalModelDeployment:
             threads=validated.threads,
             batch_size=validated.batch_size,
             gpu_layers=validated.gpu_layers,
+            kv_cache_location=validated.kv_cache_location,
+            kv_cache_type_k=validated.kv_cache_type_k,
+            kv_cache_type_v=validated.kv_cache_type_v,
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
@@ -315,6 +327,9 @@ class LocalModelDeployment:
             threads=self.threads,
             batch_size=self.batch_size,
             gpu_layers=self.gpu_layers,
+            kv_cache_location=self.kv_cache_location,
+            kv_cache_type_k=self.kv_cache_type_k,
+            kv_cache_type_v=self.kv_cache_type_v,
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
@@ -382,6 +397,9 @@ def create_local_model_deployment(
     context_size: int = 4096,
     threads: int | None = None,
     gpu_layers: int = 0,
+    kv_cache_location: str = "backend",
+    kv_cache_type_k: str | None = None,
+    kv_cache_type_v: str | None = None,
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
@@ -428,6 +446,9 @@ def create_local_model_deployment(
         context_size=context_size,
         threads=threads,
         gpu_layers=gpu_layers,
+        kv_cache_location=kv_cache_location,
+        kv_cache_type_k=kv_cache_type_k,
+        kv_cache_type_v=kv_cache_type_v,
         timeout_seconds=timeout_seconds,
         output_framing=output_framing,
         reject_model_symlink=True,
@@ -456,6 +477,13 @@ def create_local_model_deployment(
             "kv_bytes_per_token": validated.kv_bytes_per_token,
         },
     }
+    if validated.kv_cache_location != "backend":
+        # Preserve exact manifests for previously installed default profiles.
+        payload["config"]["kv_cache_location"] = validated.kv_cache_location
+    for key in ("kv_cache_type_k", "kv_cache_type_v"):
+        value = getattr(validated, key)
+        if value is not None:
+            payload["config"][key] = value
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
