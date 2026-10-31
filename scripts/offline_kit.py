@@ -208,15 +208,26 @@ def pack(
 
 
 def verify(root: str | Path) -> dict[str, object]:
-    kit = Path(root).expanduser().resolve(strict=True)
-    if not kit.is_dir():
-        raise OfflineKitError("kit root must be a directory")
-    manifest_path = kit / "manifest.json"
-    _regular(manifest_path)
-    if manifest_path.stat().st_size > _MAX_MANIFEST_BYTES:
-        raise OfflineKitError("offline manifest exceeds size limit")
+    kit = Path(root).expanduser().absolute()
+    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+        try:
+            manifest_bytes, observed = _descriptor_inventory(kit)
+        except OSError as exc:
+            raise OfflineKitError("unsafe or inaccessible offline kit") from exc
+    else:
+        if kit.is_symlink():
+            raise OfflineKitError("symlinked offline kit root")
+        kit = kit.resolve(strict=True)
+        if not kit.is_dir():
+            raise OfflineKitError("kit root must be a directory")
+        manifest_path = kit / "manifest.json"
+        _regular(manifest_path)
+        if manifest_path.stat().st_size > _MAX_MANIFEST_BYTES:
+            raise OfflineKitError("offline manifest exceeds size limit")
+        manifest_bytes = manifest_path.read_bytes()
+        observed = _files(kit)
     try:
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data = json.loads(manifest_bytes, object_pairs_hook=_reject_duplicate_keys)
     except (OSError, ValueError, UnicodeError) as exc:
         raise OfflineKitError("invalid offline manifest") from exc
     if (
@@ -249,7 +260,6 @@ def verify(root: str | Path) -> dict[str, object]:
             or item["size_bytes"] < 0
         ):
             raise OfflineKitError("invalid kit artifact digest or size")
-    observed = _files(kit)
     if provided != observed:
         raise OfflineKitError("offline kit files differ from pinned manifest")
     if not (kit / "offline_kit.py").is_file() or not (kit / "wheelhouse").is_dir():
@@ -273,6 +283,100 @@ def verify(root: str | Path) -> dict[str, object]:
             raise OfflineKitError("invalid bundled model deployment") from exc
     return data
 
+
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    data: dict[str, object] = {}
+    for key, value in pairs:
+        if key in data:
+            raise OfflineKitError("duplicate offline manifest key")
+        data[key] = value
+    return data
+
+
+def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]]]:
+    """Read the manifest and hash the exact opened POSIX file descriptors.
+
+    Neither symlink swaps nor renamed ancestors can redirect an opened handle.
+    File and directory counts remain bounded before materialization.
+    """
+    root_fd = _open_directory_without_symlink_parents(root)
+    pending: list[tuple[int, tuple[str, ...]]] = [(os.dup(root_fd), ())]
+    records: list[dict[str, object]] = []
+    manifest: bytes | None = None
+    visited = 0
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    try:
+        while pending:
+            directory, prefix = pending.pop()
+            try:
+                with os.scandir(directory) as entries:
+                    for entry in entries:
+                        visited += 1
+                        if visited > MAX_FILES * 2:
+                            raise OfflineKitError("kit directory entry budget exceeded")
+                        parts = prefix + (entry.name,)
+                        if len(parts) > 35:
+                            raise OfflineKitError("kit path depth exceeded")
+                        relative = "/".join(parts)
+                        _relative(relative)
+                        info = os.stat(entry.name, dir_fd=directory, follow_symlinks=False)
+                        if stat.S_ISDIR(info.st_mode):
+                            child = os.open(
+                                entry.name, flags | os.O_DIRECTORY, dir_fd=directory,
+                            )
+                            pending.append((child, parts))
+                            continue
+                        if not stat.S_ISREG(info.st_mode):
+                            raise OfflineKitError("kit contains symlink or nonregular entry")
+                        opened = os.open(entry.name, flags, dir_fd=directory)
+                        with os.fdopen(opened, "rb") as reader:
+                            before = os.fstat(reader.fileno())
+                            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                                raise OfflineKitError("unsafe linked kit artifact")
+                            digest = hashlib.sha256()
+                            size = 0
+                            chunks: list[bytes] = []
+                            while True:
+                                chunk = reader.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                size += len(chunk)
+                                if relative == "manifest.json":
+                                    if size > _MAX_MANIFEST_BYTES:
+                                        raise OfflineKitError("offline manifest exceeds size limit")
+                                    chunks.append(chunk)
+                                else:
+                                    digest.update(chunk)
+                            after = os.fstat(reader.fileno())
+                            identity = lambda value: (
+                                value.st_dev, value.st_ino, value.st_size,
+                                value.st_mtime_ns, value.st_ctime_ns,
+                            )
+                            if size != before.st_size or identity(before) != identity(after):
+                                raise OfflineKitError("kit artifact changed during inventory")
+                        if relative == "manifest.json":
+                            manifest = b"".join(chunks)
+                        else:
+                            records.append({
+                                "path": relative, "sha256": digest.hexdigest(),
+                                "size_bytes": size,
+                            })
+                            if len(records) > MAX_FILES:
+                                raise OfflineKitError("too many kit files")
+            finally:
+                os.close(directory)
+        if manifest is None:
+            raise OfflineKitError("missing offline manifest")
+        records.sort(key=lambda item: item["path"])
+        return manifest, records
+    finally:
+        for descriptor, _ in pending:
+            os.close(descriptor)
+        os.close(root_fd)
 
 
 def _open_directory_without_symlink_parents(path: Path) -> int:
@@ -387,7 +491,7 @@ def install(root: str | Path, destination: str | Path) -> Path:
     from venv creation to first use. On failure, delete only that newly
     created target, never an existing operator installation or its parents.
     """
-    kit = Path(root).expanduser().resolve(strict=True)
+    kit = Path(root).expanduser().absolute()
     manifest = verify(kit)
     if manifest["environment"] != _environment():
         raise OfflineKitError("bundle Python/OS/architecture differs from this host")

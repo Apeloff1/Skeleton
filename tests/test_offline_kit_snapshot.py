@@ -192,3 +192,60 @@ def test_kit_inventory_keeps_canonical_sorted_manifest_order(tmp_path):
     assert next(entry for entry in inventory if entry["path"].endswith(".whl"))[
         "sha256"
     ] == hashlib.sha256(wheel.read_bytes()).hexdigest()
+
+
+def _verifiable_kit(tmp_path: Path) -> tuple[Path, dict[str, object], Path]:
+    root, manifest, wheel = _kit(tmp_path)
+    (root / "offline_kit.py").write_text("# independent bootstrap fixture\\n")
+    manifest.update({
+        "schema_version": offline_kit.SCHEMA,
+        "distribution": "skeleton",
+        "files": offline_kit._files(root),
+    })
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
+    return root, manifest, wheel
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored POSIX verification")
+def test_verify_rejects_symlinked_root_and_ancestor(tmp_path):
+    root, manifest, _ = _verifiable_kit(tmp_path)
+    assert offline_kit.verify(root) == manifest
+    original = tmp_path / "real-kit"
+    root.rename(original)
+    root.symlink_to(original, target_is_directory=True)
+    with pytest.raises(offline_kit.OfflineKitError, match="unsafe|inaccessible"):
+        offline_kit.verify(root)
+    root.unlink()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    original.rename(parent / "kit")
+    (tmp_path / "alias").symlink_to(parent, target_is_directory=True)
+    with pytest.raises(offline_kit.OfflineKitError, match="unsafe|inaccessible"):
+        offline_kit.verify(tmp_path / "alias" / "kit")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX hardlink identity contract")
+def test_verify_rejects_hardlinked_wheel_even_when_digest_matches(tmp_path):
+    root, _, wheel = _verifiable_kit(tmp_path)
+    os.link(wheel, tmp_path / "outside.whl")
+    with pytest.raises(offline_kit.OfflineKitError, match="linked"):
+        offline_kit.verify(root)
+
+
+def test_verify_rejects_ambiguous_duplicate_manifest_keys(tmp_path):
+    root, _, _ = _verifiable_kit(tmp_path)
+    path = root / "manifest.json"
+    raw = path.read_bytes()
+    path.write_bytes(raw.replace(b'"distribution":', b'"distribution":"foreign","distribution":', 1))
+    with pytest.raises(offline_kit.OfflineKitError, match="duplicate"):
+        offline_kit.verify(root)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX bounded descriptor inventory")
+def test_verify_rejects_directory_flood_before_hashing_unbounded_tree(tmp_path, monkeypatch):
+    root, _, _ = _verifiable_kit(tmp_path)
+    monkeypatch.setattr(offline_kit, "MAX_FILES", 2)
+    for index in range(16):
+        (root / f"unlisted-{index:03d}").write_bytes(b"extra")
+    with pytest.raises(offline_kit.OfflineKitError, match="entry budget"):
+        offline_kit.verify(root)
