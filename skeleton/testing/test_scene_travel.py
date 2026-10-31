@@ -160,3 +160,95 @@ def test_installed_skeleton_scene_cli(capsys) -> None:
     result = json.loads(capsys.readouterr().out)
     assert result["state"]["phase"] == "won"
     assert verify_session(result)["state"]["scene_id"] == "sanctuary"
+
+
+def test_interactive_play_and_terminal_checkpoint() -> None:
+    from io import StringIO
+    from skeleton.game.gameplay.scene_travel import play_interactive
+    world, _ = original_demo()
+    output = StringIO()
+    result = play_interactive(
+        world, input_stream=StringIO(
+            "collect find_key\ntravel north\ntravel inside\n"
+        ), output_stream=output, checkpoint_every=2,
+    )
+    events = [json.loads(line) for line in output.getvalue().splitlines()]
+    assert [event["event"] for event in events] == [
+        "started", "scene", "accepted", "scene", "accepted",
+        "checkpoint", "scene", "accepted", "checkpoint", "terminal",
+    ]
+    assert events[-2]["reason"] == "terminal"
+    assert verify_session(events[-2]["session"]) == result
+    assert events[-1]["ending"] == "victory"
+
+
+def test_interactive_eof_checkpoint_resumes_without_state_loss() -> None:
+    from io import StringIO
+    from skeleton.game.gameplay.scene_travel import play_interactive
+    world, _ = original_demo()
+    output = StringIO()
+    with pytest.raises(SceneTravelError, match="checkpoint emitted"):
+        play_interactive(
+            world, input_stream=StringIO("collect find_key\n"),
+            output_stream=output,
+        )
+    checkpoint = json.loads(output.getvalue().splitlines()[-1])
+    assert checkpoint["reason"] == "input_eof"
+    saved = verify_session(checkpoint["session"])
+    assert saved["state"]["tick"] == 1
+    resumed = play_interactive(
+        session=json.loads(json.dumps(saved)),
+        input_stream=StringIO("travel north\ntravel inside\n"),
+        output_stream=StringIO(),
+    )
+    assert resumed["state"]["phase"] == "won"
+    assert resumed["journal"][:1] == saved["journal"]
+
+
+def test_interactive_rejects_invalid_commands_without_mutation() -> None:
+    from io import StringIO
+    from skeleton.game.gameplay.scene_travel import play_interactive
+    world, _ = original_demo()
+    output = StringIO()
+    with pytest.raises(SceneTravelError, match="three invalid"):
+        play_interactive(
+            world, input_stream=StringIO("travel north\nbad\nbad\n"),
+            output_stream=output,
+        )
+    events = [json.loads(line) for line in output.getvalue().splitlines()]
+    assert [x["remaining_retries"] for x in events if x["event"] == "rejected"] == [
+        2, 1, 0,
+    ]
+    assert verify_session(events[-1]["session"])["state"]["tick"] == 0
+
+
+def test_interactive_source_digest_fence_and_interval() -> None:
+    from io import StringIO
+    from skeleton.game.gameplay.scene_travel import play_interactive
+    world, _ = original_demo()
+    with pytest.raises(SceneTravelError, match="trusted digest"):
+        play_interactive(
+            world, expected_source_digest="0" * 64,
+            input_stream=StringIO(), output_stream=StringIO(),
+        )
+    for interval in (0, 65, True, -1):
+        with pytest.raises(SceneTravelError, match="checkpoint interval"):
+            play_interactive(
+                world, checkpoint_every=interval,
+                input_stream=StringIO(), output_stream=StringIO(),
+            )
+
+
+def test_installed_interactive_scene_cli(monkeypatch, capsys) -> None:
+    import io
+    import sys
+    from skeleton.__main__ import main
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(
+            "collect find_key\ntravel north\ntravel inside\n"
+        ),
+    )
+    assert main(["scene-travel", "play", "--demo"]) == 0
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert events[-1]["event"] == "terminal"
+    assert events[-1]["ending"] == "victory"
