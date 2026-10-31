@@ -50,3 +50,68 @@ def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, 
         else:
             deferred.append(c)
     return StreamPlan(tuple(load), tuple(unload), tuple(deferred), used)
+
+
+# --- Heading-aware prioritisation (Wally LD review on #4268, note 7) ---
+# Nearest-first ignores travel direction; at speed this pops in ahead of the
+# player. Bias priority toward cells along the heading and any nav path.
+
+def _priority(c: CellId, focus: CellId, heading: tuple[float, float],
+              ahead_bias: float, path_rank: Mapping[CellId, int]) -> tuple[float, CellId]:
+    dx, dy = c[0] - focus[0], c[1] - focus[1]
+    cheb = max(abs(dx), abs(dy))
+    hx, hy = heading
+    norm = (hx * hx + hy * hy) ** 0.5
+    if cheb == 0 or norm == 0:
+        align = 0.0
+    else:
+        align = (dx * hx + dy * hy) / (norm * (dx * dx + dy * dy) ** 0.5)  # cosine in [-1, 1]
+    p = cheb - ahead_bias * align
+    if c in path_rank:
+        p = min(p, path_rank[c] * 0.5) - ahead_bias  # cells on the upcoming nav path go first
+    if cheb == 0:
+        p = float("-inf")  # the cell the player stands in always loads first
+    return (round(p, 9), c)
+
+
+def plan_tick_directed(focus: CellId, heading: tuple[float, float], resident: Iterable[CellId],
+                       sizes: Mapping[CellId, int], budget: StreamBudget,
+                       ahead_bias: float = 1.5, path: Iterable[CellId] = (),
+                       behind_radius: int | None = None) -> StreamPlan:
+    """Like ``plan_tick`` but loads cells ahead of the player (and on ``path``) first.
+
+    ``behind_radius`` optionally shrinks the wanted radius for cells behind the
+    heading (cosine < 0), freeing memory for look-ahead. Zero heading falls back
+    to nearest-first ordering, so stationary players behave like ``plan_tick``.
+    """
+    if ahead_bias < 0:
+        raise StreamingError("ahead_bias must be >= 0")
+    fx, fy = focus
+    hx, hy = heading
+    path_rank = {c: i for i, c in enumerate(path) if c in sizes}
+
+    def in_range(c: CellId) -> bool:
+        dx, dy = c[0] - fx, c[1] - fy
+        d = max(abs(dx), abs(dy))
+        if c in path_rank:
+            return True
+        if behind_radius is not None and dx * hx + dy * hy < 0:
+            return d <= min(behind_radius, budget.radius)
+        return d <= budget.radius
+
+    wanted = sorted((c for c in sizes if in_range(c)),
+                    key=lambda c: _priority(c, focus, heading, ahead_bias, path_rank))
+    wanted_set = set(wanted)
+    res = set(resident)
+    unload = sorted(c for c in res if c not in wanted_set)
+    used = sum(sizes.get(c, 0) for c in wanted if c in res)
+    load, deferred = [], []
+    for c in wanted:
+        if c in res:
+            continue
+        if len(load) < budget.max_loads_per_tick and used + sizes[c] <= budget.memory_bytes:
+            load.append(c)
+            used += sizes[c]
+        else:
+            deferred.append(c)
+    return StreamPlan(tuple(load), tuple(unload), tuple(deferred), used)

@@ -91,3 +91,49 @@ def score_paced(c: WorldCandidate, budget_ms: float, intensity: Sequence[float],
         + (("encounter_spacing",) if parts["encounter_spacing"] < 0.5 else ())
     total = round(sum(PACED_WEIGHTS[k] * v for k, v in parts.items()), 6)
     return ArenaScore(c.world_id, total, parts, not fails, fails)
+
+
+# --- Structured variety (Wally LD review on #4268, note 4) ---
+# unique-kinds / tile-count rewards noise. Readable space = several kinds
+# arranged in coherent regions. Score = normalised kind entropy x spatial
+# coherence above chance, so salt-and-pepper noise and monotone maps both score low.
+
+def structured_variety(tiles: Sequence[Sequence[str]], ideal_kinds: int = 4) -> float:
+    """Variety in [0, 1] for a 2D grid of tile kinds that penalises unstructured randomness."""
+    import math
+    from collections import Counter
+
+    if not tiles or not tiles[0] or len({len(r) for r in tiles}) != 1:
+        return 0.0
+    flat = [k for r in tiles for k in r]
+    counts = Counter(flat)
+    k = len(counts)
+    if k < 2:
+        return 0.0
+    n = len(flat)
+    probs = [v / n for v in counts.values()]
+    entropy = -sum(p * math.log(p) for p in probs) / math.log(k)
+    kinds_term = min(1.0, (k - 1) / max(1, ideal_kinds - 1))
+    same = pairs = 0
+    h, w = len(tiles), len(tiles[0])
+    for y in range(h):
+        for x in range(w):
+            for nx, ny in ((x + 1, y), (x, y + 1)):
+                if nx < w and ny < h:
+                    pairs += 1
+                    same += tiles[y][x] == tiles[ny][nx]
+    if not pairs:
+        return 0.0
+    chance = sum(p * p for p in probs)  # expected same-kind adjacency if tiles were shuffled
+    coherence = max(0.0, (same / pairs - chance) / (1 - chance)) if chance < 1 else 0.0
+    return round(entropy * kinds_term * coherence, 6)
+
+
+def score_structured(c: WorldCandidate, budget_ms: float, tiles: Sequence[Sequence[str]],
+                     constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None) -> ArenaScore:
+    """``score`` with variety replaced by ``structured_variety`` over the tile grid."""
+    base = score(c, budget_ms, constraints)
+    parts = dict(base.parts)
+    parts["variety"] = structured_variety(tiles)
+    return ArenaScore(c.world_id, round(sum(WEIGHTS[k] * v for k, v in parts.items()), 6),
+                      parts, base.passed, base.failures)
