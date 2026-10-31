@@ -6,6 +6,8 @@ import json
 import sys
 from typing import Sequence
 
+from .offline_receipt_publication import ReceiptPublicationError, publish_verified_receipt
+
 from .dual_runtime_verify import (
     DualRuntimeVerificationError, verify_exported_package,
 )
@@ -16,6 +18,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--package", required=True)
     parser.add_argument("--expected-manifest-sha256", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
+    parser.add_argument("--receipt-output", help="New atomic JSON receipt outside source roots")
     args = parser.parse_args(argv)
     try:
         receipt = verify_exported_package(
@@ -23,7 +26,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             expected_manifest_sha256=args.expected_manifest_sha256,
             authorized=args.trusted_local_operator,
         )
-    except (DualRuntimeVerificationError, PermissionError, OSError) as exc:
+        if args.receipt_output:
+            publish_verified_receipt(
+                receipt, args.receipt_output,
+                protected_roots=(args.package,),
+                authorized=args.trusted_local_operator,
+            )
+    except (DualRuntimeVerificationError, ReceiptPublicationError, PermissionError, OSError) as exc:
         print(json.dumps({
             "verified": False, "error": type(exc).__name__,
             "reason": str(exc)[:200],

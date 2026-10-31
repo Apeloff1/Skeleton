@@ -135,3 +135,18 @@ def test_added_and_removed_projects_are_source_bound(tmp_path):
     )
     assert result["classification_counts"]["added"] == 1
     assert result["classification_counts"]["removed"] == 1
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="POSIX receipt publication")
+def test_delta_cli_publishes_replay_bound_receipt(cohorts, tmp_path, capsys):
+    left, left_pin, right, right_pin = cohorts
+    output = tmp_path / "delta-receipt.json"
+    assert studio_cli([
+        "diff-batch", "--left-root", str(left),
+        "--left-index-sha256", left_pin, "--right-root", str(right),
+        "--right-index-sha256", right_pin, "--trusted-local-operator",
+        "--receipt-output", str(output),
+    ]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert json.loads(output.read_text()) == receipt
+    assert receipt["both_cohorts_replayed"] is True

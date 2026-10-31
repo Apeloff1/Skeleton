@@ -6,6 +6,8 @@ import json
 import sys
 from typing import Sequence
 
+from .offline_receipt_publication import ReceiptPublicationError, publish_verified_receipt
+
 from .offline_export_batch import OfflineBatchVerificationError
 from .offline_export_batch_delta import compare_export_batches
 
@@ -17,6 +19,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--right-root", required=True)
     parser.add_argument("--right-index-sha256", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
+    parser.add_argument("--receipt-output", help="New atomic JSON receipt outside source roots")
     args = parser.parse_args(argv)
     try:
         result = compare_export_batches(
@@ -25,7 +28,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             right_index_sha256=args.right_index_sha256,
             authorized=args.trusted_local_operator,
         )
-    except (OfflineBatchVerificationError, PermissionError, OSError) as exc:
+        if args.receipt_output:
+            publish_verified_receipt(
+                result, args.receipt_output,
+                protected_roots=(args.left_root, args.right_root),
+                authorized=args.trusted_local_operator,
+            )
+    except (OfflineBatchVerificationError, ReceiptPublicationError, PermissionError, OSError) as exc:
         print(json.dumps({
             "verified": False, "error": type(exc).__name__,
             "reason": str(exc)[:200],

@@ -76,3 +76,15 @@ python -m skeleton.ai.game_builder.original_game_studio_cli diff-batch \
 The receipt binds both independently pinned cohort receipts and every
 project-level change. It is an inspection result only: it does not install,
 migrate, deploy, execute native binaries, grant rights or certify release.
+
+## Durable local verification receipts
+
+The `verify-export`, `verify-batch` and `diff-batch` CLI commands accept
+`--receipt-output /private/verified-receipt.json`. This is an optional
+POSIX-only, owner-controlled, atomic no-clobber JSON publication of the
+actual canonical replay result. Output must be outside every verified source
+root. Symlinked parent directories, group/world-writable parents, existing
+filenames and failed verification are rejected without overwriting evidence.
+The receipt is **not** a signature, publisher attestation, rights clearance,
+native Godot execution or device qualification. Transfer the independent
+source/index SHA-256 pins separately from the untrusted package.

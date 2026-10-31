@@ -289,3 +289,32 @@ def test_replaced_package_root_during_replay_cannot_receive_receipt(package, mon
             root, expected_manifest_sha256=pin, authorized=True,
         )
     assert original.is_dir()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX atomic receipt custody")
+def test_verify_export_cli_publishes_no_clobber_receipt(package, tmp_path, capsys):
+    root, pin = package
+    receipt_file = tmp_path / "verification.json"
+    command = ["--package", str(root), "--expected-manifest-sha256", pin,
+               "--trusted-local-operator", "--receipt-output", str(receipt_file)]
+    assert main(command) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert json.loads(receipt_file.read_text()) == payload
+    assert receipt_file.stat().st_mode & 0o077 == 0
+    assert main(command) == 2
+    assert json.loads(receipt_file.read_text()) == payload
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX atomic receipt custody")
+def test_verify_export_receipt_rejects_source_write_and_symlink_parent(package, tmp_path):
+    root, pin = package
+    base = ["--package", str(root), "--expected-manifest-sha256", pin,
+            "--trusted-local-operator", "--receipt-output"]
+    assert main([*base, str(root / "receipt.json")]) == 2
+    assert not (root / "receipt.json").exists()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(outside, target_is_directory=True)
+    assert main([*base, str(alias / "receipt.json")]) == 2
+    assert not (outside / "receipt.json").exists()

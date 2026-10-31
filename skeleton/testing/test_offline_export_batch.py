@@ -244,3 +244,18 @@ def test_batch_rejects_root_path_swap_after_replay(batch, monkeypatch, tmp_path)
     monkeypatch.setattr(batch_module, "verify_exported_package", replace_root_after_replay)
     with pytest.raises(OfflineBatchVerificationError, match="batch verification rejected"):
         verify_export_batch(root, expected_index_sha256=pin, authorized=True)
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="POSIX receipt publication")
+def test_batch_cli_persists_verified_replay_receipt(batch, tmp_path, capsys):
+    from skeleton.ai.game_builder.offline_export_batch_cli import main as batch_cli
+    root, pin, _ = batch
+    output = tmp_path / "batch-receipt.json"
+    args = ["--root", str(root), "--expected-index-sha256", pin,
+            "--trusted-local-operator", "--receipt-output", str(output)]
+    assert batch_cli(args) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert json.loads(output.read_text()) == receipt
+    assert receipt["offline_gameplay_reexecuted"] is True
+    assert batch_cli(args) == 2
+    assert json.loads(output.read_text()) == receipt
