@@ -72,6 +72,14 @@ _READINESS = {
         "The local model artifact could not be loaded safely.",
         "Ask an administrator to replace the artifact with a valid governed model and restart the engine.",
     ),
+    "local_guard_unavailable": (
+        "Local AI is unavailable because its required safety components are not configured.",
+        "Ask an administrator to complete the trusted local AI setup and restart the engine.",
+    ),
+    "local_guard_configuration_invalid": (
+        "The local AI safety configuration is invalid.",
+        "Ask an administrator to correct the local AI safety configuration and restart the engine.",
+    ),
     "local_artifact_identity_invalid": (
         "The activated local model identity changed.",
         "Ask an administrator to verify its artifact and restart the engine.",

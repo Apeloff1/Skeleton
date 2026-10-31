@@ -1,5 +1,14 @@
 # Guarded local inference readiness — 2026-10-28
 
+# Later status (2026-10-31)
+
+The historical findings below describe the October 28 candidate. Current main
+requires the local guard by default, but the default Compose engine startup does
+not supply its trusted bootstrap dependencies. Local inference therefore fails
+closed; the setup instructions cannot yet activate it. Production qualification
+still needs trusted state authorities, a bounded independent reviewer and
+tokenizer attestation tied to the activated GGUF backend.
+
 The sealed-context guard is available only through explicit trusted application
 composition. The normal local provider path does not enable this protection by
 default. **Docker Compose and the Dockerfile do not supply the required trusted

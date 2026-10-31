@@ -8,6 +8,11 @@ and Mongo services. This guide covers installation, optional local weights,
 durable chat and bounded web capture. It does not certify production deployment,
 every-console compatibility, studio mastery or automatic improvement in quality.
 
+**Local chat is currently blocked:** default Compose startup does not supply the
+trusted components required by the local inference guard. Preparing a model does
+not resolve that missing bootstrap. A consumer installation has not been qualified
+on the target Windows laptop.
+
 ## Start the application
 
 From the repository root, with Python and Docker Compose installed and the
