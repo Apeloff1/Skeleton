@@ -100,6 +100,16 @@ class AdmissionDecision:
     snapshot_digest: str
 
 
+@dataclass(frozen=True, slots=True)
+class KVReclamationReceipt:
+    """Deterministic cache reclamation, with no active or pinned KV eviction."""
+    evicted: tuple[str, ...]
+    reclaimed_bytes: int
+    resident_bytes: int
+    target_bytes: int
+    snapshot_digest: str
+
+
 class RuntimeAdmissionScheduler:
     """Stateful, deterministic and fail-closed local inference admission scheduler."""
 
@@ -296,6 +306,55 @@ class RuntimeAdmissionScheduler:
             self._active[request_id] = ScheduledRequest(active.request, active.kv_bytes, active.enqueue_sequence, pinned)
         self._sequence += 1
 
+    def trim_retained_kv(self, *, target_bytes: int) -> KVReclamationReceipt:
+        """Atomically evict oldest unpinned retained KV to a measured byte target.
+
+        Active decoding state and explicitly pinned retained state are never
+        reclaimed. If the requested target cannot be achieved without them,
+        leave the entire scheduler unchanged and fail closed.
+        """
+        if type(target_bytes) is not int or not 0 <= target_bytes <= self.limits.kv_capacity_bytes:
+            raise ModelRuntimeError("invalid KV reclamation target")
+        used = sum(entry.bytes for entry in self._kv.values())
+        victims: list[KVCacheEntry] = []
+        remaining = used
+        if used > target_bytes:
+            candidates = sorted(
+                (entry for entry in self._kv.values()
+                 if entry.request_id not in self._active and not entry.pinned),
+                key=lambda entry: (entry.last_used_sequence, entry.request_id),
+            )
+            for entry in candidates:
+                if remaining <= target_bytes:
+                    break
+                victims.append(entry)
+                remaining -= entry.bytes
+            if remaining > target_bytes:
+                raise ModelRuntimeError("KV reclamation would evict active or pinned state")
+        for entry in victims:
+            self._kv.pop(entry.request_id)
+        if victims:
+            self._sequence += 1
+        snapshot = self.snapshot()
+        return KVReclamationReceipt(
+            tuple(entry.request_id for entry in victims),
+            used - remaining, remaining, target_bytes, str(snapshot["digest"])
+        )
+
+    def reclaim_for_headroom(
+        self, *, available_memory_bytes: int, reserve_bytes: int = 0,
+    ) -> KVReclamationReceipt:
+        """Tighten resident KV to a caller-measured free-memory allowance.
+
+        The caller owns OS telemetry and must not substitute unknown with zero.
+        This does not create a device reservation or modify active allocations.
+        """
+        for name, value in (("available_memory_bytes", available_memory_bytes), ("reserve_bytes", reserve_bytes)):
+            if type(value) is not int or not 0 <= value < 1 << 63:
+                raise ModelRuntimeError(f"invalid {name}")
+        target = min(self.limits.kv_capacity_bytes, max(0, available_memory_bytes - reserve_bytes))
+        return self.trim_retained_kv(target_bytes=target)
+
     def capacity(self) -> dict[str, int]:
         kv_used = sum(entry.bytes for entry in self._kv.values())
         queued_tokens = sum(item.request.prompt_tokens + item.request.max_new_tokens for item in self._queued.values())
@@ -383,6 +442,7 @@ class RuntimeAdmissionScheduler:
 
 
 __all__ = [
+    "KVReclamationReceipt",
     "AdmissionDecision",
     "AdmissionLimits",
     "RuntimeAdmissionScheduler",
