@@ -42,6 +42,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Verified first authored revision bundle")
     ap.add_argument("--merge-right-source", type=Path,
                     help="Verified second authored revision bundle")
+    ap.add_argument("--cherry-pick-revision", action="store_true",
+                    help="Transplant selected donor prose into a verified target revision")
+    ap.add_argument("--cherry-pick-paths", metavar="JSON",
+                    help="Exact selected authored source paths, e.g. [[\\"narrative\\",\\"premise\\"]]")
     ap.add_argument("--revision-impact", action="store_true",
                     help="Compare canonical source against a verified authored revision")
     ap.add_argument("--revision-compare-source", type=Path,
@@ -293,6 +297,56 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.merge_left_source is not None or args.merge_right_source is not None:
         ap.error("--merge-left-source and --merge-right-source require --merge-revisions")
+    if args.cherry_pick_revision:
+        if (not args.project or args.revision_compare_source is None
+                or args.cherry_pick_paths is None or args.output is None
+                or args.author_revision or args.merge_revisions or args.revision_lineage
+                or args.revision_impact or args.audit_canon or args.ending_plan
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.revision_request is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None):
+            ap.error("--cherry-pick-revision requires --project, donor, paths and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_author_cherry_pick import (
+            cherry_pick_canon_revision,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            if len(args.cherry_pick_paths.encode("utf-8", "strict")) > 8192:
+                raise StudioQuestError("authored cherry-pick path request too large")
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate cherry-pick JSON key")
+                    result[key] = value
+                return result
+            paths = json.loads(
+                args.cherry_pick_paths, object_pairs_hook=unique,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite cherry-pick path JSON")),
+            )
+            base = read_blueprint(args.project)
+            donor = load_revision_bundle(
+                args.revision_compare_source, authorized=True, project_id=args.project)[0]
+            target = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None else base)
+            revised, html, receipt, impact = cherry_pick_canon_revision(
+                base, donor, target, paths, authorized=True)
+            write_revision_bundle(args.output, revised, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"receipt": receipt, "impact": impact},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.cherry_pick_paths is not None:
+        ap.error("--cherry-pick-paths requires --cherry-pick-revision")
     if args.revision_impact:
         if (not args.project or args.revision_compare_source is None
                 or args.author_revision or args.audit_canon or args.play_walk

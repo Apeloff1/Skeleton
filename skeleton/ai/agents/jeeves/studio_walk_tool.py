@@ -511,6 +511,80 @@ def execute_author_merge_tool(request: Mapping[str, Any], *,
     return result
 
 
+
+AUTHOR_CHERRY_PICK_REQUEST_SCHEMA = "skeleton.jeeves.studio_author_cherry_pick_request.v1"
+AUTHOR_CHERRY_PICK_RESULT_SCHEMA = "skeleton.jeeves.studio_author_cherry_pick_result.v1"
+
+
+def author_cherry_pick_tool_schema() -> dict[str, object]:
+    """Discoverable operator-authorized selective source transplant preview."""
+    return {
+        "name": "studio_author_cherry_pick",
+        "description": "Select source-leased original prose from a donor into a distinct revision",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": AUTHOR_CHERRY_PICK_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "donor_edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                                "items": {"type": "object"}},
+                "target_edits": {"type": "array", "maxItems": 16,
+                                 "items": {"type": "object"}},
+                "selected_paths": {"type": "array", "minItems": 1, "maxItems": 16,
+                                   "items": {"type": "array", "minItems": 2, "maxItems": 4}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "donor_edits", "target_edits", "selected_paths"],
+        },
+    }
+
+
+def execute_author_cherry_pick_tool(request: Mapping[str, Any], *,
+                                    authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves authored cherry-pick requires operator authorization")
+    if (type(request) is not dict
+            or set(request) != {"schema", "project_id", "expected_source_digest",
+                                "donor_edits", "target_edits", "selected_paths"}
+            or request.get("schema") != AUTHOR_CHERRY_PICK_REQUEST_SCHEMA
+            or len(_canonical(request)) > 32768):
+        raise StudioQuestError("invalid typed Jeeves authored cherry-pick request")
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+        REVISION_SCHEMA, preview_canon_revision,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_author_cherry_pick import (
+        cherry_pick_canon_revision,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+    base = read_blueprint(request["project_id"])
+    proof = audit_canon_source(base, authorized=True)
+    if request["expected_source_digest"] != proof["source_digest"]:
+        raise StudioQuestError("stale Jeeves authored cherry-pick root")
+    def preview(edits):
+        return preview_canon_revision(base, {
+            "schema": REVISION_SCHEMA, "project_id": request["project_id"],
+            "expected_source_digest": proof["source_digest"], "edits": edits,
+        }, authorized=True)[0]
+    donor = preview(request["donor_edits"])
+    target_edits = request["target_edits"]
+    if type(target_edits) is not list:
+        raise StudioQuestError("invalid Jeeves cherry-pick target edits")
+    target = preview(target_edits) if target_edits else base
+    _, _, receipt, impact = cherry_pick_canon_revision(
+        base, donor, target, request["selected_paths"], authorized=True)
+    payload = {
+        "schema": AUTHOR_CHERRY_PICK_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": receipt, "impact": impact,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
+
+
 AUTHOR_LINEAGE_REQUEST_SCHEMA = "skeleton.jeeves.studio_author_lineage_request.v1"
 AUTHOR_LINEAGE_RESULT_SCHEMA = "skeleton.jeeves.studio_author_lineage_result.v1"
 

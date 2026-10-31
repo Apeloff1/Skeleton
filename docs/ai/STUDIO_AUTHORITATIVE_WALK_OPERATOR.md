@@ -495,3 +495,21 @@ replay digests and unbound ending predicates; a simulated route does not
 invent missing external evidence, grant rewards to the player's saved game,
 or certify a narrative ending. The typed Jeeves `studio_ending_plan` tool
 exposes the same read-only source-bound plan and explicit external holds.
+
+### Selective original-world prose cherry-pick (Studio A)
+
+Use `--project PROJECT --cherry-pick-revision --revision-compare-source DONOR
+--revision-source TARGET --cherry-pick-paths '[["narrative","premise"]]'
+--output NEW_DIRECTORY` to transplant only explicitly selected, author-editable
+donor prose into a different verified target. Omit `--revision-source` to
+target the registered original. All inputs must share a registered base, pass
+canon proof and preserve every protected quest, visual, verification and
+identity field. Overlapping divergent edits, unchanged selections, duplicate
+paths, malformed Unicode/JSON, oversized sources and stale bundles fail closed.
+The new private export includes source.json, playable story.html and a digest
+receipt with base/donor/target provenance. It never overwrites earlier saves or
+grants model file access. The typed `studio_author_cherry_pick` Jeeves preview
+accepts donor and target edit batches with explicit selected paths, returning
+the same deterministic source-bound impact without writing files. Content
+digests are not signatures, authorship proof, native engine qualification or
+release certification.
