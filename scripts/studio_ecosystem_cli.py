@@ -267,7 +267,8 @@ def main(argv: list[str] | None = None) -> int:
                 or args.compile_preview or args.materialize_batch
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
                 or args.search is not None or args.deep_search or args.genre
-                or args.biome or (args.output is not None and not (args.dialogue_export or args.dialogue_fork_index is not None))
+                or args.biome or (args.output is not None and not (args.dialogue_export or args.dialogue_fork_index is not None
+                                                     or args.dialogue_route_scene is not None))
                 or args.quest_actions is not None
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
@@ -277,8 +278,7 @@ def main(argv: list[str] | None = None) -> int:
                     or args.dialogue_compare_actions is not None
                     or args.dialogue_transcript or args.dialogue_commit
                     or args.dialogue_preview or args.dialogue_restore_stdin
-                    or args.dialogue_export or args.dialogue_import is not None
-                    or args.output is not None)
+                    or args.dialogue_export or args.dialogue_import is not None)
                 or args.dialogue_route_scene is None and
                     args.dialogue_route_choices is not None):
             ap.error("dialogue route requires --dialogue-route-scene exclusively")
@@ -382,6 +382,19 @@ def main(argv: list[str] | None = None) -> int:
                     docs, actions, target_scene_id=args.dialogue_route_scene,
                     preferred_alternatives=preferences, authorized=True,
                     expected_source_digest=args.dialogue_expected_digest)
+                if args.output is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                        export_dialogue_handoff,
+                    )
+                    handoff = export_dialogue_handoff(
+                        args.output, docs, result["planned_quest_receipt"]["choices"],
+                        expected_source_digest=result["source_digest"],
+                        authorized=True)
+                    result = {
+                        "route": result, "handoff": handoff,
+                        "file_write_performed": True,
+                        "release_certified": False,
+                    }
             elif args.dialogue_checkpoints:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_checkpoints import (
                     page_dialogue_checkpoints,

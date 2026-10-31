@@ -127,3 +127,30 @@ def test_cli_and_typed_jeeves_route_parity(capsys):
               "--dialogue-route-choices", "{}"])
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--dialogue-route-scene", target])
+
+def test_route_private_handoff_is_source_replayable_and_exclusive(tmp_path, capsys):
+    from scripts.studio_ecosystem_cli import main
+    docs, target, source = _fixture()
+    output = tmp_path / "npc-route"
+    args = [
+        "--project", PROJECT, "--dialogue-stage",
+        "--dialogue-actions", "[]",
+        "--dialogue-route-scene", target,
+        "--dialogue-expected-digest", source,
+        "--output", str(output),
+    ]
+    assert main(args) == 0
+    written = json.loads(capsys.readouterr().out)
+    assert written["file_write_performed"] is True
+    assert written["route"]["file_write_performed"] is False
+    assert written["handoff"]["file_write_performed"] is True
+    assert main([
+        "--project", PROJECT, "--dialogue-stage",
+        "--dialogue-import", str(output),
+        "--dialogue-expected-digest", source,
+    ]) == 0
+    restored = json.loads(capsys.readouterr().out)
+    assert restored["session_digest"] == written["route"]["planned_session_digest"]
+    with pytest.raises(SystemExit):
+        main(args)
+    assert sorted(p.name for p in output.iterdir()) == ["dialogue.json", "receipt.json"]

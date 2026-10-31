@@ -718,3 +718,14 @@ Reopen with `--dialogue-stage --dialogue-import <directory>` against the
 same project/source; the import replays and checks every authored cue and
 manifest digest. The original save is not overwritten. Without `--output`,
 fork remains a read-only operation with CLI/Jeeves parity.
+
+## Private NPC scene route handoff
+
+Add `--output <new-directory>` to the source-verified NPC scene route
+command to atomically persist the *planned* canonical quest history as an
+exclusive private dialogue handoff. This uses the same secure, fsynced,
+no-follow two-file exporter and source-checked importer as authored NPC
+handoffs; it does not commit game-engine actions or claim the scene was
+played. The returned wrapper distinguishes the deterministic read-only
+route proof from the written handoff receipt. Reopen with
+`--dialogue-stage --dialogue-import <directory>` and an exact source lease.
