@@ -1,0 +1,123 @@
+"""Application integration of conservative in-flight pressure and tail timing."""
+from __future__ import annotations
+
+import pytest
+
+from skeleton.ai.model_runtime.tail_inflight_guard import (
+    InFlightCPUResourceGuard, InFlightPressureDenied,
+    InFlightPressurePolicy,
+)
+from skeleton.ai.model_runtime.tail_latency_profile import ProfileIdentity
+from skeleton.ai.model_runtime.tail_live_capture import LiveTailCapture
+from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+from skeleton.app.offline_resources import LocalResourceSnapshot
+from skeleton.app.offline_tail_inflight import (
+    InFlightLifecycleQuarantined, OfflineTailInFlightSession,
+)
+
+
+def snapshot(_):
+    return LocalResourceSnapshot(
+        total_ram_bytes=8 << 30, available_ram_bytes=4 << 30,
+        total_disk_bytes=100 << 30, free_disk_bytes=50 << 30,
+        cpu_count=8, cpu_load_ratio=0.2,
+    )
+
+
+def thermal():
+    return (CPUThermalSensor("zone0", "cpu", 40.0, 90.0),)
+
+
+def controller(*, ticks=(10, 20, 40), capture_probe=snapshot):
+    policy = InFlightPressurePolicy(
+        min_ram_bytes=1 << 20, min_disk_bytes=1 << 20,
+        max_cpu_load_ppm=900_000, max_memory_pressure_ppm=900_000,
+        max_generated_tokens=256, max_quantum_tokens=64,
+    )
+    guard = InFlightCPUResourceGuard(
+        policy, storage_path=".", simulated=True,
+        resource_probe=snapshot, thermal_probe=thermal,
+    )
+    identity = ProfileIdentity(
+        "a" * 64, "b" * 64, "c" * 64, "d" * 64,
+        "e" * 40, "native", "simulated-cpu", "simulated",
+    )
+    capture = LiveTailCapture(
+        identity, storage_path=".",
+        clock=iter(ticks).__next__, resource_probe=capture_probe,
+    )
+    return OfflineTailInFlightSession(guard, capture)
+
+
+def test_simulated_app_lifecycle_records_tail_without_production_admission():
+    app = controller()
+    start = app.begin(request_id="a", prompt_tokens=16)
+    assert start.state == "running"
+    assert start.continue_execution is False
+    assert start.gpu_device_qualified is False
+    app.first_token()
+    step = app.checkpoint(generated_tokens=8)
+    assert step.generated_tokens == 8
+    done, timing = app.complete(output_tokens=8)
+    assert done.state == "completed"
+    assert done.continue_execution is False
+    assert timing.request_id == "a"
+    with pytest.raises(InFlightPressureDenied):
+        app.begin(request_id="b", prompt_tokens=1)
+
+
+def test_duplicate_begin_does_not_reuse_controller():
+    app = controller()
+    app.begin(request_id="a", prompt_tokens=2)
+    with pytest.raises(InFlightPressureDenied, match="one in-flight"):
+        app.begin(request_id="a", prompt_tokens=2)
+
+
+def test_capture_failure_quarantines_after_guard_started():
+    app = controller()
+    with pytest.raises(InFlightLifecycleQuarantined, match="capture failed"):
+        app.begin(request_id="bad\nrequest", prompt_tokens=1)
+    assert app.status().telemetry_quarantined
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.begin(request_id="other", prompt_tokens=1)
+
+
+def test_first_token_failure_quarantines():
+    app = controller(ticks=(20, 10))
+    app.begin(request_id="a", prompt_tokens=1)
+    with pytest.raises(InFlightLifecycleQuarantined, match="first-token"):
+        app.first_token()
+    assert app.status().telemetry_quarantined
+
+
+def test_late_capture_failure_does_not_report_success():
+    def broken_probe(path):
+        broken_probe.calls += 1
+        if broken_probe.calls > 1:
+            raise OSError("telemetry failed")
+        return snapshot(path)
+
+    broken_probe.calls = 0
+    app = controller(capture_probe=broken_probe)
+    app.begin(request_id="a", prompt_tokens=1)
+    app.first_token()
+    with pytest.raises(InFlightLifecycleQuarantined, match="completion"):
+        app.complete(output_tokens=1)
+    assert app.status().telemetry_quarantined
+    assert not app.status().continue_execution
+
+
+def test_abort_is_terminal():
+    app = controller()
+    app.begin(request_id="a", prompt_tokens=1)
+    assert app.abort().state == "aborted"
+    with pytest.raises(InFlightPressureDenied):
+        app.complete(output_tokens=1)
+
+
+def test_no_first_token_without_begin():
+    app = controller()
+    with pytest.raises(InFlightPressureDenied):
+        app.first_token()
+    with pytest.raises(InFlightPressureDenied):
+        app.checkpoint(generated_tokens=1)
