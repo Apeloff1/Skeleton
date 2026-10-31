@@ -19,6 +19,8 @@ from skeleton.ai.model_runtime.native_fair_stream_backend import (
     NativeFairStreamBackend, NativePromptRegistry, pin_native_prompt,
 )
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+from skeleton.ai.model_runtime.fair_stream_session import DurableFairStreamSession
+from skeleton.app.offline_dispatch_bridge import OfflineAdaptiveDispatchService
 from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle
 from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
 from skeleton.ai.model_runtime.native_token_pressure import NativeTokenPressureGuard
@@ -86,3 +88,31 @@ def stage_native_cpu_prompt(
         max_output_tokens=max_output_tokens,
     )
     registry.stage(pinned)
+
+
+def bind_native_cpu_dispatch_service(
+    *, session: DurableFairStreamSession, runtime: NativeLLMRuntime,
+    registry: NativePromptRegistry, result_handle: PrivateSQLiteHandle,
+    journal: FairStreamExecutionJournal, result_key: bytes,
+    sampler: LiveStreamBudgetSampler, storage_path: str,
+) -> tuple[OfflineAdaptiveDispatchService, SealedFairStreamResultVault]:
+    """End-to-end app composition without manufacturing keys or CPU telemetry.
+
+    Caller owns a verified session, an independent durable CAS anchor, and
+    three distinct custody roles (session, journal, encrypted result).
+    This method never bootstraps or resets durable state on restart.
+    """
+    if type(session) is not DurableFairStreamSession:
+        raise ValueError("canonical authenticated dispatch session required")
+    state = session.verify()
+    if state.get("session_id") != registry.session_id:
+        raise ValueError("app session and native prompt registry mismatch")
+    owner, vault = bind_native_cpu_result_owner(
+        runtime=runtime, registry=registry, result_handle=result_handle,
+        journal=journal, result_key=result_key,
+        sampler=sampler, storage_path=storage_path,
+    )
+    service = OfflineAdaptiveDispatchService(
+        session, owner, sampler=sampler, storage_path=storage_path,
+    )
+    return service, vault

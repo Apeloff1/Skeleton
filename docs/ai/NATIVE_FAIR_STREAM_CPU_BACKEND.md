@@ -43,3 +43,12 @@ stops on missing evidence, RAM pressure, thermal hold or probe exhaustion,
 and retains a stopped state after any failure. A stop is not a successful
 completion or a retry permit. The outer journal must reconcile the uncertain
 RUNNING intent through the authorized recovery path.
+
+The application can compose the entire canonical pipeline with
+`bind_native_cpu_dispatch_service` after it has opened independent private
+result and journal handles and a session with external CAS. It returns an
+`OfflineAdaptiveDispatchService` and the encrypted vault; callers retain
+ownership of all handles and must not retry an uncertain RUNNING lease.
+
+End-to-end deterministic integration coverage:
+`python -m pytest -q skeleton/testing/test_offline_native_fair_stream.py`.
