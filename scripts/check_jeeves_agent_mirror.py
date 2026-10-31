@@ -8,13 +8,13 @@ every ancestor, not merely symlinks visible in a prior path check.
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack
 import errno
 import hashlib
 import json
 import os
-from pathlib import Path
 import stat
+from contextlib import ExitStack
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = Path("skeleton/jeeves/agent")
@@ -82,9 +82,14 @@ def _source_bytes(root: Path, relative: Path) -> bytes:
                 chunks.append(part)
                 total += len(part)
             after = os.fstat(fd)
-            identity = lambda s: (
-                s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns
-            )
+            def identity(snapshot: os.stat_result) -> tuple[int, int, int, int, int]:
+                return (
+                    snapshot.st_dev,
+                    snapshot.st_ino,
+                    snapshot.st_size,
+                    snapshot.st_mtime_ns,
+                    snapshot.st_ctime_ns,
+                )
             if total > MAX_SOURCE_BYTES or total != before.st_size or identity(before) != identity(after):
                 raise SourceBlocked("unsafe")
             return b"".join(chunks)
