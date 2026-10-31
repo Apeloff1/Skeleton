@@ -580,3 +580,54 @@ def execute_author_lineage_tool(request: Mapping[str, Any], *,
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+ENDING_PLAN_REQUEST_SCHEMA = "skeleton.jeeves.studio_ending_plan_request.v1"
+ENDING_PLAN_RESULT_SCHEMA = "skeleton.jeeves.studio_ending_plan_result.v1"
+
+
+def ending_plan_tool_schema() -> dict[str, object]:
+    """Discoverable offline quest plan, not a promise of a reachable ending."""
+    return {
+        "name": "studio_ending_plan",
+        "description": "Replay-verify an authored sandbox ending itinerary and expose external holds",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": ENDING_PLAN_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "ending_id": {"type": "string", "minLength": 1, "maxLength": 256},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+            },
+            "required": ["schema", "project_id", "ending_id", "actions"],
+        },
+    }
+
+
+def execute_ending_plan_tool(request: Mapping[str, Any], *,
+                             authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves ending plan requires operator authorization")
+    if (type(request) is not dict
+            or set(request) != {"schema", "project_id", "ending_id", "actions"}
+            or request.get("schema") != ENDING_PLAN_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves ending plan request")
+    from skeleton.ai.game_builder.studio_ecosystem_ending_plan import plan_authored_ending
+    from skeleton.ai.game_builder.studio_ecosystem_quest import replay_quest
+    source = read_blueprint(request["project_id"])
+    session = replay_quest(source, request["actions"], authorized=True)
+    detail = plan_authored_ending(
+        source, ending_id=request["ending_id"], session=session, authorized=True)
+    result = {
+        "schema": ENDING_PLAN_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    result["result_digest"] = _digest(result)
+    return result

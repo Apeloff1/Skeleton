@@ -29,6 +29,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--ending-plan", action="store_true",
+                    help="Replay-verify a deterministic authored quest route toward one ending")
+    ap.add_argument("--ending-id", help="Exact authored ending ID for --ending-plan")
     ap.add_argument("--revision-lineage", action="store_true",
                     help="Verify an ordered source-leased original authoring history")
     ap.add_argument("--revision-lineage-source", type=Path, action="append",
@@ -188,6 +191,44 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.ending_plan:
+        if (not args.project or not args.ending_id or args.play_quest
+                or args.play_walk or args.author_revision or args.merge_revisions
+                or args.revision_lineage or args.revision_impact or args.audit_canon
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.output is not None or args.limit != 20
+                or args.max_artifact_bytes is not None or args.revision_source is not None):
+            ap.error("--ending-plan requires --project and --ending-id, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_ending_plan import plan_authored_ending
+        from skeleton.ai.game_builder.studio_ecosystem_quest import (
+            StudioQuestError, replay_quest,
+        )
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("ending plan actions exceed byte budget")
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate ending plan JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(encoded, object_pairs_hook=unique,
+                                 parse_constant=lambda _: (_ for _ in ()).throw(
+                                     StudioQuestError("nonfinite ending plan JSON")))
+            docs = read_blueprint(args.project)
+            session = replay_quest(docs, actions, authorized=True)
+            result = plan_authored_ending(
+                docs, ending_id=args.ending_id, session=session, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.ending_id is not None:
+        ap.error("--ending-id requires --ending-plan")
     if args.revision_lineage:
         if (not args.project or not args.revision_lineage_source
                 or len(args.revision_lineage_source) > 8 or args.output is not None

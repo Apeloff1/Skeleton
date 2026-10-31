@@ -482,3 +482,16 @@ conservative replay lease invalidation without writing files. The typed
 edit batches, uses the same canonical editor and verifier, and never grants
 the model filesystem privileges. Digests are integrity checks, not signatures
 or proof of authorship, rights or consumer readiness.
+
+
+### Source-bound ending itinerary (Studio A)
+
+Use `--project PROJECT --ending-plan --ending-id ENDING`, optionally with
+`--quest-actions JSON` containing previously completed [stage, alternative]
+pairs. The planner validates the authored quest DAG, replays the original
+session and simulates the minimal dependency-closed set of remaining stages
+using deterministic authored alternatives. It reports exact stage choices,
+replay digests and unbound ending predicates; a simulated route does not
+invent missing external evidence, grant rewards to the player's saved game,
+or certify a narrative ending. The typed Jeeves `studio_ending_plan` tool
+exposes the same read-only source-bound plan and explicit external holds.
