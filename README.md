@@ -109,8 +109,6 @@ uname -m
 cd ~
 git clone https://github.com/Apeloff1/Skeleton.git
 cd Skeleton
-# While PR #4357 is open, select the current installation candidate:
-git switch --track origin/codex/consumer-runtime-readiness-2026-10-25
 python3 -m venv .venv
 source .venv/bin/activate
 python scripts/install_app.py --production --start
@@ -118,8 +116,10 @@ python -m skeleton app doctor --live --studio --json
 ```
 
 The `uname -m` result must be `x86_64` for the pinned Linux model/runtime below.
-The branch selection is for this unmerged candidate; default `main` does not yet
-contain all of PR #4357.
+PR #4357 has been merged; a fresh clone uses the default branch. The hosted
+Windows installer smoke test covered an earlier revision, not the current source
+or an installation on your laptop. Check the current readiness report before
+using this path for a tester.
 
 Open **http://localhost:3000/setup** first, then **http://localhost:3000/product**.
 The production flag serves the built web app through Nginx. Later commands must

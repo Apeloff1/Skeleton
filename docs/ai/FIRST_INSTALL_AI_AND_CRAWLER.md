@@ -84,7 +84,7 @@ that `docker compose version` works there and `uname -m` reports `x86_64`.
 Keep the repository, `.venv`, model and private configuration in the Ubuntu
 Linux filesystem, such as `~/Skeleton`; do not use an `/mnt/c` checkout for this
 recipe. The [Windows first-install commands](../../README.md#windows-with-wsl-2)
-select the current candidate and run the installer inside Ubuntu. Open the published
+run the installer from a fresh default-branch checkout inside Ubuntu. Open the published
 `http://localhost:3000/setup` address from a Windows browser.
 
 Create a private UTF-8 password file **outside** the repository. For example,
