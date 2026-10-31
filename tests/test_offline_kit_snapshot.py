@@ -200,7 +200,7 @@ def _verifiable_kit(tmp_path: Path) -> tuple[Path, dict[str, object], Path]:
         "distribution": "skeleton",
         "files": offline_kit._files(root),
     })
-    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\n")
     return root, manifest, wheel
 
 
@@ -271,7 +271,7 @@ def test_verify_rejects_nonwheel_payload_inside_wheelhouse(tmp_path):
     bad = root / "wheelhouse" / "arbitrary.txt"
     bad.write_bytes(b"unexpected")
     manifest["files"] = offline_kit._files(root)
-    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\n")
     with pytest.raises(offline_kit.OfflineKitError, match="wheelhouse"):
         offline_kit.verify(root)
 
@@ -288,7 +288,7 @@ def test_model_snapshot_rejects_unlisted_source_payload(tmp_path):
     ):
         (root / relative).write_bytes(content)
     manifest["files"] = offline_kit._files(root)
-    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\n")
     (root / "model" / "unlisted-private.txt").write_bytes(b"not in manifest")
     with pytest.raises(offline_kit.OfflineKitError, match="inventory differs"):
         offline_kit._copy_pinned_assets(root, manifest, tmp_path / "copied")
@@ -364,3 +364,63 @@ def test_install_rejects_symlinked_destination_parent(tmp_path, monkeypatch):
     with pytest.raises(offline_kit.OfflineKitError, match="reserve"):
         offline_kit.install(root, alias / "installed")
     assert not (real_parent / "installed").exists()
+
+def test_independent_pin_rejects_rewritten_self_consistent_kit(tmp_path):
+    root, manifest, wheel = _verifiable_kit(tmp_path)
+    trusted = hashlib.sha256((root / "manifest.json").read_bytes()).hexdigest()
+    assert offline_kit.verify(root, expected_manifest_sha256=trusted) == manifest
+    wheel.write_bytes(b"replaced wheel bytes")
+    manifest["files"] = offline_kit._files(root)
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\n")
+    assert offline_kit.verify(root) == manifest
+    with pytest.raises(offline_kit.OfflineKitError, match="independent pin"):
+        offline_kit.verify(root, expected_manifest_sha256=trusted)
+
+
+@pytest.mark.parametrize("pin", ["", "A" * 64, "f" * 63, True])
+def test_independent_pin_rejects_invalid_value(tmp_path, pin):
+    root, _, _ = _verifiable_kit(tmp_path)
+    with pytest.raises(offline_kit.OfflineKitError, match="pin"):
+        offline_kit.verify(root, expected_manifest_sha256=pin)
+
+
+def test_install_detects_replaced_destination_after_pip(tmp_path, monkeypatch):
+    root, manifest, _ = _kit(tmp_path)
+    target, moved = tmp_path / "installed", tmp_path / "moved"
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+
+    def fake_create(self, destination):
+        python = Path(destination) / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        python.parent.mkdir(parents=True)
+        python.write_bytes(b"python")
+
+    def fake_run(*args, **kwargs):
+        target.rename(moved)
+        target.mkdir()
+        (target / "other-owner").write_text("preserve")
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fake_create)
+    monkeypatch.setattr(offline_kit.subprocess, "run", fake_run)
+    with pytest.raises(offline_kit.OfflineKitError, match="destination changed"):
+        offline_kit.install(root, target)
+    assert (target / "other-owner").read_text() == "preserve"
+    assert moved.is_dir()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX directory identity")
+def test_install_detects_swapped_parent_after_venv(tmp_path, monkeypatch):
+    root, manifest, _ = _kit(tmp_path)
+    parent, moved = tmp_path / "consumer", tmp_path / "moved-parent"
+    parent.mkdir()
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+
+    def fake_create(self, destination):
+        parent.rename(moved)
+        parent.mkdir()
+        (parent / "installed").mkdir()
+        (parent / "installed" / "other-owner").write_text("preserve")
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fake_create)
+    with pytest.raises(offline_kit.OfflineKitError, match="parent changed"):
+        offline_kit.install(root, parent / "installed")
+    assert (parent / "installed" / "other-owner").read_text() == "preserve"
