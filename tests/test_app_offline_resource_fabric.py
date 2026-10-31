@@ -259,6 +259,29 @@ class FabricTests(unittest.TestCase):
                     root, ("valid.txt",),
                 )), 1)
 
+    def test_readonly_stream_has_no_artificial_spill_capacity_quota(self):
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            disk_full = replace(
+                hardware(ram=20_000_000), free_disk_bytes=10_000,
+            )
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=disk_full,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                with self.assertRaises(LocalResourcePressure):
+                    fabric.plan(2_000_000_000)
+                plan = fabric.plan(2_000_000_000, readonly_stream=True)
+                self.assertTrue(plan.readonly_stream)
+                self.assertTrue(plan.readonly_staging)
+                self.assertEqual(plan.residency, "disk_chunks")
+                self.assertFalse(plan.as_dict()["backend_gpu_transfer_executed"])
+                with self.assertRaises(ValueError):
+                    fabric.plan(10, readonly_stream="true")
+
     def test_symlink_escape_is_rejected(self):
         with TemporaryDirectory() as d:
             root = Path(d)

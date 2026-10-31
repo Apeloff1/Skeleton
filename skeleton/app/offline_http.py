@@ -447,13 +447,14 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(503, "local resource telemetry unavailable") from exc
         if path == "/v1/resources/plan" and method == "POST":
             _fields(body, {"source_bytes", "desired_streams", "requested_gpu_bytes",
-                           "allow_gpu"}, {"source_bytes"})
+                           "allow_gpu", "readonly_stream"}, {"source_bytes"})
             try:
                 return 200, self.resource_fabric.plan(
                     body["source_bytes"],
                     desired_streams=body.get("desired_streams", 1),
                     requested_gpu_bytes=body.get("requested_gpu_bytes", 0),
                     allow_gpu=body.get("allow_gpu", False),
+                    readonly_stream=body.get("readonly_stream", False),
                 ).as_dict()
             except (OSError, ValueError, RuntimeError) as exc:
                 raise OfflineHTTPError(422, "resource plan rejected by live hardware policy") from exc

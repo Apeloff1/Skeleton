@@ -383,3 +383,15 @@ or contradictory v1 counters fail closed to unknown/zero swap capacity rather
 than fabricating available virtual memory. The unlimited kernel sentinel is
 not treated as a real quota. This is admission telemetry, not a swapfile or
 kernel memory-configuration modification.
+
+## Read-only staging is not a disk-spill allocation
+
+The versioned `/v1/resources/plan` request accepts optional
+`readonly_stream: true` for operator-selected, descriptor-verified mmap
+reads. Such reads do not allocate a second source-sized disk copy or load
+an entire source into resident Python objects, so their planning no longer
+rejects a source solely because its length exceeds SQLite/WAL spill budget.
+They still require measured host stream slots, bounded mmap windows and
+stable source identity; I/O, cancellation and physical-memory failures
+remain possible. Write/index/ingest plans retain the strict existing disk
+and resident-memory admission. The evidence digest binds the read-only mode.

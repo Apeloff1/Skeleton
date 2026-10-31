@@ -205,6 +205,17 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(planned["backend_gpu_transfer_executed"])
         self.assertTrue(planned["evidence_digest"])
+        self.assertFalse(planned["readonly_stream"])
+        status, read_plan, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "readonly_stream": True,
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(read_plan["readonly_stream"])
+        self.assertNotEqual(read_plan["evidence_digest"], planned["evidence_digest"])
+        status, _, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "readonly_stream": "true",
+        })
+        self.assertEqual(status, 422)
         source = self.folder / "selected"
         source.mkdir()
         (source / "first.txt").write_text("immutable selected file")

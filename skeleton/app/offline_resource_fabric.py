@@ -286,6 +286,7 @@ class FabricPlan:
     evidence_digest: str
     host_stream_capacity: int = 1
     available_stream_slots: int = 1
+    readonly_stream: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -295,6 +296,7 @@ class FabricPlan:
             "stream_count": self.stream_count,
             "host_stream_capacity": self.host_stream_capacity,
             "available_stream_slots": self.available_stream_slots,
+            "readonly_stream": self.readonly_stream,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -376,11 +378,13 @@ class AdaptiveResourceFabric:
     def plan(
         self, source_bytes: int, *, desired_streams: int = 1,
         requested_gpu_bytes: int = 0, allow_gpu: bool = False,
+        readonly_stream: bool = False,
     ) -> FabricPlan:
         for value in (source_bytes, desired_streams, requested_gpu_bytes):
             if type(value) is not int or value < 0:
                 raise ValueError("resource requests must be non-negative integers")
-        if desired_streams == 0 or type(allow_gpu) is not bool:
+        if (desired_streams == 0 or type(allow_gpu) is not bool
+                or type(readonly_stream) is not bool):
             raise ValueError("invalid concurrent resource request")
         snap = self.observe()
         hw = snap.hardware
@@ -388,10 +392,14 @@ class AdaptiveResourceFabric:
             ema = self._pressure_ema if self._pressure_ema is not None else 1.0
             running = self._active_streams
             learned_parallelism = self._learned_parallelism
-        if source_bytes > hw.disk_document_budget and source_bytes > hw.resident_document_budget:
+        # A verified read-only mmap stream does not duplicate the source on
+        # disk or materialize it in RAM. Apply spill/storage admission only
+        # to operations that can actually allocate those resources.
+        if (not readonly_stream and source_bytes > hw.disk_document_budget
+                and source_bytes > hw.resident_document_budget):
             raise LocalResourcePressure("not enough RAM or disk headroom to stage requested source")
         residency = "disk_chunks" if (
-            source_bytes > hw.resident_document_budget or hw.should_spill_early
+            readonly_stream or source_bytes > hw.resident_document_budget or hw.should_spill_early
             or ema >= 0.8
         ) else "system_ram"
         # "Read-only on-board" is host page-cache-backed immutable mmap staging.
@@ -445,6 +453,7 @@ class AdaptiveResourceFabric:
         )
         evidence = {
             "source_bytes": source_bytes,
+            "readonly_stream": readonly_stream,
             "residency": residency, "streams": streams,
             "requested_gpu_bytes": requested_gpu_bytes,
             "gpu": gpu.device if eligible and gpu else None,
@@ -465,6 +474,7 @@ class AdaptiveResourceFabric:
             memory_pressure=round(ema, 6), reason=reason,
             host_stream_capacity=hw.suggested_index_jobs,
             available_stream_slots=headroom,
+            readonly_stream=readonly_stream,
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -547,7 +557,9 @@ class AdaptiveResourceFabric:
         # Hold the reentrant lock across fresh planning and reservation so
         # two readers cannot claim the same measured host capacity.
         with self._lock:
-            plan = self.plan(total, desired_streams=desired_streams)
+            plan = self.plan(
+                total, desired_streams=desired_streams, readonly_stream=True,
+            )
             reserved = min(plan.stream_count, len(entries))
             if (reserved < 1 or self._active_streams + reserved
                     > plan.host_stream_capacity):
