@@ -20,7 +20,13 @@ OMNI_PATHS = {
 
 
 def _paths(app) -> set[str]:
-    return {getattr(route, "path", "") for route in app.routes}
+    # FastAPI >= 0.141 wraps include_router results in lazy _IncludedRouter
+    # objects without ``.path``; flatten with the cortex guard's walker.
+    from skeleton.api.cortex_mount_guard import _iter_paths
+
+    return {getattr(route, "path", "") for route in app.routes} | set(
+        _iter_paths(app.routes, "", ())
+    )
 
 
 @pytest.mark.parametrize("value", [None, "1", "true", "on", " YES "])
@@ -63,3 +69,16 @@ def test_cortex_and_legacy_gameforge_routes_stay_unmounted():
     assert "skeleton.api.omnifabric_routes" in modules
     assert "skeleton.api.cortex_routes" not in modules
     assert "skeleton.api.gameforge_routes" not in modules
+
+
+def test_omnifabric_route_requires_seal(monkeypatch):
+    """Regression for #4139: mount present by default and behind install_gate."""
+    from fastapi.testclient import TestClient
+
+    monkeypatch.delenv("SKELETON_OMNIFABRIC_API", raising=False)
+    monkeypatch.delenv("SKELETON_PUBLIC_DEV_SURFACES", raising=False)
+    app = server.create_app()
+    assert any(p.startswith("/api/v1/omnifabric/") for p in _paths(app))
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/api/v1/omnifabric/status")
+    assert resp.status_code in {401, 503}, resp.status_code

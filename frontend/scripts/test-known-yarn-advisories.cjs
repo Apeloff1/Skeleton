@@ -28,47 +28,120 @@ function fixture(braces = '3.0.3', forge = '1.4.0') {
     '  version "0.5.0"', '',
     'http-cache-semantics@^4.0.0:',
     '  version "4.3.0"', '',
+    'undici@^6.18.2:',
+    '  version "6.29.1"', '',
   ].join('\n');
 }
 
-test('Yarn v1 reader binds dependency parents and never converts unpatched to green', () => {
+test('Yarn v1 reader binds parents, reports the withdrawal and blocks affected versions', () => {
   const result = auditLock(fixture());
   const byName = Object.fromEntries(result.findings.map(x => [x.name, x]));
-  assert.deepEqual(result.outstanding.sort(), ['braces', 'node-forge']);
+  assert.deepEqual(result.outstanding, ['node-forge']);
   assert.equal(result.release_accepted, false);
   assert.equal(result.automatic_alert_dismissal_authorized, false);
   assert.deepEqual(byName.braces.parents, ['micromatch@4.0.8']);
+  assert.equal(byName.braces.status, 'advisory_withdrawn');
+  assert.equal(byName['node-forge'].status, 'unpatched_affected');
   assert.deepEqual(byName['node-forge'].parents, ['@expo/code-signing-certificates@0.0.6']);
   assert.equal(byName['brace-expansion'].status, 'patched_in_lock');
   assert.equal(byName['decode-uri-component'].status, 'patched_in_lock');
+  assert.equal(byName.undici.status, 'patched_in_lock');
   assert.equal(byName['image-size'].status, 'not_in_lock');
 });
 
 test('older patchable packages are not accepted', () => {
   const s = fixture().replace('version "2.1.7"', 'version "2.1.6"');
   const result = auditLock(s);
-  assert.deepEqual(result.outstanding.sort(), ['brace-expansion', 'braces', 'node-forge']);
+  assert.deepEqual(result.outstanding.sort(), ['brace-expansion', 'node-forge']);
 });
 
-test('new unreviewed versions never auto-clear unpublished fixes', () => {
+test('new unreviewed outside-range versions do not auto-clear an active advisory', () => {
   const result = auditLock(fixture('3.0.4', '1.4.1'));
-  assert.deepEqual(result.outstanding.sort(), ['braces', 'node-forge']);
-  assert.equal(result.findings.find(x => x.name === 'braces').status, 'requires_advisory_reverification');
+  assert.deepEqual(result.outstanding, ['node-forge']);
+  assert.equal(result.findings.find(x => x.name === 'braces').status, 'advisory_withdrawn');
+  assert.equal(result.findings.find(x => x.name === 'node-forge').status, 'requires_advisory_reverification');
+});
+
+test('reviewed outside-range versions are not described as published fixes', () => {
+  const result = auditLock(fixture('3.0.3', '1.4.2'));
+  const byName = Object.fromEntries(result.findings.map(x => [x.name, x]));
+  assert.equal(byName['node-forge'].status, 'outside_published_range');
+  assert.equal(byName['http-cache-semantics'].status, 'outside_published_range');
+  assert.deepEqual(result.outstanding, []);
+  assert.equal(result.release_accepted, true); // Scoped lock check only.
+  assert.match(result.scope, /not complete Dependabot/);
+  assert.match(result.scope, /not.*release certification/);
+});
+
+test('mixed vulnerable and reviewed versions remain blocked', () => {
+  const mixed = fixture('3.0.3', '1.4.2') + '\nnode-forge@^1.0.0:\n  version "1.4.0"\n';
+  const result = auditLock(mixed);
+  assert.equal(result.findings.find(x => x.name === 'node-forge').status, 'unpatched_affected');
+  assert.deepEqual(result.outstanding, ['node-forge']);
+});
+
+test('http-cache range and unreviewed outside versions fail closed', () => {
+  for (const [version, expected] of [['4.2.0', 'unpatched_affected'], ['4.2.1', 'requires_advisory_reverification'], ['4.3.1', 'requires_advisory_reverification']]) {
+    const lock = fixture('3.0.3', '1.4.2').replace('version "4.3.0"', `version "${version}"`);
+    const result = auditLock(lock);
+    assert.equal(result.findings.find(x => x.name === 'http-cache-semantics').status, expected);
+    assert.deepEqual(result.outstanding, ['http-cache-semantics']);
+  }
+});
+
+test('undici requires the reviewed fixed version for every locked major', () => {
+  for (const [version, expected] of [['6.28.1', 'patch_required'], ['6.29.1', 'patched_in_lock'],
+    ['7.30.0', 'patch_required'], ['7.30.1', 'patched_in_lock'],
+    ['8.12.1', 'patch_required'], ['8.12.2', 'patched_in_lock'], ['9.0.0', 'patch_required']]) {
+    const lock = fixture('3.0.3', '1.4.2').replace('version "6.29.1"', `version "${version}"`);
+    const result = auditLock(lock);
+    assert.equal(result.findings.find(x => x.name === 'undici').status, expected);
+    assert.equal(result.outstanding.includes('undici'), expected !== 'patched_in_lock');
+  }
+  const mixed = fixture('3.0.3', '1.4.2') + '\nundici@^6.0.0:\n  version "6.28.1"\n';
+  assert.equal(auditLock(mixed).findings.find(x => x.name === 'undici').status, 'patch_required');
+});
+
+test('actual undici resolution and lock bind the reviewed published artifact', () => {
+  const root = path.resolve(__dirname, '..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const lock = fs.readFileSync(path.join(root, 'yarn.lock'), 'utf8');
+  const entries = parseYarnV1(lock).filter(row => row.name === 'undici');
+  assert.equal(manifest.resolutions.undici, '6.29.1');
+  assert.deepEqual(entries.map(row => row.version), ['6.29.1']);
+  assert.match(lock, /^undici@6\.29\.1, undici@\^6\.18\.2:\n  version "6\.29\.1"\n  resolved "https:\/\/registry\.yarnpkg\.com\/undici\/-\/undici-6\.29\.1\.tgz#a3317c5df0236e0633727d9a7bd4f7ed195d8575"\n  integrity sha512-EvRlUt\/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE\/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==$/m);
+});
+
+test('the newly observed low-severity deepmerge advisory remains a blocking finding', () => {
+  const lock = fixture('3.0.3', '1.4.2') + '\ndeepmerge@^4.3.1:\n  version "4.3.1"\n';
+  const result = auditLock(lock);
+  const finding = result.findings.find(x => x.name === 'deepmerge');
+  assert.equal(finding.status, 'unpatched_affected');
+  assert.equal(finding.severity, 'low');
+  assert.deepEqual(result.outstanding, ['deepmerge']);
+  assert.equal(result.release_accepted, false);
+  const unknown = lock.replace('version "4.3.1"', 'version "4.3.2"');
+  assert.equal(auditLock(unknown).findings.find(x => x.name === 'deepmerge').status, 'requires_advisory_reverification');
 });
 
 test('unsupported or malformed locks fail rather than hiding findings', () => {
   assert.throws(() => parseYarnV1('braces@^3.0.3:\n  version "3.0.3"'), /Yarn classic/);
   assert.throws(() => parseYarnV1('# yarn lockfile v1\n\n\nbraces@^3.0.3:'), /unpinned/);
   assert.throws(() => compareVersions('3.0.3-rc1', '3.0.3'), /unparseable/);
+  assert.throws(() => compareVersions('9007199254740992.0.0', '1.0.0'), /unparseable/);
   assert.throws(() => parseYarnV1('# yarn lockfile v1\n\n\nfoo@^1:\n  version "1.0.0"\n\nfoo@^1:\n  version "1.1.0"'), /duplicate/);
 });
 
-test('the actual lockfile cannot be certified while unpatched advisories remain', () => {
+test('the actual lockfile records only the reviewed snapshot, not a release certification', () => {
   const actual = fs.readFileSync(path.resolve(__dirname, '..', 'yarn.lock'), 'utf8');
   const result = auditLock(actual);
   const status = Object.fromEntries(result.findings.map(x => [x.name, x.status]));
-  assert.equal(status['braces'], 'unpatched_affected');
-  assert.equal(status['node-forge'], 'unpatched_affected');
-  assert.equal(status['http-cache-semantics'], 'patched_in_lock');
+  assert.equal(status['braces'], 'advisory_withdrawn');
+  assert.equal(status['node-forge'], 'outside_published_range');
+  assert.equal(status['http-cache-semantics'], 'outside_published_range');
+  assert.equal(status.undici, 'patched_in_lock');
+  assert.equal(status.deepmerge, 'unpatched_affected');
+  assert.deepEqual(result.outstanding, ['deepmerge']);
   assert.equal(result.release_accepted, false);
+  assert.equal(result.automatic_alert_dismissal_authorized, false);
 });

@@ -853,13 +853,21 @@ def audit_public_app_bootstrap_contract() -> None:
         "aggregate app readiness route must use manifest contract",
     )
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
-    check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
+    check(
+        "async def _probe_engine" in route
+        and "async with asyncio.timeout(timeout_s)" in route
+        and "async with client.stream(" in route,
+        "aggregate app status does not use a bounded asynchronous engine probe",
+    )
     check('"identity mismatch"' in route, "aggregate app status does not validate engine identity")
-    check("identity.get(key) == value" in route, "engine identity verification is incomplete")
+    check("candidate.get(key) != value" in route, "engine identity verification is incomplete")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
-    check("public_readiness()" in route, "aggregate app status omits product readiness")
+    check(
+        "await asyncio.to_thread(public_readiness)" in route,
+        "aggregate app status must observe product readiness outside the event loop",
+    )
     check('"product": product_readiness' in route, "aggregate app status product summary missing")
     check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")

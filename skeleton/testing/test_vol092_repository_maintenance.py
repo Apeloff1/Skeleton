@@ -348,7 +348,7 @@ def test_update_requires_fresh_evidence_and_owned_authority_but_not_staleness():
         risk=MaintenanceRisk.MEDIUM,
         stale_after_seconds=86400,
     )
-    recent = evidence(last_activity_at=NOW - timedelta(minutes=1))
+    recent = evidence(observed_at=NOW, last_activity_at=NOW - timedelta(minutes=1))
     assert authorize(update, ownership(), recent, at=NOW).decision is MaintenanceVerdict.ALLOW
     assert authorize(update, ownership(), None, at=NOW).decision is MaintenanceVerdict.BLOCK
 

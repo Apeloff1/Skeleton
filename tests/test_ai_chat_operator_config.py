@@ -6,6 +6,7 @@ import stat
 from pathlib import Path
 
 import pytest
+from dotenv import dotenv_values
 
 from scripts import configure_ai_chat as config
 
@@ -62,8 +63,20 @@ def test_existing_configuration_refuses_accidental_overwrite(
     before = path.read_bytes()
     assert config.main(args) == 2
     assert path.read_bytes() == before
+    # An intentional model reconfiguration preserves durable authentication
+    # and database identities. Repeating the same request is byte-stable.
+    before_values = dotenv_values(path)
     assert config.main(args + ["--force"]) == 0
-    assert path.read_bytes() != before
+    assert path.read_bytes() == before
+    assert config.main(args + ["--force", "--model", "operator-model-v2"]) == 0
+    after_values = dotenv_values(path)
+    assert after_values["AI_MODEL"] == "operator-model-v2"
+    persistent_keys = (
+        "MONGO_INITDB_ROOT_PASSWORD", "MONGO_URL", "SKL_MONGO_URI",
+        "JWT_SECRET", "GAMEFORGE_JWT_SECRET", "SKL_ENGINE_SERVICE_TOKEN",
+        "SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED",
+    )
+    assert all(after_values[key] == before_values[key] for key in persistent_keys)
 
 
 def test_symlink_output_is_rejected_without_touching_target(

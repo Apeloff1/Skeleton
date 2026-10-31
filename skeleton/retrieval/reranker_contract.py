@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Protocol, Sequence, Tuple, runtime_checkable
 
-from skeleton.retrieval.fusion import ScoredResult
+from .fusion import ScoredResult
 
 
 def _limit(value: int) -> int:

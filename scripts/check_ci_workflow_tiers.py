@@ -35,6 +35,15 @@ def events(source: str) -> set[str]:
     return found
 
 
+def independently_triggered(found: set[str]) -> bool:
+    """Count only independent Actions admissions, not manually dispatched or called jobs.
+
+    workflow_call never subscribes to repository events. Its caller consumes
+    the existing PR workflow admission, while required native checks still run.
+    """
+    return bool(found - {"workflow_dispatch", "workflow_call"})
+
+
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
@@ -72,7 +81,7 @@ def audit(root: Path = ROOT) -> list[str]:
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
-        if found != {"workflow_dispatch"}:
+        if independently_triggered(found):
             automatic += 1
     if automatic > 20:
         failures.append(f"unexpected active workflow count: {automatic}")

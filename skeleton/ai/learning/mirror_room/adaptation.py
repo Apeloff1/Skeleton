@@ -329,6 +329,7 @@ class DeterministicCoordinateLearner:
         self._bound_train: dict[str, MirrorScenario] = {}
         self._proposed_parameters: set[str] = set()
         self._pending_candidates: dict[str, str] = {}
+        self._pending_step_outcomes: dict[str, bool] = {}
 
     @property
     def strategy_digest(self) -> str:
@@ -361,6 +362,7 @@ class DeterministicCoordinateLearner:
             "generator_id": self.generator_id,
             "training_scenarios": sorted(item.digest for item in train),
             "feature_schema_digest": self._feature_schema_digest,
+            "step_adaptation": "completed-train-proposal-batch/v1",
         })
         self._context_digest = context
         self._checkpoint_digest = None
@@ -372,6 +374,7 @@ class DeterministicCoordinateLearner:
         self._last_parent_parameters = None
         self._proposed_parameters = {_digest(dict(spec.production_baseline.parameters))}
         self._pending_candidates.clear()
+        self._pending_step_outcomes.clear()
         self._predictor = _BoundedNeuralPredictor(4 * len(self.dimensions) + 3, context, self.learning_policy)
         checkpoint = self.training_archive.checkpoint_for(context, self._feature_schema_digest, self.generator_id)
         # Never warm-start numeric edits or rewards from a different corpus,
@@ -391,16 +394,27 @@ class DeterministicCoordinateLearner:
         for observation in replay:
             if observation.experiment_id != spec.manifest.experiment_id or set(observation.scenario_digests) != set(self._bound_train) or len(observation.features) != self._predictor.architecture[0]:
                 raise MirrorRoomError("restored TRAIN observation does not match its bound context")
-        if checkpoint is not None and (checkpoint.observations_seen < len(replay) or checkpoint.training_steps + checkpoint.rejected_updates != checkpoint.observations_seen * self.learning_policy.updates_per_observation):
+        if checkpoint is not None and (
+            checkpoint.observations_seen < len(replay)
+            or checkpoint.training_steps + checkpoint.rejected_updates
+            != checkpoint.observations_seen * self.learning_policy.updates_per_observation
+        ):
             raise MirrorRoomError("restored optimizer counters do not match completed TRAIN updates")
         if checkpoint is None and replay:
             # Rebuild only when numeric observations survive but no optimizer
             # checkpoint does; deterministic order preserves reproducibility.
+            batches: dict[tuple[str, int, str], list[TrainingObservation]] = {}
             for observation in replay:
                 self._learn_observation(observation, replay=(observation,))
-                self._apply_observation_steps(observation)
+                key = (observation.run_id, observation.generation, observation.parent_behavior_digest)
+                batches.setdefault(key, []).append(observation)
+            for batch in batches.values():
+                self._apply_training_batch_steps(batch)
+            self._save_checkpoint()
 
-    def bind_numeric_observations(self, *, context_digest: str, experiment_id: str, workload_digest: str) -> None:
+    def bind_numeric_observations(
+        self, *, context_digest: str, experiment_id: str, workload_digest: str
+    ) -> None:
         """Bind an application-owned, explicitly admitted numeric workload.
 
         Application callers verify their own immutable review/job receipts and
@@ -418,6 +432,7 @@ class DeterministicCoordinateLearner:
         self._bound_executor_id = None
         self._bound_train = {}
         self._pending_candidates.clear()
+        self._pending_step_outcomes.clear()
         self._proposed_parameters.clear()
         self._last_parent_parameters = None
         self._checkpoint_digest = None
@@ -633,7 +648,10 @@ class DeterministicCoordinateLearner:
         self._pending_candidates.pop(candidate.digest, None)
 
     def _remember_observation(self, observation: TrainingObservation) -> None:
-        if observation.context_digest != self._context_digest or observation.feature_schema_digest != self._feature_schema_digest:
+        if (
+            observation.context_digest != self._context_digest
+            or observation.feature_schema_digest != self._feature_schema_digest
+        ):
             raise MirrorRoomError("numeric observation context or feature schema differs")
         updated = self.training_archive.with_observation(observation)
         if updated is self.training_archive:
@@ -645,11 +663,56 @@ class DeterministicCoordinateLearner:
         self._save_checkpoint()
 
     def _apply_observation_steps(self, observation: TrainingObservation) -> None:
+        if self._bound_spec is not None:
+            # Opposite probes are one search batch. Multiplying expansion for
+            # an improving direction and contraction for its counterprobe
+            # would shrink even a productive coordinate every generation.
+            # Wait for the final issued proposal's TRAIN outcome; every probe
+            # still updates the neural predictor and its receipt checkpoint.
+            completed = len(self._pending_candidates) == 1
+            self._apply_training_batch_steps(
+                (observation,), outcomes=self._pending_step_outcomes, completed=completed
+            )
+            if completed:
+                self._pending_step_outcomes.clear()
+            return
         for index, dimension in enumerate(self.dimensions):
             if abs(observation.features[4 * index + 2]) <= 1e-15:
                 continue
-            factor = dimension.expansion if observation.training_utility_delta > 0.0 and observation.guardrails_passed else dimension.contraction
-            self._steps[dimension.name] = min(dimension.max_step, max(dimension.min_step, self._steps[dimension.name] * factor))
+            factor = (
+                dimension.expansion
+                if observation.training_utility_delta > 0.0 and observation.guardrails_passed
+                else dimension.contraction
+            )
+            self._steps[dimension.name] = min(
+                dimension.max_step, max(dimension.min_step, self._steps[dimension.name] * factor)
+            )
+
+    def _apply_training_batch_steps(
+        self,
+        observations: Sequence[TrainingObservation],
+        *,
+        outcomes: dict[str, bool] | None = None,
+        completed: bool = True,
+    ) -> None:
+        """Adapt each tried coordinate once from this parent's TRAIN probes."""
+        outcomes = {} if outcomes is None else outcomes
+        # At most one flag per declared dimension survives between outcomes.
+        # Replay may evict an earlier probe before a large batch completes.
+        for observation in observations:
+            improved = observation.training_utility_delta > 0.0 and observation.guardrails_passed
+            for index, dimension in enumerate(self.dimensions):
+                if abs(observation.features[4 * index + 2]) > 1e-15:
+                    outcomes[dimension.name] = outcomes.get(dimension.name, False) or improved
+        if not completed:
+            return
+        for dimension in self.dimensions:
+            if dimension.name not in outcomes:
+                continue
+            factor = dimension.expansion if outcomes[dimension.name] else dimension.contraction
+            self._steps[dimension.name] = min(
+                dimension.max_step, max(dimension.min_step, self._steps[dimension.name] * factor)
+            )
 
     def curriculum_priorities(self) -> Mapping[str, float]:
         """Bounded difficulty/progress scores from the fixed TRAIN corpus."""
@@ -782,6 +845,7 @@ class DeterministicCoordinateLearner:
         parent_numeric = self._numeric_parent(feedback)
         if self._context_digest is not None and self._pending_candidates:
             raise MirrorRoomError("previous numeric proposals require completed TRAIN outcomes before advancing")
+        self._pending_step_outcomes.clear()
         if self._context_digest is None:
             self._adapt_steps(parent_numeric)
         elif {item.digest for item in feedback.training_scenarios} != set(self._bound_train):

@@ -37,12 +37,39 @@ _LAZY_EXPORTS = {
 __all__ = ["__version__", "__codename__", *_LAZY_EXPORTS]
 
 
+def _load_reviewed_export_owner(module_name: str):
+    """Keep import side effects limited to explicitly reviewed modules."""
+    if module_name == "skeleton.agents.coordination":
+        return import_module("skeleton.agents.coordination")
+    if module_name == "skeleton.config.snapshots":
+        return import_module("skeleton.config.snapshots")
+    if module_name == "skeleton.kernel.errors":
+        return import_module("skeleton.kernel.errors")
+    if module_name == "skeleton.kernel.events":
+        return import_module("skeleton.kernel.events")
+    if module_name == "skeleton.kernel.registry":
+        return import_module("skeleton.kernel.registry")
+    if module_name == "skeleton.observability.sampling":
+        return import_module("skeleton.observability.sampling")
+    if module_name == "skeleton.retrieval.fusion":
+        return import_module("skeleton.retrieval.fusion")
+    if module_name == "skeleton.retrieval.ranking":
+        return import_module("skeleton.retrieval.ranking")
+    if module_name == "skeleton.testing.scaffold":
+        return import_module("skeleton.testing.scaffold")
+    if module_name == "skeleton.vault.access":
+        return import_module("skeleton.vault.access")
+    if module_name == "skeleton.vault.kms":
+        return import_module("skeleton.vault.kms")
+    raise ImportError("unregistered lazy export owner")
+
+
 def __getattr__(name: str) -> Any:
     target = _LAZY_EXPORTS.get(name)
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = target
-    value = getattr(import_module(module_name), attribute)
+    value = getattr(_load_reviewed_export_owner(module_name), attribute)
     globals()[name] = value
     return value
 

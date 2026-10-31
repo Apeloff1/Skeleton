@@ -82,14 +82,17 @@ class DrivingSimulator:
         self.state.thermal.tire_temp = min(120.0, self.state.thermal.tire_temp + abs(steer) * v * 0.02)
         self.state.thermal.brake_temp = min(800.0, self.state.thermal.brake_temp + brake * 15.0 - 2.0)
         torque = self.power * throttle * (1.0 - self.state.rpm / 9500.0) * (1.0 if self.state.thermal.engine_temp < 120 else 0.7)
-        accel = (torque / self.mass) - (drag_force / self.mass) - brake * 18.0
+        # Crankshaft torque must be geared into wheel force before opposing braking.
+        # First gear (3.5:1) and a 0.35 m tire radius give 10 N per N·m.
+        wheel_force = torque * (3.5 / 0.35)
+        accel = (wheel_force - drag_force) / self.mass - brake * 18.0
         self.state.speed = max(0.0, min(_MAX_SPEED, self.state.speed + accel * _DT))
         self.state.rpm = 800.0 + self.state.speed * 32.0
         self.state.heading += steer * min(v * 0.011, 1.3) * (1.0 if self.state.thermal.tire_temp < 110 else 0.8)
         self.state.x += math.cos(self.state.heading) * self.state.speed * _DT
         self.state.y += math.sin(self.state.heading) * self.state.speed * _DT
         self.state.collision = abs(self.state.x) > 1200 or abs(self.state.y) > 1200
-        self.state.telemetry = {"speed": self.state.speed, "rpm": self.state.rpm, "downforce": self.state.downforce, "engine_temp": self.state.thermal.engine_temp, "tire_temp": self.state.thermal.tire_temp, "aero_balance": self.state.aero_balance}
+        self.state.telemetry = {"speed": self.state.speed, "rpm": self.state.rpm, "downforce": self.state.downforce, "engine_temp": self.state.thermal.engine_temp, "tire_temp": self.state.thermal.tire_temp, "aero_balance": self.state.aero_balance, "steps": self.state.steps}
         payload = f"{self.state.x:.1f}:{self.state.y:.1f}:{self.state.speed:.1f}:{self.state.thermal.engine_temp:.1f}"
         self.state.digest = hashlib.sha256(payload.encode()).hexdigest()
         emit_receipt(kind="driving_step_30x", target=self.state.digest, engine_temp=self.state.thermal.engine_temp, stored_prose=0)

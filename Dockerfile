@@ -22,11 +22,11 @@ RUN groupadd --system --gid 10001 appuser \
 
 # Dependencies come from the same canonical metadata as host installation.
 # Resolve them before source so a code-only rebuild retains this cache layer.
-COPY pyproject.toml README.md ./
+COPY pyproject.toml ./
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     python -c "import pathlib,tomllib; d=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); p=d['project']; r=p['dependencies']+p['optional-dependencies']['local-inference']+p['optional-dependencies']['hosted-inference']+d['build-system']['requires']; pathlib.Path('/tmp/skeleton-runtime-requirements.txt').write_text('\n'.join(r)+'\n')" \
-    && pip install --no-cache-dir -r /tmp/skeleton-runtime-requirements.txt \
+    && pip install --no-cache-dir --no-compile -r /tmp/skeleton-runtime-requirements.txt \
     && rm /tmp/skeleton-runtime-requirements.txt
 
 # Dockerfile.dockerignore admits only canonical runtime source and contracts.
@@ -41,7 +41,7 @@ COPY --chown=appuser:appuser . .
 # installer/toolchain surface from the final runtime.
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    pip install --no-cache-dir --no-deps --no-build-isolation . \
+    pip install --no-cache-dir --no-compile --no-deps --no-build-isolation . \
     && pip uninstall -y msgpack setuptools \
     && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
               /usr/local/lib/python3.14/site-packages/setuptools* \

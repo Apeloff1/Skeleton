@@ -42,6 +42,8 @@ _stopped = False
 _tick_count: int = 0
 _restart_history: list[float] = []  # epoch seconds of recent restarts
 _last_tick_at: float = 0.0
+_first_tick_started_at: float = 0.0
+_watchdog_scheduled_at: float = 0.0  # bounds first-tick scheduling grace
 _last_counts: dict[str, int] = {}
 
 
@@ -140,7 +142,13 @@ def _age_seconds(value: Any) -> float | None:
 
 async def _scan_once() -> dict:
     """One bounded sweep. Timed-out work increments stopped, never completed."""
-    global _tick_count, _restart_history
+    global _tick_count, _restart_history, _first_tick_started_at
+    # Publish an initial heartbeat *before* incrementing the tick counter.
+    # LoadSheddingMiddleware uses this only until the first sweep completes:
+    # a still-running first sweep is not incorrectly classified as 55 years
+    # stale, yet a wedged first sweep will fail closed after wd_stale_sec.
+    if not _first_tick_started_at:
+        _first_tick_started_at = time.time()
     _tick_count += 1
     counts = {
         "restarted": 0,
@@ -291,15 +299,30 @@ async def _loop():
 
 def start_watchdog() -> None:
     global _watchdog_task, _stopped
+    global _tick_count, _first_tick_started_at, _last_tick_at, _last_counts, _watchdog_scheduled_at
     if _watchdog_task is not None and not _watchdog_task.done():
         return
-    _stopped = False
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    _watchdog_task = loop.create_task(_loop())
+
+    # A new task starts a new heartbeat epoch. The previous task's completed
+    # timestamp may be hours old and must not trigger a false stale-watchdog
+    # rejection while the fresh task is scheduling its first scan. A first
+    # scan publishes its start time *before* incrementing the tick counter;
+    # once it begins, the existing bounded stale check applies unchanged.
+    # Keep _restart_history intact: restarting a task must never reset the
+    # five-minute orphan recovery rate limit.
+    task = loop.create_task(_loop())
+    _watchdog_scheduled_at = time.time()
+    _tick_count = 0
+    _first_tick_started_at = 0.0
+    _last_tick_at = 0.0
+    _last_counts = {}
+    _stopped = False
+    _watchdog_task = task
 
 
 def stop_watchdog() -> None:

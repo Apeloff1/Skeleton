@@ -19,8 +19,8 @@ from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
-import importlib
 import inspect
+import sys
 import itertools
 import json
 import math
@@ -350,12 +350,15 @@ class ImplementationBinding:
         )
 
     def resolve(self) -> object:
-        try:
-            module = importlib.import_module(self.module_path)
-        except Exception as exc:
+        # A serialized binding is a reference to already-admitted code, not an
+        # executable module-import capability. Loading a new module here would
+        # permit verification itself to run arbitrary package import hooks.
+        module = sys.modules.get(self.module_path)
+        if module is None:
             raise FormalMethodError(
-                f"cannot import implementation module {self.module_path}"
-            ) from exc
+                f"implementation module {self.module_path} is not loaded; "
+                "import trusted implementation code before verification"
+            )
         current: object = module
         for component in self.symbol.split("."):
             if component == "<locals>":

@@ -1,9 +1,12 @@
-"""The restored CI/CD change scope is one script, shared with Merge Readiness."""
+"""Reusable CI scopes its lanes; required readiness retains complete gates."""
 from __future__ import annotations
 
 import os
 from pathlib import Path
 import subprocess
+
+import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "ci_change_scope.sh"
@@ -89,14 +92,62 @@ def test_ci_policy_edit_runs_every_lane(tmp_path: Path) -> None:
     assert set(_scope(repo, "pull_request").values()) == {"true"}
 
 
-def test_restored_workflows_call_the_shared_scope_script() -> None:
+@pytest.mark.parametrize("changed_path", [
+    "frontend/nginx.conf",
+    "frontend/scripts/test-nginx-runtime-dns.mjs",
+])
+def test_frontend_ingress_changes_run_docker_regression(tmp_path: Path, changed_path: str) -> None:
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    changed = repo / changed_path
+    changed.parent.mkdir(parents=True)
+    changed.write_text("ingress regression\n", encoding="utf-8")
+    _git(repo, "add", changed_path)
+    _git(repo, "commit", "-m", "ingress")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature", "-m", "merge ingress")
+    assert _scope(repo, "pull_request") == {
+        "frontend": "true",
+        "backend": "false",
+        "python": "false",
+        "docker": "true",
+    }
+
+
+def test_reusable_ci_calls_the_shared_scope_script_once() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    readiness = (ROOT / ".github" / "workflows" / "merge-readiness.yml").read_text(encoding="utf-8")
     assert "bash scripts/ci_change_scope.sh" in ci
     assert ci.count("bash scripts/ci_change_scope.sh") == 1
-    assert "bash scripts/ci_change_scope.sh" in readiness
-    assert "steps.scope.outputs.python == 'true'" in readiness
-    assert "QUALITY_GATES_SKIP_FRONTEND" in readiness
-    assert "QUALITY_GATES_SKIP_BACKEND_LINT" in readiness
     assert 'name: "Backend Lint"' in ci
     assert "yarn lint:ci" in ci
+
+
+def test_required_readiness_keeps_complete_unit_and_security_gates() -> None:
+    readiness = yaml.safe_load(
+        (ROOT / ".github" / "workflows" / "merge-readiness.yml").read_text(encoding="utf-8")
+    )
+    jobs = readiness["jobs"]
+    unit_commands = [
+        step for step in jobs["unit"]["steps"]
+        if "python tests/run_unit.py" in step.get("run", "")
+        or "skeleton/testing --tb=short" in " ".join(step.get("run", "").split())
+    ]
+    assert len(unit_commands) == 2
+    assert all("if" not in step and not step.get("continue-on-error") for step in unit_commands)
+
+    quality = jobs["quality_security"]
+    security_commands = [
+        step for step in quality["steps"]
+        if "bash scripts/quality-gates.sh" in step.get("run", "")
+    ]
+    assert len(security_commands) == 1
+    assert "if" not in security_commands[0]
+    assert not security_commands[0].get("continue-on-error")
+    for key in ("QUALITY_GATES_SKIP_FRONTEND", "QUALITY_GATES_SKIP_BACKEND_LINT"):
+        assert key not in readiness.get("env", {})
+        assert key not in quality.get("env", {})
+        assert key not in security_commands[0].get("env", {})
+
+    assert jobs["ci"]["uses"] == "./.github/workflows/ci.yml"
+    assert "ci" in jobs["readiness"]["needs"]

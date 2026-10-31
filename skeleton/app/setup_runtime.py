@@ -313,7 +313,7 @@ def ensure_runtime_environment(
     # Keep its signing identity stable too, without sharing signing material
     # between the two existing authentication surfaces.
     gameforge_secret = values.get("GAMEFORGE_JWT_SECRET", "")
-    if rotate_secrets or _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
+    if _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
         gameforge_secret = secrets.token_hex(32)
         text = _replace_env_value(text, "GAMEFORGE_JWT_SECRET", gameforge_secret)
         values["GAMEFORGE_JWT_SECRET"] = gameforge_secret

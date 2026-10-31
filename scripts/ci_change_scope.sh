@@ -46,4 +46,4 @@ has() {
 out "frontend=$(has '^frontend/')"
 out "backend=$(has '^backend/')"
 out "python=$(has '^(skeleton/|tests/|scripts/|java-accelerators/)')"
-out "docker=$(has '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$')"
+out "docker=$(has '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$|^frontend/(nginx\.conf|scripts/test-nginx-runtime-dns\.mjs)$')"

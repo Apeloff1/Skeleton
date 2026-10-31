@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      actions: read
+      checks: read
       packages: write
     env:
       REGISTRY: ghcr.io
@@ -38,7 +40,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
@@ -59,6 +61,17 @@ jobs:
         run: |
           python scripts/generate_changelog.py --version "${{ steps.version.outputs.version }}" --to HEAD > "$RUNNER_TEMP/CHANGELOG_SECTION.md"
           cat "$RUNNER_TEMP/CHANGELOG_SECTION.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refuse publication without current protected main and exact-head green CI
+        if: env.PUSH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_release_governance_verdict.py' -q
+          python scripts/release_governance_verdict.py \
+            --repo "$GITHUB_REPOSITORY" --sha "$(git rev-parse HEAD)" --branch main
 
       - name: Log in to GHCR
         if: env.PUSH == 'true'

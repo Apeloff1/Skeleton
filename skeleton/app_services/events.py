@@ -61,6 +61,10 @@ class _StreamIds:
 _DEFAULT_IDS = _StreamIds()
 
 
+#: Keys stripped from producer payloads; ownership rides top-level only.
+OWNERSHIP_PAYLOAD_KEYS = ("actor_id", "tenant_id", "owner", "principal", "tenant")
+
+
 def make_envelope(
     channel: str,
     type: str,
@@ -68,6 +72,8 @@ def make_envelope(
     *,
     correlation_id: str = "",
     job_id: str = "",
+    actor_id: str = "",
+    tenant_id: str = "",
     ids: Optional[_StreamIds] = None,
     clock: Callable[[], float] = time.time,
 ) -> dict:
@@ -75,7 +81,13 @@ def make_envelope(
         raise ValueError(f"unknown channel: {channel!r}")
     if type not in EVENT_TYPES or not type.startswith(channel + "."):
         raise ValueError(f"unknown or mismatched event type: {type!r}")
-    safe = redact_payload(dict(payload or {}))
+    raw = dict(payload or {})
+    # Ownership is envelope metadata (realtime S1-1, #4139): the hub sink reads
+    # it ONLY from top-level actor_id/tenant_id, never from payload, so it
+    # must never travel (or be spoofable) inside payload.
+    for key in OWNERSHIP_PAYLOAD_KEYS:
+        raw.pop(key, None)
+    safe = redact_payload(raw)
     if not isinstance(safe, dict):
         safe = {"value": safe}
     env: dict[str, Any] = {
@@ -90,6 +102,10 @@ def make_envelope(
         env["correlation_id"] = redact_text(str(correlation_id))
     if job_id:
         env["job_id"] = str(job_id)
+    if actor_id:
+        env["actor_id"] = str(actor_id)
+    if tenant_id:
+        env["tenant_id"] = str(tenant_id)
     return env
 
 

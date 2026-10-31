@@ -176,9 +176,11 @@ def execute_build_async(req: BuildReq) -> dict:
 
 
 @router.get("/job/{job_id}")
-def job(job_id: str) -> dict:
+async def job(job_id: str) -> dict:
+    from routes.galaxy_studio_state import load_build
+
     j = scheduler.get_job(job_id)
-    if not j:
+    if not j or await load_build(j.get("build_id", "")) is None:
         raise HTTPException(404, "unknown job")
     return j
 

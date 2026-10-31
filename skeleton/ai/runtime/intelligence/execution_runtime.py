@@ -931,16 +931,10 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
 
-            self._assert_provider_binding(execution, payload)
-            if self._provider_budget_exceeded(execution, payload):
-                return self._finalize_non_success(
-                    execution,
-                    payload,
-                    status="failed",
-                    error_code="provider_usage_exceeded_reservation",
-                    now=now,
-                )
-
+            # An unresolved approval can be observed without invoking a model,
+            # running a tool or publishing a staged result. Keep that passive
+            # recovery available for old checkpoints, but require the provider
+            # binding before approved work can actually continue.
             if execution.state is ExecutionState.WAITING_FOR_USER:
                 pending = self._pending_approvals(execution, payload)
                 missing = tuple(item for item in pending if not approval_refs.get(item.call_id))
@@ -952,6 +946,18 @@ class CognitiveExecutionRuntime:
                         pending_approvals=missing,
                         checkpoint_ref=(None if checkpoint is None else checkpoint.checkpoint_ref),
                     )
+
+            self._assert_provider_binding(execution, payload)
+            if self._provider_budget_exceeded(execution, payload):
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="provider_usage_exceeded_reservation",
+                    now=now,
+                )
+
+            if execution.state is ExecutionState.WAITING_FOR_USER:
                 execution = self._transition(
                     execution,
                     ExecutionState.TOOL_PENDING,

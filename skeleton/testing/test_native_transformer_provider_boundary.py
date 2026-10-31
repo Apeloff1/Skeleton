@@ -1,3 +1,5 @@
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 import asyncio
 from datetime import datetime, timedelta, timezone
 import unittest
@@ -11,7 +13,7 @@ from skeleton.ai.runtime.inference import (
     NativeTransformerModel,
     build_native_transformer_adapter,
 )
-from skeleton.provider_runtime import ProviderRequest
+from skeleton.provider_runtime import ProviderInvocationError, ProviderPolicyError, ProviderRequest
 from skeleton.providers.contract import FinishReason
 
 
@@ -43,9 +45,9 @@ class TestNativeTransformerProviderBoundary(unittest.TestCase):
                     operation_id="op-native-1",
                     execution_id="exec-native-1",
                     turn_id="turn-native-1",
-                    context_id="ctx-native-1",
+                    context_id="df6ca6b5-cc95-4c94-95ee-fde85ae63eed",
                     context_digest="a" * 64,
-                    context_source_snapshot=(("source", "b" * 64),),
+                    context_source_snapshot=(("3e523bc9-e74f-430f-9f72-c2eb64480e5c", "b" * 64),),
                     context_compiler_version="native-test-v1",
                 )
             )
@@ -55,7 +57,7 @@ class TestNativeTransformerProviderBoundary(unittest.TestCase):
             self.assertEqual(response.usage.output_tokens, 3)
             self.assertEqual(response.usage.total_tokens, response.usage.input_tokens + 3)
             self.assertEqual(response.usage.estimated_cost, "0")
-            self.assertEqual(response.context_id, "ctx-native-1")
+            self.assertEqual(response.context_id, "df6ca6b5-cc95-4c94-95ee-fde85ae63eed")
             self.assertEqual(response.context_digest, "a" * 64)
             self.assertEqual(adapter.runtime_digest, backend.runtime_digest)
             self.assertEqual(adapter.status()["model_digest"], backend.model_digest)
@@ -89,7 +91,7 @@ class TestNativeTransformerProviderBoundary(unittest.TestCase):
                 max_output_tokens=4,
                 deadline=datetime.now(timezone.utc) - timedelta(seconds=1),
             )
-            with self.assertRaisesRegex(LocalInferenceCancelled, "deadline exceeded"):
+            with self.assertRaisesRegex(ProviderInvocationError, "deadline exceeded"):
                 await adapter.generate(request)
         asyncio.run(scenario())
 
@@ -101,7 +103,7 @@ class TestNativeTransformerProviderBoundary(unittest.TestCase):
                 prompt="hello",
                 deadline=datetime(2026, 10, 7, 21, 0, 0),
             )
-            with self.assertRaisesRegex(ValueError, "timezone-aware"):
+            with self.assertRaisesRegex(ProviderPolicyError, "timezone-aware"):
                 await adapter.generate(request)
         asyncio.run(scenario())
 

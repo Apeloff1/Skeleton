@@ -322,3 +322,112 @@ async def audit_walkable_routes(scope: Mapping[str, str], project_id: str,
         "source_version": owner["version"],
         "verified_against_authoritative_source": True,
     }
+
+
+# --------------------------------------------------------------------------
+# GF-B: save / restore / replay (extend-only; durable SQLite/WAL adapter)
+# --------------------------------------------------------------------------
+import os as _os
+import threading as _threading
+
+from skeleton.kernel.game_save_plane import (
+    ChunkReceiptStore as _ChunkReceiptStore, GameSavePlane as _GameSavePlane,
+    SavePlaneError,
+)
+from skeleton.persistence.game_save_sqlite import (
+    SqliteCheckpointStore as _SqliteCheckpointStore,
+    SqliteReplayJournal as _SqliteReplayJournal,
+    open_game_save_db as _open_game_save_db,
+)
+
+GAME_SAVE_DB_ENV = "SKELETON_GAME_SAVE_DB"
+_save_state: dict = {}
+_save_lock = _threading.Lock()
+
+
+def _save_plane():
+    with _save_lock:
+        if "plane" not in _save_state:
+            path = _os.environ.get(GAME_SAVE_DB_ENV, ":memory:")
+            conn = _open_game_save_db(path)
+            _save_state["conn"] = conn
+            _save_state["plane"] = _GameSavePlane(
+                store=_SqliteCheckpointStore(conn))
+        return _save_state["plane"]
+
+
+def _reset_save_plane() -> None:
+    """Test hook: drop the cached plane so the next call reopens the DB."""
+    with _save_lock:
+        conn = _save_state.pop("conn", None)
+        _save_state.clear()
+        if conn is not None:
+            conn.close()
+
+
+def _save_slot(scope: Mapping[str, str], project_id: str, slot: str) -> str:
+    return f"{scope['tenant_id']}/{scope['owner_id']}/{project_id}/{slot}"
+
+
+async def save_game_state(scope: Mapping[str, str], project_id: str, slot: str,
+                          sequence: int, sections: Mapping[str, Mapping[str, Any]],
+                          receipts: Any = None) -> dict:
+    await _source(scope, project_id)  # authority check
+    store = None
+    if receipts:
+        store = _ChunkReceiptStore()
+        for item in receipts:
+            store.put(str(item["chunk_id"]), item["body"])
+    ckpt = _save_plane().save(_save_slot(scope, project_id, slot), int(sequence),
+                              sections, receipts=store)
+    return {"schema": "skeleton.game.frontier_save.v1", "project_id": project_id,
+            "slot": slot, "sequence": ckpt.sequence, "seal": ckpt.seal,
+            "receipt_root": ckpt.state.get("receipt_root")}
+
+
+async def restore_game_state(scope: Mapping[str, str], project_id: str, slot: str,
+                             sequence: Any = None, receipt_cursor: int = 0,
+                             receipt_limit: int = 100) -> dict:
+    await _source(scope, project_id)
+    plane = _save_plane()
+    key = _save_slot(scope, project_id, slot)
+    sections, receipts = plane.restore(key, sequence=sequence)
+    out = {"schema": "skeleton.game.frontier_restore.v1",
+           "project_id": project_id, "slot": slot, "sections": sections,
+           "backups": list(plane.backups(key)), "receipts": None}
+    if receipts is not None:
+        page = receipts.page(cursor=receipt_cursor, limit=receipt_limit)
+        out["receipts"] = {
+            "items": [{"chunk_id": r.chunk_id, "digest": r.digest, "body": r.body}
+                      for r in page.items],
+            "next_cursor": page.next_cursor, "total": page.total,
+            "root": receipts.root()}
+    return out
+
+
+def _journal(scope: Mapping[str, str], project_id: str, stream: str):
+    _save_plane()
+    return _SqliteReplayJournal(_save_state["conn"],
+                                _save_slot(scope, project_id, stream))
+
+
+async def record_replay_frames(scope: Mapping[str, str], project_id: str,
+                               stream: str, frames: Any) -> dict:
+    await _source(scope, project_id)
+    journal = _journal(scope, project_id, stream)
+    for item in frames:
+        journal.append(int(item["frame"]), item["event"])
+    return {"stream": stream, "head_digest": journal.head_digest(),
+            "frames": len(journal.frames())}
+
+
+async def replay_frames(scope: Mapping[str, str], project_id: str, stream: str,
+                        after: int = -1, upto: Any = None,
+                        context_upto: Any = None) -> dict:
+    await _source(scope, project_id)
+    journal = _journal(scope, project_id, stream)
+    frames = [{"frame": f, "event": e} for f, e in journal.frames(after=after)
+              if upto is None or f <= upto]
+    return {"stream": stream, "frames": frames,
+            "ai_context": journal.ai_context(upto=context_upto),
+            "head_digest": journal.head_digest()}

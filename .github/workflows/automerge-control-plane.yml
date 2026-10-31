@@ -42,7 +42,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
 
@@ -129,7 +129,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
 
@@ -143,6 +143,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A configured policy file is not GitHub enforcement. Refuse all
+          # automatic mutations while the target branch is unprotected or
+          # when its protection state cannot be read reliably.
+          protected="$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/branches/${AUTOMERGE_DEFAULT_BRANCH}" --jq '.protected')"
+          if [[ "$protected" != "true" ]]; then
+            echo "::error::Auto-merge refused: GitHub default branch protection is not enabled"
+            exit 1
+          fi
           python -m skeleton.pr_automation.automerge_cli             --repo "$GITHUB_REPOSITORY"             --base "$AUTOMERGE_DEFAULT_BRANCH"             --ledger "$AUTOMERGE_LEDGER_PATH"             --report-json "$AUTOMERGE_REPORT_PATH"
 
       - name: Upload reconciliation evidence

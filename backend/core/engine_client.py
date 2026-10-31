@@ -2631,6 +2631,12 @@ class EngineClient:
         )
         started = monotonic()
         attempts = 0
+        # Keep both configured bounds: a longer execution observation must not
+        # spend its finite request allowance at the short default cadence and
+        # abandon an admitted provider while it is still physically running.
+        # Slower probes only lengthen this interval; the absolute deadline and
+        # maximum number of probes remain authoritative.
+        poll_interval = max(self.config.poll_interval_s, timeout / self.config.max_poll_attempts)
         try:
             # One poll can read status, events and the terminal result. Their
             # individual HTTP deadlines cannot extend this aggregate wait.
@@ -2655,7 +2661,7 @@ class EngineClient:
                             )
                         return terminal
 
-                    await asyncio.sleep(self.config.poll_interval_s)
+                    await asyncio.sleep(poll_interval)
         except TimeoutError as exc:
             raise EngineUnavailableError("engine execution did not reach terminal state in time") from exc
 

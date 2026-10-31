@@ -114,7 +114,7 @@ export default function WelcomeScreen() {
         </Animated.Text>
 
         <Animated.Text style={[styles.subtitle, { opacity: subOpacity }]}>
-          Hyperscale game-build factory · 600K+ knowledge assets · live RAG
+          Local-first game studio · AI tools and project workspaces
         </Animated.Text>
 
         <Animated.View

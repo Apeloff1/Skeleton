@@ -43,9 +43,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-33 Path-scoped frontier CI verified: 57 tests passed on source commit `586028081cd740fb153378422eb04f78c944cbf8` (GitHub Actions run `39186433511`).
 - [ ] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
 - [ ] GF-P0-35 Convert projected polygons and character-aware ray shadows into visible graphics with native renderer reference screenshots.
-- [ ] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups.
+- [x] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups. (77f36d8ce)
 - [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras.
-- [ ] GF-P0-38 Run real Godot headless parse, emitted scene import and screenshot smoke; inspect shadow caster geometry, camera and collision fidelity.
+- [ ] GF-P0-38 Run real Godot headless parse, emitted scene import and screenshot smoke; inspect shadow caster geometry, camera and collision fidelity. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + emitted .tscn import/instantiate, Camera3D current, slope collision pass locally; open: screenshot/shadow-caster/camera fidelity need a real renderer)
 - [x] GF-P0-39 Add conflict-safe Godot project overlay attachment preserving existing main level and imports.
 - [x] GF-P0-40 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
 - [x] GF-P0-41 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
@@ -81,7 +81,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-71 Wire opt-in advanced aerodynamic, traction, impact and weather candidates into the existing source-hashed Jeeves scene.
 - [x] GF-P0-72 Export Godot native RigidBody3D candidate with mass/collider/restitution, live per-fixed-tick wind-relative drag and wet/ice-adjusted contact material.
 - [x] GF-P0-73 Add focused regression source and CI tests for terminal speed, lee-wake, thermals, climbing, collision momentum/energy, CCD, air/terrain integration and scene compatibility.
-- [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior.
+- [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + RigidBody3D mass, slope contact and down-slope motion at 60 Hz fixed ticks pass locally; open: GPU/physics timestep equivalence and impact behaviour need GPU hardware)
 - [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
 - [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
 - [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
@@ -103,7 +103,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-93 Integrate optional body distribution, skin and navigation triggers into Jeeves canonical scene and Forge export.
 - [x] GF-P0-94 Add detailed source regression tests and path-scoped CI for skin, navigation, weight, RPG and scene export.
 - [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes.
-- [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation.
+- [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + SoftBody3D import, pinned vertex hold, total mass, collision layer, free-vertex motion pass locally; open: skinned SoftBody3D animation validation)
 - [ ] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
 - [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
 - [ ] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
@@ -123,8 +123,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-113 Extend the existing RPG Studio to produce double-verified build-progress receipts from true placed prefab assets and stable IDs.
 - [x] GF-P0-114 Focused regressions passed for 141 tests including surveyed fixes, privacy, GPS spoof/replay rejection and 80 continuous GDD-linked frames.
 - [ ] GF-P0-115 Install compatible Expo SDK 54 native foreground location provider with permission config and actually verify Android/iOS device acquisition and revocation.
+  - Note (2026-10-24, GF-J): code landed — expo-location ~19.0.8 (SDK 54) foreground-only adapter + FrontierLocationProvider/useFrontierLocation (`frontend/src/product/location/`), iOS NSLocationWhenInUseUsageDescription, Android FINE/COARSE (background blocked), jest tests with mocked expo-location. On-device Android/iOS acquisition and revocation verification is PENDING (needs hardware); item stays open.
 - [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
-- [ ] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay.
+- [x] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay. (77f36d8ce)
 - [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
 - [x] GF-P0-119 Create game-only fictional map XYZ, metric tiles, rotation, realm coordinates and explicitly non-Earth latitude/longitude-style display.
 - [x] GF-P0-120 Simulate deterministic range measurements from four-plus authored virtual 3D beacons without device GPS.
@@ -137,9 +138,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access.
 - [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
 - [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
-- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era.
+- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era. (GF-H `2a81c848c`: hub in skeleton/frontier_nav/gps.py; stays open until GF-A engine wiring feeds real frames)
 - [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
-- [ ] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes.
+- [x] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes. (GF-H `2a81c848c`: skeleton/frontier_nav/route_grounding.py)
 
 - [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [x] GF-P0-135 Implement source-hashed evidence records for every registered-era mesh chunk with 3D bounds, triangle IDs, vertex IDs and deterministic ordering.
@@ -155,7 +156,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-145 Add Godot chunk receipt inspector with source-only proof root, chunk counts, migration and signed GDD note counts.
 - [x] GF-P0-146 Add adversarial and 30/50/60/120 FPS receipt tests including mesh corruption, retired cells and chained 40-frame review.
 - [ ] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates.
-- [ ] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination.
+- [x] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination. (77f36d8ce)
 - [ ] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits.
 - [x] GF-P0-150 Add SQLite WAL full-fidelity frame and content-addressed chunk receipt journal with atomic single-frame commits.
 - [x] GF-P0-151 Reconstruct stored canonical typed FrameReceipt and source chunk receipts from hashed durable blobs with independently checked signed-GDD inputs.
@@ -206,7 +207,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-196 Extend reference physics proxies to actual NPC/gear/interaction controllers with signed event authority.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
-- [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
+- [x] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups. (77f36d8ce)
 - [ ] GF-P0-15 Add model-weight readiness/rights/VRAM capability discovery to existing model registry and provider runtime.
 - [ ] GF-P0-16 Add exact game environment adapters, deterministic replay and holdout dataset isolation.
 - [ ] GF-P0-17 Confirm correct per-era bone-weighted mesh imports with actual Godot/headless output.

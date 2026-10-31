@@ -14,6 +14,14 @@ python scripts/check_toolchain_contract.py
 printf '\n== Canonical local/CI quality parity ==\n'
 python scripts/check_quality_gate_parity.py
 
+# Fail quickly on missing canonical AI-tree owners before long provider and
+# architecture suites. This is an order-only change; it does not skip a gate.
+printf '\n== Canonical AI file tree ==\n'
+python scripts/check_ai_file_tree.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_file_tree.py \
+  skeleton/testing/test_ci_ai_tree_failfast.py
+
 printf '\n== Provider runtime boundary ==\n'
 python scripts/check_provider_runtime_boundary.py
 python scripts/check_provider_bootstrap.py
@@ -63,11 +71,6 @@ printf '\n== Master build sequence ==\n'
 python scripts/check_ai_master_build_sequence.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_master_build_sequence.py
-
-printf '\n== Canonical AI file tree ==\n'
-python scripts/check_ai_file_tree.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  skeleton/testing/test_ai_file_tree.py
 
 printf '\n== Masterplan engineering pass ==\n'
 python scripts/check_ai_engineering_pass.py

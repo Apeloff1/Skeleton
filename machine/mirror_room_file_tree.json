@@ -47,8 +47,8 @@
         "role": "projection and product-closure regression"
       },
       {
-        "path": ".github/workflows/mirror-room-extensions.yml",
-        "role": "focused exact-head extension/product gate"
+        "path": ".github/workflows/merge-readiness.yml",
+        "role": "active canonical domain regression gate including Mirror Room"
       },
       {
         "path": "docs/plan/MIRROR_ROOM_LEARNING.md",

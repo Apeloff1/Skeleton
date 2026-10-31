@@ -1228,8 +1228,10 @@
           ]
         },
         "final_output": {
-          "type": "Ref",
-          "nullable": true
+          "type": "string",
+          "nullable": true,
+          "min_length": 1,
+          "max_utf8_bytes": 4194304
         },
         "verification": {
           "type": "Ref",
@@ -1268,7 +1270,9 @@
       },
       "invariants": [
         "completed requires durable final output/result semantics and required verification",
-        "operation terminal completion may not precede canonical result commit"
+        "operation terminal completion may not precede canonical result commit",
+        "final_output is normalized generated UTF-8 text, not a Ref; its four-MiB outer ceiling does not override token, context, checkpoint, storage or transport limits",
+        "verification and stream_terminal_event retain the Ref limit of 2048 characters"
       ]
     },
     "DelegatedAuthority": {

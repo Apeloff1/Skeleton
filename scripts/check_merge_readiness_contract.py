@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/merge-readiness.yml"
 PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
-RUFF_VERSION = "0.17.1"
+RUFF_VERSION = "0.17.2"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
 REQUIRED_NEEDS = (
     "quarantine_policy",

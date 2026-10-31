@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pytest
+import json
+from pathlib import Path
 
 from core.route_privacy import (
     bind_route_privacy,
@@ -16,6 +18,27 @@ from skeleton.vault.data_governance import DataGovernanceDenied
 
 def test_route_privacy_catalog_covers_every_written_domain() -> None:
     validate_domain_privacy_coverage()
+
+
+def test_declared_private_families_use_existing_confidential_studio_ceiling():
+    from core.route_policy_catalog import ROUTE_POLICY_CATALOG_VERSION
+    contract = json.loads((Path(__file__).resolve().parents[2] / "machine/ai_app_construction.json").read_text())
+    declaration = contract["first_install_continuation_2026_10_15"]["private_model_route_admission"]
+    assert declaration["catalog_version"] == ROUTE_POLICY_CATALOG_VERSION
+    for prefix in declaration["authenticated_prefixes"]:
+        token = bind_route_privacy(prefix + "/private-model-operation")
+        try:
+            assert current_route_privacy().domain == declaration["existing_domain"] == "studio"
+            permitted = require_route_provider_transfer(provider_id="skeleton-engine", data_class="confidential",
+                                                        tenant_id="tenant-a", purpose="model-inference")
+            assert permitted.permitted is True
+            with pytest.raises(DataGovernanceDenied, match="route_data_ceiling_exceeded"):
+                require_route_provider_transfer(provider_id="skeleton-engine", data_class="restricted",
+                                                tenant_id="tenant-a", purpose="model-inference")
+        finally:
+            reset_route_privacy(token)
+    for path in ["/api/playable-lookalike", "/api/jeeves-core/overview", "/api/assets/unknown-public-surface"]:
+        assert resolve_route_privacy(path).domain == "legacy_api"
 
 
 def test_governance_route_denies_external_provider_transfer() -> None:

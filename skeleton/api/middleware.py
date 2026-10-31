@@ -149,6 +149,7 @@ DEFAULT_OPEN_PREFIXES: Tuple[str, ...] = (
 DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/forge", "forge"),
     ("/api/v1/gameforge", "forge"),
+    ("/api/v1/game/build", "forge"),
     ("/api/v1/swarm", "swarm"),
     ("/api/v1/jeeves", "jeeves"),
     ("/api/v1/memory", "memory"),

@@ -12,19 +12,24 @@ Shares the codegen helpers + Mongo handle with routes.playable (single source of
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routes.playable_htmlutils import passes_playability_gate
+
 from routes.playable import (
+    PlayableModelFailure,
     _db, _GAME_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 _FINETUNE_SYS = _GAME_SYS + (
     "\n\nYou are FINE-TUNING an existing, working game. Apply EXACTLY the requested change and "
@@ -68,13 +73,17 @@ async def _do_edit(pid: str, mode: str, instruction: str) -> dict:
                   f"Preserve everything else. Return the FULL updated single-file HTML:\n{base_html[:16000]}")
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, sys_prompt, _GAME_ENSEMBLE)
+    except (PlayableModelFailure, HTTPException):
+        # The shared runner owns uncertain execution and revoked authority.
+        # Neither may become a completed "not applied" mutation result.
+        raise
     except Exception:
         return {"playable_id": pid, "edited": False, "error": "edit model unavailable"}
     new_html, removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(new_html)
     # guard: must stay runnable AND not regress more than 10 pts below the prior score
     floor = max(PLAYABILITY_THRESHOLD, prev_score - 10)
-    if not new_html or val["score"] < floor:
+    if not new_html or not passes_playability_gate(val, floor):
         return {"playable_id": pid, "edited": False, "kind": mode, "score": val["score"],
                 "missing": val.get("missing", []), "prev_score": prev_score}
     trail = doc.get("edit_trail") or []

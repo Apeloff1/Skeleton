@@ -107,6 +107,7 @@ def test_rag_admission_rejects_non_finite_mutable_fields() -> None:
         (CanonicalStore,CanonicalChunk),
         (AIStore,AIChunk),
     ):
+        store=store_type()
         for field,value,match in (
             ("embedding",[0.1,math.inf],"embedding values must be finite"),
             ("timestamp",math.nan,"timestamp must be finite numeric data"),

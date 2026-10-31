@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skeleton/b040/eval_baseline.schema.json",
+  "title": "B040 baseline per (set version, candidate) (S2, draft). Stored as baselines/<set>/<candidate>.json",
+  "type": "object",
+  "required": ["set_version", "candidate", "source_run_id", "tolerance", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "set_version": {"type": "integer", "minimum": 1},
+    "candidate": {"type": "string", "minLength": 1},
+    "source_run_id": {"type": "string", "minLength": 1},
+    "tolerance": {
+      "type": "object",
+      "required": ["correctness", "editability", "latency", "cost", "safety"],
+      "additionalProperties": false,
+      "properties": {
+        "correctness": {"type": "number", "minimum": 0},
+        "editability": {"type": "number", "minimum": 0},
+        "latency": {"type": "number", "minimum": 0},
+        "cost": {"type": "number", "minimum": 0},
+        "safety": {"type": "number", "minimum": 0}
+      }
+    },
+    "cases": {
+      "type": "object",
+      "patternProperties": {
+        "^B040-[A-Z]{2,8}-[0-9]{3}@[0-9]+$": {
+          "type": "object",
+          "additionalProperties": {"type": ["number", "null"]}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

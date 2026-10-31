@@ -120,6 +120,8 @@ services:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Explicit trusted browser origin; never build share links from Host headers.
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
       - DEBUG=${DEBUG:-false}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
@@ -233,6 +235,11 @@ services:
     # This service has no auth boundary here, so never bind it publicly.
     ports:
       - "127.0.0.1:${CHROMA_PORT:-8000}:8000"
+    # IMPORTANT: The pinned image persists at /data. This legacy mount is
+    # deliberately retained until existing containers' /data has been exported,
+    # verified and restored to chroma_data. Never recreate an existing Chroma
+    # container to apply a mount correction without that migration.
+    # See docs/APP_ASSEMBLY.md for the data-recovery hold.
     volumes:
       - chroma_data:/chroma/chroma
     environment:

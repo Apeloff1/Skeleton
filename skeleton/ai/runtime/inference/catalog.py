@@ -244,7 +244,11 @@ class _CatalogLocalAdapter(LocalModelAdapter):
             "catalog_entry_digest": entry.entry_digest,
             "catalog_source_sha256": entry.sha256,
         })
-        super().__init__(adapter.engine, default_seed=adapter.default_seed, artifact_status=artifact)
+        super().__init__(
+            adapter.engine, default_seed=adapter.default_seed, artifact_status=artifact,
+            guarded_service=adapter.guarded_service,
+            require_guarded_inference=adapter.require_guarded_inference,
+        )
         self.model = entry.model_id
         self._catalog_model_id = entry.model_id
         self._source_model_id = source_model_id
@@ -282,8 +286,19 @@ def load_local_model_catalog(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelCatalogActivation:
-    """Activate a bounded explicit catalog, after every source passes preflight."""
+    """Activate pinned catalog; all entries share enforced guard policy."""
+    from skeleton.provider_runtime import ProviderPolicyError
+    if type(require_guarded_inference) is not bool:
+        raise LocalModelCatalogError("guard policy must be explicit")
+    if require_guarded_inference:
+        from .guarded_composition import ProtectedLocalComponents
+        if not isinstance(guarded_components, ProtectedLocalComponents):
+            raise LocalModelCatalogError("guard-required catalog lacks trusted dependencies")
+    elif guarded_components is not None:
+        raise LocalModelCatalogError("catalog guarded components require enforcement")
 
     catalog = LocalModelCatalog.load(path)
     adapters: dict[str, LocalModelAdapter] = {}
@@ -295,17 +310,36 @@ def load_local_model_catalog(
             if entry.kind == "deployment":
                 if entry.deployment is None:
                     raise LocalModelCatalogError("local catalog deployment preflight is missing")
-                adapter = entry.deployment.adapter(cache_size=cache_size, default_seed=default_seed, rehash_artifacts_each_run=True, **capacity)
+                adapter = entry.deployment.adapter(
+                    cache_size=cache_size, default_seed=default_seed,
+                    rehash_artifacts_each_run=True,
+                    require_guarded_inference=require_guarded_inference,
+                    guarded_components=guarded_components, **capacity,
+                )
             else:
                 _memory_admission(remaining_resident)
                 loaded = load_local_model_artifact(entry.path, expected_sha256=entry.sha256)
                 if loaded.receipt.artifact_sha256 != entry.sha256:
                     raise LocalModelCatalogError("loaded artifact differs from its catalog digest pin")
-                adapter = LocalModelAdapter(LocalInferenceEngine(loaded.model, cache_size=cache_size, **capacity), default_seed=default_seed, artifact_status=loaded.receipt.as_dict())
+                engine = LocalInferenceEngine(
+                    loaded.model, cache_size=cache_size,
+                    require_guarded_context=require_guarded_inference, **capacity,
+                )
+                if require_guarded_inference:
+                    from .guarded_composition import compose_protected_local_adapter
+                    adapter = compose_protected_local_adapter(
+                        engine, components=guarded_components, default_seed=default_seed,
+                        artifact_status=loaded.receipt.as_dict(),
+                    )
+                else:
+                    adapter = LocalModelAdapter(
+                        engine, default_seed=default_seed,
+                        artifact_status=loaded.receipt.as_dict(),
+                    )
                 remaining_resident -= entry.source_bytes
             _verify_source(entry.path, entry.sha256, entry.source_bytes)
             adapters[entry.model_id] = _CatalogLocalAdapter(adapter, catalog, entry)
-    except (LocalModelArtifactError, LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
+    except (LocalModelArtifactError, LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
         raise LocalModelCatalogError("local catalog activation failed") from exc
     primary = adapters[catalog.primary_model_id]
     verifier = None if catalog.verifier_model_id is None else adapters[catalog.verifier_model_id]

@@ -15,6 +15,7 @@ import math
 from uuid import uuid4
 from collections import OrderedDict
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -377,6 +378,7 @@ async def route_complete(
     idempotency_key: str | None = None,
     max_output_tokens: int | None = None,
     cooperation: dict | None = None,
+    data_class: Literal["public", "internal", "confidential", "restricted"] = "internal",
 ) -> dict:
     """Complete exact scoped work without a second model or transcript owner.
 
@@ -416,6 +418,8 @@ async def route_complete(
         or not isinstance(session_id, str)
         or len(session_id) > 512
         or len(task) > 64
+        or not isinstance(data_class, str)
+        or data_class not in {"public", "internal", "confidential", "restricted"}
     ):
         return {**public, "error": "The completion request is invalid.", "error_code": "request_invalid"}
     key_for_turn = idempotency_key if idempotency_key is not None else "llm-router:" + str(uuid4())
@@ -455,6 +459,7 @@ async def route_complete(
             cooperation=policy,
             catalog_digest=catalog_identity,
             idempotency_key=idempotency_key,
+            data_class=data_class,
         )
         chat = (
             EngineChat(
@@ -462,6 +467,7 @@ async def route_complete(
                 instruction_policy=LLM_ROUTER_POLICY,
                 tenant_id=tenant_id,
                 actor_id=actor_id,
+                data_class=data_class,
                 capability="assistant.compat",
                 verification_profile="assistant_proposal",
                 turn_idempotency_key=key_for_turn,
@@ -489,7 +495,8 @@ async def route_complete(
 
     if use_cache:
         cached = _CACHE.get(key)
-        if cached is not None and cached.get("_scope") == [tenant_id, actor_id]:
+        if (cached is not None and cached.get("_scope") == [tenant_id, actor_id]
+                and cached.get("_data_class") == data_class):
             _STATS["cache_hits"] += 1
             hit = json.loads(json.dumps(cached["result"], allow_nan=False))
             await _log_call(
@@ -558,7 +565,7 @@ async def route_complete(
         "verification": response.verification,
     }
     if use_cache:
-        _CACHE.set(key, {"_scope": [tenant_id, actor_id], "result": result})
+        _CACHE.set(key, {"_scope": [tenant_id, actor_id], "_data_class": data_class, "result": result})
     await _log_call({**result, **scope, "provider_receipt_count": len(response.provider_receipts)})
     return result
 

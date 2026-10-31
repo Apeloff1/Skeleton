@@ -58,7 +58,10 @@ def test_discrete_probability_zero_support_fails_closed() -> None:
 def test_stable_special_functions_are_inverse_or_log_domain_consistent() -> None:
     for value in (-20.0, -2.0, 0.0, 3.0, 20.0):
         probability = stable_sigmoid(value)
-        assert stable_logit(probability) == pytest.approx(value, abs=1e-8)
+        # Rounding a probability near 1 loses logit precision; bound that loss
+        # by half an ulp propagated through d(logit)/dp = 1 / (p * (1-p)).
+        quantization_bound = math.ulp(probability) / (2.0 * probability * (1.0 - probability))
+        assert stable_logit(probability) == pytest.approx(value, abs=1e-8 + quantization_bound)
         softplus = stable_softplus(value)
         assert inverse_softplus(softplus) == pytest.approx(value, abs=1e-9)
     assert stable_sigmoid(30.0) > 0.999999999999

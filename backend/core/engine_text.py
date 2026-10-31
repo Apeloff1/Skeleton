@@ -21,6 +21,7 @@ from core.model_catalog import (
     resolve_selection,
     context_budget_for_selection,
     estimate_context_tokens,
+    selection_may_use_llama_cpp,
     cooperation_context_selection,
     cooperation_context_budget,
     ModelSelectionError,
@@ -89,8 +90,11 @@ class EngineTextRequest:
 
     structured_output_schema: Mapping[str, Any] | None = None
     cooperation: Mapping[str, Any] | None = None
+    max_model_turns: int = 4
 
     def __post_init__(self) -> None:
+        if type(self.max_model_turns) is not int or not 1 <= self.max_model_turns <= 4:
+            raise EngineTextError("max_model_turns may only lower the existing limit within [1,4]")
         if self.cooperation is not None:
             from skeleton.intelligence.cooperation import normalize_cooperation_policy
 
@@ -292,6 +296,7 @@ class EngineTextRequest:
                     else {"structured_output_schema": self.structured_output_schema}
                 ),
                 **({} if self.cooperation is None else {"cooperation": self.cooperation}),
+                **({} if self.max_model_turns == 4 else {"max_model_turns": self.max_model_turns}),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -360,6 +365,7 @@ def _terminal_response(
         and request.temperature is None
         and request.structured_output_schema is None
         and request.cooperation is None
+        and request.max_model_turns == 4
         and legacy_prompt in snapshot
     ):
         raise EngineTextError("chat idempotency identity was reused with different request semantics")
@@ -656,19 +662,27 @@ async def execute_engine_text(
     projection = project_provider_context(envelope)
     if expected_prompt not in selected_prompts or projection.prompt != request.prompt:
         raise EngineTextContextError("current prompt does not fit the selected model context")
-    if selection["context_tokenizer"] in {"utf8_bytes", "reference_tokens"}:
+    native_upper_bound = selection_may_use_llama_cpp(catalog, selection, cooperation=request.cooperation)
+    if native_upper_bound or selection["context_tokenizer"] in {"utf8_bytes", "reference_tokens"}:
         from skeleton.ai.runtime.inference.local import LocalInferenceRequest, _TOKEN
 
-        rendered = LocalInferenceRequest(
+        projected_request = LocalInferenceRequest(
             prompt=projection.prompt,
             instructions=projection.instructions,
             history=tuple((item["role"], item["content"]) for item in projection.history),
-        ).rendered_input
-        estimate = (
-            len(rendered.encode("utf-8")) + 1
-            if selection["context_tokenizer"] == "utf8_bytes"
-            else sum(1 for _ in _TOKEN.finditer(rendered))
+            structured_output_schema=request.structured_output_schema,
         )
+        if native_upper_bound:
+            from skeleton.ai.runtime.inference.llama_cpp import llama_cpp_prompt_tokens_upper_bound
+
+            estimate = llama_cpp_prompt_tokens_upper_bound(projected_request)
+        else:
+            rendered = projected_request.rendered_input
+            estimate = (
+                len(rendered.encode("utf-8")) + 1
+                if selection["context_tokenizer"] == "utf8_bytes"
+                else sum(1 for _ in _TOKEN.finditer(rendered))
+            )
         if estimate > envelope.budget.input_capacity(tools_enabled=False):
             raise EngineTextContextError("complete framed conversation does not fit the selected model")
     command = command_from_context(
@@ -685,7 +699,7 @@ async def execute_engine_text(
         created_at=now,
         deadline=now + timedelta(seconds=active_client.config.execution_timeout_s),
         trace_id="engine-text:" + operation_id,
-        max_model_turns=4,
+        max_model_turns=request.max_model_turns,
         max_output_tokens=budget.reserved_output_tokens,
         provider_id=selection["selection_provider_id"],
         model_id=selection["selection_model_id"],

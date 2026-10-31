@@ -29,6 +29,18 @@ class WorkflowTierTests(unittest.TestCase):
         )
         self.assertEqual(missing, [], "masterplan references missing workflows")
 
+    def test_auxiliary_admissions_are_manual_only(self):
+        """Keep the 20-trigger cap without dropping required security gates."""
+        for name in ("historical-zero-job-canary.yml", "local-ai-boilerplate.yml"):
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertEqual(events(source), {"workflow_dispatch"}, name)
+        canary = (ROOT / ".github/workflows/historical-zero-job-canary.yml").read_text(encoding="utf-8")
+        self.assertIn("os.environ.get('GH_ACTOR') != 'Apeloff1'", canary)
+        self.assertIn("os.environ.get('GH_EVENT') != 'workflow_dispatch'", canary)
+        readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
+        self.assertIn("skeleton/testing --tb=short", readiness)
+        self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import Any
 
 from skeleton.cue.gb46.caps import names
 from skeleton.cue.gb46.cards import cue_card
 from skeleton.cue.gb46.law import CAPABILITY_COUNT, HEAT_DROP
+from skeleton.cue.gb46._dispatch import load_organ_module
 
 
 class Conductor:
@@ -17,7 +17,7 @@ class Conductor:
             raise RuntimeError("count")
 
     def load(self, module: str):
-        return importlib.import_module(f"skeleton.cue.gb46.caps.{module}")
+        return load_organ_module(module)
 
     def pulse_sample(self, step: int = 160) -> list[dict[str, Any]]:
         from skeleton.cue.gb46.caps.c0001_house_001 import CuePulse

@@ -16,6 +16,13 @@ def test_static_analysis_is_deterministic_and_located():
 def test_simulation_is_non_production_and_includes_failure_modes():
  s=simulate_plan(("x",));assert not s.production_evidence
  assert {x.scenario for x in s.steps}=={"success","failure","timeout","resource_exhaustion"}
+def test_simulation_cannot_claim_production_evidence():
+ import pytest
+ s=simulate_plan(("x",))
+ assert s.production_evidence is False
+ with pytest.raises(TypeError):PlanSimulation((),(),True)
+ with pytest.raises((AttributeError,TypeError)):s.production_evidence=True
+ assert s.production_evidence is False
 def test_tool_composition_cannot_union_authority():
  a=ToolBinding("a","1",frozenset({"read","write"}),"A","B","verified");b=ToolBinding("b","1",frozenset({"read"}),"B","C","verified")
  assert not compose_tools(ToolComposition((a,b),frozenset({"read","write"}))).admissible

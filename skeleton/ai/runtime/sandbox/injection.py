@@ -107,8 +107,56 @@ CONTEXT_FAMILIES: dict[str, frozenset[str]] = {
     "html": frozenset({"markup", "template", "exfil", "hidden"}),
     "template": frozenset({"template", "hidden"}),
 }
-_LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
-_B64_RE = re.compile(r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{24,}={0,2}(?![A-Za-z0-9+/=])")
+_LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a"})
+# ``$`` folds to ``s`` except where it opens an expression (``${`` / ``$(``),
+# which the shell and template rules must still see.
+_LEET_DOLLAR = re.compile(r"\$(?![{(])")
+_B64_RE = re.compile(r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{6,}={0,2}(?![A-Za-z0-9+/=])")
+B64_MIN_CHARS = 8
+B64_LONG_CHARS = 24
+MAX_VIEWS = 16
+# Cross-script lookalikes (Cyrillic / Greek / Latin-extended) that NFKC does
+# not fold.  Folding them is a *view*, so mixed-script prose is never rewritten
+# in what the caller sees.
+CONFUSABLES = str.maketrans({
+    "\u0430": "a", "\u0410": "A", "\u0435": "e", "\u0415": "E", "\u043e": "o", "\u041e": "O",
+    "\u0440": "p", "\u0420": "P", "\u0441": "c", "\u0421": "C", "\u0445": "x", "\u0425": "X",
+    "\u0443": "y", "\u0423": "Y", "\u0456": "i", "\u0406": "I", "\u0458": "j", "\u0408": "J",
+    "\u0455": "s", "\u0405": "S", "\u04bb": "h", "\u0501": "d", "\u051b": "q", "\u051d": "w",
+    "\u0412": "B", "\u041a": "K", "\u041c": "M", "\u041d": "H", "\u0422": "T", "\u0432": "b",
+    "\u043a": "k", "\u043c": "m", "\u043d": "h", "\u0442": "t", "\u0433": "r", "\u0457": "i",
+    "\u03bf": "o", "\u039f": "O", "\u03b1": "a", "\u0391": "A", "\u03b5": "e", "\u0395": "E",
+    "\u03b9": "i", "\u0399": "I", "\u03ba": "k", "\u039a": "K", "\u03bd": "v", "\u03c1": "p",
+    "\u03a1": "P", "\u03c4": "t", "\u03a4": "T", "\u03c5": "u", "\u03c7": "x", "\u03a7": "X",
+    "\u0392": "B", "\u0397": "H", "\u039c": "M", "\u039d": "N", "\u0396": "Z", "\u03b3": "y",
+    "\u0131": "i", "\u0261": "g", "\u01c3": "!", "\u2044": "/", "\u2215": "/", "\u29f8": "/",
+    "\uff0f": "/", "\u2024": ".", "\uff0e": ".",
+})
+# A run of three or more single letters split by one separator: "U N I O N".
+_SPACED_RUN = re.compile(r"(?<![A-Za-z])(?:[A-Za-z][ .\-_*]){2,}[A-Za-z](?![A-Za-z])")
+# Keywords used to re-split adjacent spaced runs ("d i s r e g a r d t h e")
+# whose word boundary the spacing destroyed.
+_RUN_LEXICON = tuple(sorted({
+    "ignore", "disregard", "forget", "override", "bypass", "previous", "prior", "above", "earlier",
+    "instructions", "instruction", "prompts", "prompt", "rules", "directives", "guidelines", "context",
+    "reveal", "print", "show", "repeat", "output", "leak", "dump", "system", "hidden", "initial", "your",
+    "call", "invoke", "run", "execute", "use", "tool", "function", "shell", "terminal", "browser",
+    "immediately", "silently", "without", "send", "upload", "exfiltrate", "forward", "tokens", "token",
+    "passwords", "password", "credentials", "secrets", "keys", "jailbreak", "developer", "mode", "enabled",
+    "unrestricted", "restrictions", "union", "select", "drop", "delete", "insert", "update", "alter",
+    "truncate", "table", "from", "where", "all", "the", "and", "now", "you", "are", "act", "as",
+}, key=lambda w: (-len(w), w)))
+_RUN_LEXICON_RE = re.compile("|".join(_RUN_LEXICON), re.I)
+
+
+def _segment_run(run: str) -> str:
+    joined = re.sub(r"[ .\-_*]", "", run)
+    return " " + re.sub(r"\s+", " ", _RUN_LEXICON_RE.sub(lambda m: f" {m.group(0)} ", joined)).strip() + " "
+
+
+# A ``;`` that is really the terminator of an HTML entity (``&#115;``) in an
+# undecoded layer is not a command separator.
+_ENTITY_TAIL = re.compile(r"&#?[A-Za-z0-9]{1,8}$")
 
 
 @dataclass(frozen=True)
@@ -155,7 +203,20 @@ def _strip_hidden(text: str) -> str:
     return "".join(ch for ch in text if ch not in BIDI_CONTROLS and ch not in INVISIBLES and not 0xE0000 <= ord(ch) <= 0xE007F)
 
 
+def _b64_candidate(token: str) -> bool:
+    """Cheap pre-filter so ordinary words are not base64-decoded."""
+    body = token.rstrip("=")
+    if len(token) < B64_MIN_CHARS or len(body) % 4 == 1:
+        return False
+    if len(token) >= B64_LONG_CHARS:
+        return True
+    has_marker = any(ch.isdigit() or ch in "+/=" for ch in token)
+    return has_marker and any(ch.isupper() for ch in body) and any(ch.islower() for ch in body)
+
+
 def _try_b64(token: str) -> str | None:
+    if not _b64_candidate(token):
+        return None
     try:
         raw = base64.b64decode(token + "=" * (-len(token) % 4), validate=True)
     except (binascii.Error, ValueError):
@@ -174,12 +235,15 @@ def views(text: str) -> list[tuple[str, str]]:
     seen: set[str] = set()
 
     def add(layer: str, value: str) -> None:
-        if value and value not in seen and len(out) < 12:
+        if value and value not in seen and len(out) < MAX_VIEWS:
             seen.add(value)
             out.append((layer, value))
 
     base = unicodedata.normalize("NFKC", _strip_hidden(text))
     add("raw", base)
+    folded_base = base.translate(CONFUSABLES)
+    if folded_base != base:
+        add("raw+fold", folded_base)
     smuggled = decode_tag_smuggling(text)
     if smuggled:
         add("tag-smuggled", smuggled)
@@ -193,7 +257,7 @@ def views(text: str) -> list[tuple[str, str]]:
             ent = html.unescape(value)
             if ent != value:
                 nxt.append((layer + "+html", ent))
-            for m in list(_B64_RE.finditer(value))[:8]:
+            for m in [t for t in _B64_RE.finditer(value) if _b64_candidate(t.group(0))][:8]:
                 dec = _try_b64(m.group(0))
                 if dec:
                     nxt.append((layer + "+b64", dec))
@@ -203,13 +267,27 @@ def views(text: str) -> list[tuple[str, str]]:
         if not queue:
             break
     for layer, value in list(out):
-        folded = value.translate(_LEET)
+        folded = _LEET_DOLLAR.sub("s", value.translate(_LEET))
         if folded != value:
             add(layer + "+leet", folded)
         squashed = re.sub(r"(?<=\b\w)[\s.\-_*](?=\w\b)", "", value)  # "i g n o r e" -> "ignore"
         if squashed != value:
             add(layer + "+squash", squashed)
+        despaced = _SPACED_RUN.sub(lambda m: re.sub(r"[ .\-_*]", "", m.group(0)), value)  # "1 U N I O N" -> "1 UNION"
+        if despaced != value and despaced != squashed:
+            add(layer + "+despace", despaced)
+        if despaced != value:
+            add(layer + "+segment", _SPACED_RUN.sub(lambda m: _segment_run(m.group(0)), value))
     return out
+
+
+def _first_match(rule: Rule, value: str, layer: str) -> re.Match[str] | None:
+    """First match of ``rule`` that is not an undecoded-entity artifact."""
+    for m in rule.pattern.finditer(value):
+        if "+html" not in layer and m.group(0)[:1] == ";" and _ENTITY_TAIL.search(value, 0, m.start()):
+            continue
+        return m
+    return None
 
 
 def detect(text: str, *, context: str = "any") -> InjectionReport:
@@ -234,7 +312,7 @@ def detect(text: str, *, context: str = "any") -> InjectionReport:
         for rule in RULES:
             if rule.family not in families or (rule.family, rule.rule_id) in found:
                 continue
-            m = rule.pattern.search(value)
+            m = _first_match(rule, value, layer)
             if m:
                 weight = rule.weight if layer == "raw" else min(0.99, rule.weight + 0.05)  # obfuscation is itself a signal
                 found[(rule.family, rule.rule_id)] = Finding(rule.family, rule.rule_id, weight, rule.description, value[max(0, m.start() - 20): m.end() + 20][:160], layer)
@@ -266,6 +344,7 @@ def quarantine(text: str, *, source: str = "untrusted") -> str:
 
 
 __all__ = [
+    "CONFUSABLES",
     "CONTEXT_FAMILIES",
     "FAMILIES",
     "RULES",

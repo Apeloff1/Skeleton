@@ -13,6 +13,8 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from backend.core.engine_client import EngineClient, EngineClientConfig
 from skeleton.ai.runtime.inference import (
     LocalInferenceCancelled,
@@ -312,12 +314,15 @@ def _engine_bundle():
 
 
 async def _wait_result(service, execution_id: str):
-    for _ in range(200):
-        result = service.repository.result(execution_id)
-        if result is not None:
-            return result
-        await asyncio.sleep(0)
-    raise AssertionError("local engine execution did not complete")
+    try:
+        async with asyncio.timeout(10):
+            while True:
+                result = service.repository.result(execution_id)
+                if result is not None:
+                    return result
+                await asyncio.sleep(0.01)
+    except TimeoutError as exc:
+        raise AssertionError("local engine execution did not complete") from exc
 
 
 @pytest.mark.asyncio

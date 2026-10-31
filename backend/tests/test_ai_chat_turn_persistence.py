@@ -20,6 +20,7 @@ from skeleton.ai.assistant.turn_runtime import (
 from skeleton.persistence.chat_turn_repository import (
     ChatTurnBinding,
     ChatTurnConflict,
+    ChatTurnCorruption,
 )
 
 
@@ -58,9 +59,6 @@ class FakeCursor:
 def _expression_operand(doc, operand, now):
     """Minimal Mongo expression evaluator for the lease CAS test double."""
     if isinstance(operand, str):
-        # Mongo aggregation binds server clock as $$NOW, not $NOW (which
-        # names a document field). Resolve it before field lookups so
-        # expiry and takeover CAS tests faithfully model MongoDB.
         if operand == "$$NOW":
             return now
         if operand.startswith("$"):
@@ -74,15 +72,6 @@ def _expression_operand(doc, operand, now):
     return operand
 
 
-def test_fake_mongo_server_clock_uses_double_dollar_now():
-    """Lease fences must compare against server time, not a missing field."""
-    from core import chat_turns as turn_module
-
-    doc = {"lease_expires_at": turn_module._utcnow() + timedelta(seconds=10)}
-    assert _expression_operand(doc, "$$NOW", turn_module._utcnow()) is not None
-    assert _expression_operand(doc, "$NOW", turn_module._utcnow()) is None
-
-
 def _matches_expression(doc, expression):
     # Mongo evaluates $$NOW at the server's comparison point. Tests freeze the
     # authority clock, so the fake storage uses that same deterministic clock.
@@ -92,10 +81,9 @@ def _matches_expression(doc, expression):
     if not isinstance(expression, dict) or len(expression) != 1:
         raise AssertionError("unsupported Mongo expression")
     operation, arguments = next(iter(expression.items()))
-    if operation == "$or":
-        return any(_matches_expression(doc, item) for item in arguments)
-    if operation == "$and":
-        return all(_matches_expression(doc, item) for item in arguments)
+    if operation in {"$or", "$and"}:
+        results = (_matches_expression(doc, expression) for expression in arguments)
+        return any(results) if operation == "$or" else all(results)
     if operation in {"$gt", "$lte", "$eq"}:
         if not isinstance(arguments, list) or len(arguments) != 2:
             raise AssertionError("unsupported Mongo comparison")
@@ -116,6 +104,10 @@ def _matches(doc, query):
             continue
         actual = doc.get(key)
         if isinstance(expected, dict):
+            if not any(str(field).startswith("$") for field in expected):
+                if actual != expected:
+                    return False
+                continue
             if "$gt" in expected:
                 threshold = expected["$gt"]
                 # Mongo compares only compatible BSON types for order queries.
@@ -664,3 +656,240 @@ async def test_mongo_legacy_operation_gets_atomic_ownership_schema():
     initialized = authority.operations.docs[operation_id]
     assert initialized["lease_epoch"] == 1
     assert initialized["lease_holder_id"] == "worker-a"
+
+
+def test_mongo_authority_pins_primary_reads_and_aware_timestamps():
+    from pymongo import ReadPreference
+
+    class ConfigurableDatabase(FakeDatabase):
+        def with_options(self, **options):
+            self.options = options
+            return self
+
+    database = ConfigurableDatabase()
+    authority = MongoChatTurnAuthority(database)
+    assert authority.database is database
+    assert database.options["read_preference"] == ReadPreference.PRIMARY
+    assert database.options["codec_options"].tz_aware is True
+    assert database.options["codec_options"].tzinfo is timezone.utc
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("changed_content", [False, True])
+async def test_stale_recovery_cannot_delete_replacement_preparation(monkeypatch, changed_content):
+    from core import chat_turns as module
+
+    monkeypatch.setattr(module, "_utcnow", lambda: NOW + timedelta(seconds=12))
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="5" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    stale = await authority.acquire_lease(
+        operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="old", ttl_seconds=10, now=NOW,
+    )
+    current = await authority.acquire_lease(
+        operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="current", ttl_seconds=30,
+        now=NOW + timedelta(seconds=11),
+    )
+    event = make_event(turn.snapshot, TurnState.ADMITTED, observed_at=NOW + timedelta(seconds=12))
+    replacement_event = (
+        make_event(turn.snapshot, TurnState.ADMITTED, observed_at=event.observed_at, reason_code="replacement")
+        if changed_content else event
+    )
+    prepared = module._event_doc(event, stale)
+    replacement = module._event_doc(replacement_event, current)
+    await authority.events.insert_one(prepared)
+    original_delete = authority.events.delete_one
+
+    async def replace_before_delete(query):
+        authority.events.docs[prepared["_id"]] = deepcopy(replacement)
+        return await original_delete(query)
+
+    monkeypatch.setattr(authority.events, "delete_one", replace_before_delete)
+    recovered = await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert recovered.snapshot.state is TurnState.RECEIVED
+    assert authority.events.docs[prepared["_id"]] == replacement
+
+    recovered = await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert recovered.snapshot.last_event_digest == replacement_event.digest
+    assert authority.events.docs[prepared["_id"]]["_commit_state"] == "committed"
+
+
+@pytest.mark.asyncio
+async def test_recovery_refreshes_snapshot_after_preparation_lookup(monkeypatch):
+    from core import chat_turns as module
+
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="6" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    first = make_event(turn.snapshot, TurnState.ADMITTED, observed_at=NOW + timedelta(seconds=1))
+    admitted = turn.snapshot.apply(first)
+    second = make_event(admitted, TurnState.USER_MESSAGE_COMMITTED, observed_at=NOW + timedelta(seconds=2))
+    original_find = authority.events.find_one
+    advanced = False
+
+    async def advance_between_reads(query, *args, **kwargs):
+        nonlocal advanced
+        if query.get("_commit_state") == "prepared" and not advanced:
+            advanced = True
+            authority.operations.docs[operation_id].update(module.MongoChatTurnAuthority._snapshot_update(admitted, NOW))
+            committed = module._event_doc(first)
+            committed["_commit_state"] = "committed"
+            authority.events.docs[committed["_id"]] = committed
+            prepared = module._event_doc(second)
+            authority.events.docs[prepared["_id"]] = prepared
+        return await original_find(query, *args, **kwargs)
+
+    monkeypatch.setattr(authority.events, "find_one", advance_between_reads)
+    recovered = await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert recovered.snapshot.state is TurnState.USER_MESSAGE_COMMITTED
+    assert authority.events.docs[f"{operation_id}:2"]["_commit_state"] == "committed"
+
+
+@pytest.mark.asyncio
+async def test_recovery_uses_database_clock_instead_of_skewed_process_clock(monkeypatch):
+    from core import chat_turns as module
+
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="7" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    lease = await authority.acquire_lease(
+        operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="worker", ttl_seconds=30, now=NOW,
+    )
+    event = make_event(turn.snapshot, TurnState.ADMITTED, observed_at=NOW + timedelta(seconds=1))
+    await authority.events.insert_one(module._event_doc(event, lease))
+    original_operand = _expression_operand
+
+    def database_clock(doc, operand, now):
+        return NOW + timedelta(seconds=5) if operand == "$$NOW" else original_operand(doc, operand, now)
+
+    monkeypatch.setitem(globals(), "_expression_operand", database_clock)
+    monkeypatch.setattr(module, "_utcnow", lambda: NOW + timedelta(minutes=5))
+    recovered = await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert recovered.snapshot.state is TurnState.ADMITTED
+    assert authority.events.docs[f"{operation_id}:1"]["_commit_state"] == "committed"
+
+
+@pytest.mark.asyncio
+async def test_failed_ownership_probe_preserves_commit_racing_before_expiry(monkeypatch):
+    from core import chat_turns as module
+
+    monkeypatch.setattr(module, "_utcnow", lambda: NOW + timedelta(seconds=31))
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="8" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    lease = await authority.acquire_lease(
+        operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="worker", ttl_seconds=30, now=NOW,
+    )
+    event = make_event(turn.snapshot, TurnState.ADMITTED, observed_at=NOW + timedelta(seconds=29))
+    await authority.events.insert_one(module._event_doc(event, lease))
+    original_find = authority.operations.find_one
+
+    async def commit_at_probe(query, *args, **kwargs):
+        if "$expr" in query:
+            authority.operations.docs[operation_id].update(
+                module.MongoChatTurnAuthority._snapshot_update(turn.snapshot.apply(event), NOW + timedelta(seconds=29))
+            )
+            return None
+        return await original_find(query, *args, **kwargs)
+
+    monkeypatch.setattr(authority.operations, "find_one", commit_at_probe)
+    recovered = await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert recovered.snapshot.state is TurnState.ADMITTED
+    assert authority.events.docs[f"{operation_id}:1"]["_commit_state"] == "committed"
+
+
+@pytest.mark.asyncio
+async def test_blocked_unowned_intent_survives_until_database_lease_expiry(monkeypatch):
+    from core import chat_turns as module
+
+    monkeypatch.setattr(module, "_utcnow", lambda: NOW + timedelta(seconds=5))
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="9" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    await authority.acquire_lease(
+        operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="worker", ttl_seconds=30, now=NOW,
+    )
+    event = make_event(turn.snapshot, TurnState.ADMITTED, observed_at=NOW + timedelta(seconds=1))
+    prepared = module._event_doc(event)
+    await authority.events.insert_one(prepared)
+
+    with pytest.raises(ChatTurnConflict, match="blocked"):
+        await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert authority.events.docs[prepared["_id"]] == prepared
+
+    monkeypatch.setattr(module, "_utcnow", lambda: NOW + timedelta(seconds=31))
+    recovered = await authority.get_operation(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert recovered.snapshot.state is TurnState.ADMITTED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field,value", [
+    ("lease_epoch", True), ("lease_epoch", "1"), ("lease_epoch", None),
+    ("lease_epoch", -1), ("ownership_audit_sequence", False), ("lease_digest", "not-a-digest"),
+])
+async def test_malformed_fencing_header_cannot_be_reset(field, value):
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="a" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    authority.operations.docs[operation_id][field] = value
+    before = deepcopy(authority.operations.docs[operation_id])
+    with pytest.raises(ChatTurnCorruption):
+        await authority.acquire_lease(
+            operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="worker", now=NOW,
+        )
+    assert authority.operations.docs[operation_id] == before
+
+
+@pytest.mark.asyncio
+async def test_partial_legacy_header_is_not_reinitialized():
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="b" * 64, binding=_binding(), created_at=NOW,
+    )
+    operation_id = turn.snapshot.operation_id
+    authority.operations.docs[operation_id].pop("ownership_audit_sequence")
+    before = deepcopy(authority.operations.docs[operation_id])
+    with pytest.raises(ChatTurnCorruption, match="partially"):
+        await authority.acquire_lease(
+            operation_id, tenant_id=TENANT, owner_id=OWNER, holder_id="worker", now=NOW,
+        )
+    assert authority.operations.docs[operation_id] == before
+
+
+@pytest.mark.asyncio
+async def test_future_preparation_is_retained_for_inspection():
+    from core import chat_turns as module
+
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    turn = await authority.create_operation(
+        operation_id=str(uuid4()), request_digest="c" * 64, binding=_binding(), created_at=NOW,
+    )
+    first = make_event(turn.snapshot, TurnState.ADMITTED, observed_at=NOW + timedelta(seconds=1))
+    future = make_event(turn.snapshot.apply(first), TurnState.USER_MESSAGE_COMMITTED,
+                        observed_at=NOW + timedelta(seconds=2))
+    prepared = module._event_doc(future)
+    await authority.events.insert_one(prepared)
+    with pytest.raises(ChatTurnCorruption, match="sequence gap"):
+        await authority.get_operation(turn.snapshot.operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert authority.events.docs[prepared["_id"]] == prepared
+
+
+def test_fake_mongo_server_clock_uses_double_dollar_now():
+    """Lease fences must compare against server time, not a missing field."""
+    from core import chat_turns as turn_module
+
+    doc = {"lease_expires_at": turn_module._utcnow() + timedelta(seconds=10)}
+    assert _expression_operand(doc, "$$NOW", turn_module._utcnow()) is not None
+    assert _expression_operand(doc, "$NOW", turn_module._utcnow()) is None

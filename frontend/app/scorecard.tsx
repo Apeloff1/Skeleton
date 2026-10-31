@@ -6,10 +6,13 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
  */
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, SafeAreaView, Linking, Platform, Share,
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, SafeAreaView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
+import { downloadPrivateAtlas } from '../src/product/privateAtlasExport';
+import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
+import { savePrivateImage } from '../src/components/PrivateImage';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -26,6 +29,20 @@ export default function Scorecard() {
   const [delivering, setDelivering] = React.useState(false);
   const [deliverMsg, setDeliverMsg] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<any[]>([]);
+  const [atlasBusy, setAtlasBusy] = React.useState(false);
+  const [atlasMessage, setAtlasMessage] = React.useState<string | null>(null);
+  React.useEffect(() => subscribeAuthChanges(() => { setAtlasBusy(false); setAtlasMessage(null); }), []);
+  const exportAtlas = React.useCallback(async () => {
+    if (atlasBusy) return;
+    const epoch = getAuthEpoch();
+    setAtlasBusy(true); setAtlasMessage(null);
+    try {
+      await downloadPrivateAtlas(gameId);
+      if (epoch === getAuthEpoch()) setAtlasMessage('World atlas file export started.');
+    } catch (error) {
+      if (epoch === getAuthEpoch()) setAtlasMessage(error instanceof Error ? error.message : 'The atlas could not be downloaded.');
+    } finally { if (epoch === getAuthEpoch()) setAtlasBusy(false); }
+  }, [atlasBusy, gameId]);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -101,8 +118,10 @@ export default function Scorecard() {
 
   const shareCard = React.useCallback(async () => {
     const url = `${BACKEND}/api/snowball/${gameId}/scorecard.png`;
-    if (Platform.OS === 'web') Linking.openURL(url);
-    else try { await Share.share({ url, message: 'My Galaxy Studio quality scorecard' }); } catch {}
+    try {
+      const result = await savePrivateImage(url, `${gameId}-scorecard.png`);
+      setDeliverMsg(result === 'saved' ? 'Scorecard image downloaded.' : 'Scorecard image copied.');
+    } catch { setDeliverMsg('Could not save the scorecard image. Sign in and try again.'); }
   }, [gameId]);
 
   if (loading) {
@@ -252,14 +271,15 @@ export default function Scorecard() {
 
         {/* actions */}
         <View style={s.actions}>
-          <TouchableOpacity testID="share-scorecard" onPress={shareCard} style={s.actBtn}><Text style={s.actTxt}>🖼️ Share scorecard PNG</Text></TouchableOpacity>
+          <TouchableOpacity testID="share-scorecard" onPress={shareCard} style={s.actBtn}><Text style={s.actTxt}>🖼️ Save scorecard PNG</Text></TouchableOpacity>
           <TouchableOpacity testID="refresh-audit" onPress={load} style={s.actBtn}><Text style={s.actTxt}>🔄 Re-audit</Text></TouchableOpacity>
         </View>
         <View style={s.actions}>
-          <TouchableOpacity testID="open-atlas" onPress={() => Linking.openURL(`${BACKEND}/api/snowball/${gameId}/atlas.html`)} style={s.actBtn}><Text style={s.actTxt}>📖 World Atlas</Text></TouchableOpacity>
+          <TouchableOpacity testID="open-atlas" onPress={exportAtlas} disabled={atlasBusy} style={s.actBtn}><Text style={s.actTxt}>{atlasBusy ? 'Downloading atlas…' : '📖 Download world atlas HTML'}</Text></TouchableOpacity>
           <TouchableOpacity testID="open-compare" onPress={() => router.push(`/render-compare?game=${gameId}` as any)} style={s.actBtn}><Text style={s.actTxt}>🖼️ Compare renders</Text></TouchableOpacity>
           <TouchableOpacity testID="publish-btn" onPress={publish} style={s.actBtn}><Text style={s.actTxt}>🏪 Publish</Text></TouchableOpacity>
         </View>
+        {atlasMessage && <Text accessibilityRole="alert" style={s.deliverMsg}>{atlasMessage}</Text>}
 
         {/* history trend */}
         {history.length > 1 && (

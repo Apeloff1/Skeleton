@@ -19,6 +19,7 @@ from skeleton.api.engine_service import (
 from skeleton.contracts.ai_execution import AIExecutionRequest, AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import (
+    CognitiveExecutionError,
     CognitiveExecutionRuntime,
     FinalizationBindingHook,
     VerificationHook,
@@ -714,6 +715,9 @@ class EngineExecutionCoordinator:
         command: EngineExecutionCommand,
     ) -> None:
         execution_id = command.execution_request.execution_id
+        if self.service.repository.result(execution_id) is not None:
+            self.service.complete_execution_admission(execution_id)
+            return
         try:
             self.service.ensure_execution_admission(command)
         except EngineServiceError:
@@ -816,10 +820,30 @@ class EngineExecutionCoordinator:
                     approval_refs=approval_refs,
                 )
             else:
-                await runtime.resume(
-                    execution_id,
-                    approval_refs=approval_refs,
-                )
+                try:
+                    await runtime.resume(
+                        execution_id,
+                        approval_refs=approval_refs,
+                    )
+                except CognitiveExecutionError:
+                    # The runtime first handles committed results, cancellation,
+                    # deadlines and passive approval observation. It fences all
+                    # actual execution and staged-result publication on the
+                    # pinned provider identity. Preserve a useful failure code
+                    # without preempting those safe recovery paths.
+                    try:
+                        runtime._assert_provider_binding(
+                            self.service.repository.get(execution_id), checkpoint.payload
+                        )
+                    except CognitiveExecutionError:
+                        code = (
+                            "provider_activation_binding_missing"
+                            if "provider_execution_binding" not in checkpoint.payload
+                            else "provider_activation_binding_mismatch"
+                        )
+                        await self._finalize_failure(execution_id, code)
+                        return
+                    raise
             if self.service.repository.result(execution_id) is not None:
                 self.service.complete_execution_admission(execution_id)
         except asyncio.CancelledError:
@@ -852,14 +876,35 @@ class EngineExecutionCoordinator:
         if current.terminal:
             return
         now = datetime.now(timezone.utc)
+        # A failed recovery may already own settled physical provider work.
+        # Preserve its receipts and metered turns without writing another
+        # checkpoint or claiming any lost/unobserved work was completed.
+        checkpoint = repository.latest_checkpoint(execution_id)
+        payload = checkpoint.payload if checkpoint is not None else {}
+        model_turns = payload.get("model_turns", 0)
+        tool_calls = payload.get("tool_calls", 0)
+        usage_events = payload.get("usage_events", [])
+        provider_receipts = payload.get("provider_receipts", [])
+        tool_receipts = payload.get("tool_receipts", [])
+        if (
+            type(model_turns) is not int or model_turns < 0
+            or type(tool_calls) is not int or tool_calls < 0
+            or not isinstance(usage_events, list)
+            or not isinstance(provider_receipts, list)
+            or not isinstance(tool_receipts, list)
+        ):
+            raise EngineExecutionCoordinatorError("durable execution usage is corrupt")
         result = AIExecutionResult(
             operation_id=current.operation_id,
             execution_id=current.execution_id,
             status="failed",
+            provider_receipts=tuple(provider_receipts),
+            tool_receipts=tuple(tool_receipts),
             usage={
                 "error_code": str(error_code),
-                "model_turns": 0,
-                "tool_calls": 0,
+                "model_turns": model_turns,
+                "tool_calls": tool_calls,
+                "provider_usage": list(usage_events),
             },
             stream_terminal_event=("stream-terminal:" + current.execution_id + ":failed:" + str(error_code)),
             completed_at=now,

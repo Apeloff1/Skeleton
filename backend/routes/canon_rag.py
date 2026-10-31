@@ -13,11 +13,10 @@ from __future__ import annotations
 
 import os
 import re
-import json
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from core.databases import client as _MONGO
+from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/rag", tags=["rag"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
@@ -71,9 +70,48 @@ def chunks_from_arts(arts: dict) -> list:
     return out
 
 
-async def _arts(pid: str) -> dict:
-    kb = await _db.game_kb.find_one({"game_id": pid}, {"_id": 0, "artifacts": 1})
-    return (kb or {}).get("artifacts") or {}
+def _verified_scope(scope) -> dict[str, str] | None:
+    if not isinstance(scope, dict) or set(scope) != {"tenant_id", "owner_id"}:
+        return None
+    if any(not isinstance(value, str) or not value or value != value.strip()
+           for value in scope.values()):
+        return None
+    return dict(scope)
+
+
+async def _arts(pid: str, *, scope=None) -> dict:
+    identity = _verified_scope(scope)
+    if identity is None:
+        # Legacy internal callers cannot widen authority by supplying only a PID.
+        return {}
+    if not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", pid):
+        raise HTTPException(422, "Invalid game ID")
+    # Canon artifacts belong to their existing playable source. A matching KB
+    # projection alone cannot grant ownership, including for legacy ownerless rows.
+    project = await _db.playables.find_one(
+        {"playable_id": pid, **identity},
+        {"_id": 0, "playable_id": 1, "tenant_id": 1, "owner_id": 1,
+         "state": 1, "deleted": 1},
+    )
+    if (
+        not isinstance(project, dict)
+        or project.get("playable_id") != pid
+        or any(project.get(key) != value for key, value in identity.items())
+        or project.get("deleted") is True
+        or project.get("state") in {"deleted", "revoked", "archived"}
+    ):
+        raise HTTPException(404, "Game not found")
+    kb = await _db.game_kb.find_one(
+        {"game_id": pid, **identity},
+        {"_id": 0, "game_id": 1, "artifacts": 1, "tenant_id": 1, "owner_id": 1},
+    )
+    if (
+        not isinstance(kb, dict)
+        or kb.get("game_id") != pid
+        or any(kb.get(key) != value for key, value in identity.items())
+    ):
+        return {}
+    return kb.get("artifacts") or {}
 
 
 def _score(query_tokens: set, chunk: dict) -> float:
@@ -85,9 +123,13 @@ def _score(query_tokens: set, chunk: dict) -> float:
     return overlap + (overlap / (len(ct) ** 0.5))
 
 
-async def _recall(pid: str, query: str, k: int = 5) -> list:
+async def _recall(pid: str, query: str, k: int = 5, *, scope=None) -> list:
     """Top-k relevant canon chunks for a query (used by agents before generating)."""
-    arts = await _arts(pid)
+    if _verified_scope(scope) is None:
+        return []
+    if isinstance(k, bool) or not isinstance(k, int) or not 1 <= k <= 30:
+        raise HTTPException(422, "Retrieval limit must be between 1 and 30")
+    arts = await _arts(pid, scope=scope)
     chunks = chunks_from_arts(arts)
     qt = set(_tok(query))
     if not qt or not chunks:
@@ -108,9 +150,9 @@ def recall_block(hits: list) -> str:
 
 
 @router.get("/{pid}/memory")
-async def memory_stats(pid: str):
+async def memory_stats(pid: str, scope=Depends(require_authenticated_identity)):
     """🧠 Size + composition of the canon memory store."""
-    arts = await _arts(pid)
+    arts = await _arts(pid, scope=scope)
     chunks = chunks_from_arts(arts)
     by_type: dict = {}
     for c in chunks:
@@ -120,7 +162,8 @@ async def memory_stats(pid: str):
 
 
 @router.get("/{pid}/retrieve")
-async def retrieve(pid: str, q: str = "", k: int = 5):
+async def retrieve(pid: str, q: str = "", k: int = Query(5, ge=1, le=30),
+                   scope=Depends(require_authenticated_identity)):
     """🔎 Retrieve the top-k canon chunks relevant to a query."""
-    hits = await _recall(pid, q, k)
+    hits = await _recall(pid, q, k, scope=scope)
     return {"game_id": pid, "query": q, "k": k, "count": len(hits), "hits": hits}

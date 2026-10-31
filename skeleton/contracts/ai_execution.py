@@ -18,6 +18,9 @@ from enum import Enum
 from typing import Any
 
 AI_EXECUTION_SCHEMA_VERSION = 1
+# Generated answers are content, not identifiers. Match the existing provider
+# text envelope while retaining smaller bounds on references and metadata.
+AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES = 4 * 1024 * 1024
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -536,7 +539,18 @@ class AIExecutionResult:
             raise AIExecutionContractError("result status is invalid")
         if status == "completed" and self.final_output is None:
             raise AIExecutionContractError("completed result requires final_output")
-        for name in ("final_output", "verification", "stream_terminal_event"):
+        final_output = _optional_text(
+            self.final_output, "final_output", maximum=AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES,
+        )
+        if final_output is not None:
+            try:
+                encoded = final_output.encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise AIExecutionContractError("final_output must be valid UTF-8 text") from exc
+            if len(encoded) > AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES:
+                raise AIExecutionContractError("final_output exceeds maximum UTF-8 size")
+        object.__setattr__(self, "final_output", final_output)
+        for name in ("verification", "stream_terminal_event"):
             object.__setattr__(self, name, _optional_text(getattr(self, name), name))
         if self.verification_receipt is not None:
             object.__setattr__(
@@ -643,6 +657,7 @@ def execution_failure_code(result: Mapping[str, Any]) -> str | None:
 
 __all__ = [
     "AI_EXECUTION_SCHEMA_VERSION",
+    "AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES",
     "TERMINAL_EXECUTION_STATES",
     "AIExecution",
     "AIExecutionContractError",

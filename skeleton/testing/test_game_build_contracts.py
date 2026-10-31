@@ -51,6 +51,19 @@ _PROOF = {
 }
 
 
+@pytest.fixture
+def fallback_queue(monkeypatch):
+    """Select the optional adapter explicitly; the durable owner is now installed."""
+    from skeleton.forge import game_build_queue
+
+    queue = game_build_queue._FallbackQueue()
+    monkeypatch.setattr(game_build_queue, "_real_api", lambda: None)
+    monkeypatch.setattr(game_build_queue, "_fallback", queue)
+    yield queue
+    if queue._worker is not None:
+        queue._worker.stop(timeout=1)
+
+
 def _patch_engine(monkeypatch):
     def fake_execute(self, vision, **kwargs):
         del self, kwargs
@@ -356,7 +369,7 @@ def test_playtest_does_not_start_godot_after_deadline(monkeypatch):
     assert "deadline exceeded" in report["errors"]
 
 
-def test_job_timeout_is_the_builder_deadline(monkeypatch):
+def test_job_timeout_is_the_builder_deadline(monkeypatch, fallback_queue):
     seen = []
 
     def fake_build(brief, **kwargs):
@@ -472,7 +485,7 @@ def test_deadline_zero_fails_before_godot():
     assert proved["repair"]["rounds"] == 0
 
 
-def test_queue_enqueue_progress_and_idempotency(monkeypatch):
+def test_queue_enqueue_progress_and_idempotency(monkeypatch, fallback_queue):
     seen = []
 
     def fake_build(brief, **kwargs):
@@ -519,7 +532,7 @@ def test_queue_enqueue_progress_and_idempotency(monkeypatch):
 
 
 @pytest.fixture()
-def client(monkeypatch, tmp_path):
+def client(monkeypatch, tmp_path, fallback_queue):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GF_SEAL_SECRET", SECRET)
 

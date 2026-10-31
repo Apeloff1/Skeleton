@@ -95,6 +95,10 @@ $RuntimePaths = @(
     ".cursor/rules/architecture.mdc",
     "docs/ARCHITECTURE_MAP.md",
     "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    # Lifecycle refusals must point to recovery guidance in the installed payload.
+    "docs/APP_ASSEMBLY.md",
+    "docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md",
+    "docs/ai/LOCAL_CODING_PROFILE.md",
     "machine/manifest.json",
     "machine/architecture.json",
     "machine/ai_app_construction.json",

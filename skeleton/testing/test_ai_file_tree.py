@@ -232,7 +232,13 @@ def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
     assert retained["skeleton/foundation/architecture/index.py"]["owner"] == "architecture authority"
     assert retained["skeleton/acquired"]["owner"] == "quarantine/provenance"
     assert retained["skeleton/release"]["owner"] == "release engineering"
+    assert retained["skeleton/frontier_nav"]["owner"] == (
+        "Game Frontier virtual positioning and route-grounding domain"
+    )
+    assert "not real-device location authority" in retained["skeleton/frontier_nav"]["reason"]
     assert retained["skeleton/ubuntu"]["owner"] == "deployment/platform support"
+    assert retained["skeleton/netcode"]["owner"] == "game-network transport and authoritative multiplayer runtime"
+    assert "no ai ownership cutover" in retained["skeleton/netcode"]["reason"].lower()
     assert retained["skeleton/__main__.py"]["owner"] == "package CLI shell"
 
 
