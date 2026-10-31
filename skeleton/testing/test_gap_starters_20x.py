@@ -1,7 +1,7 @@
 """20x ultra adversarial tests."""
 import pytest
 from skeleton.simulation.game.driving_sim_starter import DrivingSimulator, DrivingSimError
-from skeleton.distributed.mesh.multiplayer_authority import SessionAuthority
+from skeleton.distributed.mesh.multiplayer_authority import MultiplayerError, SessionAuthority
 
 def test_driving_20x_aero():
     sim = DrivingSimulator(power=500, frontal_area=2.0)
@@ -23,3 +23,13 @@ def test_multi_predictive():
     auth.predictive_sync("p1", "p2", (10.0, 20.0, 0.0), 50)
     assert auth.verify_grant("p1", g.digest)
     assert len(g.rollback_buffer) > 0
+
+
+def test_multi_predictive_preserves_fail_closed_peer_validation():
+    auth = SessionAuthority("sess20x-invalid")
+    auth.issue_grant("p1")
+    with pytest.raises(MultiplayerError, match="invalid peer position"):
+        auth.predictive_sync("p1", "p2", (float("nan"), 0.0, 0.0), 50)
+    with pytest.raises(MultiplayerError, match="invalid peer lag"):
+        auth.predictive_sync("p1", "p2", (10.0, 20.0, 0.0), -1)
+    assert auth.grants["p1"].rollback_buffer == []

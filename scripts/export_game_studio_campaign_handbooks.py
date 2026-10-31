@@ -62,7 +62,7 @@ def export(destination:Path,*,offset:int=0,limit:int=32)->dict:
     rankfile=root/f"campaign_ranking_{offset}_{offset+limit}.json"
     rankfile.write_text(json.dumps({
         "schema":"skeleton.forge.campaign_handbook_batch_ranking.v1",
-        "scope":"only_this_rendered_export_batch","catalog":BOOK_COUNT,
+        "scope":"rendered_export_batch_only","catalog":BOOK_COUNT,
         "evaluated":len(ranking),"ranking":variants,
     },indent=2,sort_keys=True,ensure_ascii=False)+"\n",encoding="utf8")
     return {"total_catalog":BOOK_COUNT,"exported":len(ranking),

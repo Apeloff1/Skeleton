@@ -10,6 +10,11 @@ def test_driving_10x_dynamics():
     assert s.speed > 0
     assert s.rpm > 800
     assert len(s.tires) == 4
+    assert [t.corner for t in s.tires] == [
+        "front_left", "front_right", "rear_left", "rear_right"
+    ]
+    assert len({id(t) for t in s.tires}) == 4
+    assert all(0.2 <= t.grip <= 1.0 for t in s.tires)
     assert s.digest
 
 def test_driving_bounds():
