@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_ashen_archipelago",
+  "title": "Ashen Archipelago: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610303875,
+  "width": 23,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 4
+}

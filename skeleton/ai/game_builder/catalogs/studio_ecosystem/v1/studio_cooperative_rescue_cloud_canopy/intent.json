@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_cloud_canopy",
+  "title": "Cloud Canopy: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610303909,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 6
+}
