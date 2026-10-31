@@ -26,6 +26,8 @@ def test_jeeves_revision_preview_is_typed_and_operator_gated():
     result = execute_author_revision_tool(req, authorized=True)
     assert result["detail"]["revised_source_digest"] != req["expected_source_digest"]
     assert result["file_write_performed"] is False
+    assert result["impact"]["new_save_required"] is True
+    assert result["impact"]["changed_path_count"] == 1
     assert result["release_certified"] is False
     with pytest.raises(StudioQuestError):
         execute_author_revision_tool({**req, "extra": True}, authorized=True)
@@ -65,3 +67,21 @@ def test_cli_replays_and_audits_persisted_revised_story(tmp_path, capsys):
                  "--walk-events", "[]"]) == 0
     played = json.loads(capsys.readouterr().out)
     assert played["source_digest"] == receipt["revised_source_digest"]
+
+
+def test_cli_revision_impact_from_registered_to_persisted_source(tmp_path, capsys):
+    from scripts.studio_ecosystem_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+        REVISION_SCHEMA, preview_canon_revision, write_revision_bundle,
+    )
+    docs = read_blueprint(PROJECT)
+    req = _request()
+    req["schema"] = REVISION_SCHEMA
+    revised, html, receipt = preview_canon_revision(docs, req, authorized=True)
+    out = tmp_path / "revised"
+    write_revision_bundle(out, revised, html, receipt)
+    assert main(["--project", PROJECT, "--revision-impact",
+                 "--revision-compare-source", str(out)]) == 0
+    impact = json.loads(capsys.readouterr().out)
+    assert impact["new_save_required"] is True
+    assert impact["changed_paths"][0]["path"] == ["narrative", "premise"]

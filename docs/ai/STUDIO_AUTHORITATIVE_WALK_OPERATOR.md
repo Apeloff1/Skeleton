@@ -442,3 +442,11 @@ An exported original revision can also be used with --project PROJECT
 offline replay engine consumes the same source-verified authored content
 rather than silently reverting to the registered catalog. Forged, stale,
 symlinked or contradictory bundles fail before gameplay.
+
+
+Revision impact is available as --project PROJECT --revision-impact
+--revision-compare-source NEW_DIRECTORY, optionally with --revision-source
+OLDER_DIRECTORY. It reports exact changed source paths and digests, playable
+HTML differences, and conservative save/replay invalidation; it never
+migrates a player's save or certifies the authored ending. Jeeves
+studio_author_revision includes the same impact receipt in its typed preview.

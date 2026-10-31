@@ -426,14 +426,18 @@ def execute_author_revision_tool(request: Mapping[str, Any], *,
     )
     source_request = dict(request)
     source_request["schema"] = REVISION_SCHEMA
-    _, _, receipt = preview_canon_revision(
-        read_blueprint(request["project_id"]), source_request, authorized=True,
+    source = read_blueprint(request["project_id"])
+    revised, _, receipt = preview_canon_revision(
+        source, source_request, authorized=True,
     )
+    from skeleton.ai.game_builder.studio_ecosystem_revision_impact import compare_revision_sources
+    impact = compare_revision_sources(source, revised, authorized=True)
     payload = {
         "schema": AUTHOR_REVISION_RESULT_SCHEMA,
         "project_id": request["project_id"],
         "request_digest": _digest(request),
         "detail": receipt,
+        "impact": impact,
         "file_write_performed": False,
         "release_certified": False,
     }
