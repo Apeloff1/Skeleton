@@ -34,6 +34,15 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        # Deterministic simulated host: real CI cgroup PSI is not test input.
+        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle']:
+            guard = patch("skeleton.app.offline_resource_fabric." + name,
+                          return_value=None)
+            guard.start()
+            self.addCleanup(guard.stop)
+
     def test_bounded_waiter_gets_stream_slot_after_prior_reader_finishes(self):
         with TemporaryDirectory() as d:
             root = Path(d)
@@ -637,6 +646,16 @@ class FabricTests(unittest.TestCase):
 class CgroupPressureTests(unittest.TestCase):
     """Synthetic counters verify canonical hardware admission and recovery."""
 
+    def setUp(self):
+        super().setUp()
+        # Deterministic simulated host: real CI cgroup PSI is not test input.
+        for name in ['probe_io_pressure','probe_cpu_throttle']:
+            guard = patch("skeleton.app.offline_resource_fabric." + name,
+                          return_value=None)
+            guard.start()
+            self.addCleanup(guard.stop)
+
+
     def test_kernel_counter_probe_and_strict_unknown(self):
         from skeleton.app.offline_cgroup_events import probe_cgroup_events
         with TemporaryDirectory() as d:
@@ -745,6 +764,16 @@ class CgroupPressureTests(unittest.TestCase):
 class IOPressureTests(unittest.TestCase):
     """Kernel PSI parser and canonical source planner use simulated readings."""
 
+    def setUp(self):
+        super().setUp()
+        # Deterministic simulated host: real CI cgroup PSI is not test input.
+        for name in ['probe_cgroup_events','probe_cpu_throttle']:
+            guard = patch("skeleton.app.offline_resource_fabric." + name,
+                          return_value=None)
+            guard.start()
+            self.addCleanup(guard.stop)
+
+
     def test_linux_psi_parser_and_invalid_values(self):
         from skeleton.app.offline_io_pressure import probe_io_pressure
         with TemporaryDirectory() as d:
@@ -816,6 +845,16 @@ class IOPressureTests(unittest.TestCase):
 
 class CPUThrottleTests(unittest.TestCase):
     """Synthetic cgroup CPU.stat deltas control the canonical staging planner."""
+
+    def setUp(self):
+        super().setUp()
+        # Deterministic simulated host: real CI cgroup PSI is not test input.
+        for name in ['probe_cgroup_events','probe_io_pressure']:
+            guard = patch("skeleton.app.offline_resource_fabric." + name,
+                          return_value=None)
+            guard.start()
+            self.addCleanup(guard.stop)
+
 
     def test_linux_cpu_stat_probe_and_invalid_counters(self):
         from skeleton.app.offline_cpu_throttle import probe_cpu_throttle
