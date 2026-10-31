@@ -117,3 +117,14 @@ def test_authored_actor_order_does_not_affect_diagnostic_timeline() -> None:
     assert inspect_session(simulate(source, actions)) == inspect_session(
         simulate(reverse, actions),
     )
+
+
+def test_canonical_app_cli_inspector(capsys) -> None:
+    from skeleton.__main__ import main
+    snapshot = _full()
+    assert main([
+        "combat-inspect", "inspect", "--session-json", json.dumps(snapshot),
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["state_digest"] == snapshot["state_digest"]
+    assert report["turn_count"] == 3
