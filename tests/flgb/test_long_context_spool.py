@@ -189,6 +189,34 @@ class TestLongContextSpool(unittest.TestCase):
         with self.assertRaises(LongContextSpoolError):
             LongContextSpool(link)
 
+
+    def test_posix_symlinked_ancestor_rejected_before_root_creation(self):
+        if os.name != "posix":
+            self.skipTest("POSIX no-follow ancestry contract")
+        outside = Path(self.directory.name) / "outside"
+        outside.mkdir()
+        alias = Path(self.directory.name) / "alias"
+        alias.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(LongContextSpoolError):
+            LongContextSpool(alias / "new-spool", disk_reserve_bytes=0)
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_posix_selected_sequence_ancestor_symlink_rejected(self):
+        if os.name != "posix":
+            self.skipTest("POSIX no-follow selected source contract")
+        from skeleton.ai.model_runtime.long_context_spool import read_selected_sequence
+        trusted = Path(self.directory.name) / "trusted"
+        trusted.mkdir()
+        (trusted / "tokens.json").write_bytes(serialize_token_sequence(self.sequence))
+        alias = Path(self.directory.name) / "source-alias"
+        alias.symlink_to(trusted, target_is_directory=True)
+        with self.assertRaises(OSError):
+            read_selected_sequence(alias / "tokens.json", limit=4096)
+        self.assertEqual(
+            read_selected_sequence(trusted / "tokens.json", limit=4096),
+            serialize_token_sequence(self.sequence),
+        )
+
     def test_cli_stage_inspect_window_advance(self):
         sequence_file = Path(self.directory.name) / "tokens.json"
         sequence_file.write_bytes(serialize_token_sequence(self.sequence))

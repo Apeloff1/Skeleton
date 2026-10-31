@@ -92,6 +92,67 @@ class SpoolCheckpoint:
         }
 
 
+
+def _open_directory_chain(path: Path, *, create: bool) -> int:
+    """Open every POSIX ancestor without following any path component.
+
+    mkdir is descriptor-relative so a concurrently replaced ancestor cannot
+    redirect subsequent creates. The caller owns the returned directory FD.
+    """
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise LongContextSpoolError("secure POSIX directory operations unavailable")
+    absolute = Path(os.path.abspath(path))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    parts = absolute.parts
+    fd = os.open(parts[0], flags)
+    try:
+        for component in parts[1:]:
+            if component in {"", ".", ".."}:
+                raise LongContextSpoolError("invalid spool directory component")
+            if create:
+                try:
+                    os.mkdir(component, 0o700, dir_fd=fd)
+                except FileExistsError:
+                    pass
+            next_fd = os.open(component, flags, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def read_selected_sequence(path: Path, *, limit: int) -> bytes:
+    """Read a user-selected token file without POSIX ancestor races.
+
+    On Windows the legacy selected-path read remains unqualified for ancestor
+    substitution; it never grants a model execution or trusted-publisher claim.
+    """
+    _positive(limit, "sequence byte limit", MAX_SERIALIZED_SEQUENCE_BYTES)
+    if os.name != "posix":
+        if path.is_symlink():
+            raise LongContextSpoolError("symlinked sequence source rejected")
+        with path.open("rb") as stream:
+            raw = stream.read(limit + 1)
+    else:
+        parent_fd = _open_directory_chain(path.parent, create=False)
+        try:
+            flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+            fd = os.open(path.name, flags, dir_fd=parent_fd)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise LongContextSpoolError("sequence source is not regular")
+                with os.fdopen(fd, "rb", closefd=False) as stream:
+                    raw = stream.read(limit + 1)
+            finally:
+                os.close(fd)
+        finally:
+            os.close(parent_fd)
+    if len(raw) > limit:
+        raise LongContextSpoolError("selected token sequence exceeds byte budget")
+    return raw
+
 class LongContextSpool:
     """Content-addressed offline token store with immutable progress receipts.
 
@@ -112,44 +173,53 @@ class LongContextSpool:
         if (isinstance(disk_reserve_bytes, bool) or not isinstance(disk_reserve_bytes, int)
                 or not 0 <= disk_reserve_bytes <= 2**63 - 1):
             raise LongContextSpoolError("invalid disk reserve")
-        self.root = Path(directory)
+        self.root = Path(os.path.abspath(directory)) if os.name == "posix" else Path(directory)
         self.max_sequence_bytes = max_sequence_bytes
         self.disk_reserve_bytes = disk_reserve_bytes
-        if self.root.is_symlink():
-            raise LongContextSpoolError("spool root must not be a symlink")
-        try:
-            self.root.mkdir(parents=True, mode=0o700, exist_ok=True)
-            if not self.root.is_dir() or self.root.is_symlink():
-                raise LongContextSpoolError("spool root must be a directory")
-            if os.name == "posix" and self.root.stat().st_mode & 0o022:
-                raise LongContextSpoolError("spool root must not be group/world writable")
-            self.objects = self.root / "objects"
-            self.checkpoints = self.root / "checkpoints"
-            for path in (self.objects, self.checkpoints):
-                if path.is_symlink():
-                    raise LongContextSpoolError("spool component must not be a symlink")
-                path.mkdir(mode=0o700, exist_ok=True)
-                if not path.is_dir() or path.is_symlink():
-                    raise LongContextSpoolError("spool component must be a directory")
-        except OSError as exc:
-            raise LongContextSpoolError("cannot initialize spool directory") from exc
-        # POSIX: pin the actual directory inode, not a path that can be
-        # replaced between an is_symlink check and an open.
+        self.objects = self.root / "objects"
+        self.checkpoints = self.root / "checkpoints"
         self._root_fd: int | None = None
-        if os.name == "posix":
-            if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
-                raise LongContextSpoolError("secure POSIX directory opens unavailable")
-            flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-            try:
-                root_fd = os.open(self.root, flags)
-                mode = os.fstat(root_fd).st_mode
-                if not stat.S_ISDIR(mode) or mode & 0o022:
-                    raise LongContextSpoolError("insecure spool root permissions")
-                self._root_fd = root_fd
-            except BaseException:
-                if "root_fd" in locals():
+        try:
+            if os.name == "posix":
+                root_fd = _open_directory_chain(self.root, create=True)
+                try:
+                    mode = os.fstat(root_fd).st_mode
+                    if not stat.S_ISDIR(mode) or mode & 0o022:
+                        raise LongContextSpoolError("insecure spool root permissions")
+                    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+                    for name in ("objects", "checkpoints"):
+                        try:
+                            os.mkdir(name, 0o700, dir_fd=root_fd)
+                        except FileExistsError:
+                            pass
+                        child_fd = os.open(name, flags, dir_fd=root_fd)
+                        try:
+                            child_mode = os.fstat(child_fd).st_mode
+                            if not stat.S_ISDIR(child_mode) or child_mode & 0o022:
+                                raise LongContextSpoolError("insecure spool component")
+                        finally:
+                            os.close(child_fd)
+                    self._root_fd = root_fd
+                except BaseException:
                     os.close(root_fd)
-                raise
+                    raise
+            else:
+                # Windows lacks the descriptor-relative no-follow primitive
+                # used above. The path mode is explicitly unqualified against
+                # same-user ancestor replacement and must not be called secure.
+                if self.root.is_symlink():
+                    raise LongContextSpoolError("spool root must not be a symlink")
+                self.root.mkdir(parents=True, mode=0o700, exist_ok=True)
+                if not self.root.is_dir() or self.root.is_symlink():
+                    raise LongContextSpoolError("spool root must be a directory")
+                for child in (self.objects, self.checkpoints):
+                    if child.is_symlink():
+                        raise LongContextSpoolError("spool component must not be a symlink")
+                    child.mkdir(mode=0o700, exist_ok=True)
+                    if not child.is_dir() or child.is_symlink():
+                        raise LongContextSpoolError("spool component must be a directory")
+        except OSError as exc:
+            raise LongContextSpoolError("cannot initialize pinned spool directory") from exc
 
     def close(self) -> None:
         fd = getattr(self, "_root_fd", None)
@@ -463,4 +533,4 @@ class LongContextSpool:
         )
 
 
-__all__ = ["LongContextSpool", "LongContextSpoolError", "SpoolCheckpoint"]
+__all__ = ["LongContextSpool", "LongContextSpoolError", "SpoolCheckpoint", "read_selected_sequence"]

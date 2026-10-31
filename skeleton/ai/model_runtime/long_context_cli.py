@@ -6,7 +6,7 @@ from dataclasses import asdict
 import json
 from pathlib import Path
 
-from .long_context_spool import LongContextSpool, LongContextSpoolError
+from .long_context_spool import LongContextSpool, LongContextSpoolError, read_selected_sequence
 from .tokenization import deserialize_token_sequence
 
 
@@ -29,8 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         spool = LongContextSpool(args.root)
         if args.command == "stage":
-            with args.sequence_file.open("rb") as stream:
-                raw = stream.read(spool.max_sequence_bytes + 1)
+            raw = read_selected_sequence(
+                args.sequence_file, limit=spool.max_sequence_bytes,
+            )
             sequence = deserialize_token_sequence(raw, require_canonical=True)
             if sequence.tokenizer_digest != args.tokenizer_digest:
                 raise LongContextSpoolError("tokenizer identity mismatch")
