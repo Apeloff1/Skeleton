@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "trade_route_charter",
+  "domain": "trade",
+  "topic": "route_charter",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 4,
+  "approval": 3,
+  "commands": [
+    {
+      "id": "trade_route_charter:open",
+      "action": "open",
+      "proposal": "trade_route_charter",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "trade_route_charter:vote:0",
+      "action": "cast",
+      "proposal": "trade_route_charter",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "trade_route_charter:vote:1",
+      "action": "cast",
+      "proposal": "trade_route_charter",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "trade_route_charter:vote:2",
+      "action": "cast",
+      "proposal": "trade_route_charter",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "trade_route_charter:vote:3",
+      "action": "cast",
+      "proposal": "trade_route_charter",
+      "delegate": "delegate_4",
+      "choice": "yes",
+      "expected_version": 4
+    },
+    {
+      "id": "trade_route_charter:finalize",
+      "action": "finalize",
+      "proposal": "trade_route_charter",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 5
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 4,
+    "yes": 4,
+    "final_version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}

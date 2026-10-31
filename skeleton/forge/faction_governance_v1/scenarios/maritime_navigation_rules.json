@@ -1,0 +1,79 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "maritime_navigation_rules",
+  "domain": "maritime",
+  "topic": "navigation_rules",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 3,
+  "approval": 2,
+  "commands": [
+    {
+      "id": "maritime_navigation_rules:open",
+      "action": "open",
+      "proposal": "maritime_navigation_rules",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "maritime_navigation_rules:vote:0",
+      "action": "cast",
+      "proposal": "maritime_navigation_rules",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "maritime_navigation_rules:vote:1",
+      "action": "cast",
+      "proposal": "maritime_navigation_rules",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "maritime_navigation_rules:vote:2",
+      "action": "cast",
+      "proposal": "maritime_navigation_rules",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "maritime_navigation_rules:finalize",
+      "action": "finalize",
+      "proposal": "maritime_navigation_rules",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 4
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 3,
+    "yes": 3,
+    "final_version": 5
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}

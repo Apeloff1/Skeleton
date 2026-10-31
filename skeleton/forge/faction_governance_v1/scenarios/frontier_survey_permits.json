@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "frontier_survey_permits",
+  "domain": "frontier",
+  "topic": "survey_permits",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 5,
+  "approval": 4,
+  "commands": [
+    {
+      "id": "frontier_survey_permits:open",
+      "action": "open",
+      "proposal": "frontier_survey_permits",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "frontier_survey_permits:vote:0",
+      "action": "cast",
+      "proposal": "frontier_survey_permits",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "frontier_survey_permits:vote:1",
+      "action": "cast",
+      "proposal": "frontier_survey_permits",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "frontier_survey_permits:vote:2",
+      "action": "cast",
+      "proposal": "frontier_survey_permits",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "frontier_survey_permits:vote:3",
+      "action": "cast",
+      "proposal": "frontier_survey_permits",
+      "delegate": "delegate_4",
+      "choice": "yes",
+      "expected_version": 4
+    },
+    {
+      "id": "frontier_survey_permits:vote:4",
+      "action": "cast",
+      "proposal": "frontier_survey_permits",
+      "delegate": "delegate_5",
+      "choice": "yes",
+      "expected_version": 5
+    },
+    {
+      "id": "frontier_survey_permits:finalize",
+      "action": "finalize",
+      "proposal": "frontier_survey_permits",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 6
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 5,
+    "yes": 5,
+    "final_version": 7
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}
