@@ -93,3 +93,18 @@ must equal SHA-256 of the exact UTF-8 authored text; a modified source,
 unsupported license or missing provenance fails before gameplay starts.
 This is machine-verifiable source binding, not an independent external
 copyright clearance or marketplace rights certification.
+
+## Canonical installed application command
+
+The same journey is reachable through the existing GameForge command dispatcher,
+without adding another top-level runtime or provider:
+
+```sh
+python -m skeleton game npc-schedule \
+  --schedule skeleton/testing/fixtures/lantern_harbor_npc_schedule.json \
+  --commands skeleton/testing/fixtures/lantern_harbor_npc_commands.json
+```
+
+The existing `game <brief>` production path remains unchanged; only the
+explicit `npc-schedule` subcommand is delegated to the offline gameplay
+module. The acceptance test enters through `skeleton.forge.game_builder.cli`.

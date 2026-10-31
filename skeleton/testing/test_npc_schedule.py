@@ -282,3 +282,13 @@ def test_direct_schedule_constructor_enforces_source_and_route_invariants():
     with pytest.raises(GameplayContractError):
         NpcRoute("duplicate", (spec.routes[0].stops[0],
                                spec.routes[0].stops[0]))
+
+
+def test_installed_game_cli_reaches_offline_npc_journey(capsys):
+    from skeleton.forge.game_builder import cli as game_cli
+    result = game_cli(["npc-schedule", "--schedule", str(FIXTURE),
+                       "--commands", str(COMMANDS)])
+    assert result == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["ending"] == "harbor_restored"
+    assert "tide_gate_open" in output["facts"]
