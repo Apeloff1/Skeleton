@@ -7,7 +7,6 @@ missing it cannot authorize additional capacity or clear an existing hold.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import math
 import mmap
 from pathlib import Path
 import sys

@@ -549,8 +549,17 @@ class AdaptiveResourceFabric:
         # On UMA systems it may be physically shared with the GPU, but without
         # an explicit driver API this is NOT a GPU-coherent allocation.
         staging = residency == "disk_chunks" or source_bytes > hw.read_chunk_bytes
+        # Pressure holds apply to the GLOBAL in-process slot budget, not
+        # merely to the stream count of each independently admitted batch.
+        # Otherwise eight simultaneous one-stream batches defeat the hold.
+        pressure_limited = bool(
+            cgroup["high_backpressure"] or io["congested"]
+            or cpu_throttle["backpressure"] or swap_churn["backpressure"]
+            or cpu_thermal["thermal_backpressure"] or reclaim["backpressure"]
+        )
+        effective_capacity = 1 if pressure_limited else hw.suggested_index_jobs
         # Planning does not reserve capacity: expose zero slots honestly.
-        headroom = max(0, hw.suggested_index_jobs - running)
+        headroom = max(0, effective_capacity - running)
         # Capacity follows measured headroom; ordinary 50%-used RAM must
         # not collapse a many-core machine to a single stream. Throttle
         # aggressively only as predictive pressure approaches saturation.
@@ -563,11 +572,7 @@ class AdaptiveResourceFabric:
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
-        if (cgroup["high_backpressure"] or io["congested"]
-                or cpu_throttle["backpressure"]
-                or swap_churn["backpressure"]
-                or cpu_thermal["thermal_backpressure"]
-                or reclaim["backpressure"]):
+        if pressure_limited:
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -668,7 +673,7 @@ class AdaptiveResourceFabric:
             requested_gpu_bytes=requested_gpu_bytes,
             dedicated_gpu_budget_bytes=budget,
             memory_pressure=round(ema, 6), reason=reason,
-            host_stream_capacity=hw.suggested_index_jobs,
+            host_stream_capacity=effective_capacity,
             available_stream_slots=headroom,
             readonly_stream=readonly_stream,
             thermal_holds=thermal_holds,

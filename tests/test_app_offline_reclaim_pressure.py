@@ -1,10 +1,8 @@
 """Kernel reclaim pressure and real offline resource-fabric integration."""
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import threading
 import unittest
 from unittest.mock import patch
 
@@ -174,7 +172,21 @@ class ResourceFabricIntegrationTests(unittest.TestCase):
                 requested_gpu_bytes=100_000_000, allow_gpu=True, readonly_stream=True,
             )
             self.assertEqual(plan.stream_count, 1)
+            self.assertEqual(plan.host_stream_capacity, 1)
+            self.assertEqual(plan.available_stream_slots, 1)
             self.assertFalse(plan.gpu_eligible)
+            # The hold is global: a running one-stream batch consumes the
+            # only permitted slot, regardless of another caller's plan.
+            with fabric._lock:
+                fabric._active_streams = 1
+            occupied = fabric.plan(
+                10_000_000, desired_streams=8, readonly_stream=True,
+            )
+            self.assertEqual(occupied.host_stream_capacity, 1)
+            self.assertEqual(occupied.available_stream_slots, 0)
+            self.assertEqual(occupied.stream_count, 0)
+            with fabric._lock:
+                fabric._active_streams = 0
             self.assertTrue(plan.as_dict()["reclaim_backpressure"])
             self.assertTrue(fabric.monitor()["controller"]["reclaim_pressure"]["backpressure"])
 

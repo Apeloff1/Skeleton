@@ -23,3 +23,7 @@ rates; source paths, model bytes and private prompts are not included.
 Focused tests use labeled synthetic counters. Device qualification must
 exercise actual cgroup memory pressure and measure p95/p99 throughput,
 cancellation and recovery on each target platform.
+
+The pressure hold constrains the **aggregate** in-process stream-slot budget,
+not only each request's stream count. Already running streams are allowed to
+finish or cancel; new work cannot overbook the held capacity.
