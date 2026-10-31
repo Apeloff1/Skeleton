@@ -106,6 +106,33 @@ class KVPressureTieringTests(unittest.TestCase):
         later = TierPressureSample(1002, "simulated-test", 99, 99, 0, 1000)
         self.assertEqual(self.planner.plan(self.manager, later, now_ns=1003).moves, ())
 
+    def test_direct_migration_preserves_pinned_handle(self) -> None:
+        keys = self.pages(pin=True)
+        self.assertEqual(self.manager.migrate(keys, CacheTier.CPU), ())
+        self.assertEqual(self.adapter.moves, [])
+        self.assertEqual({p.tier for p in self.manager.tier_inventory()}, {CacheTier.GPU})
+        self.manager.release(keys)
+        self.assertEqual(set(self.manager.migrate(keys, CacheTier.CPU)), set(keys))
+
+    def test_direct_migration_fails_closed_on_missing_adapter_handle(self) -> None:
+        class NullHandleStorage(SimulatedStorage):
+            def move(self, handle, source, target):
+                return None
+        manager = KVCacheManager(
+            KVCacheConfig(block_size_tokens=2, max_bytes=4096),
+            storage=NullHandleStorage(), clock=lambda: 1.0,
+        )
+        keys = manager.commit_prefix(
+            (1, 2), (KVPageInput("gpu", 128),), self.namespace,
+        )
+        with self.assertRaisesRegex(RuntimeError, "no page handle"):
+            manager.migrate(keys, CacheTier.CPU)
+        self.assertEqual(manager.stats().storage_errors, 1)
+        self.assertEqual(manager.stats().migrations, 0)
+        self.assertEqual(manager.tier_inventory()[0].tier, CacheTier.GPU)
+        with self.assertRaises(ValueError):
+            manager.migrate(keys, "cpu")
+
     def test_invalid_telemetry_is_rejected(self) -> None:
         for bad in (True, -1, 101, 1.5):
             with self.subTest(bad=bad):

@@ -31,3 +31,13 @@ python -m pytest -q --noconftest skeleton/testing/test_kv_pressure_tiering.py
 Before runtime activation, wire trusted OS telemetry into this planner
 through the canonical local inference owner, qualify the physical storage
 adapter on each supported device, and run full exact-head CI/security.
+
+## Direct migration invariant parity
+
+The explicit `KVCacheManager.migrate` API now enforces the same pinned-page
+and adapter-handle invariants as pressure-driven `migrate_if`. A pinned KV
+page remains in its original tier until released; a missing adapter result
+never replaces the resident handle or increments the successful migration
+counter. Adapter exceptions increment storage-error accounting and propagate;
+partial earlier moves are not falsely rolled back or reported as atomic.
+These source-level simulated tests do not qualify physical GPU transfers.

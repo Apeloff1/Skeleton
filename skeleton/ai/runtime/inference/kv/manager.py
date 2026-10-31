@@ -367,15 +367,31 @@ class KVCacheManager:
             return True
 
     def migrate(self, page_keys: Iterable[str], target: CacheTier) -> tuple[str, ...]:
+        """Explicit tier movement with the same pin and adapter fences as migrate_if.
+
+        Each page is committed only after a real adapter handle is returned.
+        Earlier successful moves remain visible if a later adapter call fails;
+        callers must inspect the inventory before retrying.
+        """
+        if not isinstance(target, CacheTier):
+            raise ValueError("CacheTier target required")
         moved: list[str] = []
         with self._lock:
             for key in page_keys:
                 page = self._pages.get(key)
-                if page is None or page.tier == target:
+                if page is None or page.tier is target or page.pin_count:
                     continue
                 if self._storage is None:
                     raise RuntimeError("tier migration requires a KVStorageAdapter")
-                page.handle = self._storage.move(page.handle, page.tier, target)
+                try:
+                    handle = self._storage.move(page.handle, page.tier, target)
+                except Exception:
+                    self._counters["storage_errors"] += 1
+                    raise
+                if handle is None:
+                    self._counters["storage_errors"] += 1
+                    raise RuntimeError("tier adapter returned no page handle")
+                page.handle = handle
                 page.tier = target
                 page.last_access = self._clock()
                 self._counters["migrations"] += 1
