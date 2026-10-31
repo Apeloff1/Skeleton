@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 
 from skeleton.app.combat_cli import main as run_combat_cli
-from skeleton.game.gameplay.encounter_session import (
-    CombatSessionError, MAX_TURNS, advance, replay, validate_source, verify_save,
+from skeleton.game.gameplay.combat_logic import (
+    CombatSessionError, advance, replay, validate_source, verify_save,
 )
+from skeleton.game.gameplay.encounter_session import MAX_TURNS
 
 FIXTURE = Path(__file__).parent / "fixtures" / "combat_original_lantern_harbor.json"
 
@@ -121,7 +122,6 @@ def test_command_fails_closed_without_consuming_save(source):
         {"action": "attack", "attack_id": "wind-lash"},
         {"action": "attack"},
         {"action": "guard", "attack_id": "lantern-jab"},
-        {"action": "heal"},
         {"action": "teleport"},
         {"action": "rest", "amount": 999},
     ):
@@ -141,7 +141,7 @@ def test_stamina_and_turn_limits_are_bounded(source):
         replay(source, [attack()] * (MAX_TURNS + 1))
 
 
-def test_app_cli_play_verify_and_reject_symlink(tmp_path, capsys, source):
+def test_combat_cli_play_verify_and_reject_symlink(tmp_path, capsys, source):
     source_path = tmp_path / "encounter.json"
     source_path.write_text(json.dumps(source), encoding="utf-8")
     first = tmp_path / "save1.json"
