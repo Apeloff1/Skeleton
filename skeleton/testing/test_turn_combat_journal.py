@@ -159,4 +159,3 @@ def test_interactive_rejects_eof_and_bounded_invalid_attempts() -> None:
             input_stream=StringIO('{"kind":"bad"}\n' * 3),
             output_stream=StringIO(),
         )
-
