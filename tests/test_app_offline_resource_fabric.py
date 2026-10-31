@@ -599,6 +599,48 @@ class FabricTests(unittest.TestCase):
                 root, ("source.txt",), deadline_s=10.0,
             )), 1)
 
+    def test_root_ancestor_replacement_cannot_redirect_staged_bytes(self):
+        import os
+
+        if os.name != "posix":
+            self.skipTest("descriptor-relative POSIX validation")
+        from skeleton.app.offline_resource_fabric import _open_source_at
+
+        with TemporaryDirectory() as d:
+            home = Path(d)
+            operator_parent = home / "operator"
+            selected = operator_parent / "selected"
+            selected.mkdir(parents=True)
+            (selected / "source.txt").write_text("approved")
+            outside = home / "outside"
+            (outside / "selected").mkdir(parents=True)
+            (outside / "selected" / "source.txt").write_text("secret")
+            # The original root is resolved, then an ancestor is exchanged.
+            # O_NOFOLLOW on only the selected leaf would not prevent traversal.
+            operator_parent.rename(home / "original-parent")
+            operator_parent.symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(OSError):
+                _open_source_at(selected, Path("source.txt"))
+
+    def test_unsupported_safe_open_primitives_fail_closed(self):
+        from skeleton.app.offline_resource_fabric import _open_source_at
+
+        with TemporaryDirectory() as d:
+            for platform in (
+                SimpleNamespace(name="nt", open=Mock()),
+                SimpleNamespace(
+                    name="posix", O_NOFOLLOW=0, O_DIRECTORY=0, open=Mock(),
+                ),
+            ):
+                with self.subTest(platform=platform.name), patch(
+                    "skeleton.app.offline_resource_fabric.os", platform,
+                ):
+                    with self.assertRaisesRegex(
+                        ResourceFabricError, "no-follow.*unavailable",
+                    ):
+                        _open_source_at(Path(d), Path("source.txt"))
+                    platform.open.assert_not_called()
+
     def test_symlink_escape_is_rejected(self):
         with TemporaryDirectory() as d:
             root = Path(d)

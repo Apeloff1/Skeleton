@@ -418,21 +418,33 @@ class FabricPlan:
 
 
 def _open_source_at(root: Path, relative: Path) -> int:
-    """Open beneath a stable root without following POSIX parent symlinks."""
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    if os.name != "posix":
-        return os.open(root / relative, flags)
-    parent_flags = (
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
-    )
-    parent_fd = os.open(root, parent_flags)
+    """Anchor every directory component, including ancestors of the root.
+
+    A no-follow flag on the final root pathname does not protect its
+    ancestors from concurrent symlink replacement. Without native
+    descriptor-relative no-follow primitives, staging fails closed.
+    """
+    if (os.name != "posix" or not getattr(os, "O_NOFOLLOW", 0)
+            or not getattr(os, "O_DIRECTORY", 0)):
+        raise ResourceFabricError(
+            "descriptor-anchored no-follow source opening unavailable"
+        )
+    base = Path(root)
+    child = Path(relative)
+    if (not base.is_absolute() or child.is_absolute() or not child.parts
+            or any(part in {".", ".."} for part in child.parts)):
+        raise ResourceFabricError("unsafe descriptor-relative source path")
+    parent_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    parent_fd = os.open(base.anchor, parent_flags)
     try:
-        for component in relative.parts[:-1]:
+        for component in (*base.parts[1:], *child.parts[:-1]):
             child_fd = os.open(component, parent_flags, dir_fd=parent_fd)
             os.close(parent_fd)
             parent_fd = child_fd
-        return os.open(relative.parts[-1], flags, dir_fd=parent_fd)
+        return os.open(
+            child.parts[-1], os.O_RDONLY | os.O_NOFOLLOW,
+            dir_fd=parent_fd,
+        )
     finally:
         os.close(parent_fd)
 
