@@ -62,7 +62,7 @@ class OfflineGridCampaignTests(unittest.TestCase):
             advanced.step(Command("one", "wait"))
         self.assertEqual(advanced.tick, 1)
         with self.assertRaises(GameplayContractError):
-            advanced.step(Command("missing", "collect", "lantern"))
+            advanced.step(Command("missing", "collect", "keeper"))
         self.assertEqual(Session.restore(self.campaign, advanced.snapshot()), advanced)
 
     def test_tamper_source_event_state_and_version(self):
@@ -83,6 +83,14 @@ class OfflineGridCampaignTests(unittest.TestCase):
             payload["events"][0][field] = value
             with self.subTest(event=field), self.assertRaises(GameplayContractError):
                 Session.restore(self.campaign, payload)
+        payload = copy.deepcopy(original)
+        payload["events"][0]["tick"] = True
+        with self.assertRaises(GameplayContractError):
+            Session.restore(self.campaign, payload)
+        payload = copy.deepcopy(original)
+        payload["state"]["x"] = True
+        with self.assertRaises(GameplayContractError):
+            Session.restore(self.campaign, payload)
         payload = copy.deepcopy(original)
         payload["state"]["x"] += 1
         with self.assertRaises(GameplayContractError):

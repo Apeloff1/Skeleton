@@ -277,9 +277,9 @@ class Session:
         for event in events:
             _keys(event, {"command_id", "kind", "target", "tick", "previous_digest", "digest"})
             session = session.step(Command(event["command_id"], event["kind"], event["target"]))
-            if session.events[-1] != event:
+            if _canonical(session.events[-1]) != _canonical(event):
                 _fail("save event integrity mismatch")
-        if payload["state"] != session._state() or payload["state_digest"] != session.state_digest:
+        if _canonical(payload["state"]) != _canonical(session._state()) or payload["state_digest"] != session.state_digest:
             _fail("save state integrity mismatch")
         return session
 
