@@ -38,8 +38,13 @@ class NativeGpuMemoryReceipt:
             raise NVMLProbeError("unknown native probe source")
         if self.status not in {"measured", "unavailable"}:
             raise NVMLProbeError("invalid native probe status")
-        if self.status == "unavailable" and self.devices:
-            raise NVMLProbeError("unavailable GPU probe cannot publish devices")
+        if self.status == "unavailable":
+            if self.source != "unavailable" or self.devices:
+                raise NVMLProbeError("unavailable GPU probe cannot publish measured provenance or devices")
+            if self.measured_total_bytes != 0 or self.measured_free_bytes != 0:
+                raise NVMLProbeError("unavailable GPU probe cannot publish measured memory")
+        elif self.source == "unavailable":
+            raise NVMLProbeError("measured GPU probe requires measured provenance")
         for value in (self.measured_total_bytes, self.measured_free_bytes):
             if type(value) is not int or value < 0 or value >= 1 << 63:
                 raise NVMLProbeError("invalid aggregate GPU memory")
