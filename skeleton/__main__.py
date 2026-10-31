@@ -56,6 +56,7 @@ Commands:
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
     scene-atlas  Explore fog-of-war maps, legal known routes and portable replay
+    scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
     scene-mission-route  Solve replayable authored mission ending paths
     game        Build a playable Godot project from a natural-language brief
@@ -745,6 +746,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-mission-route":
         from skeleton.game.gameplay.scene_mission_solver import cli as route_cli
         return route_cli(rest)
+    if cmd == "scene-consequences":
+        from skeleton.game.gameplay.scene_mission_consequences import cli as consequences_cli
+        return consequences_cli(rest)
     if cmd == "scene-mission":
         from skeleton.game.gameplay.scene_mission import cli as mission_cli
         return mission_cli(rest)
