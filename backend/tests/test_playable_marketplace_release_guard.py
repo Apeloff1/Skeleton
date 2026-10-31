@@ -1,7 +1,12 @@
 """Sales stay closed until runtime qualification and buyer delivery exist."""
 from copy import deepcopy
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
+import asyncio
+import pytest
+
+from emergentintegrations.payments.stripe import checkout as stripe_facade
 from routes import marketplace, playable_access
 from backend.tests.test_playable_private_creation import project_boundary
 from backend.tests.test_private_memory_boundary import memory_boundary
@@ -60,3 +65,68 @@ def test_existing_listings_and_payment_status_remain_available(project_boundary,
     assert calls == ["existing-session"]
     assert client.get("/api/marketplace/checkout/status/existing-session", headers=headers["bob"]).json() == {"error": "unknown session"}
     assert calls == ["existing-session"]
+
+
+def test_signed_completed_event_without_payment_status_does_not_imply_paid(monkeypatch):
+    class Webhook:
+        @staticmethod
+        def construct_event(payload, signature, secret):
+            return {"type": "checkout.session.completed", "data": {"object": {
+                "object": "checkout.session", "id": "cs_existing",
+            }}}
+
+    monkeypatch.setattr(stripe_facade, "_stripe_module", lambda: SimpleNamespace(Webhook=Webhook))
+    checkout = stripe_facade.StripeCheckout("key", "https://example.test/webhook", "secret")
+    event = asyncio.run(checkout.handle_webhook(b"{}", "valid-signature"))
+    assert event.session_id == "cs_existing"
+    assert event.payment_status is None
+
+
+@pytest.mark.parametrize("event_type,payment_status,finalizes", [
+    ("checkout.session.completed", None, False),
+    ("checkout.session.completed", "unpaid", False),
+    ("checkout.session.async_payment_failed", "unpaid", False),
+    ("checkout.session.expired", "paid", False),
+    ("checkout.session.completed", "paid", True),
+    ("checkout.session.async_payment_succeeded", "paid", True),
+])
+def test_webhook_settles_only_explicitly_paid_checkout_events(
+    project_boundary, monkeypatch, event_type, payment_status, finalizes,
+):
+    client, headers, _, database = project_boundary
+    identity = {"owner_id": "alice@example.test", "tenant_id": "tenant-a"}
+    database.payment_transactions.rows.append({
+        **identity, "session_id": "cs_existing", "payment_status": "initiated",
+    })
+    event = SimpleNamespace(session_id="cs_existing", payment_status=payment_status, event_type=event_type)
+    checkout = SimpleNamespace(handle_webhook=AsyncMock(return_value=event))
+    finalize = AsyncMock()
+    monkeypatch.setattr(marketplace, "_db", playable_access.scoped_database(database))
+    monkeypatch.setattr(marketplace, "STRIPE_API_KEY", "test-key")
+    monkeypatch.setattr(marketplace, "_checkout", lambda *_: checkout)
+    monkeypatch.setattr(marketplace, "_finalize_purchase", finalize)
+    client.app.include_router(marketplace.router)
+
+    response = client.post("/api/webhook/stripe", headers=headers["alice"], json={})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"received": True}
+    if finalizes:
+        finalize.assert_awaited_once()
+        assert database.payment_transactions.rows[0]["payment_status"] == "paid"
+    else:
+        finalize.assert_not_awaited()
+        assert database.payment_transactions.writes == []
+        assert database.payment_transactions.rows[0]["payment_status"] == "initiated"
+
+
+def test_webhook_rejects_invalid_signature_without_acknowledging_it(project_boundary, monkeypatch):
+    client, headers, _, database = project_boundary
+    checkout = SimpleNamespace(handle_webhook=AsyncMock(side_effect=ValueError("bad signature")))
+    monkeypatch.setattr(marketplace, "_db", playable_access.scoped_database(database))
+    monkeypatch.setattr(marketplace, "STRIPE_API_KEY", "test-key")
+    monkeypatch.setattr(marketplace, "_checkout", lambda *_: checkout)
+    client.app.include_router(marketplace.router)
+    response = client.post("/api/webhook/stripe", headers=headers["alice"], json={})
+    assert response.status_code == 400
+    assert response.json() == {"received": False, "error": "webhook_rejected"}
+    assert all(not collection.writes for collection in database.collections.values())

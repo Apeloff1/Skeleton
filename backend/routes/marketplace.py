@@ -341,26 +341,29 @@ async def checkout_status(session_id: str, request: Request):
 
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
-    """Stripe webhook — the source of truth. Marks the transaction paid + records
-    the purchase on checkout.session.completed."""
+    """Settle an existing transaction only on an explicitly paid session event."""
     if not STRIPE_API_KEY:
-        return {"received": False}
+        return JSONResponse(status_code=503, content={"received": False, "error": "payments_not_configured"})
     body = await request.body()
     sig = request.headers.get("Stripe-Signature")
     sc = _checkout(str(request.base_url))
     try:
         ev = await sc.handle_webhook(body, sig)
     except Exception:
-        return {"received": False, "error": "webhook_rejected"}
-    if ev.session_id:
+        return JSONResponse(status_code=400, content={"received": False, "error": "webhook_rejected"})
+    # Completion can precede payment for delayed methods. An absent status is
+    # not evidence of payment, and late unpaid events must not downgrade a paid
+    # transaction. Payment-status polling remains available for existing orders.
+    if (ev.session_id and ev.payment_status == "paid" and ev.event_type in {
+        "checkout.session.completed", "checkout.session.async_payment_succeeded",
+    }):
         await _db.payment_transactions.update_one(
             {"session_id": ev.session_id},
-            {"$set": {"payment_status": ev.payment_status or "unknown",
+            {"$set": {"payment_status": "paid",
                       "webhook_event": ev.event_type, "updated_at": _now()}})
-        if (ev.payment_status == "paid") or (ev.event_type == "checkout.session.completed"):
-            txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
-            if txn:
-                await _finalize_purchase(txn)
+        txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
+        if txn:
+            await _finalize_purchase(txn)
     return {"received": True}
 
 

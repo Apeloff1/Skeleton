@@ -108,8 +108,6 @@ class StripeCheckout:
             obj = {}
         session_id = obj.get("id") if str(obj.get("object") or "") == "checkout.session" else None
         payment_status = obj.get("payment_status")
-        if event_type == "checkout.session.completed" and not payment_status:
-            payment_status = "paid"
         return WebhookEvent(
             event_type=event_type,
             session_id=str(session_id) if isinstance(session_id, str) else None,
