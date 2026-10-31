@@ -9,6 +9,7 @@ import stat
 import sys
 import tempfile
 
+from skeleton.game.gameplay.quest_route_planner import QuestRoutePlanner
 from skeleton.game.gameplay.quest_session import (
     GameplayContractError, QuestEngine, QuestPlan, QuestTrigger, MAX_EVENTS,
 )
@@ -85,7 +86,7 @@ def _events(path: Path) -> list[QuestTrigger]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Deterministic offline quest journal")
-    parser.add_argument("command", choices=("inspect", "run", "verify", "play"))
+    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--events", type=Path, help="ordered authored event triggers for run")
     parser.add_argument("--save", type=Path, help="new no-clobber save output, or input for verify")
@@ -93,11 +94,26 @@ def main(argv: list[str] | None = None) -> int:
         "--resume", type=Path,
         help="verified previous save for play; output must be a new file",
     )
+    parser.add_argument("--goal-ending")
+    parser.add_argument("--max-search-nodes", type=int, default=1024)
+    parser.add_argument("--max-search-depth", type=int, default=24)
     args = parser.parse_args(argv)
     try:
         plan = QuestPlan.from_record(_read(args.plan))
         engine = QuestEngine(plan)
-        if args.command == "inspect":
+        if args.command != "solve" and (
+            args.goal_ending is not None or args.max_search_nodes != 1024
+            or args.max_search_depth != 24
+        ):
+            raise GameplayContractError("route options require solve")
+        if args.command == "solve":
+            if args.events or args.save or args.resume or not args.goal_ending:
+                raise GameplayContractError("solve requires --goal-ending only")
+            result = QuestRoutePlanner(engine).solve(
+                args.goal_ending, max_nodes=args.max_search_nodes,
+                max_depth=args.max_search_depth,
+            ).record()
+        elif args.command == "inspect":
             if args.events or args.save or args.resume:
                 raise GameplayContractError("inspect does not accept events or saves")
             result = {"world_id": plan.world_id, "plan_digest": plan.digest, "quest_order": plan.order}
