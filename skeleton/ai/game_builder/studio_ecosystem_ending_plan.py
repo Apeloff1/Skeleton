@@ -31,6 +31,7 @@ def _digest(value: object) -> str:
 def plan_authored_ending(
     documents: Mapping[str, Any], *, ending_id: str,
     session: QuestSession | None = None, authorized: bool,
+    preferred_choices: Mapping[str, str] | None = None,
 ) -> dict[str, object]:
     """Return a bounded replay-verified quest-stage itinerary for one ending."""
     if authorized is not True:
@@ -69,6 +70,14 @@ def plan_authored_ending(
         needed.add(key)
     for key in targets:
         visit(key)
+    if preferred_choices is not None:
+        if type(preferred_choices) is not dict or len(preferred_choices) > MAX_PLAN_STAGES:
+            raise StudioQuestError("invalid preferred ending choice map")
+        for stage_id, alternative in preferred_choices.items():
+            if (type(stage_id) is not str or type(alternative) is not str
+                    or stage_id not in needed or stage_id in session.completed
+                    or alternative not in stage_by_key[stage_id].alternatives):
+                raise StudioQuestError("preferred ending choice is not executable")
     if len(needed) > MAX_PLAN_STAGES:
         raise StudioQuestError("authored ending plan stage budget exceeded")
     original_digest = session.digest
@@ -80,7 +89,8 @@ def plan_authored_ending(
             continue
         if not set(stage.prerequisites).issubset(set(simulated.completed)):
             raise StudioQuestError("authored ending stage dependency not executable")
-        choice = stage.alternatives[0]
+        choice = (preferred_choices.get(stage.key, stage.alternatives[0])
+                  if preferred_choices is not None else stage.alternatives[0])
         previous_digest = simulated.digest
         simulated = step_quest(simulated, documents, stage=stage.key,
                                alternative=choice, authorized=True)
@@ -115,5 +125,11 @@ def plan_authored_ending(
         "external_evidence_verified": False,
         "release_certified": False,
     }
+    if preferred_choices is not None:
+        payload["preferred_choice_count"] = len(preferred_choices)
+        payload["preferred_alternatives"] = [
+            {"stage_id": key, "choice": preferred_choices[key]}
+            for key in sorted(preferred_choices)
+        ]
     payload["plan_digest"] = _digest(payload)
     return payload

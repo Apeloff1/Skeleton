@@ -513,3 +513,16 @@ accepts donor and target edit batches with explicit selected paths, returning
 the same deterministic source-bound impact without writing files. Content
 digests are not signatures, authorship proof, native engine qualification or
 release certification.
+
+### Authored ending alternative selection (Studio A)
+
+The source-bound ending planner accepts `--ending-choices '{"investigate":"EXACT_CHOICE"}'`
+alongside `--ending-plan --project PROJECT --ending-id ENDING`. The exact
+stage-to-alternative map must reference uncompleted, needed stages and their
+existing authored alternatives. The canonical quest simulator replays the
+chosen alternatives and returns a deterministic receipt, with no mutation of
+the player's save and no fabricated external predicates. Unknown, locked,
+already-completed, non-authored or oversized preferences fail closed. Jeeves
+`studio_ending_plan` accepts the optional typed `preferred_choices` map and
+returns the same replay proof. Absent preferences preserve the previous v1
+receipt shape and deterministic default choice behavior.

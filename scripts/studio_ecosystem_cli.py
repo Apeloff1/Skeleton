@@ -32,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ending-plan", action="store_true",
                     help="Replay-verify a deterministic authored quest route toward one ending")
     ap.add_argument("--ending-id", help="Exact authored ending ID for --ending-plan")
+    ap.add_argument("--ending-choices", metavar="JSON",
+                    help="Optional exact stage-to-alternative map for source-verified ending planning")
     ap.add_argument("--revision-lineage", action="store_true",
                     help="Verify an ordered source-leased original authoring history")
     ap.add_argument("--revision-lineage-source", type=Path, action="append",
@@ -223,16 +225,27 @@ def main(argv: list[str] | None = None) -> int:
             actions = json.loads(encoded, object_pairs_hook=unique,
                                  parse_constant=lambda _: (_ for _ in ()).throw(
                                      StudioQuestError("nonfinite ending plan JSON")))
+            preferred = None
+            if args.ending_choices is not None:
+                if len(args.ending_choices.encode("utf-8", "strict")) > 8192:
+                    raise StudioQuestError("ending preferences exceed byte budget")
+                preferred = json.loads(
+                    args.ending_choices, object_pairs_hook=unique,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite ending preferences")))
             docs = read_blueprint(args.project)
             session = replay_quest(docs, actions, authorized=True)
             result = plan_authored_ending(
-                docs, ending_id=args.ending_id, session=session, authorized=True)
+                docs, ending_id=args.ending_id, session=session,
+                preferred_choices=preferred, authorized=True)
         except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     if args.ending_id is not None:
         ap.error("--ending-id requires --ending-plan")
+    if args.ending_choices is not None:
+        ap.error("--ending-choices requires --ending-plan")
     if args.revision_lineage:
         if (not args.project or not args.revision_lineage_source
                 or len(args.revision_lineage_source) > 8 or args.output is not None

@@ -81,3 +81,67 @@ def test_cli_and_typed_jeeves_endings_use_same_source(capsys):
     assert cli == result["detail"]
     with pytest.raises(StudioQuestError):
         execute_ending_plan_tool({**req, "extra": True}, authorized=True)
+
+def test_preferred_alternative_is_replayed_without_mutating_session():
+    from skeleton.ai.game_builder.studio_ecosystem_quest import compile_quest_program
+    source = read_blueprint(PROJECT)
+    session = start_quest(source, authorized=True)
+    program = compile_quest_program(source)
+    baseline = plan_authored_ending(source, ending_id="commons", authorized=True)
+    assert baseline["planned_steps"]
+    first = baseline["planned_steps"][0]
+    stage = next(s for s in program.stages if s.key == first["stage_id"])
+    assert len(stage.alternatives) > 1
+    selected = stage.alternatives[1]
+    preferred = {stage.key: selected}
+    plan = plan_authored_ending(
+        source, ending_id="commons", session=session,
+        preferred_choices=preferred, authorized=True)
+    assert plan["planned_steps"][0]["choice"] == selected
+    assert plan["preferred_alternatives"] == [{"stage_id": stage.key, "choice": selected}]
+    assert plan["preferred_choice_count"] == 1
+    assert plan["plan_digest"] != baseline["plan_digest"]
+    assert session == start_quest(source, authorized=True)
+    assert plan == plan_authored_ending(
+        source, ending_id="commons", session=session,
+        preferred_choices=preferred, authorized=True)
+
+
+def test_preferred_alternative_rejects_unbound_completed_and_invalid():
+    source = read_blueprint(PROJECT)
+    first = plan_authored_ending(source, ending_id="commons", authorized=True)[
+        "planned_steps"][0]
+    stage_id = first["stage_id"]
+    for preferences in ({"unknown_stage": "choice"}, {stage_id: "not_authored"},
+                        {stage_id: 3}, ["not", "a", "mapping"]):
+        with pytest.raises(StudioQuestError):
+            plan_authored_ending(source, ending_id="commons",
+                                 preferred_choices=preferences, authorized=True)
+    completed = replay_quest(source, [[stage_id, first["choice"]]], authorized=True)
+    with pytest.raises(StudioQuestError, match="not executable"):
+        plan_authored_ending(source, ending_id="commons", session=completed,
+                             preferred_choices={stage_id: first["choice"]},
+                             authorized=True)
+
+
+def test_preferred_alternative_cli_and_jeeves_parity(capsys):
+    from scripts.studio_ecosystem_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_quest import compile_quest_program
+    source = read_blueprint(PROJECT)
+    first = plan_authored_ending(source, ending_id="commons", authorized=True)[
+        "planned_steps"][0]
+    stage = next(s for s in compile_quest_program(source).stages
+                 if s.key == first["stage_id"])
+    selected = {stage.key: stage.alternatives[-1]}
+    req = {"schema": ENDING_PLAN_REQUEST_SCHEMA,
+           "project_id": PROJECT, "ending_id": "commons", "actions": [],
+           "preferred_choices": selected}
+    result = execute_ending_plan_tool(req, authorized=True)
+    assert main(["--project", PROJECT, "--ending-plan", "--ending-id", "commons",
+                 "--ending-choices", json.dumps(selected)]) == 0
+    assert json.loads(capsys.readouterr().out) == result["detail"]
+    with pytest.raises(StudioQuestError):
+        execute_ending_plan_tool({**req, "preferred_choices": {"forged": "choice"}},
+                                 authorized=True)
+    with pytest.raises(SystemExit):
+        main(["--project", PROJECT, "--ending-choices", "{}"])

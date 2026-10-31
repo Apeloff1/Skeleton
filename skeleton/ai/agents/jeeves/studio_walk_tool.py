@@ -674,6 +674,8 @@ def ending_plan_tool_schema() -> dict[str, object]:
                 "actions": {"type": "array", "maxItems": 64,
                             "items": {"type": "array", "minItems": 2, "maxItems": 2,
                                       "items": {"type": "string"}}},
+                "preferred_choices": {"type": "object", "maxProperties": 64,
+                                      "additionalProperties": {"type": "string"}},
             },
             "required": ["schema", "project_id", "ending_id", "actions"],
         },
@@ -685,7 +687,9 @@ def execute_ending_plan_tool(request: Mapping[str, Any], *,
     if authorized is not True:
         raise PermissionError("Jeeves ending plan requires operator authorization")
     if (type(request) is not dict
-            or set(request) != {"schema", "project_id", "ending_id", "actions"}
+            or set(request) - {"schema", "project_id", "ending_id",
+                               "actions", "preferred_choices"}
+            or not {"schema", "project_id", "ending_id", "actions"}.issubset(request)
             or request.get("schema") != ENDING_PLAN_REQUEST_SCHEMA
             or len(_canonical(request)) > 16384):
         raise StudioQuestError("invalid typed Jeeves ending plan request")
@@ -694,7 +698,8 @@ def execute_ending_plan_tool(request: Mapping[str, Any], *,
     source = read_blueprint(request["project_id"])
     session = replay_quest(source, request["actions"], authorized=True)
     detail = plan_authored_ending(
-        source, ending_id=request["ending_id"], session=session, authorized=True)
+        source, ending_id=request["ending_id"], session=session,
+        preferred_choices=request.get("preferred_choices"), authorized=True)
     result = {
         "schema": ENDING_PLAN_RESULT_SCHEMA,
         "project_id": request["project_id"],
