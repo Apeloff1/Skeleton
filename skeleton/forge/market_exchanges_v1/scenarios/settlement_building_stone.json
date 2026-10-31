@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "settlement_building_stone",
+  "domain": "settlement",
+  "commodity": "building_stone",
+  "pricing": {
+    "base": 98,
+    "markup_percent": 110,
+    "tariff": 3,
+    "capacity": 297
+  },
+  "initial": {
+    "stock": 78,
+    "treasury": 7003,
+    "holdings": 0,
+    "wallet": 7003,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "settlement_building_stone:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "settlement_building_stone:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "settlement_building_stone:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

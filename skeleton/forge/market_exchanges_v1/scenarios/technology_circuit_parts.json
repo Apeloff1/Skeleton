@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "technology_circuit_parts",
+  "domain": "technology",
+  "commodity": "circuit_parts",
+  "pricing": {
+    "base": 110,
+    "markup_percent": 130,
+    "tariff": 0,
+    "capacity": 325
+  },
+  "initial": {
+    "stock": 90,
+    "treasury": 7455,
+    "holdings": 0,
+    "wallet": 7455,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "technology_circuit_parts:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "technology_circuit_parts:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "technology_circuit_parts:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
