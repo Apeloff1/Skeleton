@@ -14,6 +14,7 @@ from skeleton.app.offline_resources import LocalResourcePressure, LocalResourceS
 from skeleton.app.offline_resource_fabric import (
     AdaptiveResourceFabric, GPUResource, ResourceFabricError,
     _probe_apple_metal, probe_gpu_resources,
+    build_staging_manifest, STAGING_MANIFEST_SCHEMA,
 )
 
 
@@ -32,6 +33,57 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_staged_manifest_is_stable_across_parallelism_and_order_sensitive(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "first.txt").write_bytes(b"first" * 50)
+            (root / "second.txt").write_bytes(b"second" * 40)
+            fabric = AdaptiveResourceFabric(root)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                a = fabric.stream_readonly(root, ("first.txt", "second.txt"), desired_streams=1)
+                b = fabric.stream_readonly(root, ("first.txt", "second.txt"), desired_streams=4)
+                c = fabric.stream_readonly(root, ("second.txt", "first.txt"), desired_streams=2)
+            manifest = build_staging_manifest(a)
+            self.assertEqual(manifest, build_staging_manifest(b))
+            self.assertEqual(manifest["manifest_schema"], STAGING_MANIFEST_SCHEMA)
+            self.assertEqual(manifest["source_count"], 2)
+            self.assertEqual(manifest["source_bytes"], 490)
+            self.assertNotEqual(manifest["manifest_digest"], build_staging_manifest(c)["manifest_digest"])
+            self.assertFalse(manifest["manifest_authenticated"])
+
+    def test_staged_manifest_rejects_forgery_and_nonfinite_gpu_sensors(self):
+        record = {
+            "source": "chapter.txt", "size_bytes": 4,
+            "sha256": sha256(b"text").hexdigest(),
+            "readonly": True, "staging": "os_file_backed_mmap",
+            "gpu_coherence_verified": False,
+        }
+        self.assertEqual(build_staging_manifest((record,))["source_bytes"], 4)
+        for key, value in (
+            ("sha256", "a" * 63), ("size_bytes", True),
+            ("source", "chapter.txt\nforged"), ("readonly", False),
+            ("gpu_coherence_verified", True), ("staging", "gpu_unified_memory"),
+        ):
+            with self.subTest(key=key), self.assertRaises(ResourceFabricError):
+                build_staging_manifest((dict(record, **{key: value}),))
+        for invalid in ((record, record), (), (dict(record, unexpected="field"),),
+                        (dict(record, source="\ud800"),)):
+            with self.assertRaises(ResourceFabricError):
+                build_staging_manifest(tuple(invalid))
+        for invalid in (float("nan"), float("inf"), -float("inf")):
+            for key in ("utilization_ratio", "temperature_c"):
+                with self.assertRaises(ValueError):
+                    GPUResource(
+                        device="gpu", vendor="test", dedicated_total_bytes=10,
+                        dedicated_free_bytes=5, **{key: invalid},
+                    )
+
     def test_metal_repeated_probe_releases_created_device_on_all_paths(self):
         metal = SimpleNamespace(
             MTLCreateSystemDefaultDevice=Mock(return_value=0xFEED),

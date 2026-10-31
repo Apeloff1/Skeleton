@@ -33,6 +33,56 @@ class ResourceFabricError(RuntimeError):
     """The resource fabric cannot safely stage or schedule this operation."""
 
 
+STAGING_MANIFEST_SCHEMA = "skeleton.offline.staging-manifest.v1"
+
+
+def build_staging_manifest(records: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    """Bind ordered verified source identities; no signature or GPU claim."""
+    if type(records) is not tuple or not 1 <= len(records) <= 10000:
+        raise ResourceFabricError("bounded staged source receipts required")
+    sources: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    total = 0
+    expected = {"source", "size_bytes", "sha256", "readonly", "staging",
+                "gpu_coherence_verified"}
+    for record in records:
+        if type(record) is not dict or set(record) != expected:
+            raise ResourceFabricError("unexpected staged source receipt fields")
+        name, size, digest = record["source"], record["size_bytes"], record["sha256"]
+        if type(name) is not str or not name or name in seen:
+            raise ResourceFabricError("unique staged source identity required")
+        try:
+            encoded = name.encode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise ResourceFabricError("invalid UTF-8 staged source identity") from exc
+        if len(encoded) > 4096 or any(ord(ch) < 32 for ch in name):
+            raise ResourceFabricError("invalid staged source identity")
+        if type(size) is not int or size < 0:
+            raise ResourceFabricError("invalid staged source byte count")
+        if (type(digest) is not str or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)):
+            raise ResourceFabricError("invalid staged source SHA-256")
+        if (record["readonly"] is not True
+                or record["staging"] != "os_file_backed_mmap"
+                or record["gpu_coherence_verified"] is not False):
+            raise ResourceFabricError("staging receipt claims unsupported authority")
+        seen.add(name)
+        total += size
+        sources.append({"source": name, "size_bytes": size, "sha256": digest})
+    canonical = {"schema": STAGING_MANIFEST_SCHEMA, "sources": sources}
+    encoded = json.dumps(
+        canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+    ).encode("utf-8")
+    return {
+        "schema": "skeleton.offline.readonly-staging.v1",
+        "manifest_schema": STAGING_MANIFEST_SCHEMA,
+        "manifest_digest": hashlib.sha256(encoded).hexdigest(),
+        "source_count": len(sources), "source_bytes": total,
+        "sources": list(records), "verified": True,
+        "gpu_transfer_executed": False, "manifest_authenticated": False,
+    }
+
+
 @dataclass(frozen=True)
 class GPUResource:
     device: str
@@ -60,7 +110,8 @@ class GPUResource:
             raise ValueError("shared GPU memory must have complete telemetry")
         for value in (self.utilization_ratio, self.temperature_c):
             if value is not None and (not isinstance(value, (int, float))
-                                      or isinstance(value, bool)):
+                                      or isinstance(value, bool)
+                                      or not math.isfinite(value)):
                 raise ValueError("invalid GPU sensor value")
         if self.utilization_ratio is not None and not 0 <= self.utilization_ratio <= 1:
             raise ValueError("invalid GPU utilization")
@@ -698,4 +749,5 @@ class AdaptiveResourceFabric:
 __all__ = [
     "GPUResource", "FabricSnapshot", "FabricPlan", "AdaptiveResourceFabric",
     "ResourceFabricError", "probe_gpu_resources",
+    "build_staging_manifest", "STAGING_MANIFEST_SCHEMA",
 ]

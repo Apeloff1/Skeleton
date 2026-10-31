@@ -37,7 +37,9 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
-from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
+from skeleton.app.offline_resource_fabric import (
+    AdaptiveResourceFabric, build_staging_manifest,
+)
 from skeleton.app.offline_longform_virtual import (
     LongformVirtualMemory, LongformMemoryError,
 )
@@ -476,9 +478,7 @@ class OfflineHTTPApplication:
                     desired_streams=body.get("desired_streams", 4),
                     deadline_s=body.get("deadline_s"),
                 )
-                return 200, {"schema": "skeleton.offline.readonly-staging.v1",
-                             "sources": list(records), "verified": True,
-                             "gpu_transfer_executed": False}
+                return 200, build_staging_manifest(records)
             except (OSError, ValueError, RuntimeError) as exc:
                 raise OfflineHTTPError(422, "local read-only staging rejected") from exc
         if path.startswith("/v1/resources/longform/"):

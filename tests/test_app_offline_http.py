@@ -231,6 +231,24 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(output["verified"])
         self.assertFalse(output["gpu_transfer_executed"])
+        self.assertFalse(output["manifest_authenticated"])
+        self.assertEqual(output["source_count"], 2)
+        self.assertEqual(
+            output["source_bytes"],
+            sum(item["size_bytes"] for item in output["sources"]),
+        )
+        canonical = {
+            "schema": output["manifest_schema"],
+            "sources": [
+                {key: item[key] for key in ("source", "size_bytes", "sha256")}
+                for item in output["sources"]
+            ],
+        }
+        expected = sha256(json.dumps(
+            canonical, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")).hexdigest()
+        self.assertEqual(output["manifest_digest"], expected)
         self.assertEqual(len(output["sources"]), 2)
         self.assertTrue(all(item["readonly"] for item in output["sources"]))
         request["deadline_s"] = 0
