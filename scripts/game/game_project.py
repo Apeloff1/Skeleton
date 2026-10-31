@@ -33,7 +33,7 @@ from skeleton.ai.runtime.gameplay_capabilities import (
 from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
     verify_play_session, render_play_session, render_play_frame,
-    fork_play_session, compare_play_sessions,
+    fork_play_session, compare_play_sessions, render_play_comparison_frame,
 )
 from skeleton.ai.runtime.game_play_bundle import (
     GamePlayBundleError, pack_play_bundle, verify_play_bundle,
@@ -160,6 +160,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="create an independent save with alternate inputs at a verified frame")
     operations.add_argument("--compare-play-sessions", type=Path,
                             help="compare two independently verified alternate game histories")
+    operations.add_argument("--render-play-comparison", type=Path,
+                            help="ASCII overlay of two verified histories at one shared frame")
     operations.add_argument("--export-play-bundle", type=Path,
                             help="package a verified original capsule and save for offline transfer")
     operations.add_argument("--verify-play-bundle", type=Path,
@@ -217,7 +219,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.play_capsule, args.resume_play_session,
         args.verify_play_session, args.render_play_session,
         args.inspect_play_frame, args.fork_play_session,
-        args.compare_play_sessions, args.terminal_play_capsule, args.terminal_resume_session,
+        args.compare_play_sessions, args.render_play_comparison,
+        args.terminal_play_capsule, args.terminal_resume_session,
     ))
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
@@ -225,8 +228,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     ))
     seeking = any(value is not None for value in (
         args.inspect_play_frame, args.fork_play_session, args.fork_play_bundle,
+        args.render_play_comparison,
     ))
-    if (args.other_session is not None) != (args.compare_play_sessions is not None):
+    comparing = args.compare_play_sessions is not None or args.render_play_comparison is not None
+    if (args.other_session is not None) != comparing:
         print("--other-session is required only for session comparison", file=sys.stderr)
         return 2
     if (seeking != (args.at_frame is not None)):
@@ -343,6 +348,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "output_path": output_path,
                     "rendered_grid": render_play_session(capsule, session)["grid"],
                 }
+            elif args.render_play_comparison is not None:
+                report = render_play_comparison_frame(
+                    capsule, _read_json(args.render_play_comparison),
+                    _read_json(args.other_session), args.at_frame,
+                )
             elif args.compare_play_sessions is not None:
                 report = compare_play_sessions(
                     capsule, _read_json(args.compare_play_sessions),

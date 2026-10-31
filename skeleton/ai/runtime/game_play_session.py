@@ -257,9 +257,50 @@ def compare_play_sessions(
     }
 
 
+def render_play_comparison_frame(
+    capsule: Mapping[str, Any], left: Any, right: Any, frame: Any,
+) -> dict[str, Any]:
+    """ASCII overlay of two verified histories at a shared frame.
+
+    Both histories must actually contain the requested frame. The overlay
+    never extrapolates a shorter save, and uses only replayed coordinates.
+    """
+    comparison = compare_play_sessions(capsule, left, right)
+    maximum = min(comparison["left_frame_count"], comparison["right_frame_count"])
+    if type(frame) is not int or not 0 <= frame <= maximum:
+        raise GamePlaySessionError("comparison frame outside both verified histories")
+    left_state = _replay(capsule, left["controls"][:frame])
+    right_state = _replay(capsule, right["controls"][:frame])
+    rows = [list(row) for row in capsule["tilemap"]]
+    first = left_state["final_avatar"]
+    second = right_state["final_avatar"]
+    if first["x"] == second["x"] and first["y"] == second["y"]:
+        rows[first["y"]][first["x"]] = "X"
+    else:
+        rows[first["y"]][first["x"]] = "1"
+        rows[second["y"]][second["x"]] = "2"
+    return {
+        "schema_version": "skeleton.game.play_session.comparison_frame.v1",
+        "capsule_sha256": comparison["capsule_sha256"],
+        "left_session_sha256": comparison["left_session_sha256"],
+        "right_session_sha256": comparison["right_session_sha256"],
+        "frame": frame,
+        "shared_prefix_frames": comparison["shared_prefix_frames"],
+        "first_divergent_frame": comparison["first_divergent_frame"],
+        "left_avatar": first,
+        "right_avatar": second,
+        "grid": ["".join(row) for row in rows],
+        "legend": {"1": "first player", "2": "second player", "X": "overlapping players",
+                   "#": "wall", ".": "floor", "G": "goal"},
+        "source_bound_replay_verified": True,
+        "render_backend": "ascii_offline",
+        "native_renderer_used": False,
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_FRAMES", "MAX_BATCH_FRAMES", "GamePlaySessionError",
     "start_play_session", "resume_play_session", "verify_play_session",
     "render_play_session", "inspect_play_frame", "render_play_frame",
-    "fork_play_session", "compare_play_sessions",
+    "fork_play_session", "compare_play_sessions", "render_play_comparison_frame",
 ]
