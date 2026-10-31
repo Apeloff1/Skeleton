@@ -19,7 +19,7 @@ from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, verify_exported_package,
 )
 from skeleton.ai.game_builder.offline_receipt_publication import (
-    ReceiptPublicationError, publish_verified_receipt,
+    ReceiptPublicationError, preflight_receipt_destination, publish_verified_receipt,
 )
 from skeleton.ai.game_builder.original_game_studio import (
     StudioError, export_studio_run, run_original_game_studio,
@@ -33,6 +33,7 @@ from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
 
 
 SCHEMA = "skeleton.app.first_playable_journey.v1"
+VERIFY_SCHEMA = "skeleton.app.first_playable_journey_verification.v1"
 
 
 class FirstPlayableJourneyError(ValueError):
@@ -60,6 +61,10 @@ def build_first_playable_journey(
         raise FirstPlayableJourneyError("mirror attempt budget must be 64 to 512")
     if type(practice_games) is not int or not 0 <= practice_games <= 8:
         raise FirstPlayableJourneyError("practice game budget must be 0 to 8")
+    if receipt_destination is not None:
+        preflight_receipt_destination(
+            receipt_destination, protected_roots=(destination,), authorized=True,
+        )
     intent = _intent(_read_json(str(intent_path), MAX_INPUT_BYTES))
     run = run_original_game_studio(
         intent, authorized=True, mirror_attempts=mirror_attempts,
@@ -118,12 +123,71 @@ def build_first_playable_journey(
     }
 
 
+
+def verify_existing_playable_journey(
+    source_directory: str | Path, *, expected_manifest_sha256: str,
+    authorized: bool, receipt_destination: str | Path | None = None,
+) -> dict[str, object]:
+    """Reopen and reexecute an existing game using an independently held pin.
+
+    Unlike a build, this path never creates or modifies the source package.
+    Verification is bounded by the canonical game-builder source verifier and
+    cannot turn a source-level proof into device, rights or release approval.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    if receipt_destination is not None:
+        preflight_receipt_destination(
+            receipt_destination, protected_roots=(source_directory,),
+            authorized=True,
+        )
+    verified = verify_exported_package(
+        source_directory, expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    if (verified.get("offline_gameplay_reexecuted") is not True
+            or verified.get("manifest_sha256") != expected_manifest_sha256
+            or verified.get("release_certified") is not False
+            or verified.get("godot_executed") is not False):
+        raise FirstPlayableJourneyError("existing game source replay did not qualify")
+    receipt_pin = None
+    if receipt_destination is not None:
+        receipt_pin = publish_verified_receipt(
+            verified, receipt_destination, protected_roots=(source_directory,),
+            authorized=True,
+        )
+    return {
+        "schema": VERIFY_SCHEMA,
+        "status": "existing_source_playable_verified_release_blocked",
+        "project_id": verified["project_id"],
+        "source_directory": str(source_directory),
+        "independent_manifest_sha256": expected_manifest_sha256,
+        "verified_source_files": verified["verified_files"],
+        "replayed_actions": verified["replayed_actions"],
+        "world_digest": verified["world_digest"],
+        "replay_digest": verified["replay_digest"],
+        "offline_gameplay_reexecuted": True,
+        "model_inference_observed": False,
+        "native_godot_executed": False,
+        "native_device_qualified": False,
+        "rights_certified": False,
+        "release_certified": False,
+        "verification_receipt": verified,
+        "receipt_file": str(receipt_destination) if receipt_pin is not None else None,
+        "independent_receipt_sha256": receipt_pin,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton app studio-journey",
         description="Build an original game, export browser/Godot source and replay-verify it offline.",
     )
-    parser.add_argument("--intent", required=True, help="bounded original game intent JSON")
+    parser.add_argument("--intent", help="bounded original game intent JSON for new builds")
+    parser.add_argument("--verify-existing", action="store_true",
+                        help="read-only re-verification of an existing exported game")
+    parser.add_argument("--expected-manifest-sha256",
+                        help="independent SHA-256 pin required for --verify-existing")
     parser.add_argument("--output", required=True, help="new destination directory")
     parser.add_argument("--mirror-attempts", type=int, default=64)
     parser.add_argument("--practice-games", type=int, default=0)
@@ -138,13 +202,28 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        receipt = build_first_playable_journey(
-            args.intent, args.output,
-            authorized=args.trusted_local_operator,
-            mirror_attempts=args.mirror_attempts,
-            practice_games=args.practice_games,
-            receipt_destination=args.receipt,
-        )
+        if args.verify_existing:
+            if args.intent is not None or args.mirror_attempts != 64 or args.practice_games != 0:
+                raise FirstPlayableJourneyError(
+                    "existing verification cannot build or tune a new game"
+                )
+            receipt = verify_existing_playable_journey(
+                args.output, expected_manifest_sha256=args.expected_manifest_sha256,
+                authorized=args.trusted_local_operator,
+                receipt_destination=args.receipt,
+            )
+        else:
+            if args.intent is None or args.expected_manifest_sha256 is not None:
+                raise FirstPlayableJourneyError(
+                    "new game builds require --intent and reject external verification pins"
+                )
+            receipt = build_first_playable_journey(
+                args.intent, args.output,
+                authorized=args.trusted_local_operator,
+                mirror_attempts=args.mirror_attempts,
+                practice_games=args.practice_games,
+                receipt_destination=args.receipt,
+            )
     except (
         FirstPlayableJourneyError, StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
@@ -168,4 +247,4 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["SCHEMA", "FirstPlayableJourneyError", "build_first_playable_journey", "main"]
+__all__ = ["SCHEMA", "VERIFY_SCHEMA", "FirstPlayableJourneyError", "build_first_playable_journey", "verify_existing_playable_journey", "main"]

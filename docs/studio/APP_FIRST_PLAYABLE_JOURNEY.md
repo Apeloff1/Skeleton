@@ -50,3 +50,30 @@ inspect it with `python -m skeleton.ai.game_builder.offline_receipt_inspect_cli
 A stored receipt proves historical replay evidence and source integrity at
 the time of verification; re-inspection does not reexecute the game or grant
 release authorization. A receipt inside the source package is rejected.
+
+## Offline recovery and independent replay of an existing game
+
+A new build is not required to prove that a previously exported game is still
+intact. Keep the independently distributed SHA-256 of its original release.json
+outside the game package, then run the app-owned read-only verification path:
+
+```sh
+python -m skeleton app studio-journey --verify-existing \
+  --output ./existing-original-game \
+  --expected-manifest-sha256 <trusted-64-character-sha256> \
+  --receipt ./private-reverification.json \
+  --trusted-local-operator
+```
+
+This path rejects absent or forged pins, modified package bytes, symlinked
+source roots, unsafe receipt parents, receipt collisions, and attempts to
+combine build parameters with re-verification. The source directory is never
+modified by the verifier; receipt publication is optional and is no-clobber.
+A receipt destination inside the package is rejected **before** game creation,
+avoiding an otherwise predictable partial handoff. If a concurrent filesystem
+change occurs after preflight, the final publisher still fails closed; a
+post-export verification failure leaves the source unqualified for inspection.
+
+Verification reexecutes the canonical winning actions on the actual package
+bytes. It does not perform model inference, native Godot execution, hardware
+qualification, publisher identity attestation, rights clearance, or release.

@@ -28,6 +28,53 @@ class ReceiptPublicationError(ValueError):
     """A receipt could not be published without violating custody rules."""
 
 
+
+def preflight_receipt_destination(
+    destination: str | Path, *, protected_roots: Sequence[str | Path],
+    authorized: bool,
+) -> Path:
+    """Read-only, descriptor-pinned destination admission before costly work.
+
+    This check prevents predictable receipt failures from leaving an otherwise
+    newly exported game behind. It is NOT a reservation: the publisher repeats
+    its authority and no-clobber checks when the verified receipt is written.
+    """
+    if authorized is not True:
+        raise PermissionError("operator authorization required for receipt publication")
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise ReceiptPublicationError("descriptor-safe receipt publication unavailable")
+    target = Path(destination).expanduser().absolute()
+    if not _NAME.fullmatch(target.name):
+        raise ReceiptPublicationError("receipt filename must be a bounded .json name")
+    target_path = os.path.abspath(os.fspath(target))
+    for source in protected_roots:
+        source_path = os.path.abspath(os.fspath(Path(source).expanduser()))
+        if os.path.commonpath((source_path, target_path)) == source_path:
+            raise ReceiptPublicationError("receipt must be outside verified source roots")
+    try:
+        parent_fd = _root_fd(target.parent)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ReceiptPublicationError("unsafe receipt destination parent") from exc
+    try:
+        parent = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022
+                or parent.st_uid != os.geteuid()):
+            raise ReceiptPublicationError("receipt parent must be owner-controlled")
+        _assert_original_root(target.parent, parent_fd)
+        try:
+            os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ReceiptPublicationError("receipt destination already exists")
+        _assert_original_root(target.parent, parent_fd)
+    except (DualRuntimeVerificationError, OSError) as exc:
+        raise ReceiptPublicationError("unsafe receipt destination") from exc
+    finally:
+        os.close(parent_fd)
+    return target
+
+
 def publish_verified_receipt(
     receipt: Mapping[str, object], destination: str | Path, *,
     protected_roots: Sequence[str | Path], authorized: bool,
@@ -140,4 +187,4 @@ def publish_verified_receipt(
         os.close(parent_fd)
 
 
-__all__ = ["ReceiptPublicationError", "publish_verified_receipt"]
+__all__ = ["ReceiptPublicationError", "preflight_receipt_destination", "publish_verified_receipt"]

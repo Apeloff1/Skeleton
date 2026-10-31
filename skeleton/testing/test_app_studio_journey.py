@@ -157,5 +157,110 @@ def test_receipt_inside_source_package_is_rejected_without_false_success(
         "--receipt", str(receipt), "--trusted-local-operator",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
-    assert (output / "release.json").is_file()
+    assert not output.exists()  # deterministic preflight rejects before construction
     assert not receipt.exists()
+
+def test_existing_export_reverified_without_rebuild_or_source_mutation(tmp_path, capsys):
+    from hashlib import sha256
+    from skeleton.ai.game_builder.offline_receipt_inspection import inspect_verified_receipt
+
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 0
+    capsys.readouterr()
+    release = (output / "release.json").read_bytes()
+    before = (output / "index.html").read_bytes()
+    receipt = tmp_path / "reverified.json"
+    assert run_app_cli([
+        "studio-journey", "--verify-existing", "--output", str(output),
+        "--expected-manifest-sha256", sha256(release).hexdigest(),
+        "--receipt", str(receipt), "--trusted-local-operator",
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["schema"] == "skeleton.app.first_playable_journey_verification.v1"
+    assert result["offline_gameplay_reexecuted"] is True
+    assert result["replayed_actions"] > 0
+    assert result["native_device_qualified"] is False
+    assert result["release_certified"] is False
+    assert (output / "index.html").read_bytes() == before
+    assert (output / "release.json").read_bytes() == release
+    assert inspect_verified_receipt(
+        receipt, expected_sha256=result["independent_receipt_sha256"],
+        authorized=True,
+    )["receipt_integrity_verified"] is True
+
+
+def test_receipt_collision_rejected_before_any_game_export(tmp_path, capsys):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    receipt = tmp_path / "existing.json"
+    receipt.write_text("operator-owned", encoding="utf-8")
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--receipt", str(receipt), "--trusted-local-operator",
+    ]) == 2
+    assert not output.exists()
+    assert receipt.read_text(encoding="utf-8") == "operator-owned"
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_receipt_symlink_parent_rejected_before_any_game_export(tmp_path, capsys):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    private = tmp_path / "private"
+    private.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(private, target_is_directory=True)
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--receipt", str(alias / "receipt.json"), "--trusted-local-operator",
+    ]) == 2
+    assert not output.exists()
+    assert not (private / "receipt.json").exists()
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_existing_source_requires_authority_and_external_pin(tmp_path, capsys):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 0
+    capsys.readouterr()
+    for args in (
+        ["--verify-existing"],
+        ["--verify-existing", "--trusted-local-operator"],
+        ["--verify-existing", "--expected-manifest-sha256", "0" * 64,
+         "--trusted-local-operator"],
+        ["--verify-existing", "--intent", str(source),
+         "--expected-manifest-sha256", "0" * 64, "--trusted-local-operator"],
+    ):
+        assert run_app_cli(["studio-journey", "--output", str(output), *args]) == 2
+        assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert (output / "release.json").is_file()
+
+
+def test_existing_source_mutation_fails_closed_without_receipt(tmp_path, capsys):
+    from hashlib import sha256
+
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 0
+    capsys.readouterr()
+    pin = sha256((output / "release.json").read_bytes()).hexdigest()
+    (output / "index.html").write_text("modified", encoding="utf-8")
+    receipt = tmp_path / "must-not-exist.json"
+    assert run_app_cli([
+        "studio-journey", "--verify-existing", "--output", str(output),
+        "--expected-manifest-sha256", pin, "--receipt", str(receipt),
+        "--trusted-local-operator",
+    ]) == 2
+    assert not receipt.exists()
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
