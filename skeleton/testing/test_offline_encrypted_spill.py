@@ -309,5 +309,49 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
                 finally:
                     path.unlink(missing_ok=True)
 
+    def test_cross_process_ciphertext_quota_is_serialized(self):
+        """Two independent CLI processes cannot both consume one-slot custody."""
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor locking acceptance")
+        import subprocess
+        import sys
+
+        keyfile = self.temp / "concurrent-key"
+        keyfile.write_bytes(self.key)
+        keyfile.chmod(0o600)
+        source = self.temp / "concurrent-input"
+        source.write_bytes(b"data")
+        command = [
+            sys.executable, "-m", "skeleton.app.offline_spill_cli",
+            "--store", str(self.root),
+            "--key-file", str(keyfile),
+            "--max-entry-bytes", "4",
+            "--max-total-bytes", "20",
+            "--min-free-bytes", str(64 * 1024 * 1024),
+            "put", "--input", str(source),
+            "--model-sha256", MODEL, "--tokenizer-sha256", TOKENIZER,
+            "--context-id", "test-context", "--chunk-index", "0",
+        ]
+        processes = [
+            subprocess.Popen(command, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True)
+            for _ in range(2)
+        ]
+        try:
+            results = [
+                (process.communicate(timeout=20), process.returncode)
+                for process in processes
+            ]
+        finally:
+            for process in processes:
+                if process.poll() is None:
+                    process.kill()
+                process.communicate()
+        self.assertEqual(sorted(code for _, code in results), [0, 1], results)
+        rejected = next(streams[1] for streams, code in results if code != 0)
+        self.assertIn("byte quota exhausted", rejected)
+        self.assertEqual(self.store.verify()["verified"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
