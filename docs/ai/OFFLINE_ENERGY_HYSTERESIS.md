@@ -22,3 +22,8 @@ settings.
 Focused canonical tests:
 
     python -m pytest -q --noconftest skeleton/testing/test_offline_energy_hysteresis.py
+
+The operator-facing command supports sequential real observations with
+--hysteresis-samples 2..32 and --hysteresis-interval-ms 0..1000. It emits
+bounded per-sample receipts and the final admitted worker count; it never
+starts workers or claims to alter physical device thermal controls.

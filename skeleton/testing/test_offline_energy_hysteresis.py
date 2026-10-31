@@ -95,6 +95,27 @@ class TestEnergyHysteresis(TestCase):
         with self.assertRaises(HysteresisError):
             gate.step(candidate(), now_ns=9, sampled_ns=9)
 
+
+    def test_installed_energy_cli_hysteresis(self):
+        import io
+        import json
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+        from skeleton.app.offline_energy_budget import main
+        out = io.StringIO()
+        with patch("skeleton.app.offline_energy_budget.probe_cpu_topology", return_value=CPU), \
+             patch("skeleton.app.offline_energy_budget.probe_memory_topology", return_value=MEM), \
+             patch("skeleton.app.offline_energy_budget.probe_power",
+                   return_value=PowerObservation(95, True, 40, "test", "test", "test")), \
+             patch("skeleton.app.offline_energy_budget.time.monotonic_ns",
+                   side_effect=[1, 2, 3]), \
+             redirect_stdout(out):
+            self.assertEqual(main(["--hysteresis-samples", "3",
+                                   "--hysteresis-interval-ms", "0"]), 0)
+        data = json.loads(out.getvalue())
+        self.assertEqual(len(data["hysteresis"]), 3)
+        self.assertEqual(data["allowed_workers"], 1)
+
     def test_invalid_policy(self):
         for options in (
             {"recovery_samples": 1},
