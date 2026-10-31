@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_copper_mesa",
+  "title": "Copper Mesa: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Copper Mesa; prototype maps are not full genre implementations.",
+  "seed": 202610302305,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 4
+}

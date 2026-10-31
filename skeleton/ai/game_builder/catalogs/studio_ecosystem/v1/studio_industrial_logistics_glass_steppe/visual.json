@@ -1,0 +1,61 @@
+{
+  "project_id": "studio_industrial_logistics_glass_steppe",
+  "genre": "industrial_logistics",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "art_direction": {
+    "environment": "prismatic plains",
+    "landmark": "shattered outpost",
+    "palette": [
+      "#42301D",
+      "#A67345",
+      "#F0CC86",
+      "#FFF5D8"
+    ],
+    "readability": "depth_and_high_contrast",
+    "inspiration": "original_asset_concepts_only"
+  },
+  "asset_recipes": [
+    {
+      "id": "navigator",
+      "type": "character",
+      "brief": "Distinct engineer equipment, readable at handheld resolution",
+      "production": "design_only"
+    },
+    {
+      "id": "biome_modular",
+      "type": "landscape",
+      "brief": "Tessellated original prismatic plains with reactive glass-shard gales",
+      "production": "design_only"
+    },
+    {
+      "id": "architecture",
+      "type": "modular_structure",
+      "brief": "Interlocking geometry derived from shattered outpost",
+      "production": "design_only"
+    },
+    {
+      "id": "resource",
+      "type": "prop_and_hud",
+      "brief": "Readable 3D and 2D depictions of ceramic heat tiles",
+      "production": "design_only"
+    },
+    {
+      "id": "weather",
+      "type": "volumetric_effect",
+      "brief": "Performance-limited glass-shard gales field",
+      "production": "design_only"
+    }
+  ],
+  "streaming_profile": {
+    "target": "hardware_adaptive",
+    "gpu_budget_source": "measured_at_runtime",
+    "offload_strategy": "required_not_implemented"
+  },
+  "rights": {
+    "external_asset_source": "none",
+    "approval_pending": true
+  },
+  "owner": "existing game_builder original-studio and scene editor owners"
+}

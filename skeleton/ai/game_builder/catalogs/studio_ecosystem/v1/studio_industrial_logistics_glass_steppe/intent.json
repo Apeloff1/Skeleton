@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_glass_steppe",
+  "title": "Glass Steppe: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610302475,
+  "width": 23,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "desert",
+  "starting_health": 6
+}
