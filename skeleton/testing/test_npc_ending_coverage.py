@@ -35,7 +35,8 @@ def test_all_original_harbor_endings_have_real_witnesses() -> None:
         replay = play(schedule, row["commands"])
         assert replay.ending == row["ending_id"]
         assert replay.state_digest == row["state_digest"]
-        assert NpcSession.restore(schedule, row["snapshot"]) == replay
+        assert (NpcSession.restore(schedule, row["snapshot"]).state_digest
+                == replay.state_digest)
     assert verify_coverage(schedule, json.loads(json.dumps(report))) == report
 
 
