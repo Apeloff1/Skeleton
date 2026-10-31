@@ -72,11 +72,13 @@ def test_jeeves_tool_denies_untrusted_calls_before_source(monkeypatch):
 @pytest.mark.parametrize("change", [
     {"schema": "future"}, {"project_id": ""}, {"operation": "delete"},
     {"events": "not events"}, {"events": [["move", "north"]]},
+    {"events": [["teleport", "east"]]},
     {"events": [["move", "right", "extra"]]}, {"unauthorized": True},
     {"forecast_depth": True}, {"forecast_depth": 4},
     {"compare_events": []},
     {"operation": "compare"},
     {"operation": "compare", "compare_events": "bad"},
+    {"operation": "compare", "compare_events": [["move", "north"]]},
 ])
 def test_jeeves_tool_rejects_malformed_request_before_source(change, monkeypatch):
     monkeypatch.setattr(tool, "read_blueprint", lambda _: pytest.fail("malformed request reached source"))

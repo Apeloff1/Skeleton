@@ -12,7 +12,7 @@ from typing import Any, Mapping
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_walk_replay import (
-    MAX_WALK_EVENTS, MAX_WALK_RECEIPT_BYTES, compare_walk_sessions,
+    DIRECTIONS, MAX_WALK_EVENTS, MAX_WALK_RECEIPT_BYTES, compare_walk_sessions,
     export_walk_receipt, follow_walk_route, replay_walk,
     restore_walk_receipt, validate_walk_events, walk_branch_forecast,
     walk_checkpoint_timeline, walk_choice_previews, walk_narrative_continuity,
@@ -39,6 +39,15 @@ def _canonical(value: object) -> bytes:
 
 def _digest(value: object) -> str:
     return sha256(_canonical(value)).hexdigest()
+
+
+def _validate_tool_events(events: list[object]) -> None:
+    validate_walk_events(events)
+    for kind, value in events:
+        if kind == "move" and value not in DIRECTIONS:
+            raise StudioQuestError("unknown Jeeves walk direction")
+        if kind not in ("move", "choose"):
+            raise StudioQuestError("unknown Jeeves walk action")
 
 
 def tool_schema() -> dict[str, object]:
@@ -86,7 +95,7 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
     events = request.get("events")
     if type(events) is not list:
         raise StudioQuestError("Jeeves walk tool events must be a list")
-    validate_walk_events(events)
+    _validate_tool_events(events)
     depth = request.get("forecast_depth", 2)
     if (type(depth) is not int or not 1 <= depth <= 3
             or ("forecast_depth" in request and operation != "forecast")):
@@ -95,7 +104,7 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
     if operation == "compare":
         if type(comparison) is not list:
             raise StudioQuestError("compare requires a complete event list")
-        validate_walk_events(comparison)
+        _validate_tool_events(comparison)
     elif "compare_events" in request:
         raise StudioQuestError("compare_events requires compare operation")
     raw_receipt = request.get("receipt")
