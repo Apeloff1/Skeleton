@@ -348,7 +348,10 @@ def _parse_json(raw: str, label: str) -> Any:
 def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton combat")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("demo", help="Run a complete original offline encounter")\n    live = sub.add_parser("play", help="Interactively play an offline encounter")\n    live.add_argument("--scenario-json")\n    live.add_argument("--demo", action="store_true")
+    sub.add_parser("demo", help="Run a complete original offline encounter")
+    live = sub.add_parser("play", help="Interactively play an offline encounter")
+    live.add_argument("--scenario-json")
+    live.add_argument("--demo", action="store_true")
     start = sub.add_parser("simulate", help="Compile source and apply ordered actions")
     start.add_argument("--scenario-json", required=True)
     start.add_argument("--actions-json", required=True)
@@ -359,7 +362,13 @@ def cli(argv: Sequence[str]) -> int:
     resume.add_argument("--actions-json", required=True)
     try:
         args = parser.parse_args(list(argv))
-        if args.command == "play":\n            if bool(args.demo) == bool(args.scenario_json):\n                raise CombatSessionError("play needs exactly one of --demo or --scenario-json")\n            scenario = original_demo()[0] if args.demo else _parse_json(args.scenario_json, "scenario")\n            play_interactive(scenario)\n            return 0\n        if args.command == "demo":
+        if args.command == "play":
+            if bool(args.demo) == bool(args.scenario_json):
+                raise CombatSessionError("play needs exactly one of --demo or --scenario-json")
+            scenario = original_demo()[0] if args.demo else _parse_json(args.scenario_json, "scenario")
+            play_interactive(scenario)
+            return 0
+        if args.command == "demo":
             spec, actions = original_demo()
             result = simulate(spec, actions)
         elif args.command == "simulate":
