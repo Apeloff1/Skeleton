@@ -259,3 +259,26 @@ def test_original_canon_provenance_is_content_bound():
     del raw["canon_source"]["author"]
     with pytest.raises(GameplayContractError):
         NpcSchedule.parse(raw)
+
+
+def test_parsed_schedule_is_immutable_against_canon_mutation():
+    spec = schedule()
+    before = spec.digest
+    with pytest.raises(TypeError):
+        spec.canon_source["text"] = "counterfeit"
+    assert spec.digest == before
+
+
+def test_direct_schedule_constructor_enforces_source_and_route_invariants():
+    from skeleton.game.gameplay.npc_schedule import NpcRoute, NpcStop
+    spec = schedule()
+    with pytest.raises(GameplayContractError):
+        NpcSchedule(spec.world_id, spec.canon_digest,
+                    {"text": "forged", "origin": "project-original",
+                     "license_id": "CC0-1.0", "author": "Studio B"},
+                    spec.horizon_ticks, spec.initial_facts, spec.routes, spec.endings)
+    with pytest.raises(GameplayContractError):
+        NpcStop(8, 5, "gate", "talk", (), ())
+    with pytest.raises(GameplayContractError):
+        NpcRoute("duplicate", (spec.routes[0].stops[0],
+                               spec.routes[0].stops[0]))

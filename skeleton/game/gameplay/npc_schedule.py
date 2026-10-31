@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
 from .flgb_gameplay_runtime import (
@@ -50,6 +51,21 @@ class NpcStop:
     requires: tuple[str, ...]
     grants: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        _integer(self.start_tick, "start_tick", 0, MAX_HORIZON)
+        _integer(self.end_tick, "end_tick", 1, MAX_HORIZON + 1)
+        if self.end_tick <= self.start_tick:
+            raise GameplayContractError("empty NPC stop")
+        req_id(self.location_id, "location_id")
+        req_id(self.interaction_id, "interaction_id")
+        for name, facts in (("requires", self.requires), ("grants", self.grants)):
+            if type(facts) is not tuple or len(facts) > MAX_FACTS:
+                raise GameplayContractError(f"invalid {name} tuple")
+            if facts != tuple(sorted(set(facts))):
+                raise GameplayContractError(f"noncanonical {name}")
+            for fact in facts:
+                req_id(fact, name)
+
     @classmethod
     def parse(cls, raw: Any, horizon: int) -> "NpcStop":
         row = _keys(raw, {"start_tick", "end_tick", "location_id",
@@ -73,6 +89,19 @@ class NpcStop:
 class NpcRoute:
     npc_id: str
     stops: tuple[NpcStop, ...]
+
+    def __post_init__(self) -> None:
+        req_id(self.npc_id, "npc_id")
+        if (type(self.stops) is not tuple or not 1 <= len(self.stops) <= MAX_STOPS
+                or any(not isinstance(s, NpcStop) for s in self.stops)):
+            raise GameplayContractError("invalid NPC route stops")
+        if self.stops != tuple(sorted(self.stops,
+                                     key=lambda s: (s.start_tick, s.end_tick))):
+            raise GameplayContractError("noncanonical NPC stop order")
+        if any(a.end_tick > b.start_tick for a, b in zip(self.stops, self.stops[1:])):
+            raise GameplayContractError("overlapping NPC stops")
+        if len({s.interaction_id for s in self.stops}) != len(self.stops):
+            raise GameplayContractError("duplicate NPC interaction")
 
     @classmethod
     def parse(cls, raw: Any, horizon: int) -> "NpcRoute":
@@ -106,6 +135,18 @@ class NpcEnding:
     forbidden_facts: tuple[str, ...]
     priority: int
 
+    def __post_init__(self) -> None:
+        req_id(self.ending_id, "ending_id")
+        _integer(self.priority, "ending priority", 0, 1_000_000)
+        for name, facts in (("required_facts", self.required_facts),
+                            ("forbidden_facts", self.forbidden_facts)):
+            if type(facts) is not tuple or facts != tuple(sorted(set(facts))):
+                raise GameplayContractError(f"noncanonical {name}")
+            for fact in facts:
+                req_id(fact, name)
+        if not self.required_facts or set(self.required_facts) & set(self.forbidden_facts):
+            raise GameplayContractError("invalid ending condition")
+
     @classmethod
     def parse(cls, raw: Any) -> "NpcEnding":
         row = _keys(raw, {"ending_id", "required_facts", "forbidden_facts",
@@ -138,6 +179,43 @@ class NpcSchedule:
     initial_facts: tuple[str, ...]
     routes: tuple[NpcRoute, ...]
     endings: tuple[NpcEnding, ...]
+
+    def __post_init__(self) -> None:
+        req_id(self.world_id, "world_id")
+        req_digest(self.canon_digest, "canon_digest")
+        _integer(self.horizon_ticks, "horizon_ticks", 1, MAX_HORIZON)
+        source = _keys(dict(self.canon_source),
+                       {"text", "origin", "license_id", "author"}, "canon source")
+        if (source["origin"] != "project-original" or source["license_id"] != "CC0-1.0"
+                or type(source["text"]) is not str
+                or not 1 <= len(source["text"]) <= 4096
+                or type(source["author"]) is not str):
+            raise GameplayContractError("unsupported original canon provenance")
+        req_id(source["author"], "canon author")
+        if sha256(source["text"].encode("utf-8")).hexdigest() != self.canon_digest:
+            raise GameplayContractError("canon source digest mismatch")
+        object.__setattr__(self, "canon_source", MappingProxyType(dict(source)))
+        if (type(self.initial_facts) is not tuple
+                or self.initial_facts != tuple(sorted(set(self.initial_facts)))
+                or len(self.initial_facts) > MAX_FACTS):
+            raise GameplayContractError("noncanonical initial facts")
+        for fact in self.initial_facts:
+            req_id(fact, "initial fact")
+        if (type(self.routes) is not tuple or not 1 <= len(self.routes) <= MAX_NPCS
+                or any(not isinstance(r, NpcRoute) for r in self.routes)
+                or self.routes != tuple(sorted(self.routes, key=lambda r: r.npc_id))
+                or len({r.npc_id for r in self.routes}) != len(self.routes)):
+            raise GameplayContractError("noncanonical NPC routes")
+        if any(s.end_tick > self.horizon_ticks + 1
+               for route in self.routes for s in route.stops):
+            raise GameplayContractError("NPC stop exceeds horizon")
+        if (type(self.endings) is not tuple or not 1 <= len(self.endings) <= 64
+                or any(not isinstance(e, NpcEnding) for e in self.endings)
+                or self.endings != tuple(sorted(self.endings,
+                                                 key=lambda e: (-e.priority, e.ending_id)))
+                or len({e.ending_id for e in self.endings}) != len(self.endings)
+                or len({e.priority for e in self.endings}) != len(self.endings)):
+            raise GameplayContractError("noncanonical NPC endings")
 
     @classmethod
     def parse(cls, raw: Any) -> "NpcSchedule":
