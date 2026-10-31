@@ -14,8 +14,7 @@ from typing import Any
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.combat_tournament import (
-    SCHEMA as TOURNAMENT_SCHEMA, finish_tournament,
-    normalize_tournament, original_tournament,
+    finish_tournament, normalize_tournament, original_tournament,
 )
 from skeleton.game.gameplay.turn_combat import (
     CombatSessionError, MAX_CLI_BYTES, _id, _integer, _object, _parse_json,
