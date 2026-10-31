@@ -9,7 +9,7 @@ from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.fair_stream_session import DispatchPermit
 from skeleton.ai.model_runtime.native_fair_stream_backend import (
     NativeFairStreamBackend, NativeFairStreamDenied, NativePromptRegistry,
-    PinnedNativePrompt, pin_native_prompt,
+    pin_native_prompt,
 )
 from skeleton.app.offline_native_fair_stream import stage_native_cpu_prompt
 
