@@ -26,7 +26,7 @@ from .fair_stream_result_vault import (
     SealedFairStreamResultVault,
 )
 from .fair_stream_session import DispatchPermit
-from .private_sqlite import PrivateSQLiteHandle
+from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
 
 SCHEMA = "skeleton.ai.fair-stream-result-read-grant.v1"
 MAX_GRANT_BYTES = 1024
@@ -215,8 +215,12 @@ class AuthorizedSealedResultReader:
         method. A consumed grant remains consumed if decryption later fails.
         """
         with self._lock:
-            if self._handle._closed or self._connection.in_transaction:
+            if self._connection.in_transaction:
                 raise ResultReadDenied("grant ledger unavailable")
+            try:
+                self._handle.assert_current()
+            except PrivateSQLiteUnavailable as exc:
+                raise ResultReadDenied("grant ledger inode custody changed") from exc
             try:
                 receipt = self._journal.recover_committed_receipt(permit)
             except (ValueError, RuntimeError, sqlite3.Error) as exc:

@@ -86,7 +86,53 @@ class PrivateSQLiteHandle:
     connection: sqlite3.Connection
     _file_fd: int
     _directory_fd: int
+    _filename: str
+    _max_database_bytes: int
     _closed: bool = False
+
+    def assert_current(self) -> None:
+        """Revalidate the exact opened inode before sensitive operations.
+
+        This catches rename/symlink replacement, permission changes and
+        unexpected SQLite reattachment after the initial openat check.
+        It does not defend against a malicious same-UID process racing
+        between checks; app-account isolation is still mandatory.
+        """
+        if self._closed:
+            raise PrivateSQLiteUnavailable("private SQLite handle closed")
+        try:
+            directory = os.fstat(self._directory_fd)
+            if (not stat.S_ISDIR(directory.st_mode)
+                    or directory.st_uid != os.geteuid()
+                    or directory.st_mode & 0o077):
+                raise PrivateSQLiteUnavailable("private directory custody changed")
+            fd_info = os.fstat(self._file_fd)
+            entry = os.stat(
+                self._filename, dir_fd=self._directory_fd,
+                follow_symlinks=False,
+            )
+            _check_file(fd_info, self._max_database_bytes)
+            _check_file(entry, self._max_database_bytes)
+            if (fd_info.st_dev, fd_info.st_ino) != (
+                entry.st_dev, entry.st_ino,
+            ):
+                raise PrivateSQLiteUnavailable("SQLite path inode replaced")
+            databases = self.connection.execute("PRAGMA database_list").fetchall()
+            if (len(databases) != 1 or databases[0][1] != "main"
+                    or not databases[0][2]):
+                raise PrivateSQLiteUnavailable("unexpected SQLite attachment")
+            actual = os.stat(databases[0][2], follow_symlinks=False)
+            if (actual.st_dev, actual.st_ino) != (
+                fd_info.st_dev, fd_info.st_ino,
+            ):
+                raise PrivateSQLiteUnavailable("SQLite backing inode changed")
+            page_size = self.connection.execute("PRAGMA page_size").fetchone()[0]
+            pages = self.connection.execute("PRAGMA page_count").fetchone()[0]
+            if (type(page_size) is not int or type(pages) is not int
+                    or pages * page_size > self._max_database_bytes):
+                raise PrivateSQLiteUnavailable("SQLite page budget exceeded")
+        except (OSError, sqlite3.Error) as exc:
+            raise PrivateSQLiteUnavailable("private SQLite custody unavailable") from exc
 
     def close(self) -> None:
         if self._closed:
@@ -208,7 +254,9 @@ def open_private_sqlite(
         connection.execute("PRAGMA journal_size_limit = 65536")
         if connection.execute("PRAGMA quick_check(1)").fetchone()[0] != "ok":
             raise PrivateSQLiteUnavailable("SQLite integrity check failed")
-        return PrivateSQLiteHandle(connection, file_fd, dir_fd)
+        return PrivateSQLiteHandle(
+            connection, file_fd, dir_fd, filename, max_database_bytes,
+        )
     except BaseException:
         if connection is not None:
             connection.close()

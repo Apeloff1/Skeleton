@@ -190,3 +190,41 @@ def test_failed_app_bootstrap_closes_owned_connection(private_dir):
         assert opened.connection.execute(
             "SELECT COUNT(*) FROM local_fair_stream_custody"
         ).fetchone() == (1,)
+
+
+def test_live_handle_rejects_renamed_and_replaced_inode(private_dir):
+    path = private_dir / "fair-stream.db"
+    with open_private_sqlite(private_dir, create=True) as handle:
+        handle.assert_current()
+        path.rename(private_dir / "old.db")
+        path.write_bytes(b"replacement")
+        path.chmod(0o600)
+        with pytest.raises(PrivateSQLiteUnavailable, match="inode replaced"):
+            handle.assert_current()
+
+
+def test_live_handle_rejects_permission_drift(private_dir):
+    path = private_dir / "fair-stream.db"
+    with open_private_sqlite(private_dir, create=True) as handle:
+        path.chmod(0o640)
+        with pytest.raises(PrivateSQLiteUnavailable, match="inode"):
+            handle.assert_current()
+        path.chmod(0o600)
+        handle.assert_current()
+
+
+def test_live_handle_rejects_hardlink_added_after_open(private_dir):
+    path = private_dir / "fair-stream.db"
+    with open_private_sqlite(private_dir, create=True) as handle:
+        os.link(path, private_dir / "alias.db")
+        with pytest.raises(PrivateSQLiteUnavailable, match="inode"):
+            handle.assert_current()
+
+
+def test_live_handle_rejects_directory_permission_drift(private_dir):
+    with open_private_sqlite(private_dir, create=True) as handle:
+        private_dir.chmod(0o750)
+        with pytest.raises(PrivateSQLiteUnavailable, match="directory custody"):
+            handle.assert_current()
+        private_dir.chmod(0o700)
+        handle.assert_current()

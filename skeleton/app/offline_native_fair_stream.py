@@ -7,6 +7,7 @@ keys. No default secrets, GPU qualification or automatic restart replay.
 from __future__ import annotations
 
 import os
+import stat
 
 from skeleton.ai.model_runtime.fair_stream_execution_journal import (
     FairStreamExecutionJournal, JournaledExecutionOwner,
@@ -43,7 +44,13 @@ def bind_native_cpu_result_owner(
     db_rows = journal._connection.execute("PRAGMA database_list").fetchall()
     if len(db_rows) != 1 or db_rows[0][1] != "main" or not db_rows[0][2]:
         raise ValueError("file-backed private execution journal required")
+    result_handle.assert_current()
     journal_info = os.stat(db_rows[0][2], follow_symlinks=False)
+    if (not stat.S_ISREG(journal_info.st_mode)
+            or journal_info.st_uid != os.geteuid()
+            or journal_info.st_nlink != 1
+            or journal_info.st_mode & 0o777 != 0o600):
+        raise ValueError("untrusted private execution journal inode")
     result_info = os.fstat(result_handle._file_fd)
     if (journal_info.st_dev, journal_info.st_ino) == (
         result_info.st_dev, result_info.st_ino,

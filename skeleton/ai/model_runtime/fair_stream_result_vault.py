@@ -21,7 +21,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .fair_stream_session import DispatchPermit
-from .private_sqlite import PrivateSQLiteHandle
+from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
 
 SCHEMA = "skeleton.ai.fair-stream-result-vault.v1"
 MAX_RESULT_BYTES = 1 << 20
@@ -165,8 +165,10 @@ class SealedFairStreamResultVault:
             raise SealedResultUnavailable("untrusted result table trigger")
 
     def _require_open(self) -> None:
-        if self._handle._closed:
-            raise SealedResultUnavailable("result database handle closed")
+        try:
+            self._handle.assert_current()
+        except PrivateSQLiteUnavailable as exc:
+            raise SealedResultUnavailable("result database custody changed") from exc
         if self._connection.in_transaction:
             raise SealedResultUnavailable("shared SQLite transaction forbidden")
 
