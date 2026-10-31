@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/object_integrity.schema.json",
+  "title": "storage.object_integrity observation contract",
+  "description": "Reject damaged objects",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash_mismatch_count",
+        "unverified_objects"
+      ],
+      "properties": {
+        "hash_mismatch_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for hash_mismatch_count"
+        },
+        "unverified_objects": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unverified_objects"
+        }
+      }
+    }
+  }
+}

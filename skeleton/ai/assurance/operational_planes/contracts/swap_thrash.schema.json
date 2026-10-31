@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/swap_thrash.schema.json",
+  "title": "hardware.swap_thrash observation contract",
+  "description": "Detect paging thrash",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "swap_io_mbps",
+        "major_faults_per_second"
+      ],
+      "properties": {
+        "swap_io_mbps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1500,
+          "description": "Upper bound for swap_io_mbps"
+        },
+        "major_faults_per_second": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 120,
+          "description": "Upper bound for major_faults_per_second"
+        }
+      }
+    }
+  }
+}

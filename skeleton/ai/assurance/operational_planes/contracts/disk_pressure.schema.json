@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/disk_pressure.schema.json",
+  "title": "storage.disk_pressure observation contract",
+  "description": "Guard disk writes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disk_used_pct",
+        "disk_write_p99_ms"
+      ],
+      "properties": {
+        "disk_used_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 94,
+          "description": "Upper bound for disk_used_pct"
+        },
+        "disk_write_p99_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600,
+          "description": "Upper bound for disk_write_p99_ms"
+        }
+      }
+    }
+  }
+}

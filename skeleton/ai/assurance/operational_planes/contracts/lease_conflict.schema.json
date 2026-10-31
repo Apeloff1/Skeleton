@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/lease_conflict.schema.json",
+  "title": "agents.lease_conflict observation contract",
+  "description": "Guard lease exclusivity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lease_conflicts_per_min",
+        "unresolved_lease_count"
+      ],
+      "properties": {
+        "lease_conflicts_per_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Upper bound for lease_conflicts_per_min"
+        },
+        "unresolved_lease_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unresolved_lease_count"
+        }
+      }
+    }
+  }
+}

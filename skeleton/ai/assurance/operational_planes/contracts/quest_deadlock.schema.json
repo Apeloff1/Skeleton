@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/quest_deadlock.schema.json",
+  "title": "gameworld.quest_deadlock observation contract",
+  "description": "Detect quest deadlocks",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unreachable_quest_goals",
+        "unresolvable_quest_states"
+      ],
+      "properties": {
+        "unreachable_quest_goals": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unreachable_quest_goals"
+        },
+        "unresolvable_quest_states": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unresolvable_quest_states"
+        }
+      }
+    }
+  }
+}
