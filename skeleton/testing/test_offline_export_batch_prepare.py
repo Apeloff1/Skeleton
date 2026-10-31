@@ -185,3 +185,71 @@ def test_concurrent_sibling_during_atomic_link_rolls_back_own_index(unpublished,
         prepare_export_batch(root, entries=entries, authorized=True)
     assert not (root / "batch.json").exists()
     assert not any(path.name.startswith(".batch-") for path in root.iterdir())
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-relative source identity")
+def test_prepare_rejects_verified_package_replacement_before_publication(unpublished, monkeypatch, tmp_path):
+    import shutil
+    import skeleton.ai.game_builder.offline_export_batch_prepare as module
+
+    root, entries = unpublished
+    original = module.verify_exported_package
+    replaced = False
+
+    def replace_after_replay(*args, **kwargs):
+        nonlocal replaced
+        result = original(*args, **kwargs)
+        if not replaced:
+            replaced = True
+            moved = tmp_path / "moved-package-001"
+            (root / "package-001").rename(moved)
+            shutil.copytree(moved, root / "package-001")
+        return result
+
+    monkeypatch.setattr(module, "verify_exported_package", replace_after_replay)
+    with pytest.raises(OfflineBatchVerificationError, match="directory changed"):
+        prepare_export_batch(root, entries=entries, authorized=True)
+    assert not (root / "batch.json").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-relative source identity")
+def test_prepare_rejects_root_path_replacement_before_publication(unpublished, monkeypatch, tmp_path):
+    import skeleton.ai.game_builder.offline_export_batch_prepare as module
+
+    root, entries = unpublished
+    original = module.verify_exported_package
+    moved = tmp_path / "original-cohort"
+    swapped = False
+
+    def swap_root_after_replay(*args, **kwargs):
+        nonlocal swapped
+        result = original(*args, **kwargs)
+        if not swapped:
+            swapped = True
+            root.rename(moved)
+            root.mkdir(mode=0o700)
+        return result
+
+    monkeypatch.setattr(module, "verify_exported_package", swap_root_after_replay)
+    with pytest.raises(OfflineBatchVerificationError, match="batch preparation rejected"):
+        prepare_export_batch(root, entries=entries, authorized=True)
+    assert not (root / "batch.json").exists()
+    assert not (moved / "batch.json").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-relative source identity")
+def test_prepare_rolls_back_own_published_index_on_root_swap(unpublished, monkeypatch, tmp_path):
+    root, entries = unpublished
+    original_link = os.link
+    moved = tmp_path / "original-cohort"
+
+    def swap_after_link(*args, **kwargs):
+        original_link(*args, **kwargs)
+        root.rename(moved)
+        root.mkdir(mode=0o700)
+
+    monkeypatch.setattr(os, "link", swap_after_link)
+    with pytest.raises(OfflineBatchVerificationError, match="batch preparation rejected"):
+        prepare_export_batch(root, entries=entries, authorized=True)
+    assert not (root / "batch.json").exists()
+    assert not (moved / "batch.json").exists()

@@ -16,7 +16,8 @@ from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
 from .dual_runtime_verify import (
-    DualRuntimeVerificationError, _bounded_names, _canonical_bytes, _child_fd, _root_fd,
+    DualRuntimeVerificationError, _assert_original_root, _bounded_names,
+    _canonical_bytes, _child_fd, _root_fd,
     verify_exported_package,
 )
 from .offline_export_batch import (
@@ -70,9 +71,12 @@ def prepare_export_batch(
         if set(_bounded_names(root_fd, MAX_PACKAGES)) != set(directories):
             raise OfflineBatchVerificationError("batch root has unlisted or missing entries")
         replay_digests: list[str] = []
+        package_inodes: dict[str, tuple[int, int]] = {}
         for project_id, directory, pin in ordered:
             child_fd = _child_fd(root_fd, (directory,), directory=True)
             try:
+                info = os.fstat(child_fd)
+                package_inodes[directory] = (info.st_dev, info.st_ino)
                 result = verify_exported_package(
                     child_fd, expected_manifest_sha256=pin, authorized=True,
                 )
@@ -90,6 +94,23 @@ def prepare_export_batch(
                 "batch root changed during replay before publication"
             )
 
+        # Reopening from the anchored root detects rename-and-replace of a
+        # previously verified package, even if the new package has the same
+        # name and bytes. Also reject a root path replaced after replay.
+        def assert_source_identity() -> None:
+            _assert_original_root(root, root_fd)
+            for directory in directories:
+                reopened = _child_fd(root_fd, (directory,), directory=True)
+                try:
+                    current = os.fstat(reopened)
+                    if (current.st_dev, current.st_ino) != package_inodes[directory]:
+                        raise OfflineBatchVerificationError(
+                            "verified package directory changed before publication"
+                        )
+                finally:
+                    os.close(reopened)
+
+        assert_source_identity()
         temporary = ".batch-" + secrets.token_hex(16)
         temp_fd = -1
         published = False
@@ -110,6 +131,9 @@ def prepare_export_batch(
             os.fsync(temp_fd)
             os.close(temp_fd)
             temp_fd = -1
+            # A package/root swap during the temporary write must not be
+            # stamped with a trusted index just because the names still match.
+            assert_source_identity()
             # link() rejects an existing batch.json, unlike rename() which may
             # silently overwrite a concurrent publisher's index.
             os.link(
@@ -135,6 +159,7 @@ def prepare_export_batch(
                     "batch root changed during atomic publication"
                 )
             os.fsync(root_fd)
+            assert_source_identity()
         except BaseException:
             if temp_fd >= 0:
                 os.close(temp_fd)
