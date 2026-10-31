@@ -390,11 +390,31 @@ def install(root: str | Path, destination: str | Path) -> Path:
                 "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
                 else "llama-cli"
             )
+            expected_assets = {
+                "model/deployment.json", "model/model.gguf",
+                "runtime/" + runtime_name,
+            }
+            pinned_assets = {
+                item["path"]: item for item in manifest["files"]
+                if item["path"].startswith(("model/", "runtime/"))
+            }
+            if set(pinned_assets) != expected_assets:
+                raise OfflineKitError("offline model asset inventory differs from manifest")
+            for relative, item in pinned_assets.items():
+                copied = assets / relative
+                _regular(copied)
+                if (copied.stat().st_size != item["size_bytes"]
+                        or _hash(copied) != item["sha256"]):
+                    raise OfflineKitError("copied model artifact differs from pinned manifest")
             if (
-                _hash(assets / "model" / "model.gguf") != local["model_sha256"]
+                local.get("schema_version") != "skeleton.local_model.deployment.v1"
+                or local.get("runtime_kind") != "llama.cpp-cli"
+                or local.get("model_path") != "model.gguf"
+                or local.get("executable_path") != "../runtime/" + runtime_name
+                or _hash(assets / "model" / "model.gguf") != local["model_sha256"]
                 or _hash(assets / "runtime" / runtime_name) != local["executable_sha256"]
             ):
-                raise OfflineKitError("copied model or local runtime digest differs")
+                raise OfflineKitError("copied model or local runtime contract differs")
         # Validate the actual install, not only subprocess exit code.
         if not python.is_file():
             raise OfflineKitError("offline installation created no Python runtime")

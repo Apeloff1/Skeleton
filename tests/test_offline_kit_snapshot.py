@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 
@@ -95,3 +96,55 @@ def test_installer_resolves_only_private_snapshot_not_original_kit(tmp_path, mon
     assert len(seen) == 1
     assert not seen[0].exists()
     assert target.is_dir()
+
+
+def test_install_rejects_copied_model_tampering_and_rolls_back(tmp_path, monkeypatch):
+    root, manifest, wheel = _kit(tmp_path)
+    model = root / "model"
+    runtime = root / "runtime"
+    model.mkdir()
+    runtime.mkdir()
+    runtime_name = "llama-cli.exe" if os.name == "nt" else "llama-cli"
+    (model / "model.gguf").write_bytes(b"original local model")
+    (runtime / runtime_name).write_bytes(b"original native runtime")
+    deployment = {
+        "schema_version": "skeleton.local_model.deployment.v1",
+        "runtime_kind": "llama.cpp-cli",
+        "model_path": "model.gguf",
+        "executable_path": "../runtime/" + runtime_name,
+        "model_sha256": hashlib.sha256((model / "model.gguf").read_bytes()).hexdigest(),
+        "executable_sha256": hashlib.sha256((runtime / runtime_name).read_bytes()).hexdigest(),
+    }
+    (model / "deployment.json").write_text(json.dumps(deployment))
+    manifest["gguf_included"] = True
+    for relative in ("model/deployment.json", "model/model.gguf", "runtime/" + runtime_name):
+        data = (root / relative).read_bytes()
+        manifest["files"].append({
+            "path": relative,
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "size_bytes": len(data),
+        })
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+
+    def fake_create(self, destination):
+        executable = Path(destination) / (
+            "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        )
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"test python")
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fake_create)
+    monkeypatch.setattr(offline_kit.subprocess, "run", lambda *args, **kwargs: None)
+    original_copytree = offline_kit.shutil.copytree
+
+    def tamper_copytree(source, destination, **kwargs):
+        copied = original_copytree(source, destination, **kwargs)
+        if Path(source).name == "model":
+            (Path(destination) / "model.gguf").write_bytes(b"attacker-replaced")
+        return copied
+
+    monkeypatch.setattr(offline_kit.shutil, "copytree", tamper_copytree)
+    target = tmp_path / "installed"
+    with pytest.raises(offline_kit.OfflineKitError, match="pinned manifest"):
+        offline_kit.install(root, target)
+    assert not target.exists()
