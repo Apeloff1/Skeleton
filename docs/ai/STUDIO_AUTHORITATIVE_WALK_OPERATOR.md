@@ -632,3 +632,16 @@ oversized saves fail closed. The restore path never writes to the filesystem.
 Typed Jeeves parity is `execute_dialogue_restore_tool` with schema
 `skeleton.jeeves.studio_dialogue_restore_request.v1`. Canonical replay
 remains the sole authority; this does not claim native engine qualification.
+
+## Source-bound authored NPC dialogue transcript
+
+`--project <id> --dialogue-stage --dialogue-transcript` renders exact
+original NPC/scene cue history from replayed quest decisions. Supply
+`--dialogue-actions` for the saved choice history, and optionally
+`--dialogue-transcript-offset`, `--dialogue-transcript-limit` (1..16),
+and `--dialogue-transcript-expected-session` for digest-leased pagination.
+A verified `--dialogue-revision-source` preserves edited source provenance.
+No generated speech, earned testimony, native engine or release qualification
+is implied. The typed Jeeves operation is
+`execute_dialogue_transcript_tool`; regression tests are in
+`tests/test_studio_ecosystem_dialogue_transcript.py`.

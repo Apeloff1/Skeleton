@@ -1100,3 +1100,77 @@ def execute_dialogue_restore_tool(request: Mapping[str, Any], *,
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_TRANSCRIPT_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_transcript_request.v1"
+DIALOGUE_TRANSCRIPT_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_transcript_result.v1"
+
+
+def dialogue_transcript_tool_schema() -> dict[str, object]:
+    """Typed authored NPC conversation history with digest-bound pagination."""
+    return {
+        "name": "studio_dialogue_transcript",
+        "description": "Page original NPC scene cues and replayed choices without claiming speech",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_TRANSCRIPT_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "offset": {"type": "integer", "minimum": 0, "maximum": 64},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 16},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                          "items": {"type": "object"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_dialogue_transcript_tool(request: Mapping[str, Any], *,
+                                     authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue transcript requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    optional = {"scene_id", "offset", "limit", "expected_session_digest", "edits"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - optional
+            or request.get("schema") != DIALOGUE_TRANSCRIPT_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue transcript request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_transcript import (
+        compile_dialogue_transcript,
+    )
+    source = read_blueprint(request["project_id"])
+    expected = request["expected_source_digest"]
+    author_receipt = None
+    if "edits" in request:
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            REVISION_SCHEMA, preview_canon_revision,
+        )
+        source, _, author_receipt = preview_canon_revision(
+            source, {
+                "schema": REVISION_SCHEMA, "project_id": request["project_id"],
+                "expected_source_digest": expected, "edits": request["edits"],
+            }, authorized=True)
+        expected = author_receipt["revised_source_digest"]
+    detail = compile_dialogue_transcript(
+        source, request["actions"], authorized=True,
+        expected_source_digest=expected,
+        expected_session_digest=request.get("expected_session_digest"),
+        offset=request.get("offset", 0), limit=request.get("limit", 16),
+        scene_id=request.get("scene_id"))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_TRANSCRIPT_RESULT_SCHEMA,
+        "project_id": request["project_id"], "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    if author_receipt is not None:
+        payload["author_receipt"] = author_receipt
+    payload["result_digest"] = _digest(payload)
+    return payload
