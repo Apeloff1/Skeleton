@@ -108,11 +108,13 @@ class ServingResources:
     io_full_stall_fraction: float | None = None
     swap_used_fraction: float | None = None
     swap_available_bytes: int | None = None
+    commit_used_fraction: float | None = None
+    commit_available_bytes: int | None = None
     thermal_level: str | None = None
     thermal_headroom_c: float | None = None
 
     def __post_init__(self) -> None:
-        for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction", "io_stall_fraction", "io_full_stall_fraction", "swap_used_fraction"):
+        for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction", "io_stall_fraction", "io_full_stall_fraction", "swap_used_fraction", "commit_used_fraction"):
             value = getattr(self, name)
             if value is not None and (
                 isinstance(value, bool)
@@ -122,7 +124,7 @@ class ServingResources:
                 or (name != "cpu_load_fraction" and value > 1)
             ):
                 raise ValueError(f"{name} must be a finite non-negative resource measurement")
-        for name in ("process_rss_bytes", "available_memory_bytes", "swap_available_bytes"):
+        for name in ("process_rss_bytes", "available_memory_bytes", "swap_available_bytes", "commit_available_bytes"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative byte count")
@@ -211,6 +213,8 @@ class AdaptiveServingController:
         full_stall = resources.memory_full_stall_fraction
         io_stall = resources.io_stall_fraction
         io_full_stall = resources.io_full_stall_fraction
+        commit_fraction = resources.commit_used_fraction
+        commit_critical = commit_fraction is not None and commit_fraction >= 0.97
         io_critical = (
             (io_stall is not None and io_stall >= 0.70)
             or (io_full_stall is not None and io_full_stall >= 0.30)
@@ -223,7 +227,7 @@ class AdaptiveServingController:
             or (full_stall is not None and full_stall >= 0.10)
         )
         thermal_critical = resources.thermal_level == "critical"
-        critical = memory_critical or stall_critical or thermal_critical or io_critical
+        critical = memory_critical or stall_critical or thermal_critical or io_critical or commit_critical
         reason = "within_operator_limits"
         if memory_critical:
             reason = "memory_critical"
@@ -233,8 +237,12 @@ class AdaptiveServingController:
             reason = "thermal_critical"
         elif io_critical:
             reason = "io_stall_critical"
+        elif commit_critical:
+            reason = "windows_commit_critical"
         elif resources.thermal_level == "elevated":
             reason = "thermal_pressure"
+        elif commit_fraction is not None and commit_fraction >= 0.90:
+            reason = "windows_commit_pressure"
         elif (
             (io_stall is not None and io_stall >= 0.30)
             or (io_full_stall is not None and io_full_stall >= 0.10)
@@ -262,7 +270,7 @@ class AdaptiveServingController:
         capacity_observed = (
             memory is not None or partial_stall is not None or full_stall is not None
             or io_stall is not None or io_full_stall is not None
-            or resources.thermal_level is not None
+            or resources.thermal_level is not None or commit_fraction is not None
         )
         healthy = (
             capacity_observed
@@ -271,6 +279,7 @@ class AdaptiveServingController:
             and (full_stall is None or full_stall <= 0.01)
             and (io_stall is None or io_stall <= 0.05)
             and (io_full_stall is None or io_full_stall <= 0.01)
+            and (commit_fraction is None or commit_fraction <= 0.80)
             and resources.thermal_level in {None, "normal"}
             and (cpu is None or cpu < 0.85)
             and self.failure_ewma < 0.1

@@ -54,6 +54,7 @@ from .linux_pressure import read_linux_memory_pressure
 from .linux_thermal import sample_linux_thermal
 from .linux_io_pressure import read_linux_io_pressure
 from .linux_swap import read_linux_swap
+from .windows_commit import probe_windows_commit
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -1253,6 +1254,8 @@ def _sample_windows_resources() -> ServingResources:
 
     memory = available = rss = cpu = None
     sources: list[str] = []
+    commit = probe_windows_commit()
+    sources.append(commit.source)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     psapi = ctypes.WinDLL("psapi", use_last_error=True)
 
@@ -1357,7 +1360,11 @@ def _sample_windows_resources() -> ServingResources:
     kernel.IsProcessInJob.restype = wintypes.BOOL
     in_job = wintypes.BOOL()
     if not kernel.IsProcessInJob(process, None, ctypes.byref(in_job)):
-        return ServingResources(None, None, rss, None, ",".join(sources + ["windows_job_unknown"]))
+        return ServingResources(
+            None, None, rss, None, ",".join(sources + ["windows_job_unknown"]),
+            commit_used_fraction=commit.used_fraction,
+            commit_available_bytes=commit.available_bytes,
+        )
     if in_job.value:
 
         class BasicLimits(ctypes.Structure):
@@ -1474,7 +1481,11 @@ def _sample_windows_resources() -> ServingResources:
         else:
             cpu = None
             sources.append("windows_job_cpu_unknown")
-    return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+    return ServingResources(
+        memory, cpu, rss, available, ",".join(sources),
+        commit_used_fraction=commit.used_fraction,
+        commit_available_bytes=commit.available_bytes,
+    )
 
 
 def _sample_darwin_resources() -> ServingResources:
