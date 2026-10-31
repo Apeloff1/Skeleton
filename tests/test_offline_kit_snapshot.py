@@ -148,3 +148,25 @@ def test_install_rejects_copied_model_tampering_and_rolls_back(tmp_path, monkeyp
     with pytest.raises(offline_kit.OfflineKitError, match="pinned manifest"):
         offline_kit.install(root, target)
     assert not target.exists()
+
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor traversal")
+def test_snapshot_rejects_symlinked_kit_parent(tmp_path):
+    root, manifest, _ = _kit(tmp_path)
+    actual = tmp_path / "actual-kit"
+    root.rename(actual)
+    root.symlink_to(actual, target_is_directory=True)
+    with pytest.raises(offline_kit.OfflineKitError, match="unable to create"):
+        offline_kit._snapshot_wheels(root, manifest, tmp_path / "snapshot")
+    assert not (tmp_path / "snapshot").exists()
+
+
+def test_snapshot_directory_flood_rejected_without_private_output(tmp_path):
+    root, manifest, _ = _kit(tmp_path)
+    for index in range(128):
+        (root / "wheelhouse" / f"unlisted-{index:04d}.whl").write_bytes(b"x")
+    snapshot = tmp_path / "snapshot"
+    with pytest.raises(offline_kit.OfflineKitError, match="differs"):
+        offline_kit._snapshot_wheels(root, manifest, snapshot)
+    assert not snapshot.exists()

@@ -261,6 +261,39 @@ def verify(root: str | Path) -> dict[str, object]:
 
 
 
+def _open_directory_without_symlink_parents(path: Path) -> int:
+    """Pin every POSIX path component by descriptor, rejecting parent symlinks."""
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise OfflineKitError("descriptor-safe directory opening unavailable")
+    absolute = os.path.abspath(os.fspath(path))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    current = os.open("/", flags)
+    try:
+        for component in absolute.split("/")[1:]:
+            if not component:
+                continue
+            following = os.open(component, flags, dir_fd=current)
+            os.close(current)
+            current = following
+        return current
+    except BaseException:
+        os.close(current)
+        raise
+
+
+def _bounded_wheel_names(directory: int | Path, maximum: int) -> list[str]:
+    """Stop after the first unlisted wheel, not after a huge list allocation."""
+    names: list[str] = []
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            if len(names) >= maximum:
+                raise OfflineKitError("wheelhouse differs from pinned manifest")
+            names.append(entry.name)
+    return sorted(names)
+
+
 def _snapshot_wheels(kit: Path, manifest: dict[str, object], snapshot: Path) -> None:
     """Copy only pinned wheel bytes into a private resolver input directory.
 
@@ -278,12 +311,11 @@ def _snapshot_wheels(kit: Path, manifest: dict[str, object], snapshot: Path) -> 
     directory_fd = None
     try:
         if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
-            directory_fd = os.open(
-                source_root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
-            )
-        names = sorted(os.listdir(
-            directory_fd if directory_fd is not None else source_root
-        ))
+            directory_fd = _open_directory_without_symlink_parents(source_root)
+        names = _bounded_wheel_names(
+            directory_fd if directory_fd is not None else source_root,
+            len(expected),
+        )
         if set(names) != set(expected):
             raise OfflineKitError("wheelhouse differs from pinned manifest")
         snapshot.mkdir(mode=0o700)
@@ -322,8 +354,9 @@ def _snapshot_wheels(kit: Path, manifest: dict[str, object], snapshot: Path) -> 
                     raise OfflineKitError("private wheel snapshot digest mismatch")
                 if directory_fd is None and (source_root / name).is_symlink():
                     raise OfflineKitError("wheel became a symlink during snapshot")
-        if set(os.listdir(
-            directory_fd if directory_fd is not None else source_root
+        if set(_bounded_wheel_names(
+            directory_fd if directory_fd is not None else source_root,
+            len(expected),
         )) != set(names):
             raise OfflineKitError("wheelhouse changed during snapshot")
     except OSError as exc:
