@@ -40,6 +40,11 @@ def check_parity(root: Path = ROOT) -> dict[str, object]:
     for name in REQUIRED:
         original = root / CANONICAL / name
         mirror = root / MIRROR / name
+        # is_file() follows symlinks: a redirected file must not satisfy
+        # canonical/mirror custody even when its target has identical bytes.
+        if original.is_symlink() or mirror.is_symlink():
+            records.append({"name": name, "status": "symlink"})
+            continue
         if not original.is_file() or not mirror.is_file():
             records.append({"name": name, "status": "missing"})
             continue
