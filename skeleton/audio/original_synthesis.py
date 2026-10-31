@@ -62,7 +62,7 @@ class SoundPatch:
         if type(source["version"]) is not int or source["version"] != 1:
             raise AudioError("unsupported sound patch version")
         patch_id = _text(source["patch_id"], "patch_id")
-        if not re.fullmatch(r"SFX\\.[A-Z0-9_.:-]{1,120}", patch_id):
+        if not re.fullmatch(r"SFX\.[A-Z0-9_.:-]{1,120}", patch_id):
             raise AudioError("sound patch ID must begin SFX.")
         author = _text(source["author"], "author")
         if source["license"] != "CC0-1.0":
