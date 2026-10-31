@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "frontier_mining_lamps",
+  "domain": "frontier",
+  "commodity": "mining_lamps",
+  "pricing": {
+    "base": 89,
+    "markup_percent": 125,
+    "tariff": 0,
+    "capacity": 276
+  },
+  "initial": {
+    "stock": 69,
+    "treasury": 6664,
+    "holdings": 0,
+    "wallet": 6664,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "frontier_mining_lamps:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "frontier_mining_lamps:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "frontier_mining_lamps:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

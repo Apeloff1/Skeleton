@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "technology_data_slates",
+  "domain": "technology",
+  "commodity": "data_slates",
+  "pricing": {
+    "base": 122,
+    "markup_percent": 120,
+    "tariff": 4,
+    "capacity": 353
+  },
+  "initial": {
+    "stock": 47,
+    "treasury": 7907,
+    "holdings": 0,
+    "wallet": 7907,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "technology_data_slates:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "technology_data_slates:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "technology_data_slates:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
