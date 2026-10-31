@@ -53,6 +53,7 @@ from .adaptive_serving import AdaptiveServingController, ServingResources
 from .linux_pressure import read_linux_memory_pressure
 from .linux_thermal import sample_linux_thermal
 from .linux_io_pressure import read_linux_io_pressure
+from .linux_swap import read_linux_swap
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -1227,6 +1228,10 @@ def _sample_linux_resources() -> ServingResources:
         _resource_text, cgroup_directory=unified[0] if unified is not None else None
     )
     sources.append(io_pressure.source)
+    swap = read_linux_swap(
+        _resource_text, cgroup_directory=unified[0] if unified is not None else None
+    )
+    sources.append(swap.source)
     thermal = sample_linux_thermal(_resource_text)
     sources.append(thermal.source)
     return ServingResources(
@@ -1235,6 +1240,8 @@ def _sample_linux_resources() -> ServingResources:
         memory_full_stall_fraction=pressure.full_avg10,
         io_stall_fraction=io_pressure.some_avg10,
         io_full_stall_fraction=io_pressure.full_avg10,
+        swap_used_fraction=swap.used_fraction,
+        swap_available_bytes=swap.available_bytes,
         thermal_level=thermal.level,
         thermal_headroom_c=thermal.minimum_headroom_c,
     )

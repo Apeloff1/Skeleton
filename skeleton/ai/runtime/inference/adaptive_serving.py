@@ -106,11 +106,13 @@ class ServingResources:
     memory_full_stall_fraction: float | None = None
     io_stall_fraction: float | None = None
     io_full_stall_fraction: float | None = None
+    swap_used_fraction: float | None = None
+    swap_available_bytes: int | None = None
     thermal_level: str | None = None
     thermal_headroom_c: float | None = None
 
     def __post_init__(self) -> None:
-        for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction", "io_stall_fraction", "io_full_stall_fraction"):
+        for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction", "io_stall_fraction", "io_full_stall_fraction", "swap_used_fraction"):
             value = getattr(self, name)
             if value is not None and (
                 isinstance(value, bool)
@@ -120,7 +122,7 @@ class ServingResources:
                 or (name != "cpu_load_fraction" and value > 1)
             ):
                 raise ValueError(f"{name} must be a finite non-negative resource measurement")
-        for name in ("process_rss_bytes", "available_memory_bytes"):
+        for name in ("process_rss_bytes", "available_memory_bytes", "swap_available_bytes"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative byte count")
@@ -182,8 +184,14 @@ class AdaptiveServingController:
         self._last_sample = None
 
     def observe(self, *, elapsed_ms: float, queue_wait_ms: float, failed: bool) -> None:
-        self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, max(0.0, elapsed_ms))
-        self.queue_wait_ewma_ms = self._ewma(self.queue_wait_ewma_ms, max(0.0, queue_wait_ms))
+        for name, value in (("elapsed_ms", elapsed_ms), ("queue_wait_ms", queue_wait_ms)):
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0):
+                raise ValueError(f"{name} must be finite and non-negative")
+        if type(failed) is not bool:
+            raise ValueError("failed must be boolean")
+        self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, elapsed_ms)
+        self.queue_wait_ewma_ms = self._ewma(self.queue_wait_ewma_ms, queue_wait_ms)
         self.failure_ewma = self._ewma(self.failure_ewma, 1.0 if failed else 0.0)
         self.observations += 1
 
@@ -250,8 +258,15 @@ class AdaptiveServingController:
         ):
             reason = "latency_pressure"
         pressured = reason != "within_operator_limits"
+        # A wholly unavailable resource snapshot cannot certify recovery.
+        capacity_observed = (
+            memory is not None or partial_stall is not None or full_stall is not None
+            or io_stall is not None or io_full_stall is not None
+            or resources.thermal_level is not None
+        )
         healthy = (
-            (memory is None or memory <= policy.memory_low_watermark)
+            capacity_observed
+            and (memory is None or memory <= policy.memory_low_watermark)
             and (partial_stall is None or partial_stall <= 0.03)
             and (full_stall is None or full_stall <= 0.01)
             and (io_stall is None or io_stall <= 0.05)
