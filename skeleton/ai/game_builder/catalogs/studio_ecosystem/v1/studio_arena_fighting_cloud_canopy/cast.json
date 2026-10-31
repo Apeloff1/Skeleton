@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_arena_fighting_cloud_canopy",
+  "genre": "arena_fighting",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Miro Morrow",
+    "role": "competitor",
+    "public_goal": "dismantle an illegal match-rigging cartel",
+    "private_burden": "An earlier severe canopy winds report ignored by peers",
+    "abilities": [
+      "frame-advantage reading and evasive counters",
+      "duel"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Iva Ashe",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of suspended library",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Tavi Rowan",
+      "role": "Maintainer of aerial roots",
+      "knows": "Repair topology under crosswind shear",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Lio Kest",
+      "role": "contested operations director",
+      "organization": "a corrupt bout promoter",
+      "goal": "Exclusive access to aerial roots",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of stamina and bout points",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over aerial roots",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_orbital_gardens",
+  "title": "Orbital Gardens: The Open Tournament",
+  "subtitle": "Original the open tournament design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010310995,
+  "width": 21,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 14,
+  "theme": "space",
+  "starting_health": 3
+}

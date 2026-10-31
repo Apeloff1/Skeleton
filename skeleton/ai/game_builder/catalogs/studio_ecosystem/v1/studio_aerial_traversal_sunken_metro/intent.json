@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_sunken_metro",
+  "title": "Sunken Metro: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610302697,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 5
+}

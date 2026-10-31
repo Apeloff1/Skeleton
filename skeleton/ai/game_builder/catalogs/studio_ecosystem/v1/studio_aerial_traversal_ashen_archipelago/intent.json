@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_ashen_archipelago",
+  "title": "Ashen Archipelago: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610302595,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 3
+}
