@@ -121,12 +121,9 @@ def test_route_avoids_wall_and_reaches_attack_position():
     assert route["source_digest"] == session["source_digest"]
     assert route["moves"][0] in ("north", "south")
     for direction in route["moves"]:
-        actor = "scout" if session["state"]["tick"] % 2 == 0 else "warden"
-        if actor == "scout":
-            session = _advance(session, act("move", actor, direction=direction))
-        else:
-            session = _advance(session, act("guard", actor))
-            session = _advance(session, act("move", "scout", direction=direction))
+        session = _advance(session, act("move", "scout", direction=direction))
+        if session["state"]["phase"] == "active":
+            session = _advance(session, act("guard", "warden"))
     assert route_to_attack(session)["moves"] == []
 
 

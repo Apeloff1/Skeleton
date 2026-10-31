@@ -743,6 +743,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
+    if cmd == "combat-expedition":
+        from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
+        return expedition_cli(rest)
     if cmd == "combat-campaign":
         from skeleton.game.gameplay.combat_campaign import cli as campaign_cli
         return campaign_cli(rest)
