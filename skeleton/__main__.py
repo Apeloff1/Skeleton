@@ -55,6 +55,7 @@ Commands:
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
+    scene-npc  Play authored NPC itineraries, choices and earned scene endings
     scene-atlas  Explore fog-of-war maps, legal known routes and portable replay
     scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
@@ -764,6 +765,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-travel":
         from skeleton.game.gameplay.scene_travel import cli as scene_cli
         return scene_cli(rest)
+    if cmd == "scene-npc":
+        from skeleton.game.gameplay.scene_npc_encounter import cli as npc_cli
+        return npc_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
