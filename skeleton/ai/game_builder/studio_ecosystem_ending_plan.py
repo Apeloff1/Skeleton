@@ -58,6 +58,18 @@ def plan_authored_ending(
     targets = {stage_by_key[key].key if key in stage_by_key
                else reward_to_stage[key] for key in required
                if key in stage_by_key or key in reward_to_stage}
+    # An explicit authored detour is executable even when the selected
+    # narrative ending has only external predicates. It does not satisfy
+    # those predicates or grant any unobserved evidence.
+    if preferred_choices is not None:
+        if type(preferred_choices) is not dict or len(preferred_choices) > MAX_PLAN_STAGES:
+            raise StudioQuestError("invalid preferred ending choice map")
+        for stage_id, alternative in preferred_choices.items():
+            if (type(stage_id) is not str or type(alternative) is not str
+                    or stage_id not in stage_by_key or stage_id in session.completed
+                    or alternative not in stage_by_key[stage_id].alternatives):
+                raise StudioQuestError("preferred ending choice is not executable")
+            targets.add(stage_id)
     needed: set[str] = set()
     def visit(key: str) -> None:
         if key in needed:
@@ -70,14 +82,6 @@ def plan_authored_ending(
         needed.add(key)
     for key in targets:
         visit(key)
-    if preferred_choices is not None:
-        if type(preferred_choices) is not dict or len(preferred_choices) > MAX_PLAN_STAGES:
-            raise StudioQuestError("invalid preferred ending choice map")
-        for stage_id, alternative in preferred_choices.items():
-            if (type(stage_id) is not str or type(alternative) is not str
-                    or stage_id not in needed or stage_id in session.completed
-                    or alternative not in stage_by_key[stage_id].alternatives):
-                raise StudioQuestError("preferred ending choice is not executable")
     if len(needed) > MAX_PLAN_STAGES:
         raise StudioQuestError("authored ending plan stage budget exceeded")
     original_digest = session.digest

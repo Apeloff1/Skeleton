@@ -526,3 +526,8 @@ already-completed, non-authored or oversized preferences fail closed. Jeeves
 `studio_ending_plan` accepts the optional typed `preferred_choices` map and
 returns the same replay proof. Absent preferences preserve the previous v1
 receipt shape and deterministic default choice behavior.
+
+Explicit authored stage choices may add a prerequisite-closed detour even if
+the chosen ending is blocked entirely by external evidence. Such a route
+simulates only its authored stage tokens; the ending remains blocked and
+unverified external requirements remain visible.

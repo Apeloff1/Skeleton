@@ -88,9 +88,8 @@ def test_preferred_alternative_is_replayed_without_mutating_session():
     session = start_quest(source, authorized=True)
     program = compile_quest_program(source)
     baseline = plan_authored_ending(source, ending_id="commons", authorized=True)
-    assert baseline["planned_steps"]
-    first = baseline["planned_steps"][0]
-    stage = next(s for s in program.stages if s.key == first["stage_id"])
+    assert baseline["planned_steps"] == []
+    stage = program.stages[0]
     assert len(stage.alternatives) > 1
     selected = stage.alternatives[1]
     preferred = {stage.key: selected}
@@ -109,18 +108,18 @@ def test_preferred_alternative_is_replayed_without_mutating_session():
 
 def test_preferred_alternative_rejects_unbound_completed_and_invalid():
     source = read_blueprint(PROJECT)
-    first = plan_authored_ending(source, ending_id="commons", authorized=True)[
-        "planned_steps"][0]
-    stage_id = first["stage_id"]
+    from skeleton.ai.game_builder.studio_ecosystem_quest import compile_quest_program
+    stage = compile_quest_program(source).stages[0]
+    stage_id = stage.key
     for preferences in ({"unknown_stage": "choice"}, {stage_id: "not_authored"},
                         {stage_id: 3}, ["not", "a", "mapping"]):
         with pytest.raises(StudioQuestError):
             plan_authored_ending(source, ending_id="commons",
                                  preferred_choices=preferences, authorized=True)
-    completed = replay_quest(source, [[stage_id, first["choice"]]], authorized=True)
+    completed = replay_quest(source, [[stage_id, stage.alternatives[0]]], authorized=True)
     with pytest.raises(StudioQuestError, match="not executable"):
         plan_authored_ending(source, ending_id="commons", session=completed,
-                             preferred_choices={stage_id: first["choice"]},
+                             preferred_choices={stage_id: stage.alternatives[0]},
                              authorized=True)
 
 
@@ -128,10 +127,7 @@ def test_preferred_alternative_cli_and_jeeves_parity(capsys):
     from scripts.studio_ecosystem_cli import main
     from skeleton.ai.game_builder.studio_ecosystem_quest import compile_quest_program
     source = read_blueprint(PROJECT)
-    first = plan_authored_ending(source, ending_id="commons", authorized=True)[
-        "planned_steps"][0]
-    stage = next(s for s in compile_quest_program(source).stages
-                 if s.key == first["stage_id"])
+    stage = compile_quest_program(source).stages[0]
     selected = {stage.key: stage.alternatives[-1]}
     req = {"schema": ENDING_PLAN_REQUEST_SCHEMA,
            "project_id": PROJECT, "ending_id": "commons", "actions": [],
