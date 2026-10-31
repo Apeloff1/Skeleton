@@ -72,15 +72,48 @@ class MemorySubscriptionRepository:
 
 
 class MemorySecretRepository:
+    """Raw secret blob store (``secret_vault.SecretBlobStore``); no crypto here."""
+
     def __init__(self) -> None:
-        self._d: dict[str, tuple[str, bytes]] = {}
+        self._d: dict[str, tuple[str, bytes, float, str]] = {}
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _kid(blob: bytes) -> str:
+        from .envelope import EnvelopeError, key_id_of
+        try:
+            return key_id_of(blob)
+        except EnvelopeError:
+            return ""
 
     def put(self, secret_id, tenant_id, secret, created_at) -> None:
-        self._d[secret_id] = (tenant_id, secret)
+        with self._lock:
+            if secret_id in self._d:
+                raise KeyError(secret_id)
+            self._d[secret_id] = (tenant_id, bytes(secret), created_at, self._kid(secret))
 
     def get(self, tenant_id, secret_id):
         v = self._d.get(secret_id)
         return v[1] if v and v[0] == tenant_id else None
+
+    def scan(self, after_id: str, limit: int):
+        from .secret_vault import SecretRow
+        ids = sorted(k for k in self._d if k > after_id)[:limit]
+        return [SecretRow(k, self._d[k][0], self._d[k][1], self._d[k][2]) for k in ids]
+
+    def compare_and_set(self, secret_id: str, expected: bytes, new: bytes, key_id: str) -> bool:
+        with self._lock:
+            cur = self._d.get(secret_id)
+            if cur is None or cur[1] != bytes(expected):
+                return False
+            self._d[secret_id] = (cur[0], bytes(new), cur[2], key_id)
+            return True
+
+    def count_by_key(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for _, _, _, kid in self._d.values():
+            out[kid] = out.get(kid, 0) + 1
+        return out
 
 
 class MemoryEventRepository:
