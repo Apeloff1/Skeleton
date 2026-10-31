@@ -1,10 +1,16 @@
 """Canonical live fair-stream budget regressions; simulated probes, no device claim."""
 from __future__ import annotations
 
+import io
+import json
+import sys
+from types import SimpleNamespace
+
 import pytest
 
 from skeleton.ai.model_runtime import fair_stream_live_budget as module
-from skeleton.ai.model_runtime.fair_stream_cli import _command, INPUT_SCHEMA
+from skeleton.ai.model_runtime.fair_stream_cli import _command, main, INPUT_SCHEMA
+from skeleton.ai.model_runtime.offline_json_guard import load_strict_telemetry_json
 from skeleton.app.offline_resources import LocalResourceSnapshot
 from skeleton.app.offline_io_pressure import IOPressure
 
@@ -91,3 +97,53 @@ def test_unknown_ram_probe_fails_closed(monkeypatch):
     monkeypatch.setattr(module, "probe_local_resources", unavailable)
     with pytest.raises(OSError):
         module.LiveStreamBudgetSampler().sample(token_budget=10)
+
+
+def test_fair_stream_cli_rejects_duplicate_authority_fields(monkeypatch, capsys):
+    raw = (
+        b'{"schema":"skeleton.ai.fair-stream-command.v1",'
+        b'"schema":"forged","requests":[],"checkpoint":null,'
+        b'"acknowledgments":[],"cancellations":[],"envelope":null,'
+        b'"token_budget":32}'
+    )
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=io.BytesIO(raw)))
+    assert main([]) == 2
+    assert "duplicate" in capsys.readouterr().err
+
+
+def test_fair_stream_cli_rejects_nonfinite_and_nested_payloads():
+    for raw in (b'{"pressure":NaN}', b'{"pressure":1e999}', b'{"pressure":Infinity}'):
+        with pytest.raises(ValueError, match="nonfinite"):
+            load_strict_telemetry_json(raw, max_bytes=1024)
+    deep = b"[" * 35 + b"0" + b"]" * 35
+    with pytest.raises(ValueError, match="structure budget"):
+        load_strict_telemetry_json(deep, max_bytes=1024, max_depth=32)
+
+
+def test_fair_stream_cli_rejects_duplicate_checkpoint_fields(monkeypatch, capsys):
+    raw = (
+        b'{"schema":"skeleton.ai.fair-stream-command.v1",'
+        b'"requests":[],"checkpoint":{"round":1,"round":2},'
+        b'"acknowledgments":[],"cancellations":[],"envelope":null,'
+        b'"token_budget":32}'
+    )
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=io.BytesIO(raw)))
+    assert main([]) == 2
+    assert "duplicate" in capsys.readouterr().err
+
+
+def test_fair_stream_cli_strict_json_preserves_valid_live_path(monkeypatch, capsys):
+    configure(monkeypatch)
+    raw = {
+        "schema": INPUT_SCHEMA,
+        "requests": [], "checkpoint": None, "acknowledgments": [],
+        "cancellations": [], "envelope": None, "token_budget": 64,
+    }
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(
+        buffer=io.BytesIO(json.dumps(raw).encode("utf-8")),
+    ))
+    assert main(["--live"]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["measurement"] == "os_probe"
+    assert receipt["live_evidence"]["gpu_device_qualified"] is False
+    assert receipt["live_evidence"]["cross_process_admission_guaranteed"] is False

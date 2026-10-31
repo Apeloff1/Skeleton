@@ -9,6 +9,8 @@ import argparse
 import json
 import sys
 
+from .offline_json_guard import load_strict_telemetry_json
+
 from .fair_stream_queue import (
     FairStreamScheduler, MeasuredStreamBudget, StreamRequest,
 )
@@ -142,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
         if len(payload) > MAX_INPUT_BYTES:
             raise ValueError("fair-stream command exceeds input byte budget")
-        raw = json.loads(payload.decode("utf-8", errors="strict"))
+        raw = load_strict_telemetry_json(payload, max_bytes=MAX_INPUT_BYTES)
         receipt = _command(raw, live=args.live, storage_path=args.storage_path)
         print(json.dumps(receipt, sort_keys=True, separators=(",", ":"), allow_nan=False))
         return 0

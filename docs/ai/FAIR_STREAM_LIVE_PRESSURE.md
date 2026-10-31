@@ -17,3 +17,13 @@ These tests use explicitly simulated host probes and do not qualify Metal,
 CUDA, ROCm, Windows, energy sensors or actual model throughput. Re-probe at
 dispatch, retain source-bound checkpoint and independent watermark custody,
 and enforce backend memory quotas and cancellation before executing work.
+
+## Strict untrusted command boundary
+
+The command uses the canonical bounded telemetry JSON parser shared with the
+local inference tail profiler. It rejects duplicate keys (including nested
+checkpoint fields), nonfinite floats, excessive nesting and oversized decoded
+structures *before* reconstructing scheduler state, applying acknowledgments
+or sampling host resources. This prevents ambiguous operator JSON from
+silently overriding an admission budget or durable checkpoint field. Valid
+input remains a planning request, not an authorization or device attestation.
