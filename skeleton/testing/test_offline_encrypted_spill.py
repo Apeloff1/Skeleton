@@ -68,7 +68,7 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
         receipt = self.store.put(b"private", IDENTITY)
         self.assertEqual(self.store.records()[0]["record_id"], receipt["record_id"])
         with self.assertRaisesRegex(SpillError, "authentication"):
-            EncryptedSpillStore(self.root, b"\\x13" * 32).records()
+            EncryptedSpillStore(self.root, bytes([0x13]) * 32).records()
         path = self.root / (receipt["record_id"] + ".json")
         manifest = json.loads(path.read_text())
         manifest["context_id"] = "forged-context"
