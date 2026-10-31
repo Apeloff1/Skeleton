@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.world_event_scenario.v1",
+  "id": "transport_airship_delay",
+  "domain": "transport",
+  "sensor": "instability",
+  "threshold": 21,
+  "severity": 3,
+  "cost": 6,
+  "boost": 9,
+  "cooldown": 5,
+  "initial": {
+    "region": "central",
+    "pressure": 100,
+    "resources": 100,
+    "resilience": 50
+  },
+  "commands": [
+    {
+      "id": "transport_airship_delay:open",
+      "action": "activate",
+      "tick": 1,
+      "expected_version": 0,
+      "intensity": 0,
+      "evidence": ""
+    },
+    {
+      "id": "transport_airship_delay:finish",
+      "action": "resolve",
+      "tick": 2,
+      "expected_version": 1,
+      "intensity": 0,
+      "evidence": "trusted-world-proof"
+    },
+    {
+      "id": "transport_airship_delay:ready",
+      "action": "release_cooldown",
+      "tick": 7,
+      "expected_version": 2,
+      "intensity": 0,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "final_lifecycle": "idle",
+    "final_version": 3,
+    "accepted": 3,
+    "resolution_requires_evidence": true,
+    "duplicate_events_rejected": true,
+    "optimistic_version_fence": true
+  },
+  "qualification": {
+    "synthetic": true,
+    "provenance_authenticated": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
