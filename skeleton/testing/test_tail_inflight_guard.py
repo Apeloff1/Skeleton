@@ -207,3 +207,55 @@ def test_no_restart_state_is_implicitly_reconstructed():
     fresh = guard()
     assert fresh.status().state == "new"
     assert fresh.status().generated_tokens == 0
+
+
+def test_quantum_admission_clamps_to_remaining_budget_and_prevents_overrun():
+    g = InFlightCPUResourceGuard(
+        replace(policy(), max_generated_tokens=70),
+        storage_path=".", simulated=True,
+        resource_probe=lambda path: snapshot(),
+        thermal_probe=healthy_thermal,
+    )
+    assert g.start().authorized_quantum_tokens == 0
+    first = g.admit_quantum(requested_tokens=64)
+    assert first.authorized_quantum_tokens == 64
+    assert not first.continue_execution  # simulation never authorizes a device
+    with pytest.raises(InFlightPressureDenied, match="previous quantum"):
+        g.admit_quantum(requested_tokens=1)
+    assert g.checkpoint(generated_tokens=64).generated_tokens == 64
+    last = g.admit_quantum(requested_tokens=64)
+    assert last.authorized_quantum_tokens == 6
+    with pytest.raises(InFlightPressureDenied, match="unaccounted"):
+        g.checkpoint(generated_tokens=7)
+    assert g.status().state == "aborted"
+    assert g.status().authorized_quantum_tokens == 0
+
+
+def test_outstanding_quantum_blocks_completion_until_accounted():
+    g = guard()
+    g.start()
+    g.admit_quantum(requested_tokens=8)
+    with pytest.raises(InFlightPressureDenied, match="outstanding"):
+        g.complete()
+    assert g.checkpoint(generated_tokens=5).generated_tokens == 5
+    assert g.complete().state == "completed"
+
+
+def test_fresh_quantum_probe_holds_when_memory_collapses():
+    readings = iter((snapshot(), snapshot(available_ram_bytes=1)))
+    g = guard(resource=lambda path: next(readings))
+    assert g.start().state == "running"
+    d = g.admit_quantum(requested_tokens=8)
+    assert d.state == "hold"
+    assert d.authorized_quantum_tokens == 0
+    assert not d.continue_execution
+
+
+@pytest.mark.parametrize("bad", [True, 0, -1, 4097])
+def test_bad_requested_quantum_cannot_mutate_state(bad):
+    g = guard()
+    g.start()
+    before = g.status()
+    with pytest.raises(ValueError, match="requested token quantum"):
+        g.admit_quantum(requested_tokens=bad)
+    assert g.status() == before

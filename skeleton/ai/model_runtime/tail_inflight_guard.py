@@ -63,6 +63,7 @@ class InFlightPressureDecision:
     generated_tokens: int
     continue_execution: bool
     gpu_device_qualified: bool = False
+    authorized_quantum_tokens: int = 0
 
 
 class InFlightPressureDenied(RuntimeError):
@@ -108,6 +109,7 @@ class InFlightCPUResourceGuard:
         self._generation = 0
         self._generated = 0
         self._good = 0
+        self._authorized_quantum = 0
 
     def _observe(self) -> str:
         try:
@@ -151,7 +153,11 @@ class InFlightCPUResourceGuard:
         return InFlightPressureDecision(
             schema=SCHEMA, state=self._state, reason=self._reason,
             generation=self._generation, generated_tokens=self._generated,
-            continue_execution=self._state == "running" and not self._simulated,
+            continue_execution=(
+                self._state == "running" and not self._simulated
+                and self._authorized_quantum > 0
+            ),
+            authorized_quantum_tokens=self._authorized_quantum,
         )
 
     def start(self) -> InFlightPressureDecision:
@@ -164,6 +170,39 @@ class InFlightCPUResourceGuard:
             self._generation += 1
             return self._receipt()
 
+    def admit_quantum(self, *, requested_tokens: int) -> InFlightPressureDecision:
+        """Reserve a single bounded token quantum before invoking the model.
+
+        A fresh CPU/thermal probe is required for every new quantum. The
+        reservation is process-local, not a physical memory reservation.
+        Simulated receipts never authorize production execution.
+        """
+        if (type(requested_tokens) is not int
+                or not 1 <= requested_tokens <= self.policy.max_quantum_tokens):
+            raise ValueError("bounded positive requested token quantum required")
+        with self._lock:
+            if self._state != "running":
+                raise InFlightPressureDenied("execution is not running")
+            if self._authorized_quantum:
+                raise InFlightPressureDenied("previous quantum not accounted")
+            remaining = self.policy.max_generated_tokens - self._generated
+            if remaining <= 0:
+                self._state = "aborted"
+                self._reason = "token_budget_exhausted"
+                self._generation += 1
+                raise InFlightPressureDenied("token budget exhausted")
+            reason = self._observe()
+            if reason != "measured_cpu_headroom":
+                self._state = "hold"
+                self._reason = reason
+                self._good = 0
+                self._generation += 1
+                return self._receipt()
+            self._authorized_quantum = min(requested_tokens, remaining)
+            self._reason = "measured_cpu_headroom"
+            self._generation += 1
+            return self._receipt()
+
     def checkpoint(self, *, generated_tokens: int) -> InFlightPressureDecision:
         """Check AFTER at most one bounded token quantum, before next quantum."""
         if type(generated_tokens) is not int or not 0 <= generated_tokens <= self.policy.max_quantum_tokens:
@@ -171,6 +210,15 @@ class InFlightCPUResourceGuard:
         with self._lock:
             if self._state != "running":
                 raise InFlightPressureDenied("execution is not running")
+            if not self._simulated and self._authorized_quantum == 0:
+                raise InFlightPressureDenied("quantum must be admitted before execution")
+            if self._authorized_quantum and generated_tokens > self._authorized_quantum:
+                self._authorized_quantum = 0
+                self._state = "aborted"
+                self._reason = "quantum_accounting_violation"
+                self._generation += 1
+                raise InFlightPressureDenied("unaccounted generated token quantum")
+            self._authorized_quantum = 0
             self._generated += generated_tokens
             if self._generated > self.policy.max_generated_tokens:
                 self._state = "aborted"
@@ -203,6 +251,8 @@ class InFlightCPUResourceGuard:
         with self._lock:
             if self._state != "running":
                 raise InFlightPressureDenied("completion requires running execution")
+            if self._authorized_quantum:
+                raise InFlightPressureDenied("outstanding quantum must be accounted")
             reason = self._observe()
             if reason != "measured_cpu_headroom":
                 self._state = "hold"
@@ -219,6 +269,7 @@ class InFlightCPUResourceGuard:
             if self._state in ("completed", "aborted"):
                 raise InFlightPressureDenied("terminal execution cannot be restarted")
             self._state = "aborted"
+            self._authorized_quantum = 0
             self._reason = "operator_abort"
             self._generation += 1
             return self._receipt()

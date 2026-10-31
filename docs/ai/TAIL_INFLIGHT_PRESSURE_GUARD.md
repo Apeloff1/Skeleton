@@ -24,3 +24,18 @@ Focused validation:
 `python -m pytest -q skeleton/testing/test_tail_inflight_guard.py`
 plus canonical tail, thermal and offline resource suites. Exact-head CI and
 device qualification remain held.
+
+
+## Explicit pre-quantum admission and completion accounting
+
+Production CPU token loops must call `admit_quantum(requested_tokens=N)`
+before each model quantum, inspect `continue_execution`, and cap generated
+tokens at `authorized_quantum_tokens`. A fresh OS resource/thermal sample is
+taken before granting each quantum; an unaccounted outstanding quantum blocks
+completion and a reported token count beyond the granted quantum aborts the
+controller. The final application completion count must exactly match the
+sum of checkpointed generated tokens or the session quarantines pending
+independent execution-journal reconciliation. Simulated measurements never
+grant production execution, even when their state says `running`.
+These controls are cooperative: the backend must honor the grant and maintain
+its own memory allocation and durable execution fences.

@@ -32,6 +32,7 @@ class OfflineInFlightStatus:
     continue_execution: bool
     telemetry_quarantined: bool
     gpu_device_qualified: bool = False
+    authorized_quantum_tokens: int = 0
 
 
 class OfflineTailInFlightSession:
@@ -69,6 +70,7 @@ class OfflineTailInFlightSession:
             generation=decision.generation,
             continue_execution=decision.continue_execution and not self._quarantined,
             telemetry_quarantined=self._quarantined,
+            authorized_quantum_tokens=decision.authorized_quantum_tokens,
         )
 
     def begin(
@@ -108,6 +110,21 @@ class OfflineTailInFlightSession:
                     "first-token telemetry failed"
                 ) from exc
 
+    def admit_quantum(self, *, requested_tokens: int) -> OfflineInFlightStatus:
+        """Issue a fresh, measured, one-quantum CPU token authorization.
+
+        Production backends must use the returned authorized_quantum_tokens
+        and continue_execution together; simulated receipts never authorize
+        hardware execution or GPU qualification.
+        """
+        with self._lock:
+            self._require_healthy()
+            if self._request_id is None:
+                raise InFlightPressureDenied("no in-flight request")
+            return self._status(
+                self._guard.admit_quantum(requested_tokens=requested_tokens)
+            )
+
     def checkpoint(self, *, generated_tokens: int) -> OfflineInFlightStatus:
         with self._lock:
             self._require_healthy()
@@ -131,6 +148,18 @@ class OfflineTailInFlightSession:
             self._require_healthy()
             if self._request_id is None:
                 raise InFlightPressureDenied("no in-flight request")
+            before = self._guard.status()
+            if before.state != "running":
+                raise InFlightPressureDenied("completion requires running execution")
+            if type(output_tokens) is not int or output_tokens != before.generated_tokens:
+                self._quarantined = True
+                try:
+                    self._guard.abort()
+                except BaseException:
+                    pass
+                raise InFlightLifecycleQuarantined(
+                    "completion token accounting mismatch; journal reconciliation required"
+                )
             decision = self._guard.complete()
             if decision.state != "completed":
                 raise InFlightPressureDenied("fresh pressure probe holds completion")

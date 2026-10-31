@@ -101,6 +101,7 @@ def test_late_capture_failure_does_not_report_success():
     app = controller(capture_probe=broken_probe)
     app.begin(request_id="a", prompt_tokens=1)
     app.first_token()
+    app.checkpoint(generated_tokens=1)
     with pytest.raises(InFlightLifecycleQuarantined, match="completion"):
         app.complete(output_tokens=1)
     assert app.status().telemetry_quarantined
@@ -121,3 +122,32 @@ def test_no_first_token_without_begin():
         app.first_token()
     with pytest.raises(InFlightPressureDenied):
         app.checkpoint(generated_tokens=1)
+
+
+def test_app_exposes_bounded_quantum_without_simulated_execution_authority():
+    app = controller()
+    assert app.begin(request_id="a", prompt_tokens=8).authorized_quantum_tokens == 0
+    d = app.admit_quantum(requested_tokens=16)
+    assert d.authorized_quantum_tokens == 16
+    assert d.continue_execution is False
+    assert d.gpu_device_qualified is False
+    with pytest.raises(InFlightPressureDenied, match="outstanding"):
+        app.complete(output_tokens=0)
+    app.first_token()
+    app.checkpoint(generated_tokens=8)
+    done, timing = app.complete(output_tokens=8)
+    assert done.state == "completed"
+    assert timing.output_tokens == 8
+
+
+def test_app_token_mismatch_quarantines_instead_of_publishing_false_tail():
+    app = controller()
+    app.begin(request_id="a", prompt_tokens=8)
+    app.first_token()
+    app.checkpoint(generated_tokens=5)
+    with pytest.raises(InFlightLifecycleQuarantined, match="token accounting mismatch"):
+        app.complete(output_tokens=6)
+    assert app.status().telemetry_quarantined
+    assert app.status().state == "aborted"
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.complete(output_tokens=5)
