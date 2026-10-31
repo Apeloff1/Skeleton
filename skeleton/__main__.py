@@ -57,6 +57,7 @@ Commands:
     combat-arena    Play source-bound tactical grid combat with offline replay
     combat-expedition  Play original multi-arena campaigns with earned inventory
     quest-expedition  Play authored NPC/choice/crafting quest over combat
+    quest-author  Edit original quest source and preview offline gameplay
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -747,6 +748,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
+    if cmd == "quest-author":
+        from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
+        return author_cli(rest)
     if cmd == "quest-expedition":
         from skeleton.game.gameplay.expedition_quest import cli as quest_cli
         return quest_cli(rest)
