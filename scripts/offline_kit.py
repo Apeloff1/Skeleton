@@ -635,6 +635,65 @@ def _copy_pinned_assets(
             os.close(root_fd)
 
 
+def _reserve_install_destination(target: Path) -> tuple[int | None, tuple[int, int]]:
+    """Atomically claim a new install directory before invoking venv or pip.
+
+    POSIX pins the parent directory through nofollow descriptors. The returned
+    inode identity is the sole rollback authority; a replaced path is never
+    recursively deleted merely because the installer previously owned its name.
+    """
+    parent_fd: int | None = None
+    try:
+        if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+            parent_fd = _open_directory_without_symlink_parents(target.parent)
+            os.mkdir(target.name, mode=0o700, dir_fd=parent_fd)
+            info = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        else:
+            target.mkdir(mode=0o700)
+            info = target.lstat()
+        if not stat.S_ISDIR(info.st_mode):
+            raise OfflineKitError("reserved install target is not a directory")
+        return parent_fd, (info.st_dev, info.st_ino)
+    except BaseException as exc:
+        if parent_fd is not None:
+            os.close(parent_fd)
+        if isinstance(exc, FileExistsError):
+            raise OfflineKitError("installation destination already exists") from exc
+        if isinstance(exc, OSError):
+            raise OfflineKitError("unable to reserve safe installation destination") from exc
+        raise
+
+
+def _rollback_owned_install(
+    target: Path, parent_fd: int | None, identity: tuple[int, int],
+) -> bool:
+    """Remove only the exact directory reserved by this installation.
+
+    A concurrent replacement, symlink, missing target, or renamed parent must
+    never cause deletion of an unrelated installation. POSIX deletion remains
+    relative to the pinned parent descriptor, not a mutable absolute pathname.
+    """
+    try:
+        info = (
+            os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+            if parent_fd is not None else target.lstat()
+        )
+    except FileNotFoundError:
+        return False
+    if (not stat.S_ISDIR(info.st_mode)
+            or (info.st_dev, info.st_ino) != identity):
+        return False
+    if parent_fd is not None:
+        if not shutil.rmtree.avoids_symlink_attacks:
+            raise OfflineKitError("descriptor-safe installation rollback unavailable")
+        shutil.rmtree(target.name, dir_fd=parent_fd)
+    elif not target.is_symlink():
+        shutil.rmtree(target)
+    else:
+        return False
+    return True
+
+
 def install(root: str | Path, destination: str | Path) -> Path:
     """Install into a new venv, rolling back incomplete local installations.
 
@@ -654,6 +713,8 @@ def install(root: str | Path, destination: str | Path) -> Path:
 
     # Isolation is enforced at the package resolver, not claimed as an OS
     # egress sandbox for arbitrary executable wheel-install hooks.
+    parent_fd: int | None = None
+    owned_identity: tuple[int, int] | None = None
     env = dict(os.environ)
     env.update({
         "PIP_NO_INDEX": "1",
@@ -661,6 +722,7 @@ def install(root: str | Path, destination: str | Path) -> Path:
         "PYTHONNOUSERSITE": "1",
     })
     try:
+        parent_fd, owned_identity = _reserve_install_destination(target)
         with tempfile.TemporaryDirectory(
             prefix=".skeleton-wheels-", dir=target.parent,
         ) as temporary:
@@ -719,9 +781,12 @@ def install(root: str | Path, destination: str | Path) -> Path:
         if not python.is_file():
             raise OfflineKitError("offline installation created no Python runtime")
     except BaseException:
-        if target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target)
+        if owned_identity is not None:
+            _rollback_owned_install(target, parent_fd, owned_identity)
         raise
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
     return target
 
 

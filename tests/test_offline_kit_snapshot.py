@@ -308,3 +308,59 @@ def test_model_snapshot_rejects_symlinked_model_parent(tmp_path):
     model.symlink_to(tmp_path / "original-model", target_is_directory=True)
     with pytest.raises(offline_kit.OfflineKitError, match="unable to copy"):
         offline_kit._copy_pinned_assets(root, manifest, tmp_path / "copied")
+
+
+def test_install_reserves_destination_before_virtualenv_creation(tmp_path, monkeypatch):
+    root, manifest, _ = _kit(tmp_path)
+    target = tmp_path / "installed"
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+
+    def fail_create(self, destination):
+        assert Path(destination).is_dir()
+        assert Path(destination).stat().st_mode & 0o077 == 0
+        raise RuntimeError("injected venv failure")
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fail_create)
+    with pytest.raises(RuntimeError, match="injected venv failure"):
+        offline_kit.install(root, target)
+    assert not target.exists()
+
+
+def test_install_never_deletes_replaced_destination_on_failure(tmp_path, monkeypatch):
+    root, manifest, _ = _kit(tmp_path)
+    target = tmp_path / "installed"
+    moved = tmp_path / "moved-original"
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+
+    def fake_create(self, destination):
+        executable = Path(destination) / (
+            "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        )
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"test python")
+
+    def fail_after_swap(*args, **kwargs):
+        target.rename(moved)
+        target.mkdir()
+        (target / "unrelated-owner-data.txt").write_text("must survive")
+        raise RuntimeError("injected subprocess failure")
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fake_create)
+    monkeypatch.setattr(offline_kit.subprocess, "run", fail_after_swap)
+    with pytest.raises(RuntimeError, match="injected subprocess failure"):
+        offline_kit.install(root, target)
+    assert (target / "unrelated-owner-data.txt").read_text() == "must survive"
+    assert moved.is_dir()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow parent contract")
+def test_install_rejects_symlinked_destination_parent(tmp_path, monkeypatch):
+    root, manifest, _ = _kit(tmp_path)
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir()
+    alias = tmp_path / "alias-parent"
+    alias.symlink_to(real_parent, target_is_directory=True)
+    monkeypatch.setattr(offline_kit, "verify", lambda _: manifest)
+    with pytest.raises(offline_kit.OfflineKitError, match="reserve"):
+        offline_kit.install(root, alias / "installed")
+    assert not (real_parent / "installed").exists()
