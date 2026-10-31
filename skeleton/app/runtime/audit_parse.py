@@ -1432,6 +1432,65 @@ def _idempotency_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool
     return replay, remember
 
 
+
+def _forge_wrapper_attrs(tree: ast.Module) -> tuple[bool, bool]:
+    """Audit the real decorator's replay and completion, without API imports."""
+    for outer in tree.body:
+        if not isinstance(outer, (ast.FunctionDef, ast.AsyncFunctionDef)) or outer.name != "_forge_idempotent":
+            continue
+        guards = [
+            node for node in outer.body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "guarded"
+        ]
+        returns_guard = any(
+            isinstance(node, ast.Return) and isinstance(node.value, ast.Name)
+            and node.value.id == "guarded" for node in outer.body
+        )
+        if len(guards) != 1 or not returns_guard:
+            return False, False
+        for node in ast.walk(guards[0]):
+            if not isinstance(node, (ast.With, ast.AsyncWith)):
+                continue
+            for item in node.items:
+                call = item.context_expr
+                if not (
+                    isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                    and isinstance(call.func.value, ast.Name)
+                    and call.func.value.id == "_idempotency"
+                    and call.func.attr == "operation"
+                    and isinstance(item.optional_vars, ast.Name)
+                    and item.optional_vars.id == "replay"
+                ):
+                    continue
+                replay = any(
+                    isinstance(child, ast.If)
+                    and isinstance(child.test, ast.Compare)
+                    and isinstance(child.test.left, ast.Name)
+                    and child.test.left.id == "replay"
+                    and len(child.test.ops) == 1
+                    and isinstance(child.test.ops[0], ast.IsNot)
+                    and len(child.test.comparators) == 1
+                    and isinstance(child.test.comparators[0], ast.Constant)
+                    and child.test.comparators[0].value is None
+                    and any(
+                        isinstance(ret, ast.Return) and isinstance(ret.value, ast.Name)
+                        and ret.value.id == "replay" for ret in ast.walk(child)
+                    )
+                    for child in node.body
+                )
+                complete = any(
+                    isinstance(child, ast.Call)
+                    and isinstance(child.func, ast.Attribute)
+                    and isinstance(child.func.value, ast.Name)
+                    and child.func.value.id == "_idempotency"
+                    and child.func.attr == "complete"
+                    for child in ast.walk(node)
+                )
+                return replay, complete
+        return False, False
+    return False, False
+
+
 def idempotency_handler_rows() -> list[dict[str, object]]:
     modules = (
         ("skeleton.api.routes", "/api/v1"),
@@ -1442,11 +1501,19 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
         tree = parse_module_tree(module)
         if tree is None or not isinstance(tree, ast.Module):
             continue
+        wrapper_replay, wrapper_remember = _forge_wrapper_attrs(tree)
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            replay, remember = _idempotency_attrs(node)
-            if not replay and not remember:
+            wrapped = any(
+                isinstance(decorator, ast.Name) and decorator.id == "_forge_idempotent"
+                for decorator in node.decorator_list
+            )
+            replay, remember = (
+                (wrapper_replay, wrapper_remember) if wrapped else _idempotency_attrs(node)
+            )
+            # An invalid/missing wrapper must still produce a failing audit row.
+            if not wrapped and not replay and not remember:
                 continue
             for decorator in node.decorator_list:
                 parsed = _decorator_route(decorator)
