@@ -707,6 +707,13 @@ def _reserve_install_destination(target: Path) -> tuple[int | None, tuple[int, i
     try:
         if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
             parent_fd = _open_directory_without_symlink_parents(target.parent)
+            parent_info = os.fstat(parent_fd)
+            if (not stat.S_ISDIR(parent_info.st_mode)
+                    or parent_info.st_uid != os.geteuid()
+                    or parent_info.st_mode & 0o022):
+                raise OfflineKitError(
+                    "installation parent must be operator-owned and private"
+                )
             os.mkdir(target.name, mode=0o700, dir_fd=parent_fd)
             info = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
         else:

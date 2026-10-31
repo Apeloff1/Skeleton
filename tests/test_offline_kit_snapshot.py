@@ -505,3 +505,43 @@ def test_model_copy_rejects_swapped_destination_without_writing_outside(tmp_path
         offline_kit._copy_pinned_assets(root, manifest, destination)
     assert swapped
     assert list(outside.iterdir()) == []
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX owner-private parent admission")
+def test_install_rejects_world_writable_parent_before_venv_or_pip(
+    tmp_path, monkeypatch,
+):
+    root, manifest, _ = _kit(tmp_path)
+    unsafe = tmp_path / "shared"
+    unsafe.mkdir(mode=0o700)
+    unsafe.chmod(0o777)
+    target = unsafe / "installed"
+    monkeypatch.setattr(offline_kit, "verify", lambda *_args, **_kwargs: manifest)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("untrusted install parent must not reach venv or pip")
+
+    monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", forbidden)
+    monkeypatch.setattr(offline_kit.subprocess, "run", forbidden)
+    try:
+        with pytest.raises(offline_kit.OfflineKitError, match="operator-owned and private"):
+            offline_kit.install(root, target)
+        assert not target.exists()
+    finally:
+        unsafe.chmod(0o700)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX private install destination")
+def test_private_install_parent_is_accepted_for_destination_reservation(tmp_path):
+    parent = tmp_path / "private"
+    parent.mkdir(mode=0o700)
+    target = parent / "installed"
+    descriptor, identity = offline_kit._reserve_install_destination(target)
+    try:
+        observed = target.stat()
+        assert (observed.st_dev, observed.st_ino) == identity
+        assert target.is_dir()
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        target.rmdir()
