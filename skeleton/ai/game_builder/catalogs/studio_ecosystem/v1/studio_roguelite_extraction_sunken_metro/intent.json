@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_sunken_metro",
+  "title": "Sunken Metro: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610302953,
+  "width": 19,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 6
+}

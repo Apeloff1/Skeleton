@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_roguelite_extraction_echo_caverns",
+  "genre": "roguelite_extraction",
+  "biome": "echo_caverns",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Amea Bryn",
+    "role": "delver",
+    "skill": "risk and retreat",
+    "objective": "retrieve the endangered survey archive",
+    "weakness": "Personal responsibility for the unstable resonance aftermath",
+    "development": "Shares ownership of the remedy with residents"
+  },
+  "support": [
+    {
+      "id": "guide",
+      "name": "Jori Rowan",
+      "knows": "Safe routes through ringing stone halls",
+      "trust": "earned_by_documented_aid"
+    },
+    {
+      "id": "antagonist",
+      "name": "Noa Bell",
+      "affiliation": "a hostile salvage crew",
+      "agenda": "Privatize access to acoustic reflectors",
+      "trust": "conditional_on_public_agreement"
+    }
+  ],
+  "factions": [
+    {
+      "id": "settlers",
+      "objective": "public welfare",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "objective": "scarce resource security",
+      "reputation": 0
+    }
+  ],
+  "dialogue_branches": [
+    {
+      "choice": "disclose_proof",
+      "reputation_delta": {
+        "settlers": 2,
+        "claimants": -1
+      }
+    },
+    {
+      "choice": "exclusive_license",
+      "reputation_delta": {
+        "settlers": -2,
+        "claimants": 2
+      }
+    }
+  ],
+  "rights": "original_story_material_only"
+}

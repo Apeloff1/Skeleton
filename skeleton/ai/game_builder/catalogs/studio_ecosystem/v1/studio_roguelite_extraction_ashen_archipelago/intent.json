@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_ashen_archipelago",
+  "title": "Ashen Archipelago: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610302851,
+  "width": 23,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 4
+}
