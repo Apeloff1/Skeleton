@@ -30,6 +30,10 @@ from skeleton.ai.runtime.game_project_capsule import (
 from skeleton.ai.runtime.gameplay_capabilities import (
     GameplayError, compile_level, generate_level,
 )
+from skeleton.ai.runtime.game_play_session import (
+    GamePlaySessionError, start_play_session, resume_play_session,
+    verify_play_session,
+)
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -131,6 +135,12 @@ def _parser() -> argparse.ArgumentParser:
         description="Author legally reviewed game project specifications across eras. No ROM/SDK output.",
     )
     operations = parser.add_mutually_exclusive_group(required=True)
+    operations.add_argument("--play-capsule", type=Path,
+                            help="execute offline controller frames against a verified original capsule")
+    operations.add_argument("--resume-play-session", type=Path,
+                            help="verify and append frames to a source-bound saved session")
+    operations.add_argument("--verify-play-session", type=Path,
+                            help="replay a saved session against its original capsule")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -141,6 +151,12 @@ def _parser() -> argparse.ArgumentParser:
                             help="verify portable project and recalculate scene digests")
     operations.add_argument("--demo-project", type=Path,
                             help="write a new small original portable game capsule")
+    parser.add_argument("--controls-file", type=Path,
+                        help="JSON object containing a bounded controls array")
+    parser.add_argument("--session-capsule", type=Path,
+                        help="original capsule for session resume/verification")
+    parser.add_argument("--save-session", type=Path,
+                        help="write a new exclusive offline session JSON file")
     parser.add_argument("--output", type=Path,
                         help="exclusive new file for --compose")
     parser.add_argument("--seed", type=int, default=1729,
@@ -158,6 +174,20 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    playing = args.play_capsule is not None or args.resume_play_session is not None or args.verify_play_session is not None
+    if not playing and any(value is not None for value in (
+        args.controls_file, args.session_capsule, args.save_session,
+    )):
+        print("play-session flags require a play-session operation", file=sys.stderr)
+        return 2
+    if playing:
+        needs_actions = args.verify_play_session is None
+        needs_source = args.play_capsule is None
+        if (needs_actions != (args.controls_file is not None)
+                or needs_actions != (args.save_session is not None)
+                or needs_source != (args.session_capsule is not None)):
+            print("play-session source, controls and output arguments mismatch", file=sys.stderr)
+            return 2
     if args.output is not None and args.compose is None:
         print("--output is supported only for --compose", file=sys.stderr)
         return 2
@@ -174,7 +204,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("--targets is only for --demo-project", file=sys.stderr)
         return 2
     try:
-        if args.catalog:
+        if playing:
+            capsule = _read_json(args.play_capsule or args.session_capsule)
+            if args.verify_play_session is not None:
+                report = verify_play_session(capsule, _read_json(args.verify_play_session))
+            else:
+                actions = _read_json(args.controls_file)
+                if set(actions) != {"controls"}:
+                    raise GamePlaySessionError("play controls require exactly controls")
+                if args.play_capsule is not None:
+                    session = start_play_session(capsule, actions["controls"])
+                else:
+                    session = resume_play_session(
+                        capsule, _read_json(args.resume_play_session), actions["controls"],
+                    )
+                output_path = _write_new(args.save_session, session)
+                report = {
+                    "schema_version": "skeleton.game.play_session.write.v1",
+                    "session_sha256": session["session_sha256"],
+                    "capsule_sha256": session["capsule_sha256"],
+                    "frame_count": session["frame_count"],
+                    "victory_frame": session["victory_frame"],
+                    "native_export_created": False,
+                    "output_path": output_path,
+                }
+        elif args.catalog:
             report = catalog_summary()
         elif args.plan:
             body = _read_json(args.plan)
@@ -223,7 +277,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             report = verify_game_capsule(_read_json(args.verify_capsule))
         print(json.dumps(report, sort_keys=True, ensure_ascii=True))
         return 0
-    except (GameCapsuleError, GamePlatformError, GameRightsError,
+    except (GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
             GameplayError, ValueError, TypeError, KeyError, OSError) as exc:
         print(
             "cross-era game project rejected: " + type(exc).__name__ + ": " + str(exc),

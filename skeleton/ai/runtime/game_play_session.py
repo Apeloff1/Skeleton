@@ -1,0 +1,139 @@
+"""Bounded, deterministic, offline play sessions for verified original game capsules.
+
+This is an engine-neutral input/replay interface, not a native renderer or a
+claim of legal release clearance. A session is replayed from the source capsule
+on every restore; self-signed JSON cannot invent a victory or player position.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any, Mapping
+
+from .game_project_capsule import verify_game_capsule
+from .gameplay_capabilities import compile_level, platformer_step
+
+SCHEMA = "skeleton.game.play_session.v1"
+MAX_FRAMES = 1024
+MAX_BATCH_FRAMES = 64
+_CONTROL_KEYS = frozenset(("left", "right", "jump"))
+_SESSION_KEYS = frozenset((
+    "schema_version", "capsule_sha256", "frame_count", "controls",
+    "final_avatar", "victory_frame", "trace_sha256", "session_sha256",
+    "offline_replay", "native_export_created",
+))
+
+
+class GamePlaySessionError(ValueError):
+    """Malformed, tampered, over-budget or incompatible play session."""
+
+
+def _hash(value: Any) -> str:
+    try:
+        raw = json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            allow_nan=False,
+        ).encode("ascii")
+    except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
+        raise GamePlaySessionError("noncanonical play session value") from exc
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _admit_controls(controls: Any, *, batch: bool) -> list[dict[str, bool]]:
+    limit = MAX_BATCH_FRAMES if batch else MAX_FRAMES
+    if type(controls) is not list or not 1 <= len(controls) <= limit:
+        raise GamePlaySessionError("controller frame count outside admitted bounds")
+    accepted: list[dict[str, bool]] = []
+    for item in controls:
+        if type(item) is not dict or set(item) != _CONTROL_KEYS:
+            raise GamePlaySessionError("controller frame must contain left/right/jump")
+        if any(type(value) is not bool for value in item.values()):
+            raise GamePlaySessionError("controller buttons must be boolean")
+        accepted.append({key: item[key] for key in sorted(_CONTROL_KEYS)})
+    return accepted
+
+
+def _replay(capsule: Mapping[str, Any], controls: list[dict[str, bool]]) -> dict[str, Any]:
+    if type(capsule) is not dict:
+        raise GamePlaySessionError("play session requires a capsule object")
+    # Recompute source rights, edits, platform claims and playability evidence.
+    verified = verify_game_capsule(capsule)
+    if len(controls) > MAX_FRAMES:
+        raise GamePlaySessionError("play session exceeded frame budget")
+    tiles = capsule["tilemap"]
+    spawn = compile_level({"tiles": tiles})["spawn"]
+    avatar = {"x": spawn["x"], "y": spawn["y"], "vx": 0, "vy": 0}
+    won_at: int | None = None
+    chain = _hash({"schema_version": SCHEMA, "capsule_sha256": verified["capsule_sha256"]})
+    for index, control in enumerate(controls, 1):
+        if won_at is not None:
+            raise GamePlaySessionError("terminal victory forbids further gameplay inputs")
+        outcome = platformer_step({"tiles": tiles, "avatar": avatar, "control": control})
+        avatar = outcome["avatar"]
+        chain = _hash({
+            "previous": chain, "frame": index, "control": control,
+            "avatar": avatar, "goal_reached": outcome["goal_reached"],
+        })
+        if outcome["goal_reached"]:
+            won_at = index
+    return {
+        "schema_version": SCHEMA,
+        "capsule_sha256": verified["capsule_sha256"],
+        "frame_count": len(controls),
+        "controls": controls,
+        "final_avatar": avatar,
+        "victory_frame": won_at,
+        "trace_sha256": chain,
+        "offline_replay": True,
+        "native_export_created": False,
+    }
+
+
+def _seal(capsule: Mapping[str, Any], controls: list[dict[str, bool]]) -> dict[str, Any]:
+    body = _replay(capsule, controls)
+    return {**body, "session_sha256": _hash(body)}
+
+
+def start_play_session(capsule: Mapping[str, Any], controls: Any) -> dict[str, Any]:
+    """Start a bounded controller-driven game, with a replayable save receipt."""
+    return _seal(capsule, _admit_controls(controls, batch=True))
+
+
+def verify_play_session(capsule: Mapping[str, Any], session: Any) -> dict[str, Any]:
+    """Reject forged or stale state by replaying all authoritative controls."""
+    if type(session) is not dict or set(session) != _SESSION_KEYS:
+        raise GamePlaySessionError("play session schema mismatch")
+    if session.get("schema_version") != SCHEMA:
+        raise GamePlaySessionError("unsupported play session version")
+    controls = _admit_controls(session["controls"], batch=False)
+    expected = _seal(capsule, controls)
+    if expected != session:
+        raise GamePlaySessionError("play session differs from source-bound replay")
+    return {
+        "schema_version": "skeleton.game.play_session.verify.v1",
+        "capsule_sha256": expected["capsule_sha256"],
+        "session_sha256": expected["session_sha256"],
+        "frame_count": expected["frame_count"],
+        "victory_frame": expected["victory_frame"],
+        "source_bound_replay_verified": True,
+        "native_export_created": False,
+    }
+
+
+def resume_play_session(
+    capsule: Mapping[str, Any], session: Any, controls: Any,
+) -> dict[str, Any]:
+    """Verify prior state before appending up to 64 new deterministic frames."""
+    verify_play_session(capsule, session)
+    admitted = _admit_controls(controls, batch=True)
+    if session["victory_frame"] is not None:
+        raise GamePlaySessionError("terminal victory cannot be resumed")
+    if session["frame_count"] + len(admitted) > MAX_FRAMES:
+        raise GamePlaySessionError("play session exceeded frame budget")
+    return _seal(capsule, session["controls"] + admitted)
+
+
+__all__ = [
+    "SCHEMA", "MAX_FRAMES", "MAX_BATCH_FRAMES", "GamePlaySessionError",
+    "start_play_session", "resume_play_session", "verify_play_session",
+]
