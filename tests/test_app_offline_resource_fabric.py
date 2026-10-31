@@ -813,5 +813,76 @@ class IOPressureTests(unittest.TestCase):
             controller.observe({"some": 25})
 
 
+
+class CPUThrottleTests(unittest.TestCase):
+    """Synthetic cgroup CPU.stat deltas control the canonical staging planner."""
+
+    def test_linux_cpu_stat_probe_and_invalid_counters(self):
+        from skeleton.app.offline_cpu_throttle import probe_cpu_throttle
+        with TemporaryDirectory() as d:
+            stat = Path(d) / "cpu.stat"
+            stat.write_text("usage_usec 500\nnr_periods 100\nnr_throttled 20\n"
+                            "throttled_usec 300\n")
+            with patch("skeleton.app.offline_cpu_throttle.sys.platform", "linux"):
+                sample = probe_cpu_throttle(d)
+                self.assertEqual((sample.periods, sample.throttled_periods), (100, 20))
+                stat.write_text("nr_periods 2\nnr_throttled 3\nthrottled_usec 1\n")
+                self.assertIsNone(probe_cpu_throttle(d))
+            with patch("skeleton.app.offline_cpu_throttle.sys.platform", "darwin"):
+                self.assertIsNone(probe_cpu_throttle(d))
+
+    def test_throttling_hysteresis_limits_real_stream_plan(self):
+        from skeleton.app.offline_cpu_throttle import CPUThrottleSample
+        before = CPUThrottleSample(100, 10, 100)
+        busy = CPUThrottleSample(200, 40, 200)
+        recovering = CPUThrottleSample(300, 55, 250)
+        clear = CPUThrottleSample(400, 56, 260)
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_cgroup_events",
+                return_value=None,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_io_pressure",
+                return_value=None,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_cpu_throttle",
+                side_effect=[before, busy, recovering, clear, clear],
+            ):
+                self.assertGreater(fabric.plan(1000, desired_streams=8).stream_count, 1)
+                slowed = fabric.plan(1000, desired_streams=8)
+                self.assertTrue(slowed.cpu_throttle_backpressure)
+                self.assertEqual(slowed.stream_count, 1)
+                self.assertIn("CPU throttling", slowed.reason)
+                self.assertTrue(fabric.plan(1000, desired_streams=8).cpu_throttle_backpressure)
+                self.assertFalse(fabric.plan(1000, desired_streams=8).cpu_throttle_backpressure)
+                receipt = fabric.monitor()["controller"]["cpu_throttle"]
+                self.assertEqual(receipt["transitions"], 2)
+                self.assertTrue(receipt["measured"])
+
+    def test_unknown_and_reset_preserve_throttle_hold(self):
+        from skeleton.app.offline_cpu_throttle import (
+            CPUThrottleSample, CPUThrottleController,
+        )
+        controller = CPUThrottleController()
+        controller.observe(CPUThrottleSample(100, 10, 100))
+        controller.observe(CPUThrottleSample(200, 50, 200))
+        controller.observe(None)
+        self.assertTrue(controller.snapshot()["backpressure"])
+        self.assertFalse(controller.snapshot()["measured"])
+        controller.observe(CPUThrottleSample(0, 0, 0))
+        self.assertTrue(controller.snapshot()["backpressure"])
+        controller.observe(CPUThrottleSample(100, 0, 1))
+        self.assertFalse(controller.snapshot()["backpressure"])
+        with self.assertRaises(TypeError):
+            controller.observe({"periods": 100})
+
+
 if __name__ == "__main__":
     unittest.main()

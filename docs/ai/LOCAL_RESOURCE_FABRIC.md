@@ -570,3 +570,16 @@ unknown sample retains a prior congestion hold. This is advisory cooperative
 backpressure, not an OS I/O scheduler override. The resource monitor reports
 whether the reading was actually measured and the current hysteresis state.
 Windows and macOS remain explicitly unsupported by this Linux PSI probe.
+
+
+## Linux cgroup CPU quota-throttling feedback
+
+The controller reads v2 cpu.stat counters for scheduling periods, throttled
+periods and throttled microseconds. It derives a throttled-period ratio only
+from consecutive monotonic counter deltas, never from the cumulative total.
+When at least 20% of sampled periods are throttled, future read-stream plans
+are capped at one worker; they recover after a subsequent valid sample with
+at most 5% throttled periods. Missing, reset or inconsistent counters cannot
+clear an existing hold. The monitor reports whether the sensor was measured,
+observed delta ratio and transition count. This is a CPU scheduling hint, not
+an OS quota modification or a claim of universal platform support.

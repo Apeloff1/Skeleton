@@ -27,6 +27,7 @@ from typing import Any, Iterable
 
 from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from .offline_io_pressure import IOPressureController, probe_io_pressure
+from .offline_cpu_throttle import CPUThrottleController, probe_cpu_throttle
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
 )
@@ -380,6 +381,7 @@ class FabricPlan:
     cgroup_high_backpressure: bool = False
     cgroup_oom_backpressure: bool = False
     io_backpressure: bool = False
+    cpu_throttle_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -394,6 +396,7 @@ class FabricPlan:
             "cgroup_high_backpressure": self.cgroup_high_backpressure,
             "cgroup_oom_backpressure": self.cgroup_oom_backpressure,
             "io_backpressure": self.io_backpressure,
+            "cpu_throttle_backpressure": self.cpu_throttle_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -455,12 +458,14 @@ class AdaptiveResourceFabric:
         self._thermal_blocked: set[tuple[int, str, str]] = set()
         self._cgroup = CgroupPressureTracker()
         self._io = IOPressureController()
+        self._cpu_throttle = CPUThrottleController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
         gpus = probe_gpu_resources()
         self._cgroup.sample(probe_cgroup_events())
         self._io.observe(probe_io_pressure())
+        self._cpu_throttle.observe(probe_cpu_throttle())
         ram_pressure = 1 - hardware.available_ram_bytes / hardware.total_ram_bytes
         swap_pressure = (
             1 - hardware.free_swap_bytes / hardware.total_swap_bytes
@@ -496,6 +501,7 @@ class AdaptiveResourceFabric:
         hw = snap.hardware
         cgroup = self._cgroup.snapshot()
         io = self._io.snapshot()
+        cpu_throttle = self._cpu_throttle.snapshot()
         if readonly_stream and cgroup["oom_backpressure"]:
             raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
@@ -535,7 +541,8 @@ class AdaptiveResourceFabric:
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
-        if cgroup["high_backpressure"] or io["congested"]:
+        if (cgroup["high_backpressure"] or io["congested"]
+                or cpu_throttle["backpressure"]):
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -598,6 +605,8 @@ class AdaptiveResourceFabric:
             reason += "; measured GPU thermal hold"
         if io["congested"]:
             reason += "; observed IO stall backpressure"
+        if cpu_throttle["backpressure"]:
+            reason += "; observed cgroup CPU throttling"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -613,6 +622,7 @@ class AdaptiveResourceFabric:
             "cgroup_high_backpressure": cgroup["high_backpressure"],
             "cgroup_oom_backpressure": cgroup["oom_backpressure"],
             "io_backpressure": io["congested"],
+            "cpu_throttle_backpressure": cpu_throttle["backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -630,6 +640,7 @@ class AdaptiveResourceFabric:
             cgroup_high_backpressure=bool(cgroup["high_backpressure"]),
             cgroup_oom_backpressure=bool(cgroup["oom_backpressure"]),
             io_backpressure=bool(io["congested"]),
+            cpu_throttle_backpressure=bool(cpu_throttle["backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -693,6 +704,7 @@ class AdaptiveResourceFabric:
             "waiting_stream_batches": waiting_batches,
             "cgroup_memory_events": self._cgroup.snapshot(),
             "io_pressure": self._io.snapshot(),
+            "cpu_throttle": self._cpu_throttle.snapshot(),
         }
         return result
 
