@@ -42,19 +42,26 @@ git diff --name-only -z HEAD^1 HEAD | {
 
   while IFS= read -r -d '' path; do
     seen=true
+    classified=false
     case "$path" in
       .github/workflows/ci.yml|.github/workflows/merge-readiness.yml|.github/ci/*|pyproject.toml|requirements*.txt)
         force_all=true
+        classified=true
         ;;
     esac
-    case "$path" in frontend/*) frontend=true ;; esac
-    case "$path" in backend/*) backend=true ;; esac
-    case "$path" in skeleton/*|tests/*|scripts/*|java-accelerators/*) python=true ;; esac
+    case "$path" in frontend/*) frontend=true; classified=true ;; esac
+    case "$path" in backend/*) backend=true; classified=true ;; esac
+    case "$path" in skeleton/*|tests/*|scripts/*|java-accelerators/*) python=true; classified=true ;; esac
     case "$path" in
       Dockerfile*|*/Dockerfile*|.dockerignore|compose*.yml|compose*.yaml|frontend/nginx.conf|frontend/scripts/test-nginx-runtime-dns.mjs)
         docker=true
+        classified=true
         ;;
     esac
+    # New/unclassified paths must never silently suppress all optional CI lanes.
+    if [ "$classified" = false ]; then
+      force_all=true
+    fi
   done
 
   if [ "$seen" = false ] || [ "$force_all" = true ]; then

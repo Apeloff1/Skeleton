@@ -177,6 +177,40 @@ def test_empty_merge_diff_fails_closed_to_every_lane(tmp_path: Path) -> None:
     assert set(_scope(repo, "pull_request").values()) == {"true"}
 
 
+@pytest.mark.parametrize("changed_path", [
+    "machine/unknown_policy_contract.json",
+    ".github/workflows/new-security-gate.yml",
+    "README.md",
+])
+def test_unclassified_path_fails_closed_to_every_lane(tmp_path: Path, changed_path: str) -> None:
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    changed = repo / changed_path
+    changed.parent.mkdir(parents=True, exist_ok=True)
+    changed.write_text("updated\\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", "unclassified source")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature", "-m", "merge unclassified")
+    assert set(_scope(repo, "pull_request").values()) == {"true"}
+
+
+def test_mixed_known_and_unknown_path_keeps_every_lane(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    for name in ("frontend/App.tsx", "machine/unclassified_policy.json"):
+        changed = repo / name
+        changed.parent.mkdir(parents=True, exist_ok=True)
+        changed.write_text("source\\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", "mixed known and unknown")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature", "-m", "merge mixed")
+    assert set(_scope(repo, "pull_request").values()) == {"true"}
+
+
 def test_reusable_ci_calls_the_shared_scope_script_once() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "bash scripts/ci_change_scope.sh" in ci
