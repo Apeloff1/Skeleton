@@ -35,6 +35,13 @@ def _integer(value: object, minimum: int = 0, maximum: int = MAX_CURRENCY) -> in
     return value
 
 
+def _safe_id(value: object, name: str) -> str:
+    req_id(value, name)
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise GameplayContractError("control character in " + name)
+    return value
+
+
 def _canonical(value: object) -> bytes:
     try:
         return json.dumps(
@@ -60,7 +67,7 @@ class QuestReward:
             if self.quantity != 0:
                 raise GameplayContractError("quantity without item")
         else:
-            req_id(self.item_id, "item_id")
+            _safe_id(self.item_id, "item_id")
             _integer(self.quantity, 1, MAX_REWARD)
         _integer(self.currency, 0, MAX_REWARD)
 
@@ -79,17 +86,19 @@ class QuestSpec:
     ending_id: str | None = None
 
     def __post_init__(self) -> None:
-        req_id(self.quest_id, "quest_id")
-        req_id(self.event_type, "event_type")
-        req_id(self.source_id, "source_id")
+        _safe_id(self.quest_id, "quest_id")
+        _safe_id(self.event_type, "event_type")
+        _safe_id(self.source_id, "source_id")
         req_digest(self.payload_digest, "payload_digest")
         if self.ending_id is not None:
-            req_id(self.ending_id, "ending_id")
+            _safe_id(self.ending_id, "ending_id")
+        if not isinstance(self.reward, QuestReward):
+            raise GameplayContractError("invalid reward contract")
         dependencies = tuple(sorted(self.dependencies))
         if self.quest_id in dependencies or len(set(dependencies)) != len(dependencies):
             raise GameplayContractError("invalid quest dependencies")
         for dependency in dependencies:
-            req_id(dependency, "dependency")
+            _safe_id(dependency, "dependency")
         object.__setattr__(self, "dependencies", dependencies)
 
     def as_record(self) -> dict[str, object]:
@@ -114,7 +123,7 @@ class QuestTrigger:
 
     def __post_init__(self) -> None:
         _integer(self.sequence, 0, MAX_EVENTS - 1)
-        req_id(self.quest_id, "quest_id")
+        _safe_id(self.quest_id, "quest_id")
         # Reuse the canonical event contract and its strict identity checks.
         GameplayEvent(self.sequence, self.event_type, self.source_id, self.payload_digest)
 
@@ -130,9 +139,11 @@ class QuestTrigger:
 
 class QuestPlan:
     def __init__(self, world_id: str, quests: Sequence[QuestSpec]) -> None:
-        self.world_id = req_id(world_id, "world_id")
+        self.world_id = _safe_id(world_id, "world_id")
         if not quests or len(quests) > MAX_QUESTS:
             raise GameplayContractError("quest count out of bounds")
+        if any(not isinstance(quest, QuestSpec) for quest in quests):
+            raise GameplayContractError("invalid quest contract")
         ids = [quest.quest_id for quest in quests]
         if len(set(ids)) != len(ids):
             raise GameplayContractError("duplicate quest identity")
@@ -192,7 +203,7 @@ class QuestSession:
     events: tuple[QuestTrigger, ...] = ()
 
     def __post_init__(self) -> None:
-        req_id(self.world_id, "world_id")
+        _safe_id(self.world_id, "world_id")
         req_digest(self.plan_digest, "plan_digest")
         _integer(self.currency)
         if len(self.events) > MAX_EVENTS or len(self.inventory) > MAX_ITEMS:
@@ -200,8 +211,10 @@ class QuestSession:
         if len(set(self.completed)) != len(self.completed):
             raise GameplayContractError("duplicate completion")
         for quest_id in self.completed:
-            req_id(quest_id, "completed quest")
+            _safe_id(quest_id, "completed quest")
         for index, event in enumerate(self.events):
+            if not isinstance(event, QuestTrigger):
+                raise GameplayContractError("invalid quest event")
             if event.sequence != index:
                 raise GameplayContractError("non-canonical event sequence")
         if tuple(sorted(self.inventory)) != self.inventory:
@@ -209,10 +222,10 @@ class QuestSession:
         if len({item for item, _ in self.inventory}) != len(self.inventory):
             raise GameplayContractError("duplicate inventory item")
         for item, count in self.inventory:
-            req_id(item, "item_id")
+            _safe_id(item, "item_id")
             _integer(count, 1, MAX_CURRENCY)
         if self.ending_id is not None:
-            req_id(self.ending_id, "ending_id")
+            _safe_id(self.ending_id, "ending_id")
 
     def as_state(self) -> dict[str, object]:
         return {
