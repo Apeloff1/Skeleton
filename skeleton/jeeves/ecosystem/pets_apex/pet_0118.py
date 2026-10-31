@@ -1,0 +1,11 @@
+"""Pet apex 0118.
+"""
+from __future__ import annotations
+
+ID = "pet_apex_0118"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "pet", "index": 118}
+
+def activate(context: str = "") -> dict:
+    return {"ok": True, "id": ID, "context": context[:100], "active": True}
