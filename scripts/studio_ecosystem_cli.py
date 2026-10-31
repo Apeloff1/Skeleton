@@ -33,6 +33,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="Find and replay-verify prerequisites for an authored NPC scene")
     ap.add_argument("--dialogue-route-choices", metavar="JSON",
                     help="Optional exact stage-to-authored-alternative preferences")
+    ap.add_argument("--dialogue-npc-codex", action="store_true",
+                    help="Page source-bound original NPC encounter cards")
+    ap.add_argument("--dialogue-npc-id", help="Optional exact original NPC ID")
+    ap.add_argument("--dialogue-npc-offset", type=int, default=0)
+    ap.add_argument("--dialogue-npc-limit", type=int, default=8)
+    ap.add_argument("--dialogue-npc-expected-session",
+                    help="Exact session digest required for continuation pages")
     ap.add_argument("--dialogue-itinerary-scenes", metavar="JSON",
                     help="Ordered JSON list of 1..8 authored NPC scene IDs")
     ap.add_argument("--dialogue-itinerary-expected-session",
@@ -263,6 +270,10 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if not args.dialogue_stage and (args.dialogue_npc_codex or args.dialogue_npc_id is not None
+                                    or args.dialogue_npc_offset != 0 or args.dialogue_npc_limit != 8
+                                    or args.dialogue_npc_expected_session is not None):
+        ap.error("NPC codex requires --dialogue-stage")
     if not args.dialogue_stage and (args.dialogue_itinerary_scenes is not None
                                     or args.dialogue_itinerary_expected_session is not None):
         ap.error("NPC itinerary requires --dialogue-stage")
@@ -281,6 +292,18 @@ def main(argv: list[str] | None = None) -> int:
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_npc_codex and (
+                    args.dialogue_itinerary_scenes is not None
+                    or args.dialogue_route_scene is not None or args.dialogue_checkpoints
+                    or args.dialogue_fork_index is not None or args.dialogue_compare_actions is not None
+                    or args.dialogue_transcript or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None or args.output is not None)
+                or not args.dialogue_npc_codex and (
+                    args.dialogue_npc_id is not None or args.dialogue_npc_offset != 0
+                    or args.dialogue_npc_limit != 8
+                    or args.dialogue_npc_expected_session is not None)):
+            ap.error("NPC codex pagination requires --dialogue-npc-codex exclusively")
         if (args.dialogue_itinerary_scenes is not None and (
                     args.dialogue_route_scene is not None or args.dialogue_route_choices is not None
                     or args.dialogue_checkpoints or args.dialogue_fork_index is not None
@@ -385,7 +408,17 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_itinerary_scenes is not None:
+            if args.dialogue_npc_codex:
+                from skeleton.ai.game_builder.studio_ecosystem_npc_codex import page_npc_encounters
+                from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+                source_digest = (args.dialogue_expected_digest
+                                 or audit_canon_source(docs, authorized=True)["source_digest"])
+                result = page_npc_encounters(
+                    docs, actions, authorized=True, expected_source_digest=source_digest,
+                    npc_id=args.dialogue_npc_id, offset=args.dialogue_npc_offset,
+                    limit=args.dialogue_npc_limit,
+                    expected_session_digest=args.dialogue_npc_expected_session)
+            elif args.dialogue_itinerary_scenes is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_itinerary import (
                     plan_dialogue_itinerary,
                 )

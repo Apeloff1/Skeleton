@@ -1493,3 +1493,59 @@ def execute_dialogue_itinerary_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+NPC_CODEX_REQUEST_SCHEMA = "skeleton.jeeves.studio_npc_codex_request.v1"
+NPC_CODEX_RESULT_SCHEMA = "skeleton.jeeves.studio_npc_codex_result.v1"
+
+
+def npc_codex_tool_schema() -> dict[str, object]:
+    """Read-only original NPC encounter index with exact continuation leases."""
+    return {
+        "name": "studio_npc_encounter_codex",
+        "description": "Page source-verified original NPC encounter cues and quest status",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": NPC_CODEX_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "npc_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "offset": {"type": "integer", "minimum": 0},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 16},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_npc_codex_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves NPC codex requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    allowed = required | {"expected_session_digest", "npc_id", "offset", "limit"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - allowed or request.get("schema") != NPC_CODEX_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves NPC codex request")
+    from skeleton.ai.game_builder.studio_ecosystem_npc_codex import page_npc_encounters
+    detail = page_npc_encounters(
+        read_blueprint(request["project_id"]), request["actions"],
+        authorized=True, expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request.get("expected_session_digest"),
+        npc_id=request.get("npc_id"), offset=request.get("offset", 0),
+        limit=request.get("limit", 8))
+    payload: dict[str, Any] = {
+        "schema": NPC_CODEX_RESULT_SCHEMA, "project_id": request["project_id"],
+        "request_digest": _digest(request), "detail": detail,
+        "file_write_performed": False, "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
