@@ -6,6 +6,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { test } = require('node:test');
 const { compileFunction } = require('node:vm');
+const { spawnSync } = require('node:child_process');
 const ts = require('typescript');
 const source = fs.readFileSync(path.resolve(__dirname, '../src/features/Jeeves/successorPreviewDocument.ts'), 'utf8');
 const compiled = ts.transpileModule(source, { reportDiagnostics: true, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
@@ -74,4 +75,41 @@ test('CSP precedes attacker-controlled tags even with a fake head and blocks the
   }), html);
   assert.deepEqual(outcome, { result: 'blocked', game: 'started', origin: 'null' });
   assert.deepEqual(requests.filter(url => url.startsWith('/leaked-')), []);
+});
+
+test('generated successor starts and responds to keyboard input in the actual isolated preview', {
+  skip: runtime ? false : 'Requires a local Playwright installation and Chromium executable', timeout: 45000,
+}, async t => {
+  // This compiles an original temporary recipe through the real application
+  // generator; it is not a canned HTML fixture or a claim about ROM support.
+  const python = process.env.SKELETON_TEST_PYTHON || 'python3';
+  const generator = spawnSync(python, ['-c', [
+    'import json',
+    'from skeleton.jeeves.game_successor import compile_successor, default_successor_profiles',
+    "recipe = compile_successor(default_successor_profiles(), project_id='preview_test', title='Temporary preview test', seed=4)",
+    "print(json.dumps([{'path': p, 'content': c} for p, c in recipe.files.items() if p.startswith('game/successor/')]))",
+  ].join('\n')], { cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', maxBuffer: 9 * 1024 * 1024 });
+  if (generator.error?.code === 'ENOENT') { t.skip('Requires Python 3 to generate a successor'); return; }
+  assert.equal(generator.status, 0, `Successor generation failed: ${generator.stderr}`);
+  const html = successorPreviewDocument(JSON.parse(generator.stdout));
+  assert.ok(html);
+  const browser = await runtime.chromium.launch({ executablePath: runtime.executablePath, headless: true, args: ['--no-sandbox'] });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setContent('<iframe sandbox="allow-scripts"></iframe>');
+  await page.locator('iframe').evaluate((element, document) => { element.srcdoc = document; }, html);
+  const frame = page.frameLocator('iframe');
+  await frame.locator('#continue').click({ timeout: 15000 });
+  const child = page.frames().find(value => value !== page.mainFrame());
+  assert.ok(child);
+  const before = await child.evaluate(() => window.SUCCESSOR_GAME.getState());
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(600);
+  await page.keyboard.up('ArrowRight');
+  const after = await child.evaluate(() => window.SUCCESSOR_GAME.getState());
+  assert.ok(after.steps > before.steps, 'The generated game loop must advance');
+  assert.ok(after.x > before.x, 'A real ArrowRight key press must move the player');
+  assert.deepEqual(errors, []);
 });

@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "c46a24f545d7a214898e2f10bf63111374b6924d",
+      "source_git_object_sha": "cd986104431b5dd33c915f64cac31960d606722d",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "3b8db791c3c7445a746f255aa0159891af388863",
+      "source_git_object_sha": "f62ef9a6a5493aace0ea912417392e72895be0d1",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1499,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "b72b2c8393eb1178dd2421f841e67fa48c984290",
+      "source_git_object_sha": "1319be9bb28694090866a8e38115d8ccfeeccfdf",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"

@@ -25,7 +25,10 @@ source and verify the actual WSL2/Docker installation before release.
   manual reconciliation if their source, amount, currency or plan cannot be
   verified. The legacy webhook requires a scoped account and is not qualified
   for direct Stripe delivery; concurrent settlement is not yet atomic.
-  A generated game has not been demonstrated playable end to end on this source.
+  A single original successor recipe has rendered and responded to keyboard
+  input in Chromium, and one authenticated project build reached a headless
+  Godot playtest. These bounded examples do not establish general game quality,
+  coverage of generated games or full input-driven play in Godot.
 - The latest inspected [merge-readiness run](https://github.com/Apeloff1/Skeleton/actions/runs/41185615613)
   reported failures across its canonical test shards on a separate pull request.
   That run is diagnostic evidence, not a result for this branch or a complete
