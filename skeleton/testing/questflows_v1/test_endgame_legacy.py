@@ -8,10 +8,13 @@ from skeleton.forge.questflows_v1.endgame_legacy import (
 )
 
 
-def command(key="e0", action="advance", version=0, evidence=None):
+_UNSET = object()
+
+
+def command(key="e0", action="advance", version=0, evidence=_UNSET):
     return {
         "id": key, "action": action, "expected_version": version,
-        "evidence": [] if evidence is None else evidence,
+        "evidence": [] if evidence is _UNSET else evidence,
     }
 
 
