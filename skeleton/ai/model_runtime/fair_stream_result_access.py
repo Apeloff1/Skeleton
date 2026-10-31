@@ -7,7 +7,6 @@ a crash cannot silently replay the grant. No prompt or plaintext is logged.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 import hmac
 import json
 import sqlite3
@@ -94,7 +93,7 @@ def issue_result_read_grant(
     The caller is responsible for independent operator authentication,
     signing-key protection and cryptographically random, unique nonces.
     """
-    if type(signing_key) is not Ed25519PrivateKey:
+    if not isinstance(signing_key, Ed25519PrivateKey):
         raise ValueError("canonical Ed25519 operator signing key required")
     body = _body(
         session_id=session_id, generation=generation,
@@ -109,7 +108,7 @@ def verify_result_read_grant(
     permit: DispatchPermit, session_id: str, result_digest: str,
 ) -> str:
     """Verify exact signed lease, model-result receipt and one-use nonce."""
-    if type(public_key) is not Ed25519PublicKey:
+    if not isinstance(public_key, Ed25519PublicKey):
         raise ResultReadDenied("trusted operator verification key required")
     if type(permit) is not DispatchPermit or permit.device_qualified:
         raise ResultReadDenied("canonical CPU-only permit required")
