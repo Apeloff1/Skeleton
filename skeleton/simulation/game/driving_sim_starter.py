@@ -36,6 +36,22 @@ class ThermalState:
     brake_temp: float = 50.0
 
 @dataclass
+class TireState:
+    """Deterministic, independent tire temperature, wear and grip custody."""
+    corner: str
+    temperature: float = 70.0
+    wear: float = 0.0
+    grip: float = 1.0
+
+
+def _fresh_tires() -> tuple[TireState, ...]:
+    return tuple(
+        TireState(corner)
+        for corner in ("front_left", "front_right", "rear_left", "rear_right")
+    )
+
+
+@dataclass
 class VehicleState:
     x: float = 0.0
     y: float = 0.0
@@ -46,6 +62,7 @@ class VehicleState:
     downforce: float = 0.0
     aero_balance: float = 0.5
     thermal: ThermalState = field(default_factory=ThermalState)
+    tires: tuple[TireState, ...] = field(default_factory=_fresh_tires)
     telemetry: Dict[str, float] = field(default_factory=dict)
     digest: str = ""
     collision: bool = False
@@ -79,7 +96,24 @@ class DrivingSimulator:
         self.state.downforce = 0.5 * _AIR_DENSITY * 2.1 * self.frontal_area * v * v * 0.35
         self.state.aero_balance = 0.45 + (v / _MAX_SPEED) * 0.1
         self.state.thermal.engine_temp = min(140.0, self.state.thermal.engine_temp + throttle * 0.8 - 0.3)
-        self.state.thermal.tire_temp = min(120.0, self.state.thermal.tire_temp + abs(steer) * v * 0.02)
+        # Distinct front/rear and outside/inside tire loads; no shared mutable
+        # tire instances across vehicles or resets. Keep aggregate telemetry.
+        for tire in self.state.tires:
+            front = tire.corner.startswith("front")
+            outside = (steer > 0) == tire.corner.endswith("right")
+            side_bias = (1.2 if outside else 0.8) if steer else 1.0
+            slip_heat = abs(steer) * v * (0.018 if front else 0.010) * side_bias
+            brake_heat = brake * (0.7 if front else 0.4)
+            heat = max(0.0, slip_heat + brake_heat)
+            tire.temperature = min(140.0, tire.temperature + heat)
+            tire.wear = min(1.0, tire.wear + heat * 0.0002)
+            tire.grip = max(
+                0.2, 1.0 - max(0.0, tire.temperature - 100.0) * 0.008
+                - tire.wear * 0.3
+            )
+        self.state.thermal.tire_temp = min(
+            120.0, sum(tire.temperature for tire in self.state.tires) / 4.0
+        )
         self.state.thermal.brake_temp = min(800.0, self.state.thermal.brake_temp + brake * 15.0 - 2.0)
         torque = self.power * throttle * (1.0 - self.state.rpm / 9500.0) * (1.0 if self.state.thermal.engine_temp < 120 else 0.7)
         # Crankshaft torque must be geared into wheel force before opposing braking.
