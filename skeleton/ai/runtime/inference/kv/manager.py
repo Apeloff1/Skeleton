@@ -14,6 +14,7 @@ from .types import (
     KVCacheConfig,
     KVCacheMatch,
     KVCacheStats,
+    KVResidentPage,
     KVIntegrityReport,
     KVNamespace,
     KVPageInput,
@@ -317,6 +318,53 @@ class KVCacheManager:
                 if page is not None and page.pin_count:
                     page.pin_count -= 1
             self._enforce_limits(None)
+
+    def tier_inventory(self) -> tuple[KVResidentPage, ...]:
+        """Actual resident pages, without tensor handles or tenant content."""
+        with self._lock:
+            return tuple(
+                KVResidentPage(
+                    page.key, page.tier, page.size_bytes,
+                    page.pin_count, page.last_access,
+                )
+                for page in sorted(self._pages.values(), key=lambda p: p.key)
+            )
+
+    def migrate_if(
+        self, key: str, *, source: CacheTier, target: CacheTier,
+        expected_bytes: int,
+    ) -> bool:
+        """Single-page compare-and-migrate under the canonical KV lock.
+
+        The adapter owns physical movement. No migration occurs if the page
+        became pinned, changed tier/size, or was evicted after planning.
+        """
+        if not isinstance(key, str) or len(key) != 64:
+            raise ValueError("invalid migration page identity")
+        if not isinstance(source, CacheTier) or not isinstance(target, CacheTier) or source is target:
+            raise ValueError("distinct source and target tiers required")
+        if type(expected_bytes) is not int or expected_bytes <= 0:
+            raise ValueError("invalid expected page size")
+        with self._lock:
+            page = self._pages.get(key)
+            if (page is None or page.tier is not source
+                    or page.size_bytes != expected_bytes or page.pin_count):
+                return False
+            if self._storage is None:
+                raise RuntimeError("tier migration requires a KVStorageAdapter")
+            try:
+                handle = self._storage.move(page.handle, source, target)
+            except Exception:
+                self._counters["storage_errors"] += 1
+                raise
+            if handle is None:
+                self._counters["storage_errors"] += 1
+                raise RuntimeError("tier adapter returned no page handle")
+            page.handle = handle
+            page.tier = target
+            page.last_access = self._clock()
+            self._counters["migrations"] += 1
+            return True
 
     def migrate(self, page_keys: Iterable[str], target: CacheTier) -> tuple[str, ...]:
         moved: list[str] = []

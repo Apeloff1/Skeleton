@@ -135,6 +135,29 @@ class KVReuseEstimate:
 
 
 @dataclass(frozen=True, slots=True)
+class KVResidentPage:
+    """Payload-free, immutable view of one actual resident KV page."""
+
+    key: str
+    tier: CacheTier
+    size_bytes: int
+    pin_count: int
+    last_access: float
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, str) or len(self.key) != 64:
+            raise ValueError("invalid resident page identity")
+        if not isinstance(self.tier, CacheTier):
+            raise ValueError("invalid resident page tier")
+        if type(self.size_bytes) is not int or self.size_bytes <= 0:
+            raise ValueError("invalid resident page bytes")
+        if type(self.pin_count) is not int or self.pin_count < 0:
+            raise ValueError("invalid resident page pin count")
+        if not isinstance(self.last_access, (int, float)) or not math.isfinite(self.last_access):
+            raise ValueError("invalid resident page access time")
+
+
+@dataclass(frozen=True, slots=True)
 class KVCacheStats:
     lookups: int
     hits: int
