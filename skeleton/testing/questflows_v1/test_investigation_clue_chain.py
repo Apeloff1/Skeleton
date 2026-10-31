@@ -137,6 +137,25 @@ def test_invalid_state_invariants():
         QuestState(event_ids=frozenset({"a"}) | frozenset({""}))
 
 
+def test_reconstructed_state_rejects_forged_completion():
+    with pytest.raises(ValueError, match="grant-ledger-mismatch"):
+        QuestState(stage=len(STAGES), version=len(STAGES), status="completed",
+                   event_ids=frozenset(f"e{i}" for i in range(len(STAGES))))
+
+
+def test_reconstructed_state_rejects_missing_event_ledger():
+    with pytest.raises(ValueError, match="event-version-mismatch"):
+        QuestState(version=1)
+
+
+def test_completed_replay_state_reconstructs_consistently():
+    steps = [command(f"e{i}", version=i, evidence=[stage[1]])
+             for i, stage in enumerate(STAGES)]
+    state, _ = replay(steps)
+    assert QuestState(state.stage, state.version, state.status,
+                      state.grants, state.event_ids) == state
+
+
 def test_replay_batch_capacity_fails_closed():
     with pytest.raises(ValueError):
         replay([command()] * (MAX_EVENTS + 1))

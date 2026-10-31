@@ -46,6 +46,13 @@ class QuestState:
             raise ValueError("invalid-ledger-entry")
         if len(self.event_ids) > MAX_EVENTS:
             raise ValueError("event-ledger-capacity")
+        expected_grants = frozenset(stage[2] for stage in STAGES[:self.stage])
+        if self.grants != expected_grants:
+            raise ValueError("grant-ledger-mismatch")
+        if self.version != len(self.event_ids):
+            raise ValueError("event-version-mismatch")
+        if self.status == "abandoned" and self.stage == len(STAGES):
+            raise ValueError("abandoned-after-completion")
 
 
 @dataclass(frozen=True, slots=True)
