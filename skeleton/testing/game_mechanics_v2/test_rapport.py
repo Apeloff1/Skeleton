@@ -65,6 +65,21 @@ def test_unexpected_fields_rejected():
     with pytest.raises(ValueError):
         apply(State(), {**event(), "role": "admin"})
 
+def test_restored_state_rejects_impossible_event_clock():
+    with pytest.raises(ValueError, match="event-tick-inconsistent"):
+        State(event_ids=frozenset({"forged"}))
+
+
+def test_restored_state_rejects_oversized_event_ledger():
+    with pytest.raises(ValueError, match="identity-capacity"):
+        State(tick=10001, event_ids=frozenset(f"e{i}" for i in range(10001)))
+
+
+def test_replayed_state_reconstructs_consistently():
+    state, _ = replay([event("a", tick=1), event("b", tick=3)])
+    assert State(state.value, state.tick, state.event_ids) == state
+
+
 def test_state_invariants():
     with pytest.raises(ValueError):
         State(value=MAX_VALUE + 1)

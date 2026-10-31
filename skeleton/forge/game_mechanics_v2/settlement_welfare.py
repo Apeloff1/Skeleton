@@ -6,7 +6,6 @@ monotonic logical clock, validated inputs, and reproducible event receipts.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from math import isfinite
 from typing import Any
 
 NAME = "settlement_welfare"
@@ -34,6 +33,10 @@ class State:
             raise ValueError("invalid-event-identity-set")
         if any(not isinstance(key, str) or not key or len(key) > 128 for key in self.event_ids):
             raise ValueError("invalid-event-identity")
+        if len(self.event_ids) > 10000:
+            raise ValueError("identity-capacity")
+        if len(self.event_ids) > self.tick:
+            raise ValueError("event-tick-inconsistent")
 
 @dataclass(frozen=True, slots=True)
 class Receipt:
