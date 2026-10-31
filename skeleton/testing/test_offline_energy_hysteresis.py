@@ -1,0 +1,105 @@
+"""Deterministic energy anti-thrash and stale telemetry regressions."""
+from __future__ import annotations
+
+from unittest import TestCase
+
+from skeleton.app.offline_cpu_budget import (
+    CpuTopology, MemoryTopology, plan_cpu_workers,
+)
+from skeleton.app.offline_energy_budget import (
+    PowerObservation, plan_energy_workers,
+)
+from skeleton.app.offline_energy_hysteresis import (
+    EnergyHysteresis, HysteresisError, HysteresisPolicy,
+)
+
+CPU = CpuTopology(8, 4, 8.0, None, "test", "test", "unavailable", "Linux")
+MEM = MemoryTopology(8 * 1024**3, 4 * 1024**3, "test")
+BASE = plan_cpu_workers(CPU, MEM, operator_max_workers=8,
+                        bytes_per_worker=256 * 1024**2,
+                        memory_reserve_bytes=512 * 1024**2,
+                        thermal_state="normal")
+
+
+def candidate(temp=40, battery=90, ac=True):
+    return plan_energy_workers(BASE, PowerObservation(
+        battery, ac, temp, "test-battery", "test-ac", "test-thermal",
+    ))
+
+
+class TestEnergyHysteresis(TestCase):
+    def test_recovery_requires_multiple_samples(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=3, recovery_cooldown_ns=0))
+        healthy = candidate()
+        self.assertEqual(gate.step(healthy, now_ns=1, sampled_ns=1).admitted_workers, 0)
+        self.assertEqual(gate.step(healthy, now_ns=2, sampled_ns=2).admitted_workers, 0)
+        self.assertEqual(gate.step(healthy, now_ns=3, sampled_ns=3).admitted_workers, 1)
+        self.assertEqual(gate.step(healthy, now_ns=4, sampled_ns=4).admitted_workers, 1)
+        self.assertEqual(gate.step(healthy, now_ns=6, sampled_ns=6).admitted_workers, 2)
+
+    def test_critical_sheds_immediately(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0))
+        gate.step(candidate(), now_ns=1, sampled_ns=1)
+        gate.step(candidate(), now_ns=2, sampled_ns=2)
+        self.assertEqual(gate.workers, 1)
+        receipt = gate.step(candidate(temp=95), now_ns=3, sampled_ns=3)
+        self.assertEqual(receipt.admitted_workers, 0)
+        self.assertEqual(receipt.healthy_streak, 0)
+
+    def test_stale_telemetry_denied(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2,
+                                                 recovery_cooldown_ns=0,
+                                                 max_sample_age_ns=10))
+        gate.step(candidate(), now_ns=1, sampled_ns=1)
+        gate.step(candidate(), now_ns=2, sampled_ns=2)
+        self.assertEqual(gate.workers, 1)
+        result = gate.step(candidate(), now_ns=100, sampled_ns=1)
+        self.assertEqual(result.admitted_workers, 0)
+        self.assertEqual(result.reason, "stale_or_future_telemetry")
+
+    def test_future_telemetry_denied(self):
+        gate = EnergyHysteresis()
+        result = gate.step(candidate(), now_ns=1, sampled_ns=2)
+        self.assertEqual(result.admitted_workers, 0)
+
+    def test_cooldown_prevents_oscillation(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2,
+                                                 recovery_cooldown_ns=100))
+        gate.step(candidate(), now_ns=1, sampled_ns=1)
+        gate.step(candidate(), now_ns=2, sampled_ns=2)
+        gate.step(candidate(temp=95), now_ns=3, sampled_ns=3)
+        for now in range(4, 20):
+            self.assertEqual(gate.step(candidate(), now_ns=now, sampled_ns=now).admitted_workers, 0)
+        self.assertEqual(gate.step(candidate(), now_ns=103, sampled_ns=103).admitted_workers, 1)
+
+    def test_step_cap(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2,
+                                                 recovery_cooldown_ns=0,
+                                                 max_recovery_step=2))
+        gate.step(candidate(), now_ns=1, sampled_ns=1)
+        result = gate.step(candidate(), now_ns=2, sampled_ns=2)
+        self.assertEqual(result.admitted_workers, 2)
+        self.assertLessEqual(result.admitted_workers, result.candidate_workers)
+
+    def test_deterministic_receipt(self):
+        first = EnergyHysteresis()
+        second = EnergyHysteresis()
+        a = first.step(candidate(), now_ns=100, sampled_ns=100)
+        b = second.step(candidate(), now_ns=100, sampled_ns=100)
+        self.assertEqual(a.digest, b.digest)
+
+    def test_clock_regression_rejected(self):
+        gate = EnergyHysteresis()
+        gate.step(candidate(), now_ns=10, sampled_ns=10)
+        with self.assertRaises(HysteresisError):
+            gate.step(candidate(), now_ns=9, sampled_ns=9)
+
+    def test_invalid_policy(self):
+        for options in (
+            {"recovery_samples": 1},
+            {"recovery_cooldown_ns": -1},
+            {"max_sample_age_ns": 0},
+            {"max_recovery_step": 0},
+        ):
+            with self.assertRaises(HysteresisError):
+                HysteresisPolicy(**options)
