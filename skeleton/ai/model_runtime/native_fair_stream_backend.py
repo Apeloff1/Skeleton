@@ -235,7 +235,12 @@ class NativeFairStreamBackend:
                 or type(requests) is not list):
             raise NativeFairStreamDenied("invalid pending lease cardinality")
         lease = pending[0]
-        if (lease.get("lease_id") != permit.lease_id
+        if (type(lease.get("lease_id")) is not str
+                or type(lease.get("request_id")) is not str
+                or type(lease.get("tenant_id")) is not str
+                or type(lease.get("tokens")) is not int
+                or type(lease.get("bytes_reserved")) is not int
+                or lease.get("lease_id") != permit.lease_id
                 or lease.get("request_id") != permit.request_id
                 or lease.get("tokens") != permit.tokens
                 or lease.get("bytes_reserved") != permit.bytes_reserved):
@@ -245,6 +250,11 @@ class NativeFairStreamBackend:
         if len(matching) != 1:
             raise NativeFairStreamDenied("missing canonical stream request")
         request = matching[0]
+        if (
+            type(request.get("tenant_id")) is not str
+            or request["tenant_id"] != lease["tenant_id"]
+        ):
+            raise NativeFairStreamDenied("lease and request tenant mismatch")
         bytes_per_token = request.get("bytes_per_token")
         if (type(bytes_per_token) is not int or bytes_per_token <= 0
                 or type(permit.tokens) is not int or permit.tokens <= 0

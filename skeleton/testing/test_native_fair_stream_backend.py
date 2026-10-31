@@ -276,3 +276,22 @@ def test_forged_native_output_digest_never_reaches_result_vault(monkeypatch):
         backend.generate(permit(), state())
     assert guard.status().stopped
     assert registry.status()["consumed_or_revoked"] == 1
+
+
+def test_pending_lease_cannot_change_tenant_after_durable_admission():
+    _, registry, backend = setup()
+    forged = state()
+    forged["checkpoint"]["pending"][0]["tenant_id"] = "bob"
+    with pytest.raises(NativeFairStreamDenied, match="tenant mismatch"):
+        backend.generate(permit(), forged)
+    assert registry.status()["staged"] == 1
+
+
+def test_bool_pending_token_count_cannot_alias_integer_permit():
+    _, registry, backend = setup()
+    p = permit(tokens=1)
+    forged = state(p)
+    forged["checkpoint"]["pending"][0]["tokens"] = True
+    with pytest.raises(NativeFairStreamDenied, match="lease identity mismatch"):
+        backend.generate(p, forged)
+    assert registry.status()["staged"] == 1
