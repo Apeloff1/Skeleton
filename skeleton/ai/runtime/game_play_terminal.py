@@ -6,8 +6,7 @@ Every action advances one authoritative source-bound simulation frame.
 """
 from __future__ import annotations
 
-from collections.abc import TextIO
-from typing import Any, Mapping
+from typing import Any, Mapping, TextIO
 
 from .game_play_session import (
     GamePlaySessionError, MAX_BATCH_FRAMES, render_play_session,
