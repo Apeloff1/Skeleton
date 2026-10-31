@@ -71,6 +71,11 @@ class JeevesGameOrchestrator:
         from .studio_walk_tool import execute_catalog_merge_tool
         return execute_catalog_merge_tool(request, authorized=authorized)
 
+    def authoritative_canon_proof(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Audit original authored source and ending obligations under operator authority."""
+        from .studio_walk_tool import execute_canon_proof_tool
+        return execute_canon_proof_tool(request, authorized=authorized)
+
     def model_card(self) -> str:
         return (
             "Jeeves game orchestrator: one call produces unified brief, advanced systems, "

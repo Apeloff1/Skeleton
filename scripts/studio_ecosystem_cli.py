@@ -27,6 +27,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Search authored narrative/quest/asset/audio sections as well")
     ap.add_argument("--limit", type=int, default=20,
                     help="Maximum deterministic search results, 1..100")
+    ap.add_argument("--audit-canon", action="store_true",
+                    help="Audit original scene/era/cast continuity and ending obligations")
     ap.add_argument("--play-quest", action="store_true",
                     help="Execute deterministic authored quest choices without certifying native gameplay")
     ap.add_argument("--quest-actions", help="Bounded JSON array of [stage, choice] pairs")
@@ -166,6 +168,22 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.audit_canon:
+        if (not args.project or args.play_walk or args.play_quest
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.compile_preview or args.materialize_batch or args.output
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.limit != 20 or args.quest_actions is not None
+                or args.max_artifact_bytes is not None):
+            ap.error("--audit-canon requires --project and excludes other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            proof = audit_canon_source(read_blueprint(args.project), authorized=True)
+        except (StudioQuestError, ValueError, TypeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(proof, sort_keys=True, separators=(",", ":")))
+        return 0
     if args.play_walk:
         if (not args.project or args.play_quest or args.quest_actions is not None
                 or args.search is not None or args.materialize_batch

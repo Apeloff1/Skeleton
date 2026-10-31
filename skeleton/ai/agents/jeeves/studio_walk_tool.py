@@ -344,3 +344,49 @@ def execute_catalog_merge_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+CANON_PROOF_REQUEST_SCHEMA = "skeleton.jeeves.studio_canon_proof_request.v1"
+CANON_PROOF_RESULT_SCHEMA = "skeleton.jeeves.studio_canon_proof_result.v1"
+
+
+def canon_proof_tool_schema() -> dict[str, object]:
+    """Discoverable, operator-gated original-world contradiction checker."""
+    return {
+        "name": "studio_canon_proof",
+        "description": "Audit source-bound era, scene, quest, cast and ending obligations",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": CANON_PROOF_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+            },
+            "required": ["schema", "project_id"],
+        },
+    }
+
+
+def execute_canon_proof_tool(request: Mapping[str, Any], *,
+                             authorized: bool = False) -> dict[str, Any]:
+    """Read canonical authored sections without a model or side effects."""
+    if authorized is not True:
+        raise PermissionError("Jeeves canon proof requires operator authorization")
+    if (type(request) is not dict or set(request) != {"schema", "project_id"}
+            or request.get("schema") != CANON_PROOF_REQUEST_SCHEMA):
+        raise StudioQuestError("invalid Jeeves canon proof request")
+    project = request["project_id"]
+    if type(project) is not str or not 1 <= len(project) <= 128:
+        raise StudioQuestError("invalid Jeeves canon proof project")
+    if len(_canonical(request)) > 4096:
+        raise StudioQuestError("Jeeves canon proof request exceeds byte budget")
+    from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+    detail = audit_canon_source(read_blueprint(project), authorized=True)
+    if detail["project_id"] != project:
+        raise StudioQuestError("Jeeves canon proof project/source mismatch")
+    payload = {
+        "schema": CANON_PROOF_RESULT_SCHEMA,
+        "project_id": project, "request_digest": _digest(request),
+        "detail": detail, "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

@@ -398,3 +398,15 @@ SHA-256 and an independent digest of the narrative/scene/cast source, so
 changing canon between pages fails closed. The typed Jeeves walk tool exposes
 `operation=journal` and the equivalent bounded continuation fields.
 No provider, native engine or unverified evidence is activated by this read.
+
+
+## Canon source proof and ending obligations
+
+`python scripts/studio_ecosystem_cli.py --project ID --audit-canon` checks
+original era order, quest-to-scene mapping, plot-beat identity, cast dialogue
+hooks and critical cast references against the canonical authored blueprint.
+Jeeves exposes the same read-only operation through
+`JeevesGameOrchestrator.authoritative_canon_proof()` and the typed
+`studio_canon_proof` tool schema. Contradictions are explicit deterministic
+issue records; unproven ending predicates remain external evidence obligations,
+not earned rewards. No authoring audit certifies rights, native gameplay or release.
