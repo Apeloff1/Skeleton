@@ -101,3 +101,13 @@ def test_probe_budget_validation(limit):
         NativeTokenPressureGuard(
             LiveStreamBudgetSampler(), storage_path=".", max_probes=limit,
         )
+
+
+def test_unobserved_success_cannot_reset_guard_to_available():
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    guard.start(P)
+    with pytest.raises(NativePressureInterrupted, match="unverified"):
+        guard.finish(success=True)
+    assert guard.status().stopped
+    with pytest.raises(NativePressureInterrupted, match="not available"):
+        guard.start(P)

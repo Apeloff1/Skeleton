@@ -168,3 +168,75 @@ def test_cpu_only_not_a_gpu_qualification():
     with pytest.raises(NativeFairStreamDenied, match="CPU-only"):
         backend.generate(p, state(p))
     assert registry.status()["staged"] == 1
+
+
+def test_invalid_native_result_never_marks_pressure_guard_success(monkeypatch):
+    """A native return value is not an attested execution receipt."""
+    from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
+    from skeleton.ai.model_runtime.fair_stream_queue import MeasuredStreamBudget
+    from skeleton.ai.model_runtime.native_token_pressure import NativeTokenPressureGuard
+
+    def sample(self, *, token_budget, storage_path):
+        return MeasuredStreamBudget(
+            available_ram_bytes=4096, reserved_ram_bytes=0,
+            token_budget=token_budget, stream_slots=1,
+            pressure_ppm=0, thermal_hold=False, measurement="os_probe",
+        ), {
+            "measurement": "os_probe", "gpu_device_qualified": False,
+            "physical_memory_reserved": False,
+            "auxiliary_telemetry_incomplete": True,
+        }
+
+    def invalid_native(self, sequence, config, *, interrupt=None):
+        assert interrupt is not None
+        interrupt()
+        return object()
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", invalid_native)
+    runtime, registry, _ = setup()
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    backend = NativeFairStreamBackend(runtime, registry, pressure_guard=guard)
+    with pytest.raises(NativeFairStreamDenied, match="untrusted native"):
+        backend.generate(permit(), state())
+    assert guard.status().stopped
+    assert guard.status().samples == 1
+    assert registry.status()["consumed_or_revoked"] == 1
+
+
+def test_postflight_pressure_hold_fences_attested_native_output(monkeypatch):
+    """The last OS sample runs after native result validation, before return."""
+    from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
+    from skeleton.ai.model_runtime.fair_stream_queue import MeasuredStreamBudget
+    from skeleton.ai.model_runtime.native_token_pressure import NativeTokenPressureGuard
+    from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
+
+    runtime, registry, _ = setup()
+    baseline = runtime.generate("hello", GenerationConfig(max_new_tokens=2))
+    readings = iter((1, 0))
+
+    def sample(self, *, token_budget, storage_path):
+        slots = next(readings)
+        return MeasuredStreamBudget(
+            available_ram_bytes=4096, reserved_ram_bytes=0,
+            token_budget=token_budget, stream_slots=slots,
+            pressure_ppm=0, thermal_hold=False, measurement="os_probe",
+        ), {
+            "measurement": "os_probe", "gpu_device_qualified": False,
+            "physical_memory_reserved": False,
+            "auxiliary_telemetry_incomplete": True,
+        }
+
+    def native_once(self, sequence, config, *, interrupt=None):
+        interrupt()
+        return baseline
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", native_once)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    backend = NativeFairStreamBackend(runtime, registry, pressure_guard=guard)
+    with pytest.raises(NativeFairStreamDenied, match="no retry"):
+        backend.generate(permit(), state())
+    assert guard.status().stopped
+    assert guard.status().samples == 2
+    assert registry.status()["consumed_or_revoked"] == 1

@@ -287,7 +287,35 @@ class NativeFairStreamBackend:
                         sequence, config, interrupt=interrupt,
                     )
                     _cpu_runtime(self.runtime)
+                    # A native model returning an object is NOT a completion:
+                    # validate its exact identity, token accounting, output
+                    # encoding and result capacity while the guard is active.
+                    if type(result) is not GenerationResult:
+                        raise NativeFairStreamDenied("untrusted native generation result")
+                    receipt = result.replay_receipt
+                    if (receipt.model_digest != model
+                            or receipt.tokenizer_digest != tokenizer
+                            or receipt.device_digest != self.runtime.device.digest
+                            or result.prompt_sequence.token_ids != sequence.token_ids
+                            or type(result.usage.generated_tokens) is not int
+                            or result.usage.generated_tokens != len(result.generated_ids)
+                            or result.usage.generated_tokens > permit.tokens
+                            or type(result.text) is not str):
+                        raise NativeFairStreamDenied("native output attestation mismatch")
+                    try:
+                        output = result.text.encode("utf-8", errors="strict")
+                    except UnicodeEncodeError as exc:
+                        raise NativeFairStreamDenied("invalid native output Unicode") from exc
+                    if len(output) > MAX_RESULT_BYTES:
+                        raise NativeFairStreamDenied("native output exceeds sealed vault limit")
+                    # A final independent OS sample fences thermal/memory
+                    # pressure that changed after the last model callback.
+                    # A postflight hold is outcome-uncertain: no result escapes
+                    # to the encrypted vault or durable success journal.
+                    if interrupt is not None:
+                        interrupt()
                     succeeded = True
+                    return result.usage.generated_tokens, output
                 finally:
                     if guard is not None:
                         guard.finish(success=succeeded)
@@ -295,22 +323,4 @@ class NativeFairStreamBackend:
                 raise
             except Exception as exc:
                 raise NativeFairStreamDenied("native inference failed; no retry") from exc
-            if type(result) is not GenerationResult:
-                raise NativeFairStreamDenied("untrusted native generation result")
-            receipt = result.replay_receipt
-            if (receipt.model_digest != model
-                    or receipt.tokenizer_digest != tokenizer
-                    or receipt.device_digest != self.runtime.device.digest
-                    or result.prompt_sequence.token_ids != sequence.token_ids
-                    or type(result.usage.generated_tokens) is not int
-                    or result.usage.generated_tokens != len(result.generated_ids)
-                    or result.usage.generated_tokens > permit.tokens
-                    or type(result.text) is not str):
-                raise NativeFairStreamDenied("native output attestation mismatch")
-            try:
-                output = result.text.encode("utf-8", errors="strict")
-            except UnicodeEncodeError as exc:
-                raise NativeFairStreamDenied("invalid native output Unicode") from exc
-            if len(output) > MAX_RESULT_BYTES:
-                raise NativeFairStreamDenied("native output exceeds sealed vault limit")
-            return result.usage.generated_tokens, output
+
