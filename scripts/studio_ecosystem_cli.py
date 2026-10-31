@@ -29,7 +29,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
-    ap.add_argument("--faction-reputation", action="store_true",
+    ap.add_argument("--faction-plan", action="store_true",
+                    help="Plan a shortest replay-verified original faction negotiation")
+    ap.add_argument("--faction-goal", metavar="JSON",
+                    help='Exact faction threshold, e.g. {"faction_id":"residents","minimum":3}')
+    ap.add_argument("--faction-reputation", action="store_true",    ap.add_argument("--faction-reputation", action="store_true",
                     help="Replay original authored faction reputation consequences")
     ap.add_argument("--faction-decisions", metavar="JSON",
                     help="Bounded JSON list of distinct authored faction decisions")
@@ -203,6 +207,53 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.faction_plan:
+        if (not args.project or args.faction_goal is None
+                or args.faction_reputation or args.ending_plan or args.author_revision
+                or args.cherry_pick_revision or args.merge_revisions
+                or args.revision_impact or args.revision_lineage or args.audit_canon
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome or args.output
+                or args.quest_actions is not None or args.revision_source is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None):
+            ap.error("--faction-plan requires --project and --faction-goal, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_faction_plan import (
+            plan_faction_negotiation,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            def unique(pairs):
+                obj = {}
+                for key, value in pairs:
+                    if key in obj:
+                        raise StudioQuestError("duplicate faction plan JSON key")
+                    obj[key] = value
+                return obj
+            goal_raw = args.faction_goal.encode("utf-8", "strict")
+            decisions_raw = (args.faction_decisions or "[]").encode("utf-8", "strict")
+            if len(goal_raw) > 4096 or len(decisions_raw) > 8192:
+                raise StudioQuestError("faction plan input exceeds byte budget")
+            parse = dict(object_pairs_hook=unique, parse_constant=lambda _: (
+                _ for _ in ()).throw(StudioQuestError("nonfinite faction plan JSON")))
+            goal = json.loads(goal_raw, **parse)
+            decisions = json.loads(decisions_raw, **parse)
+            if (type(goal) is not dict
+                    or set(goal) not in ({"faction_id", "minimum"},
+                                        {"faction_id", "maximum"})):
+                raise StudioQuestError("invalid faction plan goal fields")
+            result = plan_faction_negotiation(
+                read_blueprint(args.project), decisions=decisions,
+                expected_source_digest=args.faction_expected_digest,
+                authorized=True, **goal)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.faction_goal is not None:
+        ap.error("--faction-goal requires --faction-plan")
+    if args.faction_reputation:
     if args.faction_reputation:
         if (not args.project or args.ending_plan or args.author_revision
                 or args.cherry_pick_revision or args.merge_revisions

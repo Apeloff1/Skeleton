@@ -762,3 +762,63 @@ def execute_faction_reputation_tool(request: Mapping[str, Any], *,
     }
     result["result_digest"] = _digest(result)
     return result
+
+FACTION_PLAN_REQUEST_SCHEMA = "skeleton.jeeves.studio_faction_plan_request.v1"
+FACTION_PLAN_RESULT_SCHEMA = "skeleton.jeeves.studio_faction_plan_result.v1"
+
+
+def faction_plan_tool_schema() -> dict[str, object]:
+    """Operator-gated typed original faction negotiation planner."""
+    return {
+        "name": "studio_faction_plan",
+        "description": "Shortest source-verified original faction reputation plan, no game writes",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": FACTION_PLAN_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "faction_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "minimum": {"type": "integer", "minimum": -100, "maximum": 100},
+                "maximum": {"type": "integer", "minimum": -100, "maximum": 100},
+                "decisions": {"type": "array", "maxItems": 32,
+                              "uniqueItems": True, "items": {"type": "string"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "faction_id", "decisions"],
+        },
+    }
+
+
+def execute_faction_plan_tool(request: Mapping[str, Any], *,
+                              authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves faction planning requires operator authorization")
+    common = {"schema", "project_id", "expected_source_digest",
+              "faction_id", "decisions"}
+    optional = {"minimum", "maximum"}
+    if (type(request) is not dict or not common.issubset(request)
+            or set(request) - common - optional
+            or len(set(request) & optional) != 1
+            or request.get("schema") != FACTION_PLAN_REQUEST_SCHEMA
+            or len(_canonical(request)) > 8192):
+        raise StudioQuestError("invalid typed Jeeves faction plan request")
+    from skeleton.ai.game_builder.studio_ecosystem_faction_plan import (
+        plan_faction_negotiation,
+    )
+    kwargs = {key: request[key] for key in ("minimum", "maximum")
+              if key in request}
+    detail = plan_faction_negotiation(
+        read_blueprint(request["project_id"]), faction_id=request["faction_id"],
+        decisions=request["decisions"],
+        expected_source_digest=request["expected_source_digest"],
+        authorized=True, **kwargs)
+    payload = {
+        "schema": FACTION_PLAN_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

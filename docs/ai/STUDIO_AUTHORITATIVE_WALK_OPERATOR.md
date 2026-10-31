@@ -559,3 +559,7 @@ never exceed reputation [-100,100]. The CLI and typed
 per-decision digest receipts without mutating source, claiming external
 evidence, or certifying a runtime. Unknown/repeated decisions, forged
 reputations, malformed rules and stale source fail closed.
+
+### Source-bound faction negotiation planning
+
+Use `python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord --faction-plan --faction-goal '{"faction_id":"residents","minimum":3}'` to calculate the shortest replay-verified sequence of original social decisions. The optional `--faction-decisions '["publish_ledger"]'` resumes a verified decision history; `--faction-expected-digest` pins the exact authored source. Jeeves exposes the same result through `studio_faction_plan` with explicit operator authorization. The planner is read-only and deterministic, caps its search at 12 remaining rules, eight new decisions and 4096 explored states, rejects stale sources and forged rules, and reports an explicit unreachable status without awarding reputation or external evidence. Neither CLI nor Jeeves asserts native-game execution or release qualification.
