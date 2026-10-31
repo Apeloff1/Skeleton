@@ -18,6 +18,9 @@ from skeleton.ai.game_builder.dual_runtime_export import DualRuntimeExportError
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, verify_exported_package,
 )
+from skeleton.ai.game_builder.offline_receipt_publication import (
+    ReceiptPublicationError, publish_verified_receipt,
+)
 from skeleton.ai.game_builder.original_game_studio import (
     StudioError, export_studio_run, run_original_game_studio,
 )
@@ -40,6 +43,7 @@ def build_first_playable_journey(
     intent_path: str | Path, destination: str | Path, *,
     authorized: bool, mirror_attempts: int = 64,
     practice_games: int = 0,
+    receipt_destination: str | Path | None = None,
 ) -> dict[str, object]:
     """Build, export and independently reexecute one real original game.
 
@@ -83,6 +87,12 @@ def build_first_playable_journey(
         raise FirstPlayableJourneyError(
             "exported source failed canonical identity and replay acceptance"
         )
+    receipt_pin = None
+    if receipt_destination is not None:
+        receipt_pin = publish_verified_receipt(
+            verified, receipt_destination, protected_roots=(output,),
+            authorized=True,
+        )
     return {
         "schema": SCHEMA,
         "status": "source_playable_verified_release_blocked",
@@ -103,6 +113,8 @@ def build_first_playable_journey(
         "consumer_blockers": list(run.consumer.blockers),
         "pin_distribution_required": True,
         "verification_receipt": verified,
+        "receipt_file": str(receipt_destination) if receipt_pin is not None else None,
+        "independent_receipt_sha256": receipt_pin,
     }
 
 
@@ -115,6 +127,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", required=True, help="new destination directory")
     parser.add_argument("--mirror-attempts", type=int, default=64)
     parser.add_argument("--practice-games", type=int, default=0)
+    parser.add_argument("--receipt", help="new owner-private .json receipt outside game package")
     parser.add_argument(
         "--trusted-local-operator", action="store_true",
         help="acknowledge separately established local operator authority",
@@ -130,11 +143,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             authorized=args.trusted_local_operator,
             mirror_attempts=args.mirror_attempts,
             practice_games=args.practice_games,
+            receipt_destination=args.receipt,
         )
     except (
         FirstPlayableJourneyError, StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
+        ReceiptPublicationError,
         PermissionError, OSError, TypeError, ValueError,
     ) as exc:
         # Do not print supplied input, credentials, arbitrary filesystem

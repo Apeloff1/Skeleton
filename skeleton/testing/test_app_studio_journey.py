@@ -118,3 +118,44 @@ def test_nonexistent_intent_fails_closed_without_export(tmp_path, capsys):
     ]) == 2
     assert not output.exists()
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_verified_journey_publishes_independently_inspectable_receipt(
+    tmp_path, capsys,
+):
+    from skeleton.ai.game_builder.offline_receipt_inspection import (
+        inspect_verified_receipt,
+    )
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    receipt = tmp_path / "verified-replay.json"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--receipt", str(receipt), "--trusted-local-operator",
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["receipt_file"] == str(receipt)
+    assert receipt.is_file()
+    inspected = inspect_verified_receipt(
+        receipt, expected_sha256=result["independent_receipt_sha256"],
+        authorized=True,
+    )
+    assert inspected["receipt_integrity_verified"] is True
+    assert inspected["gameplay_reexecuted_now"] is False
+    assert inspected["release_certified"] is False
+    assert result["verification_receipt"]["offline_gameplay_reexecuted"] is True
+
+
+def test_receipt_inside_source_package_is_rejected_without_false_success(
+    tmp_path, capsys,
+):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    receipt = output / "receipt.json"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--receipt", str(receipt), "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert (output / "release.json").is_file()
+    assert not receipt.exists()

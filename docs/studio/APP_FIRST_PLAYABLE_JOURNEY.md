@@ -37,3 +37,16 @@ Focused regression:
 `python -m pytest -q skeleton/testing/test_app_studio_journey.py
 skeleton/testing/test_secure_export_publication.py
 skeleton/testing/test_dual_runtime_verify.py`.
+
+## Durable independently inspectable verification receipt
+
+Add `--receipt ./private-replay.json` to publish the canonical replay receipt
+outside the exported game directory. The receipt is written through the
+existing POSIX descriptor-safe, fsynced, no-clobber publisher and its SHA-256
+pin is returned in `independent_receipt_sha256`. The verifier can later
+inspect it with `python -m skeleton.ai.game_builder.offline_receipt_inspect_cli
+--receipt ./private-replay.json --expected-sha256 <pin>
+--trusted-local-operator`. Keep the pin in a separate trusted channel.
+A stored receipt proves historical replay evidence and source integrity at
+the time of verification; re-inspection does not reexecute the game or grant
+release authorization. A receipt inside the source package is rejected.
