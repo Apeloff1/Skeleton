@@ -249,3 +249,30 @@ def test_verify_rejects_directory_flood_before_hashing_unbounded_tree(tmp_path, 
         (root / f"unlisted-{index:03d}").write_bytes(b"extra")
     with pytest.raises(offline_kit.OfflineKitError, match="entry budget"):
         offline_kit.verify(root)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor pinning")
+def test_verify_survives_kit_path_replacement_after_root_descriptor_is_open(tmp_path, monkeypatch):
+    root, manifest, _ = _verifiable_kit(tmp_path)
+    original_open = offline_kit._open_directory_without_symlink_parents
+
+    def rename_after_open(path):
+        descriptor = original_open(path)
+        root.rename(tmp_path / "original-moved")
+        root.mkdir()
+        (root / "manifest.json").write_text("{}", encoding="utf-8")
+        return descriptor
+
+    monkeypatch.setattr(offline_kit, "_open_directory_without_symlink_parents",
+                        rename_after_open)
+    assert offline_kit.verify(root) == manifest
+
+
+def test_verify_rejects_nonwheel_payload_inside_wheelhouse(tmp_path):
+    root, manifest, _ = _verifiable_kit(tmp_path)
+    bad = root / "wheelhouse" / "arbitrary.txt"
+    bad.write_bytes(b"unexpected")
+    manifest["files"] = offline_kit._files(root)
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
+    with pytest.raises(offline_kit.OfflineKitError, match="wheelhouse"):
+        offline_kit.verify(root)

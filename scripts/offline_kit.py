@@ -211,7 +211,7 @@ def verify(root: str | Path) -> dict[str, object]:
     kit = Path(root).expanduser().absolute()
     if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
         try:
-            manifest_bytes, observed = _descriptor_inventory(kit)
+            manifest_bytes, observed, deployment_bytes = _descriptor_inventory(kit)
         except OSError as exc:
             raise OfflineKitError("unsafe or inaccessible offline kit") from exc
     else:
@@ -226,6 +226,10 @@ def verify(root: str | Path) -> dict[str, object]:
             raise OfflineKitError("offline manifest exceeds size limit")
         manifest_bytes = manifest_path.read_bytes()
         observed = _files(kit)
+        deployment_path = kit / "model" / "deployment.json"
+        deployment_bytes = deployment_path.read_bytes() if deployment_path.is_file() else None
+        if deployment_bytes is not None and len(deployment_bytes) > 64 * 1024:
+            raise OfflineKitError("offline metadata exceeds size limit")
     try:
         data = json.loads(manifest_bytes, object_pairs_hook=_reject_duplicate_keys)
     except (OSError, ValueError, UnicodeError) as exc:
@@ -262,24 +266,39 @@ def verify(root: str | Path) -> dict[str, object]:
             raise OfflineKitError("invalid kit artifact digest or size")
     if provided != observed:
         raise OfflineKitError("offline kit files differ from pinned manifest")
-    if not (kit / "offline_kit.py").is_file() or not (kit / "wheelhouse").is_dir():
+    indexed = {entry["path"]: entry for entry in observed}
+    wheels = [path[len("wheelhouse/"):] for path in indexed
+              if path.startswith("wheelhouse/")]
+    if "offline_kit.py" not in indexed or not wheels:
         raise OfflineKitError("missing offline bootstrapper or wheelhouse")
-    if _wheel_version(kit / "wheelhouse") != data["version"]:
+    versions: set[str] = set()
+    for name in wheels:
+        if "/" in name or not _WHEEL.fullmatch(name):
+            raise OfflineKitError("wheelhouse must contain only regular .whl files")
+        pieces = name.split("-")
+        if len(pieces) < 5:
+            raise OfflineKitError("invalid wheel filename")
+        if pieces[0].replace("_", "-").lower() == "skeleton":
+            versions.add(pieces[1])
+    if versions != {data["version"]}:
         raise OfflineKitError("pinned Skeleton wheel version mismatch")
     if data["gguf_included"]:
-        deployment = kit / "model" / "deployment.json"
-        _regular(deployment)
+        if deployment_bytes is None:
+            raise OfflineKitError("missing bundled model deployment")
         try:
-            local = json.loads(deployment.read_text(encoding="utf-8"))
-            binary = kit / "runtime" / (
-                "llama-cli.exe" if data["environment"]["sys_platform"] == "win32" else "llama-cli"
+            local = json.loads(
+                deployment_bytes, object_pairs_hook=_reject_duplicate_keys,
+            )
+            runtime_name = (
+                "llama-cli.exe" if data["environment"]["sys_platform"] == "win32"
+                else "llama-cli"
             )
             if (
-                local["executable_sha256"] != _hash(binary)
-                or local["model_sha256"] != _hash(kit / "model" / "model.gguf")
+                local["executable_sha256"] != indexed["runtime/" + runtime_name]["sha256"]
+                or local["model_sha256"] != indexed["model/model.gguf"]["sha256"]
             ):
                 raise OfflineKitError("pinned local model artifacts differ")
-        except (OSError, ValueError, KeyError, TypeError) as exc:
+        except (ValueError, UnicodeError, KeyError, TypeError) as exc:
             raise OfflineKitError("invalid bundled model deployment") from exc
     return data
 
@@ -295,7 +314,7 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
     return data
 
 
-def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]]]:
+def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]], bytes | None]:
     """Read the manifest and hash the exact opened POSIX file descriptors.
 
     Neither symlink swaps nor renamed ancestors can redirect an opened handle.
@@ -305,6 +324,7 @@ def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]]]:
     pending: list[tuple[int, tuple[str, ...]]] = [(os.dup(root_fd), ())]
     records: list[dict[str, object]] = []
     manifest: bytes | None = None
+    deployment: bytes | None = None
     visited = 0
     flags = os.O_RDONLY | os.O_NOFOLLOW
     if hasattr(os, "O_CLOEXEC"):
@@ -345,11 +365,13 @@ def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]]]:
                                 if not chunk:
                                     break
                                 size += len(chunk)
-                                if relative == "manifest.json":
-                                    if size > _MAX_MANIFEST_BYTES:
-                                        raise OfflineKitError("offline manifest exceeds size limit")
+                                if relative in ("manifest.json", "model/deployment.json"):
+                                    limit = (_MAX_MANIFEST_BYTES if relative == "manifest.json"
+                                             else 64 * 1024)
+                                    if size > limit:
+                                        raise OfflineKitError("offline metadata exceeds size limit")
                                     chunks.append(chunk)
-                                else:
+                                if relative != "manifest.json":
                                     digest.update(chunk)
                             after = os.fstat(reader.fileno())
                             identity = lambda value: (
@@ -361,6 +383,8 @@ def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]]]:
                         if relative == "manifest.json":
                             manifest = b"".join(chunks)
                         else:
+                            if relative == "model/deployment.json":
+                                deployment = b"".join(chunks)
                             records.append({
                                 "path": relative, "sha256": digest.hexdigest(),
                                 "size_bytes": size,
@@ -372,7 +396,7 @@ def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]]]:
         if manifest is None:
             raise OfflineKitError("missing offline manifest")
         records.sort(key=lambda item: item["path"])
-        return manifest, records
+        return manifest, records, deployment
     finally:
         for descriptor, _ in pending:
             os.close(descriptor)
