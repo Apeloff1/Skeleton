@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_luminous_marsh",
+  "title": "Luminous Marsh: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610300052,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "forest",
+  "starting_health": 6
+}

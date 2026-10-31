@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_ashen_archipelago",
+  "title": "Ashen Archipelago: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010310171,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 5
+}

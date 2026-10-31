@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_copper_mesa",
+  "title": "Copper Mesa: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Copper Mesa; prototype maps are not full genre implementations.",
+  "seed": 202610300001,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 3
+}
