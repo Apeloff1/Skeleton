@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import sqlite3
 from threading import RLock
 from typing import Mapping
@@ -162,8 +163,18 @@ class AuthorizedSealedResultReader:
             raise ValueError("pinned Ed25519 operator public key required")
         if journal.session_id != vault.session_id:
             raise ValueError("journal and vault session mismatch")
-        if grant_handle is vault._handle:
+        if (
+            grant_handle is vault._handle
+            or grant_handle.connection is vault._connection
+            or grant_handle.connection is journal._connection
+        ):
             raise ValueError("independent grant ledger required")
+        result_inode = os.fstat(vault._handle._file_fd)
+        grant_inode = os.fstat(grant_handle._file_fd)
+        if (result_inode.st_dev, result_inode.st_ino) == (
+            grant_inode.st_dev, grant_inode.st_ino
+        ):
+            raise ValueError("grant ledger must use a distinct database inode")
         self._public_key = Ed25519PublicKey.from_public_bytes(
             operator_public_key,
         )

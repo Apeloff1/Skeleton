@@ -253,3 +253,25 @@ def test_invalid_grant_ledger_schema_rejected(setup):
             )
     finally:
         handle.close()
+
+def test_same_result_handle_cannot_serve_as_grant_ledger(setup):
+    with pytest.raises(ValueError, match="independent"):
+        AuthorizedSealedResultReader(
+            journal=setup["journal"], vault=setup["vault"],
+            grant_handle=setup["result_handle"],
+            operator_public_key=setup["public"],
+        )
+
+
+def test_distinct_handle_to_same_result_inode_rejected(setup):
+    second = open_private_sqlite(
+        setup["directory"], filename="result.db", create=False,
+    )
+    try:
+        with pytest.raises(ValueError, match="distinct database inode"):
+            AuthorizedSealedResultReader(
+                journal=setup["journal"], vault=setup["vault"],
+                grant_handle=second, operator_public_key=setup["public"],
+            )
+    finally:
+        second.close()
