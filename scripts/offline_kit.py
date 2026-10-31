@@ -508,6 +508,133 @@ def _snapshot_wheels(kit: Path, manifest: dict[str, object], snapshot: Path) -> 
             os.close(directory_fd)
 
 
+
+def _copy_pinned_assets(
+    kit: Path, manifest: dict[str, object], destination: Path,
+) -> None:
+    """Copy only the manifest's three local-model artifacts, never a source tree.
+
+    POSIX opens the kit root and every child with O_NOFOLLOW. Each copy is
+    hashed against the manifest while the original inode remains open.
+    """
+    runtime_name = (
+        "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
+        else "llama-cli"
+    )
+    expected = {
+        "model/deployment.json", "model/model.gguf", "runtime/" + runtime_name,
+    }
+    pinned = {
+        item["path"]: item for item in manifest["files"]
+        if item["path"].startswith(("model/", "runtime/"))
+    }
+    if set(pinned) != expected:
+        raise OfflineKitError("offline model asset inventory differs from manifest")
+    destination.mkdir(mode=0o700)
+    (destination / "model").mkdir(mode=0o700)
+    (destination / "runtime").mkdir(mode=0o700)
+    root_fd: int | None = None
+    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+        root_fd = _open_directory_without_symlink_parents(kit)
+    try:
+        # Inventory the two source directories before copying. Extra files
+        # must never silently enter a consumer installation.
+        for prefix in ("model", "runtime"):
+            allowed = {
+                relative.split("/", 1)[1] for relative in expected
+                if relative.startswith(prefix + "/")
+            }
+            if root_fd is not None:
+                directory = os.open(
+                    prefix, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=root_fd,
+                )
+                try:
+                    iterator = os.scandir(directory)
+                    with iterator:
+                        observed: set[str] = set()
+                        for entry in iterator:
+                            if len(observed) >= len(allowed):
+                                raise OfflineKitError("model source inventory differs")
+                            observed.add(entry.name)
+                finally:
+                    os.close(directory)
+            else:
+                folder = kit / prefix
+                if folder.is_symlink():
+                    raise OfflineKitError("symlinked local model directory")
+                observed = set()
+                with os.scandir(folder) as iterator:
+                    for entry in iterator:
+                        if len(observed) >= len(allowed) or entry.is_symlink():
+                            raise OfflineKitError("model source inventory differs")
+                        observed.add(entry.name)
+            if observed != allowed:
+                raise OfflineKitError("model source inventory differs")
+        for relative in sorted(expected):
+            source = kit / relative
+            parent_fd: int | None = None
+            if root_fd is not None:
+                parent_fd = os.dup(root_fd)
+                try:
+                    for component in _relative(relative).parts[:-1]:
+                        following = os.open(
+                            component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=parent_fd,
+                        )
+                        os.close(parent_fd)
+                        parent_fd = following
+                    opened = os.open(
+                        _relative(relative).parts[-1], os.O_RDONLY | os.O_NOFOLLOW,
+                        dir_fd=parent_fd,
+                    )
+                finally:
+                    os.close(parent_fd)
+            else:
+                if source.is_symlink():
+                    raise OfflineKitError("symlinked local model artifact")
+                opened = os.open(source, os.O_RDONLY)
+            with os.fdopen(opened, "rb") as reader:
+                before = os.fstat(reader.fileno())
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or before.st_nlink != 1
+                    or before.st_size != pinned[relative]["size_bytes"]
+                ):
+                    raise OfflineKitError("unsafe or changed local model artifact")
+                digest = hashlib.sha256()
+                output = destination / relative
+                with output.open("xb") as writer:
+                    while True:
+                        chunk = reader.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        digest.update(chunk)
+                        writer.write(chunk)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                    if relative.startswith("runtime/") and os.name != "nt":
+                        os.fchmod(
+                            writer.fileno(),
+                            stat.S_IMODE(before.st_mode) & 0o755,
+                        )
+                after = os.fstat(reader.fileno())
+                identity = lambda value: (
+                    value.st_dev, value.st_ino, value.st_size,
+                    value.st_mtime_ns, value.st_ctime_ns,
+                )
+                if (
+                    identity(before) != identity(after)
+                    or digest.hexdigest() != pinned[relative]["sha256"]
+                ):
+                    raise OfflineKitError("local model changed during pinned copy")
+    except OSError as exc:
+        raise OfflineKitError("unable to copy verified local model artifacts") from exc
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
+
+
 def install(root: str | Path, destination: str | Path) -> Path:
     """Install into a new venv, rolling back incomplete local installations.
 
@@ -556,9 +683,7 @@ def install(root: str | Path, destination: str | Path) -> Path:
             raise OfflineKitError("offline kit changed during installation")
         if manifest["gguf_included"]:
             assets = target / "offline_model"
-            assets.mkdir()
-            shutil.copytree(kit / "model", assets / "model", symlinks=False)
-            shutil.copytree(kit / "runtime", assets / "runtime", symlinks=False)
+            _copy_pinned_assets(kit, manifest, assets)
             # Verify copied identities, not merely the source kit hashes.
             local = json.loads((assets / "model" / "deployment.json").read_text("utf-8"))
             runtime_name = (

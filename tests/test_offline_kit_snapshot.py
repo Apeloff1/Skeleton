@@ -135,15 +135,13 @@ def test_install_rejects_copied_model_tampering_and_rolls_back(tmp_path, monkeyp
 
     monkeypatch.setattr(offline_kit.venv.EnvBuilder, "create", fake_create)
     monkeypatch.setattr(offline_kit.subprocess, "run", lambda *args, **kwargs: None)
-    original_copytree = offline_kit.shutil.copytree
+    original_copy = offline_kit._copy_pinned_assets
 
-    def tamper_copytree(source, destination, **kwargs):
-        copied = original_copytree(source, destination, **kwargs)
-        if Path(source).name == "model":
-            (Path(destination) / "model.gguf").write_bytes(b"attacker-replaced")
-        return copied
+    def tamper_copied_assets(source, manifest, destination):
+        original_copy(source, manifest, destination)
+        (Path(destination) / "model" / "model.gguf").write_bytes(b"attacker-replaced")
 
-    monkeypatch.setattr(offline_kit.shutil, "copytree", tamper_copytree)
+    monkeypatch.setattr(offline_kit, "_copy_pinned_assets", tamper_copied_assets)
     target = tmp_path / "installed"
     with pytest.raises(offline_kit.OfflineKitError, match="pinned manifest"):
         offline_kit.install(root, target)
@@ -276,3 +274,37 @@ def test_verify_rejects_nonwheel_payload_inside_wheelhouse(tmp_path):
     (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
     with pytest.raises(offline_kit.OfflineKitError, match="wheelhouse"):
         offline_kit.verify(root)
+
+
+def test_model_snapshot_rejects_unlisted_source_payload(tmp_path):
+    root, manifest, _ = _verifiable_kit(tmp_path)
+    (root / "model").mkdir()
+    (root / "runtime").mkdir()
+    runtime_name = "llama-cli.exe" if os.name == "nt" else "llama-cli"
+    for relative, content in (
+        ("model/deployment.json", b"{}"),
+        ("model/model.gguf", b"local model"),
+        ("runtime/" + runtime_name, b"local runtime"),
+    ):
+        (root / relative).write_bytes(content)
+    manifest["files"] = offline_kit._files(root)
+    (root / "manifest.json").write_bytes(offline_kit._canonical(manifest) + b"\\n")
+    (root / "model" / "unlisted-private.txt").write_bytes(b"not in manifest")
+    with pytest.raises(offline_kit.OfflineKitError, match="inventory differs"):
+        offline_kit._copy_pinned_assets(root, manifest, tmp_path / "copied")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-relative model copy")
+def test_model_snapshot_rejects_symlinked_model_parent(tmp_path):
+    root, manifest, _ = _verifiable_kit(tmp_path)
+    model = root / "model"
+    model.mkdir()
+    (root / "runtime").mkdir()
+    (model / "deployment.json").write_bytes(b"{}")
+    (model / "model.gguf").write_bytes(b"model")
+    (root / "runtime" / "llama-cli").write_bytes(b"runtime")
+    manifest["files"] = offline_kit._files(root)
+    model.rename(tmp_path / "original-model")
+    model.symlink_to(tmp_path / "original-model", target_is_directory=True)
+    with pytest.raises(offline_kit.OfflineKitError, match="unable to copy"):
+        offline_kit._copy_pinned_assets(root, manifest, tmp_path / "copied")
