@@ -61,6 +61,7 @@ Commands:
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
     scene-accept  Audit playable scenes, verify replay and portable exports
     scene-travel  Simulate, verify and resume original offline scene journeys
+    scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
     scene-npc-solve  Find bounded replayable routes through NPC dialogue
@@ -842,6 +843,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-accept":
         from skeleton.game.gameplay.scene_acceptance import cli as accept_cli
         return accept_cli(rest)
+    if cmd == "scene-tiles":
+        from skeleton.game.gameplay.scene_tile_walk import cli as scene_tiles_cli
+        return scene_tiles_cli(rest)
     if cmd == "scene-travel":
         from skeleton.game.gameplay.scene_travel import cli as scene_cli
         return scene_cli(rest)
