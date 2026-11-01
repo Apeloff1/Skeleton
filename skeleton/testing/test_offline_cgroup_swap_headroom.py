@@ -152,3 +152,42 @@ def test_invalid_dataclass_cannot_claim_spill_authority():
         swap.CgroupSwapHeadroom(None, 0, 1, 0, True)
     with pytest.raises(ValueError):
         swap.CgroupSwapHeadroom(0, 0, 0, 0, True)
+
+
+def test_unlimited_boolean_pressure_is_not_valid_telemetry():
+    with pytest.raises(ValueError):
+        swap.CgroupSwapHeadroom(None, 0, None, False, False)
+
+
+def test_leaf_inode_replacement_during_swap_sampling_denied(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root)
+    fixture(root / "tenant", used="100")
+    monkeypatch.setattr(swap, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(swap, "_read_self_cgroup_path", lambda: ("tenant",))
+    original = swap._sample_directory
+    changed = False
+
+    def replace_leaf(fd):
+        nonlocal changed
+        result = original(fd)
+        if result is not None and result.used_bytes == 100 and not changed:
+            changed = True
+            (root / "tenant").rename(root / "detached")
+            fixture(root / "tenant", used="100")
+        return result
+
+    monkeypatch.setattr(swap, "_sample_directory", replace_leaf)
+    with pytest.raises(swap.CgroupSwapUnavailable, match="inode replaced"):
+        swap.probe_cgroup_swap_headroom()
+
+
+def test_parent_swap_counter_missing_fails_closed(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root)
+    fixture(root / "tenant")
+    (root / "memory.swap.max").unlink()
+    monkeypatch.setattr(swap, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(swap, "_read_self_cgroup_path", lambda: ("tenant",))
+    with pytest.raises(swap.CgroupSwapUnavailable, match="partial"):
+        swap.probe_cgroup_swap_headroom()

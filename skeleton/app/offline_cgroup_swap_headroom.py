@@ -38,7 +38,9 @@ class CgroupSwapHeadroom:
         if type(self.used_bytes) is not int or not 0 <= self.used_bytes <= _MAX_COUNTER:
             raise ValueError("invalid cgroup swap usage")
         if self.limit_bytes is None:
-            if (self.headroom_bytes is not None or self.pressure_ppm != 0
+            if (self.headroom_bytes is not None
+                    or type(self.pressure_ppm) is not int or self.pressure_ppm != 0
+                    or type(self.spill_allowed) is not bool
                     or self.spill_allowed is not False):
                 raise ValueError("unbounded swap is not measured spill authority")
             return
