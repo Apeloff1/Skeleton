@@ -9,8 +9,9 @@ only invalidates outstanding cursors on restart).
 Secrets at rest: when ``SKELETON_BACKEND_CORE_KEKS`` is set (see
 ``core.core_v1.keys``) new webhook signing secrets are sealed with AES-256-GCM
 envelopes and the ``/admin/secrets/*`` routes can migrate/rewrap old rows.
-Without a keyring secrets stay plaintext (logged once) unless
-``SKELETON_BACKEND_CORE_REQUIRE_KEK=1``, which makes startup fail closed.
+Production/default composition fails closed when the keyring is absent. Explicit
+``key_provider=None`` is reserved for isolated development and migration tests;
+no implicit plaintext fallback is permitted in the runtime entrypoint.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ from dataclasses import dataclass
 
 from core.core_v1.clock import Clock, SystemClock
 from core.core_v1.delivery_ops import DeliveryOps, SecretsAdmin
-from core.core_v1.keys import KeyProvider, provider_from_env
+from core.core_v1.keys import KEYS_ENV, KeyProvider, KeyProviderError, provider_from_env
 from core.core_v1.log_store import SqliteDeliveryLog, SqliteRetryPolicyRepository
 from core.core_v1.secret_migration import SecretMigrator
 from core.core_v1.secret_vault import EncryptedSecretRepository, PlaintextSecretRepository
@@ -53,14 +54,16 @@ class CoreRuntime:
 def build_runtime(db_path: str, *, clock: Clock | None = None, transport: Transport | None = None,
                   url_policy: UrlPolicy | None = None, cursor_key: bytes | None = None,
                   key_provider: "KeyProvider | None | object" = _FROM_ENV) -> CoreRuntime:
-    """``key_provider``: explicit provider, ``None`` for plaintext, or (default) env."""
+    """Default requires an environment KEK; explicit ``None`` is dev-only plaintext."""
     db = open_database(db_path)
     clock = clock or SystemClock()
     policy = url_policy or PublicHttpsPolicy()
     provider = provider_from_env() if key_provider is _FROM_ENV else key_provider
+    if provider is None and key_provider is _FROM_ENV:
+        raise KeyProviderError(f"{KEYS_ENV} is required for backend core webhook secret custody")
     blob_store = SqliteSecretRepository(db)
     if provider is None:
-        log.warning("backend core v1: no KEK keyring configured; webhook secrets stored in plaintext")
+        log.warning("backend core v1: explicit development plaintext secret repository selected")
         secret_repo = PlaintextSecretRepository(blob_store)
     else:
         secret_repo = EncryptedSecretRepository(blob_store, provider)

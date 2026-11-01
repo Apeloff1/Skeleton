@@ -165,6 +165,14 @@ def test_secret_never_rendered_and_encrypted_at_rest(client):
 def test_build_runtime_reads_keyring_from_env(tmp_path, monkeypatch):
     from core.core_v1.keys import KeyProviderError, encode_key
     monkeypatch.delenv("SKELETON_BACKEND_CORE_KEKS", raising=False)
+    monkeypatch.delenv("SKELETON_BACKEND_CORE_REQUIRE_KEK", raising=False)
+    # Default composition must never silently persist signing secrets in cleartext.
+    with pytest.raises(KeyProviderError, match="required"):
+        build_runtime(str(tmp_path / "no-key.db"), url_policy=AllowAllPolicy(), cursor_key=b"k" * 32)
+    # Explicit test-only plaintext mode remains available for migration fixtures.
+    dev = build_runtime(str(tmp_path / "dev.db"), url_policy=AllowAllPolicy(),
+                        cursor_key=b"k" * 32, key_provider=None)
+    assert dev.ops.secrets_admin is None
     monkeypatch.setenv("SKELETON_BACKEND_CORE_REQUIRE_KEK", "1")
     with pytest.raises(KeyProviderError):
         build_runtime(str(tmp_path / "a.db"), url_policy=AllowAllPolicy(), cursor_key=b"k" * 32)
