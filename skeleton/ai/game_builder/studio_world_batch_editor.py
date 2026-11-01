@@ -30,6 +30,12 @@ def render_world_batch_editor(plan: object, *, authorized: bool) -> tuple[bytes,
         "baseline_plan_digest": verified["plan_digest"],
     }
     requests = [row["request"] for row in verified["steps"]]
+    provenance = verified["provenance"]
+    sources = "".join(
+        "<li>" + escape(item["project_id"], quote=True) +
+        " — canonical source SHA-256 " + escape(item["source_digest"]) +
+        "</li>" for item in provenance["projects"]
+    )
     script = (
         "const meta=" + json.dumps(meta, sort_keys=True) + ";"
         "const edit=document.getElementById('requests');"
@@ -57,6 +63,9 @@ def render_world_batch_editor(plan: object, *, authorized: bool) -> tuple[bytes,
         "<h1>Read-only original world workflow</h1>"
         "<p>Only reviewed tool names and schema-checked arguments are accepted. "
         "This editor cannot grant authorization or release certification.</p>"
+        "<h2>Source custody</h2><p>All edits must replay against these "
+        "immutable authored source digests. Stale worlds are rejected.</p>"
+        "<ul>" + sources + "</ul>"
         "<label for='requests'>Typed world-tool requests</label>"
         "<textarea id='requests' rows='24' cols='110'>" +
         escape(json.dumps(requests, indent=2, ensure_ascii=True)) + "</textarea>"
@@ -69,6 +78,7 @@ def render_world_batch_editor(plan: object, *, authorized: bool) -> tuple[bytes,
     return html, {
         "html_sha256": sha256(html).hexdigest(),
         "html_bytes": len(html), "baseline_plan_digest": verified["plan_digest"],
+        "provenance_digest": provenance["manifest_digest"],
         "release_certified": False,
     }
 

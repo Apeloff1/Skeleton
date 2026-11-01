@@ -135,3 +135,55 @@ def test_permissions_and_malformed_identity_fail_closed():
         replay_world_batch_provenance({}, [request], authorized=False)
     with pytest.raises(PermissionError):
         verify_world_batch_step(request, {}, {}, authorized=False)
+
+
+def test_editor_displays_exact_world_source_leases_without_authority():
+    from skeleton.ai.game_builder.studio_world_batch_editor import render_world_batch_editor
+    request, catalog = _fixture()
+    plan = compile_world_batch_plan([request], authorized=True,
+                                    expected_catalog_digest=catalog)
+    html, proof = render_world_batch_editor(plan, authorized=True)
+    assert b"Source custody" in html
+    assert request["arguments"]["expected_source_digest"].encode() in html
+    assert proof["provenance_digest"] == plan["provenance"]["manifest_digest"]
+    assert b"Content-Security-Policy" in html
+    assert b"Stale worlds are rejected" in html
+
+
+def test_mid_batch_source_mutation_aborts_after_tool_before_receipt(monkeypatch):
+    import skeleton.ai.game_builder.studio_world_batch_provenance as provenance
+    import skeleton.ai.agents.jeeves.studio_world_tool_router as router
+    request, catalog = _fixture()
+    plan = compile_world_batch_plan([request], authorized=True,
+                                    expected_catalog_digest=catalog)
+    real_source = provenance._source
+    real_route = router.route_world_tool
+
+    def changing_source(project):
+        result = real_source(project)
+        return {**result, "source_digest": "0" * 64}
+
+    def route_and_change_source(request, *, authorized, allow_authoring):
+        result = real_route(request, authorized=authorized,
+                            allow_authoring=allow_authoring)
+        monkeypatch.setattr(provenance, "_source", changing_source)
+        return result
+
+    monkeypatch.setattr(router, "route_world_tool", route_and_change_source)
+    with pytest.raises(StudioQuestError, match="source changed"):
+        execute_world_batch(plan, authorized=True)
+
+
+def test_provenance_does_not_accept_stale_canon_proof(monkeypatch):
+    import skeleton.ai.game_builder.studio_world_batch_provenance as provenance
+    request, _ = _fixture()
+    manifest = compile_world_batch_provenance([request], authorized=True)
+    real_source = provenance._source
+
+    def changed_proof(project):
+        source = real_source(project)
+        return {**source, "canon_proof_digest": "0" * 64}
+
+    monkeypatch.setattr(provenance, "_source", changed_proof)
+    with pytest.raises(StudioQuestError, match="canonical source replay"):
+        replay_world_batch_provenance(manifest, [request], authorized=True)
