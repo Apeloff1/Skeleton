@@ -50,8 +50,8 @@ def test_runtime_image_excludes_development_payload() -> None:
     assert '.[dev]' not in dockerfile
     assert "p['optional-dependencies']['local-inference']" in dockerfile
     assert "p['optional-dependencies']['hosted-inference']" in dockerfile
-    assert "pip install --no-cache-dir -r /tmp/skeleton-runtime-requirements.txt" in dockerfile
-    assert "pip install --no-cache-dir --no-deps --no-build-isolation ." in dockerfile
+    assert "pip install --no-cache-dir --no-compile -r /tmp/skeleton-runtime-requirements.txt" in dockerfile
+    assert "pip install --no-cache-dir --no-compile --no-deps --no-build-isolation ." in dockerfile
     assert "pip install --no-cache-dir -e" not in dockerfile
     assert "COPY tests" not in dockerfile
     assert "USER appuser" in dockerfile

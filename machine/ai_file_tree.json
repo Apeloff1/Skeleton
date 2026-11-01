@@ -195,15 +195,8 @@
         "VOL-325",
         "VOL-364"
       ],
-      "overlay_children": [
-        "execution_authority.py"
-      ],
+      "overlay_children": [],
       "parity_exceptions": [
-        {
-          "path": "__init__.py",
-          "mode": "compatibility_facade",
-          "facade_required_import": "from .execution_authority import ("
-        },
         {
           "path": "projects.py",
           "mode": "compatibility_facade",
@@ -742,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "5fe6a4acaf644cac0283a83c0e3081af3b72bea2",
+      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -889,7 +882,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "0a2d069a913688932ea411674200743f6d6619e5",
+      "source_git_object_sha": "4390e7d4cdd98035873c4b8aa323c93cb458d447",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -2364,7 +2357,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "2b846c1f529b5f34665aeab90fb0b4bb8e0bb16b",
+      "source_git_object_sha": "fcca3be28de9f6ba2a3f9eacbf4b0ce5b1f0612c",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -6235,7 +6228,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "6dfaaf3dfaf2bc21217b6e245f295ceccd23c9d2",
+      "source_git_object_sha": "6f9897545ee1be69d3cfe23aa424c29faca951f3",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
@@ -6634,7 +6627,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "182_mapping_plus_182_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "182_mapping_plus_181_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7787,7 +7780,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 182
+    "native_ai_owner_count": 181
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8810,20 +8803,6 @@
         "VOL-412",
         "VOL-413",
         "VOL-414"
-      ]
-    },
-    {
-      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CONTRACTS",
-      "path": "skeleton/ai/runtime/contracts/execution_authority.py",
-      "kind": "file",
-      "ownership_mode": "canonical_native",
-      "residual_only": false,
-      "volume_refs": [
-        "VOL-084",
-        "VOL-097",
-        "VOL-131",
-        "VOL-164",
-        "VOL-300"
       ]
     },
     {
