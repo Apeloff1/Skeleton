@@ -138,6 +138,13 @@ class ReclaimControllerTests(unittest.TestCase):
 
 
 class ResourceFabricIntegrationTests(unittest.TestCase):
+    def test_offline_browser_never_displays_unknown_pressure_as_zero(self):
+        self.assertIn("Number.isFinite(c.predictive_pressure)", JAVASCRIPT)
+        self.assertIn("c.predictive_pressure >= 0 && c.predictive_pressure <= 1", JAVASCRIPT)
+        self.assertIn("typeof reclaim.backpressure !== 'boolean'", JAVASCRIPT)
+        self.assertIn("pressurePct", JAVASCRIPT)
+        self.assertNotIn("c.predictive_pressure ?? 0", JAVASCRIPT)
+
     def test_offline_browser_surfaces_measured_reclaim_and_plan_hold(self):
         from skeleton.app.offline_web import JAVASCRIPT
         self.assertIn("Kernel reclaim (", JAVASCRIPT)
