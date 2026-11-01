@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import gzip
 import io
+import stat
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -40,16 +41,21 @@ def _normalize_files(files: Mapping[str, bytes], prefix: str | None) -> list[tup
     if len(files) > MAX_PACKAGE_FILES:
         raise DeliveryError("too many files to package")
     out: dict[str, bytes] = {}
+    total = 0
     root = normalize_relpath(prefix, field="prefix") if prefix else None
     for raw, data in files.items():
         if not isinstance(data, (bytes, bytearray)):
             raise DeliveryError(f"file {raw!r} must be bytes")
+        size = len(data)
+        if size > MAX_ARTIFACT_BYTES - total:
+            raise DeliveryError("uncompressed package input exceeds byte limit")
         path = normalize_relpath(raw)
         if root:
             path = f"{root}/{path}"
         if path in out:
             raise DeliveryError(f"duplicate path after normalization: {path}")
         out[path] = bytes(data)
+        total += size
     return sorted(out.items())
 
 
@@ -120,23 +126,67 @@ def build_zip(
     return PackageResult(normalize_relpath(name), data, sha256_bytes(data), len(entries))
 
 
+def _archive_input(data: bytes) -> io.BytesIO:
+    if not isinstance(data, (bytes, bytearray)) or len(data) > MAX_ARTIFACT_BYTES:
+        raise DeliveryError("archive input exceeds byte limit")
+    return io.BytesIO(data)
+
+
 def list_tarball(data: bytes) -> dict[str, bytes]:
-    """Read back a tarball produced by :func:`build_tarball` (for verification)."""
+    """Inspect tar members one at a time with byte/count/path boundaries.
+
+    This is a bounded *content* verifier, not a filesystem extractor. Never
+    extract archive paths to disk or trust their Unix ownership/mode bits.
+    """
     out: dict[str, bytes] = {}
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-        for member in tar.getmembers():
+    total = 0
+    with tarfile.open(fileobj=_archive_input(data), mode="r|gz") as tar:
+        for count, member in enumerate(tar, 1):
+            if count > MAX_PACKAGE_FILES:
+                raise DeliveryError("tar member count exceeds bound")
             if not member.isfile():
                 raise DeliveryError(f"non-file member {member.name}")
-            normalize_relpath(member.name)
+            path = normalize_relpath(member.name)
+            if path != member.name or path in out:
+                raise DeliveryError("tar member path is noncanonical or duplicated")
+            if member.size < 0 or member.size > MAX_ARTIFACT_BYTES - total:
+                raise DeliveryError("tar expanded bytes exceed bound")
             handle = tar.extractfile(member)
-            out[member.name] = handle.read() if handle else b""
+            if handle is None:
+                raise DeliveryError("tar member lacks readable content")
+            payload = handle.read(member.size + 1)
+            if len(payload) != member.size:
+                raise DeliveryError("tar member size mismatch")
+            total += len(payload)
+            out[path] = payload
     return out
 
 
 def list_zip(data: bytes) -> dict[str, bytes]:
+    """Reject duplicate, aliased, nonregular or oversized ZIP members."""
     out: dict[str, bytes] = {}
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        for info in zf.infolist():
-            normalize_relpath(info.filename)
-            out[info.filename] = zf.read(info)
+    total = 0
+    with zipfile.ZipFile(_archive_input(data)) as zf:
+        infos = zf.infolist()
+        if len(infos) > MAX_PACKAGE_FILES:
+            raise DeliveryError("zip member count exceeds bound")
+        for info in infos:
+            path = normalize_relpath(info.filename)
+            if path != info.filename or path in out:
+                raise DeliveryError("zip member path is noncanonical or duplicated")
+            mode = info.external_attr >> 16
+            if info.is_dir() or (info.create_system == 3 and stat.S_ISLNK(mode)):
+                raise DeliveryError("zip nonregular member rejected")
+            if info.flag_bits & 1:
+                raise DeliveryError("zip encrypted member rejected")
+            if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                raise DeliveryError("zip compression method unsupported")
+            if info.file_size < 0 or info.file_size > MAX_ARTIFACT_BYTES - total:
+                raise DeliveryError("zip expanded bytes exceed bound")
+            with zf.open(info) as handle:
+                payload = handle.read(info.file_size + 1)
+            if len(payload) != info.file_size:
+                raise DeliveryError("zip member size mismatch")
+            total += len(payload)
+            out[path] = payload
     return out

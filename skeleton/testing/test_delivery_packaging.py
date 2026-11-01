@@ -39,3 +39,69 @@ def test_rejects_bad_inputs():
         build_zip("pkg.zip", {"a": "text"})
     with pytest.raises(DeliveryError):
         build_zip("pkg.zip", FILES, epoch=0)
+
+
+def test_packaging_input_total_budget_is_checked_before_compression(monkeypatch):
+    from skeleton.build.delivery import packaging
+
+    monkeypatch.setattr(packaging, "MAX_ARTIFACT_BYTES", 7)
+    with pytest.raises(DeliveryError, match="uncompressed package input"):
+        packaging.build_zip("small.zip", {"first": b"abcd", "second": b"efgh"})
+    with pytest.raises(DeliveryError, match="uncompressed package input"):
+        packaging.build_tarball("small.tar.gz", {"first": b"abcd", "second": b"efgh"})
+
+
+@pytest.mark.parametrize("extension,builder,reader", [
+    ("zip", build_zip, list_zip),
+    ("tar.gz", build_tarball, list_tarball),
+])
+def test_archive_reader_rejects_compressed_expansion(monkeypatch, extension, builder, reader):
+    from skeleton.build.delivery import packaging
+
+    archive = builder("package." + extension, {"huge": b"X" * 8192}).data
+    assert len(archive) < 512
+    monkeypatch.setattr(packaging, "MAX_ARTIFACT_BYTES", 512)
+    with pytest.raises(DeliveryError, match="expanded bytes exceed bound"):
+        reader(archive)
+
+
+@pytest.mark.parametrize("extension,builder,reader", [
+    ("zip", build_zip, list_zip),
+    ("tar.gz", build_tarball, list_tarball),
+])
+def test_archive_reader_does_not_accept_more_members_than_policy(
+    monkeypatch, extension, builder, reader,
+):
+    from skeleton.build.delivery import packaging
+
+    archive = builder("package." + extension, {"a": b"one", "b": b"two"}).data
+    monkeypatch.setattr(packaging, "MAX_PACKAGE_FILES", 1)
+    with pytest.raises(DeliveryError, match="member count exceeds bound"):
+        reader(archive)
+
+
+def test_zip_duplicate_members_and_noncanonical_aliases_are_rejected():
+    import io
+    import zipfile
+
+    for names in (("same", "same"), ("ok//name",), ("../escape",)):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+            for name in names:
+                z.writestr(name, b"x")
+        with pytest.raises(DeliveryError):
+            list_zip(buf.getvalue())
+
+
+def test_tar_duplicate_members_are_rejected():
+    import io
+    import tarfile
+
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for _ in range(2):
+            member = tarfile.TarInfo("same")
+            member.size = 1
+            tar.addfile(member, io.BytesIO(b"x"))
+    with pytest.raises(DeliveryError, match="noncanonical or duplicated"):
+        list_tarball(buf.getvalue())
