@@ -444,3 +444,26 @@ def test_nonce_store_refuses_expired_and_unbounded_retention_before_recording():
     assert len(store) == 0
     assert store.check_and_record("seal", "fresh", 1000, 10) is True
     assert store.check_and_record("seal", "fresh", 1000, 10) is False
+
+
+def test_nonce_store_length_snapshot_uses_same_lock_as_replay_updates():
+    store = InMemoryNonceStore(clock=lambda: NOW)
+    original_lock = store._lock
+
+    class CheckedLock:
+        entered = 0
+
+        def __enter__(self):
+            original_lock.acquire()
+            self.entered += 1
+
+        def __exit__(self, exc_type, exc, tb):
+            original_lock.release()
+
+    lock = CheckedLock()
+    store._lock = lock
+    assert len(store) == 0
+    assert lock.entered == 1
+    assert store.check_and_record("seal", "nonce", NOW, 60)
+    assert len(store) == 1
+    assert lock.entered >= 3

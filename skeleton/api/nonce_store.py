@@ -110,7 +110,8 @@ class InMemoryNonceStore:
         return self._max
 
     def __len__(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
 
     def stats(self) -> dict[str, int]:
         with self._lock:
