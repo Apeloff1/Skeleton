@@ -138,13 +138,15 @@ class LongContextProgressHead:
                             "head lock replaced during operation"
                         )
 
+                self.spool._verify_root_path()
                 verify_pinned_names()
                 try:
                     yield directory
                 finally:
                     # Never acknowledge a successful read or commit when the
-                    # visible head/lock names diverged from the pinned inodes.
+                    # visible root, head, or lock diverged from pinned inodes.
                     verify_pinned_names()
+                    self.spool._verify_root_path()
             finally:
                 os.close(directory)
         except OSError as exc:

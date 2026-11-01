@@ -269,6 +269,16 @@ def read_selected_sequence(path: Path, *, limit: int) -> bytes:
             named = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
             if _selected_source_identity(named) != _selected_source_identity(before):
                 raise LongContextSpoolError("selected sequence path changed during read")
+            try:
+                visible_parent = _open_directory_chain(path.parent, create=False)
+            except OSError as exc:
+                raise LongContextSpoolError("selected sequence parent path unavailable") from exc
+            try:
+                pinned, visible = os.fstat(parent_fd), os.fstat(visible_parent)
+                if (pinned.st_dev, pinned.st_ino) != (visible.st_dev, visible.st_ino):
+                    raise LongContextSpoolError("selected sequence ancestor replaced")
+            finally:
+                os.close(visible_parent)
             return raw
         finally:
             os.close(fd)
@@ -354,6 +364,37 @@ class LongContextSpool:
         except OSError as exc:
             raise LongContextSpoolError("cannot initialize pinned spool directory") from exc
 
+    def _verify_root_path(self) -> None:
+        """Fail closed if the visible POSIX spool or any ancestor was replaced.
+
+        Descriptor-relative operations alone could otherwise succeed against
+        an orphaned root after a parent rename. This check pins the *current*
+        absolute path again and compares it to the original authorized inode.
+        Same-UID hostile writers remain outside the trust boundary; the
+        check protects cooperative crash recovery and observable replacement,
+        not an atomic filesystem transaction across arbitrary external actors.
+        """
+        self._require_owner_process()
+        if os.name != "posix" or self._root_fd is None:
+            raise LongContextSpoolError("secure spool root unavailable")
+        try:
+            reopened = _open_directory_chain(self.root, create=False)
+        except OSError as exc:
+            raise LongContextSpoolError("spool root path unavailable") from exc
+        try:
+            pinned, visible = os.fstat(self._root_fd), os.fstat(reopened)
+            if (not stat.S_ISDIR(pinned.st_mode)
+                    or not stat.S_ISDIR(visible.st_mode)
+                    or pinned.st_uid != os.geteuid()
+                    or visible.st_uid != os.geteuid()
+                    or stat.S_IMODE(pinned.st_mode) != 0o700
+                    or stat.S_IMODE(visible.st_mode) != 0o700
+                    or (pinned.st_dev, pinned.st_ino) !=
+                       (visible.st_dev, visible.st_ino)):
+                raise LongContextSpoolError("spool root path replaced or insecure")
+        finally:
+            os.close(reopened)
+
     def _require_owner_process(self) -> None:
         """An inherited directory descriptor is not a new process grant."""
         try:
@@ -376,7 +417,7 @@ class LongContextSpool:
             pass
 
     def _open_bucket(self, kind: str, digest: str) -> int:
-        self._require_owner_process()
+        self._verify_root_path()
         if self._root_fd is None:
             raise LongContextSpoolError("secure spool root is closed")
         _digest(digest, "content digest")
@@ -420,7 +461,9 @@ class LongContextSpool:
         kind = "object" if parts[0] == "objects" else "checkpoint"
         bucket_fd = self._open_bucket(kind, digest)
         try:
-            return _read_stable_named_fd(bucket_fd, digest, limit=limit)
+            raw = _read_stable_named_fd(bucket_fd, digest, limit=limit)
+            self._verify_root_path()
+            return raw
         finally:
             os.close(bucket_fd)
 
@@ -437,6 +480,7 @@ class LongContextSpool:
             raise LongContextSpoolError("secure spool root is closed")
         import fcntl
 
+        self._verify_root_path()
         try:
             fd = os.open(
                 ".publish.lock",
@@ -482,6 +526,7 @@ class LongContextSpool:
             if ((entry.st_dev, entry.st_ino) !=
                     (identity.st_dev, identity.st_ino) or entry.st_nlink != 1):
                 raise LongContextSpoolError("spool publication lock replaced")
+            self._verify_root_path()
             return fd
         except BaseException:
             os.close(fd)
@@ -491,6 +536,7 @@ class LongContextSpool:
         lock_fd = self._publication_lock()
         try:
             self._publish_fd_locked(kind, digest, raw)
+            self._verify_root_path()
         finally:
             os.close(lock_fd)
 
@@ -629,10 +675,12 @@ class LongContextSpool:
         try:
             bucket_fd = self._open_bucket(kind, digest)
             try:
-                return self._reap_temp_locked(
+                result = self._reap_temp_locked(
                     bucket_fd, digest,
                     max_entries=max_entries, max_bytes=max_bytes,
                 )
+                self._verify_root_path()
+                return result
             finally:
                 os.close(bucket_fd)
         finally:
@@ -733,6 +781,7 @@ class LongContextSpool:
             disk_headroom = max(0, available - self.disk_reserve_bytes)
             publishable = min(remaining_quota, disk_headroom)
             sufficient = publishable >= requested_bytes if requested_bytes else publishable > 0
+            self._verify_root_path()
             return {
                 "schema": "skeleton.ai.long-context-capacity.v1",
                 "used_bytes": used,
