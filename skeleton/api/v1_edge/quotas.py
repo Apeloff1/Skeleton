@@ -18,12 +18,14 @@ class QuotaPolicy:
     window_limit: Optional[int] = None
 
     def __post_init__(self):
-        if not (self.rate_per_s > 0 and math.isfinite(self.rate_per_s)):
+        if type(self.rate_per_s) not in (int, float) or not math.isfinite(self.rate_per_s) or self.rate_per_s <= 0:
             raise ValueError("rate_per_s must be positive and finite")
-        if self.burst < 1:
-            raise ValueError("burst must be >= 1")
-        if self.window_limit is not None and self.window_limit < 1:
-            raise ValueError("window_limit must be >= 1")
+        if type(self.burst) is not int or self.burst < 1:
+            raise ValueError("burst must be a positive integer")
+        if type(self.window_s) not in (int, float) or not math.isfinite(self.window_s) or self.window_s <= 0:
+            raise ValueError("window_s must be positive and finite")
+        if self.window_limit is not None and (type(self.window_limit) is not int or self.window_limit < 1):
+            raise ValueError("window_limit must be a positive integer")
 
 
 @dataclass

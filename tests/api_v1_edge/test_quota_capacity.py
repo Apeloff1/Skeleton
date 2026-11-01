@@ -59,3 +59,15 @@ def test_invalid_bucket_capacity_fails_fast():
     for value in (0, -1, True):
         with pytest.raises(ValueError):
             TenantQuotas({"default": QuotaPolicy(1.0, 1)}, max_buckets=value)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"rate_per_s": True}, {"rate_per_s": float("nan")},
+    {"rate_per_s": float("inf")}, {"rate_per_s": 0},
+    {"burst": True}, {"burst": 0}, {"window_s": 0},
+    {"window_s": float("nan")}, {"window_s": float("inf")},
+    {"window_limit": True}, {"window_limit": 0},
+])
+def test_invalid_quota_policy_fails_closed(kwargs):
+    with pytest.raises(ValueError):
+        QuotaPolicy(**{"rate_per_s": 1.0, "burst": 1, **kwargs})
