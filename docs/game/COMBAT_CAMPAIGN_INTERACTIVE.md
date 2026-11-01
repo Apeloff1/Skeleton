@@ -36,3 +36,13 @@ The demo uses the deterministic hero policy to exercise a complete playable
 route; normal play accepts the user's explicit hero decisions. No scripts,
 network calls, providers, or arbitrary file paths are evaluated. Checksums
 provide integrity and replay consistency, not distribution signatures.
+
+## Accessible player and opponent narration
+
+`combat-campaign-play narrate --session-json "$SAVE"` renders all replayed
+turns, including the current unfinished encounter. Captions distinguish
+player decisions from deterministic opponent actions and derive damage,
+healing, knockouts, outcomes and rewards from canonical replay, never from
+untrusted text. The report includes stable turn receipts and a source-bound
+manifest. `combat-campaign-play narration-verify --report-json "$REPORT"`
+reconstructs and verifies the complete narration before acceptance.

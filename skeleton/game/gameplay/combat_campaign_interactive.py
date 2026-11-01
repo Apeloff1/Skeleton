@@ -276,12 +276,22 @@ def cli(argv: Sequence[str]) -> int:
         item.add_argument("--session-json", required=True)
     unpack = sub.add_parser("unpack")
     unpack.add_argument("--package-json", required=True)
+    narrate = sub.add_parser("narrate")
+    narrate.add_argument("--session-json", required=True)
+    narration_verify = sub.add_parser("narration-verify")
+    narration_verify.add_argument("--report-json", required=True)
     args = parser.parse_args(list(argv))
     try:
         if args.command == "demo":
             result = demo_interactive()
         elif args.command == "start":
             result = new_interactive(_parse_json(args.source_json, "campaign source"))
+        elif args.command == "narrate":
+            from skeleton.game.gameplay.combat_campaign_play_narration import narrate_interactive
+            result = narrate_interactive(_parse_json(args.session_json, "campaign checkpoint"))
+        elif args.command == "narration-verify":
+            from skeleton.game.gameplay.combat_campaign_play_narration import verify_interactive_narration
+            result = verify_interactive_narration(_parse_json(args.report_json, "narration report"))
         elif args.command == "unpack":
             result = verify_interactive_package(
                 _parse_json(args.package_json, "campaign package"),
