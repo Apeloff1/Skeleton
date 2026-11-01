@@ -43,3 +43,16 @@ def test_secret_evidence_rejects_control_and_bidi_diagnostic_labels():
         with pytest.raises(m.ContractError, match="audit scope"):
             ledger.use(m.Credential("valid", ("read",), 0, 60), bad, 1)
         assert not ledger.events
+
+
+def test_secret_audit_refuses_unbounded_timestamp_and_untyped_credential():
+    for bad in (10**1000, m.MAX_AUDIT_TIMESTAMP + 1):
+        with pytest.raises(m.ContractError, match="lifetime"):
+            m.Credential("ci", ("read",), 0, bad)
+    cred = m.Credential("ci", ("read",), 0, 100)
+    ledger = m.CredentialLedger()
+    with pytest.raises(m.ContractError, match="audit time"):
+        ledger.use(cred, "read", 10**1000)
+    with pytest.raises(m.ContractError, match="credential"):
+        ledger.use(object(), "read", 1)
+    assert not ledger.events

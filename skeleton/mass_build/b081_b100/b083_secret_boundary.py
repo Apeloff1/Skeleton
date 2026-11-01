@@ -18,6 +18,7 @@ MAX_ARTIFACTS = 256
 MAX_ARTIFACT_CHARS = 1_000_000
 MAX_CREDENTIALS = 256
 MAX_AUDIT_EVENTS = 10_000
+MAX_AUDIT_TIMESTAMP = 1_000_000_000_000
 
 
 def _safe_diagnostic(value: str) -> bool:
@@ -49,7 +50,7 @@ class Credential:
         require(len(self.name) <= 128 and _safe_diagnostic(self.name),
                 "credential name exceeds diagnostic bound")
         require(type(self.issued_at) is int and type(self.expires_at) is int
-                and 0 <= self.issued_at < self.expires_at,
+                and 0 <= self.issued_at < self.expires_at <= MAX_AUDIT_TIMESTAMP,
                 "credential must have bounded integer lifetime")
         require(type(self.scopes) is tuple and len(self.scopes) <= 32
                 and all(type(scope) is str and 1 <= len(scope) <= 128
@@ -62,7 +63,9 @@ class CredentialLedger:
         self.events: list[tuple[int, str, str]] = []
 
     def use(self, cred: Credential, scope: str, now: int) -> bool:
-        require(type(now) is int and now >= 0, "audit time must be a nonnegative integer")
+        require(isinstance(cred, Credential), "audit credential must be typed")
+        require(type(now) is int and 0 <= now <= MAX_AUDIT_TIMESTAMP,
+                "audit time must be a bounded nonnegative integer")
         require(type(scope) is str and 1 <= len(scope) <= 128
                 and _safe_diagnostic(scope), "audit scope exceeds bound")
         require(len(self.events) < MAX_AUDIT_EVENTS, "credential audit log exceeds bound")
