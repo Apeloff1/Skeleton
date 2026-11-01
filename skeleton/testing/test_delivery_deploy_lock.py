@@ -26,3 +26,16 @@ def test_renew_and_ttl_bounds():
         t.acquire("dev2", "ci", now=0, ttl=0)
     with pytest.raises(DeliveryError):
         t.renew(r, now=100, ttl=10)
+
+
+def test_deploy_lock_rejects_invalid_clocks_and_boolean_ttls():
+    t = DeployLockTable()
+    with pytest.raises(DeliveryError, match="clock"):
+        t.acquire("dev", "ci", now=True, ttl=10)
+    with pytest.raises(DeliveryError, match="clock"):
+        t.holder("dev", now=-1)
+    with pytest.raises(DeliveryError, match="ttl"):
+        t.acquire("dev", "ci", now=0, ttl=True)
+    lease = t.acquire("dev", "ci", now=0, ttl=10)
+    with pytest.raises(DeliveryError, match="ttl"):
+        t.renew(lease, now=1, ttl=True)

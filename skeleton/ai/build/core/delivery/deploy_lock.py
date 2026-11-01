@@ -26,6 +26,8 @@ class DeployLockTable:
         self._tokens: dict[str, int] = {}
 
     def holder(self, environment: str, *, now: int) -> Lease | None:
+        if type(now) is not int or now < 0:
+            raise DeliveryError("deploy lock clock must be a nonnegative integer")
         lease = self._leases.get(environment)
         if lease is None or lease.expires_at <= now:
             return None
@@ -34,7 +36,7 @@ class DeployLockTable:
     def acquire(self, environment: str, holder: str, *, now: int, ttl: int) -> Lease:
         require_env_name(environment)
         require_id(holder, field="holder")
-        if not 1 <= ttl <= MAX_TTL:
+        if type(ttl) is not int or not 1 <= ttl <= MAX_TTL:
             raise DeliveryError(f"ttl must be 1..{MAX_TTL}")
         current = self.holder(environment, now=now)
         if current is not None and current.holder != holder:
@@ -47,7 +49,7 @@ class DeployLockTable:
 
     def renew(self, lease: Lease, *, now: int, ttl: int) -> Lease:
         self.check_fence(lease, now=now)
-        if not 1 <= ttl <= MAX_TTL:
+        if type(ttl) is not int or not 1 <= ttl <= MAX_TTL:
             raise DeliveryError(f"ttl must be 1..{MAX_TTL}")
         renewed = Lease(lease.environment, lease.holder, lease.token, now + ttl)
         self._leases[lease.environment] = renewed

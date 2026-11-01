@@ -37,3 +37,12 @@ def test_plan_errors():
         plan_rollback(h, trigger="manual")
     with pytest.raises(DeliveryError):
         plan_rollback(h, trigger="vibes")
+
+
+def test_rollback_rejects_nonfinite_and_boolean_error_evidence():
+    health = HealthReport("healthy", (), ())
+    for bad in (float("nan"), float("inf"), float("-inf"), True, "0.01"):
+        with pytest.raises(DeliveryError, match="fractions"):
+            decide(health, error_rate=bad)
+        with pytest.raises(DeliveryError, match="fractions"):
+            decide(health, error_budget=bad)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 from skeleton.build.delivery._util import DeliveryError
 from skeleton.build.delivery.health_check import HealthReport
@@ -36,7 +37,9 @@ def decide(
     error_budget: float = 0.01,
     tolerate_degraded: bool = True,
 ) -> RollbackDecision:
-    if not 0 <= error_rate <= 1 or not 0 < error_budget <= 1:
+    if (type(error_rate) not in (int, float) or type(error_budget) not in (int, float)
+            or not math.isfinite(error_rate) or not math.isfinite(error_budget)
+            or not 0 <= error_rate <= 1 or not 0 < error_budget <= 1):
         raise DeliveryError("error rates must be fractions")
     if report.verdict == "unhealthy":
         return RollbackDecision(True, "health:" + ",".join(report.failing_probes), None)
