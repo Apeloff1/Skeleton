@@ -103,3 +103,20 @@ def test_migration_payload_and_chain_budgets_fail_closed(monkeypatch):
         _registry().load_section(V1_SECTION)
     with pytest.raises(GameplayMigrationError, match="callback"):
         GameplayMigrations(2).register(1, None)
+
+
+def test_migration_callback_output_is_bounded_before_digest():
+    huge = GameplayMigrations(2)
+    huge.register(1, lambda p: {"payload": [0] * 10_001})
+    with pytest.raises(GameplayMigrationError, match="collection exceeds bound"):
+        huge.load_section(V1_SECTION)
+
+    def cyclic_result(payload):
+        cycle = []
+        cycle.append(cycle)
+        return {"cycle": cycle}
+
+    cyclic = GameplayMigrations(2)
+    cyclic.register(1, cyclic_result)
+    with pytest.raises(GameplayMigrationError, match="cyclic"):
+        cyclic.load_section(V1_SECTION)
