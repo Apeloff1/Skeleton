@@ -196,3 +196,10 @@ def test_analytics_raw_identity_boundaries_fail_closed(bad):
     with pytest.raises(EventError):
         c.opt_out(bad)
     assert not c.events and not c.opted_out
+
+
+def test_maximum_bounded_player_and_session_id_are_accepted():
+    c = collector()
+    ev = c.ingest("p" * 256, "s" * 256, {"seq": 0, "t": 0, "type": "session_start"})
+    assert ev is not None and len(ev.session_id) == 21
+    assert len(build_sessions(c.events)) == 1

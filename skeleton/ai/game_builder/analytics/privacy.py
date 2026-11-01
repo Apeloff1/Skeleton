@@ -51,6 +51,13 @@ class PrivacyPolicy:
         raw = _raw_identity(raw, "raw identity")
         return kind[0] + hmac.new(self.salt, f"{kind}\x00{raw}".encode(), hashlib.sha256).hexdigest()[:20]
 
+    def session_pseudonym(self, raw_player: str, raw_session: str) -> str:
+        """Domain-separated HMAC of an unambiguous player/session tuple."""
+        player = _raw_identity(raw_player, "player identity")
+        session = _raw_identity(raw_session, "session identity")
+        message = f"session\x00{len(player)}:{player}{session}".encode()
+        return "s" + hmac.new(self.salt, message, hashlib.sha256).hexdigest()[:20]
+
     def sampled(self, raw_player: str) -> bool:
         """Per-player (not per-event) so a sampled player's whole history is kept."""
         raw_player = _raw_identity(raw_player, "player identity")
@@ -112,8 +119,7 @@ class Collector:
             return None
         try:
             ev = GameplayEvent.from_dict({**event, "player": self.policy.pseudonym("player", raw_player),
-                                          "session_id": self.policy.pseudonym(
-                                              "session", f"{len(raw_player)}:{raw_player}{raw_session}")})
+                                          "session_id": self.policy.session_pseudonym(raw_player, raw_session)})
         except EventError:
             self.counts["rejected"] += 1
             raise
