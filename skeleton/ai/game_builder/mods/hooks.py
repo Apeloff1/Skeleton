@@ -184,10 +184,22 @@ class DeclarativeHook:
                 else:
                     if isinstance(target, bool) or not isinstance(target, int | float):
                         raise HookError(f"{path}: scale target is not a number")
-                    v = target * op.get("factor", 1)
-                    v = max(v, op["min"]) if op.get("min") is not None else v
-                    v = min(v, op["max"]) if op.get("max") is not None else v
-                    self._assign(parent, last, type(target)(v) if isinstance(target, int) else v, path)
+                    try:
+                        if not math.isfinite(target):
+                            raise HookError(f"{path}: scale target is not finite")
+                        v = target * op.get("factor", 1)
+                        # Reject overflow before any clamping; an infinity must
+                        # never become an apparently valid bounded result.
+                        if not math.isfinite(v):
+                            raise HookError(f"{path}: scale result is not finite")
+                        v = max(v, op["min"]) if op.get("min") is not None else v
+                        v = min(v, op["max"]) if op.get("max") is not None else v
+                        if not math.isfinite(v):
+                            raise HookError(f"{path}: scale result is not finite")
+                        value = type(target)(v) if isinstance(target, int) else v
+                    except (OverflowError, ValueError) as exc:
+                        raise HookError(f"{path}: scale numeric overflow") from exc
+                    self._assign(parent, last, value, path)
             elif kind == "set":
                 if isinstance(parent, dict) and isinstance(last, str):
                     parent[last] = copy.deepcopy(op["value"])
