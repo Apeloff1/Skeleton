@@ -409,6 +409,34 @@ class LongContextSpool:
                             raise LongContextSpoolError("spool recovery entry bound exceeded")
         except OSError as exc:
             raise LongContextSpoolError("spool recovery enumeration failed") from exc
+        # Preflight every candidate before unlinking any. A corrupt later
+        # entry or exhausted budget must not cause partial recovery.
+        preflight: dict[str, tuple[int, int, int, int]] = {}
+        total_bytes = 0
+        for name in sorted(matches):
+            try:
+                info = os.stat(name, dir_fd=bucket_fd, follow_symlinks=False)
+                if (not stat.S_ISREG(info.st_mode)
+                        or info.st_uid != os.geteuid()
+                        or stat.S_IMODE(info.st_mode) != 0o600
+                        or info.st_nlink not in (1, 2)
+                        or info.st_size < 0
+                        or info.st_size > MAX_SERIALIZED_SEQUENCE_BYTES + 4096):
+                    raise LongContextSpoolError("untrusted orphan spool object")
+                total_bytes += info.st_size
+                if total_bytes > max_bytes:
+                    raise LongContextSpoolError("spool recovery byte bound exceeded")
+                if info.st_nlink == 2:
+                    final = os.stat(
+                        digest, dir_fd=bucket_fd, follow_symlinks=False,
+                    )
+                    if (final.st_dev, final.st_ino) != (info.st_dev, info.st_ino):
+                        raise LongContextSpoolError("untrusted orphan hardlink")
+                preflight[name] = (
+                    info.st_dev, info.st_ino, info.st_nlink, info.st_size,
+                )
+            except OSError as exc:
+                raise LongContextSpoolError("orphan spool preflight denied") from exc
         reclaimed = 0
         inspected_bytes = 0
         removed = 0
@@ -425,6 +453,9 @@ class LongContextSpool:
                             or info.st_size < 0
                             or info.st_size > MAX_SERIALIZED_SEQUENCE_BYTES + 4096):
                         raise LongContextSpoolError("untrusted orphan spool object")
+                    if ((info.st_dev, info.st_ino, info.st_nlink, info.st_size)
+                            != preflight[name]):
+                        raise LongContextSpoolError("orphan spool changed after preflight")
                     if inspected_bytes + info.st_size > max_bytes:
                         raise LongContextSpoolError("spool recovery byte bound exceeded")
                     inspected_bytes += info.st_size

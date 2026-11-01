@@ -467,6 +467,7 @@ class TestLongContextSpool(unittest.TestCase):
             self.spool.recover_abandoned_temps(
                 kind="checkpoint", digest=start, max_bytes=5,
             )
+        self.assertEqual(len(list(bucket.glob(".*.tmp"))), 2)
         self.assertTrue((bucket / ("." + start + "." + f"{1:016x}" + ".tmp")).exists())
 
     def test_posix_world_readable_root_is_rejected(self):
