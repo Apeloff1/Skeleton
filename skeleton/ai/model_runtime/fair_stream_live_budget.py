@@ -12,6 +12,7 @@ import sys
 
 from skeleton.app.offline_resources import probe_local_resources
 from skeleton.app.offline_cgroup_memory_headroom import probe_cgroup_memory_headroom
+from skeleton.app.offline_cgroup_swap_headroom import probe_cgroup_swap_headroom
 from skeleton.app.offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
 from skeleton.app.offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from skeleton.app.offline_io_pressure import IOPressureController, probe_io_pressure
@@ -53,6 +54,7 @@ class LiveStreamBudgetSampler:
             # A container can have far less RAM than its host. The separate
             # cgroup capacity probe is conservative across concurrent usage.
             cgroup_memory = probe_cgroup_memory_headroom()
+            cgroup_swap = probe_cgroup_swap_headroom()
             available_ram = host.available_ram_bytes
             if cgroup_memory is not None and cgroup_memory.headroom_bytes is not None:
                 available_ram = min(available_ram, cgroup_memory.headroom_bytes)
@@ -113,6 +115,7 @@ class LiveStreamBudgetSampler:
                 "cgroup_high": bool(cgroup["high_backpressure"]),
                 "cgroup_oom": bool(cgroup["oom_backpressure"]),
                 "cgroup_memory": bool(cgroup_memory and cgroup_memory.hard_hold),
+                "cgroup_swap_spill": bool(cgroup_swap is None or not cgroup_swap.spill_allowed),
                 "io": bool(io["congested"]),
                 "cpu_throttle": bool(cpu["backpressure"]),
                 "swap_churn": bool(swap["backpressure"]),
@@ -152,6 +155,10 @@ class LiveStreamBudgetSampler:
                 "schema": "skeleton.ai.live-stream-pressure.v1",
                 "measurement": "os_probe",
                 "auxiliary_telemetry_incomplete": missing,
+                "cgroup_swap_spill_allowed": bool(cgroup_swap and cgroup_swap.spill_allowed),
+                "cgroup_swap_limit_measured": bool(
+                    cgroup_swap and cgroup_swap.limit_bytes is not None
+                ),
                 "cgroup_memory_limit_measured": bool(
                     cgroup_memory and cgroup_memory.limit_bytes is not None
                 ),
