@@ -24,12 +24,21 @@ class QuestProgressSaveError(ValueError):
     pass
 
 
+def _validate_campaign_receipt(value: str | None) -> None:
+    if value is not None and (
+        type(value) is not str or len(value) != 64
+        or any(char not in "0123456789abcdef" for char in value)
+    ):
+        raise QuestProgressSaveError("invalid campaign receipt digest")
+
+
 def quest_section(world: DirectorWorld, state: DirectorState,
                   quests: Sequence[QuestProgressState], *,
                   failures: Sequence[QuestFailure] = (),
                   campaign_receipt_sha256: str | None = None) -> dict[str, Any]:
     if state.world_digest != world.digest:
         raise QuestProgressSaveError("director state belongs to another world")
+    _validate_campaign_receipt(campaign_receipt_sha256)
     if len(quests) > 4096 or len(failures) > 4096:
         raise QuestProgressSaveError("quest section exceeds bounded collection size")
     quest_ids = [q.quest_id for q in quests]
@@ -99,12 +108,7 @@ def restore_quest_progress(plane: GameSavePlane, slot: str, world: DirectorWorld
         or verified_state.world_digest != world.digest
     ):
         raise QuestProgressSaveError("verified director state belongs to another world")
-    if campaign_receipt_sha256 is not None and (
-        type(campaign_receipt_sha256) is not str
-        or len(campaign_receipt_sha256) != 64
-        or any(c not in "0123456789abcdef" for c in campaign_receipt_sha256)
-    ):
-        raise QuestProgressSaveError("invalid campaign receipt digest")
+    _validate_campaign_receipt(campaign_receipt_sha256)
     sections, _ = plane.restore(slot, sequence=sequence)
     section = sections.get(SECTION)
     if section is None:
