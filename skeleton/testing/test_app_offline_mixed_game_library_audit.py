@@ -123,6 +123,24 @@ def test_cross_mode_inode_alias_rejected_even_for_different_names(
         audit_mixed_game_library([unsigned], [signed], authorized=True)
 
 
+def test_cross_mode_policy_inode_alias_rejected(mixed, monkeypatch):
+    unsigned, signed = mixed
+    import skeleton.app.offline_mixed_game_library_audit as module
+    original = module._snapshot
+
+    def fake_alias(*args):
+        plain, trusted = original(*args)
+        first = list(plain[0])
+        # A policy is nested under the signed material identity. An alias
+        # against an unsigned archive must not disappear during flattening.
+        first[1] = trusted[0][5][0][1]
+        return (tuple(first),), trusted
+
+    monkeypatch.setattr(module, "_snapshot", fake_alias)
+    with pytest.raises(OfflineMixedGameLibraryError, match="inode alias"):
+        audit_mixed_game_library([unsigned], [signed], authorized=True)
+
+
 def test_unauthorized_audit_never_reads_any_game(mixed, monkeypatch):
     unsigned, signed = mixed
     import skeleton.app.offline_mixed_game_library_audit as module

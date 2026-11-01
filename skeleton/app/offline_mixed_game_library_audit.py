@@ -82,7 +82,11 @@ def _inode_pairs(snapshot: tuple[tuple[object, ...], tuple[object, ...]]
     for entry in snapshot[1]:
         for identity in entry[:3]:
             trusted.add((identity[0], identity[1]))
-        for _, identity in entry[3:]:
+        for _, identity in entry[3:5]:
+            trusted.add((identity[0], identity[1]))
+        # The policy history is one nested tuple of (bytes, inode) pairs,
+        # not a flat continuation of detached key/signature entries.
+        for _, identity in entry[5]:
             trusted.add((identity[0], identity[1]))
     return plain, trusted
 
