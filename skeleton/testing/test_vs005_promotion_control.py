@@ -517,6 +517,7 @@ def test_rollback_must_bind_exact_promotion_decision_digest() -> None:
 
 
 def test_rollback_requires_fourth_independent_verifier() -> None:
+    ledger = PromotionLedger()
     selected = candidate()
     evaluation_value, canary_value, decision = verified_promotion(selected)
     ledger.record_decision(

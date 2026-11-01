@@ -147,27 +147,27 @@ def test_safety_hazard_source_and_ai_mirror_are_byte_identical() -> None:
 
 
 def test_contract_init_source_and_ai_mirror_preserve_declared_facade() -> None:
-    """Only the governed execution-authority overlay may extend the mirror."""
-    import ast
+    """Contract exports must retain exact parity without an ownership declaration."""
+    import json
     from pathlib import Path
+
+    from scripts.check_traceability_spine import _contract_export_mirror_valid
 
     root = Path(__file__).resolve().parents[2]
     source = (root / "skeleton/contracts/__init__.py").read_bytes()
     mirror = (root / "skeleton/ai/runtime/contracts/__init__.py").read_bytes()
-    assert mirror.startswith(source)
-    # The overlay must contain exactly an explicit relative import and a
-    # matching __all__ extension; arbitrary module-level code is forbidden.
-    suffix = mirror[len(source):].decode("utf-8")
-    nodes = ast.parse(suffix).body
-    assert len(nodes) == 2
-    imported, exported = nodes
-    assert isinstance(imported, ast.ImportFrom)
-    assert imported.module == "execution_authority" and imported.level == 1
-    names = tuple(alias.name for alias in imported.names)
-    assert len(names) == len(set(names))
-    assert all(alias.asname is None for alias in imported.names)
-    assert {"ExecutionAuthority", "ExecutionAuthorityError", "verify_authority_receipt_chain"} <= set(names)
-    assert isinstance(exported, ast.AugAssign)
-    assert isinstance(exported.target, ast.Name) and exported.target.id == "__all__"
-    assert isinstance(exported.op, ast.Add)
-    assert tuple(ast.literal_eval(exported.value)) == names
+    manifest = json.loads((root / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    contracts = next(row for row in manifest["mappings"] if row["id"] == "AIFT-CONTRACTS")
+
+    assert "execution_authority.py" not in contracts.get("overlay_children", [])
+    assert not any(
+        row.get("path") == "__init__.py"
+        for row in contracts.get("parity_exceptions", [])
+    )
+    assert mirror == source
+    assert _contract_export_mirror_valid(source, mirror, manifest)
+    assert not _contract_export_mirror_valid(
+        source,
+        source + b"\nfrom .execution_authority import ResourceBudget\n",
+        manifest,
+    )
