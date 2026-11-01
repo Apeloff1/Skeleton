@@ -60,8 +60,8 @@ def test_zero_contact_route_is_deterministic_and_replayable(source):
 
 
 def test_risk_route_prefers_survival_over_shortest_path(source):
-    # From (4,1), reaching (4,3) requires moving through (4,2), not (4,1).
-    receipt = plan(source, start=[4, 1], waypoints=[[4, 3]])
+    # The direct eastern corridor crosses a hazard; a longer safe detour wins.
+    receipt = plan(source, start=[3, 1], waypoints=[[4, 3]])
     assert receipt["hazard_contact_count"] == 0
     assert receipt["finish"] == [4, 3]
 
@@ -178,3 +178,8 @@ def test_cli_and_typed_jeeves_parity(source, tmp_path, monkeypatch, capsys):
     assert routed["result"] == direct
     assert direct["detail"] == output["risk_route"]
     assert routed["file_write_performed"] is False
+
+
+def test_starting_on_hazard_requires_explicit_health_context(source):
+    with pytest.raises(StudioQuestError, match="hazardous start"):
+        plan(source, start=[4, 1])

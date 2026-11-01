@@ -45,12 +45,15 @@ def _safe_leg(
     previous: dict[tuple[int, int, int], tuple[tuple[int, int, int], str] | None] = {
         (origin[0], origin[1], 0): None,
     }
+    best_steps: dict[tuple[int, int, int], int] = {(origin[0], origin[1], 0): 0}
     sequence = 0
     selected = None
     width, height = len(rows[0]), len(rows)
     while queue:
         hits, steps, _, x, y = heappop(queue)
         state = (x, y, hits)
+        if steps != best_steps[state]:
+            continue
         if (x, y) in goals:
             selected = state
             break
@@ -60,10 +63,12 @@ def _safe_leg(
                 continue
             new_hits = hits + int((nx, ny) in hazards)
             next_state = (nx, ny, new_hits)
-            if new_hits > remaining_hits or next_state in previous:
+            if (new_hits > remaining_hits
+                    or steps + 1 >= best_steps.get(next_state, 1 << 30)):
                 continue
-            if len(previous) >= MAX_STATES:
+            if next_state not in best_steps and len(best_steps) >= MAX_STATES:
                 raise StudioQuestError("risk route state budget exceeded")
+            best_steps[next_state] = steps + 1
             previous[next_state] = (state, direction)
             sequence += 1
             heappush(queue, (new_hits, steps + 1, sequence, nx, ny))
@@ -138,6 +143,8 @@ def compile_waypoint_risk(
             raise StudioQuestError("duplicate authored hazard cell")
         hazards.add((x, y))
     cursor = tuple(baseline["start"])
+    if cursor in hazards:
+        raise StudioQuestError("risk route cannot infer health at hazardous start")
     goals = [set([tuple(point)]) for point in baseline["waypoints"]]
     tx, ty = world["target"]
     interaction = {
