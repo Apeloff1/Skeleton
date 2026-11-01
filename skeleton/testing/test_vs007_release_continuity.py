@@ -4,7 +4,7 @@ from skeleton.app.desktop_release import *
 S=lambda x:hashlib.sha256(x.encode()).hexdigest()
 def rel(i="RELEASE.V1",schema=1):return SignedDesktopRelease(i,S(i),S("sig:"+i),"SIGNER.RELEASE",schema)
 def receipt():return DesktopArtifactReceipt("RELEASE.V1",S("state-v1"),S("artifact"),1)
-def acceptance(i="RELEASE.V2"):return DesktopAcceptanceRun("RUN.1",i,S("env"),S("vs001"),S("artifact"))
+def acceptance(i="RELEASE.V2"):return DesktopAcceptanceRun("RUN.1",i,S("env"),S("vs001"),S(i))
 def test_update_requires_migration_before_commit():
  t=DesktopUpdateTransaction(rel(),receipt());t.stage(rel("RELEASE.V2",2))
  with pytest.raises(DesktopReleaseError,match="migration not complete"):t.commit(acceptance())
