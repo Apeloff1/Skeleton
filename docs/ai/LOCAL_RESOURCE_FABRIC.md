@@ -41,10 +41,16 @@ Local sources
   -> canonical inference backend (independent GPU ownership)
 ```
 
-The Linux mmap path binds individual path components through `O_DIRECTORY`
-and `O_NOFOLLOW`, and final files are opened read-only. The Windows path
-re-checks canonical paths, source identity and modification metadata; it
-does not claim an atomic kernel-enforced no-follow parent-path fence.
+On POSIX the read-only mmap path opens every component of the canonical
+operator root from the filesystem anchor, then every source subdirectory and
+final file by held directory descriptors with `O_DIRECTORY` and `O_NOFOLLOW`.
+A replaced ancestor symlink cannot redirect the staging open. Where those
+primitives are unavailable (including the current Windows staging adapter),
+source mmap staging fails closed rather than silently substituting a
+path-based check that could be raced. The Windows resource monitor and
+other independently authorized offline functions remain available; safe
+Windows streaming requires separately reviewed native handle-relative
+reparse-point protections and real Windows qualification.
 
 A mapped file is read-only from this process's perspective, but that does
 **not** make DRAM immutable, GPU-coherent, or physically dedicated. Page-cache

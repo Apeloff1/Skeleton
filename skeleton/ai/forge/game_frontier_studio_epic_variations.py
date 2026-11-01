@@ -291,6 +291,23 @@ def _paint_world(project: StudioProject, args: Mapping[str, Any],
                     data[position] = floor
                 elif obstacle:
                     data[position] = wall
+        if tuple(data) == layer.data:
+            # The caller explicitly selected this layer for an authored Epic
+            # variation. A coincidental match to the inherited source must not
+            # silently skip it. Place one deterministic accent off the shared
+            # navigable center spine; never alter an out-of-region tile.
+            changed = False
+            for v in range(height):
+                if changed:
+                    break
+                for u in range(width):
+                    if (abs(u - (width - 1) / 2) <= .5
+                            or abs(v - (height - 1) / 2) <= .5):
+                        continue
+                    position = (y0 + v) * layer.width + x0 + u
+                    data[position] = wall if data[position] == floor else floor
+                    changed = True
+                    break
         updated = _replace_layer(updated, index, replace(layer, data=tuple(data)))
     return updated
 

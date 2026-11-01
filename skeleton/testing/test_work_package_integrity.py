@@ -28,7 +28,7 @@ def test_cycle_rejected():
  with pytest.raises(WorkPackageError,match="cycle"):r.depend(WorkPackageDependency("DEP.BA","PKG.B","PKG.A"))
 def test_package_identity_immutable():
  r=WorkPackageRegistry();r.add(pkg())
- with pytest.raises(WorkPackageError,match="immutable"):r.add(WorkPackage("PKG.095","VOL.095","changed",("n",),("i",),("o",),("r",),("t",),"rb",("q",),("a",)))
+ with pytest.raises(WorkPackageError,match="immutable"):r.add(WorkPackage("PKG.095","VOL.095","changed",("n",),("i",),("o",),("r",),("t",),"rb",("REQ.1",),("AIQ.1",)))
 
 def test_evidence_is_bound_to_exact_package_digest():
  r=WorkPackageRegistry();p=pkg();r.add(p)
