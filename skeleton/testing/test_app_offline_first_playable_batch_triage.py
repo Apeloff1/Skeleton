@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import shutil
 import json
 from pathlib import Path
 
@@ -56,6 +57,8 @@ def test_pinned_first_game_and_missing_second_is_resume_eligible(
     )
     assert result["verified_prefix_count"] == 1
     assert result["resume_eligible_with_independent_pins"] is True
+    assert result["resume_source_preflight_verified"] is True
+    assert result["resume_destinations_reserved"] is False
     assert result["jobs"][0]["state"] == "independently_pinned_replay_verified"
     assert result["jobs"][1]["state"] == "missing_unpublished"
     assert Path(first.receipt).read_bytes() == receipt_before
@@ -170,3 +173,39 @@ def test_parent_replacement_during_missing_entry_triage_is_unsafe(
     assert result["read_only"] is True
     assert result["release_certified"] is False
     assert not archive.exists()
+
+
+def test_missing_suffix_with_tampered_original_source_is_not_resume_eligible(
+    original_games, tmp_path,
+):
+    copied = []
+    for index, (source, pin) in enumerate(original_games):
+        destination = tmp_path / f"original-copy-{index}"
+        shutil.copytree(source, destination)
+        copied.append((destination, pin))
+    jobs = jobs_for(tuple(copied), tmp_path)
+    first = jobs[0]
+    published = publish_first_playable_delivery(
+        first.source, first.archive, first.install, first.save, first.receipt,
+        expected_manifest_sha256=first.manifest_sha256,
+        moves=first.moves, authorized=True,
+    )
+    prefix = replace(
+        first, archive_sha256=published["archive_sha256"],
+        save_sha256=published["save_sha256"],
+        receipt_sha256=published["independent_receipt_sha256"],
+    )
+    (copied[1][0] / "release.json").write_bytes(b'{"tampered":true}')
+    summary = tmp_path / "cohort.json"
+    result = triage_first_playable_delivery_batch(
+        (prefix, jobs[1]), summary, authorized=True,
+    )
+    assert result["verified_prefix_count"] == 1
+    assert result["jobs"][1]["state"] == "missing_unpublished"
+    assert result["resume_eligible_with_independent_pins"] is False
+    assert result["resume_source_preflight_verified"] is False
+    assert result["resume_destinations_reserved"] is False
+    assert result["read_only"] is True
+    assert result["release_certified"] is False
+    assert not summary.exists()
+    assert not Path(jobs[1].archive).exists()

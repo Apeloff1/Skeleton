@@ -20,10 +20,13 @@ from skeleton.ai.game_builder.dual_runtime_verify import (
 from skeleton.app.offline_archive_install import _parent as install_parent
 from skeleton.app.offline_delivery_archive import _parent as archive_parent
 from skeleton.app.offline_first_playable_batch import (
-    DeliveryJob, _check_jobs, _parse_job,
+    DeliveryJob, _check_jobs, _parse_job, _reverify_original_sources,
     inspect_first_playable_delivery_batch,
 )
-from skeleton.app.offline_first_playable_delivery import inspect_first_playable_delivery
+from skeleton.app.offline_first_playable_delivery import (
+    _preflight, _path, inspect_first_playable_delivery,
+)
+from skeleton.app.offline_delivery_assurance import _source_identity
 from skeleton.app.private_game_save import _parent as private_parent
 
 SCHEMA = "skeleton.app.first_playable_delivery_batch_triage.v1"
@@ -173,6 +176,47 @@ def triage_first_playable_delivery_batch(
             for item in statuses[verified_prefix:]
         )
     )
+    # A clean published prefix and missing suffix are necessary, not enough.
+    # Replay every unpublished source and check every destination *without*
+    # reserving it. Otherwise triage could claim resume eligibility when the
+    # next game's source is tampered, missing, or a duplicate project.
+    source_preflight_verified = False
+    if can_resume:
+        try:
+            admissions: list[dict[str, object]] = []
+            identities: list[tuple[int, ...]] = []
+            for index, job in enumerate(checked):
+                if index < verified_prefix:
+                    observed = verify_exported_package(
+                        job.source,
+                        expected_manifest_sha256=job.manifest_sha256,
+                        authorized=True,
+                    )
+                else:
+                    observed = _preflight(
+                        _path(job.source), _path(job.archive), _path(job.install),
+                        _path(job.save), _path(job.receipt),
+                        expected_manifest_sha256=job.manifest_sha256,
+                        authorized=True,
+                    )
+                if (type(observed.get("project_id")) is not str
+                        or not observed["project_id"]
+                        or observed.get("offline_gameplay_reexecuted") is not True
+                        or observed.get("release_certified") is not False):
+                    raise FirstPlayableBatchTriageError(
+                        "original source replay admission missing"
+                    )
+                admissions.append(observed)
+                identities.append(_source_identity(job.source))
+            if len({item["project_id"] for item in admissions}) != len(admissions):
+                raise FirstPlayableBatchTriageError(
+                    "duplicate original project in resumable cohort"
+                )
+            _reverify_original_sources(checked, admissions, identities)
+        except (OSError, ValueError, TypeError, KeyError):
+            can_resume = False
+        else:
+            source_preflight_verified = True
     return {
         "schema": SCHEMA,
         "status": "read_only_delivery_cohort_triage_release_blocked",
@@ -181,6 +225,8 @@ def triage_first_playable_delivery_batch(
         "summary_state": summary_state,
         "verified_prefix_count": verified_prefix,
         "resume_eligible_with_independent_pins": can_resume,
+        "resume_source_preflight_verified": source_preflight_verified,
+        "resume_destinations_reserved": False,
         "all_games_verified": all(
             item["state"] == "independently_pinned_replay_verified"
             for item in statuses
