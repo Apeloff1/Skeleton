@@ -53,6 +53,9 @@ from skeleton.app.offline_delivery_archive import (
 from skeleton.app.offline_archive_install import (
     OfflineSourceInstallError, install_offline_game_source,
 )
+from skeleton.app.offline_progress_compatibility import (
+    verify_archived_progress_binding,
+)
 from skeleton.app.offline_progress_migration import (
     OfflineProgressMigrationError, migrate_offline_game_progress,
     preflight_offline_game_migration,
@@ -464,6 +467,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="install an independently pinned source ZIP into a new private game directory")
     parser.add_argument("--migrate-progress", action="store_true",
                         help="install pinned source ZIP and reexecute a separately pinned private replay")
+    parser.add_argument("--check-archive-save", action="store_true",
+                        help="read-only replay of a pinned private save against a pinned original source ZIP")
     parser.add_argument("--preflight-migration", action="store_true",
                         help="read-only pinned archive/save and destination admission")
     parser.add_argument("--reconcile-migration", action="store_true",
@@ -518,7 +523,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         comparison_values = (
             args.left_save, args.left_sha256, args.right_save, args.right_sha256,
         )
-        if args.preflight_migration:
+        if args.check_archive_save:
+            if (args.preflight_migration or args.migrate_progress
+                    or args.reconcile_migration or args.install_archive
+                    or args.package_existing or args.inspect_archive
+                    or args.play_existing or args.compare_saves
+                    or args.verify_existing or args.reconcile_receipt
+                    or args.inspect_receipt or args.onboard
+                    or args.archive is None or args.load_save is None
+                    or args.expected_archive_sha256 is None
+                    or args.expected_manifest_sha256 is None
+                    or args.expected_save_sha256 is None
+                    or args.output is not None or args.save is not None
+                    or args.intent is not None or args.receipt is not None
+                    or args.expected_receipt_sha256 is not None
+                    or any(value is not None for value in onboarding_values)
+                    or any(value is not None for value in comparison_values)
+                    or args.moves is not None or args.fork_at is not None
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid archive/save replay check mode")
+            raw_save = read_private_game_save(
+                args.load_save, expected_sha256=args.expected_save_sha256,
+                authorized=args.trusted_local_operator,
+            )
+            receipt = verify_archived_progress_binding(
+                args.archive, raw_save,
+                expected_archive_sha256=args.expected_archive_sha256,
+                expected_manifest_sha256=args.expected_manifest_sha256,
+                expected_save_sha256=args.expected_save_sha256,
+                authorized=args.trusted_local_operator,
+            )
+        elif args.preflight_migration:
             if (args.migrate_progress or args.reconcile_migration
                     or args.install_archive or args.package_existing
                     or args.inspect_archive or args.play_existing or args.compare_saves

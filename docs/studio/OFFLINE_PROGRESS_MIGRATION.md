@@ -80,3 +80,8 @@ archive path and inode identity are checked across replay, and the mutating
 migration repeats all admission checks and independently verifies installed
 source and save before reporting success. Preflight does not reserve paths,
 execute Godot, qualify devices, certify content rights, or authorize release.
+
+
+## Standalone archive/save replay compatibility
+
+The read-only `--check-archive-save` mode accepts `--archive`, `--expected-archive-sha256`, `--expected-manifest-sha256`, `--load-save`, `--expected-save-sha256`, and `--trusted-local-operator`. It reexecutes the private replay against the typed original world inside the pinned canonical ZIP without a destination, extraction, or publication. It fails closed on foreign progress, untrusted pins, symlinked archives and inode substitution. The receipt explicitly preserves native-device, package-signing, rights and release holds.
