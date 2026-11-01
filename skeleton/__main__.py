@@ -56,6 +56,7 @@ Commands:
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
     scene-circuit-author  Atomically edit and preview playable circuit sources
+    scene-patrol-solve  Find bounded legal routes through timed guards
     scene-patrol-author  Transactionally edit and preview timed patrols
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
     scene-travel  Simulate, verify and resume original offline scene journeys
@@ -782,6 +783,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-circuit":
         from skeleton.game.gameplay.scene_circuit import cli as circuit_cli
         return circuit_cli(rest)
+    if cmd == "scene-patrol-solve":
+        from skeleton.game.gameplay.scene_guard_patrol_solver import cli as patrol_solver_cli
+        return patrol_solver_cli(rest)
     if cmd == "scene-patrol-author":
         from skeleton.game.gameplay.scene_guard_patrol_author import cli as patrol_author_cli
         return patrol_author_cli(rest)
