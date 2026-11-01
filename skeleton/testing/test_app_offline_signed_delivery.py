@@ -45,7 +45,10 @@ def complete(tmp_path, capsys):
         expected_manifest_sha256=manifest,
     )))
     signature.chmod(0o600)
-    return installed, archive, save, key, signature, manifest, archive_pin, save_pin, sha256(key_bytes).hexdigest(), replay
+    return (
+        installed, archive, save, key, signature, manifest, archive_pin,
+        save_pin, sha256(key_bytes).hexdigest(), replay,
+    )
 
 
 def _call(bundle, **overrides):
