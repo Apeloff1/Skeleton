@@ -232,7 +232,7 @@ def test_native_pressure_old_callback_cannot_sample_new_lease(monkeypatch):
 @pytest.mark.parametrize("field,value", [
     ("tokens", True), ("generation", True), ("bytes_reserved", True),
     ("lease_id", "not-hex"), ("checkpoint_digest", "x" * 64),
-    ("request_id", "\\ud800"),
+    ("request_id", chr(0xD800)),
 ])
 def test_native_pressure_rejects_forged_permit_types_without_sampling(field, value):
     guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
