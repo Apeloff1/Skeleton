@@ -303,6 +303,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "signed-delivery-assurance":
         from skeleton.app.offline_signed_delivery import main as signed_delivery_main
         return signed_delivery_main(arguments[1:])
+    if arguments and arguments[0] == "source-signing-request":
+        from skeleton.app.offline_source_signing_request import main as source_signing_request_main
+        return source_signing_request_main(arguments[1:])
     if arguments and arguments[0] == "verify-archive-signature":
         from skeleton.app.offline_archive_signature import main as signature_main
         return signature_main(arguments[1:])
