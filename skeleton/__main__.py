@@ -76,6 +76,7 @@ Commands:
     arena-forge-author  Atomically edit and preview tactical crafting sources
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
+    quest-expedition-route  Find replayable NPC crafting and combat ending routes
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
     quest-campaign-author  Edit and preview replay-verified chapter campaigns
@@ -781,6 +782,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-expedition-play":
         from skeleton.game.gameplay.expedition_quest_interactive import cli as quest_play_cli
         return quest_play_cli(rest)
+    if cmd == "quest-expedition-route":
+        from skeleton.game.gameplay.expedition_quest_route import cli as quest_route_cli
+        return quest_route_cli(rest)
     if cmd == "quest-campaign":
         from skeleton.game.gameplay.quest_chapter_campaign import cli as campaign_cli
         return campaign_cli(rest)
