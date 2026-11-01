@@ -10,6 +10,7 @@ import json
 from typing import Any, Mapping
 
 from skeleton.ai.agents.jeeves import studio_walk_tool as studio
+from skeleton.ai.agents.jeeves import studio_npc_knowledge_tool as knowledge
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 ROUTER_SCHEMA = "skeleton.jeeves.studio_world_tool_router.v1"
@@ -54,6 +55,7 @@ _TOOL_SYMBOLS = (
     ("director_authoring_tool_schema", "execute_director_authoring_tool"),
     ("audio_cue_tool_schema", "execute_audio_cue_tool"),
     ("audio_prompt_tool_schema", "execute_audio_prompt_tool"),
+    ("npc_knowledge_tool_schema", "execute_npc_knowledge_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -84,8 +86,9 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
     registry: dict[str, tuple[dict[str, Any], Any, bool]] = {}
     schemas: set[str] = set()
     for descriptor_name, executor_name in _TOOL_SYMBOLS:
-        descriptor = getattr(studio, descriptor_name)()
-        executor = getattr(studio, executor_name)
+        adapter = knowledge if descriptor_name == "npc_knowledge_tool_schema" else studio
+        descriptor = getattr(adapter, descriptor_name)()
+        executor = getattr(adapter, executor_name)
         if (type(descriptor) is not dict or type(descriptor.get("name")) is not str
                 or type(descriptor.get("parameters")) is not dict
                 or type(descriptor["parameters"].get("properties")) is not dict):
