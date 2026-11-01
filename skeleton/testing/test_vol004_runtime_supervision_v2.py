@@ -509,9 +509,9 @@ def test_shift_gateway_retry_backoff_is_immediately_cancellable(
         max_non_rate_limit_attempts=3,
     )
     monkeypatch.setattr(
-        gateway,
+        ModelGateway,
         "_config",
-        lambda: ("https://example.com/v1/responses", "secret", "test-model"),
+        lambda self: ("https://example.com/v1/responses", "secret", "test-model"),
     )
     attempts = []
     def fail(*_args, **_kwargs):
