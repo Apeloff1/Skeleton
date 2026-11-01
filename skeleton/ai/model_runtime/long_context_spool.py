@@ -662,11 +662,19 @@ class LongContextSpool:
             used = self._spool_usage_locked()
             try:
                 volume = os.fstatvfs(self._root_fd)
-                available = volume.f_bavail * volume.f_frsize
-            except (OSError, ValueError, OverflowError) as exc:
+                blocks = volume.f_bavail
+                block_size = volume.f_frsize
+            except (OSError, ValueError, OverflowError, AttributeError) as exc:
                 raise LongContextSpoolError("spool volume telemetry unavailable") from exc
-            if (type(available) is not int or available < 0
-                    or available > 2**127 - 1):
+            # Validate each kernel counter independently. A negative block
+            # count multiplied by a negative block size would otherwise look
+            # like positive disk capacity and authorize an unsafe estimate.
+            if (type(blocks) is not int or not 0 <= blocks <= 2**63 - 1
+                    or type(block_size) is not int
+                    or not 1 <= block_size <= 2**63 - 1):
+                raise LongContextSpoolError("invalid spool volume telemetry")
+            available = blocks * block_size
+            if available > 2**127 - 1:
                 raise LongContextSpoolError("invalid spool volume telemetry")
             remaining_quota = self.max_spool_bytes - used
             disk_headroom = max(0, available - self.disk_reserve_bytes)

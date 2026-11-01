@@ -102,6 +102,25 @@ class TestLongContextSpool(unittest.TestCase):
                 self.spool.capacity_snapshot()
 
     @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
+    def test_capacity_snapshot_rejects_malformed_volume_components(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        for blocks, block_size in ((-1, -1), (True, 4096),
+                                   (1, False), (1, 0), (2**64, 4096),
+                                   (1, "4096")):
+            with self.subTest(blocks=blocks, block_size=block_size):
+                with patch(
+                    "skeleton.ai.model_runtime.long_context_spool.os.fstatvfs",
+                    return_value=SimpleNamespace(
+                        f_bavail=blocks, f_frsize=block_size,
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        LongContextSpoolError, "invalid spool volume telemetry",
+                    ):
+                        self.spool.capacity_snapshot(requested_bytes=1)
+
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
     def test_cli_capacity_emits_no_token_payload(self):
         output = StringIO()
         with redirect_stdout(output):
