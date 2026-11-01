@@ -139,6 +139,14 @@ def _parser() -> argparse.ArgumentParser:
         help="verify installed game, archive and save custody (delivery-assurance --help)",
     )
     sub.add_parser(
+        "verify-policy-signed-source", add_help=False,
+        help="verify Ed25519 source against an independently pinned local trust policy",
+    )
+    sub.add_parser(
+        "install-policy-signed-source", add_help=False,
+        help="install verified signed source under an independently pinned trust policy",
+    )
+    sub.add_parser(
         "install-signed-source", add_help=False,
         help="verify detached source signature before no-clobber game installation",
     )
@@ -294,6 +302,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "verify-policy-signed-source":
+        from skeleton.app.offline_source_trust_policy import main as policy_verify_main
+        return policy_verify_main(arguments[1:])
+    if arguments and arguments[0] == "install-policy-signed-source":
+        from skeleton.app.offline_policy_signed_install import main as policy_install_main
+        return policy_install_main(arguments[1:])
     if arguments and arguments[0] == "install-signed-source":
         from skeleton.app.offline_signed_source_install import main as signed_install_main
         return signed_install_main(arguments[1:])
