@@ -112,8 +112,9 @@ class Host:
                 "plugin payload keys are invalid")
         encoded = _bounded_json(dict(payload))
         result = getattr(impl, method)(json.loads(encoded))
-        _bounded_json(result)
-        return result
+        # Return the validated JSON snapshot, never plugin-owned mutable data.
+        # Otherwise the plugin could mutate its result after conformance.
+        return json.loads(_bounded_json(result))
 
 
 def conformance(

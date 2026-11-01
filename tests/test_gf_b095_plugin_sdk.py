@@ -84,3 +84,21 @@ def test_plugin_rejects_noncanonical_output_without_stringifying_objects():
     h.register(m.Manifest("bad", "exporter", (1, 0), ()), BadOutput())
     with pytest.raises(m.ContractError, match="not canonical"):
         h.call("bad", "export", {})
+
+
+def test_plugin_result_is_detached_from_mutable_plugin_owned_state():
+    class SharedOutput:
+        def __init__(self):
+            self.value = {"items": [1]}
+
+        def export(self, payload):
+            return self.value
+
+    plugin = SharedOutput()
+    host = m.Host(frozenset())
+    host.register(m.Manifest("shared", "exporter", (1, 0), ()), plugin)
+    returned = host.call("shared", "export", {})
+    plugin.value["items"].append(object())  # mutate after validation
+    assert returned == {"items": [1]}
+    assert returned is not plugin.value
+    assert returned["items"] is not plugin.value["items"]
