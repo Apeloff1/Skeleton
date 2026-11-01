@@ -77,3 +77,26 @@ def test_cursor_rejects_nonfinite_boolean_and_malformed_base64():
         c.decode("scope", "!!!!.0000000000000000")
     with pytest.raises(CoreError):
         parse_limit(True)
+
+
+def test_cursor_rejects_noncanonical_base64_and_non_ascii_mac():
+    codec = CursorCodec(b"strict-cursor-key-" + b"x" * 20)
+    token, mac = codec.encode("tenant:1", 100.0, "id-1").split(".")
+    for bad in (
+        f"{token}!.{mac}",  # decoder must not ignore untrusted punctuation
+        f"{token}=.{mac}",  # alternate padding is not a canonical token
+        f"{token}.\u00e9",  # non-ASCII compare_digest input must fail closed
+        f"{token}.{mac.upper()}",  # canonical lower-case MAC only
+    ):
+        with pytest.raises(CoreError) as exc:
+            codec.decode("tenant:1", bad)
+        assert exc.value.code == "CORE.PAGINATION.INVALID_CURSOR"
+
+
+def test_limit_rejects_non_integer_input_types_without_truncation():
+    assert parse_limit(2) == 2
+    assert parse_limit("2") == 2
+    for bad in (2.5, b"2", True, object()):
+        with pytest.raises(CoreError) as exc:
+            parse_limit(bad)
+        assert exc.value.code == "CORE.PAGINATION.INVALID_LIMIT"

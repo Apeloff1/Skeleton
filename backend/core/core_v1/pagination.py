@@ -67,15 +67,21 @@ class CursorCodec:
 
     def decode(self, scope: str, cursor: str) -> tuple[float, str]:
         bad = validation("CORE.PAGINATION.INVALID_CURSOR", "cursor is invalid")
-        if not isinstance(cursor, str) or cursor.count(".") != 1 or len(cursor) > 512:
+        if not isinstance(cursor, str) or len(cursor) > 512 or cursor.count(".") != 1:
             raise bad
         token, mac = cursor.split(".")
         try:
-            body = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
+            body = base64.b64decode(
+                (token + "=" * (-len(token) % 4)).encode("ascii"),
+                altchars=b"-_", validate=True,
+            )
+            if base64.urlsafe_b64encode(body).decode("ascii").rstrip("=") != token:
+                raise ValueError("non-canonical cursor encoding")
             data = json.loads(body)
         except (ValueError, binascii.Error, UnicodeError):
             raise bad from None
-        if not hmac.compare_digest(mac, self._mac(body)):
+        if (len(mac) != 16 or any(ch not in "0123456789abcdef" for ch in mac)
+                or not hmac.compare_digest(mac, self._mac(body))):
             raise bad
         if not isinstance(data, dict) or data.get("s") != scope:
             raise bad
@@ -90,8 +96,8 @@ def parse_limit(raw: int | str | None) -> int:
     if raw is None:
         return DEFAULT_LIMIT
     try:
-        if type(raw) is bool:
-            raise ValueError("boolean limit")
+        if type(raw) not in (int, str):
+            raise ValueError("non-integer limit")
         value = int(raw)
     except (TypeError, ValueError):
         raise validation("CORE.PAGINATION.INVALID_LIMIT", "limit must be an integer",
