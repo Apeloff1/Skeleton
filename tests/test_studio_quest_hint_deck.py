@@ -213,3 +213,14 @@ def test_offline_editor_export_import(tmp_path, capsys):
     path.write_text(json.dumps({**record, "session_digest": "0" * 64}))
     with pytest.raises(StudioQuestError):
         load_quest_hint_editor_export(path, **kwargs)
+
+    # A valid old editor export cannot silently migrate to a new quest session.
+    path.write_text(json.dumps(record))
+    stage = next(s for s in program.stages if s.key == first)
+    with pytest.raises(SystemExit):
+        main([
+            "--project", PROJECT, "--expected-source", source,
+            "--actions", json.dumps([[first, stage.alternatives[0]]]),
+            "--baseline-deck", json.dumps(report),
+            "--import-authoring", str(path),
+        ])

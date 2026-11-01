@@ -7,7 +7,7 @@ from pathlib import Path
 
 from scripts.studio_scene_schedule_cli import _strict
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
-from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError, replay_quest
 from skeleton.ai.game_builder.studio_quest_hint_deck import (
     PROMPT, compile_quest_hint_deck, propose_quest_hint_deck,
     replay_quest_hint_deck, publish_quest_hint_deck, restore_quest_hint_deck,
@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
                     prior = replay_quest_hint_deck(
                         docs, _strict(args.baseline_deck, max_bytes=262144),
                         authorized=True)
+                    if replay_quest(docs, actions, authorized=True).digest != prior["session_digest"]:
+                        raise StudioQuestError("stale quest hint editor session lease")
                     authoring = load_quest_hint_editor_export(
                         args.import_authoring, authorized=True,
                         expected_project_id=prior["project_id"],
@@ -67,7 +69,9 @@ def main(argv: list[str] | None = None) -> int:
                     authoring = _strict(args.authoring, max_bytes=32768)
                 detail = compile_quest_hint_deck(
                     docs, actions, authoring, authorized=True,
-                    expected_source_digest=args.expected_source)
+                    expected_source_digest=args.expected_source,
+                    expected_session_digest=prior["session_digest"]
+                    if args.import_authoring else None)
         result: dict[str, object] = {"hint_deck": detail, "file_write_performed": False}
         if args.html_sha256:
             from hashlib import sha256
