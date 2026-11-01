@@ -1923,3 +1923,65 @@ def execute_choice_impact_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+OBJECTIVE_BOARD_REQUEST_SCHEMA = "skeleton.jeeves.studio_objective_board_request.v1"
+OBJECTIVE_BOARD_RESULT_SCHEMA = "skeleton.jeeves.studio_objective_board_result.v1"
+
+
+def objective_board_tool_schema() -> dict[str, object]:
+    """Typed offline quest objective/scene/NPC editor preview."""
+    return {
+        "name": "studio_original_objective_board",
+        "description": "Show source-bound quest objectives and optional accessible offline HTML",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": OBJECTIVE_BOARD_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "offset": {"type": "integer", "minimum": 0},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 16},
+                "include_html": {"type": "boolean"},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_objective_board_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves objective board requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    allowed = required | {"expected_session_digest", "offset", "limit", "include_html"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - allowed
+            or request.get("schema") != OBJECTIVE_BOARD_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves objective board request")
+    from skeleton.ai.game_builder.studio_ecosystem_objective_board import (
+        page_objectives,
+    )
+    detail = page_objectives(
+        read_blueprint(request["project_id"]), request["actions"],
+        authorized=True, expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request.get("expected_session_digest"),
+        offset=request.get("offset", 0), limit=request.get("limit", 8),
+        include_html=request.get("include_html", False),
+    )
+    payload: dict[str, Any] = {
+        "schema": OBJECTIVE_BOARD_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request), "detail": detail,
+        "file_write_performed": False, "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
