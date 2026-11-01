@@ -17,7 +17,7 @@ def res_to_path(root: Path, res: str) -> Path:
         raise ValueError("not a bounded res:// path")
     rel = res[len("res://"):]
     parts = rel.split("/")
-    if (not rel or rel.startswith("/") or "\\\\" in rel or "\\x00" in rel
+    if (not rel or rel.startswith("/") or "\\" in rel or "\x00" in rel
             or any(part in ("", ".", "..") for part in parts)):
         raise ValueError("unsafe res:// path component")
     target = root.joinpath(*parts)
