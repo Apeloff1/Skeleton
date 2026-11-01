@@ -141,6 +141,32 @@ def test_one_callback_is_not_proof_of_postflight_and_model_probes(monkeypatch):
     assert guard.status().stopped
 
 
+def test_active_status_cannot_report_healthy_after_deadline(monkeypatch):
+    values = iter((100, 100 + 1_000_001))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(values))
+    guard = NativeTokenPressureGuard(
+        LiveStreamBudgetSampler(), storage_path=".", max_duration_ns=1_000_000,
+    )
+    guard.start(P)
+    with pytest.raises(NativePressureInterrupted, match="deadline exceeded"):
+        guard.status()
+    assert guard.status().stopped
+    with pytest.raises(NativePressureInterrupted, match="not available"):
+        guard.start(P)
+
+
+def test_active_status_rejects_clock_regression_without_sampling(monkeypatch):
+    values = iter((100, 99))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(values))
+    guard = NativeTokenPressureGuard(
+        LiveStreamBudgetSampler(), storage_path=".",
+    )
+    guard.start(P)
+    with pytest.raises(NativePressureInterrupted, match="clock regressed"):
+        guard.status()
+    assert guard.status().stopped
+
+
 def test_monotonic_deadline_interrupts_before_another_token(monkeypatch):
     probe(monkeypatch, [budget()])
     clock = iter((0, 100, 200, 1_000_001))

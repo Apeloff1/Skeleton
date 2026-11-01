@@ -313,8 +313,16 @@ class NativeTokenPressureGuard:
                 self._stopped = True
 
     def status(self) -> NativePressureStatus:
+        """Never report a live permit after its monotonic deadline expires.
+
+        Status is observational, not a new execution authorization. The same
+        fail-closed clock fence as per-token callbacks applies while active;
+        completed and already-stopped sessions remain inspectable.
+        """
         self._require_owner_process()
         with self._lock:
+            if self._active is not None and not self._stopped:
+                self._check_deadline()
             return NativePressureStatus(
                 schema="skeleton.ai.native-token-pressure.v1",
                 samples=self._samples, stopped=self._stopped,

@@ -22,3 +22,15 @@ process restarts, and none of these controls qualify GPU/M-chip execution.
 ## Fork and process-owner fence
 
 The native CPU token pressure guard now pins the creating OS process identity. Every start, callback, completion and status read checks the PID **before** acquiring its thread lock. A forked child must construct a fresh guard and acquire a new durable execution authorization; inherited callbacks fail closed without probing or issuing a token. A PID probe error permanently stops the inherited guard. This is a process-local defense in depth, not a substitute for the SQLite one-use execution journal, and it does not qualify GPU or M-chip devices.
+
+### Status observation deadline fence
+
+An active native CPU lease is now checked against its original monotonic
+execution deadline when an operator requests pressure status, not only when
+a token callback or successful completion occurs. Expired or regressed clocks
+stop the lease and raise `NativePressureInterrupted`; a subsequent status
+reports `stopped=true`. A status read does not renew, authorize or replay
+an execution lease. Completed or previously stopped guards remain inspectable
+without requiring a new clock sample. The backend still requires per-token
+callbacks and postflight pressure checks, and long-running native calls still
+need independent process-level preemption.
