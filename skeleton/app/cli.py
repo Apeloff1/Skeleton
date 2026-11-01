@@ -139,6 +139,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify installed game, archive and save custody (delivery-assurance --help)",
     )
     sub.add_parser(
+        "migrate-policy-signed-progress", add_help=False,
+        help="migrate original private replay under independently pinned signer policy",
+    )
+    sub.add_parser(
         "verify-policy-signed-source", add_help=False,
         help="verify Ed25519 source against an independently pinned local trust policy",
     )
@@ -302,6 +306,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "migrate-policy-signed-progress":
+        from skeleton.app.offline_policy_signed_progress_migration import main as policy_migrate_main
+        return policy_migrate_main(arguments[1:])
     if arguments and arguments[0] == "verify-policy-signed-source":
         from skeleton.app.offline_source_trust_policy import main as policy_verify_main
         return policy_verify_main(arguments[1:])
