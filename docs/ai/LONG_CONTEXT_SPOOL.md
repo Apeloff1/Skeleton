@@ -88,3 +88,23 @@ release readiness remain separate mandatory gates.
 ## Bounded token materialization
 
 `LongContextSpool.next_window` now caps each in-memory token tuple independently of the serialized context size. The default maximum is 4,096 tokens per window; a trusted application can select a lower limit or explicitly configure up to 65,536. Oversized requests fail before loading token content or advancing immutable checkpoints. This is a host-memory allocation bound, not a device-memory or GPU qualification. Production execution must still independently enforce actual CPU/GPU/thermal budgets and acknowledge progress only after completed work.
+
+## Payload-free bounded capacity observation
+
+The `capacity` command reports a POSIX descriptor-relative, cross-process-lock
+serialized inventory and current disk headroom without disclosing token IDs,
+checkpoint digests, source names or tenant content:
+
+```bash
+python -m skeleton.ai.model_runtime.long_context_cli --root ./private-token-spool --tokenizer-digest DIGEST capacity --request-bytes 1048576
+```
+
+The `observed_publishable_bytes` value is the minimum of quota headroom
+and free volume bytes after the configured disk reserve. `state=hold` is a
+conservative observation; `state=observed_available` is **not** a lease,
+permission grant, GPU qualification, or guarantee of a future write. Publication
+still independently revalidates quota and free space under the same lock.
+Unreadable, untrusted, oversized inventory or unknown volume telemetry fails
+closed. The POSIX scanner is cooperative, not a defense against malicious
+same-UID filesystem mutation. The Windows fallback is deliberately unsupported
+for this diagnostic until descriptor-relative custody is independently qualified.

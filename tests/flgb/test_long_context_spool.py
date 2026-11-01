@@ -51,6 +51,69 @@ class TestLongContextSpool(unittest.TestCase):
             max_tokens=8,
         ).token_ids, sequence.token_ids)
 
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
+    def test_capacity_snapshot_reports_bounded_payload_free_observation(self):
+        start = self.stage()
+        before, _ = self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
+        snapshot = self.spool.capacity_snapshot(requested_bytes=1)
+        self.assertEqual(snapshot["schema"], "skeleton.ai.long-context-capacity.v1")
+        self.assertGreater(snapshot["used_bytes"], 0)
+        self.assertEqual(snapshot["quota_remaining_bytes"],
+                         snapshot["quota_bytes"] - snapshot["used_bytes"])
+        self.assertEqual(snapshot["observed_publishable_bytes"],
+                         min(snapshot["quota_remaining_bytes"],
+                             max(0, snapshot["volume_available_bytes"] -
+                                 snapshot["disk_reserve_bytes"])))
+        self.assertEqual(snapshot["hardware_qualification"], "not_assessed")
+        self.assertIs(snapshot["is_admission_lease"], False)
+        self.assertNotIn("token_ids", snapshot)
+        self.assertNotIn("sequence_digest", snapshot)
+        self.assertEqual(before, self.spool.load(
+            start, expected_tokenizer_digest=TOKENIZER)[0])
+
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
+    def test_capacity_snapshot_holds_when_request_exceeds_quota(self):
+        self.stage()
+        snapshot = self.spool.capacity_snapshot(
+            requested_bytes=self.spool.max_spool_bytes)
+        self.assertEqual(snapshot["state"], "hold")
+        self.assertIs(snapshot["request_observed_sufficient"], False)
+
+    def test_capacity_snapshot_rejects_invalid_request_types(self):
+        for invalid in (-1, True, 1.5, "12", 2**50):
+            with self.subTest(invalid=invalid), self.assertRaises(LongContextSpoolError):
+                self.spool.capacity_snapshot(requested_bytes=invalid)
+
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
+    def test_capacity_snapshot_denies_untrusted_inventory_without_token_leak(self):
+        self.stage()
+        bucket = self.spool.objects / "aa"
+        bucket.mkdir(exist_ok=True)
+        (bucket / "untrusted").symlink_to(self.root / "absent")
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.capacity_snapshot()
+
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
+    def test_capacity_snapshot_fails_closed_on_missing_volume_telemetry(self):
+        from unittest.mock import patch
+        with patch("skeleton.ai.model_runtime.long_context_spool.os.fstatvfs",
+                   side_effect=OSError("probe denied")):
+            with self.assertRaisesRegex(LongContextSpoolError, "telemetry"):
+                self.spool.capacity_snapshot()
+
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
+    def test_cli_capacity_emits_no_token_payload(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main(["--root", str(self.root),
+                             "--tokenizer-digest", TOKENIZER,
+                             "capacity", "--request-bytes", "16"])
+        self.assertEqual(code, 0)
+        receipt = json.loads(output.getvalue())
+        self.assertEqual(receipt["schema"], "skeleton.ai.long-context-capacity.v1")
+        self.assertNotIn("token_ids", output.getvalue())
+        self.assertFalse(receipt["is_admission_lease"])
+
     def test_stage_and_resume_across_process_object(self):
         start = self.stage()
         restored = LongContextSpool(self.root, disk_reserve_bytes=0)

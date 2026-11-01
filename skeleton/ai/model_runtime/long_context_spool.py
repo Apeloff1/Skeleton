@@ -643,6 +643,52 @@ class LongContextSpool:
             raise LongContextSpoolError("spool quota inventory failed") from exc
         return total
 
+    def capacity_snapshot(self, *, requested_bytes: int = 0) -> dict[str, int | str | bool]:
+        """Bounded payload-free POSIX admission observation, never a lease.
+
+        The same cross-process lock used by publication serializes this scan
+        against cooperating writers. The result is a point-in-time diagnostic:
+        callers MUST still use guarded publication and recheck disk pressure.
+        Unknown or malformed volume telemetry fails closed.
+        """
+        self._require_owner_process()
+        if (type(requested_bytes) is not int or requested_bytes < 0
+                or requested_bytes > _MAX_SPOOL_QUOTA_BYTES):
+            raise LongContextSpoolError("invalid requested_bytes")
+        if os.name != "posix" or self._root_fd is None:
+            raise LongContextSpoolError("secure spool capacity observation unavailable")
+        lock_fd = self._publication_lock()
+        try:
+            used = self._spool_usage_locked()
+            try:
+                volume = os.fstatvfs(self._root_fd)
+                available = volume.f_bavail * volume.f_frsize
+            except (OSError, ValueError, OverflowError) as exc:
+                raise LongContextSpoolError("spool volume telemetry unavailable") from exc
+            if (type(available) is not int or available < 0
+                    or available > 2**127 - 1):
+                raise LongContextSpoolError("invalid spool volume telemetry")
+            remaining_quota = self.max_spool_bytes - used
+            disk_headroom = max(0, available - self.disk_reserve_bytes)
+            publishable = min(remaining_quota, disk_headroom)
+            sufficient = publishable >= requested_bytes if requested_bytes else publishable > 0
+            return {
+                "schema": "skeleton.ai.long-context-capacity.v1",
+                "used_bytes": used,
+                "quota_bytes": self.max_spool_bytes,
+                "quota_remaining_bytes": remaining_quota,
+                "volume_available_bytes": available,
+                "disk_reserve_bytes": self.disk_reserve_bytes,
+                "observed_publishable_bytes": publishable,
+                "requested_bytes": requested_bytes,
+                "request_observed_sufficient": sufficient,
+                "state": "observed_available" if sufficient else "hold",
+                "is_admission_lease": False,
+                "hardware_qualification": "not_assessed",
+            }
+        finally:
+            os.close(lock_fd)
+
     def _publish_fd_locked(self, kind: str, digest: str, raw: bytes) -> None:
         """Caller holds the cross-process admission lock."""
         bucket_fd = self._open_bucket(kind, digest)

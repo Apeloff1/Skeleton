@@ -30,10 +30,14 @@ def main(argv: list[str] | None = None) -> int:
     advance.add_argument("--checkpoint", required=True)
     advance.add_argument("--consumed-tokens", type=int, required=True)
     advance.add_argument("--max-checkpoints", type=int, default=4096)
+    status = commands.add_parser("capacity", help="Read bounded payload-free POSIX spool capacity")
+    status.add_argument("--request-bytes", type=int, default=0)
     args = parser.parse_args(argv)
     try:
         spool = LongContextSpool(args.root)
-        if args.command == "stage":
+        if args.command == "capacity":
+            result = spool.capacity_snapshot(requested_bytes=args.request_bytes)
+        elif args.command == "stage":
             raw = read_selected_sequence(
                 args.sequence_file, limit=spool.max_sequence_bytes,
             )
