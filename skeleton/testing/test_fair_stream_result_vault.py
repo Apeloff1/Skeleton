@@ -34,10 +34,17 @@ def state(p=None):
         "session_id": SESSION,
         "generation": p.generation,
         "checkpoint_digest": p.checkpoint_digest,
-        "checkpoint": {"pending": [{
-            "lease_id": p.lease_id, "request_id": p.request_id,
-            "tokens": p.tokens, "bytes_reserved": p.bytes_reserved,
-        }]},
+        "checkpoint": {
+            "pending": [{
+                "lease_id": p.lease_id, "request_id": p.request_id,
+                "tenant_id": "tenant-a",
+                "tokens": p.tokens, "bytes_reserved": p.bytes_reserved,
+            }],
+            "requests": [{
+                "request_id": p.request_id, "tenant_id": "tenant-a",
+                "bytes_per_token": p.bytes_reserved // p.tokens,
+            }],
+        },
     }
 
 
@@ -172,6 +179,42 @@ def test_wrong_state_never_executes(vault_dir):
     invalid["generation"] = 3
     with pytest.raises(SealedResultUnavailable, match="bind"):
         vault.run_and_commit(permit(), invalid)
+    assert backend.calls == 0
+    handle.close()
+
+
+def test_vault_rejects_cross_tenant_pending_lease_before_backend(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    forged = state()
+    forged["checkpoint"]["pending"][0]["tenant_id"] = "tenant-b"
+    with pytest.raises(SealedResultUnavailable, match="tenant or memory"):
+        vault.run_and_commit(permit(), forged)
+    assert backend.calls == 0
+    handle.close()
+
+
+def test_vault_rejects_duplicate_request_identity_before_backend(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    forged = state()
+    forged["checkpoint"]["requests"].append(
+        dict(forged["checkpoint"]["requests"][0])
+    )
+    with pytest.raises(SealedResultUnavailable, match="unique checkpoint"):
+        vault.run_and_commit(permit(), forged)
+    assert backend.calls == 0
+    handle.close()
+
+
+def test_vault_rejects_boolean_pending_token_count(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    p = DispatchPermit(LEASE, "request-1", 2, CHECKPOINT, 1, 256)
+    forged = state(p)
+    forged["checkpoint"]["pending"][0]["tokens"] = True
+    with pytest.raises(SealedResultUnavailable, match="pending lease"):
+        vault.run_and_commit(p, forged)
     assert backend.calls == 0
     handle.close()
 

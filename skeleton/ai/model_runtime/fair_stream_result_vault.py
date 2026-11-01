@@ -196,10 +196,37 @@ class SealedFairStreamResultVault:
             or type(pending[0]) is not dict
             or pending[0].get("lease_id") != permit.lease_id
             or pending[0].get("request_id") != permit.request_id
-            or pending[0].get("tokens") != permit.tokens
-            or pending[0].get("bytes_reserved") != permit.bytes_reserved
+            or type(pending[0].get("tokens")) is not int
+            or pending[0]["tokens"] != permit.tokens
+            or type(pending[0].get("bytes_reserved")) is not int
+            or pending[0]["bytes_reserved"] != permit.bytes_reserved
         ):
             raise SealedResultUnavailable("pending lease does not bind permit")
+        lease = pending[0]
+        tenant = lease.get("tenant_id")
+        if (type(tenant) is not str or not tenant
+                or len(tenant.encode("utf-8")) > 128
+                or any(ord(char) < 32 or ord(char) == 127 for char in tenant)):
+            raise SealedResultUnavailable("pending tenant identity invalid")
+        requests = checkpoint.get("requests")
+        if type(requests) is not list or len(requests) > MAX_RESULT_ROWS:
+            raise SealedResultUnavailable("unbounded checkpoint request inventory")
+        matching = [
+            item for item in requests
+            if type(item) is dict and item.get("request_id") == permit.request_id
+        ]
+        if len(matching) != 1:
+            raise SealedResultUnavailable("missing unique checkpoint request")
+        request = matching[0]
+        bytes_per_token = request.get("bytes_per_token")
+        if (
+            type(request.get("tenant_id")) is not str
+            or request["tenant_id"] != tenant
+            or type(bytes_per_token) is not int
+            or bytes_per_token <= 0
+            or permit.tokens * bytes_per_token != permit.bytes_reserved
+        ):
+            raise SealedResultUnavailable("request tenant or memory binding mismatch")
 
     def run_and_commit(
         self, permit: DispatchPermit, state: Mapping[str, object],
