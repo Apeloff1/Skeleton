@@ -211,7 +211,7 @@ def apply_create_app_hooks(app, hooks: Optional[Sequence[object]] = None) -> Dic
     """Run registered hooks on ``app`` at factory time (never in a lifespan).
 
     Idempotent per app (``app.state.create_app_hooks_applied``); each hook is
-    error-isolated so one failing hook cannot break app construction.
+    fail-closed: hook failures abort app construction to prevent partial gates.
     """
     import logging
 
@@ -225,18 +225,21 @@ def apply_create_app_hooks(app, hooks: Optional[Sequence[object]] = None) -> Dic
     errors: Dict[str, str] = {}
     try:
         resolved = list(hooks) if hooks is not None else resolve_create_app_hooks()
-    except Exception as exc:  # isolate import failures
-        log.warning("create_app hooks failed to resolve: %s", exc)
-        resolved = []
-        errors["<resolve>"] = f"{type(exc).__name__}: {exc}"
+    except Exception as exc:
+        # A missing security/mount hook must abort application construction.
+        # Continuing would serve a partially protected route graph.
+        log.error("create_app hooks failed to resolve: %s", type(exc).__name__)
+        raise RuntimeError("required create_app hooks failed to resolve") from exc
     for hook in resolved:
         name = getattr(hook, "__qualname__", repr(hook))
         try:
             hook(app)
             applied.append(name)
         except Exception as exc:
-            errors[name] = f"{type(exc).__name__}: {exc}"
-            log.warning("create_app hook %s failed: %s", name, errors[name])
+            # Never serve a partially mounted/gated app after hook failure.
+            # The app factory must fail rather than mark a partial hook set done.
+            log.error("required create_app hook %s failed: %s", name, type(exc).__name__)
+            raise RuntimeError(f"required create_app hook {name} failed") from exc
     report = {"enabled": True, "applied": applied, "errors": errors}
     if state is not None:
         state.create_app_hooks_applied = True

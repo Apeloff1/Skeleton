@@ -69,23 +69,40 @@ def test_env_flag_disables(monkeypatch, val):
     assert calls == []
 
 
-def test_error_isolation(monkeypatch):
+def test_required_hook_failure_aborts_app_construction(monkeypatch):
     monkeypatch.delenv(h.CREATE_APP_HOOKS_ENV, raising=False)
     app, calls = FastAPI(), []
 
     def boom(app):
         raise RuntimeError("bad hook")
 
-    rep = h.apply_create_app_hooks(app, [boom, _core_hook(calls)])
-    assert "bad hook" in next(iter(rep["errors"].values()))
-    assert calls == [1] and app.state.create_app_hooks_report is rep
+    with pytest.raises(RuntimeError, match="required create_app hook boom failed"):
+        h.apply_create_app_hooks(app, [boom, _core_hook(calls)])
+    assert calls == []
+    assert getattr(app.state, "create_app_hooks_applied", False) is False
 
 
-def test_resolve_failure_isolated(monkeypatch):
+def test_hook_failure_after_partial_application_remains_fail_closed(monkeypatch):
+    monkeypatch.delenv(h.CREATE_APP_HOOKS_ENV, raising=False)
+    app, calls = FastAPI(), []
+
+    def boom(app):
+        raise RuntimeError("later hook failure")
+
+    with pytest.raises(RuntimeError, match="required create_app hook boom failed"):
+        h.apply_create_app_hooks(app, [_core_hook(calls), boom])
+    assert calls == [1]
+    assert getattr(app.state, "create_app_hooks_applied", False) is False
+    assert not hasattr(app.state, "create_app_hooks_report")
+
+
+def test_required_hook_resolution_failure_aborts_app_construction(monkeypatch):
     monkeypatch.delenv(h.CREATE_APP_HOOKS_ENV, raising=False)
     monkeypatch.setattr(h, "CREATE_APP_HOOKS", ("no.such.module:x",))
-    rep = h.apply_create_app_hooks(FastAPI())
-    assert "<resolve>" in rep["errors"] and rep["applied"] == []
+    app = FastAPI()
+    with pytest.raises(RuntimeError, match="required create_app hooks failed to resolve"):
+        h.apply_create_app_hooks(app)
+    assert getattr(app.state, "create_app_hooks_applied", False) is False
 
 
 def test_server_calls_hooks_in_factory_not_lifespan():
