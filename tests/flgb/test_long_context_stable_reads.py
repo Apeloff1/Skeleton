@@ -93,6 +93,12 @@ class TestImmutableReadIdentity(unittest.TestCase):
                 try:
                     os.pwrite(fd, b"X", 0)
                     os.fsync(fd)
+                    # Force a deterministic metadata transition even on
+                    # coarse-resolution filesystems and very fast runners.
+                    before = os.fstat(fd)
+                    os.utime(name, ns=(before.st_atime_ns,
+                                       before.st_mtime_ns + 2_000_000_000),
+                             dir_fd=kwargs["dir_fd"], follow_symlinks=False)
                 finally:
                     os.close(fd)
             return original_stat(path, *args, **kwargs)
@@ -122,6 +128,55 @@ class TestImmutableReadIdentity(unittest.TestCase):
                 self.spool.load(self.checkpoint,
                                 expected_tokenizer_digest=TOKENIZER)
         self.assertTrue(removed)
+
+    def test_existing_object_collision_detects_postread_name_swap(self):
+        original_stat = os.stat
+        name = self.record.object_digest
+        raw = self.object_path.read_bytes()
+        checks = 0
+
+        def replace_on_final_check(path, *args, **kwargs):
+            nonlocal checks
+            if path == name and kwargs.get("dir_fd") is not None:
+                checks += 1
+                if checks == 2:
+                    directory = kwargs["dir_fd"]
+                    os.unlink(name, dir_fd=directory)
+                    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                                 0o600, dir_fd=directory)
+                    try:
+                        os.write(fd, raw)
+                    finally:
+                        os.close(fd)
+            return original_stat(path, *args, **kwargs)
+
+        with patch("skeleton.ai.model_runtime.long_context_spool.os.stat",
+                   side_effect=replace_on_final_check):
+            with self.assertRaisesRegex(LongContextSpoolError,
+                                        "changed during read"):
+                self.spool.stage(self.sequence)
+        self.assertEqual(checks, 2)
+
+    def test_changed_permissions_during_read_are_denied(self):
+        original_stat = os.stat
+        name = self.record.object_digest
+        changed = False
+
+        def chmod_before_named_check(path, *args, **kwargs):
+            nonlocal changed
+            if not changed and path == name and kwargs.get("dir_fd") is not None:
+                changed = True
+                os.chmod(name, 0o644, dir_fd=kwargs["dir_fd"],
+                         follow_symlinks=False)
+            return original_stat(path, *args, **kwargs)
+
+        with patch("skeleton.ai.model_runtime.long_context_spool.os.stat",
+                   side_effect=chmod_before_named_check):
+            with self.assertRaisesRegex(LongContextSpoolError,
+                                        "changed during read"):
+                self.spool.load(self.checkpoint,
+                                expected_tokenizer_digest=TOKENIZER)
+        self.assertTrue(changed)
 
     def test_immutable_restage_rejects_corrupted_existing_object(self):
         fd = os.open(self.object_path, os.O_WRONLY | os.O_NOFOLLOW)
