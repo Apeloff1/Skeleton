@@ -24,18 +24,27 @@ def test_install_grants_scoped_permissions():
     ]
 
 
-def test_custom_grant_hook_receives_scoped_calls():
+def test_custom_grant_hook_rejects_nonatomic_multiple_permissions():
     seen = []
-    m.install(
+    status, caps = m.install(
         pkg(permissions=("ui_overlay", "add_content")),
         K,
         lambda p: True,
         grant=lambda *a: seen.append(a) or a,
     )
-    assert seen == [
-        ("mod:hats", "add_content", "hats"),
-        ("mod:hats", "ui_overlay", "hats"),
-    ]
+    assert status == "rejected:non_atomic_grant" and caps == []
+    assert seen == []
+
+
+def test_custom_single_grant_receives_scoped_call():
+    seen = []
+    status, caps = m.install(
+        pkg(), K, lambda p: True,
+        grant=lambda *a: seen.append(a) or a,
+    )
+    assert status == "installed"
+    assert seen == [("mod:hats", "add_content", "hats")]
+    assert caps == seen
 
 
 def test_rejections_grant_nothing():
@@ -82,3 +91,52 @@ def test_casefolded_native_extensions_and_duplicate_grants_rejected():
     )
     assert status == "rejected:permissions:duplicate" and caps == []
     assert seen == []
+
+
+def test_unicode_alias_and_casefold_collision_rejected_before_grants():
+    seen = []
+    for files in (
+        {"dir\\leaf.tres": "data"},
+        {"fullwidth\uff0fname.tres": "data"},
+        {"A.tres": "a", "a.tres": "b"},
+    ):
+        status, caps = m.install(
+            pkg(files=files), K, lambda _: True,
+            grant=lambda *args: seen.append(args),
+        )
+        assert status == "rejected:unsafe_path" and caps == []
+    assert seen == []
+
+
+def test_compression_misleading_oversize_and_aggregate_inputs_rejected():
+    from unittest.mock import patch
+
+    with patch.object(m, "MAX_FILE_BYTES", 8):
+        status, caps = m.install(
+            replace(pkg(), files={"huge": "repeated" * 100}),
+            K, lambda _: True,
+        )
+        assert status == "rejected:files" and caps == []
+    with patch.object(m, "MAX_TOTAL_BYTES", 12):
+        status, caps = m.install(
+            replace(pkg(), files={"one": "12345", "two": "12345"}),
+            K, lambda _: True,
+        )
+        assert status == "rejected:files" and caps == []
+
+
+def test_moderation_exception_and_untrusted_non_json_body_fail_closed():
+    assert m.install(pkg(), K, lambda _: (_ for _ in ()).throw(RuntimeError("failed"))) == (
+        "rejected:moderation", []
+    )
+    status, caps = m.install(
+        replace(pkg(), files={"x": float("nan")}), K, lambda _: True,
+    )
+    assert status == "rejected:files" and caps == []
+
+
+def test_no_grants_after_signature_mismatch_from_mutated_file_body():
+    p = pkg()
+    p.files["hat.tres"] = "swapped"
+    status, caps = m.install(p, K, lambda _: True)
+    assert status == "rejected:signature" and caps == []
