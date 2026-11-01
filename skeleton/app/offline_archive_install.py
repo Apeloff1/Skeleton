@@ -24,7 +24,7 @@ from skeleton.app.offline_delivery_archive import (
 )
 
 SCHEMA = "skeleton.app.offline_source_install.v1"
-_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\\Z")
+_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\Z")
 
 
 class OfflineSourceInstallError(ValueError):
@@ -142,9 +142,9 @@ def install_offline_game_source(
         # directory, including an empty directory created by another writer.
         os.mkdir(target.name, mode=0o700, dir_fd=parent_fd)
         os.fsync(parent_fd)
-        root_fd, identity = _directory(
+        root_fd, _identity = _directory(
             parent_fd, target.name,
-            known=None if False else _stat_identity(parent_fd, target.name),
+            known=_stat_identity(parent_fd, target.name),
         )
         _assert_original_root(target, root_fd)
         directories: dict[str, tuple[int, int]] = {}
