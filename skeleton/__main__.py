@@ -814,6 +814,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-tournament":
         from skeleton.game.gameplay.combat_tournament import cli as tournament_cli
         return tournament_cli(rest)
+    if cmd == "combat-objectives-author":
+        from skeleton.game.gameplay.combat_campaign_objectives_author import cli as objectives_author_cli
+        return objectives_author_cli(rest)
     if cmd == "combat-objectives":
         from skeleton.game.gameplay.combat_campaign_objectives import cli as objectives_cli
         return objectives_cli(rest)
