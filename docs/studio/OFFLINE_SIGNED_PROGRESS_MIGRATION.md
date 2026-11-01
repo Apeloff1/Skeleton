@@ -32,3 +32,8 @@ paths, and never claims atomic migration across two destinations.
 
 Focused acceptance: `pytest -q skeleton/testing/test_app_offline_signed_progress_migration.py`.
 Full exact-head CI/security gates and device testing remain mandatory.
+
+Read-only admission: add `--preflight-only` to the same command. It verifies
+all independent pins, detached signature, replay compatibility and destination
+availability without creating directories or saves. Its receipt is not a
+reservation; the publication command repeats every gate and identity fence.

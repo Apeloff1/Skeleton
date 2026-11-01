@@ -41,6 +41,85 @@ def _input_identities(
     )
 
 
+def preflight_signed_offline_progress(
+    archive: str | Path, destination: str | Path,
+    original_save: str | Path, migrated_save: str | Path,
+    public_key_file: str | Path, signature_file: str | Path, *,
+    expected_archive_sha256: str,
+    expected_manifest_sha256: str,
+    expected_save_sha256: str,
+    expected_public_key_sha256: str,
+    authorized: bool,
+) -> dict[str, object]:
+    """Read-only signature, archive/save compatibility and destination preflight.
+
+    No output is reserved. This receipt is a point-in-time observation, never
+    a lease or permission to skip validation at publication time.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    for name, value in (
+        ("archive", expected_archive_sha256),
+        ("manifest", expected_manifest_sha256),
+        ("save", expected_save_sha256),
+        ("public key", expected_public_key_sha256),
+    ):
+        _pin(value, name)
+    before = _input_identities(
+        archive, original_save, public_key_file, signature_file,
+    )
+    signed = verify_offline_source_archive_signature(
+        archive, public_key_file, signature_file,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_public_key_sha256=expected_public_key_sha256,
+        authorized=True,
+    )
+    plan = preflight_offline_game_migration(
+        archive, destination,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        original_save=original_save,
+        expected_save_sha256=expected_save_sha256,
+        migrated_save=migrated_save,
+        authorized=True,
+    )
+    if (
+        before != _input_identities(
+            archive, original_save, public_key_file, signature_file,
+        )
+        or signed.get("source_archive_signature_verified") is not True
+        or signed.get("archive_sha256") != expected_archive_sha256
+        or signed.get("manifest_sha256") != expected_manifest_sha256
+        or signed.get("public_key_sha256") != expected_public_key_sha256
+        or plan.get("save_world_binding_verified") is not True
+        or plan.get("destination_reserved") is not False
+        or plan.get("release_certified") is not False
+    ):
+        raise SignedOfflineProgressMigrationError(
+            "signed progress preflight changed or did not qualify"
+        )
+    return {
+        "schema": "skeleton.app.signed_offline_progress_preflight.v1",
+        "status": "signed_progress_compatible_read_only_release_blocked",
+        "archive_sha256": expected_archive_sha256,
+        "manifest_sha256": expected_manifest_sha256,
+        "save_sha256": expected_save_sha256,
+        "public_key_sha256": expected_public_key_sha256,
+        "signed_message_sha256": signed["signed_message_sha256"],
+        "world_digest": plan["world_digest"],
+        "replay_digest": plan["replay_digest"],
+        "action_count": plan["action_count"],
+        "source_archive_signature_verified": True,
+        "save_world_binding_verified": True,
+        "destination_reserved": False,
+        "read_only": True,
+        "native_device_qualified": False,
+        "package_signed": False,
+        "release_certified": False,
+    }
+
+
 def migrate_signed_offline_progress(
     archive: str | Path, destination: str | Path,
     original_save: str | Path, migrated_save: str | Path,
@@ -59,43 +138,23 @@ def migrate_signed_offline_progress(
     """
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
-    for name, value in (
-        ("archive", expected_archive_sha256),
-        ("manifest", expected_manifest_sha256),
-        ("save", expected_save_sha256),
-        ("public key", expected_public_key_sha256),
-    ):
-        _pin(value, name)
     before = _input_identities(
         archive, original_save, public_key_file, signature_file,
     )
-    signature_before = verify_offline_source_archive_signature(
-        archive, public_key_file, signature_file,
+    preflight = preflight_signed_offline_progress(
+        archive, destination, original_save, migrated_save,
+        public_key_file, signature_file,
         expected_archive_sha256=expected_archive_sha256,
         expected_manifest_sha256=expected_manifest_sha256,
+        expected_save_sha256=expected_save_sha256,
         expected_public_key_sha256=expected_public_key_sha256,
         authorized=True,
     )
-    preflight = preflight_offline_game_migration(
-        archive, destination,
-        expected_archive_sha256=expected_archive_sha256,
-        expected_manifest_sha256=expected_manifest_sha256,
-        original_save=original_save,
-        expected_save_sha256=expected_save_sha256,
-        migrated_save=migrated_save,
-        authorized=True,
-    )
-    if (
-        signature_before.get("source_archive_signature_verified") is not True
-        or preflight.get("save_world_binding_verified") is not True
-        or preflight.get("destination_reserved") is not False
-        or preflight.get("release_certified") is not False
-        or before != _input_identities(
-            archive, original_save, public_key_file, signature_file,
-        )
+    if before != _input_identities(
+        archive, original_save, public_key_file, signature_file,
     ):
         raise SignedOfflineProgressMigrationError(
-            "signed migration inputs changed before publication"
+            "signed inputs changed after preflight"
         )
 
     migrated = migrate_offline_game_progress(
@@ -131,7 +190,7 @@ def migrate_signed_offline_progress(
         before != _input_identities(
             archive, original_save, public_key_file, signature_file,
         )
-        or signature_before != signature_after
+        or preflight.get("signed_message_sha256") != signature_after.get("signed_message_sha256")
         or delivered.get("source_archive_signature_verified") is not True
         or delivered.get("installed_source_archive_binding_verified") is not True
         or delivered.get("private_save_world_binding_verified") is not True
@@ -194,9 +253,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--expected-save-sha256", required=True)
     parser.add_argument("--expected-public-key-sha256", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
+    parser.add_argument("--preflight-only", action="store_true",
+                        help="verify all inputs and destination admission without writing")
     args = parser.parse_args(argv)
     try:
-        result = migrate_signed_offline_progress(
+        operation = (preflight_signed_offline_progress if args.preflight_only
+                     else migrate_signed_offline_progress)
+        result = operation(
             args.archive, args.destination, args.original_save,
             args.migrated_save, args.public_key, args.signature,
             expected_archive_sha256=args.expected_archive_sha256,
@@ -217,5 +280,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = [
     "SCHEMA", "SignedOfflineProgressMigrationError",
-    "migrate_signed_offline_progress", "main",
+    "preflight_signed_offline_progress", "migrate_signed_offline_progress", "main",
 ]

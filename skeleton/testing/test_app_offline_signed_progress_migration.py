@@ -9,6 +9,7 @@ import pytest
 from skeleton.app.cli import run_app_cli
 from skeleton.app.offline_signed_progress_migration import (
     SignedOfflineProgressMigrationError, migrate_signed_offline_progress,
+    preflight_signed_offline_progress,
 )
 from skeleton.testing.test_app_offline_archive_signature import signed
 
@@ -179,5 +180,32 @@ def test_symlinked_original_save_fails_before_install(migration, tmp_path):
     alias.symlink_to(migration["original_save"])
     with pytest.raises((OSError, ValueError)):
         _call(migration, original_save=alias)
+    assert not migration["destination"].exists()
+    assert not migration["migrated_save"].exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-safe custody")
+def test_signed_read_only_preflight_no_destination_reservation(migration, capsys):
+    args = _cli(migration) + ["--preflight-only"]
+    assert run_app_cli(args) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["schema"] == "skeleton.app.signed_offline_progress_preflight.v1"
+    assert receipt["replay_digest"] == migration["expected_replay"]
+    assert receipt["source_archive_signature_verified"] is True
+    assert receipt["save_world_binding_verified"] is True
+    assert receipt["destination_reserved"] is False
+    assert receipt["read_only"] is True
+    assert receipt["release_certified"] is False
+    assert not migration["destination"].exists()
+    assert not migration["migrated_save"].exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-safe custody")
+def test_preflight_wrong_pin_does_not_publish(migration):
+    with pytest.raises(ValueError):
+        preflight_signed_offline_progress(
+            **{**{k: v for k, v in migration.items() if k != "expected_replay"},
+               "expected_public_key_sha256": "0" * 64}
+        )
     assert not migration["destination"].exists()
     assert not migration["migrated_save"].exists()
