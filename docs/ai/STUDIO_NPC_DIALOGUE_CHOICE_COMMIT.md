@@ -30,3 +30,8 @@ authority. The tool itself does not write files.
 Follow-on engine work must consume the verified `quest_actions` and
 `next_quest_session_digest` and run the authoritative playable handoff; it
 must not infer spoken dialogue or native-device qualification from this receipt.
+
+The optional `--html-preview` CLI flag renders an escaped, script-free, CSP-
+restricted operator proof without writing files. HTML preview and publication
+are mutually exclusive. Restore also checks that file identity, length and
+modification metadata remain stable across the read.

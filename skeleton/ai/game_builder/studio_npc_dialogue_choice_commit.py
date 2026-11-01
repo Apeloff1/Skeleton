@@ -5,6 +5,7 @@ dialogue, a native game-engine transition, or a durable write until published.
 """
 from __future__ import annotations
 
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -144,6 +145,55 @@ def replay_npc_dialogue_choice_commit(
     return verified
 
 
+def render_npc_dialogue_choice_commit_html(
+    documents: Mapping[str, Any], receipt: object, *, authorized: bool,
+    expected_contact_digest: str, expected_source_digest: str,
+    expected_walk_digest: str, expected_quest_digest: str,
+) -> bytes:
+    """CSP-restricted, escaped, read-only operator proof for the next quest choice."""
+    verified = replay_npc_dialogue_choice_commit(
+        documents, receipt, authorized=authorized,
+        expected_contact_digest=expected_contact_digest,
+        expected_source_digest=expected_source_digest,
+        expected_walk_digest=expected_walk_digest,
+        expected_quest_digest=expected_quest_digest,
+    )
+    def field(value: str) -> str:
+        return escape(value, quote=True)
+
+    title = "NPC dialogue choice — canonical quest replay"
+    rows = (
+        ("Project", verified["project_id"]),
+        ("NPC", verified["npc_id"]),
+        ("Scene", verified["scene_id"]),
+        ("Quest stage", verified["quest_stage"]),
+        ("Authored alternative", verified["authored_alternative"]),
+        ("Previous quest digest", verified["previous_quest_session_digest"]),
+        ("Next quest digest", verified["next_quest_session_digest"]),
+        ("Source digest", verified["source_digest"]),
+        ("Contact proof digest", verified["contact_digest"]),
+        ("Receipt digest", verified["receipt_digest"]),
+    )
+    items = "".join(
+        "<dt>" + field(label) + "</dt><dd>" + field(value) + "</dd>"
+        for label, value in rows
+    )
+    page = (
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta http-equiv=\"Content-Security-Policy\" "
+        "content=\"default-src 'none'; script-src 'none'; style-src 'none'; "
+        "img-src 'none'; form-action 'none'; base-uri 'none'\">"
+        "<title>" + field(title) + "</title></head><body>"
+        "<main><h1>" + field(title) + "</h1>"
+        "<p>Canonical quest choice replay verified; not spoken dialogue, "
+        "native execution, external evidence or release certification.</p>"
+        "<dl>" + items + "</dl></main></body></html>"
+    ).encode("utf-8", "strict")
+    if len(page) > MAX_BYTES:
+        raise StudioQuestError("NPC dialogue choice HTML exceeds byte budget")
+    return page
+
+
 def publish_npc_dialogue_choice_commit(
     documents: Mapping[str, Any], receipt: object, directory: Path, *,
     authorized: bool, expected_contact_digest: str,
@@ -174,7 +224,11 @@ def publish_npc_dialogue_choice_commit(
             os.close(handle)
         os.link(temporary, FILENAME, src_dir_fd=fd, dst_dir_fd=fd,
                 follow_symlinks=False)
-        os.fsync(fd)
+        try:
+            os.fsync(fd)
+        except OSError:
+            os.unlink(FILENAME, dir_fd=fd)
+            raise
     finally:
         try:
             if created:
@@ -213,6 +267,12 @@ def restore_npc_dialogue_choice_commit(
                          or info.st_nlink != 1))):
                 raise StudioQuestError("NPC dialogue choice receipt must be private")
             raw = os.read(handle, MAX_BYTES + 1)
+            after = os.fstat(handle)
+            if (len(raw) != info.st_size or after.st_size != info.st_size
+                    or after.st_mtime_ns != info.st_mtime_ns
+                    or after.st_ctime_ns != info.st_ctime_ns
+                    or after.st_ino != info.st_ino):
+                raise StudioQuestError("NPC dialogue choice receipt changed during read")
         finally:
             os.close(handle)
     finally:

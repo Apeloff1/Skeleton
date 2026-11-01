@@ -11,6 +11,7 @@ from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_npc_dialogue_choice_commit import (
     MAX_BYTES, compile_npc_dialogue_choice_commit,
     publish_npc_dialogue_choice_commit, restore_npc_dialogue_choice_commit,
+    render_npc_dialogue_choice_commit_html,
 )
 
 
@@ -27,7 +28,10 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--restore", type=Path)
     parser.add_argument("--alternative")
     parser.add_argument("--publish", type=Path)
+    parser.add_argument("--html-preview", action="store_true")
     args = parser.parse_args(argv)
+    if args.html_preview and args.publish:
+        parser.error("read-only HTML preview cannot publish")
     if args.restore and (args.publish or args.alternative):
         parser.error("restore cannot also compile or publish")
     if args.contact_json and not args.alternative:
@@ -58,8 +62,12 @@ def main(argv: list[str] | None = None) -> int:
     except (StudioQuestError, PermissionError, OSError, ValueError,
             TypeError, KeyError, UnicodeError, RecursionError) as exc:
         parser.error(str(exc))
-    print(json.dumps(output, sort_keys=True, separators=(",", ":"),
-                     allow_nan=False))
+    if args.html_preview:
+        print(render_npc_dialogue_choice_commit_html(
+            documents, result, **params).decode("utf-8"))
+    else:
+        print(json.dumps(output, sort_keys=True, separators=(",", ":"),
+                         allow_nan=False))
     return 0
 
 

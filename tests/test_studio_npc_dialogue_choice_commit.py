@@ -233,3 +233,49 @@ def test_jeeves_authoring_gate_router_and_cli_parity(harness, capsys):
             {"tool": "studio_original_npc_dialogue_choice_commit",
              "arguments": {**request, "authorized": True}},
             authorized=True, allow_authoring=True)
+
+def test_offline_html_escapes_authored_content_and_never_executes(harness, capsys):
+    from skeleton.ai.game_builder.studio_npc_dialogue_choice_commit import (
+        render_npc_dialogue_choice_commit_html,
+    )
+    from scripts.studio_npc_dialogue_choice_commit_cli import main
+
+    harness[1]["npc_id"] = "<img src=x onerror=alert(1)>"
+    harness[1]["dialogue_card"]["npc_id"] = harness[1]["npc_id"]
+    for preview in harness[1]["choice_previews"]:
+        preview["npc_id"] = harness[1]["npc_id"]
+    receipt = make(harness)
+    page = render_npc_dialogue_choice_commit_html(
+        harness[0], receipt, **params()).decode("utf-8")
+    assert "default-src 'none'" in page
+    assert "script-src 'none'" in page
+    assert "&lt;img src=x onerror=alert(1)&gt;" in page
+    assert "<img src=x" not in page
+    assert "not spoken dialogue" in page
+    assert main([
+        "--project", "original", "--expected-contact", CONTACT,
+        "--expected-source", SOURCE, "--expected-walk", WALK,
+        "--expected-quest", QUEST, "--contact-json", json.dumps(harness[1]),
+        "--alternative", "listen", "--html-preview",
+    ]) == 0
+    assert "Content-Security-Policy" in capsys.readouterr().out
+
+
+def test_html_preview_is_authority_bound_and_publication_is_exclusive(harness, tmp_path):
+    from skeleton.ai.game_builder.studio_npc_dialogue_choice_commit import (
+        render_npc_dialogue_choice_commit_html,
+    )
+    receipt = make(harness)
+    with pytest.raises(PermissionError):
+        render_npc_dialogue_choice_commit_html(
+            harness[0], receipt, **{**params(), "authorized": False})
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        render_npc_dialogue_choice_commit_html(
+            harness[0], {**receipt, "release_certified": True}, **params())
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    publish_npc_dialogue_choice_commit(harness[0], receipt, private, **params())
+    target = private / FILENAME
+    target.chmod(0o644)
+    with pytest.raises(StudioQuestError, match="private"):
+        restore_npc_dialogue_choice_commit(harness[0], private, **params())
