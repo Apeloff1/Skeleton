@@ -416,8 +416,45 @@ class LongContextSpool:
         except OSError:
             pass
 
-    def _open_bucket(self, kind: str, digest: str) -> int:
+    def _verify_bucket_path(self, kind: str, digest: str, bucket_fd: int) -> None:
+        """Ensure the selected digest bucket is still reachable by its name.
+
+        A pinned bucket descriptor can outlive a rename of its visible name,
+        even while the spool root itself remains stable. Reopen the base
+        directory through the pinned root, compare the descriptor-relative
+        bucket name to the original inode and reject any permission drift.
+        """
         self._verify_root_path()
+        _digest(digest, "content digest")
+        if kind not in {"object", "checkpoint"}:
+            raise LongContextSpoolError("unknown spool object kind")
+        if self._root_fd is None:
+            raise LongContextSpoolError("secure spool root is closed")
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        base_name = "objects" if kind == "object" else "checkpoints"
+        try:
+            base_fd = os.open(base_name, flags, dir_fd=self._root_fd)
+            try:
+                visible = os.stat(digest[:2], dir_fd=base_fd, follow_symlinks=False)
+                pinned = os.fstat(bucket_fd)
+                if (not stat.S_ISDIR(visible.st_mode)
+                        or not stat.S_ISDIR(pinned.st_mode)
+                        or visible.st_uid != os.geteuid()
+                        or pinned.st_uid != os.geteuid()
+                        or stat.S_IMODE(visible.st_mode) != 0o700
+                        or stat.S_IMODE(pinned.st_mode) != 0o700
+                        or (visible.st_dev, visible.st_ino) !=
+                           (pinned.st_dev, pinned.st_ino)):
+                    raise LongContextSpoolError("spool bucket path replaced or insecure")
+            finally:
+                os.close(base_fd)
+        except OSError as exc:
+            raise LongContextSpoolError("spool bucket path unavailable") from exc
+
+    def _open_bucket(self, kind: str, digest: str, *, create: bool = True) -> int:
+        self._verify_root_path()
+        if type(create) is not bool:
+            raise LongContextSpoolError("invalid bucket creation mode")
         if self._root_fd is None:
             raise LongContextSpoolError("secure spool root is closed")
         _digest(digest, "content digest")
@@ -432,10 +469,11 @@ class LongContextSpool:
                 if (base_info.st_uid != os.geteuid()
                         or stat.S_IMODE(base_info.st_mode) != 0o700):
                     raise LongContextSpoolError("insecure spool component")
-                try:
-                    os.mkdir(digest[:2], 0o700, dir_fd=base_fd)
-                except FileExistsError:
-                    pass
+                if create:
+                    try:
+                        os.mkdir(digest[:2], 0o700, dir_fd=base_fd)
+                    except FileExistsError:
+                        pass
                 bucket_fd = os.open(digest[:2], flags, dir_fd=base_fd)
                 bucket_info = os.fstat(bucket_fd)
                 if (bucket_info.st_uid != os.geteuid()
@@ -459,10 +497,10 @@ class LongContextSpool:
         if parts[1] != digest[:2]:
             raise LongContextSpoolError("spool bucket identity mismatch")
         kind = "object" if parts[0] == "objects" else "checkpoint"
-        bucket_fd = self._open_bucket(kind, digest)
+        bucket_fd = self._open_bucket(kind, digest, create=False)
         try:
             raw = _read_stable_named_fd(bucket_fd, digest, limit=limit)
-            self._verify_root_path()
+            self._verify_bucket_path(kind, digest, bucket_fd)
             return raw
         finally:
             os.close(bucket_fd)
@@ -673,13 +711,13 @@ class LongContextSpool:
             raise LongContextSpoolError("POSIX orphan recovery not qualified")
         lock_fd = self._publication_lock()
         try:
-            bucket_fd = self._open_bucket(kind, digest)
+            bucket_fd = self._open_bucket(kind, digest, create=False)
             try:
                 result = self._reap_temp_locked(
                     bucket_fd, digest,
                     max_entries=max_entries, max_bytes=max_bytes,
                 )
-                self._verify_root_path()
+                self._verify_bucket_path(kind, digest, bucket_fd)
                 return result
             finally:
                 os.close(bucket_fd)
@@ -818,6 +856,7 @@ class LongContextSpool:
                 observed = _read_stable_named_fd(bucket_fd, digest, limit=len(raw))
                 if observed != raw:
                     raise LongContextSpoolError("existing immutable object mismatch")
+                self._verify_bucket_path(kind, digest, bucket_fd)
                 return
             used = self._spool_usage_locked()
             if len(raw) > self.max_spool_bytes - used:
@@ -903,6 +942,7 @@ class LongContextSpool:
                 # hardlink. A crash before this point is recoverable by the
                 # bounded orphan-temp scanner.
                 os.fsync(bucket_fd)
+            self._verify_bucket_path(kind, digest, bucket_fd)
         except OSError as exc:
             raise LongContextSpoolError("secure spool publication failed") from exc
         finally:

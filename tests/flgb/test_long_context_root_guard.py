@@ -137,6 +137,64 @@ class TestLongContextRootGuard(unittest.TestCase):
                 read_selected_sequence(selected, limit=len(raw) + 16)
         self.assertTrue(triggered)
 
+    def test_read_only_missing_digest_does_not_create_bucket(self) -> None:
+        absent = "ab" * 32
+        bucket = self.spool.checkpoints / absent[:2]
+        self.assertFalse(bucket.exists())
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.load(absent, expected_tokenizer_digest=TOKENIZER)
+        self.assertFalse(bucket.exists())
+
+    def test_recovery_missing_digest_does_not_create_bucket(self) -> None:
+        absent = "cd" * 32
+        bucket = self.spool.objects / absent[:2]
+        self.assertFalse(bucket.exists())
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.recover_abandoned_temps(kind="object", digest=absent)
+        self.assertFalse(bucket.exists())
+
+    def test_read_rejects_replaced_bucket_after_verified_bytes(self) -> None:
+        digest = self.spool.stage(self.sequence)
+        bucket = self.spool.checkpoints / digest[:2]
+        import skeleton.ai.model_runtime.long_context_spool as module
+        original = module._read_stable_named_fd
+        triggered = False
+
+        def replace_bucket_after_read(*args, **kwargs):
+            nonlocal triggered
+            raw = original(*args, **kwargs)
+            if not triggered:
+                triggered = True
+                bucket.rename(bucket.with_name("moved-" + digest[:2]))
+                bucket.mkdir(mode=0o700)
+            return raw
+
+        with patch.object(module, "_read_stable_named_fd",
+                          side_effect=replace_bucket_after_read):
+            with self.assertRaisesRegex(LongContextSpoolError, "bucket path replaced"):
+                self.spool.load(digest, expected_tokenizer_digest=TOKENIZER)
+        self.assertTrue(triggered)
+
+    def test_publication_rejects_bucket_replacement_before_ack(self) -> None:
+        import skeleton.ai.model_runtime.long_context_spool as module
+        original = LongContextSpool._verify_bucket_path
+        triggered = False
+
+        def replace_bucket_before_verify(spool, kind, digest, bucket_fd):
+            nonlocal triggered
+            if not triggered:
+                triggered = True
+                path = (spool.objects if kind == "object" else spool.checkpoints) / digest[:2]
+                path.rename(path.with_name("moved-" + digest[:2]))
+                path.mkdir(mode=0o700)
+            return original(spool, kind, digest, bucket_fd)
+
+        with patch.object(LongContextSpool, "_verify_bucket_path",
+                          replace_bucket_before_verify):
+            with self.assertRaisesRegex(LongContextSpoolError, "bucket path replaced"):
+                self.spool.stage(self.sequence)
+        self.assertTrue(triggered)
+
     def test_unchanged_root_and_selected_source_remain_usable(self) -> None:
         digest = self.spool.stage(self.sequence)
         receipt, loaded = self.spool.load(digest, expected_tokenizer_digest=TOKENIZER)
