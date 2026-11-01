@@ -163,3 +163,47 @@ def test_migration_options_rejected_in_unrelated_modes(tmp_path, capsys):
         "--output", str(tmp_path / "x"), "--trusted-local-operator",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_migration_rejects_save_inside_installation_source(tmp_path, capsys):
+    source, pin = _journey(tmp_path, capsys)
+    save, save_pin, _ = _save(tmp_path, capsys, source, pin)
+    archive, archive_pin = _package(tmp_path, capsys, source, pin)
+    destination = tmp_path / "new-game"
+    assert run_app_cli(_migrate(
+        archive, archive_pin, pin, save, save_pin, destination,
+        destination / "save.json",
+    )) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not destination.exists()
+
+
+def test_migration_requires_explicit_operator_acknowledgement(tmp_path, capsys):
+    source, pin = _journey(tmp_path, capsys)
+    save, save_pin, _ = _save(tmp_path, capsys, source, pin)
+    archive, archive_pin = _package(tmp_path, capsys, source, pin)
+    destination = tmp_path / "not-authorized"
+    args = _migrate(
+        archive, archive_pin, pin, save, save_pin,
+        destination, tmp_path / "not-authorized.json",
+    )
+    args.remove("--trusted-local-operator")
+    assert run_app_cli(args) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not destination.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow custody")
+def test_migration_rejects_symlinked_archive_before_install(tmp_path, capsys):
+    source, pin = _journey(tmp_path, capsys)
+    save, save_pin, _ = _save(tmp_path, capsys, source, pin)
+    archive, archive_pin = _package(tmp_path, capsys, source, pin)
+    alias = tmp_path / "aliased-archive.zip"
+    alias.symlink_to(archive)
+    destination = tmp_path / "unpublished"
+    assert run_app_cli(_migrate(
+        alias, archive_pin, pin, save, save_pin,
+        destination, tmp_path / "unpublished.json",
+    )) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not destination.exists()

@@ -109,10 +109,13 @@ def test_archive_and_pin_must_be_supplied_together(tmp_path, capsys):
 
 def test_tampered_installed_game_or_save_is_rejected(tmp_path, capsys):
     installed, save, pin, save_pin, archive, archive_pin = _prepare(tmp_path, capsys)
-    save.write_bytes(save.read_bytes() + b" ")
+    original_save = save.read_bytes()
+    save.write_bytes(original_save + b" ")
     assert run_app_cli(_recover(installed, save, pin, save_pin)) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
-    # Source tampering independently fails even without a saved replay.
+    # Restore the independently pinned private save before separately testing
+    # source tampering; otherwise this test would never reach source custody.
+    save.write_bytes(original_save)
     (installed / "index.html").write_text("tampered")
     assert run_app_cli(_recover(installed, save, pin, save_pin)) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
@@ -124,3 +127,20 @@ def test_recovery_rejects_mutating_gameplay_options(tmp_path, capsys):
         installed, save, pin, save_pin, "--moves", "up",
     )) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_reconciliation_rejects_alias_of_private_save(tmp_path, capsys):
+    installed, save, pin, save_pin, archive, archive_pin = _prepare(tmp_path, capsys)
+    alias = tmp_path / "save-alias.json"
+    alias.symlink_to(save)
+    assert run_app_cli(_recover(installed, alias, pin, save_pin)) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_reconciliation_rejects_save_publication_or_gameplay_flags(tmp_path, capsys):
+    installed, save, pin, save_pin, archive, archive_pin = _prepare(tmp_path, capsys)
+    assert run_app_cli(_recover(
+        installed, save, pin, save_pin, "--save", str(tmp_path / "new.json"),
+    )) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not (tmp_path / "new.json").exists()
