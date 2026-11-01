@@ -1,0 +1,327 @@
+"""Bounded multi-game install-to-playable delivery with independently pinned evidence.
+
+Each game is exported, freshly installed, played, saved, restored and verified
+through the canonical single-game pipeline. No device, rights or release
+qualification follows from these source-level acceptance checks.
+"""
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+from hashlib import sha256
+import hmac
+import json
+from pathlib import Path
+import sys
+from typing import Sequence
+
+from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes, _json
+from skeleton.ai.game_builder.offline_receipt_publication import (
+    preflight_receipt_destination, publish_verified_receipt,
+)
+from skeleton.app.offline_first_playable_delivery import (
+    MAX_ACTIONS, _ACTIONS, _path, _is_within, _preflight,
+    inspect_first_playable_delivery, publish_first_playable_delivery,
+)
+from skeleton.app.private_game_save import read_private_game_save
+
+SCHEMA = "skeleton.app.first_playable_delivery_batch.v1"
+MIN_GAMES = 2
+MAX_GAMES = 8
+MAX_INPUT_BYTES = 64 * 1024
+MAX_SUMMARY_BYTES = 256 * 1024
+
+
+class FirstPlayableDeliveryBatchError(ValueError):
+    """A bounded original-game delivery cohort failed closed."""
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryJob:
+    source: str | Path
+    archive: str | Path
+    install: str | Path
+    save: str | Path
+    receipt: str | Path
+    manifest_sha256: str
+    moves: tuple[str, ...]
+    archive_sha256: str | None = None
+    save_sha256: str | None = None
+    receipt_sha256: str | None = None
+
+
+def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
+                inspect: bool) -> tuple[DeliveryJob, ...]:
+    if (type(jobs) not in (tuple, list)
+            or not MIN_GAMES <= len(jobs) <= MAX_GAMES
+            or any(type(job) is not DeliveryJob for job in jobs)):
+        raise FirstPlayableDeliveryBatchError("2-8 typed game delivery jobs required")
+    checked = tuple(jobs)
+    paths: list[tuple[Path, Path, Path, Path, Path]] = []
+    for job in checked:
+        if (type(job.moves) is not tuple
+                or not 1 <= len(job.moves) <= MAX_ACTIONS
+                or any(type(move) is not str or move not in _ACTIONS
+                       for move in job.moves)):
+            raise FirstPlayableDeliveryBatchError("invalid bounded player action series")
+        if inspect and not all((job.archive_sha256, job.save_sha256,
+                                job.receipt_sha256)):
+            raise FirstPlayableDeliveryBatchError("independent game pins required")
+        if not inspect and any((job.archive_sha256, job.save_sha256,
+                                job.receipt_sha256)):
+            raise FirstPlayableDeliveryBatchError("publication cannot accept output pins")
+        paths.append(tuple(map(_path, (
+            job.source, job.archive, job.install, job.save, job.receipt,
+        ))))
+    summary_path = _path(summary)
+    sources = [entry[0] for entry in paths]
+    installs = [entry[2] for entry in paths]
+    outputs = [path for entry in paths for path in (entry[1], entry[3], entry[4])]
+    outputs.append(summary_path)
+    if len(set(outputs)) != len(outputs):
+        raise FirstPlayableDeliveryBatchError("duplicate delivery output name")
+    if len(set(sources)) != len(sources):
+        raise FirstPlayableDeliveryBatchError("duplicate original source tree")
+    if len({job.manifest_sha256 for job in checked}) != len(checked):
+        raise FirstPlayableDeliveryBatchError("reused original source manifest pin")
+    roots = sources + installs
+    for i, root in enumerate(roots):
+        if any(_is_within(root, other) or _is_within(other, root)
+               for other in roots[i + 1:]):
+            raise FirstPlayableDeliveryBatchError("source and install roots overlap")
+    if any(_is_within(output, root) for output in outputs for root in roots):
+        raise FirstPlayableDeliveryBatchError("delivery evidence inside game tree")
+    return checked
+
+
+def _evidence(result: dict[str, object]) -> dict[str, object]:
+    keys = (
+        "project_id", "manifest_sha256", "archive_sha256", "save_sha256",
+        "independent_receipt_sha256", "world_digest", "replay_digest",
+        "action_count",
+    )
+    if (type(result) is not dict
+            or any(key not in result for key in keys)
+            or result.get("offline_gameplay_reexecuted") is not True
+            or result.get("release_certified") is not False
+            or result.get("native_device_qualified") is not False
+            or result.get("package_signed") is not False):
+        raise FirstPlayableDeliveryBatchError("canonical delivery evidence missing")
+    return {key: result[key] for key in keys}
+
+
+def _summary(records: list[dict[str, object]]) -> dict[str, object]:
+    if len({record["project_id"] for record in records}) != len(records):
+        raise FirstPlayableDeliveryBatchError("duplicate original game project ID")
+    if len({record["independent_receipt_sha256"] for record in records}) != len(records):
+        raise FirstPlayableDeliveryBatchError("reused delivery receipt identity")
+    body = {
+        "schema": SCHEMA,
+        "game_count": len(records),
+        "games": records,
+        "all_original_games_replayed": True,
+        "offline_gameplay_reexecuted": True,
+        "independent_pin_distribution_required": True,
+        "read_only_source_verification": True,
+        "native_device_qualified": False,
+        "package_signed": False,
+        "rights_certified": False,
+        "persistent_rollback_protection": False,
+        "release_certified": False,
+    }
+    return body
+
+
+def _inspect_jobs(jobs: tuple[DeliveryJob, ...],
+                  records: list[dict[str, object]]) -> None:
+    if len(jobs) != len(records):
+        raise FirstPlayableDeliveryBatchError("delivery cohort length mismatch")
+    for job, record in zip(jobs, records, strict=True):
+        inspected = inspect_first_playable_delivery(
+            job.install, job.archive, job.save, job.receipt,
+            expected_manifest_sha256=job.manifest_sha256,
+            expected_archive_sha256=record["archive_sha256"],
+            expected_save_sha256=record["save_sha256"],
+            expected_receipt_sha256=record["independent_receipt_sha256"],
+            authorized=True,
+        )
+        if (_evidence(inspected) != record
+                or inspected.get("live_source_and_private_replay_reexecuted") is not True
+                or inspected.get("read_only") is not True):
+            raise FirstPlayableDeliveryBatchError(
+                "live delivery no longer matches its independently pinned record"
+            )
+
+
+def publish_first_playable_delivery_batch(
+    jobs: Sequence[DeliveryJob], summary_destination: str | Path, *,
+    authorized: bool,
+) -> dict[str, object]:
+    """Preflight every original game before any output, then publish one cohort."""
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    checked = _check_jobs(jobs, summary_destination, inspect=False)
+    roots = tuple(path for job in checked for path in (job.source, job.install))
+    preflight_receipt_destination(
+        summary_destination, protected_roots=roots, authorized=True,
+    )
+    # Admission is deliberately all-or-nothing, not a reservation. A later
+    # failure may leave a prefix of already published, immutable game outputs.
+    for job in checked:
+        _preflight(
+            _path(job.source), _path(job.archive), _path(job.install),
+            _path(job.save), _path(job.receipt),
+            expected_manifest_sha256=job.manifest_sha256, authorized=True,
+        )
+    records: list[dict[str, object]] = []
+    for job in checked:
+        published = publish_first_playable_delivery(
+            job.source, job.archive, job.install, job.save, job.receipt,
+            expected_manifest_sha256=job.manifest_sha256,
+            moves=job.moves, authorized=True,
+        )
+        records.append(_evidence(published))
+    # Recheck every earlier delivery after the last game has been installed.
+    _inspect_jobs(checked, records)
+    envelope = _summary(records)
+    pin = publish_verified_receipt(
+        envelope, summary_destination, protected_roots=roots, authorized=True,
+    )
+    read_back = read_private_game_save(
+        summary_destination, expected_sha256=pin, authorized=True,
+    )
+    if (not hmac.compare_digest(read_back, _canonical_bytes(envelope))
+            or sha256(read_back).hexdigest() != pin):
+        raise FirstPlayableDeliveryBatchError("published cohort receipt changed")
+    _inspect_jobs(checked, records)
+    return {
+        **envelope,
+        "status": "original_game_delivery_cohort_published_release_blocked",
+        "summary_receipt": str(_path(summary_destination)),
+        "independent_summary_sha256": pin,
+        "read_only": False,
+    }
+
+
+def inspect_first_playable_delivery_batch(
+    jobs: Sequence[DeliveryJob], summary_receipt: str | Path, *,
+    expected_summary_sha256: str, authorized: bool,
+) -> dict[str, object]:
+    """Reexecute each delivered game with four independent pins per game."""
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    checked = _check_jobs(jobs, summary_receipt, inspect=True)
+    raw = read_private_game_save(
+        summary_receipt, expected_sha256=expected_summary_sha256,
+        authorized=True,
+    )
+    if not 0 < len(raw) <= MAX_SUMMARY_BYTES:
+        raise FirstPlayableDeliveryBatchError("cohort receipt byte budget exceeded")
+    stored = _json(raw, MAX_SUMMARY_BYTES)
+    if (type(stored) is not dict or stored.get("schema") != SCHEMA
+            or not hmac.compare_digest(raw, _canonical_bytes(stored))
+            or type(stored.get("games")) is not list
+            or len(stored["games"]) != len(checked)):
+        raise FirstPlayableDeliveryBatchError("invalid canonical cohort receipt")
+    records = [
+        {
+            "project_id": record["project_id"],
+            "manifest_sha256": job.manifest_sha256,
+            "archive_sha256": job.archive_sha256,
+            "save_sha256": job.save_sha256,
+            "independent_receipt_sha256": job.receipt_sha256,
+            "world_digest": record["world_digest"],
+            "replay_digest": record["replay_digest"],
+            "action_count": len(job.moves),
+        }
+        for job, record in zip(checked, stored["games"], strict=True)
+    ]
+    if stored != _summary(records):
+        raise FirstPlayableDeliveryBatchError("cohort pins or release holds diverged")
+    _inspect_jobs(checked, records)
+    again = read_private_game_save(
+        summary_receipt, expected_sha256=expected_summary_sha256,
+        authorized=True,
+    )
+    if not hmac.compare_digest(raw, again):
+        raise FirstPlayableDeliveryBatchError("cohort receipt changed during replay")
+    _inspect_jobs(checked, records)
+    return {
+        **stored,
+        "status": "original_game_delivery_cohort_reverified_release_blocked",
+        "independent_summary_sha256": expected_summary_sha256,
+        "receipt_integrity_verified": True,
+        "all_live_games_reexecuted": True,
+        "read_only": True,
+    }
+
+
+def _parse_job(raw: str) -> DeliveryJob:
+    if type(raw) is not str or not 0 < len(raw.encode("utf-8")) <= MAX_INPUT_BYTES:
+        raise FirstPlayableDeliveryBatchError("job JSON byte budget exceeded")
+    value = json.loads(raw)
+    mandatory = {
+        "source", "archive", "install", "save", "receipt",
+        "manifest_sha256", "moves",
+    }
+    optional = {"archive_sha256", "save_sha256", "receipt_sha256"}
+    if (type(value) is not dict or not mandatory <= value.keys()
+            or not value.keys() <= mandatory | optional
+            or any(type(value[key]) is not str for key in mandatory - {"moves"})
+            or type(value["moves"]) is not list):
+        raise FirstPlayableDeliveryBatchError("invalid bounded delivery job schema")
+    return DeliveryJob(
+        source=value["source"], archive=value["archive"],
+        install=value["install"], save=value["save"], receipt=value["receipt"],
+        manifest_sha256=value["manifest_sha256"],
+        moves=tuple(value["moves"]),
+        archive_sha256=value.get("archive_sha256"),
+        save_sha256=value.get("save_sha256"),
+        receipt_sha256=value.get("receipt_sha256"),
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m skeleton app first-playable-batch",
+        description="Publish or reverify 2-8 independently pinned original games",
+    )
+    parser.add_argument("--job", action="append", required=True,
+                        help="bounded JSON job; repeat for each original game")
+    parser.add_argument("--summary", required=True)
+    parser.add_argument("--inspect", action="store_true")
+    parser.add_argument("--expected-summary-sha256")
+    parser.add_argument("--trusted-local-operator", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        if not args.trusted_local_operator:
+            raise PermissionError("trusted local operator acknowledgement required")
+        if not MIN_GAMES <= len(args.job) <= MAX_GAMES:
+            raise FirstPlayableDeliveryBatchError("2-8 original game jobs required")
+        jobs = tuple(_parse_job(raw) for raw in args.job)
+        if args.inspect:
+            if args.expected_summary_sha256 is None:
+                raise FirstPlayableDeliveryBatchError("independent cohort pin required")
+            result = inspect_first_playable_delivery_batch(
+                jobs, args.summary,
+                expected_summary_sha256=args.expected_summary_sha256,
+                authorized=True,
+            )
+        else:
+            if args.expected_summary_sha256 is not None:
+                raise FirstPlayableDeliveryBatchError("output pin is inspection-only")
+            result = publish_first_playable_delivery_batch(
+                jobs, args.summary, authorized=True,
+            )
+    except (PermissionError, OSError, ValueError, TypeError, KeyError) as exc:
+        print(json.dumps({
+            "schema": SCHEMA, "status": "blocked",
+            "error": type(exc).__name__, "release_certified": False,
+        }, sort_keys=True), file=sys.stderr)
+        return 2
+    print(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

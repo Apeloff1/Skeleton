@@ -270,6 +270,8 @@ def _parser() -> argparse.ArgumentParser:
         "inspect-uncertain-offline-receipt", add_help=False,
         help="read-only quarantine triage of an independently pinned offline receipt",
     )
+    sub.add_parser("first-playable-batch", add_help=False,
+                   help="publish or independently reverify 2-8 original playable deliveries")
     sub.add_parser("first-playable-delivery", add_help=False,
                    help="exercise original source, fresh install, interactive save and pinned delivery acceptance")
     sub.add_parser("studio-journey", add_help=False,
@@ -519,6 +521,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "delivery-assurance":
         from skeleton.app.offline_delivery_assurance import main as assurance_main
         return assurance_main(arguments[1:])
+    if arguments and arguments[0] == "first-playable-batch":
+        from skeleton.app.offline_first_playable_batch import main as batch_main
+        return batch_main(arguments[1:])
     if arguments and arguments[0] == "first-playable-delivery":
         from skeleton.app.offline_first_playable_delivery import main as delivery_main
         return delivery_main(arguments[1:])
