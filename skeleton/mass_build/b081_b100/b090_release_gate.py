@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from ._core import ContractError, Verdict, digest, require, verdict
+from ._core import Verdict, digest, require, verdict
 
 REQUIRED = ("B081", "B083", "B084", "B089")
 MAX_AGE_TICKS = 24
@@ -23,7 +23,10 @@ def evaluate(evidence: Mapping[str, tuple[Verdict, int]], now: int, policy_ok: b
     SHA, or check an authenticated repository policy. No local caller can
     supply a bool or a synthetic Verdict to override that absence.
     """
-    require(isinstance(evidence, Mapping) and len(evidence) <= MAX_EVIDENCE, "bounded evidence mapping required")
+    require(
+        isinstance(evidence, Mapping) and len(evidence) <= MAX_EVIDENCE,
+        "bounded evidence mapping required",
+    )
     require(type(now) is int and now >= 0, "now must be a nonnegative integer tick")
     require(type(policy_ok) is bool, "policy_ok must be a boolean")
     findings = [UNVERIFIED_AUTHORITY]
@@ -50,5 +53,7 @@ def evaluate(evidence: Mapping[str, tuple[Verdict, int]], now: int, policy_ok: b
             findings.append(f"stale:{batch}")
     if not policy_ok:
         findings.append("policy")
-    return verdict("B090", findings, bundle=digest({key: bundle[key] for key in sorted(bundle)}),
-                   release_authorized=False, authority="unverified-local-diagnostic")
+    return verdict(
+        "B090", findings, bundle=digest({key: bundle[key] for key in sorted(bundle)}),
+        release_authorized=False, authority="unverified-local-diagnostic",
+    )
