@@ -34,7 +34,7 @@ MIN_GAMES = 2
 MAX_GAMES = 8
 MAX_INPUT_BYTES = 64 * 1024
 MAX_SUMMARY_BYTES = 256 * 1024
-_PIN = re.compile(r"[0-9a-f]{64}\\Z")
+_PIN = re.compile(r"[0-9a-f]{64}\Z")
 
 
 class FirstPlayableDeliveryBatchError(ValueError):
