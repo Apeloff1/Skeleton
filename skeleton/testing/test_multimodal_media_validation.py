@@ -333,7 +333,7 @@ def test_constructed_or_mutated_receipts_cannot_bypass_payload_verification():
     payload = _image()
     intake, asset = _admit(payload)
     forged = replace(asset, validation=replace(asset.validation, decoded_digest="0" * 64))
-    with pytest.raises(MultimodalSanitizationError, match="drift"):
+    with pytest.raises(MultimodalSanitizationError, match="differs from issued evidence"):
         verify_verified_asset(forged, payload)
     object.__setattr__(asset.validation.limits, "max_pixels", 10**12)
     with pytest.raises(MultimodalSanitizationError, match="max_pixels"):
