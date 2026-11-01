@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pytest
 
 from skeleton.app.cli import run_app_cli
@@ -128,6 +129,26 @@ def test_detects_archive_replacement_during_reconciliation(installed_game, monke
     monkeypatch.setattr(module, "inspect_offline_game_archive", change_after_comparison)
     with pytest.raises(ValueError):
         reconcile_installed_game_archive(
+            installed, archive, expected_archive_sha256=pin,
+            expected_manifest_sha256=manifest, authorized=True,
+        )
+
+def test_same_byte_archive_inode_swap_is_not_accepted(installed_game, monkeypatch):
+    installed, archive, pin, manifest = installed_game
+    from skeleton.app import offline_install_reconciliation as module
+    original_read = module._read_private_archive
+
+    def swap_with_identical_bytes(path):
+        raw = original_read(path)
+        replacement = archive.with_name("same-bytes.zip")
+        replacement.write_bytes(raw)
+        replacement.chmod(0o600)
+        os.replace(replacement, archive)
+        return raw
+
+    monkeypatch.setattr(module, "_read_private_archive", swap_with_identical_bytes)
+    with pytest.raises(module.OfflineInstallReconciliationError):
+        module.reconcile_installed_game_archive(
             installed, archive, expected_archive_sha256=pin,
             expected_manifest_sha256=manifest, authorized=True,
         )

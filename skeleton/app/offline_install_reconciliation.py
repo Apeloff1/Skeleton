@@ -18,7 +18,8 @@ from skeleton.ai.game_builder.dual_runtime_verify import (
     verify_exported_package,
 )
 from skeleton.app.offline_delivery_archive import (
-    _read_private_archive, inspect_offline_game_archive,
+    _parent as _archive_parent, _read_private_archive,
+    inspect_offline_game_archive,
 )
 
 SCHEMA = "skeleton.app.offline_install_reconciliation.v1"
@@ -39,6 +40,23 @@ def _identity(fd: int) -> tuple[int, ...]:
     )
 
 
+def _archive_identity(path: str | Path) -> tuple[int, ...]:
+    """Detect even same-byte archive inode substitution during reconciliation."""
+    target, fd = _archive_parent(path)
+    try:
+        info = os.stat(target.name, dir_fd=fd, follow_symlinks=False)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_nlink != 1 or info.st_mode & 0o077):
+            raise OfflineInstallReconciliationError("archive is not owner-private")
+        _assert_original_root(target.parent, fd)
+        return (
+            info.st_dev, info.st_ino, info.st_size, info.st_mode,
+            info.st_uid, info.st_nlink, info.st_mtime_ns, info.st_ctime_ns,
+        )
+    finally:
+        os.close(fd)
+
+
 def reconcile_installed_game_archive(
     installed_source: str | Path, archive: str | Path, *,
     expected_archive_sha256: str,
@@ -53,6 +71,7 @@ def reconcile_installed_game_archive(
     """
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
+    original_archive = _archive_identity(archive)
     before_archive = inspect_offline_game_archive(
         archive, expected_archive_sha256=expected_archive_sha256,
         expected_manifest_sha256=expected_manifest_sha256, authorized=True,
@@ -111,6 +130,7 @@ def reconcile_installed_game_archive(
         )
         _assert_original_root(root, fd)
         if (_identity(fd) != original or before != after
+                or _archive_identity(archive) != original_archive
                 or before_archive != after_archive
                 or matched != after["verified_files"]):
             raise OfflineInstallReconciliationError(
