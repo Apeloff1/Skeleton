@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 
 from skeleton.ai.game_builder.studio_ecosystem_director_authoring import load_director_authoring
+from skeleton.ai.game_builder.studio_ecosystem_director_choice_rehearsal import (
+    load_choice_export, replay_choice_export,
+)
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError, replay_quest
@@ -22,6 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expected-visual", required=True)
     ap.add_argument("--expected-session")
     ap.add_argument("--actions", default="[]")
+    ap.add_argument("--choice-export", type=Path,
+                    help="Verify source-leased offline quest choices before playable compilation")
     ap.add_argument("--schedule", help="Strict inline schedule JSON (requires --assignments)")
     ap.add_argument("--assignments", help="Strict inline assignments JSON (requires --schedule)")
     ap.add_argument("--editor-export", type=Path,
@@ -36,12 +41,23 @@ def main(argv: list[str] | None = None) -> int:
     elif args.schedule is None or args.assignments is None:
         ap.error("provide --editor-export or both --schedule and --assignments")
     try:
-        actions = _strict(args.actions, max_bytes=16384)
         docs = read_blueprint(args.project)
+        if args.choice_export is not None:
+            if args.actions != "[]" or args.expected_session is None:
+                ap.error("--choice-export requires --expected-session and no inline --actions")
+            proposal = load_choice_export(args.choice_export)
+            verified_choice = replay_choice_export(
+                docs, proposal, authorized=True,
+                expected_source_digest=args.expected_source,
+                expected_session_digest=args.expected_session)
+            actions = verified_choice["verified_actions"]
+            session_lease = verified_choice["result_session_digest"]
+        else:
+            actions = _strict(args.actions, max_bytes=16384)
+            session_lease = args.expected_session
         # A browser export must always be bound to the *current* replay,
         # including when the operator omits --expected-session. A stale
         # exported session may never be silently reinterpreted as a new one.
-        session_lease = args.expected_session
         if args.editor_export is not None:
             current_session = replay_quest(docs, actions, authorized=True).digest
             if session_lease is not None and session_lease != current_session:
