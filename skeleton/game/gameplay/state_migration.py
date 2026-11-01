@@ -134,10 +134,13 @@ class GameplayStateEnvelope:
 
     @classmethod
     def from_section(cls, section: Mapping[str, Any]) -> "GameplayStateEnvelope":
-        if section.get("schema") != ENVELOPE_SCHEMA:
+        if not isinstance(section, Mapping) or section.get("schema") != ENVELOPE_SCHEMA:
             raise GameplayMigrationError("unknown gameplay save schema")
-        env = cls(section["world_id"], section["schema_version"], section["tick"],
-                  section["payload"], section["canon_digest"], section.get("parent_save_digest"))
+        try:
+            env = cls(section["world_id"], section["schema_version"], section["tick"],
+                      section["payload"], section["canon_digest"], section.get("parent_save_digest"))
+        except KeyError:
+            raise GameplayMigrationError("missing gameplay save field") from None
         if section.get("state_digest") != env.state_digest:
             raise GameplayMigrationError("gameplay save digest mismatch")
         return env
@@ -170,6 +173,9 @@ class GameplayMigrations:
         self._steps[from_version] = fn
 
     def missing_steps(self, oldest: int = 1) -> tuple[int, ...]:
+        oldest = _version(oldest, "oldest")
+        if oldest > self.current_version:
+            raise GameplayMigrationError("oldest version exceeds current version")
         return tuple(v for v in range(oldest, self.current_version) if v not in self._steps)
 
     def _step(self, v: int, payload: Dict[str, Any]) -> Dict[str, Any]:

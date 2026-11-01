@@ -120,3 +120,18 @@ def test_migration_callback_output_is_bounded_before_digest():
     cyclic.register(1, cyclic_result)
     with pytest.raises(GameplayMigrationError, match="cyclic"):
         cyclic.load_section(V1_SECTION)
+
+
+def test_migration_rejects_unbounded_oldest_and_missing_section_fields():
+    registry = _registry()
+    for oldest in (-10**9, 0, True, 10**9, 4):
+        with pytest.raises(GameplayMigrationError):
+            registry.missing_steps(oldest)
+    assert registry.missing_steps(2) == ()
+    for missing in ("world_id", "schema_version", "tick", "payload", "canon_digest"):
+        invalid = dict(V1_SECTION)
+        invalid.pop(missing)
+        with pytest.raises(GameplayMigrationError, match="missing gameplay save field"):
+            GameplayStateEnvelope.from_section(invalid)
+    with pytest.raises(GameplayMigrationError, match="schema"):
+        GameplayStateEnvelope.from_section(None)
