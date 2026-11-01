@@ -356,7 +356,8 @@ def verify_seal(
     legacy seals are subject to ``GF_SEAL_LEGACY`` (``legacy=`` overrides).
     Default ``False`` keeps the pre-v2 helper semantics for direct callers.
     """
-    if type(raw_header) is not str or not 1 <= len(raw_header) <= 1024:
+    if (type(raw_header) is not str or not 1 <= len(raw_header) <= 1024
+            or any(ord(char) < 32 or ord(char) == 127 for char in raw_header)):
         raise AuthError(_OPAQUE)
     if now is not None:
         if type(now) not in (int, float):

@@ -258,3 +258,11 @@ def test_v2_rejects_noncanonical_expiry_aliases_and_invalid_expected_domain():
     for domain in ("proje\u00e7ts", 7, True):
         with pytest.raises(AuthError):
             _v(token, domain=domain, replay_cache=hs.InMemoryReplayCache())
+
+
+def test_verifier_rejects_control_bytes_even_in_signed_legacy_identity():
+    for control in ("\\r", "\\n", "\\t", "\\x00", "\\x7f"):
+        attester = "service" + control + "injected"
+        signed = hs.mint_seal(attester, 60, secret=SECRET, now=NOW)
+        with pytest.raises(AuthError):
+            hs.verify_seal(signed, secret=SECRET, now=NOW)
