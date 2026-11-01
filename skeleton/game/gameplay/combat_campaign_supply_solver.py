@@ -112,7 +112,7 @@ def cli(argv: Sequence[str]) -> int:
     verify.add_argument("--source-json", required=True)
     verify.add_argument("--receipt-json", required=True)
     for command in (demo, solve):
-        command.add_argument("--min-hp", type=int, default=11)
+        command.add_argument("--min-hp", type=int, default=10)
         command.add_argument("--max-states", type=int, default=96)
         command.add_argument("--max-depth", type=int, default=12)
     args = parser.parse_args(list(argv))

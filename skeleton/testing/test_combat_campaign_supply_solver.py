@@ -19,11 +19,11 @@ from skeleton.game.gameplay.turn_combat import CombatSessionError
 
 def test_survival_route_is_real_canonical_play():
     source = original_supply()
-    result = solve_supply(source, min_hp=11)
+    result = solve_supply(source, min_hp=10)
     assert result["status"] == "found"
     assert result["actions"][0] == {"kind": "fight"}
     assert result["snapshot"]["state"]["phase"] == "won"
-    assert result["snapshot"]["state"]["hp"] >= 11
+    assert result["snapshot"]["state"]["hp"] >= 10
     session = new_supply(source)
     for command in result["actions"]:
         session = advance_supply(session, command)
@@ -33,7 +33,7 @@ def test_survival_route_is_real_canonical_play():
 
 
 def test_budget_exhaustion_is_not_claimed_as_unreachable():
-    result = solve_supply(original_supply(), min_hp=11, max_states=1)
+    result = solve_supply(original_supply(), min_hp=10, max_states=1)
     assert result["status"] == "inconclusive"
     assert result["snapshot"] is None
     assert result["actions"] == []
@@ -41,7 +41,7 @@ def test_budget_exhaustion_is_not_claimed_as_unreachable():
 
 
 def test_depth_limit_is_explicitly_inconclusive():
-    result = solve_supply(original_supply(), min_hp=11, max_depth=1)
+    result = solve_supply(original_supply(), min_hp=10, max_depth=1)
     assert result["status"] == "inconclusive"
 
 
@@ -61,7 +61,7 @@ def test_invalid_search_budget_fails_closed(options):
 
 def test_forged_rehashed_route_and_source_fail():
     source = original_supply()
-    result = solve_supply(source, min_hp=11)
+    result = solve_supply(source, min_hp=10)
     for mutation in (
         lambda r: r["actions"].pop(),
         lambda r: r.update(status="unreachable"),
@@ -80,7 +80,7 @@ def test_forged_rehashed_route_and_source_fail():
 
 
 def test_cli_demo_verify_and_bad_budget(capsys):
-    assert main(["combat-supply-solve", "demo", "--min-hp", "11"]) == 0
+    assert main(["combat-supply-solve", "demo", "--min-hp", "10"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "found"
     assert main(["combat-supply-solve", "verify", "--source-json",

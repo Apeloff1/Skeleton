@@ -19,7 +19,7 @@ from skeleton.game.gameplay.combat_campaign_supply import (
 )
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.turn_combat import (
-    CombatSessionError, MAX_CLI_BYTES, _id, _integer, _object, _parse_json,
+    CombatSessionError, _id, _integer, _object, _parse_json,
 )
 
 SCHEMA = "skeleton.combat_campaign_supply_author.v1"

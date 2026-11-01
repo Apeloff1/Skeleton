@@ -1,6 +1,6 @@
 # Replay-verifiable supply route search
 
-`python -m skeleton combat-supply-solve demo --min-hp 11` searches for a
+`python -m skeleton combat-supply-solve demo --min-hp 10` searches for a
 surviving original Lantern Harbor combat route. The planner only expands
 legal, source-bound `fight`, `buy` and `use` actions. Every battle is
 resolved by the canonical deterministic turn-combat engine. It cannot grant
@@ -8,7 +8,7 @@ currency, health or inventory from a fabricated save.
 
 ```sh
 python -m skeleton combat-supply-solve solve --source-json '<authored source>' \
-  --min-hp 11 --max-states 96 --max-depth 12
+  --min-hp 10 --max-states 96 --max-depth 12
 python -m skeleton combat-supply-solve verify --source-json '<authored source>' \
   --receipt-json '<search result>'
 ```
