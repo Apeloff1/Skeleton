@@ -94,3 +94,31 @@ def test_server_calls_hooks_in_factory_not_lifespan():
     body = src[src.index("def create_app("):]
     i = body.index("apply_create_app_hooks(app)")
     assert i < body.index('@app.on_event("startup")')
+
+
+@pytest.mark.parametrize(
+    ("checker", "allowed"),
+    [
+        (h.assert_open_probe_health, "/health"),
+        (h.assert_open_probe_ready, "/ready"),
+        (h.assert_open_probe_api_v1_health, "/api/v1/health"),
+        (h.assert_open_probe_api_v1_health_live, "/api/v1/health/live"),
+        (h.assert_open_probe_api_v1_health_ready, "/api/v1/health/ready"),
+        (h.assert_open_probe_metrics, "/metrics"),
+        (h.assert_open_probe_api_v1_metrics, "/api/v1/metrics"),
+        (h.assert_open_probe_root, "/"),
+        (h.assert_open_probe_cortex_status, "/cortex/status"),
+        (h.assert_open_probe_cockpit, "/cockpit"),
+        (h.assert_open_probe_docs, "/docs"),
+        (h.assert_open_probe_openapi_json, "/openapi.json"),
+        (h.assert_open_probe_redoc, "/redoc"),
+    ],
+)
+def test_public_probe_path_requires_complete_component(checker, allowed):
+    assert checker(allowed)["ok"] is True
+    assert checker(allowed + "private")["ok"] is False
+    assert checker(allowed + "-admin")["ok"] is False
+    if allowed != "/":
+        assert checker(allowed + "/live")["ok"] is True
+    else:
+        assert checker("/admin")["ok"] is False
