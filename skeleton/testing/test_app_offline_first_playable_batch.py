@@ -577,3 +577,41 @@ def test_cohort_record_rejects_replay_count_mismatch_and_unsupported_moves():
         _record(result, ("up",))
     with pytest.raises(FirstPlayableDeliveryBatchError):
         _record(result, ("up", "teleport"))
+
+
+def test_read_only_cohort_inspection_rejects_same_byte_summary_inode_swap(
+    original_games, tmp_path, monkeypatch,
+):
+    import os
+    from skeleton.app import offline_first_playable_batch as batch
+
+    jobs = jobs_for(original_games, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    original_read = batch.read_private_game_save
+    reads = 0
+
+    def replace_after_first_summary_read(path, *args, **kwargs):
+        nonlocal reads
+        raw = original_read(path, *args, **kwargs)
+        if Path(path) == summary:
+            reads += 1
+            if reads == 1:
+                replacement = tmp_path / "same-byte-replacement"
+                replacement.write_bytes(raw)
+                replacement.chmod(0o600)
+                os.replace(replacement, summary)
+        return raw
+
+    monkeypatch.setattr(batch, "read_private_game_save",
+                        replace_after_first_summary_read)
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="inode"):
+        batch.inspect_first_playable_delivery_batch(
+            pinned(jobs, published), summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+    assert reads >= 1
+    assert summary.exists()  # read-only inspector never deletes evidence

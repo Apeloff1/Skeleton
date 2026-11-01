@@ -27,7 +27,7 @@ from skeleton.app.offline_first_playable_delivery import (
     MAX_ACTIONS, _ACTIONS, _path, _is_within, _preflight,
     inspect_first_playable_delivery, publish_first_playable_delivery,
 )
-from skeleton.app.offline_delivery_assurance import _source_identity
+from skeleton.app.offline_delivery_assurance import _save_identity, _source_identity
 from skeleton.app.private_game_save import read_private_game_save
 
 SCHEMA = "skeleton.app.first_playable_delivery_batch.v1"
@@ -463,6 +463,9 @@ def inspect_first_playable_delivery_batch(
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
     checked = _check_jobs(jobs, summary_receipt, inspect=True)
+    # An independently pinned digest alone does not bind an inode. Detect a
+    # same-byte replacement of the owner-private summary during live replay.
+    summary_identity = _save_identity(summary_receipt)
     raw = read_private_game_save(
         summary_receipt, expected_sha256=expected_summary_sha256,
         authorized=True,
@@ -496,9 +499,16 @@ def inspect_first_playable_delivery_batch(
         summary_receipt, expected_sha256=expected_summary_sha256,
         authorized=True,
     )
-    if not hmac.compare_digest(raw, again):
-        raise FirstPlayableDeliveryBatchError("cohort receipt changed during replay")
+    if (not hmac.compare_digest(raw, again)
+            or summary_identity != _save_identity(summary_receipt)):
+        raise FirstPlayableDeliveryBatchError(
+            "cohort receipt inode or bytes changed during replay"
+        )
     _inspect_jobs(checked, records)
+    if summary_identity != _save_identity(summary_receipt):
+        raise FirstPlayableDeliveryBatchError(
+            "cohort receipt inode changed during final game replay"
+        )
     return {
         **stored,
         "status": "original_game_delivery_cohort_reverified_release_blocked",
