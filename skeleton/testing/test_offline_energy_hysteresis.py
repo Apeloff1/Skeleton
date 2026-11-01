@@ -177,3 +177,30 @@ class TestEnergyHysteresis(TestCase):
         self.assertIsNone(gate.last_seen_ns)
         gate.step(original, now_ns=100, sampled_ns=100)
         self.assertEqual(gate.last_seen_ns, 100)
+
+
+    def test_repeated_sample_cannot_accelerate_recovery_using_new_clock(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0))
+        healthy = candidate()
+        gate.step(healthy, now_ns=10, sampled_ns=10)
+        with self.assertRaisesRegex(HysteresisError, "non-advancing source telemetry"):
+            gate.step(healthy, now_ns=11, sampled_ns=10)
+        self.assertEqual(gate.workers, 0)
+        self.assertEqual(gate.healthy_streak, 1)
+        gate.step(healthy, now_ns=12, sampled_ns=12)
+        self.assertEqual(gate.workers, 1)
+
+    def test_checkpoint_contains_source_sample_fence_and_rejects_forged_chronology(self):
+        gate = EnergyHysteresis()
+        gate.step(candidate(), now_ns=20, sampled_ns=19)
+        state = gate.checkpoint()
+        self.assertEqual(state["last_sampled_ns"], 19)
+        from hashlib import sha256
+        import json
+        malformed = dict(state, last_sampled_ns=21)
+        payload = {k: v for k, v in malformed.items() if k != "digest"}
+        fake = sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                                 allow_nan=False).encode("utf-8")).hexdigest()
+        malformed["digest"] = fake
+        with self.assertRaisesRegex(HysteresisError, "invalid checkpoint chronology"):
+            EnergyHysteresis.restart_from_checkpoint(malformed, expected_digest=fake)

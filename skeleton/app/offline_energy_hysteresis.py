@@ -59,6 +59,7 @@ class EnergyHysteresis:
         self.healthy_streak = 0
         self.last_change_ns: int | None = None
         self.last_seen_ns: int | None = None
+        self.last_sampled_ns: int | None = None
         self.last_receipt: HysteresisReceipt | None = None
 
     def step(self, candidate: EnergyAdmission, *, now_ns: int, sampled_ns: int) -> HysteresisReceipt:
@@ -66,6 +67,11 @@ class EnergyHysteresis:
             raise HysteresisError("source-bound energy admission required")
         if any(type(value) is not int or value < 0 for value in (now_ns, sampled_ns)):
             raise HysteresisError("invalid monotonic timestamp")
+        if (self.last_sampled_ns is not None and sampled_ns <= self.last_sampled_ns):
+            # A source observation is usable at most once for recovery.
+            # A fresh monotonic clock tick cannot turn one sample into
+            # multiple independently confirmed healthy observations.
+            raise HysteresisError("non-advancing source telemetry sample")
         if sampled_ns > now_ns or now_ns - sampled_ns > self.policy.max_sample_age_ns:
             target, reason = 0, "stale_or_future_telemetry"
         else:
@@ -95,6 +101,7 @@ class EnergyHysteresis:
         else:
             self.healthy_streak = 0
         self.last_seen_ns = now_ns
+        self.last_sampled_ns = sampled_ns
         body = {"schema": SCHEMA, "candidate_digest": candidate.digest,
                 "candidate_workers": target, "admitted_workers": self.workers,
                 "healthy_streak": self.healthy_streak, "reason": reason,
@@ -120,6 +127,7 @@ class EnergyHysteresis:
             "healthy_streak": self.healthy_streak,
             "last_change_ns": self.last_change_ns,
             "last_seen_ns": self.last_seen_ns,
+            "last_sampled_ns": self.last_sampled_ns,
             "last_receipt_digest": self.last_receipt.digest if self.last_receipt else None,
         }
         digest = sha256(json.dumps(
@@ -139,7 +147,7 @@ class EnergyHysteresis:
         """
         fields = {
             "schema", "policy", "workers", "healthy_streak",
-            "last_change_ns", "last_seen_ns", "last_receipt_digest", "digest",
+            "last_change_ns", "last_seen_ns", "last_sampled_ns", "last_receipt_digest", "digest",
         }
         if not isinstance(state, Mapping) or set(state) != fields:
             raise HysteresisError("invalid energy checkpoint shape")
@@ -169,8 +177,11 @@ class EnergyHysteresis:
                 or type(streak) is not int or not 0 <= streak < policy.recovery_samples):
             raise HysteresisError("invalid checkpoint admission")
         seen, changed = state["last_seen_ns"], state["last_change_ns"]
+        sampled = state["last_sampled_ns"]
         if any(v is not None and (type(v) is not int or v < 0)
-               for v in (seen, changed)):
+               for v in (seen, changed, sampled)):
+            raise HysteresisError("invalid checkpoint chronology")
+        if sampled is not None and (seen is None or sampled > seen):
             raise HysteresisError("invalid checkpoint chronology")
         if changed is not None and (seen is None or changed > seen):
             raise HysteresisError("invalid checkpoint chronology")
