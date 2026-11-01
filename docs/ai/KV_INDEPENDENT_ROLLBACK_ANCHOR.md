@@ -23,3 +23,14 @@ transaction. It cannot prove physical tier residency or recover an uncertain
 partially completed adapter operation. A trusted operator must reconcile the
 backend, journal and anchor. The simulated CAS in deterministic tests does
 **not** provide production anti-rollback or device qualification.
+
+## Production SQLite file preflight
+
+The production app constructor rejects ephemeral/in-memory SQLite, attached
+databases, disabled/weak synchronous modes, journal modes without durable
+rollback, symlinks, hardlinks and non-private POSIX owner/mode settings.
+It requires an owner-only regular file with mode 0600 and synchronous FULL
+or stronger. This is a preflight, not a substitute for a securely opened
+and retained OS inode handle. Non-POSIX ACL qualification is held until a
+platform-specific trusted adapter is implemented; simulation remains
+available for deterministic tests only.

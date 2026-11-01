@@ -1,6 +1,7 @@
 """Simulated app KV migration integration; no hardware qualification."""
 from __future__ import annotations
 
+import os
 import sqlite3
 
 import pytest
@@ -111,3 +112,58 @@ def test_app_exposes_authenticated_migration_inventory_without_device_claim():
     assert inventory["committed"] == 1
     assert inventory["running"] == 0
     assert inventory["gpu_device_qualified"] is False
+
+
+class FakeIndependentAnchor:
+    def __init__(self):
+        self.value = None
+
+    def initialize(self, *, generation, digest):
+        if self.value is not None:
+            raise ValueError("already initialized")
+        self.value = generation, digest
+
+    def read(self):
+        if self.value is None:
+            raise ValueError("not initialized")
+        return self.value
+
+    def advance(self, *, expected_generation, expected_digest, generation, digest):
+        if self.value != (expected_generation, expected_digest):
+            raise ValueError("CAS mismatch")
+        self.value = generation, digest
+
+
+def test_production_app_refuses_ephemeral_sqlite_journal():
+    controller, journal, storage = simulated_service()
+    with pytest.raises(ValueError, match="file-backed"):
+        OfflineKVPageTierService.from_trusted_handles(
+            manager=controller._manager, connection=sqlite3.connect(":memory:"),
+            session_id="a" * 64, journal_key=b"k" * 32,
+            storage_path=".", anchor=FakeIndependentAnchor(),
+        )
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inode ownership regression")
+def test_production_app_requires_private_owner_only_durable_journal(tmp_path):
+    controller, journal, storage = simulated_service()
+    path = tmp_path / "private-kv.db"
+    connection = sqlite3.connect(path)
+    os.chmod(path, 0o644)
+    with pytest.raises(ValueError, match="owner or mode"):
+        OfflineKVPageTierService.from_trusted_handles(
+            manager=controller._manager, connection=connection,
+            session_id="a" * 64, journal_key=b"k" * 32,
+            storage_path=".", anchor=FakeIndependentAnchor(),
+        )
+    os.chmod(path, 0o600)
+    app = OfflineKVPageTierService.from_trusted_handles(
+        manager=controller._manager, connection=connection,
+        session_id="a" * 64, journal_key=b"k" * 32,
+        storage_path=".", anchor=FakeIndependentAnchor(),
+    )
+    app.bootstrap_new_journal_anchor()
+    assert app.verified_journal_status()["rows"] == 0
+    with pytest.raises(Exception):
+        app.bootstrap_new_journal_anchor()
+    connection.close()

@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import sqlite3
+import stat
 
 from skeleton.ai.runtime.inference.kv.manager import KVCacheManager
 from skeleton.ai.runtime.inference.kv.live_tier_controller import (
@@ -14,6 +16,38 @@ from skeleton.ai.runtime.inference.kv.migration_journal import (
 from skeleton.ai.runtime.inference.kv.pressure_tiering import (
     TierApplyReceipt, TierPlan, TierPressurePolicy,
 )
+
+
+def _require_private_durable_journal(connection: sqlite3.Connection) -> None:
+    """Preflight only; caller must retain its own securely opened inode handle.
+
+    An in-memory or shared SQLite journal cannot provide restart custody.
+    This check does not itself establish a durable OS-level file lock or
+    eliminate races with a malicious external process.
+    """
+    if type(connection) is not sqlite3.Connection or connection.in_transaction:
+        raise ValueError("idle private SQLite journal connection required")
+    try:
+        databases = connection.execute("PRAGMA database_list").fetchall()
+        synchronous = connection.execute("PRAGMA synchronous").fetchone()[0]
+        mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
+        if (len(databases) != 1 or databases[0][1] != "main"
+                or type(databases[0][2]) is not str or not databases[0][2]
+                or type(synchronous) is not int or synchronous < 2
+                or type(mode) is not str or mode.lower() in ("off", "memory")):
+            raise ValueError("durable file-backed SQLite journal required")
+        info = os.stat(databases[0][2], follow_symlinks=False)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError("untrusted journal inode")
+        # Windows needs an independently verified ACL/handle adapter. Do not
+        # pretend POSIX mode checks establish Windows filesystem custody.
+        if os.name != "posix":
+            raise ValueError("platform-specific journal ACL attestation required")
+        if (info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o600):
+            raise ValueError("private journal owner or mode invalid")
+    except (OSError, sqlite3.Error, IndexError, TypeError) as exc:
+        raise ValueError("private journal file verification failed") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +91,7 @@ class OfflineKVPageTierService:
         policy: TierPressurePolicy | None = None,
     ) -> "OfflineKVPageTierService":
         """Production bootstrap: canonical live OS probe, no injected sensors."""
+        _require_private_durable_journal(connection)
         controller = KVLiveTierController(
             manager, storage_path=storage_path, policy=policy,
         )
