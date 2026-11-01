@@ -61,7 +61,7 @@ def render_npc_rendezvous_editor(
            " connect-src 'none'; img-src 'none'; object-src 'none'")
     html = (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-        "<meta http-equiv='Content-Security-Policy' content=\\"" + csp + "\\">"
+        "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">"
         "<title>NPC rendezvous editor</title></head><body>"
         "<main><h1>Source-bound NPC rendezvous</h1>"
         "<p>Operator-estimated timing only. Export must be recompiled by the CLI; "
