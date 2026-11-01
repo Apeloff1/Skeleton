@@ -1,26 +1,15 @@
-"""Nonce-store adapter for the s2s replay window.
+"""Replay-store protocol for the S2S authorization domain.
 
-The s2s plane does **not** own a nonce store. Internal Systems owns it as
-``skeleton.api.nonce_store`` (draft PR #4601 @ 84e661f2, stacked on #4594)::
+The domain does not import from ``skeleton.api``. Application composition
+injects a store implementing ``check_and_record(scope, nonce, ts, ttl_s)``;
+the concrete API-owned store remains an external implementation detail.
+The structural protocol is always available, even before the upstream
+implementation is merged.
 
-    class NonceStore(Protocol):
-        def check_and_record(self, scope: str, nonce: str, ts: float, ttl_s: float) -> bool
-
-``True`` means the nonce is fresh (and is now recorded), ``False`` means it
-was already seen inside its TTL (a replay). The production implementation
-is ``InMemoryNonceStore(max_entries=100_000)``. A store that cannot record
-a fresh nonce raises ``NonceStoreFull(retry_after_s)``; it never evicts a
-live nonce. The s2s gate maps that to ``503 {"error": "nonce_store_full"}``
-with ``Retry-After`` (fail closed - never admit an unrecorded nonce).
-
-Until #4601 lands on the base, the import is guarded: :data:`NonceStore`
-falls back to a local Protocol with the identical signature, and
-:class:`LocalNonceStoreDouble` is an in-memory **test double** only. Once
-#4601 merges, callers pass Internal Systems' store and nothing here changes.
-
-Scopes used by this plane are always ``"s2s:<service>"`` (see
-:func:`s2s_scope`) so service namespaces never collide with other users of
-the shared store.
+``LocalNonceStoreDouble`` is test-only and never evicts live nonces.
+Capacity exhaustion fails closed. ``is_nonce_store_full`` recognizes
+external stores' ``NonceStoreFull`` exceptions without importing them.
+Production replicas must share a durable replay store.
 """
 
 from __future__ import annotations
@@ -30,28 +19,22 @@ import threading
 import time
 from typing import Callable, Dict, Optional, Protocol, Tuple, runtime_checkable
 
-try:  # pragma: no cover - exercised only once #4601 is on the base
-    from skeleton.api.nonce_store import NonceStore as _UpstreamNonceStore  # type: ignore[attr-defined]
-    from skeleton.api.nonce_store import NonceStoreFull as _UpstreamNonceStoreFull  # type: ignore[attr-defined]
-
-    UPSTREAM_NONCE_STORE = True
-except Exception:  # noqa: BLE001 - absent until Internal Systems' #4601 merges
-    _UpstreamNonceStore = None  # type: ignore[assignment]
-    _UpstreamNonceStoreFull = None  # type: ignore[assignment]
-    UPSTREAM_NONCE_STORE = False
+# Domain-to-API imports are forbidden. The application injects its store.
+# This compatibility flag records that no upstream implementation is imported.
+UPSTREAM_NONCE_STORE = False
 
 S2S_SCOPE_PREFIX = "s2s:"
 
 
 @runtime_checkable
 class _LocalNonceStore(Protocol):
-    """Signature-identical stand-in for ``skeleton.api.nonce_store.NonceStore``."""
+    """Structural nonce-store protocol for externally injected implementations."""
 
     def check_and_record(self, scope: str, nonce: str, ts: float, ttl_s: float) -> bool:
         ...
 
 
-NonceStore = _UpstreamNonceStore if _UpstreamNonceStore is not None else _LocalNonceStore
+NonceStore = _LocalNonceStore
 
 
 class _LocalNonceStoreFull(Exception):
@@ -62,7 +45,7 @@ class _LocalNonceStoreFull(Exception):
         self.retry_after_s = max(1, int(retry_after_s))
 
 
-NonceStoreFull = _UpstreamNonceStoreFull if _UpstreamNonceStoreFull is not None else _LocalNonceStoreFull
+NonceStoreFull = _LocalNonceStoreFull
 
 
 def s2s_scope(service: str) -> str:
@@ -133,7 +116,7 @@ class LocalNonceStoreDouble:
 
 def is_nonce_store_full(exc: BaseException) -> bool:
     """True for upstream or local ``NonceStoreFull`` (matched by type or name)."""
-    return isinstance(exc, (NonceStoreFull, _LocalNonceStoreFull)) or type(exc).__name__ == "NonceStoreFull"
+    return isinstance(exc, NonceStoreFull) or type(exc).__name__ == "NonceStoreFull"
 
 
 __all__ = [

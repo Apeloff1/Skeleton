@@ -1,6 +1,6 @@
 import pytest
 
-from skeleton.gate_plane.s2s.nonce import LocalNonceStoreDouble, NonceStoreFull, s2s_scope
+from skeleton.gate_plane.s2s.nonce import LocalNonceStoreDouble, NonceStore, NonceStoreFull, is_nonce_store_full, s2s_scope
 from skeleton.gate_plane.s2s.tokens import TokenError, TokenErrorCode
 from skeleton.gate_plane.s2s.verifier import RegistryVerifier
 
@@ -68,3 +68,19 @@ def test_double_matches_protocol_semantics(clock):
     assert s.check_and_record("s2s:b", "n1", clock.now(), 10.0) is True
     assert s.check_and_record("", "n", clock.now(), 10.0) is False
     assert s.check_and_record("s2s:a", "n2", clock.now(), 0.0) is False
+
+
+def test_external_store_uses_structural_domain_protocol():
+    class ExternalStore:
+        def check_and_record(self, scope, nonce, ts, ttl_s):
+            return True
+
+    assert isinstance(ExternalStore(), NonceStore)
+
+
+def test_external_capacity_signal_is_recognized_without_api_import():
+    class NonceStoreFull(Exception):
+        retry_after_s = 2
+
+    assert is_nonce_store_full(NonceStoreFull())
+    assert not is_nonce_store_full(RuntimeError("unexpected store failure"))
