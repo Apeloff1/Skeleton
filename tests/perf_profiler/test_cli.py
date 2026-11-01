@@ -37,14 +37,24 @@ def test_frames_empty_fails_closed_and_bad_input_is_usage_error(tmp_path):
     assert main(["frames", str(tmp_path / "missing.json")]) == 2
 
 
-def test_alloc_limits(capsys):
+def test_alloc_limits(capsys, monkeypatch):
     target = f"{__name__}:allocate_two_mb"
-    assert main(["alloc", target]) == 0
+    # No symbol import or invocation without both trusted-local gates.
+    assert main(["alloc", target]) == 2
+    assert _KEEP == []
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    assert main(["alloc", target]) == 2
+    assert _KEEP == []
+    monkeypatch.delenv("SKELETON_PERF_TRUSTED_EXECUTION")
+    assert main(["alloc", target, "--allow-local-callable"]) == 2
+    assert _KEEP == []
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    assert main(["alloc", target, "--allow-local-callable"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["alloc_bytes"] >= 2 * 1024 * 1024
-    assert main(["alloc", target, "--max-alloc-bytes", "1024"]) == 1
-    assert main(["alloc", "no_colon"]) == 2
-    assert main(["alloc", "json:does_not_exist"]) == 2
+    assert main(["alloc", target, "--allow-local-callable", "--max-alloc-bytes", "1024"]) == 1
+    assert main(["alloc", "no_colon", "--allow-local-callable"]) == 2
+    assert main(["alloc", "json:does_not_exist", "--allow-local-callable"]) == 2
     _KEEP.clear()
 
 
