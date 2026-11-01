@@ -19,7 +19,7 @@ from skeleton.game.gameplay.scene_mission_league import (
     MAX_LEAGUE_BYTES, _bounded, inspect_league, new_league,
     normalize_rules, original_rules, submit_league, verify_league,
 )
-from skeleton.game.gameplay.scene_mission import original_mission, demo_actions
+from skeleton.game.gameplay.scene_mission import original_mission
 from skeleton.game.gameplay.scene_travel import SceneTravelError, _object
 
 SCHEMA = "skeleton.scene_mission_league_author.v1"
