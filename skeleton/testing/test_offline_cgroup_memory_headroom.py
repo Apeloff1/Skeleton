@@ -238,17 +238,34 @@ def test_symlinked_membership_component_denied(tmp_path, monkeypatch):
         module.probe_cgroup_memory_headroom()
 
 
-def test_invalid_membership_from_proc_is_not_trusted(monkeypatch):
-    # This validates the parser without granting a fabricated cgroup path.
-    import os
+def test_invalid_membership_from_proc_is_not_trusted(tmp_path, monkeypatch):
+    # The fixture is a real regular file, not /dev/null (a character device).
+    bad = tmp_path / "cgroup"
+    bad.write_bytes(b"0::/../escape\\n")
     original_open = module.os.open
+
     def fake_open(path, flags, *args, **kwargs):
         if path == "/proc/self/cgroup":
-            return original_open(os.devnull, flags)
+            return original_open(str(bad), flags)
         return original_open(path, flags, *args, **kwargs)
+
     monkeypatch.setattr(module.os, "open", fake_open)
-    monkeypatch.setattr(module.os, "read", lambda fd, n: b"0::/../escape\\n")
     with pytest.raises(module.CgroupMemoryUnavailable, match="unsafe"):
+        module._read_self_cgroup_path()
+
+
+def test_duplicate_unified_membership_is_denied(tmp_path, monkeypatch):
+    bad = tmp_path / "cgroup"
+    bad.write_bytes(b"0::/one\\n0::/two\\n")
+    original_open = module.os.open
+
+    def fake_open(path, flags, *args, **kwargs):
+        if path == "/proc/self/cgroup":
+            return original_open(str(bad), flags)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", fake_open)
+    with pytest.raises(module.CgroupMemoryUnavailable, match="unique"):
         module._read_self_cgroup_path()
 
 
