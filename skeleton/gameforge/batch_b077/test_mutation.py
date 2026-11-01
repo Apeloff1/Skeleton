@@ -42,3 +42,13 @@ def test_weak_suite_gated():
 def test_rejects_failing_baseline():
     with pytest.raises(AssertionError):
         run_mutation(can_trade, lambda f: f(0, 0, True))
+
+
+def test_unsupported_mutant_is_not_counted_as_a_kill():
+    from skeleton.gameforge.batch_b077.mutation import MutationUnsupportedError
+
+    def uses_a_call(x):
+        return abs(x) > 0
+
+    with pytest.raises(MutationUnsupportedError):
+        run_mutation(uses_a_call, lambda f: f(1))
