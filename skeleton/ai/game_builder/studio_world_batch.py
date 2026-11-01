@@ -235,6 +235,7 @@ def execute_world_batch(
     verified = replay_world_batch_plan(plan, authorized=True)
     from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
     rows: list[dict[str, Any]] = []
+    playable: list[dict[str, Any]] = []
     for step in verified["steps"]:
         # A failure aborts the entire batch; no subsequent tool is invoked.
         result = route_world_tool(step["request"], authorized=True,
@@ -242,8 +243,22 @@ def execute_world_batch(
         if result.get("file_write_performed") is not False:
             raise StudioQuestError("world batch refused unverified read-only execution")
         detail = result.get("result")
-        if type(detail) is not dict or detail.get("release_certified") is not False:
-            raise StudioQuestError("world batch refuses unqualified tool result")
+        if (type(detail) is not dict or detail.get("release_certified") is not False
+                or detail.get("file_write_performed") is not False):
+            raise StudioQuestError("world batch refuses unqualified or writable tool result")
+        if "playable_handoff" in detail:
+            handoff = detail["playable_handoff"]
+            if (type(handoff) is not dict
+                    or handoff.get("release_certified") is not False):
+                raise StudioQuestError("world batch refuses unverified playable handoff")
+            _lease(handoff.get("handoff_digest"), "world batch playable handoff")
+            playable.append({
+                "ordinal": step["ordinal"],
+                "tool": step["request"]["tool"],
+                "handoff_digest": handoff["handoff_digest"],
+                "native_runtime_verified": False,
+                "release_certified": False,
+            })
         rows.append({
             "ordinal": step["ordinal"],
             "tool": step["request"]["tool"],
@@ -256,6 +271,7 @@ def execute_world_batch(
         "schema": EXECUTION_SCHEMA, "catalog_digest": verified["catalog_digest"],
         "plan_digest": verified["plan_digest"], "plan": verified,
         "results": rows, "completed_count": len(rows),
+        "playable_handoffs": playable, "playable_handoff_count": len(playable),
         "all_read_only": True, "file_write_performed": False,
         "native_runtime_verified": False, "release_certified": False,
     }

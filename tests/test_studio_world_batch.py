@@ -57,6 +57,7 @@ def test_typed_plan_and_source_replayed_read_only_execution():
     assert replay_world_batch_plan(plan, authorized=True) == plan
     execution = execute_world_batch(plan, authorized=True)
     assert execution["completed_count"] == 1
+    assert execution["playable_handoff_count"] == 0
     assert execution["file_write_performed"] is False
     assert execution["release_certified"] is False
     assert replay_world_batch_execution(execution, authorized=True) == execution
