@@ -183,7 +183,7 @@ def publish_mixed_library_continuity_handoff(
     published_identity = _save_identity(target)
     if (
         published_identity != _save_identity(target)
-        not hmac.compare_digest(digest, sha256(encoded).hexdigest())
+        or not hmac.compare_digest(digest, sha256(encoded).hexdigest())
         or _read_envelope(target, expected_sha256=digest) != envelope
         or published_identity != _save_identity(target)
         or audit != _audit(
