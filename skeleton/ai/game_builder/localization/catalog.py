@@ -24,6 +24,9 @@ TEXT_FIELDS = frozenset({"name", "title", "description", "text", "dialogue", "la
                          "caption", "subtitle", "flavor", "quest_text", "choices"})
 _ID_FIELDS = ("id", "key", "slug")
 _SEG = re.compile(r"[^a-z0-9]+")
+MAX_EXTRACT_NODES = 10_000
+MAX_EXTRACT_DEPTH = 32
+MAX_EXTRACT_STRINGS = 4_096
 
 
 def source_hash(text: str) -> str:
@@ -65,21 +68,42 @@ def extract_strings(data: Any, prefix: str = "game", *,
 
     def add(key: str, text: str, ctx: str) -> None:
         if text.strip():
+            if len(text) > 4096:
+                raise ValueError("source localization text exceeds message bound")
             if key in out and out[key].text != text:
                 raise ValueError(f"key collision at {key}")
+            if key not in out and len(out) >= MAX_EXTRACT_STRINGS:
+                raise ValueError("source localization string capacity exceeded")
             out[key] = SourceString(key, text, ctx)
 
-    def walk(node: Any, path: str, take: bool, ctx: str) -> None:
-        if isinstance(node, Mapping):
-            for k in sorted(node, key=str):
-                v = node[k]
-                sub = f"{path}.{_seg(k)}"
-                walk(v, sub, str(k) in wanted, str(k))
-        elif isinstance(node, list | tuple):
-            for i, item in enumerate(node):
-                walk(item, f"{path}.{item_seg(i, item)}", take, ctx)
-        elif isinstance(node, str) and take:
-            add(path, node, ctx)
+    nodes_seen = 0
+    active_containers: set[int] = set()
+
+    def walk(node: Any, path: str, take: bool, ctx: str, depth: int = 0) -> None:
+        nonlocal nodes_seen
+        nodes_seen += 1
+        if nodes_seen > MAX_EXTRACT_NODES or depth > MAX_EXTRACT_DEPTH:
+            raise ValueError("source localization traversal budget exceeded")
+        is_container = isinstance(node, (Mapping, list, tuple))
+        if is_container:
+            identity = id(node)
+            if identity in active_containers:
+                raise ValueError("cyclic source localization structure")
+            active_containers.add(identity)
+        try:
+            if isinstance(node, Mapping):
+                for k in sorted(node, key=str):
+                    v = node[k]
+                    sub = f"{path}.{_seg(k)}"
+                    walk(v, sub, str(k) in wanted, str(k), depth + 1)
+            elif isinstance(node, list | tuple):
+                for i, item in enumerate(node):
+                    walk(item, f"{path}.{item_seg(i, item)}", take, ctx, depth + 1)
+            elif isinstance(node, str) and take:
+                add(path, node, ctx)
+        finally:
+            if is_container:
+                active_containers.remove(identity)
 
     walk(data, _seg(prefix), False, "")
     return [out[k] for k in sorted(out)]

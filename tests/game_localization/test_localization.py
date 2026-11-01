@@ -16,6 +16,22 @@ def game():
     return LocalizedGame(extract_strings(PLAN, "plan"), "en")
 
 
+def test_extract_rejects_cyclic_deep_and_unbounded_structures():
+    cyclic = []
+    cyclic.append(cyclic)
+    with pytest.raises(ValueError, match="cyclic"):
+        extract_strings({"choices": cyclic})
+    deep = {"text": "safe"}
+    for _ in range(40):
+        deep = {"node": deep}
+    with pytest.raises(ValueError, match="budget"):
+        extract_strings(deep)
+    with pytest.raises(ValueError, match="budget"):
+        extract_strings({"choices": [None] * 10_001})
+    with pytest.raises(ValueError, match="message bound"):
+        extract_strings({"text": "a" * 4097})
+
+
 def test_extract_stable_keys_and_skips_non_text():
     keys = [s.key for s in extract_strings(PLAN, "plan")]
     assert keys == sorted(keys)
