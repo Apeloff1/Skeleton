@@ -57,6 +57,7 @@ def test_finds_canonical_choice_effect_witness_and_replays():
     receipt = compile_ending_witness(source, **options)
     assert receipt["status"] == "found"
     assert receipt["witness_actions"] == [["meet", "help"], ["return", "stay"]]
+    assert not receipt["search_exhaustive"]
     assert receipt["playable_quest_replay_verified"]
     assert receipt["witness_progress"]["sandbox_endings_eligible"] == ["kind"]
     assert not receipt["native_gameplay_verified"]
@@ -154,6 +155,11 @@ def test_jeeves_router_authority_and_cli_are_consistent(monkeypatch, capsys):
          "arguments": request}, authorized=True)
     assert routed["result"] == direct
     assert not routed["file_write_performed"]
+    assert cli.main(["--project", "original", "--inspect"]) == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["source_digest"] == options["expected_source_digest"]
+    assert inspected["session_digest"] == options["expected_initial_session_digest"]
+    assert inspected["ending_ids"] == ["kind", "impossible"]
     assert cli.main([
         "--project", "original",
         "--expected-source", options["expected_source_digest"],

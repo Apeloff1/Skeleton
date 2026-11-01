@@ -134,7 +134,7 @@ def compile_ending_witness(
         "target_ending": target_ending, "initial_actions": actions,
         "initial_session_digest": initial.digest,
         "max_states": states, "max_depth": depth,
-        "status": status, "search_exhaustive": status != "inconclusive",
+        "status": status, "search_exhaustive": status == "unreachable",
         "expanded_states": expanded, "witness_actions": found or [],
         "witness_session_digest": (
             found_session.digest if found is not None else None),
@@ -287,6 +287,8 @@ def restore_ending_witness(
             raw.decode("utf-8", "strict"), object_pairs_hook=unique,
             parse_constant=lambda _: (_ for _ in ()).throw(
                 StudioQuestError("nonfinite ending witness JSON")))
+    except StudioQuestError:
+        raise
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise StudioQuestError("invalid ending witness JSON") from exc
     return replay_ending_witness(
