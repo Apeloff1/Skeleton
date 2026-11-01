@@ -69,6 +69,7 @@ Commands:
     combat-expedition  Play original multi-arena campaigns with earned inventory
     combat-expedition-solve  Find replayable bounded expedition routes
     combat-expedition-audit  Audit earned rewards, spending and save branches
+    combat-expedition-playbook  Build and verify portable playable victories
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
     arena-forge-solve  Solve bounded equipment and combat routes
     arena-forge-author  Atomically edit and preview tactical crafting sources
@@ -790,6 +791,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "arena-forge":
         from skeleton.game.gameplay.arena_forge_run import cli as forge_cli
         return forge_cli(rest)
+    if cmd == "combat-expedition-playbook":
+        from skeleton.game.gameplay.arena_expedition_playbook import cli as playbook_cli
+        return playbook_cli(rest)
     if cmd == "combat-expedition-audit":
         from skeleton.game.gameplay.arena_expedition_economy import cli as expedition_audit_cli
         return expedition_audit_cli(rest)
