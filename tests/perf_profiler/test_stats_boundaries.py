@@ -45,3 +45,10 @@ def test_percentile_summary_rejects_aggregate_overflow_and_unsafe_metric_names()
         with pytest.raises(ValueError, match="bounded and printable"):
             _stats.percentile_summary(bad_name, [1.0])
     assert _stats.percentile_summary("frame/render", [1.0, 2.0])["samples"] == 2
+
+
+def test_percentile_summary_rejects_unicode_bidi_spoofed_metric_names():
+    for bad_name in ("render\\u202ereverse", "render\\u2066isolated",
+                     "render\\u2028line", "render\\u2029paragraph"):
+        with pytest.raises(ValueError, match="bounded and printable"):
+            _stats.percentile_summary(bad_name, [1.0])
