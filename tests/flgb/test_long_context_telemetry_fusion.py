@@ -1,13 +1,16 @@
 """Conservative cross-source telemetry fusion regressions (no device claims)."""
 from __future__ import annotations
 
-from dataclasses import replace
+from contextlib import redirect_stdout
+from io import StringIO
 import json
 import os
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
+from skeleton.ai.model_runtime import LongContextTelemetryFusion as ExportedFusion
+from skeleton.ai.model_runtime.long_context_cli import main as long_context_main
 from skeleton.ai.model_runtime.long_context_telemetry_fusion import (
     LongContextTelemetryFusion, _event, _source,
 )
@@ -155,6 +158,53 @@ class TestTelemetryFusion(TestCase):
         for invalid in (0, True, -1, 10_000_000_001, "10"):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 LongContextTelemetryFusion(max_sample_ns=invalid)
+
+    def test_cli_fused_diagnostics_never_opens_spool(self):
+        self.assertIs(ExportedFusion, LongContextTelemetryFusion)
+        output = StringIO()
+        with patch("skeleton.ai.model_runtime.long_context_cli.LongContextSpool",
+                   side_effect=AssertionError("must not open spool")):
+            with patch(
+                "skeleton.ai.model_runtime.long_context_cli.LongContextTelemetryFusion",
+                return_value=self.monitor,
+            ):
+                with redirect_stdout(output):
+                    code = long_context_main([
+                        "--root", "/nonexistent-spool",
+                        "--tokenizer-digest", "a" * 64,
+                        "head-observe-fused",
+                    ])
+        self.assertEqual(code, 0)
+        observed = json.loads(output.getvalue())
+        self.assertEqual(observed["state"], "observed")
+        self.assertFalse(observed["is_execution_lease"])
+
+    def test_event_authority_spoof_rejected(self):
+        for key in (
+            "is_admission_grant", "is_execution_lease", "device_qualified",
+            "pressure_signals_attested", "scope_membership_attested",
+        ):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                _event({**event(), key: 1})
+        self.mock_events.return_value = {
+            **event(), "is_execution_lease": True,
+        }
+        observed = self.monitor.sample()
+        self.assertEqual(observed["event_state"], "baseline_required")
+        self.assertIn("event_observation_unavailable", observed["reasons"])
+
+    def test_clock_regression_does_not_rebase_last_good_sample(self):
+        times = iter((100, 200, 150, 250, 175, 275, 300, 400))
+        monitor = LongContextTelemetryFusion(clock=lambda: next(times))
+        with patch.object(monitor._events, "sample", return_value=event()):
+            first = monitor.sample()
+            second = monitor.sample()
+            third = monitor.sample()
+            fourth = monitor.sample()
+        self.assertEqual(first["state"], "observed")
+        self.assertEqual(second["state"], "unavailable")
+        self.assertEqual(third["state"], "unavailable")
+        self.assertEqual(fourth["state"], "observed")
 
     def test_observations_do_not_mutate_spool(self):
         self.assertFalse(hasattr(self.monitor, "spool"))

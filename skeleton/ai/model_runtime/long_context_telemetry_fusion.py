@@ -28,7 +28,7 @@ def _source(value: object) -> dict[str, str]:
     """Validate even internal observer results; never trust injected fixtures."""
     if not isinstance(value, dict):
         raise ValueError("invalid observation")
-    if any(value.get(key) is True for key in (
+    if any(value.get(key, False) is not False for key in (
         "is_admission_grant", "is_execution_lease", "device_qualified",
         "pressure_signals_attested", "scope_membership_attested",
     )):
@@ -46,7 +46,10 @@ def _source(value: object) -> dict[str, str]:
 
 
 def _event(value: object) -> tuple[str, tuple[str, ...], dict[str, int] | None]:
-    if not isinstance(value, dict) or value.get("is_admission_grant") is True:
+    if not isinstance(value, dict) or any(value.get(key, False) is not False for key in (
+        "is_admission_grant", "is_execution_lease", "device_qualified",
+        "pressure_signals_attested", "scope_membership_attested",
+    )):
         raise ValueError("invalid event observation")
     state = value.get("state")
     reasons = value.get("reasons")
@@ -116,7 +119,7 @@ class LongContextTelemetryFusion:
             ):
                 try:
                     sources[name] = _source(observer(root))
-                except (OSError, ValueError, OverflowError, TypeError, KeyError):
+                except Exception:
                     sources[name] = {key: "unknown" for key in _KEYS}
                     reasons.add(name + "_observation_unavailable")
             try:
@@ -135,7 +138,9 @@ class LongContextTelemetryFusion:
                     name: {key: "unknown" for key in _KEYS}
                     for name in ("host", "cgroup")
                 }
-            self._last_ns = end if type(end) is int and end >= 0 else None
+            self._last_ns = (max(self._last_ns or 0, end)
+                             if type(end) is int and end >= 0
+                             else self._last_ns)
             combined: dict[str, str] = {}
             for key in _KEYS:
                 combined[key] = max(
