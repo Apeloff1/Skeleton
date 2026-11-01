@@ -87,6 +87,14 @@ class SecretMigrator:
         if max_batches is not None and (type(max_batches) is not int or not 1 <= max_batches <= 1000):
             raise ValueError("max_batches must be 1..1000 or None")
 
+    def _checked_clock(self) -> float:
+        stamp = self.now()
+        if (type(stamp) not in (int, float)
+                or not 0 <= stamp <= 1_000_000_000_000
+                or not math.isfinite(stamp)):
+            raise ValueError("invalid secret migration checkpoint clock")
+        return float(stamp)
+
     def _run(self, job: str, transform, batch_size: int, max_batches: int | None) -> JobReport:
         self._validate_batch_bounds(batch_size, max_batches)
         cp = self.checkpoints.get(job)
@@ -109,7 +117,7 @@ class SecretMigrator:
             rows = self.store.scan(cursor, batch_size)
             if not rows:
                 report.done = True
-                self.checkpoints.save(Checkpoint(job, cursor, True, self.now()))
+                self.checkpoints.save(Checkpoint(job, cursor, True, self._checked_clock()))
                 break
             blocked = False
             for row in rows:
@@ -136,7 +144,7 @@ class SecretMigrator:
                 # safely skipped. A failed/conflicting row must be retried.
                 cursor = row.secret_id
             report.batches += 1
-            self.checkpoints.save(Checkpoint(job, cursor, False, self.now()))
+            self.checkpoints.save(Checkpoint(job, cursor, False, self._checked_clock()))
             if blocked:
                 return report
         return report
@@ -149,6 +157,7 @@ class SecretMigrator:
         # the durable resume checkpoint for the next authorized attempt.
         self._validate_batch_bounds(batch_size, max_batches)
         if force:
+            self._checked_clock()  # never erase a valid resume checkpoint on invalid time
             self.checkpoints.reset(JOB_ENCRYPT)
         def transform(blob: bytes, aad: bytes) -> bytes | None:
             kind = classify_blob(blob)
@@ -165,6 +174,7 @@ class SecretMigrator:
         target = self.provider.active_key_id()
         job = f"{JOB_REWRAP}:{target}"
         if force:
+            self._checked_clock()  # validate before destructive checkpoint reset
             self.checkpoints.reset(job)
 
         def transform(blob: bytes, aad: bytes) -> bytes | None:

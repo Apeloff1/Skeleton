@@ -245,3 +245,26 @@ def test_force_migration_invalid_bounds_preserve_durable_resume_checkpoint(store
         with pytest.raises(ValueError):
             migrator.rewrap(force=True, **kwargs)
         assert checkpoints.get(rewrap_job) == rewrap_checkpoint
+
+
+@pytest.mark.parametrize("bad_clock", [float("nan"), float("inf"), -1, True, 10**1000])
+def test_invalid_migration_clock_cannot_erase_resume_checkpoint(stores, bad_clock):
+    store, checkpoints = stores
+    _seed_plain(store, 3)
+    SecretMigrator(store, P1, checkpoints, Clock()).encrypt_plaintext(
+        batch_size=1, max_batches=1,
+    )
+    before = checkpoints.get(JOB_ENCRYPT)
+    assert before is not None and not before.done
+    invalid = SecretMigrator(store, P1, checkpoints, lambda: bad_clock)
+    with pytest.raises(ValueError, match="checkpoint clock"):
+        invalid.encrypt_plaintext(force=True, batch_size=1, max_batches=1)
+    assert checkpoints.get(JOB_ENCRYPT) == before
+
+
+def test_invalid_migration_clock_never_persists_bad_checkpoint(stores):
+    store, checkpoints = stores
+    invalid = SecretMigrator(store, P1, checkpoints, lambda: float("nan"))
+    with pytest.raises(ValueError, match="checkpoint clock"):
+        invalid.encrypt_plaintext()
+    assert checkpoints.get(JOB_ENCRYPT) is None
