@@ -316,3 +316,95 @@ def test_same_size_in_place_mutation_with_restored_mtime_is_rejected(tmp_path, m
     assert any(issue.code == "broken" and "changed during descriptor read" in issue.detail
                for issue in report.issues)
     assert report.imported == []
+
+
+def test_root_ancestor_symlink_is_rejected(tmp_path):
+    """O_NOFOLLOW on the final root component is not enough."""
+    source = tmp_path / "source"
+    nested = source / "assets"
+    nested.mkdir(parents=True)
+    (nested / "hero.png").write_bytes(png())
+    (tmp_path / "shortcut").symlink_to(source, target_is_directory=True)
+    report = import_files(tmp_path / "shortcut" / "assets", ["hero.png"])
+    assert not report.ok
+    assert not report.imported
+    assert report.issues[0].code == "unsafe"
+
+
+def test_root_parent_replacement_keeps_original_directory_fd(tmp_path, monkeypatch):
+    """A replaced parent pathname cannot redirect an already opened dirfd."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    parent = tmp_path / "parent"
+    root = parent / "assets"
+    root.mkdir(parents=True)
+    original_bytes = png()
+    (root / "hero.png").write_bytes(original_bytes)
+    outside = tmp_path / "outside"
+    (outside / "assets").mkdir(parents=True)
+    (outside / "assets" / "hero.png").write_bytes(b"forged source")
+    original_open = pipeline.os.open
+    swapped = [False]
+
+    def swap_ancestor(name, flags, *args, **kwargs):
+        if name == "assets" and kwargs.get("dir_fd") is not None and not swapped[0]:
+            swapped[0] = True
+            parent.rename(tmp_path / "retired")
+            parent.symlink_to(outside, target_is_directory=True)
+        return original_open(name, flags, *args, **kwargs)
+
+    monkeypatch.setattr(pipeline.os, "open", swap_ancestor)
+    report = pipeline.import_files(root, ["hero.png"])
+    assert swapped[0]
+    assert report.ok, report.issues
+    assert report.manifest.resolve("hero.png").size == len(original_bytes)
+
+
+def test_leaf_swap_to_symlink_fails_closed(tmp_path, monkeypatch):
+    from skeleton.game.build.asset_ingest import pipeline
+
+    root = tmp_path / "assets"
+    root.mkdir()
+    target = tmp_path / "outside.png"
+    target.write_bytes(png())
+    leaf = root / "hero.png"
+    leaf.write_bytes(png())
+    original_open = pipeline.os.open
+    swapped = [False]
+
+    def swap_leaf(name, flags, *args, **kwargs):
+        if name == "hero.png" and kwargs.get("dir_fd") is not None and not swapped[0]:
+            swapped[0] = True
+            leaf.unlink()
+            leaf.symlink_to(target)
+        return original_open(name, flags, *args, **kwargs)
+
+    monkeypatch.setattr(pipeline.os, "open", swap_leaf)
+    report = pipeline.import_files(root, ["hero.png"])
+    assert swapped[0]
+    assert not report.ok
+    assert report.imported == []
+    assert any(issue.code == "unsafe" for issue in report.issues)
+
+
+def test_sparse_oversize_and_aggregate_volume_limits(tmp_path, monkeypatch):
+    from skeleton.game.build.asset_ingest import pipeline
+    from skeleton.game.build.asset_ingest.importers import MAX_ASSET_BYTES
+
+    oversized = tmp_path / "oversized.png"
+    with oversized.open("wb") as dest:
+        dest.truncate(MAX_ASSET_BYTES + 1)
+    report = pipeline.import_files(tmp_path, ["oversized.png"])
+    assert not report.ok and not report.imported
+    assert any("exceeds size limit" in issue.detail for issue in report.issues)
+
+    (tmp_path / "a.png").write_bytes(png(4, 4))
+    (tmp_path / "b.png").write_bytes(png(8, 4))
+    monkeypatch.setattr(pipeline, "MAX_IMPORT_TOTAL_BYTES", len(png(4, 4)) + 1)
+    report = pipeline.import_files(tmp_path, ["a.png", "b.png"])
+    assert not report.ok
+    assert any("aggregate asset bytes exceed bound" in issue.detail for issue in report.issues)
+    monkeypatch.setattr(pipeline, "MAX_IMPORT_FILES", 1)
+    report = pipeline.import_files(tmp_path, ["a.png", "b.png"])
+    assert not report.ok
+    assert any("file count exceeds bound" in issue.detail for issue in report.issues)
