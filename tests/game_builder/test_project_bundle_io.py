@@ -43,6 +43,22 @@ def test_zip_slip_member_rejected_even_with_valid_envelope(saver):
             bio.safe_member_path(bad)
 
 
+def test_bundle_write_cannot_follow_predictable_temp_symlink(tmp_path):
+    victim = tmp_path / "unrelated.txt"
+    victim.write_text("private original", encoding="utf-8")
+    target = tmp_path / "hero.gfbundle.json"
+    predictable = target.with_name(target.name + ".tmp")
+    try:
+        predictable.symlink_to(victim)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable on this platform")
+
+    bio.write_bundle(target, '{"safe":true}')
+    assert victim.read_text(encoding="utf-8") == "private original"
+    assert bio.read_bundle(target) == '{"safe":true}'
+    assert predictable.is_symlink()
+
+
 def test_tenant_path_write_read(tmp_path, saver):
     saver.save_files("hero", "platformer", {"a.md": "abc"})
     p = bio.bundle_path(tmp_path, "tenant-one", "hero", tenant_storage_namespace)

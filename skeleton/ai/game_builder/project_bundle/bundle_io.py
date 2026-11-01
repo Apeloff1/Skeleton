@@ -9,6 +9,7 @@ and ``backend.core.tenant_storage_boundary.tenant_storage_namespace``.
 from __future__ import annotations
 
 import os
+import tempfile
 import re
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Protocol
@@ -119,9 +120,22 @@ def write_bundle(path: Path, raw: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_symlink():
         raise BundleError("refusing to write through a symlink")
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(raw, encoding="utf-8")
-    os.replace(tmp, path)
+    # Never open a predictable .tmp path: an attacker could pre-create it
+    # as a symlink and redirect write_text() to an unrelated local file.
+    # mkstemp creates a private, exclusive 0600 file in the target directory.
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def read_bundle(path: Path) -> str:
