@@ -334,3 +334,41 @@ def test_bool_pending_token_count_cannot_alias_integer_permit():
     with pytest.raises(NativeFairStreamDenied, match="lease identity mismatch"):
         backend.generate(p, forged)
     assert registry.status()["staged"] == 1
+
+
+def test_forked_registry_cannot_claim_revoke_or_report_parent_grants(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as module
+
+    runtime, registry, backend = setup()
+    parent_pid = registry._owner_pid
+    assert registry.status()["staged"] == 1
+    with monkeypatch.context() as scoped:
+        scoped.setattr(module.os, "getpid", lambda: parent_pid + 1)
+        with pytest.raises(NativeFairStreamDenied, match="forked native prompt"):
+            registry.claim("request-1", "alice")
+        with pytest.raises(NativeFairStreamDenied, match="forked native prompt"):
+            registry.revoke("request-1")
+        with pytest.raises(NativeFairStreamDenied, match="forked native prompt"):
+            registry.status()
+        with pytest.raises(NativeFairStreamDenied, match="forked native prompt"):
+            registry.budget_status()
+        with pytest.raises(NativeFairStreamDenied, match="forked native prompt"):
+            backend.generate(permit(), state())
+    assert registry.status()["staged"] == 1
+    assert registry.status()["consumed_or_revoked"] == 0
+
+
+def test_unreadable_native_process_identity_denies_before_lock(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as module
+
+    _, registry, backend = setup()
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            module.os, "getpid",
+            lambda: (_ for _ in ()).throw(OSError("PID unavailable")),
+        )
+        with pytest.raises(NativeFairStreamDenied, match="identity unavailable"):
+            backend.generate(permit(), state())
+        with pytest.raises(NativeFairStreamDenied, match="identity unavailable"):
+            registry.claim("request-1", "alice")
+    assert registry.status()["staged"] == 1

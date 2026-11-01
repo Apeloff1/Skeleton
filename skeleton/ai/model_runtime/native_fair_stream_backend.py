@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import hmac
+import os
 from threading import RLock
 from typing import Mapping
 
@@ -28,6 +29,24 @@ MAX_ID_BYTES = 128
 
 class NativeFairStreamDenied(RuntimeError):
     """No execution is authorized; an uncertain owner must not auto-retry."""
+
+
+def _require_owner_process(owner_pid: int) -> None:
+    """A fork inherits staged plaintext and Python locks, not execution rights.
+
+    Reject before entering any inherited RLock: a parent thread holding that
+    lock might not exist in the child, and a copied grant is not a new lease.
+    """
+    try:
+        current = os.getpid()
+    except BaseException as exc:
+        raise NativeFairStreamDenied(
+            "native prompt process identity unavailable"
+        ) from exc
+    if type(current) is not int or current != owner_pid:
+        raise NativeFairStreamDenied(
+            "forked native prompt authority requires reauthorization"
+        )
 
 
 def _id(value: object, label: str) -> str:
@@ -151,12 +170,17 @@ class NativePromptRegistry:
         self, *, session_id: str, budget: NativePromptBudget | None = None,
     ) -> None:
         self.session_id = _id(session_id, "session")
+        self._owner_pid = os.getpid()
         self._lock = RLock()
         self._staged: dict[str, PinnedNativePrompt] = {}
         self._used: set[str] = set()
         self._budget = PromptBudgetLedger(budget or NativePromptBudget())
 
+    def _require_owner_process(self) -> None:
+        _require_owner_process(self._owner_pid)
+
     def stage(self, pinned: PinnedNativePrompt) -> None:
+        _require_owner_process(self._owner_pid)
         if type(pinned) is not PinnedNativePrompt:
             raise NativeFairStreamDenied("canonical pinned prompt required")
         if pinned.session_id != self.session_id:
@@ -174,6 +198,7 @@ class NativePromptRegistry:
 
     def claim(self, request_id: str, tenant_id: str) -> PinnedNativePrompt:
         """Consume before invoking a potentially side-effecting model."""
+        _require_owner_process(self._owner_pid)
         with self._lock:
             pinned = self._staged.get(_id(request_id, "request"))
             if pinned is None or pinned.tenant_id != _id(tenant_id, "tenant"):
@@ -185,6 +210,7 @@ class NativePromptRegistry:
 
     def revoke(self, request_id: str) -> None:
         """Burn a pending grant without authorizing an execution."""
+        _require_owner_process(self._owner_pid)
         with self._lock:
             _id(request_id, "request")
             pinned = self._staged.get(request_id)
@@ -194,6 +220,7 @@ class NativePromptRegistry:
             self._used.add(request_id)
 
     def status(self) -> dict[str, int | str]:
+        _require_owner_process(self._owner_pid)
         with self._lock:
             return {
                 "schema": "skeleton.ai.native-fair-stream-prompt-status.v1",
@@ -204,6 +231,7 @@ class NativePromptRegistry:
 
     def budget_status(self) -> dict[str, int | str]:
         """Payload-free operator telemetry; never expose prompts or tenant IDs."""
+        _require_owner_process(self._owner_pid)
         with self._lock:
             return self._budget.snapshot()
 
@@ -226,6 +254,7 @@ class NativeFairStreamBackend:
             raise NativeFairStreamDenied("canonical prompt registry required")
         self.runtime = runtime
         self.registry = registry
+        self._owner_pid = os.getpid()
         if pressure_guard is not None and type(pressure_guard) is not NativeTokenPressureGuard:
             raise NativeFairStreamDenied("canonical native pressure guard required")
         self._pressure_guard = pressure_guard
@@ -283,6 +312,8 @@ class NativeFairStreamBackend:
     def generate(
         self, permit: DispatchPermit, state: Mapping[str, object],
     ) -> tuple[int, bytes]:
+        _require_owner_process(self._owner_pid)
+        self.registry._require_owner_process()
         with self._lock:
             tenant = self._pending(permit, state)
             model, tokenizer = _cpu_runtime(self.runtime)
