@@ -7,7 +7,13 @@ quest replay engine, returning the first deterministic witness in authored
 stage/choice order. It never invents unobserved evidence. A budget-exhausted
 search is **inconclusive**, not unreachable.
 
-Inspect the selected catalog source and obtain its canonical leases first:\n\n```bash\npython -m scripts.studio_quest_ending_witness_cli --project PROJECT --inspect\n```\n\nExample (digests must be computed from the actual selected catalog project):
+Inspect the selected catalog source and obtain its canonical leases first:
+
+```bash
+python -m scripts.studio_quest_ending_witness_cli --project PROJECT --inspect
+```
+
+Example (digests must be computed from the actual selected catalog project):
 
 ```bash
 python -m scripts.studio_quest_ending_witness_cli --project PROJECT \
