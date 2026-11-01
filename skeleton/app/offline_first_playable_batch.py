@@ -27,6 +27,7 @@ from skeleton.app.offline_first_playable_delivery import (
     MAX_ACTIONS, _ACTIONS, _path, _is_within, _preflight,
     inspect_first_playable_delivery, publish_first_playable_delivery,
 )
+from skeleton.app.offline_delivery_assurance import _source_identity
 from skeleton.app.private_game_save import read_private_game_save
 
 SCHEMA = "skeleton.app.first_playable_delivery_batch.v1"
@@ -195,6 +196,38 @@ def _inspect_jobs(jobs: tuple[DeliveryJob, ...],
             )
 
 
+def _reverify_original_sources(
+    jobs: tuple[DeliveryJob, ...],
+    admissions: Sequence[dict[str, object]],
+    identities: Sequence[tuple[int, ...]],
+) -> None:
+    """Reexecute *every* original source after the last game publishes.
+
+    A single-game delivery checks its own source, but later cohort members
+    may take minutes to install and play. A previously admitted source can
+    change in that interval. The final cohort receipt must never certify a
+    stale original-source inventory. No file is repaired or deleted here.
+    """
+    if len(jobs) != len(admissions) or len(jobs) != len(identities):
+        raise FirstPlayableDeliveryBatchError("source cohort evidence length mismatch")
+    for job, admitted, identity in zip(jobs, admissions, identities, strict=True):
+        if _source_identity(job.source) != identity:
+            raise FirstPlayableDeliveryBatchError(
+                "original game source root identity changed"
+            )
+        replayed = verify_exported_package(
+            job.source, expected_manifest_sha256=job.manifest_sha256,
+            authorized=True,
+        )
+        if (replayed != admitted
+                or replayed.get("offline_gameplay_reexecuted") is not True
+                or replayed.get("release_certified") is not False
+                or _source_identity(job.source) != identity):
+            raise FirstPlayableDeliveryBatchError(
+                "original game source changed during cohort delivery"
+            )
+
+
 def publish_first_playable_delivery_batch(
     jobs: Sequence[DeliveryJob], summary_destination: str | Path, *,
     authorized: bool,
@@ -210,6 +243,8 @@ def publish_first_playable_delivery_batch(
     # Admission is deliberately all-or-nothing, not a reservation. A later
     # failure may leave a prefix of already published, immutable game outputs.
     source_projects: list[str] = []
+    admissions: list[dict[str, object]] = []
+    identities: list[tuple[int, ...]] = []
     for job in checked:
         admitted = _preflight(
             _path(job.source), _path(job.archive), _path(job.install),
@@ -222,6 +257,8 @@ def publish_first_playable_delivery_batch(
                 "canonical original source project identity missing"
             )
         source_projects.append(project)
+        admissions.append(admitted)
+        identities.append(_source_identity(job.source))
     # The source verifier already knows project identity. Reject duplicate
     # projects before the first ZIP is published; discovering this only when
     # assembling the final receipt would strand an otherwise valid cohort.
@@ -229,6 +266,7 @@ def publish_first_playable_delivery_batch(
         raise FirstPlayableDeliveryBatchError(
             "duplicate original project identity before publication"
         )
+    _reverify_original_sources(checked, admissions, identities)
     records: list[dict[str, object]] = []
     for job in checked:
         published = publish_first_playable_delivery(
@@ -237,8 +275,9 @@ def publish_first_playable_delivery_batch(
             moves=job.moves, authorized=True,
         )
         records.append(_record(published, job.moves))
-    # Recheck every earlier delivery after the last game has been installed.
+    # Recheck original sources as well as installed games after the last write.
     _inspect_jobs(checked, records)
+    _reverify_original_sources(checked, admissions, identities)
     envelope = _summary(records)
     pin = publish_verified_receipt(
         envelope, summary_destination, protected_roots=roots, authorized=True,
@@ -250,6 +289,7 @@ def publish_first_playable_delivery_batch(
             or sha256(read_back).hexdigest() != pin):
         raise FirstPlayableDeliveryBatchError("published cohort receipt changed")
     _inspect_jobs(checked, records)
+    _reverify_original_sources(checked, admissions, identities)
     return {
         **envelope,
         "status": "original_game_delivery_cohort_published_release_blocked",
@@ -291,6 +331,8 @@ def resume_first_playable_delivery_batch(
         summary_destination, protected_roots=roots, authorized=True,
     )
     records: list[dict[str, object]] = []
+    admissions: list[dict[str, object]] = []
+    identities: list[tuple[int, ...]] = []
     for job in checked[:completed]:
         inspected = inspect_first_playable_delivery(
             job.install, job.archive, job.save, job.receipt,
@@ -312,6 +354,8 @@ def resume_first_playable_delivery_batch(
                 "pinned prior delivery diverged from original game source"
             )
         records.append(_record(inspected, job.moves))
+        admissions.append(source)
+        identities.append(_source_identity(job.source))
     _inspect_jobs(checked[:completed], records)
     source_projects = [record["project_id"] for record in records]
     for job in checked[completed:]:
@@ -326,10 +370,13 @@ def resume_first_playable_delivery_batch(
                 "canonical original source project identity missing"
             )
         source_projects.append(project)
+        admissions.append(admitted)
+        identities.append(_source_identity(job.source))
     if len(set(source_projects)) != len(source_projects):
         raise FirstPlayableDeliveryBatchError(
             "duplicate original project identity before resumed publication"
         )
+    _reverify_original_sources(checked, admissions, identities)
     for job in checked[completed:]:
         published = publish_first_playable_delivery(
             job.source, job.archive, job.install, job.save, job.receipt,
@@ -338,6 +385,7 @@ def resume_first_playable_delivery_batch(
         )
         records.append(_record(published, job.moves))
     _inspect_jobs(checked, records)
+    _reverify_original_sources(checked, admissions, identities)
     envelope = _summary(records)
     pin = publish_verified_receipt(
         envelope, summary_destination, protected_roots=roots, authorized=True,
@@ -348,6 +396,7 @@ def resume_first_playable_delivery_batch(
     if not hmac.compare_digest(raw, _canonical_bytes(envelope)):
         raise FirstPlayableDeliveryBatchError("resumed cohort receipt changed")
     _inspect_jobs(checked, records)
+    _reverify_original_sources(checked, admissions, identities)
     return {
         **envelope,
         "status": "original_game_delivery_cohort_resumed_release_blocked",

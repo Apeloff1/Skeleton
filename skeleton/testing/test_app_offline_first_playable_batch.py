@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import shutil
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -385,3 +386,75 @@ def test_noncanonical_resumed_prefix_pin_fails_before_writing_next_game(
             jobs, tmp_path / "cohort.json", authorized=True,
         )
     assert all(not Path(job.archive).exists() for job in jobs)
+
+
+def _copied_original_games(original_games, tmp_path):
+    copied = []
+    for index, (source, pin) in enumerate(original_games):
+        destination = tmp_path / f"copy-source-{index}"
+        shutil.copytree(source, destination)
+        copied.append((destination, pin))
+    return tuple(copied)
+
+
+def test_publish_rejects_earlier_original_source_mutation_after_later_game(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_batch as batch
+    copied = _copied_original_games(original_games, tmp_path)
+    jobs = jobs_for(copied, tmp_path)
+    original_publish = batch.publish_first_playable_delivery
+    completed = 0
+
+    def mutate_after_later_game(*args, **kwargs):
+        nonlocal completed
+        result = original_publish(*args, **kwargs)
+        completed += 1
+        if completed == 2:
+            (copied[0][0] / "release.json").write_bytes(b'{"tampered":true}')
+        return result
+
+    monkeypatch.setattr(batch, "publish_first_playable_delivery",
+                        mutate_after_later_game)
+    summary = tmp_path / "cohort.json"
+    with pytest.raises(ValueError):
+        batch.publish_first_playable_delivery_batch(jobs, summary, authorized=True)
+    assert completed == 2
+    assert Path(jobs[0].archive).exists()
+    assert not summary.exists()
+
+
+def test_resume_rejects_mutated_original_prefix_before_summary_publication(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_batch as batch
+    copied = _copied_original_games(original_games, tmp_path)
+    jobs = jobs_for(copied, tmp_path)
+    first = publish_first_playable_delivery(
+        jobs[0].source, jobs[0].archive, jobs[0].install,
+        jobs[0].save, jobs[0].receipt,
+        expected_manifest_sha256=jobs[0].manifest_sha256,
+        moves=jobs[0].moves, authorized=True,
+    )
+    prefix = replace(
+        jobs[0], archive_sha256=first["archive_sha256"],
+        save_sha256=first["save_sha256"],
+        receipt_sha256=first["independent_receipt_sha256"],
+    )
+    original_publish = batch.publish_first_playable_delivery
+
+    def mutate_prefix_after_suffix(*args, **kwargs):
+        result = original_publish(*args, **kwargs)
+        (copied[0][0] / "release.json").write_bytes(b'{"tampered":true}')
+        return result
+
+    monkeypatch.setattr(batch, "publish_first_playable_delivery",
+                        mutate_prefix_after_suffix)
+    summary = tmp_path / "cohort.json"
+    with pytest.raises(ValueError):
+        batch.resume_first_playable_delivery_batch(
+            (prefix, jobs[1]), summary, authorized=True,
+        )
+    assert Path(jobs[0].receipt).exists()
+    assert Path(jobs[1].archive).exists()
+    assert not summary.exists()
