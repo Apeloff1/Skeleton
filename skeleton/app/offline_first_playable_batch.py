@@ -568,8 +568,11 @@ def _parse_job(raw: str) -> DeliveryJob:
     def no_constant(value: str) -> object:
         raise FirstPlayableDeliveryBatchError("nonfinite job JSON constant")
 
-    value = json.loads(raw, object_pairs_hook=unique_pairs,
-                       parse_constant=no_constant)
+    try:
+        value = json.loads(raw, object_pairs_hook=unique_pairs,
+                           parse_constant=no_constant)
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise FirstPlayableDeliveryBatchError("invalid bounded job JSON") from exc
     mandatory = {
         "source", "archive", "install", "save", "receipt",
         "manifest_sha256", "moves",

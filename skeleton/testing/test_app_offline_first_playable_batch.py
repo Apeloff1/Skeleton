@@ -663,3 +663,18 @@ def test_original_source_inspection_flag_rejects_non_boolean(
             expected_summary_sha256="a" * 64,
             authorized=True, verify_original_sources="yes",
         )
+
+
+def test_batch_cli_deeply_nested_job_fails_closed_before_any_write(
+    tmp_path, capsys,
+):
+    malformed = "[" * 1500 + "0" + "]" * 1500
+    assert run_app_cli([
+        "first-playable-batch", "--job", malformed, "--job", malformed,
+        "--summary", str(tmp_path / "cohort.json"),
+        "--trusted-local-operator",
+    ]) == 2
+    result = json.loads(capsys.readouterr().err)
+    assert result["status"] == "blocked"
+    assert result["release_certified"] is False
+    assert not (tmp_path / "cohort.json").exists()
