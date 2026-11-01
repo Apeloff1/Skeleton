@@ -144,3 +144,48 @@ def test_cli_requires_bounded_pinned_checkpoints(capsys):
         "--trusted-local-operator",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+
+def test_receipt_chain_mid_replay_swap_rejected(
+    catalog, tmp_path, monkeypatch,
+):
+    """A receipt changed after the first successor must fail identity fencing."""
+    from pathlib import Path
+    from skeleton.app import offline_mixed_library_epoch_receipt_chain as module
+
+    checkpoints = _checkpoints(catalog, tmp_path)
+    original = module.assure_mixed_library_epoch_successor
+    seen = 0
+
+    def swap_after_first(*args, **kwargs):
+        nonlocal seen
+        result = original(*args, **kwargs)
+        seen += 1
+        if seen == 1:
+            target = Path(checkpoints[1].receipt)
+            replacement = tmp_path / "checkpoint-replacement.json"
+            replacement.write_bytes(target.read_bytes())
+            os.chmod(replacement, 0o600)
+            os.replace(replacement, target)
+        return result
+
+    monkeypatch.setattr(
+        module, "assure_mixed_library_epoch_successor", swap_after_first,
+    )
+    with pytest.raises(ValueError):
+        audit_mixed_library_epoch_receipt_chain(
+            checkpoints, authorized=True,
+        )
+    assert seen >= 1
+
+
+def test_checkpoint_duplicate_json_keys_rejected(capsys):
+    bad = '{"receipt":"/missing.json","receipt":"/other.json"}'
+    assert run_app_cli([
+        "audit-mixed-library-epoch-receipts",
+        "--checkpoint", bad,
+        "--checkpoint", bad,
+        "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"

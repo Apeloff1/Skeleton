@@ -28,7 +28,7 @@ from skeleton.app.offline_mixed_library_epoch_successor import (
 
 SCHEMA = "skeleton.app.offline_mixed_library_epoch_receipt_chain.v1"
 MAX_CHECKPOINTS = MAX_GENERATIONS - 1
-MAX_CHECKPOINT_JSON_BYTES = 512 * 1024
+MAX_CHECKPOINT_JSON_BYTES = 1024 * 1024
 
 
 class OfflineMixedLibraryEpochReceiptChainError(ValueError):

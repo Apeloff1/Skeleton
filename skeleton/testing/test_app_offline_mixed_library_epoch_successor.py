@@ -161,3 +161,56 @@ def test_cli_fails_closed_without_pin(capsys):
         "--previous-receipt-sha256", "0" * 64,
         "--trusted-local-operator",
     ]) == 2
+
+
+
+def test_same_byte_receipt_inode_swap_during_replay_rejected(
+    catalog, tmp_path, monkeypatch,
+):
+    """Replacing a receipt with byte-identical content must still fail."""
+    from skeleton.app import offline_mixed_library_epoch_successor as module
+
+    previous, current = _histories(catalog, tmp_path)
+    old, new, old_pin, new_pin = _publish(previous, current, tmp_path)
+    original = module.inspect_mixed_library_epoch_handoff
+    seen = 0
+
+    def replace_after_inspection(*args, **kwargs):
+        nonlocal seen
+        result = original(*args, **kwargs)
+        seen += 1
+        if seen == 2:
+            replacement = tmp_path / "receipt-swap.json"
+            replacement.write_bytes(new.read_bytes())
+            os.chmod(replacement, 0o600)
+            os.replace(replacement, new)
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_mixed_library_epoch_handoff",
+        replace_after_inspection,
+    )
+    with pytest.raises(ValueError):
+        _verify(previous, current, old, new, old_pin, new_pin)
+    assert seen == 2
+
+
+def test_cli_rejects_unpaired_historical_generations(capsys):
+    assert run_app_cli([
+        "audit-mixed-library-epoch-successor",
+        "--previous-unsigned-generation", "[]",
+        "--previous-unsigned-generation", "[]",
+        "--previous-signed-generation", "[]",
+        "--current-unsigned-generation", "[]",
+        "--current-unsigned-generation", "[]",
+        "--current-unsigned-generation", "[]",
+        "--current-signed-generation", "[]",
+        "--current-signed-generation", "[]",
+        "--current-signed-generation", "[]",
+        "--previous-receipt", "/missing/old.json",
+        "--current-receipt", "/missing/new.json",
+        "--previous-receipt-sha256", "0" * 64,
+        "--current-receipt-sha256", "1" * 64,
+        "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["release_certified"] is False
