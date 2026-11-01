@@ -64,9 +64,31 @@ def _parts(relative: str) -> tuple[str, ...]:
 
 
 def _root_fd(root: str | Path) -> int:
+    """Open every root ancestor relative to a held directory descriptor.
+
+    O_NOFOLLOW protects only the final component of an os.open(path) call.
+    Opening a whole root pathname would silently follow a symlink in one of
+    its parents, even though subsequent asset opens use dir_fd correctly.
+    """
     if not _SECURE_OPEN:
         raise AssetImportError("descriptor-anchored asset import is unavailable on this platform")
-    return os.open(os.fspath(root), _DIR_FLAGS)
+    source = os.fspath(root)
+    if (not isinstance(source, str) or not source or len(source) > 4096
+            or "\x00" in source or source.startswith("//")):
+        raise AssetImportError("unsafe import root")
+    components = [part for part in source.split("/") if part and part != "."]
+    if ".." in components or len(components) > 128:
+        raise AssetImportError("unsafe import root")
+    current = os.open("/" if source.startswith("/") else ".", _DIR_FLAGS)
+    try:
+        for component in components:
+            child = os.open(component, _DIR_FLAGS, dir_fd=current)
+            os.close(current)
+            current = child
+        return current
+    except BaseException:
+        os.close(current)
+        raise
 
 
 def _regular(root_fd: int, relative: str, *, read: bool) -> bytes | None:
