@@ -55,7 +55,7 @@ def setup(*, fail=False, connection=None):
         (1, 2), (KVPageInput("opaque", 128, tier=CacheTier.CPU),),
         namespace,
     )
-    clock = iter((1000, 1001))
+    clock = iter((1000, 1001, 1002, 1003, 1004, 1005))
     controller = KVLiveTierController(
         manager, storage_path=".",
         policy=TierPressurePolicy(

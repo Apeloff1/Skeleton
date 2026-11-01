@@ -49,7 +49,7 @@ def simulated_service():
         (1, 2), (KVPageInput("opaque", 128, tier=CacheTier.CPU),),
         KVNamespace("model", tokenizer_id="tokenizer"),
     )
-    ticks = iter((1000, 1001))
+    ticks = iter((1000, 1001, 1002, 1003, 1004, 1005))
     controller = KVLiveTierController(
         manager, storage_path=".",
         policy=TierPressurePolicy(
