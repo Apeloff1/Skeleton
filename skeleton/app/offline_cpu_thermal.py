@@ -97,7 +97,7 @@ def _pinned_temperature(zone_fd: int, name: str) -> float | None:
         return None
 
 
-def probe_cpu_thermal(root: str | Path = "/sys/class/thermal") -> tuple[CPUThermalSensor, ...]:
+def probe_cpu_thermal(root: str | Path = "/sys/devices/virtual/thermal") -> tuple[CPUThermalSensor, ...]:
     """Fail-closed, descriptor-pinned Linux CPU/SOC thermal inventory.
 
     Missing or mismatched trip type/temperature pairs, symlinks, unexpected
@@ -122,7 +122,7 @@ def probe_cpu_thermal(root: str | Path = "/sys/class/thermal") -> tuple[CPUTherm
                     return ()
                 zone_names.append(name)
         result: list[CPUThermalSensor] = []
-        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
         for name in sorted(zone_names):
             zone_fd = os.open(name, flags, dir_fd=root_fd)
             try:

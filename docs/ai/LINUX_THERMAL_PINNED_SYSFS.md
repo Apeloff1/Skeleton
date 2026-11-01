@@ -17,3 +17,7 @@ still revalidate pressure and token budgets.
 Focused tests: `pytest -q skeleton/testing/test_offline_cpu_thermal_probe_completeness.py`
 and the existing tail inflight/pressure guard tests. Exact-head CI and
 security review remain required before promotion.
+
+The default probes the real `/sys/devices/virtual/thermal` directory,
+not the `/sys/class/thermal` symlink view. A symlinked or unavailable
+platform topology returns unknown evidence rather than following a path.
