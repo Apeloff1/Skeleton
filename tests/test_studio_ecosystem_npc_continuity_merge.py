@@ -217,7 +217,7 @@ def test_jeeves_router_and_cli(capsys):
         execute_npc_continuity_merge_tool(request, authorized=False)
 
 
-def test_offline_editor_export_import_and_lease(tmp_path):
+def test_offline_editor_export_import_and_lease(tmp_path, capsys):
     from scripts.studio_npc_continuity_merge_cli import main
     docs, source, left, right, key = fixture()
     report = propose_npc_continuity_merge(
@@ -258,7 +258,39 @@ def test_offline_editor_export_import_and_lease(tmp_path):
         "--baseline-merge", json.dumps(report),
         "--import-decisions", str(path),
     ]) == 0
-    assert json.loads(__import__("sys").stdout.getvalue()) if False else True
+    assert json.loads(capsys.readouterr().out)["merge"]["unresolved_count"] == 0
     path.write_text(json.dumps({**record, "baseline_merge_digest": "0" * 64}))
     with pytest.raises(StudioQuestError):
         load_npc_continuity_merge_editor_export(path, **kwargs)
+
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_npc_continuity_merge_editor_export(path, **kwargs)
+
+
+def test_reject_cross_session_and_forged_event_facts():
+    docs, source, left, right, key = fixture()
+    modified = {**right, "session_digest": "0" * 64}
+    with pytest.raises(StudioQuestError):
+        compile_npc_continuity_merge(
+            docs, left, modified, {"decisions": []}, authorized=True,
+            expected_source_digest=source)
+    forged_events = [dict(row) for row in right["events"]]
+    forged_events[0]["start_tick"] += 1
+    forged = {**right, "events": forged_events}
+    with pytest.raises(StudioQuestError):
+        compile_npc_continuity_merge(
+            docs, left, forged, {"decisions": []}, authorized=True,
+            expected_source_digest=source)
+
+
+def test_html_escapes_untrusted_conflict_anchor():
+    docs, source, left, right, key = fixture()
+    report = propose_npc_continuity_merge(
+        docs, left, right, PROMPT, authorized=True,
+        expected_source_digest=source)
+    html = render_npc_continuity_merge_html(docs, report, authorized=True)
+    assert key.encode("utf-8") in html
+    assert b"<script>" not in html
+    assert b"form-action 'none'" in html
