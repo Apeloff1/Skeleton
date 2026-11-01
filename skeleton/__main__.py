@@ -72,6 +72,7 @@ Commands:
     arena-control   Play, save, replay and package tactical beacon captures
     arena-control-author  Edit and preview original control-point matches
     arena-control-solve  Find bounded replayable tactical beacon victories
+    arena-control-interactive  Play JSON-line capture battles with safe saves
     arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
@@ -783,6 +784,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "arena-control-solve":
         from skeleton.game.gameplay.arena_control_solver import cli as control_solver_cli
         return control_solver_cli(rest)
+    if cmd == "arena-control-interactive":
+        from skeleton.game.gameplay.arena_control_interactive import cli as control_play_cli
+        return control_play_cli(rest)
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
         return author_cli(rest)
