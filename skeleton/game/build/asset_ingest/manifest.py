@@ -47,7 +47,7 @@ MAX_MANIFEST_TOTAL_BYTES = 512 * 1024 * 1024
 def _valid_path(path: object) -> bool:
     if type(path) is not str or not path or len(path) > 4096:
         return False
-    if any(char in path for char in ("\\\\", "\\x00", ":", "%", "?", "#")):
+    if any(char in path for char in (chr(92), chr(0), ":", "%", "?", "#")):
         return False
     parts = path.split("/")
     return (len(parts) <= 32 and all(part not in ("", ".", "..") for part in parts)

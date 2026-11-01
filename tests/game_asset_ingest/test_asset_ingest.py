@@ -246,9 +246,8 @@ def test_manifest_rejects_collision_summary_and_receipt_rewrites():
     m = AssetManifest()
     m.add(import_bytes("a/hero.png", png()))
     m.add(import_bytes("music.wav", wav()))
-    original = json.loads(m.to_json())
     forged = json.loads(m.to_json())
-    forged["entries"][1]["aliases"].append("a/hero.png")
+    forged["entries"][0]["aliases"].append("music.wav")
     forged["digest"] = dig(forged["entries"])
     with pytest.raises(AssetImportError, match="collide"):
         AssetManifest.from_json(json.dumps(forged))
@@ -261,3 +260,13 @@ def test_manifest_rejects_collision_summary_and_receipt_rewrites():
     forged["digest"] = dig(forged["entries"])
     with pytest.raises(AssetImportError, match="receipt identity"):
         AssetManifest.from_json(json.dumps(forged))
+
+
+def test_manifest_rejects_nul_and_windows_separator_paths():
+    from dataclasses import replace
+    original = import_bytes("hero.png", png())
+    m = AssetManifest()
+    for bad in ("folder\\\\hero.png", "folder\\x00hero.png", "../hero.png"):
+        with pytest.raises(AssetImportError, match="invalid manifest asset path"):
+            m.add(replace(original, path=bad))
+    assert m.to_dict()["paths"] == 0
