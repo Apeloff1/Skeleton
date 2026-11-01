@@ -127,6 +127,9 @@ jobs:
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
+      - name: Validate studio and swarm source contracts
+        env: {PYTHONPATH: "."}
+        run: python -m pytest -q skeleton/testing/test_game_studio_swarm.py
       - name: GameForge walk -> materialise -> runnable Godot tree
         timeout-minutes: 6
         env: {PYTHONPATH: "."}
