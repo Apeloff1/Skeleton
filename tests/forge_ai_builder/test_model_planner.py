@@ -97,3 +97,23 @@ def test_request_carries_schema_and_bounds():
     req = router.requests[0]
     assert req.response_schema["properties"]["schema"]["const"].endswith("plan_proposal.v1")
     assert req.max_output_tokens == 800 and req.messages[0].role == "system"
+
+
+def test_provider_capability_grants_reject_wildcards_and_unbounded_iterators():
+    from itertools import repeat
+
+    _, issuer = gate_and_issuer()
+    for providers in (["*"], ["../other"], ["bad:scope"], [""], repeat("alpha")):
+        with pytest.raises(ValueError):
+            grant_providers(issuer, providers)
+
+
+def test_planner_output_and_request_identity_budgets_fail_closed():
+    gate, issuer = gate_and_issuer()
+    cap = grant_providers(issuer, ["alpha"])
+    for invalid in (0, -1, 4097, True):
+        with pytest.raises(ValueError, match="token budget"):
+            ModelPlanner(FakeRouter(), gate=gate, cap=cap, max_output_tokens=invalid)
+    for rid in ("", "x" * 129, "../escape", "req\nforged"):
+        with pytest.raises(ValueError, match="request identity"):
+            run(ModelPlanner(FakeRouter(), gate=gate, cap=cap).plan(BRIEF, request_id=rid))
