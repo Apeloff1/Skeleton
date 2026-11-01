@@ -23,3 +23,8 @@ quarantine; it does not delete either destination or mutate the damaged
 original. Installation and save publication are **not one transaction**.
 All release, native package signing, publisher identity, rights, hardware and
 device-qualification holds remain active.
+
+A read-only `--preflight-only` mode checks the signed archive, original
+private save replay, quarantined tree and both new destination paths without
+publishing either output. Preflight is observational, never a reservation;
+the recovery operation repeats all admission checks before publication.

@@ -181,3 +181,34 @@ def test_cli_denies_missing_authority_without_publication(damaged, capsys):
     assert result["release_certified"] is False
     assert not damaged["destination"].exists()
     assert not damaged["migrated_save"].exists()
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_signed_progress_quarantine_preflight_is_read_only(damaged, capsys):
+    args = _cli(damaged) + ["--preflight-only"]
+    old_save = damaged["original_save"].read_bytes()
+    partial = (damaged["quarantined_source"] / "index.html").read_bytes()
+    assert run_app_cli(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["schema"] == "skeleton.app.signed_quarantine_progress_preflight.v1"
+    assert result["source_archive_signature_verified"] is True
+    assert result["private_save_world_binding_verified"] is True
+    assert result["replay_digest"] == damaged["expected_replay"]
+    assert result["destination_reserved"] is False
+    assert result["migrated_save_published"] is False
+    assert result["read_only"] is True
+    assert result["release_certified"] is False
+    assert not damaged["destination"].exists()
+    assert not damaged["migrated_save"].exists()
+    assert damaged["original_save"].read_bytes() == old_save
+    assert (damaged["quarantined_source"] / "index.html").read_bytes() == partial
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_preflight_wrong_save_pin_never_publishes(damaged, capsys):
+    args = _cli(damaged) + ["--preflight-only"]
+    pos = args.index("--expected-save-sha256") + 1
+    args[pos] = "0" * 64
+    assert run_app_cli(args) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not damaged["destination"].exists()
+    assert not damaged["migrated_save"].exists()

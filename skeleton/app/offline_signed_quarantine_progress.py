@@ -45,6 +45,95 @@ def _separate_paths(
     return partial
 
 
+def preflight_signed_quarantine_progress(
+    quarantined_source: str | Path,
+    archive: str | Path,
+    fresh_destination: str | Path,
+    original_save: str | Path,
+    migrated_save: str | Path,
+    public_key_file: str | Path,
+    signature_file: str | Path,
+    *,
+    expected_archive_sha256: str,
+    expected_manifest_sha256: str,
+    expected_save_sha256: str,
+    expected_public_key_sha256: str,
+    authorized: bool,
+) -> dict[str, object]:
+    """Read-only signed quarantine, replay and dual-destination preflight.
+
+    This checks both independent inputs and destination availability without
+    publishing a source tree or save. It is not a reservation or release grant.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    for name, pin in (
+        ("archive", expected_archive_sha256),
+        ("manifest", expected_manifest_sha256),
+        ("save", expected_save_sha256),
+        ("public key", expected_public_key_sha256),
+    ):
+        _pin(pin, name)
+    partial = _separate_paths(quarantined_source, fresh_destination, migrated_save)
+    original_quarantine = _quarantine_identity(partial)
+    original_inputs = _input_identities(
+        archive, original_save, public_key_file, signature_file,
+    )
+    quarantine = inspect_offline_install_quarantine(
+        partial, archive,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    ready = preflight_signed_offline_progress(
+        archive, fresh_destination, original_save, migrated_save,
+        public_key_file, signature_file,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_save_sha256=expected_save_sha256,
+        expected_public_key_sha256=expected_public_key_sha256,
+        authorized=True,
+    )
+    if (
+        original_quarantine != _quarantine_identity(partial)
+        or original_inputs != _input_identities(
+            archive, original_save, public_key_file, signature_file,
+        )
+        or quarantine.get("quarantine_cleared") is not False
+        or ready.get("source_archive_signature_verified") is not True
+        or ready.get("save_world_binding_verified") is not True
+        or ready.get("destination_reserved") is not False
+        or ready.get("release_certified") is not False
+    ):
+        raise SignedQuarantineProgressRecoveryError(
+            "signed quarantine progress preflight unqualified"
+        )
+    return {
+        "schema": "skeleton.app.signed_quarantine_progress_preflight.v1",
+        "status": "signed_quarantine_progress_ready_unreserved_release_blocked",
+        "archive_sha256": expected_archive_sha256,
+        "manifest_sha256": expected_manifest_sha256,
+        "original_save_sha256": expected_save_sha256,
+        "public_key_sha256": expected_public_key_sha256,
+        "world_digest": ready["world_digest"],
+        "replay_digest": ready["replay_digest"],
+        "action_count": ready["action_count"],
+        "quarantined_missing_files": quarantine["missing_files"],
+        "quarantined_extra_files": quarantine["extra_files"],
+        "quarantined_mismatched_files": quarantine["mismatched_files"],
+        "source_archive_signature_verified": True,
+        "private_save_world_binding_verified": True,
+        "original_quarantine_retained": True,
+        "original_quarantine_cleared": False,
+        "destination_reserved": False,
+        "migrated_save_published": False,
+        "read_only": True,
+        "native_device_qualified": False,
+        "package_signed": False,
+        "release_certified": False,
+    }
+
+
 def recover_signed_quarantine_progress(
     quarantined_source: str | Path,
     archive: str | Path,
@@ -211,9 +300,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--expected-save-sha256", required=True)
     parser.add_argument("--expected-public-key-sha256", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
+    parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args(argv)
     try:
-        receipt = recover_signed_quarantine_progress(
+        operation = (preflight_signed_quarantine_progress if args.preflight_only
+                     else recover_signed_quarantine_progress)
+        receipt = operation(
             args.quarantined, args.archive, args.destination,
             args.original_save, args.migrated_save, args.public_key,
             args.signature,
@@ -235,5 +327,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = [
     "SCHEMA", "SignedQuarantineProgressRecoveryError",
+    "preflight_signed_quarantine_progress",
     "recover_signed_quarantine_progress", "main",
 ]
