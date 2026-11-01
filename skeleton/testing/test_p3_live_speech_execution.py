@@ -656,10 +656,9 @@ def test_verified_corpus_issuance_cannot_be_downgraded_to_opaque_envelope():
         issued.modality,
         issued.mime_type,
         issued.content_digest,
-        issued.size_bytes,
-        issued.sanitized_metadata,
-        issued.instruction_trusted,
+        issued.content_bytes,
         issued.embedded_instruction_detected,
+        issued.sanitized_metadata,
     )
     with pytest.raises(MultimodalFoundationError, match="validation evidence is missing"):
         session.corpus.get(rid)
