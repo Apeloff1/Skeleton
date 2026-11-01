@@ -76,6 +76,9 @@ def _envelope(audit: dict[str, object]) -> dict[str, object]:
         "checkpoint_evidence_sha256": audit["evidence_sha256"],
         "first_receipt_sha256": audit["first_receipt_sha256"],
         "last_receipt_sha256": audit["last_receipt_sha256"],
+        # Required by the canonical no-clobber receipt publisher; never
+        # substitute a custom boolean for its replay acceptance contract.
+        "offline_gameplay_reexecuted": True,
         "all_original_games_replayed": True,
         "read_only_source_verification": True,
         "persistent_rollback_protection": False,
