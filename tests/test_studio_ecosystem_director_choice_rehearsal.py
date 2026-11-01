@@ -10,6 +10,7 @@ import zipfile
 import pytest
 
 from scripts.studio_choice_rehearsal_cli import main as choice_cli
+from scripts.studio_director_handoff_cli import main as director_cli
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
 from skeleton.ai.game_builder.studio_ecosystem_director_choice_rehearsal import (
@@ -261,3 +262,44 @@ def test_publish_and_restore_rebuilds_choice_page_from_canon(tmp_path):
         publish_director_handoff(
             manifest, bundle, tmp_path, authorized=True, documents=documents,
             actions=[], schedule=schedule, assignments=assignments)
+
+
+def test_browser_export_replays_into_actual_playable_director_cli(tmp_path, capsys):
+    documents, canon, visual, session, schedule, assignments, _ = source()
+    first = compile_quest_program(documents).stages[0]
+    action = [[first.key, first.alternatives[0]]]
+    path = tmp_path / EXPORT_FILENAME
+    path.write_text(json.dumps(exported(documents, canon, session, action)),
+                    encoding="utf-8")
+    assert director_cli([
+        "--project", PROJECT, "--expected-source", canon,
+        "--expected-visual", visual, "--expected-session", session,
+        "--choice-export", str(path),
+        "--schedule", json.dumps(schedule), "--assignments", json.dumps(assignments),
+    ]) == 0
+    manifest = json.loads(capsys.readouterr().out)
+    expected = replay_quest(documents, action, authorized=True).digest
+    assert manifest["session_digest"] == expected
+    assert manifest["session_digest"] != session
+    assert manifest["canonical_html5_gameplay_replay_verified"] is True
+    assert manifest["release_certified"] is False
+
+
+def test_director_choice_import_requires_baseline_and_rejects_conflicting_actions(
+        tmp_path):
+    documents, canon, visual, session, schedule, assignments, _ = source()
+    path = tmp_path / EXPORT_FILENAME
+    path.write_text(json.dumps(exported(documents, canon, session)),
+                    encoding="utf-8")
+    args = [
+        "--project", PROJECT, "--expected-source", canon,
+        "--expected-visual", visual, "--choice-export", str(path),
+        "--schedule", json.dumps(schedule), "--assignments", json.dumps(assignments),
+    ]
+    with pytest.raises(SystemExit):
+        director_cli(args)
+    with pytest.raises(SystemExit):
+        director_cli(args + ["--expected-session", session,
+                             "--actions", '[["forged","choice"]]'])
+    with pytest.raises(SystemExit):
+        director_cli(args + ["--expected-session", "0" * 64])
