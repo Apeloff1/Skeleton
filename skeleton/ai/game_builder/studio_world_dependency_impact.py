@@ -97,6 +97,23 @@ def compile_dependency_impact(
             "before_digest": _digest(before) if before is not None else None,
             "after_digest": _digest(after) if after is not None else None,
         })
+    # A pure reorder of independent authored steps changes the actual batch
+    # invocation order, even when every request and edge is byte-identical.
+    # Never classify that edit as an unchanged workflow.
+    if set(old) == set(new):
+        prior_order = baseline["execution_order"]
+        next_order = candidate["execution_order"]
+        if prior_order != next_order:
+            prior_positions = {step_id: i for i, step_id in enumerate(prior_order)}
+            for index, step_id in enumerate(next_order):
+                if prior_positions[step_id] != index and step_id not in changed:
+                    changed.add(step_id)
+                    changes.append({
+                        "step_id": step_id, "kind": "execution_order_changed",
+                        "before_digest": _digest(old[step_id]),
+                        "after_digest": _digest(new[step_id]),
+                    })
+            changes.sort(key=lambda item: item["step_id"])
     impacted = _affected(changed, _followers(baseline, candidate))
     existing_impacted = [
         step_id for step_id in candidate["execution_order"] if step_id in impacted

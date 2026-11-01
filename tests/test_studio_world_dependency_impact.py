@@ -75,6 +75,18 @@ def test_request_change_invalidates_descendants_but_not_independent(canonical):
     )
 
 
+def test_independent_step_reorder_is_not_falsely_equivalent(canonical):
+    edited = graph()
+    edited["steps"] = [edited["steps"][3], *edited["steps"][:3]]
+    receipt = compile_dependency_impact(
+        canonical, edited, authorized=True, expected_catalog_digest="a" * 64,
+    )
+    assert receipt["change_requires_reverification"] is True
+    assert any(row["kind"] == "execution_order_changed" for row in receipt["changes"])
+    assert receipt["recompile_order"] == ["side", "source", "middle", "ending"]
+    assert replay_dependency_impact(receipt, authorized=True) == receipt
+
+
 def test_removed_step_is_reported_and_invalidates_old_dependents(canonical):
     edited = graph()
     edited["steps"] = [
