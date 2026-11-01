@@ -65,6 +65,7 @@ Commands:
     scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
     scene-mission-route  Solve replayable authored mission ending paths
+    scene-mission-timeline  Play replay-verified offline mission checkpoints
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -749,6 +750,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "scene-mission-timeline":
+        from skeleton.game.gameplay.scene_mission_timeline import cli as timeline_cli
+        return timeline_cli(rest)
     if cmd == "scene-mission-route":
         from skeleton.game.gameplay.scene_mission_solver import cli as route_cli
         return route_cli(rest)
