@@ -59,3 +59,16 @@ Publish and restore rebuild the complete archive from canonical source,
 including the knowledge plan; a rehashed forged manifest cannot qualify.
 The CLI uses `--knowledge-authoring-json`, and the typed Jeeves director tool
 uses `knowledge_authoring`. NPC speech/native execution remains unverified.
+
+## Offline UI authoring and verified CLI import
+
+The director ZIP includes `npc_knowledge_editor.html` with a CSP-hashed
+script, accessible selects for source facts, later recipient scenes and exact
+choice gates, and local add/remove editing. It exports an explicit
+`studio_npc_knowledge_editor_export.v1` JSON document; it does not mutate
+canonical source or claim NPC speech. The operator can import that file with
+`python -m scripts.studio_npc_knowledge_cli --project PROJECT
+--expected-source SHA256 --actions '[]' --editor-export PRIVATE_FILE`.
+The CLI requires the file to be regular and private, rejects linked parent
+paths, duplicate JSON keys, stale project/source/session leases and forged
+authored facts, then recompiles against the canonical source.

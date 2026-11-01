@@ -314,3 +314,77 @@ def test_actual_playable_director_zip_contains_source_verified_npc_knowledge():
             expected_source_digest=source, expected_visual_digest=visual,
             knowledge_authoring={"schema": REQUEST_SCHEMA, "reveals": [{
                 **request["reveals"][0], "fact_id": "forged"}]})
+
+def test_offline_editor_is_source_bound_and_csp_hashed():
+    from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_editor import (
+        render_npc_knowledge_editor,
+    )
+    docs, source, _, _ = fixture()
+    compiled = compile_npc_knowledge(
+        docs, [], authoring(), authorized=True, expected_source_digest=source)
+    html, receipt = render_npc_knowledge_editor(
+        docs, [], compiled, authorized=True)
+    assert receipt["html_sha256"] == __import__("hashlib").sha256(html).hexdigest()
+    assert receipt["authoring_export_only"] is True
+    assert b"Content-Security-Policy" in html
+    assert b"innerHTML" not in html
+    assert b"eval(" not in html
+    assert b"createObjectURL" in html
+    assert b"studio_npc_knowledge_editor_export.v1" in html
+    assert render_npc_knowledge_editor(docs, [], compiled, authorized=True) == (html, receipt)
+    with pytest.raises(StudioQuestError):
+        render_npc_knowledge_editor(
+            docs, [], {**compiled, "earned_count": 999}, authorized=True)
+
+
+def test_private_editor_import_checks_lease_and_duplicate_keys(tmp_path):
+    from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_editor import (
+        EXPORT_SCHEMA, load_npc_knowledge_editor_export,
+    )
+    docs, source, session, _ = fixture()
+    payload = {
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": session.digest,
+        "authoring": authoring(),
+    }
+    path = tmp_path / "editor.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    path.chmod(0o600)
+    kwargs = dict(authorized=True, expected_project_id=PROJECT,
+                  expected_source_digest=source,
+                  expected_session_digest=session.digest)
+    assert load_npc_knowledge_editor_export(path, **kwargs) == authoring()
+    with pytest.raises(StudioQuestError):
+        load_npc_knowledge_editor_export(
+            path, **{**kwargs, "expected_session_digest": "0" * 64})
+    path.write_text('{"schema":"a","schema":"b"}')
+    with pytest.raises(StudioQuestError):
+        load_npc_knowledge_editor_export(path, **kwargs)
+
+
+def test_editor_is_packaged_with_real_playable_director():
+    from hashlib import sha256
+    import zipfile
+    from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
+        compile_director_handoff,
+    )
+    docs, source, _, _ = fixture()
+    scenes = docs["scene"]["episode_plan"]
+    schedule = {"scene_ticks": {scene["id"]: 5 for scene in scenes},
+                "npc_turnaround_ticks": 2, "min_start_ticks": {}}
+    recipe = docs["visual"]["asset_recipes"][0]["id"]
+    assignments = {scene["id"]: {
+        asset: recipe for asset in scene["assets"] + scene["interactive_objects"]}
+        for scene in scenes}
+    visual = sha256(json.dumps(docs["visual"], sort_keys=True,
+                               separators=(",", ":"), ensure_ascii=True,
+                               allow_nan=False).encode("ascii")).hexdigest()
+    manifest, bundle = compile_director_handoff(
+        docs, [], schedule, assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual,
+        knowledge_authoring=authoring())
+    with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+        editor = archive.read("npc_knowledge_editor.html")
+        assert b"Content-Security-Policy" in editor
+        assert sha256(editor).hexdigest() == manifest["file_hashes"]["npc_knowledge_editor.html"]
+        assert manifest["offline_npc_knowledge_editor_receipt"]["html_sha256"] == sha256(editor).hexdigest()

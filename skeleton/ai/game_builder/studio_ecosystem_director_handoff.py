@@ -31,6 +31,7 @@ from .studio_ecosystem_audio_cues import (
 from .studio_ecosystem_npc_knowledge import (
     compile_npc_knowledge, render_npc_knowledge_html,
 )
+from .studio_ecosystem_npc_knowledge_editor import render_npc_knowledge_editor
 
 SCHEMA = "skeleton.game_builder.studio_director_handoff.v1"
 FILENAME = "studio_director_handoff.zip"
@@ -39,7 +40,8 @@ _FILES = ("index.html", "director_editor.html", "choice_rehearsal.html",
           "scene_schedule.json",
           "scene_asset_bindings.json", "director_manifest.json")
 _AUDIO_FILES = ("audio_cues.json", "audio_captions.html", "audio_editor.html")
-_KNOWLEDGE_FILES = ("npc_knowledge.json", "npc_knowledge.html")
+_KNOWLEDGE_FILES = ("npc_knowledge.json", "npc_knowledge.html",
+                    "npc_knowledge_editor.html")
 
 
 def compile_director_handoff(
@@ -106,6 +108,8 @@ def compile_director_handoff(
         audio_editor, audio_editor_receipt = render_audio_cue_editor(audio_plan, documents)
     knowledge_plan = None
     knowledge_html = None
+    knowledge_editor = None
+    knowledge_editor_receipt = None
     if knowledge_authoring is not None:
         knowledge_plan = compile_npc_knowledge(
             documents, actions, knowledge_authoring, authorized=True,
@@ -118,6 +122,8 @@ def compile_director_handoff(
                 [row["scene_id"] for row in timing["timeline"]]):
             raise StudioQuestError("director NPC knowledge and playable scene contract diverged")
         knowledge_html = render_npc_knowledge_html(knowledge_plan)
+        knowledge_editor, knowledge_editor_receipt = render_npc_knowledge_editor(
+            documents, actions, knowledge_plan, authorized=True)
     files = {
         "index.html": playable,
         "director_editor.html": editor_html,
@@ -132,6 +138,7 @@ def compile_director_handoff(
     if knowledge_plan is not None:
         files["npc_knowledge.json"] = _canonical(knowledge_plan) + b"\n"
         files["npc_knowledge.html"] = knowledge_html
+        files["npc_knowledge_editor.html"] = knowledge_editor
     manifest: dict[str, object] = {
         "schema": SCHEMA, "project_id": timing["project_id"],
         "source_digest": expected_source_digest,
@@ -162,6 +169,7 @@ def compile_director_handoff(
         manifest["npc_knowledge_digest"] = knowledge_plan["knowledge_digest"]
         manifest["npc_knowledge_earned_count"] = knowledge_plan["earned_count"]
         manifest["npc_knowledge_spoken_verified"] = False
+        manifest["offline_npc_knowledge_editor_receipt"] = knowledge_editor_receipt
     manifest["manifest_digest"] = _digest(manifest)
     files["director_manifest.json"] = _canonical(manifest) + b"\n"
     if sum(map(len, files.values())) > MAX_BUNDLE_BYTES:
