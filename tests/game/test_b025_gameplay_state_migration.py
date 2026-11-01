@@ -86,3 +86,20 @@ def test_section_migrations_match_gf_b_shape():
         s = steps[v](dict(s))
     direct, _ = _registry().load_section(V1_SECTION)
     assert s == direct.to_section()
+
+
+def test_migration_payload_and_chain_budgets_fail_closed(monkeypatch):
+    from skeleton.game.gameplay import state_migration as mod
+
+    cyclic = []
+    cyclic.append(cyclic)
+    with pytest.raises(GameplayMigrationError, match="cyclic"):
+        GameplayStateEnvelope("w1", 1, 0, {"cyclic": cyclic}, CANON)
+    monkeypatch.setattr(mod, "MAX_PAYLOAD_NODES", 3)
+    with pytest.raises(GameplayMigrationError, match="traversal budget"):
+        GameplayStateEnvelope("w1", 1, 0, {"items": [1, 2, 3]}, CANON)
+    monkeypatch.setattr(mod, "MAX_MIGRATION_STEPS", 1)
+    with pytest.raises(GameplayMigrationError, match="step bound"):
+        _registry().load_section(V1_SECTION)
+    with pytest.raises(GameplayMigrationError, match="callback"):
+        GameplayMigrations(2).register(1, None)
