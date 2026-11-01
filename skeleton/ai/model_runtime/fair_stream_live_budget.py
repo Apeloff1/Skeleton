@@ -11,6 +11,7 @@ from threading import RLock
 import sys
 
 from skeleton.app.offline_resources import probe_local_resources
+from skeleton.app.offline_cgroup_memory_headroom import probe_cgroup_memory_headroom
 from skeleton.app.offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
 from skeleton.app.offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from skeleton.app.offline_io_pressure import IOPressureController, probe_io_pressure
@@ -49,6 +50,12 @@ class LiveStreamBudgetSampler:
             raise ValueError("selected storage volume required")
         with self._lock:
             host = probe_local_resources(storage_path)
+            # A container can have far less RAM than its host. The separate
+            # cgroup capacity probe is conservative across concurrent usage.
+            cgroup_memory = probe_cgroup_memory_headroom()
+            available_ram = host.available_ram_bytes
+            if cgroup_memory is not None and cgroup_memory.headroom_bytes is not None:
+                available_ram = min(available_ram, cgroup_memory.headroom_bytes)
             if host.available_ram_bytes <= 0:
                 raise ValueError("no measured RAM headroom")
             self._thermal.observe(probe_cpu_thermal())
@@ -70,13 +77,15 @@ class LiveStreamBudgetSampler:
             # OS and model allocations are not reserved by this sampler.
             # Keep a proportional RAM margin for system, weights, UI and KV.
             reserve = max(
-                host.available_ram_bytes // 3,
-                min(host.available_ram_bytes, 64 * 1024 * 1024),
+                available_ram // 3,
+                min(available_ram, 64 * 1024 * 1024),
             )
             pressure = max(
                 host.memory_pressure_ratio,
                 min(1.0, max(0.0, host.cpu_load_ratio - 0.5)),
             )
+            if cgroup_memory is not None:
+                pressure = max(pressure, cgroup_memory.pressure_ppm / 1_000_000)
             if host.total_swap_bytes:
                 used = 1 - host.free_swap_bytes / host.total_swap_bytes
                 if used >= 0.85:
@@ -92,6 +101,7 @@ class LiveStreamBudgetSampler:
             # stress. Their unknown initial state must not imply spare slots.
             missing = (
                 sys.platform != "linux"
+                or cgroup_memory is None
                 or not io["measured"]
                 or not cgroup["measured"]
                 or not cpu["measured"]
@@ -102,6 +112,7 @@ class LiveStreamBudgetSampler:
                 "thermal": bool(thermal["thermal_backpressure"]),
                 "cgroup_high": bool(cgroup["high_backpressure"]),
                 "cgroup_oom": bool(cgroup["oom_backpressure"]),
+                "cgroup_memory": bool(cgroup_memory and cgroup_memory.hard_hold),
                 "io": bool(io["congested"]),
                 "cpu_throttle": bool(cpu["backpressure"]),
                 "swap_churn": bool(swap["backpressure"]),
@@ -115,7 +126,8 @@ class LiveStreamBudgetSampler:
             if holds["swap_churn"] or holds["reclaim"]:
                 pressure = max(pressure, 0.90)
             hard_hold = (
-                holds["thermal"] or holds["cgroup_oom"] or holds["disk_reserve"]
+                holds["thermal"] or holds["cgroup_oom"]
+                or holds["cgroup_memory"] or holds["disk_reserve"]
             )
             if hard_hold:
                 pressure = 1.0
@@ -128,7 +140,7 @@ class LiveStreamBudgetSampler:
             # This is a temporary per-probe quantum, never a user file limit.
             bounded_tokens = min(token_budget, 128) if missing else token_budget
             budget = MeasuredStreamBudget(
-                available_ram_bytes=host.available_ram_bytes,
+                available_ram_bytes=available_ram,
                 reserved_ram_bytes=reserve,
                 token_budget=bounded_tokens,
                 stream_slots=slots,
@@ -140,6 +152,9 @@ class LiveStreamBudgetSampler:
                 "schema": "skeleton.ai.live-stream-pressure.v1",
                 "measurement": "os_probe",
                 "auxiliary_telemetry_incomplete": missing,
+                "cgroup_memory_limit_measured": bool(
+                    cgroup_memory and cgroup_memory.limit_bytes is not None
+                ),
                 "thermal_trip_measured": bool(thermal["trip_measured"]),
                 "holds": holds,
                 "gpu_device_qualified": False,

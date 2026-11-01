@@ -28,6 +28,7 @@ def host(*, free_disk=5_000_000_000):
 
 def configure(monkeypatch, *, disk=5_000_000_000, io=None):
     monkeypatch.setattr(module, "probe_local_resources", lambda _: host(free_disk=disk))
+    monkeypatch.setattr(module, "probe_cgroup_memory_headroom", lambda: None)
     monkeypatch.setattr(module, "probe_cpu_thermal", lambda: ())
     monkeypatch.setattr(module, "probe_io_pressure", lambda: io)
     monkeypatch.setattr(module, "probe_cgroup_events", lambda: None)
