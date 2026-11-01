@@ -29,6 +29,7 @@ MAX_RESULT_ROWS = 1_000
 MAX_CIPHERTEXT_BYTES = 64 << 20
 MAX_TOKENS = 1 << 24
 _TABLE = "local_fair_stream_sealed_results"
+_REQUEST_INDEX = "local_fair_stream_result_request_identity"
 _COLUMNS = (
     "lease_id", "session_id", "generation", "checkpoint_digest",
     "request_id", "model_digest", "tokenizer_digest", "tokens",
@@ -156,6 +157,25 @@ class SealedFairStreamResultVault:
         )
         if columns != _COLUMNS:
             raise SealedResultUnavailable("untrusted result table schema")
+        # The journal fences lease IDs; the vault also fences request IDs
+        # across different leases and restarts. Check the durable index shape,
+        # not merely its name, before relying on it.
+        self._connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS " + _REQUEST_INDEX
+            + " ON " + _TABLE + " (session_id, request_id)"
+        )
+        indexes = self._connection.execute(
+            "PRAGMA index_list(" + _TABLE + ")"
+        ).fetchall()
+        matches = [row for row in indexes if row[1] == _REQUEST_INDEX]
+        if (
+            len(matches) != 1 or matches[0][2] != 1
+            or matches[0][4] != 0
+            or tuple(row[2] for row in self._connection.execute(
+                "PRAGMA index_info(" + _REQUEST_INDEX + ")"
+            )) != ("session_id", "request_id")
+        ):
+            raise SealedResultUnavailable("untrusted request replay index")
         # Reject unexpected triggers that could copy encrypted payloads or
         # change durability semantics. The caller still owns the DB handle.
         if self._connection.execute(
@@ -177,6 +197,13 @@ class SealedFairStreamResultVault:
             "SELECT " + ", ".join(_COLUMNS) + " FROM " + _TABLE
             + " WHERE lease_id=?", (lease_id,),
         ).fetchone()
+
+    def _request_seen(self, request_id: str) -> bool:
+        return self._connection.execute(
+            "SELECT 1 FROM " + _TABLE
+            + " WHERE session_id=? AND request_id=? LIMIT 1",
+            (self.session_id, request_id),
+        ).fetchone() is not None
 
     def _validate_state(
         self, permit: DispatchPermit, state: Mapping[str, object],
@@ -242,6 +269,8 @@ class SealedFairStreamResultVault:
             self._require_open()
             if self._row(permit.lease_id) is not None:
                 raise SealedResultUnavailable("result lease already published")
+            if self._request_seen(permit.request_id):
+                raise SealedResultUnavailable("result request already published")
             # Refuse known capacity exhaustion BEFORE invoking a backend whose
             # side effects cannot be undone or safely retried. Reserve for the
             # worst permitted output; the transaction rechecks actual usage.
@@ -278,6 +307,8 @@ class SealedFairStreamResultVault:
             try:
                 if self._row(permit.lease_id) is not None:
                     raise SealedResultUnavailable("result lease already published")
+                if self._request_seen(permit.request_id):
+                    raise SealedResultUnavailable("result request already published")
                 rows, total = self._connection.execute(
                     "SELECT COUNT(*), COALESCE(SUM(LENGTH(ciphertext)), 0)"
                     " FROM " + _TABLE

@@ -41,10 +41,17 @@ def state(p=None):
         "session_id": SESSION,
         "generation": p.generation,
         "checkpoint_digest": p.checkpoint_digest,
-        "checkpoint": {"pending": [{
-            "lease_id": p.lease_id, "request_id": p.request_id,
-            "tokens": p.tokens, "bytes_reserved": p.bytes_reserved,
-        }]},
+        "checkpoint": {
+            "pending": [{
+                "lease_id": p.lease_id, "request_id": p.request_id,
+                "tenant_id": "tenant-a",
+                "tokens": p.tokens, "bytes_reserved": p.bytes_reserved,
+            }],
+            "requests": [{
+                "request_id": p.request_id, "tenant_id": "tenant-a",
+                "bytes_per_token": p.bytes_reserved // p.tokens,
+            }],
+        },
     }
 
 

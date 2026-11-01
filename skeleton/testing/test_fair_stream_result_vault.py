@@ -168,6 +168,48 @@ def test_duplicate_lease_never_reexecutes(vault_dir):
     handle.close()
 
 
+def test_distinct_lease_cannot_replay_same_request_after_restart(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    vault.run_and_commit(permit(), state())
+    handle.close()
+    restarted_handle, restarted = open_vault(vault_dir, backend, create=False)
+    try:
+        second_lease = permit("f" * 64)
+        with pytest.raises(SealedResultUnavailable, match="request already published"):
+            restarted.run_and_commit(second_lease, state(second_lease))
+        assert backend.calls == 1
+    finally:
+        restarted_handle.close()
+
+
+def test_distinct_request_identity_remains_admissible(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        vault.run_and_commit(permit(), state())
+        second = DispatchPermit("f" * 64, "request-2", 2, CHECKPOINT, 16, 4096)
+        vault.run_and_commit(second, state(second))
+        assert backend.calls == 2
+    finally:
+        handle.close()
+
+
+def test_tampered_nonunique_replay_index_is_rejected(vault_dir):
+    handle, vault = open_vault(vault_dir)
+    handle.connection.execute(
+        "DROP INDEX local_fair_stream_result_request_identity"
+    )
+    handle.connection.execute(
+        "CREATE INDEX local_fair_stream_result_request_identity "
+        "ON local_fair_stream_sealed_results (session_id, request_id)"
+    )
+    handle.close()
+    with pytest.raises(SealedResultUnavailable, match="request replay index"):
+        reopened, _ = open_vault(vault_dir, create=False)
+        reopened.close()
+
+
 def test_wrong_state_never_executes(vault_dir):
     backend = Backend()
     handle, vault = open_vault(vault_dir, backend)
