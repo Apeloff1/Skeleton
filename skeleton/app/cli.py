@@ -143,6 +143,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify original-game installation relocation without replay loss",
     )
     sub.add_parser(
+        "audit-mixed-game-library", add_help=False,
+        help="audit a bounded mixed signed/unsigned original-game catalog",
+    )
+    sub.add_parser(
         "audit-signed-game-library", add_help=False,
         help="audit independently pinned signer histories across installed games",
     )
@@ -424,6 +428,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "audit-offline-library-relocation":
         from skeleton.app.offline_game_library_relocation import main as relocation_main
         return relocation_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-game-library":
+        from skeleton.app.offline_mixed_game_library_audit import main as mixed_library_main
+        return mixed_library_main(arguments[1:])
     if arguments and arguments[0] == "audit-signed-game-library":
         from skeleton.app.offline_signed_game_library_audit import main as signed_library_main
         return signed_library_main(arguments[1:])
