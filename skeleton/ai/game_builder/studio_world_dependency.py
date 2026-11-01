@@ -258,7 +258,8 @@ def restore_dependency_execution(
     except (ValueError, UnicodeError, RecursionError) as exc:
         raise StudioQuestError("invalid world dependency JSON") from exc
     if (type(receipt) is not dict or
-            receipt.get("dependency_proof", {}).get("catalog_digest")
+            type(receipt.get("dependency_proof")) is not dict or
+            receipt["dependency_proof"].get("catalog_digest")
             != expected_catalog_digest):
         raise StudioQuestError("stale world dependency catalog lease")
     return replay_dependency_execution(receipt, authorized=True)

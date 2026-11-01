@@ -146,3 +146,99 @@ def test_private_publication_and_restore(monkeypatch, tmp_path):
     with pytest.raises(StudioQuestError):
         restore_dependency_execution(
             out, authorized=True, expected_catalog_digest="b" * 64)
+
+
+def _canonical_request():
+    from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
+    from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+    from skeleton.ai.agents.jeeves.studio_walk_tool import faction_reputation_tool_schema
+    project = "studio_arena_fighting_glacial_fjord"
+    source = audit_canon_source(read_blueprint(project), authorized=True)["source_digest"]
+    descriptor = faction_reputation_tool_schema()
+    return {
+        "tool": descriptor["name"],
+        "arguments": {
+            "schema": descriptor["parameters"]["properties"]["schema"]["const"],
+            "project_id": project, "expected_source_digest": source,
+            "decisions": [],
+        },
+    }
+
+
+def test_real_source_replay_router_cli_and_private_restore(tmp_path, capsys):
+    from skeleton.ai.agents.jeeves.studio_world_dependency_tool import (
+        REQUEST_SCHEMA, execute_world_dependency_tool,
+    )
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    from scripts.studio_world_dependency_cli import main
+    request = _canonical_request()
+    digest = world_tool_catalog()["catalog_digest"]
+    graph = {
+        "schema": SCHEMA, "prompt": PROMPT,
+        "steps": [
+            {"id": "source_audit", "depends_on": [], "request": request},
+            {"id": "faction_replay", "depends_on": ["source_audit"], "request": request},
+        ],
+    }
+    proof = compile_dependency_world_batch(
+        graph, authorized=True, expected_catalog_digest=digest)
+    assert proof["execution_order"] == ["source_audit", "faction_replay"]
+    execution = execute_dependency_world_batch(proof, authorized=True)
+    assert execution["completed_count"] == 2
+    assert execution["all_read_only"] is True
+    assert execution["release_certified"] is False
+    assert replay_dependency_execution(execution, authorized=True) == execution
+    typed = {
+        "schema": REQUEST_SCHEMA, "expected_catalog_digest": digest,
+        "graph": graph,
+    }
+    direct = execute_world_dependency_tool(typed, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_world_dependency", "arguments": typed},
+        authorized=True)
+    assert routed["result"] == direct
+    assert routed["file_write_performed"] is False
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    assert main([
+        "--expected-catalog", digest, "--graph", json.dumps(graph),
+        "--publish", str(private), "--html-sha256",
+    ]) == 0
+    cli = json.loads(capsys.readouterr().out)
+    assert cli["execution"]["result_digest"] == execution["result_digest"]
+    assert cli["publication"]["file_write_performed"] is True
+    assert main([
+        "--expected-catalog", digest, "--restore", str(private),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["execution"] == execution
+    with pytest.raises(PermissionError):
+        execute_world_dependency_tool(typed, authorized=False)
+    forged = deepcopy(typed)
+    forged["graph"]["steps"][1]["request"]["arguments"]["authorized"] = True
+    with pytest.raises(StudioQuestError):
+        execute_world_dependency_tool(forged, authorized=True)
+
+
+def test_private_restore_rejects_duplicate_json_and_symlink(tmp_path, monkeypatch):
+    import skeleton.ai.game_builder.studio_world_dependency as mod
+    monkeypatch.setattr(mod, "compile_world_batch_plan", lambda *a, **k: {
+        "catalog_digest": "a" * 64, "provenance": {"projects": []},
+        "plan_digest": "b" * 64,
+    })
+    monkeypatch.setattr(mod, "execute_world_batch", lambda *a, **k: {
+        "execution_digest": "c" * 64, "completed_count": 2,
+    })
+    proof = compile_dependency_world_batch(
+        _graph(), authorized=True, expected_catalog_digest="a" * 64)
+    execution = execute_dependency_world_batch(proof, authorized=True)
+    publish_dependency_execution(execution, tmp_path, authorized=True)
+    target = tmp_path / mod.FILENAME
+    target.write_text('{"schema":"one","schema":"two"}')
+    with pytest.raises(StudioQuestError, match="duplicate"):
+        restore_dependency_execution(
+            tmp_path, authorized=True, expected_catalog_digest="a" * 64)
+    target.unlink()
+    target.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        restore_dependency_execution(
+            tmp_path, authorized=True, expected_catalog_digest="a" * 64)
