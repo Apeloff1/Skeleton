@@ -143,6 +143,10 @@ def _parser() -> argparse.ArgumentParser:
         help="inspect original browser/Godot source claim inventory without rights certification",
     )
     sub.add_parser(
+        "inspect-trust-policy-chain", add_help=False,
+        help="inspect independently pinned multi-epoch signer revocation history",
+    )
+    sub.add_parser(
         "inspect-trust-policy-transition", add_help=False,
         help="inspect independently pinned signer rotation and revocation transition",
     )
@@ -325,6 +329,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "inspect-original-provenance":
         from skeleton.app.offline_original_content_provenance import main as provenance_main
         return provenance_main(arguments[1:])
+    if arguments and arguments[0] == "inspect-trust-policy-chain":
+        from skeleton.app.offline_trust_policy_chain import main as policy_chain_main
+        return policy_chain_main(arguments[1:])
     if arguments and arguments[0] == "inspect-trust-policy-transition":
         from skeleton.app.offline_trust_policy_transition import main as policy_transition_main
         return policy_transition_main(arguments[1:])
