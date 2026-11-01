@@ -148,3 +148,14 @@ python -m pytest -q \
 The source-level evidence never implies Windows installation, native Godot
 execution, trusted publisher signatures, rights clearance, hardware
 qualification, or production release certification.
+
+
+### Original source-root continuity during read-only cohort preflight
+
+The preflight path now pins every source-root filesystem identity before
+canonical replay, checks each root immediately before and after its replay,
+and checks all roots again after the second cohort-wide replay. An attacker
+cannot substitute an identical-byte source root between games and obtain a
+stable-source preflight receipt. This is a point-in-time read-only custody
+check; it does not reserve outputs, lock source directories, qualify hardware,
+or grant release, signing, or rights approval.

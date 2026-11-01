@@ -19,7 +19,7 @@ from typing import Sequence
 from skeleton.ai.game_builder.dual_runtime_verify import (
     _assert_original_root, _read, _root_fd,
 )
-from skeleton.app.offline_delivery_assurance import _save_identity
+from skeleton.app.offline_delivery_assurance import _save_identity, _source_identity
 from skeleton.app.offline_first_playable_batch import (
     DeliveryJob, _check_jobs, _parse_job,
     inspect_first_playable_delivery_batch, publish_first_playable_delivery_batch,
@@ -180,14 +180,26 @@ def preflight_pinned_cohort(
     preflight_receipt_destination(
         summary, protected_roots=roots, authorized=True,
     )
+    # Capture every original source root before replay. A replacement root
+    # with identical package bytes must not pass as uninterrupted custody.
+    # This is observational: no directory is locked, reserved or modified.
+    source_identities = tuple(_source_identity(job.source) for job in checked)
     records: list[dict[str, object]] = []
 
-    def verify(job: DeliveryJob) -> dict[str, object]:
+    def verify(job: DeliveryJob, identity: tuple[int, ...]) -> dict[str, object]:
+        if _source_identity(job.source) != identity:
+            raise FirstPlayableJobFileError(
+                "original source root changed before cohort preflight"
+            )
         observed = _preflight(
             _path(job.source), _path(job.archive), _path(job.install),
             _path(job.save), _path(job.receipt),
             expected_manifest_sha256=job.manifest_sha256, authorized=True,
         )
+        if _source_identity(job.source) != identity:
+            raise FirstPlayableJobFileError(
+                "original source root changed during cohort preflight"
+            )
         if (type(observed.get("project_id")) is not str
                 or not observed["project_id"]
                 or type(observed.get("world_digest")) is not str
@@ -203,23 +215,32 @@ def preflight_pinned_cohort(
             "source_replay_verified": True,
         }
 
-    for job in checked:
-        records.append(verify(job))
+    for job, identity in zip(checked, source_identities, strict=True):
+        records.append(verify(job, identity))
     if len({record["project_id"] for record in records}) != len(records):
         raise FirstPlayableJobFileError(
             "duplicate original game project ID in admission cohort"
         )
-    for job, original in zip(checked, records, strict=True):
-        if verify(job) != original:
+    for job, original, identity in zip(
+        checked, records, source_identities, strict=True,
+    ):
+        if verify(job, identity) != original:
             raise FirstPlayableJobFileError(
                 "original source changed during admission"
             )
+    # The last replay of a later game must not mask an earlier source swap.
+    if any(_source_identity(job.source) != identity
+           for job, identity in zip(checked, source_identities, strict=True)):
+        raise FirstPlayableJobFileError(
+            "original source root changed after cohort preflight"
+        )
     return {
         "schema": "skeleton.app.first_playable_jobfile_preflight.v1",
         "status": "original_game_cohort_admitted_not_reserved_release_blocked",
         "game_count": len(checked),
         "games": records,
         "all_original_sources_replayed": True,
+        "source_root_inodes_stable": True,
         "destinations_reserved": False,
         "outputs_published": False,
         "read_only": True,

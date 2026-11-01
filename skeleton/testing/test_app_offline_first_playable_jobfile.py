@@ -203,6 +203,7 @@ def test_preflight_replays_both_sources_without_reserving_outputs(
     result = json.loads(capsys.readouterr().out)
     assert result["game_count"] == 2
     assert result["all_original_sources_replayed"] is True
+    assert result["source_root_inodes_stable"] is True
     assert result["destinations_reserved"] is False
     assert result["outputs_published"] is False
     assert result["read_only"] is True
@@ -231,3 +232,37 @@ def test_preflight_rejects_occupied_later_output_without_partial_write(
         )
     assert occupied.read_bytes() == b"operator-owned"
     assert not Path(jobs[0].archive).exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_preflight_rejects_same_byte_original_source_root_replacement(
+    original_games, tmp_path, monkeypatch,
+):
+    """A later game cannot hide an earlier game's source-root replacement."""
+    import shutil
+    from skeleton.app import offline_first_playable_jobfile as module
+
+    jobs = jobs_for(original_games, tmp_path)
+    original_preflight = module._preflight
+    calls = 0
+    source = Path(jobs[0].source)
+    replacement = tmp_path / "copied-source-root"
+    old = tmp_path / "old-source-root"
+    shutil.copytree(source, replacement)
+
+    def swap_first_root_during_second_game(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            os.rename(source, old)
+            os.rename(replacement, source)
+        return original_preflight(*args, **kwargs)
+
+    monkeypatch.setattr(module, "_preflight", swap_first_root_during_second_game)
+    with pytest.raises(FirstPlayableJobFileError, match="root changed"):
+        module.preflight_pinned_cohort(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert calls == 2
+    assert not (tmp_path / "cohort.json").exists()
+    assert all(not Path(job.archive).exists() for job in jobs)
