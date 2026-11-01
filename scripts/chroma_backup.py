@@ -240,6 +240,29 @@ def backup_legacy_chroma(output: Path, *, container: str = CONTAINER) -> dict:
         return manifest
 
 
+def _read_manifest_bounded(path: Path) -> bytes:
+    """Open the manifest leaf without following symlinks or blocking on FIFOs."""
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise BackupRejected("no-follow manifest opening is unavailable")
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+    except OSError as exc:
+        raise BackupRejected("backup manifest cannot be safely opened") from exc
+    with os.fdopen(fd, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_MANIFEST_BYTES:
+            raise BackupRejected("backup manifest is not a bounded regular file")
+        raw = stream.read(MAX_MANIFEST_BYTES + 1)
+        after = os.fstat(stream.fileno())
+        if (len(raw) != before.st_size or len(raw) > MAX_MANIFEST_BYTES
+                or (before.st_dev, before.st_ino, before.st_size,
+                    before.st_mtime_ns, before.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns)):
+            raise BackupRejected("backup manifest changed during descriptor read")
+    return raw
+
+
 def verify_backup(backup: Path) -> dict:
     """Recheck a custody backup without modifying it or contacting Docker.
 
@@ -251,10 +274,6 @@ def verify_backup(backup: Path) -> dict:
     if any(path.is_symlink() for path in (root, *root.parents)) or not root.is_dir():
         raise BackupRejected("backup must be an existing directory without symlink parents")
     manifest_path = root / "manifest.json"
-    if manifest_path.is_symlink() or not manifest_path.is_file():
-        raise BackupRejected("backup manifest is missing or unsafe")
-    if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
-        raise BackupRejected("backup manifest exceeds admission budget")
     def unique_object(pairs):
         value = {}
         for key, item in pairs:
@@ -263,7 +282,8 @@ def verify_backup(backup: Path) -> dict:
             value[key] = item
         return value
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+        manifest = json.loads(_read_manifest_bounded(manifest_path).decode("utf-8"),
+                              object_pairs_hook=unique_object)
     except (OSError, ValueError, UnicodeError) as exc:
         raise BackupRejected("backup manifest cannot be read") from exc
     if (not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA

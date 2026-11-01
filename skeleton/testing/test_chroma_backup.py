@@ -219,3 +219,15 @@ def test_chroma_manifest_rejects_unbounded_tree_before_hashing(tmp_path, monkeyp
     monkeypatch.setattr(chroma_backup, "MAX_TREE_ENTRIES", 2)
     with pytest.raises(chroma_backup.BackupRejected, match="tree entry"):
         chroma_backup._manifest_files(tmp_path)
+
+
+def test_verify_manifest_fifo_is_rejected_without_blocking(tmp_path):
+    import os
+
+    if not hasattr(os, "mkfifo") or not hasattr(os, "O_NOFOLLOW"):
+        pytest.skip("descriptor nofollow FIFO checks unavailable")
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    os.mkfifo(backup / "manifest.json")
+    with pytest.raises(chroma_backup.BackupRejected, match="manifest"):
+        chroma_backup.verify_backup(backup)
