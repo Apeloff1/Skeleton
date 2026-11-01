@@ -19,6 +19,7 @@ from .fair_stream_session import DispatchPermit
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig
 from .native_token_pressure import NativeTokenPressureGuard
+from .native_prompt_budget import NativePromptBudget, PromptBudgetLedger
 
 MAX_PROMPT_BYTES = 64 << 10
 MAX_STAGED_PROMPTS = 256
@@ -146,11 +147,14 @@ class NativePromptRegistry:
     lease on startup or use this registry as a replacement for durable CAS.
     """
 
-    def __init__(self, *, session_id: str) -> None:
+    def __init__(
+        self, *, session_id: str, budget: NativePromptBudget | None = None,
+    ) -> None:
         self.session_id = _id(session_id, "session")
         self._lock = RLock()
         self._staged: dict[str, PinnedNativePrompt] = {}
         self._used: set[str] = set()
+        self._budget = PromptBudgetLedger(budget or NativePromptBudget())
 
     def stage(self, pinned: PinnedNativePrompt) -> None:
         if type(pinned) is not PinnedNativePrompt:
@@ -162,6 +166,10 @@ class NativePromptRegistry:
                 raise NativeFairStreamDenied("duplicate or consumed request identity")
             if len(self._staged) + len(self._used) >= MAX_STAGED_PROMPTS:
                 raise NativeFairStreamDenied("prompt admission capacity exhausted")
+            # Charge real UTF-8 bytes, not characters or token estimates.
+            # Reservation precedes publication: a denied grant never becomes
+            # visible to a concurrent claimant.
+            self._budget.reserve(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
             self._staged[pinned.request_id] = pinned
 
     def claim(self, request_id: str, tenant_id: str) -> PinnedNativePrompt:
@@ -170,6 +178,7 @@ class NativePromptRegistry:
             pinned = self._staged.get(_id(request_id, "request"))
             if pinned is None or pinned.tenant_id != _id(tenant_id, "tenant"):
                 raise NativeFairStreamDenied("missing authorized prompt")
+            self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
             self._used.add(request_id)
             del self._staged[request_id]
             return pinned
@@ -178,7 +187,10 @@ class NativePromptRegistry:
         """Burn a pending grant without authorizing an execution."""
         with self._lock:
             _id(request_id, "request")
-            self._staged.pop(request_id, None)
+            pinned = self._staged.get(request_id)
+            if pinned is not None:
+                self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
+                del self._staged[request_id]
             self._used.add(request_id)
 
     def status(self) -> dict[str, int | str]:
@@ -187,7 +199,13 @@ class NativePromptRegistry:
                 "schema": "skeleton.ai.native-fair-stream-prompt-status.v1",
                 "staged": len(self._staged),
                 "consumed_or_revoked": len(self._used),
+                "staged_prompt_bytes": self._budget.snapshot()["staged_bytes"],
             }
+
+    def budget_status(self) -> dict[str, int | str]:
+        """Payload-free operator telemetry; never expose prompts or tenant IDs."""
+        with self._lock:
+            return self._budget.snapshot()
 
 
 class NativeFairStreamBackend:
