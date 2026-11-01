@@ -139,9 +139,21 @@ class OfflineTailInFlightSession:
             try:
                 self._capture.first_token(self._request_id)
             except BaseException as exc:
+                # First-token capture is a cross-component transition: if
+                # telemetry rejects it, revoke the pressure lease before
+                # reporting quarantine. An active guard must not outlive a
+                # failed execution-owner transition.
                 self._quarantined = True
+                try:
+                    self._guard.abort()
+                except BaseException:
+                    pass
+                try:
+                    self._capture.abort(self._request_id)
+                except BaseException:
+                    pass
                 raise InFlightLifecycleQuarantined(
-                    "first-token telemetry failed"
+                    "first-token telemetry failed; execution lease revoked"
                 ) from exc
 
     def admit_quantum(self, *, requested_tokens: int) -> OfflineInFlightStatus:
@@ -214,9 +226,21 @@ class OfflineTailInFlightSession:
             self._require_healthy()
             if self._request_id is None:
                 raise InFlightPressureDenied("no in-flight request")
+            # Revoke execution authority FIRST. If capture cleanup fails,
+            # the CPU guard is already terminal and cannot issue a quantum.
+            try:
+                decision = self._guard.abort()
+            except BaseException as exc:
+                self._quarantined = True
+                try:
+                    self._capture.abort(self._request_id)
+                except BaseException:
+                    pass
+                raise InFlightLifecycleQuarantined(
+                    "abort guard failure requires execution journal reconciliation"
+                ) from exc
             try:
                 self._capture.abort(self._request_id)
-                decision = self._guard.abort()
             except BaseException as exc:
                 self._quarantined = True
                 raise InFlightLifecycleQuarantined(

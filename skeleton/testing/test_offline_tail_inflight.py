@@ -233,3 +233,52 @@ def test_app_quarantines_when_unknown_thermal_hold_exceeds_deadline():
     assert not after.continue_execution
     with pytest.raises(InFlightLifecycleQuarantined):
         app.resume()
+
+
+def test_failed_first_token_revokes_cpu_lease_and_cleans_capture():
+    app = controller(ticks=(20, 10))
+    app.begin(request_id="first-token-failed", prompt_tokens=1)
+    assert app._capture.active_count == 1
+    with pytest.raises(InFlightLifecycleQuarantined, match="lease revoked"):
+        app.first_token()
+    assert app._guard.status().state == "aborted"
+    assert app._capture.active_count == 0
+    assert app.status().telemetry_quarantined
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.admit_quantum(requested_tokens=1)
+
+
+def test_capture_abort_failure_cannot_leave_cpu_guard_running(monkeypatch):
+    app = controller()
+    app.begin(request_id="abort-capture-failed", prompt_tokens=1)
+
+    def broken_capture_abort(self, request_id):
+        raise OSError("injected telemetry cleanup failure")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(LiveTailCapture, "abort", broken_capture_abort)
+        with pytest.raises(InFlightLifecycleQuarantined, match="abort telemetry"):
+            app.abort()
+    assert app._guard.status().state == "aborted"
+    assert app.status().telemetry_quarantined
+    assert not app.status().continue_execution
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.admit_quantum(requested_tokens=1)
+
+
+def test_guard_abort_failure_quarantines_and_cleans_capture(monkeypatch):
+    app = controller()
+    app.begin(request_id="abort-guard-failed", prompt_tokens=1)
+
+    def broken_guard_abort(self):
+        raise RuntimeError("injected CPU cancellation failure")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(InFlightCPUResourceGuard, "abort", broken_guard_abort)
+        with pytest.raises(InFlightLifecycleQuarantined, match="abort guard"):
+            app.abort()
+    assert app._capture.active_count == 0
+    assert app.status().telemetry_quarantined
+    assert not app.status().continue_execution
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.complete(output_tokens=1)
