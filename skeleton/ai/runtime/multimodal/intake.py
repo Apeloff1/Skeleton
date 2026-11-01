@@ -419,7 +419,12 @@ def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> Veri
             mime_type=asset.mime_type,
             limits=asset.validation.limits,
         )
-    except (MediaValidationError, AttributeError, TypeError) as exc:
+    except MediaValidationError as exc:
+        # Preserve a bounded policy-field diagnostic, never decoder payload data.
+        if "max_pixels" in str(exc):
+            raise MultimodalSanitizationError("verified source cannot be decoded: invalid max_pixels") from exc
+        raise MultimodalSanitizationError("verified source cannot be decoded") from exc
+    except (AttributeError, TypeError) as exc:
         raise MultimodalSanitizationError("verified source cannot be decoded") from exc
     if measured.as_dict() != asset.validation.as_dict() or asset.instruction_trusted:
         raise MultimodalSanitizationError("actual decoded source differs from issued evidence")

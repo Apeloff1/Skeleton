@@ -71,8 +71,10 @@ def test_shared_lifecycle_revokes_admission_before_shutdown_completion() -> None
     assert receipt.to_phase is ServicePhase.DRAINING
     assert receipt.cancellation.reason is CancellationReason.SHUTDOWN
     assert lifecycle.admits_work is False
-    with pytest.raises(CancellationError):
+    with pytest.raises(RuntimeSupervisionError, match="cannot admit work while draining"):
         lifecycle.require_work_admission()
+    with pytest.raises(CancellationError):
+        lifecycle.cancellation.require_active()
 
     now[0] = 3.0
     stopped = lifecycle.mark_stopped()
