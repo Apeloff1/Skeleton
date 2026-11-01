@@ -8,7 +8,7 @@ from scripts.studio_scene_schedule_cli import _strict
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_clue_visibility import (
     compile_clue_visibility, propose_clue_visibility, compile_clue_playable,
-    publish_clue_visibility, restore_clue_visibility,
+    publish_clue_visibility, restore_clue_visibility, publish_clue_playable,
 )
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
@@ -23,7 +23,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--authoring")
     ap.add_argument("--restore", type=Path)
     ap.add_argument("--publish", type=Path)
-    ap.add_argument("--handoff-manifest")
+    ap.add_argument("--handoff-manifest", action="store_true")
+    ap.add_argument("--publish-playable", type=Path)
     args = ap.parse_args(argv)
     if sum(x is not None for x in (args.prompt, args.authoring, args.restore)) != 1:
         ap.error("choose exactly one prompt, authoring or restore")
@@ -57,9 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.publish:
             result["publication"] = publish_clue_visibility(
                 docs, report, args.publish, authorized=True)
-        if args.handoff_manifest:
+        if args.handoff_manifest or args.publish_playable:
             manifest, _bundle = compile_clue_playable(docs, report, authorized=True)
             result["playable_handoff"] = manifest
+        if args.publish_playable:
+            result["playable_publication"] = publish_clue_playable(
+                docs, report, args.publish_playable, authorized=True)
     except (StudioQuestError, PermissionError, OSError, ValueError,
             TypeError, UnicodeError, RecursionError) as exc:
         ap.error(str(exc))

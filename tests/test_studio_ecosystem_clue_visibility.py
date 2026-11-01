@@ -13,7 +13,7 @@ from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_so
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError, replay_quest
 from skeleton.ai.game_builder.studio_ecosystem_clue_visibility import (
     compile_clue_visibility, propose_clue_visibility, compile_clue_playable,
-    publish_clue_visibility, restore_clue_visibility,
+    publish_clue_visibility, restore_clue_visibility, publish_clue_playable,
 )
 from skeleton.ai.agents.jeeves.studio_clue_visibility_tool import (
     REQUEST_SCHEMA, execute_clue_visibility_tool,
@@ -121,6 +121,10 @@ def test_canonical_playable_bundle_no_hidden_text_leak():
     assert manifest["native_clue_ui_integrated"] is False
     with ZipFile(BytesIO(payload)) as archive:
         assert b"<html" in archive.read("index.html")
+        viewer = archive.read("clues.html")
+        assert b"Source-replayed clue journal" in viewer
+        assert b"No clues unlocked" in viewer
+        assert b"Content-Security-Policy" in viewer
         public = json.loads(archive.read("clues.json"))
         assert public["visible_clues"] == []
         assert public["hidden_count"] > 0
@@ -144,7 +148,7 @@ def test_jeeves_router_and_cli_parity(capsys):
     assert any(x["name"] == "studio_original_clue_visibility"
                for x in world_tool_catalog()["tools"])
     assert main(["--project", PROJECT, "--expected-source", source,
-                 "--prompt", PROMPT, "--handoff-manifest", "yes"]) == 0
+                 "--prompt", PROMPT, "--handoff-manifest"]) == 0
     output = json.loads(capsys.readouterr().out)
     assert output["proposal"] == direct["detail"]
     assert output["playable_handoff"]["canonical_html5_quest_included"] is True
@@ -153,3 +157,19 @@ def test_jeeves_router_and_cli_parity(capsys):
     with pytest.raises(StudioQuestError):
         execute_clue_visibility_tool({**request, "authorized": True},
                                      authorized=True)
+
+
+def test_private_playable_publication_is_deterministic_and_no_overwrite(tmp_path):
+    docs, source, session = fixture()
+    report = propose_clue_visibility(
+        docs, [], PROMPT, authorized=True,
+        expected_source_digest=source)["detail"]
+    receipt = publish_clue_playable(docs, report, tmp_path, authorized=True)
+    bundle = (tmp_path / "clue_playable.zip").read_bytes()
+    assert receipt["bundle_sha256"] == sha256(bundle).hexdigest()
+    assert (tmp_path / "clue_playable.zip").stat().st_mode & 0o077 == 0
+    with pytest.raises(FileExistsError):
+        publish_clue_playable(docs, report, tmp_path, authorized=True)
+    with pytest.raises(StudioQuestError):
+        publish_clue_playable(docs, {**report, "visible_count": 100},
+                              tmp_path, authorized=True)

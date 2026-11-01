@@ -20,7 +20,12 @@ Use `--authoring <json>` to compile an edited proposal, `--publish
 The operator is responsible for directory custody and access authorization.
 `--handoff-manifest yes` compiles a deterministic ZIP in memory containing
 the canonical playable HTML quest and separately typed visible clue data.
-The CLI currently reports its digest/manifest without writing that ZIP.
+The CLI reports its digest/manifest without writing the ZIP unless
+\`--publish-playable <existing-private-directory>\` is supplied. The ZIP
+contains the interactive canonical quest, a static accessible clue journal
+showing only already-unlocked clues, and the typed clue JSON handoff. A
+content-security policy prevents external scripts/styles. The ZIP is published
+without overwrite and fsynced before the publication receipt is returned.
 
 The HTML quest is genuinely interactive; the clue data is **not** yet
 integrated into native engine clue UI. Hidden clue text is excluded from the

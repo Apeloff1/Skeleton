@@ -6,6 +6,7 @@ claimed. Every result is recomputed from the immutable authored quest source.
 from __future__ import annotations
 
 from hashlib import sha256
+from html import escape
 from io import BytesIO
 import json
 import os
@@ -185,7 +186,31 @@ def compile_clue_playable(documents: Mapping[str, Any], report: Mapping[str, Any
               "visible_clues": [row for row in replay["clues"] if row["visible"]],
               "hidden_count": replay["hidden_count"],
               "native_clue_ui_integrated": False, "release_certified": False}
-    files = {"index.html": html, "clues.json": _canonical(public) + b"\n"}
+    visible = public["visible_clues"]
+    rows = "".join(
+        "<li><strong>" + escape(row["id"], quote=True) + "</strong> — " +
+        escape(row["text"], quote=True) + "</li>"
+        for row in visible)
+    if not rows:
+        rows = "<li>No clues unlocked in this source-replayed session.</li>"
+    style = ("body{max-width:55rem;margin:auto;padding:2rem;"
+             "font:1rem system-ui;background:#101b28;color:#f0f5fb}"
+             "li{margin:1rem 0}a{color:#b8e6ff}")
+    from base64 import b64encode
+    style_hash = "'sha256-" + b64encode(sha256(style.encode("utf-8")).digest()).decode("ascii") + "'"
+    viewer = (
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; "
+        "style-src " + style_hash + "; base-uri 'none'; form-action 'none'; "
+        "object-src 'none'\"><title>Verified clue journal</title>"
+        "<style>" + style + "</style></head><body>"
+        "<main><h1>Source-replayed clue journal</h1>"
+        "<p>Only clues unlocked by the verified saved quest session are shown.</p>"
+        "<p><a href='index.html'>Return to the playable quest</a></p><ul>" +
+        rows + "</ul></main></body></html>").encode("utf-8")
+    files = {"index.html": html, "clues.html": viewer,
+             "clues.json": _canonical(public) + b"\n"}
     out = BytesIO()
     with ZipFile(out, "w", compression=ZIP_STORED) as archive:
         for name in sorted(files):
@@ -280,3 +305,38 @@ def restore_clue_visibility(documents: Mapping[str, Any], directory: Path, *,
             and stored.get("session_digest") != expected_session_digest):
         raise StudioQuestError("clue restore source/session mismatch")
     return _replay(documents, stored, authorized=True)
+
+
+def publish_clue_playable(documents: Mapping[str, Any],
+                          report: Mapping[str, Any], directory: Path, *,
+                          authorized: bool) -> dict[str, object]:
+    """Publish one verified ZIP without replacing existing playable artifacts."""
+    manifest, bundle = compile_clue_playable(
+        documents, report, authorized=authorized)
+    if len(bundle) > 1024 * 1024:
+        raise StudioQuestError("clue playable exceeds bounded disk publication")
+    fd = _open_directory(directory)
+    temporary = ".clue-playable-" + secrets.token_hex(16) + ".tmp"
+    created = False
+    try:
+        handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                         os.O_NOFOLLOW, 0o600, dir_fd=fd)
+        created = True
+        try:
+            _write_all(handle, bundle)
+            os.fsync(handle)
+        finally:
+            os.close(handle)
+        os.link(temporary, "clue_playable.zip", src_dir_fd=fd, dst_dir_fd=fd,
+                follow_symlinks=False)
+        os.fsync(fd)
+    finally:
+        try:
+            if created:
+                os.unlink(temporary, dir_fd=fd)
+        finally:
+            os.close(fd)
+    return {"path": str(Path(directory) / "clue_playable.zip"),
+            "bundle_sha256": manifest["bundle_sha256"],
+            "bundle_bytes": len(bundle), "file_write_performed": True,
+            "release_certified": False}
