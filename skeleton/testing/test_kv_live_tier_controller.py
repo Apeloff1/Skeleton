@@ -61,11 +61,46 @@ class KVLiveTierTests(unittest.TestCase):
         )
 
     def test_cpu_pressure_demotes_with_two_fresh_samples(self):
-        ctl = self.controller([host(), host(), host()])
+        ctl = self.controller([host(), host(), host(), host()])
         plan, observation = ctl.plan_live()
         self.assertEqual(observation.sample.gpu_pressure_pct, None)
         self.assertFalse(observation.gpu_device_qualified)
         self.assertEqual({move.target for move in plan.moves}, {CacheTier.NVME})
+        receipt = ctl.apply_live(plan)
+        self.assertEqual(receipt.moved, self.keys)
+        self.assertEqual(len(self.storage.moves), 1)
+
+
+    def test_final_adapter_pressure_regression_quarantines_completion(self):
+        # Planning, preflight and before_move are safe; the physical adapter
+        # then succeeds, but a final OS probe reveals a concurrent disk loss.
+        # The caller must keep durable RUNNING intent for reconciliation.
+        ctl = self.controller([
+            host(disk_free=900), host(disk_free=900),
+            host(disk_free=900), host(disk_free=700),
+        ])
+        plan, _ = ctl.plan_live()
+        self.assertEqual(len(plan.moves), 1)
+        with self.assertRaisesRegex(KVPressureDeferred, "worsening"):
+            ctl.apply_live(plan)
+        self.assertEqual(len(self.storage.moves), 1)
+
+    def test_final_probe_failure_never_claims_successful_receipt(self):
+        ctl = self.controller([
+            host(disk_free=900), host(disk_free=900),
+            host(disk_free=900),
+        ])
+        plan, _ = ctl.plan_live()
+        with self.assertRaisesRegex(KVPressureDeferred, "unavailable"):
+            ctl.apply_live(plan)
+        self.assertEqual(len(self.storage.moves), 1)
+
+    def test_final_probe_accepts_only_accounted_disk_consumption(self):
+        ctl = self.controller([
+            host(disk_free=900), host(disk_free=900),
+            host(disk_free=900), host(disk_free=772),
+        ])
+        plan, _ = ctl.plan_live()
         receipt = ctl.apply_live(plan)
         self.assertEqual(receipt.moved, self.keys)
         self.assertEqual(len(self.storage.moves), 1)
@@ -92,6 +127,7 @@ class KVLiveTierTests(unittest.TestCase):
 
     def test_stable_swap_pressure_remains_eligible(self):
         ctl = self.controller([
+            host(ram_free=50, swap_free=1000),
             host(ram_free=50, swap_free=1000),
             host(ram_free=50, swap_free=1000),
             host(ram_free=50, swap_free=1000),

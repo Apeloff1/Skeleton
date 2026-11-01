@@ -175,7 +175,15 @@ class KVLiveTierController:
 
             # The canonical manager independently rechecks page identity,
             # pins, size and storage adapter success under its KV lock.
-            return self._planner.apply(
+            receipt = self._planner.apply(
                 self._manager, plan, now_ns=previous_ns,
                 before_move=before_move,
             )
+            # A successful final adapter call is not proof that OS pressure
+            # stayed safe while it ran. Re-probe AFTER the final physical
+            # movement and before returning a receipt to the durable journal.
+            # Failure here leaves RUNNING intent unresolved; never publish
+            # a misleading completed migration or automatically retry it.
+            if plan.moves:
+                check(self._sample().sample, remaining_disk=0)
+            return receipt
