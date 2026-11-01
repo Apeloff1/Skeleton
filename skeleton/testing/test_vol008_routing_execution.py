@@ -239,7 +239,7 @@ def test_route_request_digest_binds_budget_metadata_and_tools():
 
 def test_governed_routing_execution_mirror_parity():
     from pathlib import Path
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     assert (
         root / "skeleton/intelligence/routing_execution.py"
     ).read_bytes() == (
