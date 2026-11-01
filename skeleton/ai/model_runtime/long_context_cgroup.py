@@ -96,7 +96,8 @@ def observe_cgroup_pressure(
                             elevated=5, critical=20)
         current = _read_counter(directory, "memory.current")
         limit = _read_counter(directory, "memory.max", unlimited=True)
-        assert current is not None
+        if current is None:
+            raise ValueError("missing cgroup memory current")
         memory = _memory_state(current, limit, memory_psi)
         # A descriptor pins an inode, not the pathname visible to other users.
         reopened = _secure_directory(cgroup_root)
