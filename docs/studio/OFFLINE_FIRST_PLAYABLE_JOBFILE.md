@@ -74,3 +74,19 @@ then repeats source verification to catch input changes. A passing preflight
 is only a point-in-time admission observation: another process can occupy
 the destination before publication. The actual publisher repeats all checks
 at the atomic no-clobber boundaries. It is never device or release readiness.
+
+
+### 2026-11-01 lexical path and output-pin custody repair
+
+Single-game delivery now collapses lexical dot segments with `os.path.abspath`
+**before** source/install/output disjointness checks. An existing sibling
+followed by `..` can otherwise disguise a destination inside the original
+source tree without using a symlink; descriptor-relative nofollow alone does
+not reject such an alias. Symlink resolution remains forbidden and delegated
+to the descriptor-anchored source and destination openers. The batch path
+already normalizes lexical aliases and now rejects empty, uppercase, truncated,
+or non-hex optional output pins before publication or resumed delivery.
+
+Focused regression entrypoints (not a test result):
+`python -m pytest skeleton/testing/test_app_offline_first_playable_delivery.py skeleton/testing/test_app_offline_first_playable_batch.py -q`.
+No device, signing, rights, malware or release qualification is asserted.

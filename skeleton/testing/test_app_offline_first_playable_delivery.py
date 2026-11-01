@@ -294,3 +294,38 @@ def test_private_save_post_link_fsync_failure_never_unlinks_published_name(
             protected_roots=(), authorized=True,
         )
     assert target.read_bytes() == b'{"replay":"private"}'
+
+
+def test_dotdot_archive_alias_into_original_source_fails_before_publication(
+    original_source, tmp_path,
+):
+    """Existing sibling/.. must not bypass source/output separation."""
+    source, pin = original_source
+    sibling = tmp_path / "existing-sibling"
+    sibling.mkdir()
+    archive, install, save, receipt = _destinations(tmp_path)
+    disguised = sibling / ".." / source.name / "poison.zip"
+    with pytest.raises(FirstPlayableDeliveryAcceptanceError, match="outside"):
+        publish_first_playable_delivery(
+            source, disguised, install, save, receipt,
+            expected_manifest_sha256=pin, moves=("up",), authorized=True,
+        )
+    assert not (source / "poison.zip").exists()
+    assert all(not path.exists() for path in (archive, install, save, receipt))
+
+
+def test_dotdot_install_alias_into_original_source_fails_before_publication(
+    original_source, tmp_path,
+):
+    source, pin = original_source
+    sibling = tmp_path / "existing-sibling"
+    sibling.mkdir()
+    archive, install, save, receipt = _destinations(tmp_path)
+    disguised = sibling / ".." / source.name / "new-install"
+    with pytest.raises(FirstPlayableDeliveryAcceptanceError, match="disjoint"):
+        publish_first_playable_delivery(
+            source, archive, disguised, save, receipt,
+            expected_manifest_sha256=pin, moves=("up",), authorized=True,
+        )
+    assert not (source / "new-install").exists()
+    assert all(not path.exists() for path in (archive, install, save, receipt))

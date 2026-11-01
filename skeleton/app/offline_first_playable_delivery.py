@@ -46,7 +46,14 @@ class FirstPlayableDeliveryAcceptanceError(ValueError):
 
 
 def _path(value: str | Path) -> Path:
-    return Path(value).expanduser().absolute()
+    """Normalize lexical dot segments before source/output overlap checks.
+
+    Path.absolute() retains '..' on supported Python versions. That allowed
+    a descriptor-safe but lexically disguised output to live inside the
+    original game source tree when an existing sibling/.. was supplied.
+    Do not resolve symlinks: the descriptor-anchored openers must reject them.
+    """
+    return Path(os.path.abspath(os.fspath(Path(value).expanduser())))
 
 
 def _is_within(child: Path, root: Path) -> bool:

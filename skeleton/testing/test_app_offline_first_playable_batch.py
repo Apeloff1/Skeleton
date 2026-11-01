@@ -357,3 +357,31 @@ def test_duplicate_project_ids_with_distinct_source_digests_fail_before_writes(
         )
     assert not Path(jobs[0].archive).exists()
     assert not Path(jobs[1].archive).exists()
+
+
+@pytest.mark.parametrize("pin", ["", "0" * 63, "A" * 64, "x" * 64])
+def test_empty_or_noncanonical_optional_output_pin_rejected_before_writes(
+    original_games, tmp_path, pin,
+):
+    jobs = list(jobs_for(original_games, tmp_path))
+    jobs[0] = replace(jobs[0], archive_sha256=pin)
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="lowercase SHA-256"):
+        publish_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert all(not Path(job.archive).exists() for job in jobs)
+
+
+def test_noncanonical_resumed_prefix_pin_fails_before_writing_next_game(
+    original_games, tmp_path,
+):
+    jobs = list(jobs_for(original_games, tmp_path))
+    jobs[0] = replace(
+        jobs[0], archive_sha256="0" * 64,
+        save_sha256="0" * 64, receipt_sha256="",
+    )
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="lowercase SHA-256"):
+        resume_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert all(not Path(job.archive).exists() for job in jobs)

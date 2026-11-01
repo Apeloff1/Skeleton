@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Sequence
 
@@ -33,6 +34,7 @@ MIN_GAMES = 2
 MAX_GAMES = 8
 MAX_INPUT_BYTES = 64 * 1024
 MAX_SUMMARY_BYTES = 256 * 1024
+_PIN = re.compile(r"[0-9a-f]{64}\\Z")
 
 
 class FirstPlayableDeliveryBatchError(ValueError):
@@ -74,9 +76,15 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
                                 job.receipt_sha256)):
             raise FirstPlayableDeliveryBatchError("independent game pins required")
         pins = (job.archive_sha256, job.save_sha256, job.receipt_sha256)
-        if inspect is False and any(pins):
+        if any(pin is not None and (type(pin) is not str
+                                    or _PIN.fullmatch(pin) is None)
+               for pin in pins):
+            raise FirstPlayableDeliveryBatchError(
+                "output pins must be complete lowercase SHA-256 digests"
+            )
+        if inspect is False and any(pin is not None for pin in pins):
             raise FirstPlayableDeliveryBatchError("publication cannot accept output pins")
-        if inspect is None and any(pins) and not all(pins):
+        if inspect is None and any(pin is not None for pin in pins) and not all(pins):
             raise FirstPlayableDeliveryBatchError("partial game pin triple rejected")
         paths.append(tuple(map(canonical, (
             job.source, job.archive, job.install, job.save, job.receipt,
