@@ -14,3 +14,7 @@ execution deadlines, bounded RAM/KV, tenant custody and no automatic retry
 after uncertain outcomes. It does not reserve RAM, certify GPU/M-chip hardware,
 or modify cgroup limits. Noncanonical fixture paths are probed as one
 explicitly selected directory; no test path can impersonate proc membership.
+
+Sampling retains a single descriptor-pinned ancestor chain and checks the
+leaf inode against a freshly resolved canonical path before admitting work.
+A detached or replaced cgroup leaf is not treated as current process capacity.

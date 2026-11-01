@@ -242,9 +242,6 @@ def test_invalid_membership_from_proc_is_not_trusted(monkeypatch):
     # This validates the parser without granting a fabricated cgroup path.
     import os
     original_open = module.os.open
-    original_read = module.os.read
-    original_close = module.os.close
-    original_fstat = module.os.fstat
     def fake_open(path, flags, *args, **kwargs):
         if path == "/proc/self/cgroup":
             return original_open(os.devnull, flags)
@@ -253,3 +250,26 @@ def test_invalid_membership_from_proc_is_not_trusted(monkeypatch):
     monkeypatch.setattr(module.os, "read", lambda fd, n: b"0::/../escape\\n")
     with pytest.raises(module.CgroupMemoryUnavailable, match="unsafe"):
         module._read_self_cgroup_path()
+
+
+def test_leaf_inode_replacement_during_sampling_is_denied(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root)
+    fixture(root / "tenant", current="1000", maximum="1000000")
+    monkeypatch.setattr(module, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(module, "_read_self_cgroup_path", lambda: ("tenant",))
+    original = module._probe_single_cgroup_memory_headroom
+    swapped = False
+
+    def replace_after_read(path, *, directory_fd=None):
+        nonlocal swapped
+        result = original(path, directory_fd=directory_fd)
+        if directory_fd is not None and not swapped and result.used_bytes == 1000:
+            swapped = True
+            (root / "tenant").rename(root / "old")
+            fixture(root / "tenant", current="1000", maximum="1000000")
+        return result
+
+    monkeypatch.setattr(module, "_probe_single_cgroup_memory_headroom", replace_after_read)
+    with pytest.raises(module.CgroupMemoryUnavailable, match="inode replaced"):
+        module.probe_cgroup_memory_headroom()

@@ -118,7 +118,7 @@ def _open_cgroup_directory(root: str) -> int:
 
 
 def _probe_single_cgroup_memory_headroom(
-    root: str,
+    root: str, *, directory_fd: int | None = None,
 ) -> CgroupMemoryHeadroom | None:
     """Observe one Linux cgroup-v2 memory limit, never infer missing capacity.
 
@@ -134,7 +134,8 @@ def _probe_single_cgroup_memory_headroom(
     if any(part in (".", "..") for part in root.split("/")):
         raise ValueError("cgroup parent traversal forbidden")
     try:
-        directory = _open_cgroup_directory(root)
+        directory = (os.dup(directory_fd) if directory_fd is not None
+                     else _open_cgroup_directory(root))
     except FileNotFoundError:
         return None
     except OSError as exc:
@@ -254,12 +255,43 @@ def probe_cgroup_memory_headroom(
         return _probe_single_cgroup_memory_headroom(root)
     parts = _read_self_cgroup_path()
     samples: list[CgroupMemoryHeadroom] = []
-    for depth in range(len(parts) + 1):
-        path = os.path.join(root, *parts[:depth])
-        observation = _probe_single_cgroup_memory_headroom(path)
-        if observation is None:
-            raise CgroupMemoryUnavailable("unmeasured cgroup ancestor capacity")
-        samples.append(observation)
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    try:
+        current_fd = _open_cgroup_directory(root)
+    except OSError as exc:
+        raise CgroupMemoryUnavailable("cgroup mount root unavailable") from exc
+    try:
+        # Keep the same pinned ancestor chain throughout sampling. Never
+        # reconstruct each child path from names between samples.
+        for depth in range(len(parts) + 1):
+            observation = _probe_single_cgroup_memory_headroom(
+                root, directory_fd=current_fd,
+            )
+            if observation is None:
+                raise CgroupMemoryUnavailable("unmeasured cgroup ancestor capacity")
+            samples.append(observation)
+            if depth < len(parts):
+                try:
+                    child_fd = os.open(parts[depth], flags, dir_fd=current_fd)
+                except OSError as exc:
+                    raise CgroupMemoryUnavailable("cgroup membership leaf unavailable") from exc
+                os.close(current_fd)
+                current_fd = child_fd
+        # A renamed/replaced leaf can leave a valid but detached directory FD.
+        # Verify the canonical path still resolves to the sampled leaf.
+        try:
+            fresh_fd = _open_cgroup_directory(os.path.join(root, *parts))
+        except OSError as exc:
+            raise CgroupMemoryUnavailable("cgroup membership path replaced") from exc
+        try:
+            before = os.fstat(current_fd)
+            after = os.fstat(fresh_fd)
+            if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+                raise CgroupMemoryUnavailable("cgroup membership inode replaced")
+        finally:
+            os.close(fresh_fd)
+    finally:
+        os.close(current_fd)
     if _read_self_cgroup_path() != parts:
         raise CgroupMemoryUnavailable("process cgroup membership changed")
     finite = [item for item in samples if item.headroom_bytes is not None]
