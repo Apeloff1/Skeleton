@@ -18,6 +18,19 @@ def test_percentile_summary_rejects_invalid_samples(bad):
         _stats.percentile_summary("frame", [1.0, bad])
 
 
+def test_percentile_summary_rejects_unrepresentable_int_without_overflow():
+    with pytest.raises(ValueError, match="nonnegative finite"):
+        _stats.percentile_summary("frame", [1.0, 10**1000])
+
+
+def test_percentile_summary_rejects_numeric_subclasses():
+    class PretendFloat(float):
+        pass
+
+    with pytest.raises(ValueError, match="nonnegative finite"):
+        _stats.percentile_summary("frame", [PretendFloat(1.0)])
+
+
 def test_percentile_summary_preserves_canonical_profiler_contract():
     result = _stats.percentile_summary("frame", [1.0, 2.0, 3.0])
     assert result["samples"] == 3

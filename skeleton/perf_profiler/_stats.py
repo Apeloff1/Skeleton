@@ -9,10 +9,10 @@ and fail loudly rather than silently computing our own numbers.
 from __future__ import annotations
 
 import importlib
-import math
-from itertools import islice
 import importlib.util
+import math
 import sys
+from itertools import islice
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable
@@ -52,10 +52,18 @@ def percentile_summary(name: str, durations_ms: Iterable[float]) -> Dict[str, An
     values = list(islice(durations_ms, MAX_SUMMARY_SAMPLES + 1))
     if len(values) > MAX_SUMMARY_SAMPLES:
         raise ValueError("percentile sample count exceeds bound")
-    if any(isinstance(value, bool) or not isinstance(value, int | float)
-           or not math.isfinite(value) or value < 0 for value in values):
-        raise ValueError("percentile samples must be nonnegative finite numbers")
-    profiler = UpstreamProfiler(max_samples_per_name=max(1, len(values)))
+    normalized: list[float] = []
     for value in values:
-        profiler.record(name, float(value))
+        if type(value) not in (int, float) or value < 0:
+            raise ValueError("percentile samples must be nonnegative finite numbers")
+        try:
+            duration = float(value)
+        except (OverflowError, ValueError):
+            raise ValueError("percentile samples must be nonnegative finite numbers") from None
+        if not math.isfinite(duration):
+            raise ValueError("percentile samples must be nonnegative finite numbers")
+        normalized.append(duration)
+    profiler = UpstreamProfiler(max_samples_per_name=max(1, len(normalized)))
+    for duration in normalized:
+        profiler.record(name, duration)
     return profiler.stats(name)
