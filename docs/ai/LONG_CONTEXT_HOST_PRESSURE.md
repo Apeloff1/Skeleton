@@ -28,3 +28,11 @@ Exact-head CI and security gates are still required before promotion.
 The `head-observe` command is side-effect-free and does not open or create a
 spool root. Unsupported host telemetry is reported as unknown; no fallback
 is promoted into an execution grant.
+
+PSI reads now fence same-inode mutation with size, ownership, link count,
+mtime and ctime checks, and reject hardlinked fixture files. A replaced
+inode or in-place rewrite between descriptor stat, read, final stat and
+pinned-directory name lookup invalidates the observation. Procfs may expose
+synthetic zero file sizes, so file size is not treated as a read-length
+assertion. These remain fail-closed diagnostics, not trusted sensor
+attestation or complete protection from hostile same-UID filesystem actors.

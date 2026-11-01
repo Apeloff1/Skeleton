@@ -120,6 +120,55 @@ class TestLongContextHostPressure(unittest.TestCase):
             result = self.observe()
         self.assertEqual(result["source"], "unavailable")
 
+    def test_in_place_mutation_during_read_fails_closed(self):
+        original_read = os.read
+        touched = [False]
+
+        def mutate_after_read(fd, size):
+            raw = original_read(fd, size)
+            if not touched[0]:
+                touched[0] = True
+                # Preserve the inode and length while changing the signal.
+                (self.root / "cpu").write_bytes(
+                    b"some avg10=80.00 avg60=0.00 avg300=0.00 total=100\\n"
+                )
+            return raw
+
+        with patch("skeleton.ai.model_runtime.long_context_host_pressure.os.read",
+                   side_effect=mutate_after_read):
+            result = self.observe()
+        self.assertTrue(touched[0])
+        self.assertEqual(result["source"], "unavailable")
+        self.assertEqual(result["signals"]["cpu"], "unknown")
+        self.assertFalse(result["is_admission_grant"])
+
+    def test_hardlinked_psi_fixture_is_untrusted(self):
+        os.link(self.root / "cpu", self.root / "cpu.alias")
+        result = self.observe()
+        self.assertEqual(result["source"], "unavailable")
+        self.assertEqual(result["signals"]["cpu"], "unknown")
+        self.assertFalse(result["device_qualified"])
+
+    def test_same_length_replacement_during_read_fails_closed(self):
+        original_read = os.read
+        touched = [False]
+
+        def replace_after_read(fd, size):
+            raw = original_read(fd, size)
+            if not touched[0]:
+                touched[0] = True
+                replacement = self.root / "cpu.new"
+                replacement.write_bytes(raw)
+                os.replace(replacement, self.root / "cpu")
+            return raw
+
+        with patch("skeleton.ai.model_runtime.long_context_host_pressure.os.read",
+                   side_effect=replace_after_read):
+            result = self.observe()
+        self.assertTrue(touched[0])
+        self.assertEqual(result["source"], "unavailable")
+        self.assertFalse(result["pressure_signals_attested"])
+
     def test_invalid_psi_source_rejected_before_open(self):
         directory = _secure_directory(self.root)
         try:

@@ -53,12 +53,20 @@ def _read_psi(directory: int, name: str) -> bytes:
     fd = os.open(name, flags, dir_fd=directory)
     try:
         before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode) or before.st_uid not in (0, os.geteuid()):
+        if (not stat.S_ISREG(before.st_mode)
+                or before.st_uid not in (0, os.geteuid())
+                or before.st_nlink != 1):
             raise OSError("untrusted PSI inode")
+        # An inode match alone does not fence in-place writes. Check mutation
+        # metadata both before and after reading and at the pinned name.
+        # Procfs can report synthetic zero st_size despite readable bytes.
+        identity = lambda x: (
+            x.st_dev, x.st_ino, x.st_mode, x.st_uid, x.st_gid,
+            x.st_nlink, x.st_size, x.st_mtime_ns, x.st_ctime_ns,
+        )
         raw = os.read(fd, _MAX_PSI_BYTES + 1)
         after = os.fstat(fd)
         named = os.stat(name, dir_fd=directory, follow_symlinks=False)
-        identity = lambda x: (x.st_dev, x.st_ino, x.st_mode, x.st_uid)
         if (len(raw) > _MAX_PSI_BYTES or not raw
                 or identity(before) != identity(after)
                 or identity(after) != identity(named)):

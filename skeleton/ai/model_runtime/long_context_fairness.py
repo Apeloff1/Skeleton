@@ -190,7 +190,8 @@ class LongContextFairPlanner:
                             "proposed_tokens": amount,
                             "weight": demand.weight,
                         })
-                        remaining -= amount
+                    # The weighted allocation loop already debits remaining;
+                    # a second debit here obscures future budget accounting.
             for demand, record in verified:
                 if self.heads._read(directory, _name(demand.stream_id)) != record:
                     raise LongContextSpoolError("head changed before return")
