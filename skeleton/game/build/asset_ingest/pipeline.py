@@ -9,6 +9,7 @@ from __future__ import annotations
 import errno
 import os
 import stat
+from itertools import islice
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -127,8 +128,6 @@ def _import_from_fd(root_fd: int, paths: Iterable[str]) -> ImportReport:
     report = ImportReport(AssetManifest())
     # Consume only a bounded prefix, then sort for deterministic manifests.
     # Do not materialize an attacker-controlled unbounded path iterator.
-    from itertools import islice
-
     requested = list(islice(paths, MAX_IMPORT_FILES + 1))
     if len(requested) > MAX_IMPORT_FILES:
         report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
@@ -174,6 +173,7 @@ def import_files(root: str | Path, paths: Iterable[str]) -> ImportReport:
         return _import_from_fd(root_fd, paths)
     finally:
         os.close(root_fd)
+
 
 def import_directory(root: str | Path) -> ImportReport:
     """Scan a bounded descriptor-held tree; never follow symlink directories."""
