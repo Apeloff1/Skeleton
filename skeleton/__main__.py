@@ -68,6 +68,7 @@ Commands:
     scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
     scene-mission-route  Solve replayable authored mission ending paths
+    scene-mission-accept  Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
@@ -756,6 +757,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-mission-timeline":
         from skeleton.game.gameplay.scene_mission_timeline import cli as timeline_cli
         return timeline_cli(rest)
+    if cmd == "scene-mission-accept":
+        from skeleton.game.gameplay.scene_mission_acceptance import cli as accept_cli
+        return accept_cli(rest)
     if cmd == "scene-mission-route":
         from skeleton.game.gameplay.scene_mission_solver import cli as route_cli
         return route_cli(rest)
