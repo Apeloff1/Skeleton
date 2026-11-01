@@ -139,11 +139,14 @@ def import_files(root: str | Path, paths: Iterable[str]) -> ImportReport:
         if len(requested) > MAX_IMPORT_FILES:
             report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
             requested = requested[:MAX_IMPORT_FILES]
+        validated: set[str] = set()
+        for item in requested:
+            if not isinstance(item, str):
+                report.issues.append(ImportIssue(str(item), "unsafe", "non-text path"))
+            else:
+                validated.add(item)
         total = 0
-        for relative in sorted(set(str(item) for item in requested)):
-            if not isinstance(relative, str):
-                report.issues.append(ImportIssue(str(relative), "unsafe", "non-text path"))
-                continue
+        for relative in sorted(validated):
             try:
                 parts = _parts(relative)
                 if PurePosixPath(parts[-1]).suffix.lower() not in _EXT:
@@ -181,6 +184,8 @@ def import_directory(root: str | Path) -> ImportReport:
 
     def walk(directory_fd: int, prefix: str, depth: int) -> None:
         nonlocal visited
+        if visited > MAX_TREE_ENTRIES or len(paths) > MAX_IMPORT_FILES:
+            return
         if depth > MAX_TREE_DEPTH:
             issues.append(ImportIssue(prefix or ".", "unsafe", "directory depth exceeds bound"))
             return
