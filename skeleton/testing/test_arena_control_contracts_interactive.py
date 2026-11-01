@@ -71,9 +71,9 @@ def test_resume_from_eof_matches_direct_canonical_replay():
 
 @pytest.mark.parametrize("mutate", [
     lambda r: r["contract_session"]["state"].update(reward=9999),
-    lambda r: r["source_digest"] = "bad",
-    lambda r: r["team"] = "opponent",
-    lambda r: r["status"] = "completed",
+    lambda r: r.update(source_digest="bad"),
+    lambda r: r.update(team="opponent"),
+    lambda r: r.update(status="completed"),
 ])
 def test_tampered_receipt_fails_closed(mutate):
     receipt = play_contract_interactive(
