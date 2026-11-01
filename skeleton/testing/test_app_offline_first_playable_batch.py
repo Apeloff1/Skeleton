@@ -13,8 +13,10 @@ from skeleton.app.cli import run_app_cli
 from skeleton.app.offline_first_playable_batch import (
     DeliveryJob, FirstPlayableDeliveryBatchError,
     inspect_first_playable_delivery_batch, publish_first_playable_delivery_batch,
+    resume_first_playable_delivery_batch,
 )
 from skeleton.app.studio_journey import build_first_playable_journey
+from skeleton.app.offline_first_playable_delivery import publish_first_playable_delivery
 
 
 @pytest.fixture(scope="module")
@@ -235,3 +237,54 @@ def test_reinspection_rejects_same_length_different_player_actions(
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
         )
+
+
+def test_resumable_delivery_requires_independently_pinned_existing_prefix(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    first = jobs[0]
+    previous = publish_first_playable_delivery(
+        first.source, first.archive, first.install, first.save, first.receipt,
+        expected_manifest_sha256=first.manifest_sha256,
+        moves=first.moves, authorized=True,
+    )
+    prefix = replace(
+        first, archive_sha256=previous["archive_sha256"],
+        save_sha256=previous["save_sha256"],
+        receipt_sha256=previous["independent_receipt_sha256"],
+    )
+    original_receipt = Path(first.receipt).read_bytes()
+    resumed = resume_first_playable_delivery_batch(
+        (prefix, jobs[1]), tmp_path / "cohort.json", authorized=True,
+    )
+    assert resumed["previously_published_games"] == 1
+    assert resumed["newly_published_games"] == 1
+    assert Path(first.receipt).read_bytes() == original_receipt
+    verified = inspect_first_playable_delivery_batch(
+        pinned(jobs, resumed), tmp_path / "cohort.json",
+        expected_summary_sha256=resumed["independent_summary_sha256"],
+        authorized=True,
+    )
+    assert verified["all_live_games_reexecuted"] is True
+    assert verified["release_certified"] is False
+
+
+def test_resume_rejects_unpinned_or_forged_prefix_without_writing_next_game(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        resume_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+    forged = replace(
+        jobs[0], archive_sha256="0" * 64,
+        save_sha256="0" * 64, receipt_sha256="0" * 64,
+    )
+    with pytest.raises((ValueError, OSError)):
+        resume_first_playable_delivery_batch(
+            (forged, jobs[1]), tmp_path / "cohort.json", authorized=True,
+        )
+    assert not Path(jobs[1].archive).exists()
