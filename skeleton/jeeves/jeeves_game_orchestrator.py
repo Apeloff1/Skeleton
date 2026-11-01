@@ -7,7 +7,7 @@ Data-only. Operator remains the gate.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 try:
     from skeleton.ai.agents.jeeves.unified_game_capability import make_unified
@@ -55,6 +55,37 @@ class JeevesGameOrchestrator:
             "Only then consider native evidence on a qualified core",
         ]
         return out
+
+    def authoritative_walk(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Execute the typed canonical offline walk tool under explicit operator authority."""
+        from .studio_walk_tool import execute_walk_tool
+        return execute_walk_tool(request, authorized=authorized)
+
+    def authoritative_walk_catalog(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Run bounded canonical catalog choice assurance under operator authority."""
+        from .studio_walk_tool import execute_catalog_audit_tool
+        return execute_catalog_audit_tool(request, authorized=authorized)
+
+    def authoritative_walk_catalog_merge(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Revalidate source-bound catalog audit pages under operator authority."""
+        from .studio_walk_tool import execute_catalog_merge_tool
+        return execute_catalog_merge_tool(request, authorized=authorized)
+
+    def authoritative_canon_proof(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Audit original authored source and ending obligations under operator authority."""
+        from .studio_walk_tool import execute_canon_proof_tool
+        return execute_canon_proof_tool(request, authorized=authorized)
+
+    def authoritative_canon_revision(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Preview source-leased authored prose edits with canonical compilation."""
+        from .studio_walk_tool import execute_author_revision_tool
+        return execute_author_revision_tool(request, authorized=authorized)
+
+    def authoritative_choice_rehearsal(self, request: Mapping[str, Any], *,
+                                       authorized: bool = False) -> dict[str, Any]:
+        """Replay typed original quest-choice edits with canonical source custody."""
+        from .studio_choice_rehearsal_tool import execute_choice_rehearsal_tool
+        return execute_choice_rehearsal_tool(request, authorized=authorized)
 
     def model_card(self) -> str:
         return (
