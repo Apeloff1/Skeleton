@@ -15,6 +15,7 @@ from skeleton.ai.agents.jeeves import studio_scene_rehearsal_tool as rehearsal
 from skeleton.ai.agents.jeeves import studio_clue_visibility_tool as clue
 from skeleton.ai.agents.jeeves import studio_temporal_windows_tool as temporal
 from skeleton.ai.agents.jeeves import studio_temporal_scenarios_tool as scenarios
+from skeleton.ai.agents.jeeves import studio_npc_transit_tool as transit
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 ROUTER_SCHEMA = "skeleton.jeeves.studio_world_tool_router.v1"
@@ -64,6 +65,7 @@ _TOOL_SYMBOLS = (
     ("clue_visibility_tool_schema", "execute_clue_visibility_tool"),
     ("temporal_windows_tool_schema", "execute_temporal_windows_tool"),
     ("temporal_scenarios_tool_schema", "execute_temporal_scenarios_tool"),
+    ("npc_transit_tool_schema", "execute_npc_transit_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -98,7 +100,8 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    rehearsal if descriptor_name == "scene_rehearsal_tool_schema" else
                    clue if descriptor_name == "clue_visibility_tool_schema" else
                    temporal if descriptor_name == "temporal_windows_tool_schema" else
-                   scenarios if descriptor_name == "temporal_scenarios_tool_schema" else studio)
+                   scenarios if descriptor_name == "temporal_scenarios_tool_schema" else
+                   transit if descriptor_name == "npc_transit_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
         executor = getattr(adapter, executor_name)
         if (type(descriptor) is not dict or type(descriptor.get("name")) is not str
