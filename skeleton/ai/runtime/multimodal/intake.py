@@ -169,8 +169,10 @@ def _verify_declared_media_metadata(
             matches = type(supplied) is str and supplied == actual
         else:
             matches = (
-                type(supplied) in (int, float)
-                and math.isfinite(supplied)
+                (
+                    type(supplied) is int
+                    or (type(supplied) is float and math.isfinite(supplied))
+                )
                 and supplied == actual
             )
         if not matches:
