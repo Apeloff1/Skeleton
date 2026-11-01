@@ -15,6 +15,7 @@ from .fair_stream_queue import MeasuredStreamBudget
 from .fair_stream_session import DispatchPermit
 
 MAX_PROBES_PER_LEASE = 4096
+MAX_USED_LEASES = 4096  # bounded lifetime replay fence per guard instance
 MAX_DURATION_NS = 86_400_000_000_000  # 24h ceiling, not a hard preemption guarantee
 DEFAULT_DURATION_NS = 900_000_000_000  # 15m cooperative lease quantum
 
@@ -30,6 +31,33 @@ class NativePressureStatus:
     stopped: bool
     last_pressure_ppm: int | None
     gpu_device_qualified: bool = False
+
+
+def _canonical_cpu_permit(permit: object) -> bool:
+    """Reject Python bool/int aliasing and forged mutable lease identities."""
+    if type(permit) is not DispatchPermit or permit.device_qualified is not False:
+        return False
+    for value in (permit.lease_id, permit.checkpoint_digest):
+        if (type(value) is not str or len(value) != 64
+                or any(char not in "0123456789abcdef" for char in value)):
+            return False
+    if type(permit.request_id) is not str or not permit.request_id:
+        return False
+    try:
+        request_bytes = permit.request_id.encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
+        return False
+    if (len(request_bytes) > 128
+            or any(ord(char) < 32 or ord(char) == 127
+                   for char in permit.request_id)
+            or type(permit.generation) is not int
+            or not 0 <= permit.generation < (1 << 63)
+            or type(permit.tokens) is not int
+            or not 1 <= permit.tokens <= (1 << 24)
+            or type(permit.bytes_reserved) is not int
+            or not 0 < permit.bytes_reserved < (1 << 63)):
+        return False
+    return True
 
 
 class NativeTokenPressureGuard:
@@ -60,6 +88,8 @@ class NativeTokenPressureGuard:
         self._max_duration_ns = max_duration_ns
         self._lock = RLock()
         self._active: str | None = None
+        self._epoch = 0
+        self._used_leases: set[str] = set()
         self._samples = 0
         self._stopped = False
         self._pressure: int | None = None
@@ -89,11 +119,20 @@ class NativeTokenPressureGuard:
 
     def start(self, permit: DispatchPermit):
         """Return an interrupt callback; one active generation per guard."""
-        if type(permit) is not DispatchPermit or permit.device_qualified:
-            raise NativePressureInterrupted("CPU-only canonical permit required")
+        if not _canonical_cpu_permit(permit):
+            raise NativePressureInterrupted("CPU-only canonical typed permit required")
         with self._lock:
             if self._active is not None or self._stopped:
                 raise NativePressureInterrupted("pressure guard not available")
+            # Successful generations do not authorize replay of the same lease.
+            # The durable journal remains the cross-process authority; this is
+            # an independent bounded in-process fence against stale callbacks.
+            if permit.lease_id in self._used_leases:
+                self._stopped = True
+                raise NativePressureInterrupted("native pressure lease replay denied")
+            if len(self._used_leases) >= MAX_USED_LEASES:
+                self._stopped = True
+                raise NativePressureInterrupted("native pressure lease capacity exhausted")
             try:
                 started = monotonic_ns()
             except BaseException as exc:
@@ -104,13 +143,17 @@ class NativeTokenPressureGuard:
                 raise NativePressureInterrupted("invalid monotonic execution clock")
             self._start_ns = started
             self._last_ns = started
+            self._epoch += 1
+            epoch = self._epoch
+            self._used_leases.add(permit.lease_id)
             self._active = permit.lease_id
             self._samples = 0
             self._pressure = None
 
         def interrupt() -> None:
             with self._lock:
-                if self._active != permit.lease_id or self._stopped:
+                if (self._active != permit.lease_id
+                        or self._epoch != epoch or self._stopped):
                     raise NativePressureInterrupted("pressure guard no longer active")
                 self._check_deadline()
                 if self._samples >= self._max_probes:

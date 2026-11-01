@@ -197,3 +197,58 @@ def test_native_execution_duration_must_be_bounded(duration):
             LiveStreamBudgetSampler(), storage_path=".",
             max_duration_ns=duration,
         )
+
+
+def test_native_pressure_guard_burns_successful_lease_and_fences_old_callback(monkeypatch):
+    probe(monkeypatch, [budget(), budget(), budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    old_callback = guard.start(P)
+    old_callback()
+    old_callback()
+    guard.finish(success=True)
+    with pytest.raises(NativePressureInterrupted, match="replay"):
+        guard.start(P)
+    assert guard.status().stopped
+
+
+def test_native_pressure_old_callback_cannot_sample_new_lease(monkeypatch):
+    probe(monkeypatch, [budget(), budget(), budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    old_callback = guard.start(P)
+    old_callback()
+    old_callback()
+    guard.finish(success=True)
+    new_permit = replace(P, lease_id="d" * 64, request_id="next")
+    new_callback = guard.start(new_permit)
+    with pytest.raises(NativePressureInterrupted, match="no longer active"):
+        old_callback()
+    assert guard.status().samples == 0
+    new_callback()
+    new_callback()
+    guard.finish(success=True)
+    assert not guard.status().stopped
+
+
+@pytest.mark.parametrize("field,value", [
+    ("tokens", True), ("generation", True), ("bytes_reserved", True),
+    ("lease_id", "not-hex"), ("checkpoint_digest", "x" * 64),
+    ("request_id", "\\ud800"),
+])
+def test_native_pressure_rejects_forged_permit_types_without_sampling(field, value):
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="canonical typed permit"):
+        guard.start(replace(P, **{field: value}))
+    assert guard.status().samples == 0
+
+
+def test_native_pressure_guard_lifetime_capacity_is_bounded(monkeypatch):
+    monkeypatch.setattr(pressure_module, "MAX_USED_LEASES", 1)
+    probe(monkeypatch, [budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+    callback()
+    callback()
+    guard.finish(success=True)
+    with pytest.raises(NativePressureInterrupted, match="capacity"):
+        guard.start(replace(P, lease_id="e" * 64, request_id="next"))
+    assert guard.status().stopped
