@@ -16,7 +16,7 @@ from .studio_ecosystem_scene_schedule import (
     _canonical, _digest, _lease, _open_directory, _write_all,
     compile_scene_schedule,
 )
-from .studio_ecosystem_npc_transit import replay_npc_transit, MAX_EDGES
+from .studio_ecosystem_npc_transit import replay_npc_transit
 
 SCHEMA = "skeleton.game_builder.studio_npc_transit_editor.v1"
 EXPORT_SCHEMA = "skeleton.game_builder.studio_npc_transit_editor_export.v1"

@@ -145,7 +145,8 @@ def compile_npc_transit(
         "conflict_count": conflict_count,
         "all_transitions_feasible": conflict_count == 0,
         "source_replay_verified": True, "operator_estimates_only": True,
-        "physical_travel_verified": False, "file_write_performed": False,
+        "physical_travel_verified": False, "model_inference_performed": False,
+        "file_write_performed": False,
         "release_certified": False,
     }
     if len(_canonical(result)) > MAX_BYTES - 128:
@@ -164,13 +165,8 @@ def propose_npc_transit(
         raise StudioQuestError("unsupported NPC transit prompt")
     # No fabricated distance or travel-time measurements: operator must add
     # directed edges before any cross-site journey can be accepted.
-    result = compile_npc_transit(
+    return compile_npc_transit(
         documents, temporal_receipt, {"edges": []}, authorized=True)
-    result["model_inference_performed"] = False
-    # Preserve the proof's canonical digest after the typed proposal marker.
-    result["transit_digest"] = _digest({
-        key: value for key, value in result.items() if key != "transit_digest"})
-    return result
 
 
 def replay_npc_transit(
@@ -183,10 +179,6 @@ def replay_npc_transit(
     replay = compile_npc_transit(
         documents, receipt.get("temporal_receipt"), receipt.get("graph"),
         authorized=True)
-    if receipt.get("model_inference_performed") is False:
-        replay["model_inference_performed"] = False
-        replay["transit_digest"] = _digest({
-            key: value for key, value in replay.items() if key != "transit_digest"})
     if replay != receipt:
         raise StudioQuestError("NPC transit receipt failed canonical replay")
     return replay
