@@ -133,6 +133,29 @@ class KVPressureTieringTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             manager.migrate(keys, "cpu")
 
+    def test_custom_policy_cannot_disable_freshness_or_bounded_cooldown(self) -> None:
+        for bad in (True, 0, -1, 30_000_000_001, 1 << 80):
+            with self.subTest(sample_age=bad):
+                with self.assertRaises(ValueError):
+                    TierPressurePolicy(max_sample_age_ns=bad)
+        for bad in (True, 0, -1, 86_400_000_000_001):
+            with self.subTest(cooldown=bad):
+                with self.assertRaises(ValueError):
+                    TierPressurePolicy(cooldown_ns=bad)
+
+    def test_maximum_allowed_freshness_is_still_checked(self) -> None:
+        self.pages()
+        planner = KVPressureTierPlanner(
+            TierPressurePolicy(max_sample_age_ns=30_000_000_000)
+        )
+        sample = self.sample()
+        with self.assertRaisesRegex(ValueError, "stale"):
+            planner.plan(self.manager, sample, now_ns=30_000_001_001)
+        self.assertEqual(
+            planner.plan(self.manager, sample, now_ns=30_000_001_000).sample,
+            sample,
+        )
+
     def test_invalid_telemetry_is_rejected(self) -> None:
         for bad in (True, -1, 101, 1.5):
             with self.subTest(bad=bad):

@@ -15,6 +15,9 @@ from typing import Callable
 from .manager import KVCacheManager
 from .types import CacheTier, KVResidentPage
 
+MAX_SAMPLE_AGE_NS = 30_000_000_000  # 30 seconds, independent of custom policy
+MAX_COOLDOWN_NS = 86_400_000_000_000  # 24 hours
+
 
 def _positive(value: object, name: str, *, allow_zero: bool = False) -> int:
     if type(value) is not int or value < (0 if allow_zero else 1):
@@ -48,6 +51,13 @@ class TierPressurePolicy:
             _positive(getattr(self, name), name)
         if self.max_moves_per_round > 128:
             raise ValueError("migration batch exceeds safety bound")
+        if self.max_sample_age_ns > MAX_SAMPLE_AGE_NS:
+            raise ValueError("migration telemetry freshness ceiling exceeded")
+        if self.cooldown_ns > MAX_COOLDOWN_NS:
+            raise ValueError("migration cooldown exceeds bounded lifetime")
+        if (self.min_disk_reserve_bytes >= (1 << 63)
+                or self.min_cpu_headroom_bytes >= (1 << 63)):
+            raise ValueError("migration resource reserve exceeds integer boundary")
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +130,11 @@ class KVPressureTierPlanner:
         if not isinstance(manager, KVCacheManager) or not isinstance(sample, TierPressureSample):
             raise ValueError("canonical KV manager and measured sample required")
         _positive(now_ns, "now_ns", allow_zero=True)
-        if not sample.observed_at_ns <= now_ns <= sample.observed_at_ns + self.policy.max_sample_age_ns:
+        # A custom policy cannot silently extend stale telemetry beyond the
+        # canonical hard ceiling. All physical migration callers share it.
+        if not sample.observed_at_ns <= now_ns <= sample.observed_at_ns + min(
+            self.policy.max_sample_age_ns, MAX_SAMPLE_AGE_NS,
+        ):
             raise ValueError("stale or future resource telemetry")
         pages = manager.tier_inventory()
         inventory_digest = self._inventory_digest(pages)

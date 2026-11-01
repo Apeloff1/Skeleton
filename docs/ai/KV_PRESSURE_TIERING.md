@@ -41,3 +41,12 @@ never replaces the resident handle or increments the successful migration
 counter. Adapter exceptions increment storage-error accounting and propagate;
 partial earlier moves are not falsely rolled back or reported as atomic.
 These source-level simulated tests do not qualify physical GPU transfers.
+
+## Hard telemetry age and cooldown ceilings
+
+Custom migration policies cannot extend the OS pressure sample freshness
+window beyond 30 seconds or the cooldown beyond 24 hours. A policy that tries
+to bypass these bounds fails construction, rather than allowing arbitrarily
+stale RAM/disk evidence to authorize KV page movement. Resource reserves are
+also bounded to signed 63-bit capacity. Fresh per-page probes and the
+independent journal remain mandatory; this does not qualify GPU residency.
