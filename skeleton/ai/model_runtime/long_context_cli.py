@@ -83,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     plan.add_argument("--quantum-tokens", type=int, default=256)
     plan.add_argument("--max-checkpoints", type=int, default=4096)
     args = parser.parse_args(argv)
+    spool = None
     try:
         spool = LongContextSpool(args.root)
         if args.command.startswith("head-"):
@@ -184,6 +185,9 @@ def main(argv: list[str] | None = None) -> int:
                           "digest": item.digest}}
     except (LongContextSpoolError, OSError, ValueError) as exc:
         parser.exit(2, f"long-context-spool: {exc}\n")
+    finally:
+        if spool is not None:
+            spool.close()
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0
 
