@@ -19,7 +19,9 @@ from .studio_ecosystem_canon_proof import audit_canon_source
 from .studio_ecosystem_quest import (
     StudioQuestError, compile_quest_program, quest_progress, replay_quest,
 )
-from .studio_ecosystem_scene_schedule import _canonical, _digest, _lease, _open_directory
+from .studio_ecosystem_scene_schedule import (
+    _canonical, _digest, _lease, _open_directory, compile_scene_schedule,
+)
 
 SCHEMA = "skeleton.game_builder.studio_choice_rehearsal.v1"
 EXPORT_SCHEMA = "skeleton.game_builder.studio_choice_rehearsal_export.v1"
@@ -159,6 +161,14 @@ def render_choice_rehearsal(
             or schedule.get("project_id") != program.project_id
             or schedule.get("replay_verified") is not True):
         raise StudioQuestError("choice rehearsal schedule lease mismatch")
+    # A SHA-256 of caller-controlled JSON is not authority. Re-run the
+    # canonical scheduler against the exact quest replay before rendering.
+    verified_schedule = compile_scene_schedule(
+        documents, actions, schedule.get("schedule_request"), authorized=True,
+        expected_source_digest=expected_source_digest,
+        expected_session_digest=session.digest)
+    if schedule != verified_schedule:
+        raise StudioQuestError("choice rehearsal lacks canonical schedule proof")
     rows = schedule.get("timeline")
     if type(rows) is not list or len(rows) != len(program.stages) or len(rows) > 64:
         raise StudioQuestError("choice rehearsal scene inventory mismatch")
