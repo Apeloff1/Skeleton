@@ -15,16 +15,16 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from skeleton.api.charter_gate import require_charter
-from skeleton.api.command_routes import router as command_router
 from skeleton.api.idempotency import IdempotencyGuard
-from skeleton.api.server import get_state
 
 router = APIRouter()
-router.include_router(command_router)
 _idempotency = IdempotencyGuard()
 
 
 def _state():
+    # Import lazily: the compatibility sidecar is never the server entrypoint.
+    from skeleton.api.server import get_state
+
     return get_state()
 
 

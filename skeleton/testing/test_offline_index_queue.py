@@ -263,21 +263,26 @@ def test_expired_unreclaimed_worker_does_not_publish_document_index(
             assert documents.count() == 0
 
 
-def test_queue_enforces_global_job_limit_without_losing_existing_jobs(
+def test_queue_disk_pressure_denies_new_job_without_losing_existing_jobs(
     tmp_path: Path, monkeypatch,
 ) -> None:
     import skeleton.app.offline_index_queue as module
+    from skeleton.app.offline_resources import LocalResourcePressure
 
     source = _root(tmp_path)
     library = tmp_path / "knowledge.sqlite"
     queuefile = tmp_path / "queue.sqlite"
-    monkeypatch.setattr(module, "MAX_STORED_JOBS", 1)
     with OfflineIndexQueue(queuefile) as queue:
         original = queue.enqueue(source, library)
-        # Deduping existing accepted work is still allowed at the quota.
+        # Deduplication never needs a new storage admission.
         assert queue.enqueue(source, library).job_id == original.job_id
         queue.cancel(original.job_id)
-        with pytest.raises(OfflineQueueError, match="quota"):
+
+        def reject_write(*_args, **_kwargs):
+            raise LocalResourcePressure("insufficient measurable storage headroom")
+
+        monkeypatch.setattr(module, "admit_resident_document", reject_write)
+        with pytest.raises(OfflineQueueError, match="headroom"):
             queue.enqueue(source, library)
         assert len(queue.list_jobs()) == 1
         assert queue.get(original.job_id).state == "cancelled"
