@@ -103,3 +103,48 @@ normalization before its source/archive containment check. Without it,
 containment guard even though each opened component was not a symlink.
 Source and destination still require descriptor-anchored ownership checks;
 no archive or game source is rewritten on rejection.
+
+## Independent cohort pins and interrupted-delivery recovery
+
+The batch inspector, resume path, private job-file bridge, and quarantine
+triage share one strict 64-character lowercase SHA-256 pin validator.
+A literal backslash followed by `Z` is **not** a digest terminator and must
+never be required or accepted. All three archive/save/receipt pins must be
+supplied for an already published game; a partial triple is rejected. Fresh
+publication cannot use output pins as authority, and each original manifest
+pin is validated before destination or source I/O.
+
+A successful single-game replay does not permanently certify a multi-game
+cohort. During publication and resume, the publisher replays **every**
+original source after the final game has been installed and again after
+the summary receipt is published. It compares each source against its
+initially admitted result and pinned source-root identity. If an earlier
+source changes while a later game is being delivered, the cohort fails
+closed and does **not** issue a successful summary. Already published
+files remain in place for operator quarantine; no pathname rollback or
+unsafe overwrite is attempted.
+
+Read-only triage only reports `resume_eligible_with_independent_pins: true`
+when the previously published prefix has valid independent replay pins,
+the suffix outputs are absent, the summary is absent, **and** the remaining
+original sources pass replay and no-clobber destination preflight.
+`resume_source_preflight_verified` records that point-in-time check;
+`resume_destinations_reserved` remains false. Duplicate original project
+identities, changed source manifests, occupied destinations and failed
+source custody turn eligibility off. This is not a lock, reservation, device
+qualification or release authorization. The subsequent resume repeats its
+own admission and publication checks.
+
+Focused regression entrypoints (execution still required):
+
+```sh
+python -m pytest -q \
+  skeleton/testing/test_app_offline_first_playable_pin_contract.py \
+  skeleton/testing/test_app_offline_first_playable_batch.py \
+  skeleton/testing/test_app_offline_first_playable_batch_triage.py \
+  skeleton/testing/test_app_offline_first_playable_jobfile.py
+```
+
+The source-level evidence never implies Windows installation, native Godot
+execution, trusted publisher signatures, rights clearance, hardware
+qualification, or production release certification.
