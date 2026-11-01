@@ -74,3 +74,7 @@ python -m unittest tests.flgb.test_long_context_spool -v
 
 Full model/OS qualification, source provenance, device memory safety and
 release readiness remain separate mandatory gates.
+
+## Bounded token materialization
+
+`LongContextSpool.next_window` now caps each in-memory token tuple independently of the serialized context size. The default maximum is 4,096 tokens per window; a trusted application can select a lower limit or explicitly configure up to 65,536. Oversized requests fail before loading token content or advancing immutable checkpoints. This is a host-memory allocation bound, not a device-memory or GPU qualification. Production execution must still independently enforce actual CPU/GPU/thermal budgets and acknowledge progress only after completed work.

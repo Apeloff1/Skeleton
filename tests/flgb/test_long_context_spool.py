@@ -59,6 +59,37 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertEqual(sequence, self.sequence)
         self.assertEqual(restored.stage(self.sequence), start)
 
+    def test_token_window_allocation_is_bounded_independently_of_spool_size(self):
+        checkpoint = self.stage()
+        with self.assertRaisesRegex(LongContextSpoolError, "max_tokens"):
+            self.spool.next_window(
+                checkpoint, expected_tokenizer_digest=TOKENIZER,
+                max_tokens=4097,
+            )
+        strict = LongContextSpool(
+            self.root, max_window_tokens=4, disk_reserve_bytes=0,
+        )
+        self.assertEqual(
+            strict.next_window(
+                checkpoint, expected_tokenizer_digest=TOKENIZER, max_tokens=4,
+            ).token_ids, (0, 1, 2, 3),
+        )
+        with self.assertRaisesRegex(LongContextSpoolError, "max_tokens"):
+            strict.next_window(
+                checkpoint, expected_tokenizer_digest=TOKENIZER, max_tokens=5,
+            )
+        for invalid in (0, True, -1, 65537):
+            with self.subTest(invalid=invalid), self.assertRaises(LongContextSpoolError):
+                LongContextSpool(
+                    self.root, max_window_tokens=invalid, disk_reserve_bytes=0,
+                )
+        # A denied oversized read never advances immutable custody.
+        self.assertEqual(
+            self.spool.load(
+                checkpoint, expected_tokenizer_digest=TOKENIZER,
+            )[0].cursor, 0,
+        )
+
     def test_bounded_windows_and_explicit_progress(self):
         current = self.stage()
         for expected_start in (0, 8, 16, 24):

@@ -26,6 +26,8 @@ from .tokenization import (
 
 _SCHEMA = "skeleton.ai.long-context-spool.v1"
 _CHUNK = 1024 * 1024
+MAX_WINDOW_TOKENS = 65_536
+DEFAULT_WINDOW_TOKENS = 4_096
 
 
 class LongContextSpoolError(TokenizerContractError):
@@ -176,14 +178,17 @@ class LongContextSpool:
         directory: str | Path,
         *,
         max_sequence_bytes: int = MAX_SERIALIZED_SEQUENCE_BYTES,
+        max_window_tokens: int = DEFAULT_WINDOW_TOKENS,
         disk_reserve_bytes: int = 128 * 1024 * 1024,
     ) -> None:
         _positive(max_sequence_bytes, "max_sequence_bytes", MAX_SERIALIZED_SEQUENCE_BYTES)
+        _positive(max_window_tokens, "max_window_tokens", MAX_WINDOW_TOKENS)
         if (isinstance(disk_reserve_bytes, bool) or not isinstance(disk_reserve_bytes, int)
                 or not 0 <= disk_reserve_bytes <= 2**63 - 1):
             raise LongContextSpoolError("invalid disk reserve")
         self.root = Path(os.path.abspath(directory)) if os.name == "posix" else Path(directory)
         self.max_sequence_bytes = max_sequence_bytes
+        self.max_window_tokens = max_window_tokens
         self.disk_reserve_bytes = disk_reserve_bytes
         self.objects = self.root / "objects"
         self.checkpoints = self.root / "checkpoints"
@@ -571,7 +576,10 @@ class LongContextSpool:
     def next_window(
         self, checkpoint_digest: str, *, expected_tokenizer_digest: str, max_tokens: int,
     ) -> TokenWindow | None:
-        _positive(max_tokens, "max_tokens", 2**31 - 1)
+        # Never materialize an unbounded token tuple in the application.
+        # This per-instance limit is intentionally independent of the full
+        # serialized context length and applies after process restart.
+        _positive(max_tokens, "max_tokens", self.max_window_tokens)
         checkpoint, sequence = self.load(
             checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
         )
