@@ -116,3 +116,16 @@ def bind_native_cpu_dispatch_service(
         session, owner, sampler=sampler, storage_path=storage_path,
     )
     return service, vault
+
+
+def native_cpu_prompt_memory_status(
+    registry: NativePromptRegistry,
+) -> dict[str, int | str]:
+    """Read only aggregate staged RAM use, never tenant IDs or plaintext.
+
+    The app authenticates the operator before exposing this telemetry. This
+    snapshot does not reserve physical memory or certify CPU/GPU hardware.
+    """
+    if type(registry) is not NativePromptRegistry:
+        raise ValueError("canonical native prompt registry required")
+    return registry.budget_status()

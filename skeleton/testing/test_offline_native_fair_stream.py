@@ -156,3 +156,26 @@ def test_result_and_journal_same_inode_denied(private_files):
             journal=journal, result_key=RESULT_KEY,
             sampler=LiveStreamBudgetSampler(), storage_path=".",
         )
+
+
+def test_app_native_prompt_ram_status_is_payload_free():
+    from skeleton.app.offline_native_fair_stream import (
+        native_cpu_prompt_memory_status,
+    )
+    runtime = NativeLLMRuntime(
+        TinyTransformer(vocab=("hello", "world"), dim=8, ctx=24, seed=3),
+    )
+    registry = NativePromptRegistry(session_id=SESSION)
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry,
+        request_id="sensitive-request", tenant_id="sensitive-tenant",
+        prompt="hello", max_output_tokens=1,
+    )
+    status = native_cpu_prompt_memory_status(registry)
+    assert status["staged_bytes"] == 5
+    assert status["staged_grants"] == 1
+    assert "sensitive-request" not in str(status)
+    assert "sensitive-tenant" not in str(status)
+    assert "hello" not in str(status)
+    with pytest.raises(ValueError, match="canonical"):
+        native_cpu_prompt_memory_status(object())

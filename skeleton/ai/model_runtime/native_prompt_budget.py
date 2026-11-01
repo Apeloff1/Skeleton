@@ -58,9 +58,13 @@ class PromptBudgetLedger:
 
     @staticmethod
     def _tenant(tenant: object) -> str:
-        if (type(tenant) is not str or not tenant
-                or len(tenant.encode("utf-8", errors="strict")) > 128
-                or any(ord(c) < 32 or ord(c) == 127 for c in tenant)):
+        if type(tenant) is not str or not tenant:
+            raise PromptBudgetDenied("invalid tenant for prompt reservation")
+        try:
+            encoded = tenant.encode("utf-8", errors="strict")
+        except UnicodeEncodeError as exc:
+            raise PromptBudgetDenied("invalid tenant Unicode") from exc
+        if len(encoded) > 128 or any(ord(c) < 32 or ord(c) == 127 for c in tenant):
             raise PromptBudgetDenied("invalid tenant for prompt reservation")
         return tenant
 
@@ -109,6 +113,8 @@ class PromptBudgetLedger:
                 raise PromptBudgetDenied("unowned prompt reservation release")
             if count == 1 and tenant_bytes != size:
                 raise PromptBudgetDenied("last prompt reservation accounting mismatch")
+            if count > 1 and tenant_bytes <= size:
+                raise PromptBudgetDenied("prompt reservation count mismatch")
             if count == 1:
                 del self._counts[tenant]
                 del self._tenant_bytes[tenant]

@@ -132,3 +132,23 @@ def test_accounting_corruption_fails_closed():
         ledger.reserve("bob", 2)
     with pytest.raises(PromptBudgetDenied, match="invariant"):
         ledger.snapshot()
+
+
+@pytest.mark.parametrize("tenant", ["\\ud800", "", "bad\\nidentity"])
+def test_untrusted_tenant_identity_is_denied(tenant):
+    ledger = PromptBudgetLedger(NativePromptBudget())
+    with pytest.raises(PromptBudgetDenied):
+        ledger.reserve(tenant, 1)
+    assert ledger.snapshot()["staged_bytes"] == 0
+
+
+def test_corrupt_multi_grant_release_does_not_partially_mutate():
+    ledger = PromptBudgetLedger(NativePromptBudget())
+    ledger.reserve("alice", 3)
+    ledger.reserve("alice", 3)
+    with pytest.raises(PromptBudgetDenied):
+        ledger.release("alice", 6)
+    assert ledger.snapshot()["staged_bytes"] == 6
+    ledger.release("alice", 3)
+    ledger.release("alice", 3)
+    assert ledger.snapshot()["staged_grants"] == 0
