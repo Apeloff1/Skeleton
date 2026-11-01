@@ -184,3 +184,32 @@ def test_app_first_token_does_not_escape_expired_quantum():
         app.first_token()
     assert app.status().telemetry_quarantined
     assert app.status().state == "aborted"
+
+
+def test_unexpected_guard_status_exception_quarantines_app(monkeypatch):
+    app = controller()
+    app.begin(request_id="unexpected", prompt_tokens=2)
+    def broken_status(self):
+        raise RuntimeError("unexpected backend status failure")
+    with monkeypatch.context() as scoped:
+        scoped.setattr(InFlightCPUResourceGuard, "status", broken_status)
+        with pytest.raises(InFlightLifecycleQuarantined, match="unexpected CPU guard"):
+            app.status()
+    after = app.status()
+    assert after.telemetry_quarantined
+    assert not after.continue_execution
+    assert after.state == "aborted"
+
+
+def test_unexpected_guard_start_exception_never_begins_tail_capture(monkeypatch):
+    app = controller()
+    def broken_start(self):
+        raise RuntimeError("unexpected guard start failure")
+    with monkeypatch.context() as scoped:
+        scoped.setattr(InFlightCPUResourceGuard, "start", broken_start)
+        with pytest.raises(InFlightLifecycleQuarantined, match="unexpected CPU guard"):
+            app.begin(request_id="unexpected", prompt_tokens=2)
+    assert app.status().telemetry_quarantined
+    assert app.status().request_id is None
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.begin(request_id="retry", prompt_tokens=2)

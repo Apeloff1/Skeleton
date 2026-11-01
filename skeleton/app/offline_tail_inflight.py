@@ -78,6 +78,17 @@ class OfflineTailInFlightSession:
                     "terminal CPU quantum requires execution journal reconciliation"
                 ) from exc
             raise
+        except BaseException as exc:
+            # Unexpected vendor/clock/guard exceptions must never leave an
+            # apparently reusable in-flight application controller.
+            self._quarantined = True
+            try:
+                self._guard.abort()
+            except BaseException:
+                pass
+            raise InFlightLifecycleQuarantined(
+                "unexpected CPU guard failure requires journal reconciliation"
+            ) from exc
 
     def _status(self, decision: InFlightPressureDecision) -> OfflineInFlightStatus:
         return OfflineInFlightStatus(
@@ -101,7 +112,7 @@ class OfflineTailInFlightSession:
             self._require_healthy()
             if self._request_id is not None:
                 raise InFlightPressureDenied("one in-flight request per controller")
-            decision = self._guard.start()
+            decision = self._checked_guard(self._guard.start)
             try:
                 self._capture.begin(
                     request_id=request_id, prompt_tokens=prompt_tokens,

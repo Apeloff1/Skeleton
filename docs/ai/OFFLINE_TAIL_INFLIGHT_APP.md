@@ -18,3 +18,5 @@ Focused tests: `python -m pytest -q
 skeleton/testing/test_offline_tail_inflight.py
 skeleton/testing/test_tail_inflight_guard.py`. Complete exact-head CI,
 thermal/device and integration qualification remain mandatory.
+
+Unexpected CPU guard or platform-adapter exceptions now quarantine the app lifecycle even when they are not a typed pressure denial. The controller attempts a terminal abort and requires durable execution-journal reconciliation before any new request; it never treats an exception as a healthy pressure sample or permits implicit replay. This remains cooperative and does not qualify a GPU or device.
