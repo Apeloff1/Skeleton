@@ -341,6 +341,22 @@ class GitBisectRun:
             )
             output = f"{proc.stdout}\n{proc.stderr}"
             result.steps = _read_steps(steps_log)
+            # Git trusts the caller's bad endpoint. Its summary is not proof
+            # that this test command actually fails at that commit. Check it
+            # in a disposable worktree before accepting any unique culprit.
+            if proc.returncode == 0:
+                endpoint_tree = tmp / "verified-bad-endpoint"
+                self.git.run("worktree", "add", "--detach", "--force", str(endpoint_tree), bad_sha)
+                try:
+                    endpoint_probe = make_step_runner(
+                        command, timeout_s=self.timeout_s, timeout_as=self.timeout_as,
+                    )(endpoint_tree, bad_sha)
+                    result.steps.append(endpoint_probe)
+                finally:
+                    self.git.run("worktree", "remove", "--force", str(endpoint_tree), check=False)
+                    self.git.run("worktree", "prune", check=False)
+                if endpoint_probe.outcome != BAD:
+                    raise BisectError("test command does not fail at declared bad endpoint")
             match = _FIRST_BAD.search(output)
             if match:
                 result.first_bad = self.git.commit(match.group(1))
@@ -355,6 +371,19 @@ class GitBisectRun:
                     proven = _verified_bisect_head(self.git, candidates, good_sha, result.steps)
                     if proven is not None:
                         result.first_bad = self.git.commit(proven)
+                    elif candidates and candidates[-1] == bad_sha:
+                        # Newer Git may leave HEAD on the final good probe
+                        # without emitting the canonical first-bad sentence.
+                        # Only accept the declared endpoint when its *direct*
+                        # bad probe above and its adjacent good predecessor
+                        # establish a unique good/bad boundary.
+                        predecessor = good_sha if len(candidates) == 1 else candidates[-2]
+                        good_witness = any(
+                            step.sha == predecessor and step.outcome == GOOD
+                            for step in result.steps
+                        )
+                        if predecessor == good_sha or good_witness:
+                            result.first_bad = self.git.commit(bad_sha)
                 else:
                     raise BisectError("git bisect run failed: " + (output.strip().splitlines() or ["?"])[-1])
         finally:
