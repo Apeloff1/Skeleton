@@ -42,6 +42,27 @@ class QuestSaveTests(unittest.TestCase):
         self.assertEqual(got, {"q1": self.prog})
         self.assertEqual(got["q1"].objectives["0"].current, 2)
 
+    def test_restore_requires_trusted_state_or_campaign_receipt(self):
+        plane = GameSavePlane()
+        save_quest_progress(plane, "s", 1, self.section)
+        with self.assertRaisesRegex(QuestProgressSaveError, "requires verified"):
+            restore_quest_progress(plane, "s", self.w)
+        with self.assertRaisesRegex(QuestProgressSaveError, "invalid campaign receipt"):
+            restore_quest_progress(plane, "s", self.w, campaign_receipt_sha256="not-a-digest")
+        restored = restore_quest_progress(plane, "s", self.w, verified_state=self.state)
+        self.assertEqual(restored, {"q1": self.prog})
+        self.assertEqual(
+            restore_quest_progress(plane, "s", self.w, campaign_receipt_sha256="ab" * 32),
+            {"q1": self.prog},
+        )
+
+    def test_restore_rejects_cross_project_section(self):
+        plane = GameSavePlane()
+        malicious = dict(self.section, project="different-project")
+        save_quest_progress(plane, "s", 1, malicious)
+        with self.assertRaisesRegex(QuestProgressSaveError, "another project"):
+            restore_quest_progress(plane, "s", self.w, verified_state=self.state)
+
     def test_rejects_mismatched_state_world_or_receipt(self):
         plane = GameSavePlane()
         save_quest_progress(plane, "s", 1, self.section)
