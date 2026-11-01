@@ -203,3 +203,28 @@ def test_cli_without_operator_acknowledgement_is_blocked(recovery, capsys):
     assert receipt["status"] == "blocked"
     assert receipt["release_certified"] is False
     assert not recovery[-1].exists()
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow custody")
+def test_read_only_signed_recovery_preflight_does_not_reserve(recovery, capsys):
+    args = _cli(recovery) + ["--preflight-only"]
+    before = (recovery[0] / "index.html").read_bytes()
+    assert run_app_cli(args) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["schema"] == "skeleton.app.signed_offline_install_recovery_preflight.v1"
+    assert receipt["source_archive_signature_verified"] is True
+    assert receipt["destination_reserved"] is False
+    assert receipt["source_installation_verified"] is False
+    assert receipt["read_only"] is True
+    assert receipt["release_certified"] is False
+    assert not recovery[-1].exists()
+    assert (recovery[0] / "index.html").read_bytes() == before
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow custody")
+def test_preflight_wrong_key_pin_never_reserves(recovery, capsys):
+    args = _cli(recovery) + ["--preflight-only"]
+    pos = args.index("--expected-public-key-sha256") + 1
+    args[pos] = "0" * 64
+    assert run_app_cli(args) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not recovery[-1].exists()

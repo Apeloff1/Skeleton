@@ -26,3 +26,8 @@ This is source-level, point-in-time evidence on supported POSIX hosts.
 It does **not** certify native package signing, publisher identity, content
 rights, Godot execution, consumer hardware, or release readiness. Existing
 malware, secret, dependency, workflow-input and exact-head CI holds remain.
+
+For read-only planning, append `--preflight-only`. This validates signature,
+quarantine identity and destination availability without reserving or
+publishing anything. The preflight is not a lease: the real recovery repeats
+all security checks before its atomic no-clobber reservation.

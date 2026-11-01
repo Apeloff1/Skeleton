@@ -44,6 +44,90 @@ def _custody(
     )
 
 
+def preflight_signed_offline_install_recovery(
+    quarantined_source: str | Path,
+    archive: str | Path,
+    fresh_destination: str | Path,
+    public_key_file: str | Path,
+    signature_file: str | Path,
+    *,
+    expected_archive_sha256: str,
+    expected_manifest_sha256: str,
+    expected_public_key_sha256: str,
+    authorized: bool,
+) -> dict[str, object]:
+    """Read-only signature, quarantine and fresh destination admission.
+
+    The result is an observation, not a lease. Publication must repeat all
+    checks and independently reserve a destination with O_EXCL/mkdir.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    for name, pin in (
+        ("archive", expected_archive_sha256),
+        ("manifest", expected_manifest_sha256),
+        ("public key", expected_public_key_sha256),
+    ):
+        _pin(pin, name)
+    partial = Path(quarantined_source).expanduser().absolute()
+    target = Path(fresh_destination).expanduser().absolute()
+    if partial == target or partial in target.parents or target in partial.parents:
+        raise SignedOfflineInstallRecoveryError(
+            "quarantined and fresh installation paths must be disjoint"
+        )
+    original = _custody(partial, archive, public_key_file, signature_file)
+    signed = verify_offline_source_archive_signature(
+        archive, public_key_file, signature_file,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_public_key_sha256=expected_public_key_sha256,
+        authorized=True,
+    )
+    quarantined = inspect_offline_install_quarantine(
+        partial, archive,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    ready = preflight_offline_game_install(
+        archive, target,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    if (
+        original != _custody(partial, archive, public_key_file, signature_file)
+        or signed.get("source_archive_signature_verified") is not True
+        or signed.get("release_certified") is not False
+        or quarantined.get("quarantine_cleared") is not False
+        or ready.get("destination_available_at_inspection") is not True
+        or ready.get("destination_reserved") is not False
+        or ready.get("release_certified") is not False
+    ):
+        raise SignedOfflineInstallRecoveryError("signed recovery preflight unqualified")
+    return {
+        "schema": "skeleton.app.signed_offline_install_recovery_preflight.v1",
+        "status": "signed_quarantine_recovery_ready_unreserved_release_blocked",
+        "archive_sha256": expected_archive_sha256,
+        "manifest_sha256": expected_manifest_sha256,
+        "public_key_sha256": expected_public_key_sha256,
+        "signed_message_sha256": signed["signed_message_sha256"],
+        "quarantined_missing_files": quarantined["missing_files"],
+        "quarantined_extra_files": quarantined["extra_files"],
+        "quarantined_mismatched_files": quarantined["mismatched_files"],
+        "source_archive_signature_verified": True,
+        "original_quarantine_retained": True,
+        "original_quarantine_cleared": False,
+        "destination_reserved": False,
+        "source_installation_verified": False,
+        "offline_gameplay_reexecuted": False,
+        "read_only": True,
+        "native_device_qualified": False,
+        "package_signed": False,
+        "release_certified": False,
+    }
+
+
 def recover_signed_offline_game_install(
     quarantined_source: str | Path,
     archive: str | Path,
@@ -202,9 +286,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--expected-manifest-sha256", required=True)
     parser.add_argument("--expected-public-key-sha256", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
+    parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args(argv)
     try:
-        receipt = recover_signed_offline_game_install(
+        operation = (preflight_signed_offline_install_recovery if args.preflight_only
+                     else recover_signed_offline_game_install)
+        receipt = operation(
             args.quarantined, args.archive, args.destination,
             args.public_key, args.signature,
             expected_archive_sha256=args.expected_archive_sha256,
@@ -224,5 +311,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = [
     "SCHEMA", "SignedOfflineInstallRecoveryError",
+    "preflight_signed_offline_install_recovery",
     "recover_signed_offline_game_install", "main",
 ]
