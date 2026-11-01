@@ -5,7 +5,7 @@ security/gameplay invariants."
 
 Operates on the *source of one function* via ``ast``: generates mutants
 (comparison flips, boundary shifts, arithmetic swaps, boolean negation,
-constant tweaks), compiles each in isolation and runs a caller-supplied test
+constant tweaks), interprets each under a bounded AST allowlist and runs a caller-supplied test
 callable against it. A mutant is *killed* if the test raises/returns False.
 The report's score is killed/total; :meth:`MutationReport.gate` fails if the
 score is below a threshold, listing survivors as evidence.
@@ -172,7 +172,7 @@ def _interpret(node: ast.AST, variables: dict, depth: int = 0):
     raise MutationUnsupportedError("unsupported mutant AST; execution refused")
 
 
-def _compile(m: Mutant, name: str, env: dict) -> Callable:
+def _compile(m: Mutant, name: str) -> Callable:
     """Compile to a bounded *interpreter closure*, never Python bytecode.
 
     Only one pure function with a single return expression and positional
@@ -207,10 +207,9 @@ def run_mutation(fn: Callable, test: Callable[[Callable], object]) -> MutationRe
     if test(fn) is False:
         raise AssertionError("test fails on the unmutated function")
     rep = MutationReport(fn.__name__)
-    env = dict(fn.__globals__)
     for m in generate_mutants(fn):
         # Unsupported syntax must not inflate the mutation score as a fake kill.
-        cand = _compile(m, fn.__name__, env)
+        cand = _compile(m, fn.__name__)
         try:
             killed = test(cand) is False
         except MutationUnsupportedError:
