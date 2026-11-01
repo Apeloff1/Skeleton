@@ -17,6 +17,7 @@ import argparse
 import importlib
 import json
 import os
+import re
 import sys
 from typing import Any, Callable, List, Optional, Sequence
 
@@ -41,8 +42,10 @@ def _read_json(path: str) -> Any:
 
 def _resolve(target: str) -> Callable[[], Any]:
     module_name, sep, attr = target.partition(":")
-    if not sep or not module_name or not attr:
-        raise UsageError("target must look like 'package.module:function'")
+    if not sep or not module_name or not attr or len(target) > 256 or not re.fullmatch(
+        r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*", target
+    ):
+        raise UsageError("target must be a bounded 'package.module:function' identifier")
     try:
         fn = getattr(importlib.import_module(module_name), attr)
     except (ImportError, AttributeError) as exc:
@@ -73,6 +76,13 @@ def _cmd_alloc(args: argparse.Namespace) -> int:
     # Require two operator-controlled gates before importing the target.
     if os.environ.get("SKELETON_PERF_TRUSTED_EXECUTION") != "1" or not args.allow_local_callable:
         raise UsageError("alloc requires trusted local operator execution and --allow-local-callable")
+    # Pin the exact operator-trusted callable before any dynamic module import.
+    raw_targets = os.environ.get("SKELETON_PERF_ALLOWED_TARGETS", "")
+    if len(raw_targets) > 4096:
+        raise UsageError("trusted target allowlist exceeds the configured bound")
+    allowed = tuple(value.strip() for value in raw_targets.split(",") if value.strip())
+    if len(allowed) > 64 or args.target not in allowed:
+        raise UsageError("alloc target is not in the explicit trusted allowlist")
     fn = _resolve(args.target)
     with AllocationTracker(top_n=args.top) as tracker:
         with tracker.scope(args.target) as result:
