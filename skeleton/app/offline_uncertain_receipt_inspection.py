@@ -61,7 +61,7 @@ def inspect_uncertain_receipt(
         )
     if (type(protected_roots) not in (tuple, list)
             or not 1 <= len(protected_roots) <= MAX_PROTECTED_ROOTS
-            or any(type(item) not in (str, Path)
+            or any(not (type(item) is str or isinstance(item, Path))
                    or not str(item) for item in protected_roots)):
         raise OfflineUncertainReceiptInspectionError(
             "bounded explicit original custody roots required"

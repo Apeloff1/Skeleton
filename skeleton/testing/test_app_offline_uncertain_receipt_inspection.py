@@ -149,3 +149,24 @@ def test_triage_rejects_unbounded_protected_root_inventory(tmp_path):
             protected_roots=[str(tmp_path / f"source-{i}") for i in range(65)],
             authorized=True,
         )
+
+
+def test_triage_accepts_actual_path_objects_for_protected_roots(
+    catalog, tmp_path,
+):
+    """Path and str roots have the same custody semantics on POSIX."""
+    from pathlib import Path
+
+    epochs, target, roots = _setup(catalog, tmp_path)
+    published = publish_mixed_library_epoch_handoff(
+        epochs, target, authorized=True,
+    )
+    report = inspect_uncertain_receipt(
+        target,
+        expected_receipt_sha256=published["receipt_sha256"],
+        protected_roots=tuple(Path(root) for root in roots),
+        authorized=True,
+    )
+    assert report["receipt_integrity_verified"] is True
+    assert report["game_replay_reverified"] is False
+    assert report["release_certified"] is False
