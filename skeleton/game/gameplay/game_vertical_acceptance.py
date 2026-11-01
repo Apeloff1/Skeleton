@@ -41,6 +41,13 @@ def _engine(kind: Any):
         )
         return (simulate_campaign, resume_campaign, verify_campaign,
                 export_campaign, import_campaign)
+    if kind == "combat_contract":
+        from skeleton.game.gameplay.combat_contract import (
+            simulate_contract, resume_contract, verify_contract,
+            export_contract, import_contract,
+        )
+        return (simulate_contract, resume_contract, verify_contract,
+                export_contract, import_contract)
     if kind == "expedition_quest":
         from skeleton.game.gameplay.expedition_quest import (
             simulate_quest, resume_quest, verify_quest,
@@ -162,6 +169,11 @@ def demo_acceptance(kind: str) -> dict[str, Any]:
             original_campaign, demo_campaign_actions,
         )
         return accept_vertical(kind, original_campaign(), demo_campaign_actions())
+    if kind == "combat_contract":
+        from skeleton.game.gameplay.combat_contract import original_contract
+        from skeleton.game.gameplay.turn_combat import original_demo
+        _, actions = original_demo()
+        return accept_vertical(kind, original_contract(), actions)
     if kind == "expedition_quest":
         from skeleton.game.gameplay.expedition_quest import (
             original_quest, demo_actions,
@@ -180,9 +192,9 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton game-vertical-accept")
     sub = parser.add_subparsers(dest="command", required=True)
     demo = sub.add_parser("demo")
-    demo.add_argument("--kind", choices=("forge", "quest", "expedition_quest"), required=True)
+    demo.add_argument("--kind", choices=("forge", "quest", "expedition_quest", "combat_contract"), required=True)
     run = sub.add_parser("run")
-    run.add_argument("--kind", choices=("forge", "quest", "expedition_quest"), required=True)
+    run.add_argument("--kind", choices=("forge", "quest", "expedition_quest", "combat_contract"), required=True)
     run.add_argument("--source-json", required=True)
     run.add_argument("--actions-json", required=True)
     run.add_argument("--checkpoint-at", type=int)
