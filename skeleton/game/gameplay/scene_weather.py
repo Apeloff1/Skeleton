@@ -249,8 +249,32 @@ def cli(argv: Sequence[str]) -> int:
     resume = sub.add_parser("resume")
     resume.add_argument("--session-json", required=True)
     resume.add_argument("--actions-json", required=True)
+    solve = sub.add_parser("solve", help="Find replay-proven weather-safe victory")
+    solve_source = solve.add_mutually_exclusive_group(required=True)
+    solve_source.add_argument("--demo", action="store_true")
+    solve_source.add_argument("--source-json")
+    solve_source.add_argument("--session-json")
+    solve.add_argument("--max-states", type=int, default=256)
+    solve.add_argument("--max-depth", type=int, default=32)
     args = parser.parse_args(list(argv))
     try:
+        if args.command == "solve":
+            from skeleton.game.gameplay.scene_weather_solver import plan_weather
+            source = (
+                original_weather_demo()[0] if args.demo else
+                _json(args.source_json, "weather source")
+                if args.source_json is not None else None
+            )
+            session = (
+                _json(args.session_json, "weather save")
+                if args.session_json is not None else None
+            )
+            result = plan_weather(
+                source, session=session,
+                max_states=args.max_states, max_depth=args.max_depth,
+            )
+            print(_export(result))
+            return 0
         if args.command == "demo":
             source, actions = original_weather_demo()
             result = simulate(source, actions)
