@@ -252,3 +252,14 @@ def test_installed_interactive_scene_cli(monkeypatch, capsys) -> None:
     events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert events[-1]["event"] == "terminal"
     assert events[-1]["ending"] == "victory"
+
+
+def test_scene_cli_rejects_duplicate_json_keys_and_nonfinite_values(capsys) -> None:
+    source, actions = original_demo()
+    duplicate = '{"schema_version":"skeleton.scene_travel.v1","schema_version":"skeleton.scene_travel.v1"}'
+    assert cli(["simulate", "--world-json", duplicate,
+                "--actions-json", json.dumps(actions)]) == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
+    assert cli(["simulate", "--world-json", json.dumps(source),
+                "--actions-json", '[{"kind":"travel","exit_id":NaN}]']) == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
