@@ -285,12 +285,14 @@ def test_checkpoint_file_cli_rejects_mixed_input_and_oversize(tmp_path, capsys):
                 "--trusted-local-operator"]
     ) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
-    # argparse must reject ambiguous JSON/file mode instead of ignoring one.
-    assert run_app_cli(
-        base + ["--checkpoint", "{}",
-                "--checkpoint-file", str(oversized),
-                "--trusted-local-operator"]
-    ) == 2
+    # argparse rejects conflicting input modes before invoking any verifier.
+    with pytest.raises(SystemExit) as rejected:
+        run_app_cli(
+            base + ["--checkpoint", "{}",
+                    "--checkpoint-file", str(oversized),
+                    "--trusted-local-operator"]
+        )
+    assert rejected.value.code == 2
 
 
 def test_checkpoint_file_cli_detects_same_byte_swap_during_replay(
