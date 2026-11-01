@@ -188,11 +188,25 @@ def publish_first_playable_delivery_batch(
     )
     # Admission is deliberately all-or-nothing, not a reservation. A later
     # failure may leave a prefix of already published, immutable game outputs.
+    source_projects: list[str] = []
     for job in checked:
-        _preflight(
+        admitted = _preflight(
             _path(job.source), _path(job.archive), _path(job.install),
             _path(job.save), _path(job.receipt),
             expected_manifest_sha256=job.manifest_sha256, authorized=True,
+        )
+        project = admitted.get("project_id")
+        if type(project) is not str or not project:
+            raise FirstPlayableDeliveryBatchError(
+                "canonical original source project identity missing"
+            )
+        source_projects.append(project)
+    # The source verifier already knows project identity. Reject duplicate
+    # projects before the first ZIP is published; discovering this only when
+    # assembling the final receipt would strand an otherwise valid cohort.
+    if len(set(source_projects)) != len(source_projects):
+        raise FirstPlayableDeliveryBatchError(
+            "duplicate original project identity before publication"
         )
     records: list[dict[str, object]] = []
     for job in checked:
@@ -278,11 +292,22 @@ def resume_first_playable_delivery_batch(
             )
         records.append(_record(inspected, job.moves))
     _inspect_jobs(checked[:completed], records)
+    source_projects = [record["project_id"] for record in records]
     for job in checked[completed:]:
-        _preflight(
+        admitted = _preflight(
             _path(job.source), _path(job.archive), _path(job.install),
             _path(job.save), _path(job.receipt),
             expected_manifest_sha256=job.manifest_sha256, authorized=True,
+        )
+        project = admitted.get("project_id")
+        if type(project) is not str or not project:
+            raise FirstPlayableDeliveryBatchError(
+                "canonical original source project identity missing"
+            )
+        source_projects.append(project)
+    if len(set(source_projects)) != len(source_projects):
+        raise FirstPlayableDeliveryBatchError(
+            "duplicate original project identity before resumed publication"
         )
     for job in checked[completed:]:
         published = publish_first_playable_delivery(

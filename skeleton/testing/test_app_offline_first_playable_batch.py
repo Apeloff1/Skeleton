@@ -324,3 +324,36 @@ def test_job_parser_rejects_duplicate_keys_and_nonfinite_values():
         _parse_job('{"source":NaN}')
     with pytest.raises(FirstPlayableDeliveryBatchError):
         _parse_job('{"source":"a","archive_sha256":42}')
+
+
+def test_duplicate_project_ids_with_distinct_source_digests_fail_before_writes(
+    original_games, tmp_path,
+):
+    duplicate = tmp_path / "second-source-same-project"
+    built = build_first_playable_journey(
+        GameBuildIntent(
+            project_id="delivery-cohort-0",
+            title="Another Original Tidal Village",
+            subtitle="Distinct original content with same project identifier",
+            seed=991, levels=1, width=9, height=9,
+            collectibles_per_level=1, hazards_per_level=0,
+            starting_health=3,
+        ),
+        duplicate, authorized=True, mirror_attempts=64,
+    )
+    assert built["offline_gameplay_reexecuted"] is True
+    jobs = list(jobs_for(original_games, tmp_path))
+    jobs[1] = replace(
+        jobs[1], source=duplicate,
+        manifest_sha256=sha256((duplicate / "release.json").read_bytes()).hexdigest(),
+    )
+    assert jobs[0].manifest_sha256 != jobs[1].manifest_sha256
+    with pytest.raises(
+        FirstPlayableDeliveryBatchError,
+        match="duplicate original project identity",
+    ):
+        publish_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+    assert not Path(jobs[1].archive).exists()
