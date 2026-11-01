@@ -57,6 +57,9 @@ from skeleton.app.offline_archive_install import (
 from skeleton.app.offline_install_reconciliation import (
     OfflineInstallReconciliationError, reconcile_installed_game_archive,
 )
+from skeleton.app.offline_install_quarantine import (
+    OfflineInstallQuarantineError, inspect_offline_install_quarantine,
+)
 from skeleton.app.offline_progress_compatibility import (
     verify_archived_progress_binding,
 )
@@ -473,6 +476,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="read-only verify installed game bytes against pinned delivery ZIP")
     parser.add_argument("--preflight-install", action="store_true",
                         help="read-only check pinned archive and unused install destination")
+    parser.add_argument("--inspect-install-quarantine", action="store_true",
+                        help="read-only inspect missing, extra or corrupt partial install files")
     parser.add_argument("--migrate-progress", action="store_true",
                         help="install pinned source ZIP and reexecute a separately pinned private replay")
     parser.add_argument("--check-archive-save", action="store_true",
@@ -531,7 +536,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         comparison_values = (
             args.left_save, args.left_sha256, args.right_save, args.right_sha256,
         )
-        if args.preflight_install:
+        if args.inspect_install_quarantine:
+            if (args.preflight_install or args.reconcile_install
+                    or args.check_archive_save or args.install_archive
+                    or args.package_existing or args.inspect_archive
+                    or args.play_existing or args.compare_saves
+                    or args.verify_existing or args.reconcile_receipt
+                    or args.inspect_receipt or args.onboard or args.migrate_progress
+                    or args.preflight_migration or args.reconcile_migration
+                    or args.output is None or args.archive is None
+                    or args.expected_archive_sha256 is None
+                    or args.expected_manifest_sha256 is None
+                    or args.intent is not None or args.receipt is not None
+                    or args.expected_receipt_sha256 is not None
+                    or args.moves is not None or args.load_save is not None
+                    or args.expected_save_sha256 is not None
+                    or args.save is not None or args.fork_at is not None
+                    or any(value is not None for value in onboarding_values)
+                    or any(value is not None for value in comparison_values)
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid quarantine inspection mode")
+            receipt = inspect_offline_install_quarantine(
+                args.output, args.archive,
+                expected_archive_sha256=args.expected_archive_sha256,
+                expected_manifest_sha256=args.expected_manifest_sha256,
+                authorized=args.trusted_local_operator,
+            )
+        elif args.preflight_install:
             if (args.reconcile_install or args.check_archive_save
                     or args.install_archive or args.package_existing
                     or args.inspect_archive or args.play_existing or args.compare_saves
@@ -863,7 +894,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (
         FirstPlayableJourneyError, PrivateGameSaveError, OfflineSaveComparisonError,
         OfflineGameArchiveError, OfflineSourceInstallError,
-        OfflineInstallReconciliationError,
+        OfflineInstallReconciliationError, OfflineInstallQuarantineError,
         OfflineProgressMigrationError, OfflineProgressReconciliationError,
         StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
