@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from skeleton.gameforge.batch_b038 import (
@@ -64,12 +64,13 @@ class EditSession:
         self._seq = 0
         self.version = self._save("edit-base", None) if history is not None else None
 
-    def _save(self, label: str, record: EditRecord | None) -> int | None:
+    def _save(self, label: str, record: EditRecord | None, *,
+              plan: Mapping[str, Any] | None = None) -> int | None:
         if self.history is None:
             return None
         extra = {SECTION: record.as_dict()} if record else None
         m = self.history.saver.save_files(self.project_id, self.genre,
-                                          {PLAN_FILE: json.dumps(self.plan, sort_keys=True, indent=2)},
+                                          {PLAN_FILE: json.dumps(self.plan if plan is None else plan, sort_keys=True, indent=2)},
                                           label=label, extra_sections=extra)
         return m.sequence
 
@@ -103,15 +104,22 @@ class EditSession:
         if v.verdict == REGENERATE:
             return EditResult("rejected", self.plan, proposal, v, issues=issues)
         before, after = digest(self.plan), digest(new)
+        prior_seq = self._seq
         self._seq += 1
-        prov = self._provenance(proposal.instruction, proposal, before, after, applied, v)
-        base = self.version
-        self.plan = new
-        rec = EditRecord(self._seq, proposal.instruction, applied, invert(applied), prov, v, before, after,
-                         None, base)
-        self.version = self._save(f"edit-{self._seq}", rec)
-        rec = EditRecord(**{**rec.__dict__, "version": self.version})
+        try:
+            prov = self._provenance(proposal.instruction, proposal, before, after, applied, v)
+            rec = EditRecord(self._seq, proposal.instruction, applied, invert(applied), prov, v,
+                             before, after, None, self.version)
+            # Persist the proposed plan without exposing it as current state.
+            # A failed save must not advance the in-memory version or undo log.
+            version = self._save(f"edit-{self._seq}", rec, plan=new)
+        except Exception:
+            self._seq = prior_seq
+            raise
+        rec = replace(rec, version=version)
         self.ledger.append(prov)
+        self.plan = new
+        self.version = version
         self.undo_stack.append(rec)
         self.redo_stack.clear()
         return EditResult("accepted" if v.verdict == ACCEPT else "repair", self.plan, proposal, v, rec,
@@ -120,19 +128,25 @@ class EditSession:
     def undo(self) -> EditRecord | None:
         if not self.undo_stack:
             return None
-        rec = self.undo_stack.pop()
-        self.plan, _ = apply_diff(self.plan, rec.inverse)
+        rec = self.undo_stack[-1]
+        prior, _ = apply_diff(self.plan, rec.inverse)
+        version = self.version
         if self.history is not None and rec.base_version is not None:
-            self.version = self.history.rollback(self.project_id, rec.base_version)["new_head"]
+            version = self.history.rollback(self.project_id, rec.base_version)["new_head"]
+        self.plan, self.version = prior, version
+        self.undo_stack.pop()
         self.redo_stack.append(rec)
         return rec
 
     def redo(self) -> EditRecord | None:
         if not self.redo_stack:
             return None
-        rec = self.redo_stack.pop()
-        self.plan, _ = apply_diff(self.plan, rec.diff)
+        rec = self.redo_stack[-1]
+        next_plan, _ = apply_diff(self.plan, rec.diff)
+        version = self.version
         if self.history is not None and rec.version is not None:
-            self.version = self.history.rollback(self.project_id, rec.version)["new_head"]
+            version = self.history.rollback(self.project_id, rec.version)["new_head"]
+        self.plan, self.version = next_plan, version
+        self.redo_stack.pop()
         self.undo_stack.append(rec)
         return rec
