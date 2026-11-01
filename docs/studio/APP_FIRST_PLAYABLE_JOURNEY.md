@@ -265,3 +265,19 @@ requires both pins, rejects ambiguous ZIPs, unsafe entries and mismatched
 content, and never extracts or executes archive members. Inspection does not
 reexecute source gameplay. A ZIP is **not** a signed installer, verified native
 Godot build, device qualification, rights clearance or release certification.
+
+### Pinned offline source installation and first playable after delivery
+
+A separately pinned ZIP can be installed into a **new** owner-controlled
+directory with `studio-journey --install-archive --archive DELIVERY.zip
+--expected-archive-sha256 ARCHIVE_PIN --expected-manifest-sha256 MANIFEST_PIN
+--output NEW_GAME_DIR --trusted-local-operator`. The archive is validated
+without executing or trusting its members, then each source file is written
+through private nofollow descriptors. The new destination is reserved with
+no-clobber mkdir and verified by the canonical source/gameplay verifier
+before a success receipt. Use `--verify-existing` and `--play-existing`
+against the installed directory with the same independent manifest pin to
+replay or save the actual original game offline. An interrupted install leaves
+a nonqualified directory for explicit operator quarantine; it is never
+mistaken for a completed consumer installation. This is source-level
+installation, not a signed package, native device test or release approval.
