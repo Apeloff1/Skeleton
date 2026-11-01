@@ -410,6 +410,7 @@ class LongContextSpool:
         except OSError as exc:
             raise LongContextSpoolError("spool recovery enumeration failed") from exc
         reclaimed = 0
+        inspected_bytes = 0
         removed = 0
         for name in sorted(matches):
             flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
@@ -424,8 +425,9 @@ class LongContextSpool:
                             or info.st_size < 0
                             or info.st_size > MAX_SERIALIZED_SEQUENCE_BYTES + 4096):
                         raise LongContextSpoolError("untrusted orphan spool object")
-                    if reclaimed + info.st_size > max_bytes:
+                    if inspected_bytes + info.st_size > max_bytes:
                         raise LongContextSpoolError("spool recovery byte bound exceeded")
+                    inspected_bytes += info.st_size
                     if info.st_nlink == 2:
                         # A completed link() before a crash leaves a second
                         # name for the *same* inode. Any other link is denied.

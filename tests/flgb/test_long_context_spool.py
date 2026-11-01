@@ -441,6 +441,34 @@ class TestLongContextSpool(unittest.TestCase):
         result = self.spool.recover_abandoned_temps(kind="checkpoint", digest=start)
         self.assertEqual(result["removed"], 3)
 
+
+    def test_crash_recovery_is_automatic_for_same_digest_publish(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor custody required")
+        start = self.stage()
+        checkpoint = self.spool.load(start, expected_tokenizer_digest=TOKENIZER)[0]
+        path = self.spool._path("object", checkpoint.object_digest)
+        orphan = path.parent / ("." + checkpoint.object_digest + "." + "d" * 16 + ".tmp")
+        orphan.write_bytes(b"orphaned before publish")
+        orphan.chmod(0o600)
+        self.assertEqual(self.stage(), start)
+        self.assertFalse(orphan.exists())
+
+    def test_crash_recovery_byte_budget_is_cumulative(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor custody required")
+        start = self.stage()
+        bucket = self.spool._path("checkpoint", start).parent
+        for i in range(2):
+            orphan = bucket / ("." + start + "." + f"{i:016x}" + ".tmp")
+            orphan.write_bytes(b"abc")
+            orphan.chmod(0o600)
+        with self.assertRaisesRegex(LongContextSpoolError, "byte bound"):
+            self.spool.recover_abandoned_temps(
+                kind="checkpoint", digest=start, max_bytes=5,
+            )
+        self.assertTrue((bucket / ("." + start + "." + f"{1:016x}" + ".tmp")).exists())
+
     def test_posix_world_readable_root_is_rejected(self):
         if os.name != "posix":
             self.skipTest("POSIX ownership and mode contract")
