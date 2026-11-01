@@ -28,6 +28,7 @@ from skeleton.ai.agents.jeeves import studio_world_dependency_impact_tool as dep
 from skeleton.ai.agents.jeeves import studio_waypoint_route_tool as waypoint
 from skeleton.ai.agents.jeeves import studio_waypoint_risk_tool as waypoint_risk
 from skeleton.ai.agents.jeeves import studio_waypoint_handoff_tool as waypoint_handoff
+from skeleton.ai.agents.jeeves import studio_npc_contact_handoff_tool as npc_contact_handoff
 from skeleton.ai.agents.jeeves import studio_quest_hint_tool as hints
 from skeleton.ai.agents.jeeves import studio_original_asset_briefs_tool as asset_briefs
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
@@ -70,6 +71,7 @@ _TOOL_SYMBOLS = (
     ("waypoint_route_tool_schema", "execute_waypoint_route_tool"),
     ("waypoint_risk_tool_schema", "execute_waypoint_risk_tool"),
     ("waypoint_handoff_tool_schema", "execute_waypoint_handoff_tool"),
+    ("npc_contact_handoff_tool_schema", "execute_npc_contact_handoff_tool"),
     ("quest_hint_tool_schema", "execute_quest_hint_tool"),
     ("original_asset_briefs_tool_schema", "execute_original_asset_briefs_tool"),
     ("npc_author_tool_schema", "execute_npc_author_tool"),
@@ -141,6 +143,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    waypoint if descriptor_name == "waypoint_route_tool_schema" else
                    waypoint_risk if descriptor_name == "waypoint_risk_tool_schema" else
                    waypoint_handoff if descriptor_name == "waypoint_handoff_tool_schema" else
+                   npc_contact_handoff if descriptor_name == "npc_contact_handoff_tool_schema" else
                    hints if descriptor_name == "quest_hint_tool_schema" else
                    asset_briefs if descriptor_name == "original_asset_briefs_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()

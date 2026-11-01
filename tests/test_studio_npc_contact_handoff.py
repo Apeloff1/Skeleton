@@ -162,3 +162,64 @@ def test_authority_and_private_publication(source, tmp_path):
             expected_source_digest=DIGEST,
             expected_session_digest=receipt["session_digest"],
         )
+
+
+def test_cli_and_jeeves_contact_parity(source, tmp_path, monkeypatch, capsys):
+    import scripts.studio_npc_contact_handoff_cli as cli
+    import skeleton.ai.agents.jeeves.studio_npc_contact_handoff_tool as adapter
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: source[0])
+    monkeypatch.setattr(adapter, "read_blueprint", lambda _: source[0])
+    session = replay_walk(source[0], [], authorized=True).receipt()
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    assert cli.main([
+        "--project", "original", "--expected-source", DIGEST,
+        "--session-json", json.dumps(session),
+        "--expected-session", session["session_digest"],
+        "--npc-id", "archivist", "--publish", str(private),
+        "--html-sha256",
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["file_write_performed"]
+    assert cli.main([
+        "--project", "original", "--expected-source", DIGEST,
+        "--expected-session", session["session_digest"],
+        "--restore", str(private),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["npc_contact"] == output["npc_contact"]
+    request = {
+        "schema": adapter.REQUEST_SCHEMA, "project_id": "original",
+        "expected_source_digest": DIGEST,
+        "expected_session_digest": session["session_digest"],
+        "session_receipt": session, "npc_id": "archivist",
+    }
+    direct = adapter.execute_npc_contact_handoff_tool(request, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_npc_contact_handoff", "arguments": request},
+        authorized=True,
+    )
+    assert direct["detail"] == output["npc_contact"]
+    assert routed["result"] == direct
+    assert routed["file_write_performed"] is False
+
+
+def test_untrusted_jeeves_request_cannot_grant_authority(source, monkeypatch):
+    import skeleton.ai.agents.jeeves.studio_npc_contact_handoff_tool as adapter
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    monkeypatch.setattr(adapter, "read_blueprint", lambda _: source[0])
+    session = replay_walk(source[0], [], authorized=True).receipt()
+    request = {
+        "schema": adapter.REQUEST_SCHEMA, "project_id": "original",
+        "expected_source_digest": DIGEST,
+        "expected_session_digest": session["session_digest"],
+        "session_receipt": session, "npc_id": "archivist",
+    }
+    with pytest.raises(PermissionError):
+        adapter.execute_npc_contact_handoff_tool(request, authorized=False)
+    with pytest.raises(StudioQuestError, match="authority"):
+        route_world_tool(
+            {"tool": "studio_original_npc_contact_handoff",
+             "arguments": {**request, "authorized": True}},
+            authorized=True,
+        )
