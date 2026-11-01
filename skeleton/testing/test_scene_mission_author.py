@@ -67,13 +67,12 @@ def test_exit_requirement_must_reference_real_authored_item():
     assert editor == new_editor(original_mission())
 
 
-def test_pickup_edit_updates_source_and_replay_rejects_stale_route():
+def test_pickup_edit_preserves_exit_item_referential_integrity():
     editor = new_editor(original_mission())
-    updated = _apply(editor, [{"kind": "pickup_item", "scene_id": "quay",
-                               "pickup_id": "find_key", "item_id": "new_key"}])
-    assert updated["source_digest"] != editor["source_digest"]
-    with pytest.raises(SceneTravelError):
-        preview_editor(updated, demo_actions())
+    with pytest.raises(SceneTravelError, match="required item"):
+        _apply(editor, [{"kind": "pickup_item", "scene_id": "quay",
+                         "pickup_id": "find_key", "item_id": "new_key"}])
+    assert editor == new_editor(original_mission())
 
 
 def test_batch_failure_is_atomic_and_stale_lease_fails_closed():

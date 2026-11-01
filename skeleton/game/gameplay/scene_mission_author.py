@@ -43,6 +43,8 @@ def _apply_one(source: dict[str, Any], raw: Any) -> tuple[dict[str, Any], dict[s
     if type(raw) is not dict:
         raise SceneTravelError("invalid mission editor operation")
     kind = raw.get("kind")
+    if type(kind) is not str:
+        raise SceneTravelError("invalid mission editor operation kind")
     fields = {
         "choice_reputation": {"kind", "choice_id", "option_id", "reputation"},
         "mission_reputation": {"kind", "mission_id", "reputation"},
