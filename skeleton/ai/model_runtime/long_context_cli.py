@@ -10,6 +10,7 @@ from .long_context_spool import LongContextSpool, LongContextSpoolError, read_se
 from .long_context_progress import LongContextProgressHead
 from .long_context_fairness import LongContextFairPlanner, PressureSignals, StreamDemand
 from .long_context_host_pressure import observe_host_pressure
+from .long_context_cgroup import observe_cgroup_pressure
 from .tokenization import deserialize_token_sequence
 
 
@@ -73,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     audit_heads.add_argument("--max-checkpoints", type=int, default=4096)
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
     commands.add_parser("head-observe", help="Read conservative local PSI pressure; no grant")
+    commands.add_parser("head-observe-cgroup", help="Read cgroup-v2 pressure; no grant")
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
     plan.add_argument("--candidate", action="append", required=True,
                       help="stream-id:checkpoint:generation:weight:max-tokens[:requested-bytes]")
@@ -88,9 +90,9 @@ def main(argv: list[str] | None = None) -> int:
     # Host observation never needs to open, create, or authorize a spool.
     # This keeps unsupported platforms conservatively observable rather
     # than mistaking POSIX spool unavailability for normal pressure.
-    if args.command == "head-observe":
-        print(json.dumps(observe_host_pressure(), sort_keys=True,
-                         separators=(",", ":")))
+    if args.command in ("head-observe", "head-observe-cgroup"):
+        observer = observe_host_pressure if args.command == "head-observe" else observe_cgroup_pressure
+        print(json.dumps(observer(), sort_keys=True, separators=(",", ":")))
         return 0
     spool = None
     try:
