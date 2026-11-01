@@ -15,7 +15,7 @@ from skeleton.game.gameplay.flgb_gameplay_runtime import SaveableGameplayState, 
 from skeleton.game.gameplay.scene_atlas import _strict_json
 from skeleton.game.gameplay.scene_travel import (
     SceneTravelError, _advance as advance_scene, _id, _object, _action as scene_action,
-    new_session, normalize_world, original_demo, verify_session,
+    new_session, normalize_world, original_demo,
 )
 
 SCHEMA = "skeleton.scene_guard_patrol.v1"

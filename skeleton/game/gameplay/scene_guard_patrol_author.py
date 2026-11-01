@@ -14,7 +14,7 @@ from typing import Any
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.scene_atlas import _strict_json
 from skeleton.game.gameplay.scene_guard_patrol import (
-    _bounded, import_patrol, inspect_patrol, new_patrol, normalize_patrol,
+    _bounded, inspect_patrol, normalize_patrol,
     original_patrol, simulate_patrol,
 )
 from skeleton.game.gameplay.scene_travel import SceneTravelError, _id, _object, _limit

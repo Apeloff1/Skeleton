@@ -52,12 +52,12 @@ def test_replay_resume_and_source_mismatch():
     first = advance_patrol(new_patrol(source), {"kind": "wait"})
     result = simulate_patrol(source, [
         {"kind": "collect", "pickup_id": "find_key"},
-        {"kind": "wait"}, {"kind": "wait"},
+        {"kind": "wait"},
         {"kind": "travel", "exit_id": "north"},
     ], resume=first)
     assert result == simulate_patrol(source, [
         {"kind": "wait"}, {"kind": "collect", "pickup_id": "find_key"},
-        {"kind": "wait"}, {"kind": "wait"},
+        {"kind": "wait"},
         {"kind": "travel", "exit_id": "north"},
     ])
     changed = copy.deepcopy(source)
