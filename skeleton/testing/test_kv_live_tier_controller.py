@@ -51,7 +51,7 @@ class KVLiveTierTests(unittest.TestCase):
             max_sample_age_ns=100, cooldown_ns=1,
         )
 
-    def controller(self, samples, ticks=(1000, 1001)):
+    def controller(self, samples, ticks=(1000, 1001, 1002, 1003)):
         observed = iter(samples)
         clock = iter(ticks)
         return KVLiveTierController(
@@ -61,7 +61,7 @@ class KVLiveTierTests(unittest.TestCase):
         )
 
     def test_cpu_pressure_demotes_with_two_fresh_samples(self):
-        ctl = self.controller([host(), host()])
+        ctl = self.controller([host(), host(), host()])
         plan, observation = ctl.plan_live()
         self.assertEqual(observation.sample.gpu_pressure_pct, None)
         self.assertFalse(observation.gpu_device_qualified)
@@ -94,6 +94,7 @@ class KVLiveTierTests(unittest.TestCase):
         ctl = self.controller([
             host(ram_free=50, swap_free=1000),
             host(ram_free=50, swap_free=1000),
+            host(ram_free=50, swap_free=1000),
         ])
         plan, _ = ctl.plan_live()
         receipt = ctl.apply_live(plan)
@@ -103,6 +104,31 @@ class KVLiveTierTests(unittest.TestCase):
         ctl = self.controller([host(), host()], ticks=(1000, 2000))
         plan, _ = ctl.plan_live()
         with self.assertRaisesRegex(KVPressureDeferred, "stale"):
+            ctl.apply_live(plan)
+        self.assertEqual(self.storage.moves, [])
+
+    def test_second_page_pressure_deterioration_fences_remaining_moves(self):
+        # Two independent resident pages. The first physical migration
+        # succeeds; a worsening OS sample MUST prevent the second move.
+        second = self.manager.commit_prefix(
+            (3, 4), (KVPageInput("cpu-page-2", 128, tier=CacheTier.CPU),),
+            self.namespace,
+        )
+        ctl = self.controller([
+            host(), host(), host(), host(disk_free=700),
+        ])
+        plan, _ = ctl.plan_live()
+        self.assertEqual(len(plan.moves), 2)
+        with self.assertRaisesRegex(KVPressureDeferred, "worsening"):
+            ctl.apply_live(plan)
+        self.assertEqual(len(self.storage.moves), 1)
+        self.assertIn(self.storage.moves[0][0], {"cpu-page", "cpu-page-2"})
+        self.assertTrue(second)
+
+    def test_exhausted_telemetry_fails_closed_before_move(self):
+        ctl = self.controller([host(), host()])
+        plan, _ = ctl.plan_live()
+        with self.assertRaisesRegex(KVPressureDeferred, "unavailable"):
             ctl.apply_live(plan)
         self.assertEqual(self.storage.moves, [])
 

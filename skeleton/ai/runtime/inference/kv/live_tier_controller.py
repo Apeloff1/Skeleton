@@ -14,9 +14,10 @@ from typing import Callable
 from skeleton.app.offline_resources import LocalResourceSnapshot, probe_local_resources
 from .manager import KVCacheManager
 from .pressure_tiering import (
-    KVPressureTierPlanner, TierApplyReceipt, TierPlan, TierPressurePolicy,
-    TierPressureSample,
+    KVPressureTierPlanner, TierApplyReceipt, TierMove, TierPlan,
+    TierPressurePolicy, TierPressureSample,
 )
+from .types import CacheTier
 
 
 class KVPressureDeferred(RuntimeError):
@@ -68,7 +69,10 @@ class KVLiveTierController:
         try:
             host = self._probe(self._storage_path)
             now = self._clock()
-        except (OSError, RuntimeError, ValueError) as exc:
+        except Exception as exc:
+            # Probe adapters may raise TypeError, OverflowError or even
+            # StopIteration on exhausted test/driver samples. Never let
+            # unexpected telemetry authorize physical migration.
             raise KVPressureDeferred("OS resource observation unavailable") from exc
         if not isinstance(host, LocalResourceSnapshot):
             raise KVPressureDeferred("canonical resource snapshot required")
@@ -106,32 +110,66 @@ class KVLiveTierController:
             return plan, observation
 
     def apply_live(self, plan: TierPlan) -> TierApplyReceipt:
-        """Reject worsening headroom before invoking any physical adapter."""
+        """Re-probe each physical page move, stopping on unknown outcomes.
+
+        This is not a cross-process disk reservation. The backend must still
+        enforce quotas atomically; the journal retains RUNNING on a partial
+        or ambiguous migration. Never infer GPU residency from host RAM.
+        """
         if not isinstance(plan, TierPlan):
             raise ValueError("canonical tier plan required")
         with self._lock:
-            fresh = self._sample().sample
             old = plan.sample
-            if (
-                fresh.source != old.source
-                or fresh.observed_at_ns < old.observed_at_ns
-                or fresh.observed_at_ns - old.observed_at_ns >
-                    self._planner.policy.max_sample_age_ns
-                or old.gpu_pressure_pct is not None
-                or fresh.gpu_pressure_pct is not None
-                or old.cpu_available_bytes is None
-                or fresh.cpu_available_bytes is None
-                or old.disk_free_bytes is None
-                or fresh.disk_free_bytes is None
-                or old.cpu_pressure_pct is None
-                or fresh.cpu_pressure_pct is None
-                or fresh.cpu_pressure_pct > old.cpu_pressure_pct
-                or fresh.cpu_available_bytes < old.cpu_available_bytes
-                or fresh.disk_free_bytes < old.disk_free_bytes
-            ):
-                raise KVPressureDeferred("stale or worsening OS headroom")
-            # Canonical manager independently rechecks page identity, pins,
-            # size and storage adapter success under its own KV lock.
+            previous_ns = old.observed_at_ns
+            disk_moved = 0
+
+            def check(fresh: TierPressureSample, *, remaining_disk: int) -> None:
+                nonlocal previous_ns
+                if (
+                    fresh.source != old.source
+                    or fresh.observed_at_ns < previous_ns
+                    or fresh.observed_at_ns - old.observed_at_ns >
+                        self._planner.policy.max_sample_age_ns
+                    or old.gpu_pressure_pct is not None
+                    or fresh.gpu_pressure_pct is not None
+                    or old.cpu_available_bytes is None
+                    or fresh.cpu_available_bytes is None
+                    or old.disk_free_bytes is None
+                    or fresh.disk_free_bytes is None
+                    or old.cpu_pressure_pct is None
+                    or fresh.cpu_pressure_pct is None
+                    or fresh.cpu_pressure_pct > old.cpu_pressure_pct
+                    or fresh.cpu_available_bytes < old.cpu_available_bytes
+                    # Account only for our own already moved NVME bytes;
+                    # any additional concurrent disk loss is a hard HOLD.
+                    or fresh.disk_free_bytes + disk_moved < old.disk_free_bytes
+                    or fresh.disk_free_bytes - remaining_disk <
+                        self._planner.policy.min_disk_reserve_bytes
+                ):
+                    raise KVPressureDeferred("stale or worsening OS headroom")
+                previous_ns = fresh.observed_at_ns
+
+            remaining = sum(
+                move.bytes for move in plan.moves
+                if move.target is CacheTier.NVME
+            )
+            check(self._sample().sample, remaining_disk=remaining)
+
+            def before_move(move: TierMove, index: int) -> None:
+                nonlocal disk_moved
+                # Re-check after the prior adapter call and before the next.
+                # A failed adapter aborts the loop in the canonical planner.
+                pending = sum(
+                    item.bytes for item in plan.moves[index:]
+                    if item.target is CacheTier.NVME
+                )
+                check(self._sample().sample, remaining_disk=pending)
+                if move.target is CacheTier.NVME:
+                    disk_moved += move.bytes
+
+            # The canonical manager independently rechecks page identity,
+            # pins, size and storage adapter success under its KV lock.
             return self._planner.apply(
-                self._manager, plan, now_ns=fresh.observed_at_ns,
+                self._manager, plan, now_ns=previous_ns,
+                before_move=before_move,
             )

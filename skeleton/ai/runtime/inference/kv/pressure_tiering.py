@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
+from typing import Callable
 
 from .manager import KVCacheManager
 from .types import CacheTier, KVResidentPage
@@ -169,26 +170,41 @@ class KVPressureTierPlanner:
 
     def apply(
         self, manager: KVCacheManager, plan: TierPlan, *, now_ns: int,
+        before_move: Callable[[TierMove, int], None] | None = None,
     ) -> TierApplyReceipt:
         if not isinstance(plan, TierPlan):
             raise ValueError("TierPlan required")
+        if before_move is not None and not callable(before_move):
+            raise ValueError("pre-move safety callback must be callable")
         # Recompute under the same measured inputs. A stale plan, changed pin,
         # or changed resident identity must never be accepted as a migration.
         if self.plan(manager, plan.sample, now_ns=now_ns) != plan:
             raise ValueError("KV pressure plan or inventory changed")
         moved: list[str] = []
         rejected: list[tuple[str, str]] = []
-        for move in plan.moves:
+        for index, move in enumerate(plan.moves):
+            # A live controller re-probes the OS immediately before EACH
+            # physical move. Callback failures propagate: no later page may
+            # move after pressure telemetry becomes unknown or worse.
+            if before_move is not None:
+                before_move(move, index)
             try:
                 ok = manager.migrate_if(
                     move.page_key, source=move.source,
                     target=move.target, expected_bytes=move.bytes,
                 )
             except Exception as exc:
+                if before_move is not None:
+                    # Storage may have moved the page before raising. In a
+                    # journaled live run, stop immediately and leave its
+                    # RUNNING intent for operator reconciliation.
+                    raise RuntimeError("physical KV migration outcome uncertain") from exc
                 rejected.append((move.page_key, type(exc).__name__))
             else:
                 if ok:
                     moved.append(move.page_key)
+                elif before_move is not None:
+                    raise RuntimeError("physical KV resident identity changed")
                 else:
                     rejected.append((move.page_key, "resident_page_changed"))
         if moved:
