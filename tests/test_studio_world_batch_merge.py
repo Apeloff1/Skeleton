@@ -46,7 +46,9 @@ def plans():
     # common ancestor, which is still a valid independent fork.
     baseline = plan([request], catalog)
     extra = deepcopy(request)
-    extra["arguments"]["decisions"] = ["faction-a"]
+    extra["arguments"]["decisions"] = [
+        read_blueprint(request["arguments"]["project_id"])["cast"]["social_rules"][0]["decision"]
+    ]
     left = plan([request, extra], catalog)
     right = plan([request], catalog)
     return baseline, left, right, catalog
@@ -157,3 +159,63 @@ def test_cli_merge_to_typed_plan_and_html(capsys):
     assert result["merge"]["receipt"]["merged_step_count"] == 2
     assert result["file_write_performed"] is False
     assert len(result["html_sha256"]) == 64
+
+
+def test_cli_merge_persists_private_editor_and_recompiles(tmp_path, capsys):
+    from scripts.studio_world_batch_cli import main
+    from skeleton.ai.game_builder.studio_world_batch_editor import (
+        FILENAME, EXPORT_SCHEMA, load_world_batch_editor_export,
+    )
+    baseline, left, right, catalog = plans()
+    payload = json.dumps({
+        "baseline": baseline, "left": left, "right": right,
+    }, sort_keys=True, separators=(",", ":"))
+    assert main([
+        "--expected-catalog", catalog, "--merge-plans", payload,
+        "--editor-directory", str(tmp_path),
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["file_write_performed"] is True
+    assert result["editor"]["file_write_performed"] is True
+    assert (tmp_path / FILENAME).read_bytes().startswith(b"<!doctype html>")
+    assert result["merge"]["receipt"]["release_certified"] is False
+    plan = result["merge"]["plan"]
+    export = {
+        "schema": EXPORT_SCHEMA,
+        "catalog_digest": catalog,
+        "baseline_plan_digest": plan["plan_digest"],
+        "requests": [step["request"] for step in plan["steps"]],
+    }
+    path = tmp_path / "edited.json"
+    path.write_text(json.dumps(export, sort_keys=True), encoding="utf-8")
+    assert load_world_batch_editor_export(
+        path, authorized=True, expected_catalog_digest=catalog,
+        expected_baseline_plan_digest=plan["plan_digest"],
+    ) == export["requests"]
+    assert main([
+        "--expected-catalog", catalog, "--import-plan", str(path),
+        "--baseline-plan", json.dumps(plan, sort_keys=True),
+    ]) == 0
+    replayed = json.loads(capsys.readouterr().out)
+    assert replayed["plan"] == plan
+    assert replayed["execution"]["release_certified"] is False
+
+
+def test_cli_merge_publish_requires_replayed_execution(tmp_path, capsys):
+    from scripts.studio_world_batch_cli import main
+    from skeleton.ai.game_builder.studio_world_batch import FILENAME
+    request, catalog = fixture()
+    baseline = plan([request], catalog)
+    payload = json.dumps({
+        "baseline": baseline, "left": baseline, "right": baseline,
+    }, sort_keys=True, separators=(",", ":"))
+    assert main([
+        "--expected-catalog", catalog, "--merge-plans", payload,
+        "--publish", str(tmp_path),
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["execution"]["completed_count"] == 1
+    assert output["execution"]["file_write_performed"] is False
+    assert output["publication"]["file_write_performed"] is True
+    assert output["file_write_performed"] is True
+    assert (tmp_path / FILENAME).exists()

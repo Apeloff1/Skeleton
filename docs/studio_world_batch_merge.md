@@ -25,3 +25,15 @@ merged plan. A receipt is never accepted as proof by itself: use
 
 Focused regression:
 `python -m pytest -q tests/test_studio_world_batch_merge.py`
+
+The merge CLI also accepts `--editor-directory <private-dir>` to publish the
+existing CSP-hashed offline editor for the merged typed plan. Export from that
+editor and use `--import-plan <export> --baseline-plan <merged-plan>` to
+recompile and execute the edited workflow against current canonical source.
+`--publish <private-dir>` executes and verifies the merged typed plan before
+using the existing no-overwrite, fsynced, private receipt publication path.
+Publication is an operator-requested write, never a merge-side effect.
+
+The editor and publication paths are opt-in. All execution and source leases
+are checked again on the final plan; the merge receipt itself is not a
+permission token, a gameplay certificate, or a release assertion.

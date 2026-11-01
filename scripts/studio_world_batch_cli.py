@@ -47,9 +47,8 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("editor import requires baseline plan")
     try:
         if args.merge_plans:
-            if (args.requests or args.baseline_plan or args.publish
-                    or args.editor_directory):
-                ap.error("merge review cannot combine with authoring or publication")
+            if args.requests or args.baseline_plan:
+                ap.error("merge cannot combine with separate authoring requests")
             record = _strict(args.merge_plans, max_bytes=196608)
             if type(record) is not dict or set(record) != {"baseline", "left", "right"}:
                 raise StudioQuestError("merge requires baseline, left and right plans")
@@ -65,6 +64,18 @@ def main(argv: list[str] | None = None) -> int:
                 output["html_sha256"] = sha256(render_world_batch_merge_html(
                     merged, record["baseline"], record["left"], record["right"],
                     authorized=True)).hexdigest()
+            # Execute and verify the full typed plan before publishing anything.
+            # A merge receipt is never an authorization or execution receipt.
+            if args.publish:
+                execution = execute_world_batch(merged["plan"], authorized=True)
+                output["execution"] = execution
+                output["publication"] = publish_world_batch_execution(
+                    execution, args.publish, authorized=True)
+                output["file_write_performed"] = True
+            if args.editor_directory:
+                output["editor"] = publish_world_batch_editor(
+                    merged["plan"], args.editor_directory, authorized=True)
+                output["file_write_performed"] = True
             print(json.dumps(output, sort_keys=True, separators=(",", ":"),
                              allow_nan=False))
             return 0
