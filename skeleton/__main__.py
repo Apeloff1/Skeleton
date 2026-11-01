@@ -72,7 +72,7 @@ Commands:
     scene-mission-board  Inspect replay-derived mission objectives and legal actions
     scene-mission-author  Transactionally edit authored missions and preview play
     scene-mission-route  Solve replayable authored mission ending paths
-    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
+    scene-mission-assist  Offer replay-proven non-mutating mission hints\n    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
@@ -761,6 +761,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-mission-timeline":
         from skeleton.game.gameplay.scene_mission_timeline import cli as timeline_cli
         return timeline_cli(rest)
+    if cmd == "scene-mission-assist":
+        from skeleton.game.gameplay.scene_mission_assistance import cli as assist_cli
+        return assist_cli(rest)
     if cmd == "scene-mission-liveness":
         from skeleton.game.gameplay.scene_mission_liveness import cli as liveness_cli
         return liveness_cli(rest)
