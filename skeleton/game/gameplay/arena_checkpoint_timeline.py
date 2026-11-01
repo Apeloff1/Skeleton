@@ -159,6 +159,27 @@ def original_fork() -> dict[str, Any]:
     return fork_expedition(played, 1, actions[1:])
 
 
+def _read_record(raw: str) -> Any:
+    """Parse up to 2 MiB with strict duplicate-key and nonfinite rejection."""
+    if type(raw) is not str:
+        raise CombatSessionError("fork record must be JSON text")
+    try:
+        if len(raw.encode("utf-8")) > MAX_BYTES:
+            raise CombatSessionError("fork record exceeds 2 MiB")
+        def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            value: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("duplicate fork JSON key")
+                value[key] = item
+            return value
+        def nonfinite(_: str) -> Any:
+            raise ValueError("nonfinite fork JSON number")
+        return json.loads(raw, object_pairs_hook=unique, parse_constant=nonfinite)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise CombatSessionError("invalid fork record JSON") from exc
+
+
 def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton.game.gameplay.arena_checkpoint_timeline"
@@ -179,7 +200,7 @@ def cli(argv: Sequence[str]) -> int:
         if args.command == "demo":
             result = original_fork()
         elif args.command == "verify-fork":
-            final = verify_fork(_parse_json(args.record_json, "fork record"))
+            final = verify_fork(_read_record(args.record_json))
             result = {
                 "ok": True, "source_digest": final["source_digest"],
                 "state_digest": final["state_digest"],

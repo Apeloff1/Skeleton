@@ -111,3 +111,9 @@ def test_installed_cli_and_fork_verification(capsys):
     record = json.loads(capsys.readouterr().out)
     assert cli(["verify-fork", "--record-json", json.dumps(record)]) == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
+
+def test_verify_cli_rejects_duplicate_and_nonfinite_json(capsys):
+    assert cli(["verify-fork", "--record-json", '{"x":1,"x":2}']) == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
+    assert cli(["verify-fork", "--record-json", '{"x":NaN}']) == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
