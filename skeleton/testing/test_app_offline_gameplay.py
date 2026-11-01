@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -183,5 +184,19 @@ def test_private_save_rejects_nonprivate_or_aliased_files(tmp_path, capsys, atta
     assert run_app_cli(_play(
         root, pin, "--load-save", str(target),
         "--expected-save-sha256", result["independent_save_sha256"],
+    )) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+
+@pytest.mark.skipif(os.name != "posix" or not hasattr(os, "mkfifo"),
+                    reason="POSIX FIFO rejection contract")
+def test_offline_save_restore_rejects_fifo_without_blocking(tmp_path, capsys):
+    root, pin = _build(tmp_path, capsys)
+    fifo = tmp_path / "not-a-regular-save.json"
+    os.mkfifo(fifo, 0o600)
+    assert run_app_cli(_play(
+        root, pin, "--load-save", str(fifo),
+        "--expected-save-sha256", "a" * 64,
     )) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"

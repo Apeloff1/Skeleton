@@ -62,7 +62,7 @@ def read_private_game_save(
         raise PrivateGameSaveError("independent offline save pin required")
     target, fd = _parent(path)
     try:
-        flags = os.O_RDONLY | os.O_NOFOLLOW
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
         if hasattr(os, "O_CLOEXEC"):
             flags |= os.O_CLOEXEC
         handle = os.open(target.name, flags, dir_fd=fd)

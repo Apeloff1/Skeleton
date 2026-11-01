@@ -89,7 +89,10 @@ def _flags(directory: bool) -> int:
         raise DualRuntimeVerificationError(
             "descriptor-safe verifier requires POSIX O_NOFOLLOW"
         )
-    flags = os.O_RDONLY | os.O_NOFOLLOW
+    # A malicious FIFO at a purported source-file path must fail closed,
+    # not suspend the verifier indefinitely before fstat can reject it.
+    # O_NONBLOCK is inert for regular files and directories on POSIX.
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
     if directory:

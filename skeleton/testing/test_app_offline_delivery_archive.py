@@ -307,3 +307,13 @@ def test_archive_readback_preserves_original_export_files(tmp_path, capsys):
         target, result["independent_archive_sha256"], manifest,
     )) == 0
     assert json.loads(capsys.readouterr().out)["archive_integrity_verified"] is True
+
+
+
+@pytest.mark.skipif(os.name != "posix" or not hasattr(os, "mkfifo"),
+                    reason="POSIX FIFO rejection contract")
+def test_archive_inspection_rejects_fifo_without_blocking(tmp_path, capsys):
+    fifo = tmp_path / "not-a-regular-archive.zip"
+    os.mkfifo(fifo, 0o600)
+    assert run_app_cli(_inspect(fifo, "a" * 64, "b" * 64)) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
