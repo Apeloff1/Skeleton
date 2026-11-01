@@ -27,6 +27,15 @@ MAX_STEPS = 8
 MAX_PLAN_BYTES = 48 * 1024
 MAX_EXECUTION_BYTES = 768 * 1024
 BATCH_TOOL = "studio_original_world_batch"
+# Only adapters with reviewed explicit False write evidence are admitted.
+# The generic router also exposes legacy read-only tools without that evidence;
+# they remain excluded until their exact result contracts are audited.
+VERIFIED_READ_ONLY_TOOLS = frozenset({
+    "studio_faction_reputation",
+    "studio_ending_plan",
+    "studio_original_npc_continuity",
+    "studio_original_npc_continuity_merge",
+})
 
 
 def _registry() -> tuple[dict[str, dict[str, Any]], str]:
@@ -35,7 +44,8 @@ def _registry() -> tuple[dict[str, dict[str, Any]], str]:
     catalog = world_tool_catalog()
     descriptors = {}
     for item in catalog["tools"]:
-        if item["name"] == BATCH_TOOL or item["explicit_authoring_permission_required"]:
+        if (item["name"] not in VERIFIED_READ_ONLY_TOOLS
+                or item["explicit_authoring_permission_required"]):
             continue
         descriptors[item["name"]] = item["descriptor"]
     return descriptors, catalog["catalog_digest"]

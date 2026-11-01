@@ -30,21 +30,19 @@ def fixture():
     # The static catalog is intentionally read-only. No dynamic Python imports.
     assert any(x["name"] == "studio_original_world_batch"
                for x in catalog["tools"])
-    # The catalog-only request is source-independent and has no writes.
-    # A concrete world-tool request still carries its own source/session lease.
+    # The faction adapter is source-leased and explicitly proves no file write.
     from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
     from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
-    from skeleton.ai.agents.jeeves.studio_walk_tool import canon_proof_tool_schema
+    from skeleton.ai.agents.jeeves.studio_walk_tool import faction_reputation_tool_schema
     project = "studio_arena_fighting_glacial_fjord"
     docs = read_blueprint(project)
     source = audit_canon_source(docs, authorized=True)["source_digest"]
-    descriptor = canon_proof_tool_schema()
+    descriptor = faction_reputation_tool_schema()
     schema = descriptor["parameters"]["properties"]["schema"]["const"]
     arguments = {
         "schema": schema, "project_id": project,
-        "expected_source_digest": source,
+        "expected_source_digest": source, "decisions": [],
     }
-    # Avoid assumptions about optional tool arguments; required fields must be typed.
     request = {"tool": descriptor["name"], "arguments": arguments}
     return catalog["catalog_digest"], request
 
@@ -71,6 +69,7 @@ def test_reject_authoring_unknown_schema_and_recursive_batch():
     for invalid in (
         [{"tool": "studio_original_world_batch", "arguments": {}}],
         [{"tool": "unknown", "arguments": {}}],
+        [{"tool": "studio_canon_proof", "arguments": {}}],
         [{**request, "arguments": {**request["arguments"], "authorized": True}}],
         [{**request, "arguments": {**request["arguments"], "schema": "forged"}}],
         [request] * 9,

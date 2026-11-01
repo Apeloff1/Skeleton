@@ -3,7 +3,9 @@
 The world batch plane turns a fixed operator prompt and up to eight explicit
 typed requests into a deterministic, catalog-leased plan. It executes only
 source-reviewed, **read-only** Jeeves world tools. Tool names must be present
-in the static router catalog. Unknown schemas, dynamic imports, embedded
+in the static router catalog **and** the reviewed explicit-no-write
+adapter allowlist. Legacy tools with missing write evidence are excluded.
+Unknown schemas, dynamic imports, embedded
 authorization, authoring tools, recursive batch calls, and unverified write
 evidence fail closed. Every nested tool rechecks its own canonical source,
 quest session and rights/continuity prerequisites.
