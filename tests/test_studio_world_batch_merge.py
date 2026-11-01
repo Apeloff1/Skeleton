@@ -220,3 +220,50 @@ def test_cli_merge_publish_requires_replayed_execution(tmp_path, capsys):
     assert output["publication"]["file_write_performed"] is True
     assert output["file_write_performed"] is True
     assert (tmp_path / FILENAME).exists()
+
+
+def test_two_independent_tools_merge_in_stable_left_then_right_order():
+    from skeleton.ai.agents.jeeves.studio_walk_tool import ending_plan_tool_schema
+    original, catalog = fixture()
+    baseline = plan([original], catalog)
+    left_request = deepcopy(original)
+    left_request["arguments"]["decisions"] = [
+        read_blueprint(original["arguments"]["project_id"])["cast"]["social_rules"][0]["decision"]
+    ]
+    descriptor = ending_plan_tool_schema()
+    right_request = {
+        "tool": descriptor["name"],
+        "arguments": {
+            "schema": descriptor["parameters"]["properties"]["schema"]["const"],
+            "project_id": original["arguments"]["project_id"],
+            "ending_id": "review_only_ending",
+            "actions": [],
+        },
+    }
+    left = plan([original, left_request], catalog)
+    right = plan([original, right_request], catalog)
+    merged = merge_world_batch_plans(
+        baseline, left, right, authorized=True)
+    assert merged["receipt"]["unique_appended_count"] == 2
+    assert [row["request"]["tool"] for row in merged["plan"]["steps"]] == [
+        original["tool"], left_request["tool"], right_request["tool"],
+    ]
+    assert replay_world_batch_merge(
+        merged, baseline, left, right, authorized=True) == merged
+
+
+def test_conflicting_cli_merge_does_not_publish_anything(tmp_path):
+    from scripts.studio_world_batch_cli import main
+    baseline, left, _, catalog = plans()
+    request = deepcopy(left["steps"][1]["request"])
+    request["arguments"]["decisions"] = ["unreviewed_different_choice"]
+    right = plan([baseline["steps"][0]["request"], request], catalog)
+    payload = json.dumps({
+        "baseline": baseline, "left": left, "right": right,
+    }, sort_keys=True, separators=(",", ":"))
+    with pytest.raises(SystemExit):
+        main([
+            "--expected-catalog", catalog,
+            "--merge-plans", payload, "--publish", str(tmp_path),
+        ])
+    assert list(tmp_path.iterdir()) == []
