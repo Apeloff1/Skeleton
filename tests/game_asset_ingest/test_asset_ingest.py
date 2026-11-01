@@ -408,3 +408,75 @@ def test_sparse_oversize_and_aggregate_volume_limits(tmp_path, monkeypatch):
     report = pipeline.import_files(tmp_path, ["a.png", "b.png"])
     assert not report.ok
     assert any("file count exceeds bound" in issue.detail for issue in report.issues)
+
+
+def test_directory_rejects_regular_leaf_replacement_after_scan(tmp_path, monkeypatch):
+    """Scanning a pathname must not authorize opening a different inode."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    root = tmp_path / "assets"
+    root.mkdir()
+    asset = root / "hero.png"
+    asset.write_bytes(png(4, 4))
+    original_import = pipeline._import_from_fd
+    replaced = [False]
+
+    def swap_after_scan(fd, paths, **kwargs):
+        if not replaced[0]:
+            replaced[0] = True
+            asset.rename(root / "retired.png")
+            asset.write_bytes(png(8, 4))
+        return original_import(fd, paths, **kwargs)
+
+    monkeypatch.setattr(pipeline, "_import_from_fd", swap_after_scan)
+    report = pipeline.import_directory(root)
+    assert replaced[0]
+    assert not report.ok
+    assert report.imported == []
+    assert any("changed after directory scan" in issue.detail for issue in report.issues)
+
+
+def test_directory_rejects_parent_subtree_replacement_after_scan(tmp_path, monkeypatch):
+    """Each reopened ancestor must match the inode enumerated by scandir."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    root = tmp_path / "assets"
+    child = root / "scenes"
+    child.mkdir(parents=True)
+    (child / "hero.png").write_bytes(png(4, 4))
+    original_import = pipeline._import_from_fd
+
+    def swap_after_scan(fd, paths, **kwargs):
+        child.rename(root / "retired")
+        child.mkdir()
+        (child / "hero.png").write_bytes(png(8, 4))
+        return original_import(fd, paths, **kwargs)
+
+    monkeypatch.setattr(pipeline, "_import_from_fd", swap_after_scan)
+    report = pipeline.import_directory(root)
+    assert not report.ok
+    assert report.imported == []
+    assert any("directory changed after scan" in issue.detail for issue in report.issues)
+
+
+def test_directory_rejects_sidecar_replacement_after_scan(tmp_path, monkeypatch):
+    """An external asset reference must stay bound to its scanned inode."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    root = tmp_path / "assets"
+    root.mkdir()
+    (root / "mesh.obj").write_bytes(OBJ)
+    sidecar = root / "cube.mtl"
+    sidecar.write_bytes(b"newmtl stone\n")
+    original_import = pipeline._import_from_fd
+
+    def swap_after_scan(fd, paths, **kwargs):
+        sidecar.rename(root / "retired.mtl")
+        sidecar.write_bytes(b"newmtl different\n")
+        return original_import(fd, paths, **kwargs)
+
+    monkeypatch.setattr(pipeline, "_import_from_fd", swap_after_scan)
+    report = pipeline.import_directory(root)
+    assert not report.ok
+    assert any(issue.code == "missing_reference" and "changed after directory scan" in issue.detail
+               for issue in report.issues)
