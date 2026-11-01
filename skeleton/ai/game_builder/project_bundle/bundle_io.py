@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import tempfile
 import re
+import stat
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Protocol
 
@@ -139,11 +140,40 @@ def write_bundle(path: Path, raw: str) -> None:
 
 
 def read_bundle(path: Path) -> str:
-    if path.is_symlink() or not path.is_file():
-        raise BundleError("bundle must be a regular file")
-    if path.stat().st_size > MAX_BUNDLE_BYTES:
-        raise BundleError("bundle exceeds size limit")
-    return path.read_text(encoding="utf-8")
+    """Read a held regular-file descriptor, never check a path then reopen it."""
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise BundleError("secure bundle read unavailable on this platform")
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise BundleError("bundle cannot be opened without following links") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise BundleError("bundle must be a regular file")
+        if before.st_size > MAX_BUNDLE_BYTES:
+            raise BundleError("bundle exceeds size limit")
+        blocks: list[bytes] = []
+        count = 0
+        while count <= MAX_BUNDLE_BYTES:
+            block = os.read(fd, min(1024 * 1024, MAX_BUNDLE_BYTES + 1 - count))
+            if not block:
+                break
+            count += len(block)
+            blocks.append(block)
+        after = os.fstat(fd)
+        if count > MAX_BUNDLE_BYTES:
+            raise BundleError("bundle exceeds size limit")
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+        ) or count != before.st_size:
+            raise BundleError("bundle changed during descriptor read")
+        try:
+            return b"".join(blocks).decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise BundleError("bundle must contain UTF-8") from exc
+    finally:
+        os.close(fd)
 
 
 __all__ = ["MAX_BUNDLE_BYTES", "BUNDLE_SUFFIX", "BundleCodec", "safe_member_path", "export_bundle",

@@ -59,6 +59,43 @@ def test_bundle_write_cannot_follow_predictable_temp_symlink(tmp_path):
     assert predictable.is_symlink()
 
 
+def test_bundle_read_refuses_symlink_and_same_size_rewrite(tmp_path, monkeypatch):
+    import os
+
+    target = tmp_path / "hero.gfbundle.json"
+    target.write_text('{"safe":true}', encoding="utf-8")
+    link = tmp_path / "redirect.gfbundle.json"
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable on this platform")
+    with pytest.raises(BundleError):
+        bio.read_bundle(link)
+
+    if not hasattr(os, "O_NOFOLLOW"):
+        return
+    original_read = bio.os.read
+    changed = [False]
+
+    def mutate_after_read(fd, size):
+        block = original_read(fd, size)
+        if block and not changed[0]:
+            changed[0] = True
+            before = os.fstat(fd)
+            with target.open("r+b") as writer:
+                writer.seek(2)
+                writer.write(b"X")
+                writer.flush()
+                os.fsync(writer.fileno())
+            os.utime(target, ns=(before.st_atime_ns, before.st_mtime_ns))
+        return block
+
+    monkeypatch.setattr(bio.os, "read", mutate_after_read)
+    with pytest.raises(BundleError, match="changed during descriptor read"):
+        bio.read_bundle(target)
+    assert changed[0]
+
+
 def test_tenant_path_write_read(tmp_path, saver):
     saver.save_files("hero", "platformer", {"a.md": "abc"})
     p = bio.bundle_path(tmp_path, "tenant-one", "hero", tenant_storage_namespace)
