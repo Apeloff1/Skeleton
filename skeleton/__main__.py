@@ -80,7 +80,7 @@ Commands:
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
     quest-campaign-author  Edit and preview replay-verified chapter campaigns
-    game        Build a playable Godot project from a natural-language brief
+    quest-campaign-route  Solve and replay authored multi-chapter campaign completion\n    game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
     forge       Blueprint compilation and materialization
@@ -785,6 +785,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-expedition-route":
         from skeleton.game.gameplay.expedition_quest_route import cli as quest_route_cli
         return quest_route_cli(rest)
+    if cmd == "quest-campaign-route":
+        from skeleton.game.gameplay.quest_chapter_campaign_route import cli as campaign_route_cli
+        return campaign_route_cli(rest)
     if cmd == "quest-campaign":
         from skeleton.game.gameplay.quest_chapter_campaign import cli as campaign_cli
         return campaign_cli(rest)
