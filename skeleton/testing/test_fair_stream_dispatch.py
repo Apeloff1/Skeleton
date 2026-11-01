@@ -219,3 +219,59 @@ def test_invalid_permit_type_fails_closed_before_owner(monkeypatch):
     with pytest.raises(DispatchUncertain, match="canonical typed"):
         guard.execute_once(None)
     assert owner.calls == 0
+
+
+def test_cross_process_anchor_change_during_probe_prevents_native_execution(monkeypatch):
+    """An OS sample is not an exclusive lock on the durable CAS anchor."""
+    owner = SimulatedCommittedOwner()
+    guard = make(owner)
+    calls = 0
+
+    def sample(self, *, token_budget, storage_path):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            # Simulate a different process moving the independent authority
+            # while the second OS probe is in progress. No backend may run.
+            guard._session._watermark.value = (999, "f" * 64)
+        return budget(), {
+            "measurement": "os_probe",
+            "gpu_device_qualified": False,
+            "physical_memory_reserved": False,
+            "auxiliary_telemetry_incomplete": True,
+        }
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    guard.submit(request())
+    permits, _ = guard.plan_live(token_budget=40)
+    with pytest.raises(DispatchUncertain, match="changed during resource probe"):
+        guard.execute_once(permits[0])
+    assert calls == 2
+    assert owner.calls == 0
+    assert guard.uncertain
+    assert guard._session.quarantined
+    with pytest.raises(DispatchUncertain, match="reconciliation"):
+        guard.execute_once(permits[0])
+
+
+def test_boolean_alias_cannot_reuse_one_token_dispatch_permit(monkeypatch):
+    """Python bool equality must not authorize a forged one-token permit."""
+    from dataclasses import replace
+
+    install_probe(monkeypatch, [budget(tokens=1)])
+    owner = SimulatedCommittedOwner()
+    guard = make(owner)
+    guard.submit(StreamRequest("one", "tenant", InferencePhase.PREFILL, 1, 1))
+    permits, _ = guard.plan_live(token_budget=1)
+    assert len(permits) == 1
+    assert permits[0].tokens == 1
+    assert permits[0].bytes_reserved == 1
+    for forged in (
+        replace(permits[0], tokens=True),
+        replace(permits[0], bytes_reserved=True),
+        replace(permits[0], generation=True),
+    ):
+        with pytest.raises(DispatchUncertain, match="canonical typed"):
+            guard.execute_once(forged)
+    assert owner.calls == 0
+    assert not guard.uncertain

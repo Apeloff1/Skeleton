@@ -148,7 +148,17 @@ class GuardedFairStreamDispatch:
             return permits, observation
 
     def _validate_pending(self, permit: DispatchPermit) -> dict[str, object]:
-        if type(permit) is not DispatchPermit:
+        # Dataclass equality is insufficient: bool == 1, and an attacker who
+        # supplies a forged permit can otherwise alias a one-token lease.
+        # Reject malformed identity before any fresh sampling or backend call.
+        if (type(permit) is not DispatchPermit
+                or type(permit.lease_id) is not str
+                or type(permit.request_id) is not str
+                or type(permit.generation) is not int
+                or type(permit.checkpoint_digest) is not str
+                or type(permit.tokens) is not int
+                or type(permit.bytes_reserved) is not int
+                or type(permit.device_qualified) is not bool):
             raise DispatchUncertain("canonical typed dispatch permit required")
         state = self._session.verify()
         if (
@@ -252,8 +262,23 @@ class GuardedFairStreamDispatch:
                 or observation.ram_headroom_bytes < permit.bytes_reserved
             ):
                 raise DispatchDeferred("fresh pressure probe denies pending lease")
+            # A live OS probe can block or yield while another process moves
+            # the independent CAS anchor. Re-read both durable authorities
+            # immediately before invoking the side-effecting native backend.
+            # The journal's one-use execution claim remains the final
+            # cross-process fence; this check narrows the sampling TOCTOU gap.
             try:
-                receipt = self._owner.execute_and_commit(permit, state)
+                refreshed = self._validate_pending(permit)
+                if (refreshed["generation"] != state["generation"]
+                        or refreshed["checkpoint_digest"] != state["checkpoint_digest"]):
+                    raise DispatchUncertain("durable lease changed during resource probe")
+            except BaseException as exc:
+                self._uncertain = True
+                raise DispatchUncertain(
+                    "durable lease changed during resource probe; reconciliation required"
+                ) from exc
+            try:
+                receipt = self._owner.execute_and_commit(permit, refreshed)
             except BaseException as exc:
                 self._uncertain = True
                 raise DispatchUncertain(
