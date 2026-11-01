@@ -59,7 +59,11 @@ Commands:
     combat-career-advice  Compare bounded replayed training choices
     combat-career-author  Transactionally edit and preview coaching careers
     combat-career  Play, train, save and replay a multi-season coaching career
-    combat-campaign-variants  Compare replay-proven authored campaign alternatives\n    combat-campaign-play  Player-controlled hero campaign with offline saves
+    combat-campaign-variants  Compare replay-proven authored campaign alternatives\n    combat-supply  Play earned supplies, replay and export offline campaigns
+    combat-supply-author  Edit source-fenced prices and preview canonical combat
+    combat-supply-solve  Find bounded replay-proven winning supply routes
+    combat-supply-accept  Run original author→play→save→export acceptance
+    combat-campaign-play  Player-controlled hero campaign with offline saves
     combat-campaign-captions  Replay-verified accessible combat narration
     combat-campaign-package  Export, verify and resume portable offline campaigns
     combat-campaign-author  Edit and replay source-bound offline combat campaigns
