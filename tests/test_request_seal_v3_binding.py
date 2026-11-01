@@ -409,3 +409,16 @@ def test_nonce_store_thread_safe_single_winner():
 def test_nonce_store_satisfies_protocol():
     store: NonceStore = InMemoryNonceStore()
     assert store.check_and_record("seal", "p", time.time(), 5)
+
+
+def test_nonce_store_rejects_nonfinite_and_unbounded_replay_evidence():
+    st = InMemoryNonceStore(clock=lambda: NOW)
+    for bad in (float("nan"), float("inf"), float("-inf"), True, "1"):
+        assert st.check_and_record("seal", "n", bad, 60) is False
+        assert st.check_and_record("seal", "n", NOW, bad) is False
+    for bad in ("", "x" * 257, "line\nfeed"):
+        assert st.check_and_record("seal", bad, NOW, 60) is False
+        assert st.check_and_record(bad, "nonce", NOW, 60) is False
+    assert len(st) == 0
+    with pytest.raises(ValueError, match="bounded"):
+        max_entries_from_env({MAX_ENTRIES_ENV: "1000001"})

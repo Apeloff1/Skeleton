@@ -20,6 +20,8 @@ import time
 from typing import Any, Protocol
 
 DEFAULT_MAX_ENTRIES = 100_000
+MAX_NONCE_ENTRIES = 1_000_000
+MAX_NONCE_TTL_S = 1_000_000_000_000
 MAX_ENTRIES_ENV = "SKELETON_SEAL_NONCE_STORE_MAX"
 FULL_METRIC = "nonce_store_full"
 
@@ -56,8 +58,8 @@ def max_entries_from_env(env: dict[str, str] | None = None) -> int:
         value = int(str(raw).strip().replace("_", ""))
     except ValueError:
         raise ValueError(f"{MAX_ENTRIES_ENV} must be a positive integer") from None
-    if value <= 0:
-        raise ValueError(f"{MAX_ENTRIES_ENV} must be a positive integer")
+    if not 1 <= value <= MAX_NONCE_ENTRIES:
+        raise ValueError(f"{MAX_ENTRIES_ENV} must be a bounded positive integer")
     return value
 
 
@@ -79,7 +81,7 @@ class InMemoryNonceStore:
         clock=time.time,
         metrics: Any = None,
     ) -> None:
-        if isinstance(max_entries, bool) or not isinstance(max_entries, int) or max_entries <= 0:
+        if (type(max_entries) is not int or not 1 <= max_entries <= MAX_NONCE_ENTRIES):
             raise ValueError("max_entries must be a positive integer")
         self._max = max_entries
         self._clock = clock
@@ -126,11 +128,17 @@ class InMemoryNonceStore:
         return NonceStoreFull(math.ceil(max(0.0, soonest - now)) or 1)
 
     def check_and_record(self, scope: str, nonce: str, ts: float, ttl_s: float) -> bool:
-        if not isinstance(scope, str) or not scope or not isinstance(nonce, str) or not nonce:
+        if (type(scope) is not str or not 1 <= len(scope) <= 256
+                or type(nonce) is not str or not 1 <= len(nonce) <= 256
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in scope + nonce)):
             return False
-        if ttl_s is None or ttl_s <= 0:
+        if (type(ts) not in (int, float) or type(ttl_s) not in (int, float)
+                or not math.isfinite(ts) or not math.isfinite(ttl_s)
+                or not 0 < ttl_s <= MAX_NONCE_TTL_S):
             return False
         now = self._clock()
+        if type(now) not in (int, float) or not math.isfinite(now):
+            return False
         key = (scope, nonce)
         with self._lock:
             exp = self._entries.get(key)
