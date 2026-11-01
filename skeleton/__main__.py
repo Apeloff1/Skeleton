@@ -59,7 +59,7 @@ Commands:
     scene-patrol-solve  Find bounded legal routes through timed guards
     scene-patrol-author  Transactionally edit and preview timed patrols
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
-    scene-weather  Play deterministic weather-gated scene travel and replay
+    scene-weather-author  Edit weather gates with source-fenced playable previews\n    scene-weather  Play deterministic weather-gated scene travel and replay
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -793,6 +793,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-patrol":
         from skeleton.game.gameplay.scene_guard_patrol import cli as patrol_cli
         return patrol_cli(rest)
+    if cmd == "scene-weather-author":
+        from skeleton.game.gameplay.scene_weather_author import cli as weather_author_cli
+        return weather_author_cli(rest)
     if cmd == "scene-weather":
         from skeleton.game.gameplay.scene_weather import cli as weather_cli
         return weather_cli(rest)
