@@ -138,8 +138,8 @@ def _envelope(assurance: dict[str, object]) -> dict[str, object]:
         "offline_gameplay_reexecuted": True,
         "installed_source_archive_binding_verified": True,
         "private_save_world_binding_verified": True,
-        "independently_pinned_delivery": True,
-        "read_only_evidence": True,
+        "independent_pin_distribution_required": True,
+        "source_level_replay_evidence": True,
         "native_device_qualified": False,
         "model_inference_observed": False,
         "package_signed": False,
@@ -360,6 +360,7 @@ def inspect_first_playable_delivery(
         "status": "live_original_game_delivery_reverified_release_blocked",
         "independent_receipt_sha256": expected_receipt_sha256,
         "receipt_integrity_verified": True,
+        "independent_pin_reverified": True,
         "live_source_and_private_replay_reexecuted": True,
         "read_only": True,
     }

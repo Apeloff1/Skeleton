@@ -75,6 +75,7 @@ def test_full_real_original_game_delivery_and_independent_reinspection(
     assert published["package_signed"] is False
     assert published["rights_certified"] is False
     assert published["release_certified"] is False
+    assert published["independent_pin_distribution_required"] is True
     assert archive.is_file() and save.is_file() and receipt.is_file()
     assert (install / "release.json").is_file()
     assert (install / "index.html").is_file()
@@ -88,6 +89,7 @@ def test_full_real_original_game_delivery_and_independent_reinspection(
         authorized=True,
     )
     assert checked["receipt_integrity_verified"] is True
+    assert checked["independent_pin_reverified"] is True
     assert checked["live_source_and_private_replay_reexecuted"] is True
     assert checked["replay_digest"] == published["replay_digest"]
     assert checked["read_only"] is True
