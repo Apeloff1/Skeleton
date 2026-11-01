@@ -215,6 +215,7 @@ class PersistentSpriteExportTests(unittest.TestCase):
                 "sprites/hero-idle.tres",
                 "sprites/hero-idle.tscn",
                 "jeeves_sprite_receipt.json",
+                "assets/catalog.json",
             })
             self.assertIn(
                 b'SpriteFrames', archive.read("sprites/hero-idle.tres"),

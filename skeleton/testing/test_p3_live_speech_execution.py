@@ -189,10 +189,12 @@ def test_transcript_declarations_must_match_issued_frame(changes):
     frame(session)
     before = local_state(session)
     segment = TranscriptSegment("conversation", 0, "declared text", 0, 0.25, True)
-    if type(changes.get("sequence")) is bool:
-        # The frozen typed declaration rejects bool before it reaches the
-        # session boundary; no command can be published or partially applied.
-        with pytest.raises(ValueError, match="sequence"):
+    if type(changes.get("sequence")) is bool or (
+        "final" in changes and type(changes["final"]) is not bool
+    ):
+        # The frozen typed declaration rejects invalid primitive types before
+        # session admission; no command can be published or partially applied.
+        with pytest.raises(ValueError, match="sequence|final"):
             replace(segment, **changes)
     else:
         with pytest.raises(MultimodalFoundationError):
