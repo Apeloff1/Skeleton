@@ -13,3 +13,19 @@ def test_evaluate():
     assert set(v.findings) == {"secret:b.log:pattern3", "long_lived:w", "wildcard_scope:w"}
 def test_bad_credential():
     with pytest.raises(m.ContractError): m.Credential("x", (), 5, 5)
+
+
+def test_secret_diagnostics_reject_unbounded_artifacts_and_audit_logs(monkeypatch):
+    with pytest.raises(m.ContractError, match="scan input"):
+        m.scan("x" * (m.MAX_ARTIFACT_CHARS + 1))
+    with pytest.raises(m.ContractError, match="artifact collection"):
+        m.evaluate({str(i): "safe" for i in range(m.MAX_ARTIFACTS + 1)}, [])
+    for bad in (True, -1, "0"):
+        with pytest.raises(m.ContractError):
+            m.Credential("bad", ("read",), bad, 10)
+    c = m.Credential("ci", ("read",), 0, 100)
+    ledger = m.CredentialLedger()
+    monkeypatch.setattr(m, "MAX_AUDIT_EVENTS", 1)
+    assert ledger.use(c, "read", 1)
+    with pytest.raises(m.ContractError, match="audit log"):
+        ledger.use(c, "read", 2)
