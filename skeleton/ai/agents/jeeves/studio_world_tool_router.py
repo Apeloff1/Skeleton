@@ -19,6 +19,7 @@ from skeleton.ai.agents.jeeves import studio_npc_transit_tool as transit
 from skeleton.ai.agents.jeeves import studio_npc_transit_resilience_tool as resilience
 from skeleton.ai.agents.jeeves import studio_npc_rendezvous_tool as rendezvous
 from skeleton.ai.agents.jeeves import studio_npc_knowledge_exchange_tool as exchange
+from skeleton.ai.agents.jeeves import studio_npc_continuity_tool as continuity
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 ROUTER_SCHEMA = "skeleton.jeeves.studio_world_tool_router.v1"
@@ -72,6 +73,7 @@ _TOOL_SYMBOLS = (
     ("npc_transit_resilience_tool_schema", "execute_npc_transit_resilience_tool"),
     ("npc_rendezvous_tool_schema", "execute_npc_rendezvous_tool"),
     ("npc_knowledge_exchange_tool_schema", "execute_npc_knowledge_exchange_tool"),
+    ("npc_continuity_tool_schema", "execute_npc_continuity_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -110,7 +112,8 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    transit if descriptor_name == "npc_transit_tool_schema" else
                    resilience if descriptor_name == "npc_transit_resilience_tool_schema" else
                    rendezvous if descriptor_name == "npc_rendezvous_tool_schema" else
-                   exchange if descriptor_name == "npc_knowledge_exchange_tool_schema" else studio)
+                   exchange if descriptor_name == "npc_knowledge_exchange_tool_schema" else
+                   continuity if descriptor_name == "npc_continuity_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
         executor = getattr(adapter, executor_name)
         if (type(descriptor) is not dict or type(descriptor.get("name")) is not str
