@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from skeleton.ai.agents.jeeves import studio_walk_tool as studio
 from skeleton.ai.agents.jeeves import studio_npc_knowledge_tool as knowledge
 from skeleton.ai.agents.jeeves import studio_scene_rehearsal_tool as rehearsal
+from skeleton.ai.agents.jeeves import studio_clue_visibility_tool as clue
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 ROUTER_SCHEMA = "skeleton.jeeves.studio_world_tool_router.v1"
@@ -58,6 +59,7 @@ _TOOL_SYMBOLS = (
     ("audio_prompt_tool_schema", "execute_audio_prompt_tool"),
     ("npc_knowledge_tool_schema", "execute_npc_knowledge_tool"),
     ("scene_rehearsal_tool_schema", "execute_scene_rehearsal_tool"),
+    ("clue_visibility_tool_schema", "execute_clue_visibility_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -89,7 +91,8 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
     schemas: set[str] = set()
     for descriptor_name, executor_name in _TOOL_SYMBOLS:
         adapter = (knowledge if descriptor_name == "npc_knowledge_tool_schema" else
-                   rehearsal if descriptor_name == "scene_rehearsal_tool_schema" else studio)
+                   rehearsal if descriptor_name == "scene_rehearsal_tool_schema" else
+                   clue if descriptor_name == "clue_visibility_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
         executor = getattr(adapter, executor_name)
         if (type(descriptor) is not dict or type(descriptor.get("name")) is not str
