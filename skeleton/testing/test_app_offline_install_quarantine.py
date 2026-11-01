@@ -107,3 +107,66 @@ def test_quarantine_inspection_rejects_mode_mixing(package, tmp_path, capsys, ex
     partial.mkdir(mode=0o700)
     assert run_app_cli(args(partial, archive, pin, manifest) + extra) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+def test_real_failed_install_remains_quarantined_and_inspectable(
+    package, tmp_path, capsys, monkeypatch,
+):
+    from skeleton.app import offline_archive_install
+
+    archive, pin, manifest = package
+    target = tmp_path / "partial-install"
+    original = offline_archive_install._write_file
+    written = 0
+
+    def fail_after_first(*args, **kwargs):
+        nonlocal written
+        if written >= 1:
+            raise offline_archive_install.OfflineSourceInstallError(
+                "injected write failure"
+            )
+        written += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(offline_archive_install, "_write_file", fail_after_first)
+    assert run_app_cli([
+        "studio-journey", "--install-archive", "--output", str(target),
+        "--archive", str(archive), "--expected-archive-sha256", pin,
+        "--expected-manifest-sha256", manifest, "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert target.is_dir()
+    assert run_app_cli(args(target, archive, pin, manifest)) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["missing_files"] > 0
+    assert receipt["quarantine_cleared"] is False
+    assert receipt["source_mutated"] is False
+
+
+def test_source_mutation_during_partial_inspection_fails_closed(
+    package, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_install_quarantine
+
+    archive, pin, manifest = package
+    target = tmp_path / "partial-install"
+    target.mkdir(mode=0o700)
+    with ZipFile(archive) as bundle:
+        original_release = bundle.read("release.json")
+    (target / "release.json").write_bytes(original_release)
+    original_read = offline_install_quarantine._read
+    mutated = False
+
+    def mutate_after_read(fd, name, limit, *, owner_controlled=False):
+        nonlocal mutated
+        data = original_read(fd, name, limit, owner_controlled=owner_controlled)
+        if name == "release.json" and not mutated:
+            mutated = True
+            (target / "release.json").write_bytes(b"x" * len(data))
+        return data
+
+    monkeypatch.setattr(offline_install_quarantine, "_read", mutate_after_read)
+    with pytest.raises(offline_install_quarantine.OfflineInstallQuarantineError):
+        offline_install_quarantine.inspect_offline_install_quarantine(
+            target, archive, expected_archive_sha256=pin,
+            expected_manifest_sha256=manifest, authorized=True,
+        )
