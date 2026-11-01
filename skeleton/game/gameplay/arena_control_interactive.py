@@ -18,6 +18,7 @@ from skeleton.game.gameplay.arena_control import (
     original_control, verify_control,
 )
 from skeleton.game.gameplay.arena_control_solver import _choices
+from skeleton.game.gameplay.arena_control_render import render_control
 from skeleton.game.gameplay.arena_policy import _decide
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.tactical_arena import _active
@@ -89,6 +90,7 @@ def play_interactive(source: Any, team: Any, *, resume: Any = None,
             "tick": session["state"]["tick"],
             "scores": session["state"]["scores"],
             "legal_actions": _choices(session),
+            "board": render_control(session),
             "state_digest": session["state_digest"],
         })
         line = reader.readline(MAX_INPUT_BYTES + 1)

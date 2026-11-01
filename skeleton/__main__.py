@@ -76,6 +76,7 @@ Commands:
     arena-control-campaign  Play replay-verified multi-stage beacon campaigns
     arena-control-campaign-author  Edit and preview replayable beacon campaigns
     arena-control-accept  Verify end-to-end offline capture-game playability
+    arena-control-render  Render replay-verified tactical ASCII capture boards
     arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
@@ -799,6 +800,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "arena-control-accept":
         from skeleton.game.gameplay.arena_control_acceptance import cli as control_accept_cli
         return control_accept_cli(rest)
+    if cmd == "arena-control-render":
+        from skeleton.game.gameplay.arena_control_render import cli as control_render_cli
+        return control_render_cli(rest)
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
         return author_cli(rest)
