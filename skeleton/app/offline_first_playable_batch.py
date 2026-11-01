@@ -67,6 +67,19 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
         # Path.absolute preserves '..'; normalize before cross-job checks.
         return Path(os.path.abspath(os.fspath(_path(value))))
     for job in checked:
+        # A manifest pin is independent operator authority. Reject malformed
+        # values before replay, destination preflight or any output publication.
+        if (type(job.manifest_sha256) is not str
+                or _PIN.fullmatch(job.manifest_sha256) is None):
+            raise FirstPlayableDeliveryBatchError(
+                "independent source manifest requires lowercase SHA-256"
+            )
+        if any(type(value) not in (str, Path) for value in (
+            job.source, job.archive, job.install, job.save, job.receipt,
+        )):
+            raise FirstPlayableDeliveryBatchError(
+                "game delivery paths must be strings or pathlib Paths"
+            )
         if (type(job.moves) is not tuple
                 or not 1 <= len(job.moves) <= MAX_ACTIONS
                 or any(type(move) is not str or move not in _ACTIONS

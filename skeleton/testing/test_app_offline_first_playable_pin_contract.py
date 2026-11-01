@@ -98,3 +98,19 @@ def test_missing_pin_triple_remains_rejected_in_inspection(tmp_path):
         _check_jobs(modified, tmp_path / "summary.json", inspect=True)
     with pytest.raises(FirstPlayableDeliveryBatchError, match="partial game pin"):
         _check_jobs(modified, tmp_path / "summary.json", inspect=None)
+
+
+@pytest.mark.parametrize("value", [None, 1, [], "A" * 64, "0" * 63, "0" * 65])
+def test_source_manifest_pin_is_validated_before_any_delivery_io(tmp_path, value):
+    jobs = _jobs(tmp_path)
+    modified = (replace(jobs[0], manifest_sha256=value), jobs[1])
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="source manifest"):
+        _check_jobs(modified, tmp_path / "summary.json", inspect=False)
+
+
+@pytest.mark.parametrize("value", [None, 1, [], object()])
+def test_untyped_delivery_paths_rejected_at_admission(tmp_path, value):
+    jobs = _jobs(tmp_path)
+    modified = (replace(jobs[0], source=value), jobs[1])
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="paths must"):
+        _check_jobs(modified, tmp_path / "summary.json", inspect=False)
