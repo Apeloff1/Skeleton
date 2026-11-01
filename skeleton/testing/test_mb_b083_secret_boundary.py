@@ -32,7 +32,7 @@ def test_secret_diagnostics_reject_unbounded_artifacts_and_audit_logs(monkeypatc
 
 
 def test_secret_evidence_rejects_control_and_bidi_diagnostic_labels():
-    for bad in ("log\\nforged", "log\\x1b[31m", "log\\u202efake"):
+    for bad in ("log" + chr(10) + "forged", "log" + chr(27) + "[31m", "log" + chr(0x202e) + "fake"):
         with pytest.raises(m.ContractError, match="artifact path"):
             m.evaluate({bad: "safe"}, [])
         with pytest.raises(m.ContractError, match="credential name"):
