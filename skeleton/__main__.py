@@ -70,7 +70,7 @@ Commands:
     scene-survival-author  Transactionally edit survival sources and preview play
     scene-survival-route  Find replay-proven bounded survival routes
     scene-survival  Play source-bound tile hazards, earned food, shelter and replay
-    scene-tiles  Play authored grid movement/collision and replay scene saves
+    scene-market  Play earned-currency trading, crafting and delivery quests\n    scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -883,6 +883,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-survival":
         from skeleton.game.gameplay.scene_tile_survival import cli as scene_survival_cli
         return scene_survival_cli(rest)
+    if cmd == "scene-market":
+        from skeleton.game.gameplay.scene_market import cli as market_cli
+        return market_cli(rest)
     if cmd == "scene-tiles":
         from skeleton.game.gameplay.scene_tile_walk import cli as scene_tiles_cli
         return scene_tiles_cli(rest)
