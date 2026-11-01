@@ -288,3 +288,39 @@ def test_resume_rejects_unpinned_or_forged_prefix_without_writing_next_game(
             (forged, jobs[1]), tmp_path / "cohort.json", authorized=True,
         )
     assert not Path(jobs[1].archive).exists()
+
+
+def test_lexical_dotdot_alias_rejected_before_any_publication(
+    original_games, tmp_path,
+):
+    jobs = list(jobs_for(original_games, tmp_path))
+    jobs[1] = replace(
+        jobs[1], receipt=tmp_path / "unused" / ".." / "receipt-0.json",
+    )
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        publish_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+
+
+def test_delivery_output_ancestor_of_other_output_is_rejected(
+    original_games, tmp_path,
+):
+    jobs = list(jobs_for(original_games, tmp_path))
+    jobs[1] = replace(jobs[1], save=Path(jobs[0].archive) / "child.json")
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        publish_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+
+
+def test_job_parser_rejects_duplicate_keys_and_nonfinite_values():
+    from skeleton.app.offline_first_playable_batch import _parse_job
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        _parse_job('{"source":"a","source":"b"}')
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        _parse_job('{"source":NaN}')
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        _parse_job('{"source":"a","archive_sha256":42}')

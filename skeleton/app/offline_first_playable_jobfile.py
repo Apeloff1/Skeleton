@@ -168,6 +168,8 @@ def execute_pinned_jobfile(
         raise PermissionError("trusted local operator acknowledgement required")
     if mode == "inspect":
         _pin(expected_summary_sha256)
+    elif mode == "triage" and expected_summary_sha256 is not None:
+        _pin(expected_summary_sha256)
     elif mode in {"publish", "resume"} and expected_summary_sha256 is not None:
         raise FirstPlayableJobFileError("summary pin is inspection-only")
     jobs, identity = read_pinned_jobs(

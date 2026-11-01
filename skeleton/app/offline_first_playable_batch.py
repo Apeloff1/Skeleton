@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import hmac
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Sequence
@@ -60,6 +61,9 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
         raise FirstPlayableDeliveryBatchError("2-8 typed game delivery jobs required")
     checked = tuple(jobs)
     paths: list[tuple[Path, Path, Path, Path, Path]] = []
+    def canonical(value: str | Path) -> Path:
+        # Path.absolute preserves '..'; normalize before cross-job checks.
+        return Path(os.path.abspath(os.fspath(_path(value))))
     for job in checked:
         if (type(job.moves) is not tuple
                 or not 1 <= len(job.moves) <= MAX_ACTIONS
@@ -74,16 +78,21 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
             raise FirstPlayableDeliveryBatchError("publication cannot accept output pins")
         if inspect is None and any(pins) and not all(pins):
             raise FirstPlayableDeliveryBatchError("partial game pin triple rejected")
-        paths.append(tuple(map(_path, (
+        paths.append(tuple(map(canonical, (
             job.source, job.archive, job.install, job.save, job.receipt,
         ))))
-    summary_path = _path(summary)
+    summary_path = canonical(summary)
     sources = [entry[0] for entry in paths]
     installs = [entry[2] for entry in paths]
     outputs = [path for entry in paths for path in (entry[1], entry[3], entry[4])]
     outputs.append(summary_path)
     if len(set(outputs)) != len(outputs):
         raise FirstPlayableDeliveryBatchError("duplicate delivery output name")
+    # A file output must not subsume another output or any game tree.
+    for index, output in enumerate(outputs):
+        if any(_is_within(output, other) or _is_within(other, output)
+               for other in outputs[index + 1:]):
+            raise FirstPlayableDeliveryBatchError("nested delivery output names")
     if len(set(sources)) != len(sources):
         raise FirstPlayableDeliveryBatchError("duplicate original source tree")
     if len({job.manifest_sha256 for job in checked}) != len(checked):
@@ -93,7 +102,8 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
         if any(_is_within(root, other) or _is_within(other, root)
                for other in roots[i + 1:]):
             raise FirstPlayableDeliveryBatchError("source and install roots overlap")
-    if any(_is_within(output, root) for output in outputs for root in roots):
+    if any(_is_within(output, root) or _is_within(root, output)
+           for output in outputs for root in roots):
         raise FirstPlayableDeliveryBatchError("delivery evidence inside game tree")
     return checked
 
@@ -360,7 +370,19 @@ def inspect_first_playable_delivery_batch(
 def _parse_job(raw: str) -> DeliveryJob:
     if type(raw) is not str or not 0 < len(raw.encode("utf-8")) <= MAX_INPUT_BYTES:
         raise FirstPlayableDeliveryBatchError("job JSON byte budget exceeded")
-    value = json.loads(raw)
+    def unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        value: dict[str, object] = {}
+        for key, item in pairs:
+            if key in value:
+                raise FirstPlayableDeliveryBatchError("duplicate job JSON key")
+            value[key] = item
+        return value
+
+    def no_constant(value: str) -> object:
+        raise FirstPlayableDeliveryBatchError("nonfinite job JSON constant")
+
+    value = json.loads(raw, object_pairs_hook=unique_pairs,
+                       parse_constant=no_constant)
     mandatory = {
         "source", "archive", "install", "save", "receipt",
         "manifest_sha256", "moves",
@@ -369,7 +391,9 @@ def _parse_job(raw: str) -> DeliveryJob:
     if (type(value) is not dict or not mandatory <= value.keys()
             or not value.keys() <= mandatory | optional
             or any(type(value[key]) is not str for key in mandatory - {"moves"})
-            or type(value["moves"]) is not list):
+            or type(value["moves"]) is not list
+            or any(key in value and type(value[key]) is not str
+                   for key in optional)):
         raise FirstPlayableDeliveryBatchError("invalid bounded delivery job schema")
     return DeliveryJob(
         source=value["source"], archive=value["archive"],
