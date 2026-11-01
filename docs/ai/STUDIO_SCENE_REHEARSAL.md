@@ -24,3 +24,10 @@ forgery, symlink denial, CLI/router parity, and real playable ZIP hashes.
 
 Validation is required on the exact remote head. Canonical pytest, security
 gates, device testing and consumer release are not asserted by source creation.
+
+The offline CSP-hashed timing editor is published by --editor-directory. It
+exports a source/session/baseline-bound JSON candidate. The CLI accepts
+--import-candidate only with the exact baseline and replays the imported
+candidate against canonical scene/quest source before any playable compilation.
+The HTML publisher independently recompiles the editor before accepting bytes;
+caller-supplied self-consistent hashes alone are never publication authority.

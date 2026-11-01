@@ -78,11 +78,14 @@ def test_editor_publish_exclusive_and_cli_path(tmp_path, capsys):
     html, receipt = render_scene_rehearsal_editor(
         docs, [], report, authorized=True)
     published = publish_scene_rehearsal_editor(
-        html, receipt, tmp_path, authorized=True)
+        html, receipt, tmp_path, authorized=True,
+        documents=docs, actions=[], report=report)
     assert published["file_write_performed"] is True
     assert (tmp_path / "scene_rehearsal_editor.html").read_bytes() == html
     with pytest.raises(FileExistsError):
-        publish_scene_rehearsal_editor(html, receipt, tmp_path, authorized=True)
+        publish_scene_rehearsal_editor(
+            html, receipt, tmp_path, authorized=True,
+            documents=docs, actions=[], report=report)
     out = tmp_path / "new"
     out.mkdir()
     assert main(["--project", PROJECT, "--expected-source", source,
@@ -93,3 +96,22 @@ def test_editor_publish_exclusive_and_cli_path(tmp_path, capsys):
     data = json.loads(capsys.readouterr().out)
     assert data["editor"]["file_write_performed"] is True
     assert (out / "scene_rehearsal_editor.html").is_file()
+
+def test_editor_publication_refuses_self_signed_forged_html(tmp_path):
+    docs, source, session, report = fixture()
+    html, receipt = render_scene_rehearsal_editor(
+        docs, [], report, authorized=True)
+    forged = html.replace(b"Original scene timing editor", b"Forged scene timing editor")
+    import hashlib
+    import json as _json
+    false_receipt = {**receipt, "html_sha256": hashlib.sha256(forged).hexdigest(),
+                     "html_bytes": len(forged)}
+    false_receipt["editor_digest"] = hashlib.sha256(_json.dumps(
+        {k: v for k, v in false_receipt.items() if k != "editor_digest"},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False).encode("ascii")).hexdigest()
+    with pytest.raises(StudioQuestError):
+        publish_scene_rehearsal_editor(
+            forged, false_receipt, tmp_path, authorized=True,
+            documents=docs, actions=[], report=report)
+    assert not (tmp_path / "scene_rehearsal_editor.html").exists()

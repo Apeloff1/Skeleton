@@ -202,7 +202,8 @@ def load_scene_rehearsal_export(
 
 def publish_scene_rehearsal_editor(
     html: bytes, receipt: Mapping[str, Any], directory: Path, *,
-    authorized: bool,
+    authorized: bool, documents: Mapping[str, Any], actions: list[list[str]],
+    report: Mapping[str, Any],
 ) -> dict[str, object]:
     if authorized is not True:
         raise PermissionError("editor publication requires authorization")
@@ -213,6 +214,12 @@ def publish_scene_rehearsal_editor(
             or receipt.get("editor_digest") != _digest({
                 k: v for k, v in receipt.items() if k != "editor_digest"})):
         raise StudioQuestError("invalid editor publication evidence")
+    # A hash supplied by the same caller is not independent provenance.
+    # Recompile the exact original source before publishing any HTML.
+    verified_html, verified_receipt = render_scene_rehearsal_editor(
+        documents, actions, report, authorized=True)
+    if html != verified_html or receipt != verified_receipt:
+        raise StudioQuestError("editor publication lacks canonical source replay")
     fd = _open_directory(directory)
     name = ".scene-editor-" + secrets.token_hex(16) + ".tmp"
     created = False

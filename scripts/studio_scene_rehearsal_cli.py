@@ -88,7 +88,8 @@ def main(argv: list[str] | None = None) -> int:
             html, editor_receipt = render_scene_rehearsal_editor(
                 docs, actions, report, authorized=True)
             result["editor"] = publish_scene_rehearsal_editor(
-                html, editor_receipt, args.editor_directory, authorized=True)
+                html, editor_receipt, args.editor_directory, authorized=True,
+                documents=docs, actions=actions, report=report)
         if args.playable_assignments is not None:
             assignments = _strict(args.playable_assignments, max_bytes=32768)
             manifest, bundle = compile_rehearsed_playable(
