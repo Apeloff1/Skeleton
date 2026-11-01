@@ -27,3 +27,10 @@ and does not write to disk or grant itself publication authority.
 The playable HTML5 maze is real, but original NPC dialogues, temporal
 duration, visual design recipes and native genre runtime are **not**
 implemented by that HTML5 compiler. All unverified claims remain false.
+
+The bundle also includes an accessible offline `director_editor.html` with
+source-leased timing and recipe selection controls. It exports two typed JSON
+files for explicit CLI re-compilation. It never silently edits canonical
+source, grants model permissions, or asserts that an exported JSON file is a
+playable runtime. The editor uses text-only DOM construction and exact CSP
+hashes, with no external scripts, network requests, or dynamic code evaluation.

@@ -58,7 +58,7 @@ def test_deterministic_complete_html5_and_editor_handoff():
     assert sha256(archive).hexdigest() == manifest["bundle_sha256"]
     with zipfile.ZipFile(io.BytesIO(archive)) as z:
         assert sorted(z.namelist()) == sorted([
-            "index.html", "scene_schedule.json",
+            "index.html", "director_editor.html", "scene_schedule.json",
             "scene_asset_bindings.json", "director_manifest.json"])
         for name, expected in manifest["file_hashes"].items():
             assert sha256(z.read(name)).hexdigest() == expected
@@ -145,3 +145,35 @@ def test_rehashed_forged_director_bundle_cannot_be_published(tmp_path):
                                  documents=docs, actions=[],
                                  schedule=schedule, assignments=assignments)
     assert not (tmp_path / "studio_director_handoff.zip").exists()
+
+def test_offline_editor_has_csp_safe_embedded_json_and_no_native_claims():
+    from skeleton.ai.game_builder.studio_ecosystem_director_editor import (
+        render_director_editor,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import (
+        compile_scene_schedule,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_scene_asset_bindings import (
+        compile_scene_asset_bindings,
+    )
+    docs, source, visual, session, schedule, assignments = fixture()
+    timing = compile_scene_schedule(
+        docs, [], schedule, authorized=True, expected_source_digest=source)
+    assets = compile_scene_asset_bindings(
+        docs, [], assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual)
+    html, receipt = render_director_editor(timing, assets)
+    assert sha256(html).hexdigest() == receipt["html_sha256"]
+    assert receipt["authoring_export_only"] is True
+    assert b"Content-Security-Policy" in html
+    assert b"studio_scene_assignments.json" in html
+    assert b"studio_scene_schedule.json" in html
+    assert b"native_asset_binding_verified" in html
+    assert b"innerHTML" not in html
+    assert b"eval(" not in html
+    assert b"document.write" not in html
+    assert render_director_editor(timing, assets) == (html, receipt)
+    altered = dict(assets)
+    altered["session_digest"] = "0" * 64
+    with pytest.raises(StudioQuestError):
+        render_director_editor(timing, altered)

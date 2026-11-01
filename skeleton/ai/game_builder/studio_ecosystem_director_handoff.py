@@ -23,11 +23,12 @@ from .studio_ecosystem_scene_schedule import (
     compile_scene_schedule,
 )
 from .studio_ecosystem_scene_asset_bindings import compile_scene_asset_bindings
+from .studio_ecosystem_director_editor import render_director_editor
 
 SCHEMA = "skeleton.game_builder.studio_director_handoff.v1"
 FILENAME = "studio_director_handoff.zip"
 MAX_BUNDLE_BYTES = 8 * 1024 * 1024
-_FILES = ("index.html", "scene_schedule.json",
+_FILES = ("index.html", "director_editor.html", "scene_schedule.json",
           "scene_asset_bindings.json", "director_manifest.json")
 
 
@@ -72,8 +73,10 @@ def compile_director_handoff(
             or receipt.get("validated_gameplay_proof") is not True
             or sha256(playable).hexdigest() != receipt.get("html_sha256")):
         raise StudioQuestError("director playable compiler proof mismatch")
+    editor_html, editor_receipt = render_director_editor(timing, assets)
     files = {
         "index.html": playable,
+        "director_editor.html": editor_html,
         "scene_schedule.json": _canonical(timing) + b"\n",
         "scene_asset_bindings.json": _canonical(assets) + b"\n",
     }
@@ -87,6 +90,7 @@ def compile_director_handoff(
         "scene_schedule_digest": timing["schedule_digest"],
         "asset_binding_digest": assets["asset_binding_digest"],
         "canonical_playable_receipt": receipt,
+        "offline_editor_receipt": editor_receipt,
         "file_hashes": {name: sha256(data).hexdigest()
                         for name, data in sorted(files.items())},
         "canonical_html5_gameplay_replay_verified": True,
