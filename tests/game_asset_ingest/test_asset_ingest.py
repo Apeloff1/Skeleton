@@ -544,3 +544,21 @@ def test_descriptor_import_rejects_invisible_and_control_character_paths(tmp_pat
         assert report.manifest.entries == []
         assert report.imported == []
         assert any(issue.code == "unsafe" for issue in report.issues)
+
+
+def test_descriptor_import_rejects_unbounded_external_references_transactionally(tmp_path):
+    from skeleton.game.build.asset_ingest import pipeline
+
+    doc = {"asset": {"version": "2.0"},
+           "buffers": [{"uri": f"missing_{i}.bin"} for i in range(257)]}
+    (tmp_path / "oversized.gltf").write_text(json.dumps(doc))
+    for importer in (pipeline.import_files, pipeline.import_directory):
+        if importer is pipeline.import_files:
+            report = importer(tmp_path, ["oversized.gltf"])
+        else:
+            report = importer(tmp_path)
+        assert not report.ok
+        assert not report.manifest.entries
+        assert not report.imported
+        assert any("external reference count exceeds bound" in issue.detail
+                   for issue in report.issues)

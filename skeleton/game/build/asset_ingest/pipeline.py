@@ -22,6 +22,8 @@ MAX_IMPORT_FILES = 8192
 MAX_TREE_ENTRIES = 16384
 MAX_TREE_DEPTH = 32
 MAX_IMPORT_TOTAL_BYTES = 512 * 1024 * 1024
+MAX_EXTERNAL_REFS_PER_ASSET = 256
+MAX_TOTAL_EXTERNAL_REFS = 8192
 
 # A platform without dir_fd + O_NOFOLLOW must not silently downgrade to a
 # check-then-open path traversal. A native Windows handle backend is separate.
@@ -167,15 +169,25 @@ def _issue_code(error: OSError) -> str:
 def _check_references(
     root_fd: int, report: ImportReport,
     observed: dict[str, tuple[int, ...]] | None = None,
-) -> None:
+) -> bool:
+    total_refs = 0
     for entry in report.manifest.entries:
-        for ref in entry.metadata.get("external_refs", []):
+        refs = entry.metadata.get("external_refs", [])
+        if (type(refs) not in (list, tuple)
+                or len(refs) > MAX_EXTERNAL_REFS_PER_ASSET
+                or total_refs + len(refs) > MAX_TOTAL_EXTERNAL_REFS):
+            report.issues.append(ImportIssue(entry.path, "broken",
+                                             "external reference count exceeds bound"))
+            return False
+        total_refs += len(refs)
+        for ref in refs:
             try:
                 _parts(ref)
                 relative = (PurePosixPath(entry.path).parent / ref).as_posix()
                 _regular(root_fd, relative, read=False, observed=observed)
             except (AssetImportError, OSError, ValueError, TypeError) as exc:
                 report.issues.append(ImportIssue(entry.path, "missing_reference", f"{ref}: {exc}"))
+    return True
 
 
 def _import_from_fd(
@@ -221,7 +233,8 @@ def _import_from_fd(
             report.issues.append(ImportIssue(relative, code, str(exc)))
         except OSError as exc:
             report.issues.append(ImportIssue(relative, _issue_code(exc), str(exc)))
-    _check_references(root_fd, report, observed=observed)
+    if not _check_references(root_fd, report, observed=observed):
+        return ImportReport(AssetManifest(), issues=report.issues)
     return report
 
 
