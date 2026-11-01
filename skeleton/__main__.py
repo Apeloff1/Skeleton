@@ -62,6 +62,7 @@ Commands:
     combat-arena    Play source-bound tactical grid combat with offline replay
     arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
+    arena-forge    Play earned salvage, equipment crafting and tactical arenas
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
@@ -771,6 +772,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-campaign-author":
         from skeleton.game.gameplay.quest_chapter_campaign_author import cli as campaign_author_cli
         return campaign_author_cli(rest)
+    if cmd == "arena-forge":
+        from skeleton.game.gameplay.arena_forge_run import cli as forge_cli
+        return forge_cli(rest)
     if cmd == "combat-expedition":
         from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
         return expedition_cli(rest)
