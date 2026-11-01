@@ -91,12 +91,25 @@ def _root_fd(root: str | Path) -> int:
         raise
 
 
-def _regular(root_fd: int, relative: str, *, read: bool) -> bytes | None:
+def _regular(
+    root_fd: int, relative: str, *, read: bool,
+    observed: dict[str, tuple[int, ...]] | None = None,
+) -> bytes | None:
     parts = _parts(relative)
     parent = os.dup(root_fd)
     try:
-        for component in parts[:-1]:
+        for index, component in enumerate(parts[:-1]):
             child = os.open(component, _DIR_FLAGS, dir_fd=parent)
+            try:
+                if observed is not None:
+                    prefix = "/".join(parts[:index + 1])
+                    snapshot = observed.get(prefix)
+                    opened = os.fstat(child)
+                    if snapshot != (opened.st_dev, opened.st_ino):
+                        raise AssetImportError("directory changed after scan")
+            except BaseException:
+                os.close(child)
+                raise
             os.close(parent)
             parent = child
         leaf = os.open(parts[-1], _FILE_FLAGS, dir_fd=parent)
@@ -106,6 +119,12 @@ def _regular(root_fd: int, relative: str, *, read: bool) -> bytes | None:
                 raise AssetImportError("asset is not a regular file")
             if before.st_size > MAX_ASSET_BYTES:
                 raise AssetImportError("asset exceeds size limit")
+            if observed is not None:
+                snapshot = observed.get(relative)
+                opened = (before.st_dev, before.st_ino, before.st_size,
+                          before.st_mtime_ns, before.st_ctime_ns)
+                if snapshot != opened:
+                    raise AssetImportError("asset changed after directory scan")
             if not read:
                 return None
             chunks: list[bytes] = []
@@ -136,18 +155,24 @@ def _issue_code(error: OSError) -> str:
     return "missing" if error.errno == errno.ENOENT else "unsafe"
 
 
-def _check_references(root_fd: int, report: ImportReport) -> None:
+def _check_references(
+    root_fd: int, report: ImportReport,
+    observed: dict[str, tuple[int, ...]] | None = None,
+) -> None:
     for entry in report.manifest.entries:
         for ref in entry.metadata.get("external_refs", []):
             try:
                 _parts(ref)
                 relative = (PurePosixPath(entry.path).parent / ref).as_posix()
-                _regular(root_fd, relative, read=False)
+                _regular(root_fd, relative, read=False, observed=observed)
             except (AssetImportError, OSError, ValueError, TypeError) as exc:
                 report.issues.append(ImportIssue(entry.path, "missing_reference", f"{ref}: {exc}"))
 
 
-def _import_from_fd(root_fd: int, paths: Iterable[str]) -> ImportReport:
+def _import_from_fd(
+    root_fd: int, paths: Iterable[str],
+    observed: dict[str, tuple[int, ...]] | None = None,
+) -> ImportReport:
     """Import and validate against the exact held root descriptor."""
     report = ImportReport(AssetManifest())
     # Consume only a bounded prefix, then sort for deterministic manifests.
@@ -169,7 +194,7 @@ def _import_from_fd(root_fd: int, paths: Iterable[str]) -> ImportReport:
             if PurePosixPath(parts[-1]).suffix.lower() not in _EXT:
                 report.issues.append(ImportIssue(relative, "unsupported", "unsupported extension"))
                 continue
-            payload = _regular(root_fd, relative, read=True)
+            payload = _regular(root_fd, relative, read=True, observed=observed)
             assert payload is not None
             total += len(payload)
             if total > MAX_IMPORT_TOTAL_BYTES:
@@ -183,7 +208,7 @@ def _import_from_fd(root_fd: int, paths: Iterable[str]) -> ImportReport:
             report.issues.append(ImportIssue(relative, code, str(exc)))
         except OSError as exc:
             report.issues.append(ImportIssue(relative, _issue_code(exc), str(exc)))
-    _check_references(root_fd, report)
+    _check_references(root_fd, report, observed=observed)
     return report
 
 
@@ -203,6 +228,9 @@ def import_directory(root: str | Path) -> ImportReport:
     """Scan a bounded descriptor-held tree; never follow symlink directories."""
     issues: list[ImportIssue] = []
     paths: list[str] = []
+    # Bounded identities for every scanned directory and regular file.
+    # These bind later descriptor opens to the enumerated tree snapshot.
+    observed: dict[str, tuple[int, ...]] = {}
     try:
         root_fd = _root_fd(root)
     except (OSError, AssetImportError) as exc:
@@ -226,19 +254,29 @@ def import_directory(root: str | Path) -> ImportReport:
                     relative = prefix + entry.name
                     try:
                         _parts(relative)
-                        if entry.is_symlink():
+                        snapshot = entry.stat(follow_symlinks=False)
+                        if stat.S_ISLNK(snapshot.st_mode):
                             continue
-                        if entry.is_dir(follow_symlinks=False):
+                        if stat.S_ISDIR(snapshot.st_mode):
                             child = os.open(entry.name, _DIR_FLAGS, dir_fd=directory_fd)
                             try:
+                                opened = os.fstat(child)
+                                if (snapshot.st_dev, snapshot.st_ino) != (opened.st_dev, opened.st_ino):
+                                    raise AssetImportError("directory changed during traversal")
+                                observed[relative] = (opened.st_dev, opened.st_ino)
                                 walk(child, relative + "/", depth + 1)
                             finally:
                                 os.close(child)
-                        elif entry.is_file(follow_symlinks=False) and PurePosixPath(relative).suffix.lower() in _EXT:
-                            paths.append(relative)
-                            if len(paths) > MAX_IMPORT_FILES:
-                                issues.append(ImportIssue(relative, "broken", "file count exceeds bound"))
-                                return
+                        elif stat.S_ISREG(snapshot.st_mode):
+                            observed[relative] = (
+                                snapshot.st_dev, snapshot.st_ino, snapshot.st_size,
+                                snapshot.st_mtime_ns, snapshot.st_ctime_ns,
+                            )
+                            if PurePosixPath(relative).suffix.lower() in _EXT:
+                                paths.append(relative)
+                                if len(paths) > MAX_IMPORT_FILES:
+                                    issues.append(ImportIssue(relative, "broken", "file count exceeds bound"))
+                                    return
                     except (OSError, AssetImportError) as exc:
                         issues.append(ImportIssue(relative, "unsafe", str(exc)))
                     if visited > MAX_TREE_ENTRIES or len(paths) > MAX_IMPORT_FILES:
@@ -248,7 +286,7 @@ def import_directory(root: str | Path) -> ImportReport:
 
     try:
         walk(root_fd, "", 0)
-        report = _import_from_fd(root_fd, sorted(paths[:MAX_IMPORT_FILES]))
+        report = _import_from_fd(root_fd, sorted(paths[:MAX_IMPORT_FILES]), observed=observed)
     finally:
         os.close(root_fd)
     report.issues.extend(issues)
