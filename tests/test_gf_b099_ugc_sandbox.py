@@ -140,3 +140,26 @@ def test_no_grants_after_signature_mismatch_from_mutated_file_body():
     p.files["hat.tres"] = "swapped"
     status, caps = m.install(p, K, lambda _: True)
     assert status == "rejected:signature" and caps == []
+
+
+def test_malformed_identity_sdk_permissions_and_signature_fail_closed():
+    seen = []
+    g = lambda *a: seen.append(a)
+    cases = (
+        (replace(pkg(), mod_id="../outside"), "rejected:identity"),
+        (replace(pkg(), version="../bad"), "rejected:identity"),
+        (replace(pkg(), sdk_api=("one", 0)), "rejected:incompatible"),
+        (replace(pkg(), sdk_api=(True, 0)), "rejected:incompatible"),
+        (replace(pkg(), permissions=("add_content", 3)), "rejected:permissions"),
+        (replace(pkg(), signature="\N{LATIN SMALL LETTER E WITH ACUTE}" * 64), "rejected:signature"),
+    )
+    for candidate, reason in cases:
+        assert m.install(candidate, K, lambda _: True, g) == (reason, [])
+    assert seen == []
+
+
+def test_moderation_truthiness_is_not_proof_of_acceptance():
+    seen = []
+    result = m.install(pkg(), K, lambda _: "yes", grant=lambda *a: seen.append(a))
+    assert result == ("rejected:moderation", [])
+    assert seen == []
