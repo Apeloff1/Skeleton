@@ -8,6 +8,7 @@ and enforce backend allocation limits at the actual dispatch boundary.
 from __future__ import annotations
 
 from threading import RLock
+import os
 import sys
 
 from skeleton.app.offline_resources import probe_local_resources
@@ -34,6 +35,13 @@ class LiveStreamBudgetSampler:
     """
 
     def __init__(self) -> None:
+        try:
+            owner_pid = os.getpid()
+        except BaseException as exc:
+            raise RuntimeError("live stream process identity unavailable") from exc
+        if type(owner_pid) is not int or owner_pid <= 0:
+            raise RuntimeError("live stream process identity unavailable")
+        self._owner_pid = owner_pid
         self._lock = RLock()
         self._thermal = CPUThermalController()
         self._cgroup = CgroupPressureTracker()
@@ -42,9 +50,19 @@ class LiveStreamBudgetSampler:
         self._swap = SwapChurnController()
         self._reclaim = ReclaimPressureController()
 
+    def _require_owner_process(self) -> None:
+        """Never inherit hysteresis state or an RLock across fork."""
+        try:
+            current = os.getpid()
+        except BaseException as exc:
+            raise RuntimeError("live stream process identity unavailable") from exc
+        if type(current) is not int or current != self._owner_pid:
+            raise RuntimeError("forked live stream sampler requires new owner")
+
     def sample(
         self, *, token_budget: int, storage_path: str = ".",
     ) -> tuple[MeasuredStreamBudget, dict[str, object]]:
+        self._require_owner_process()
         if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
             raise ValueError("positive bounded token budget required")
         if type(storage_path) is not str or not storage_path:

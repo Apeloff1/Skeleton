@@ -148,3 +148,32 @@ def test_fair_stream_cli_strict_json_preserves_valid_live_path(monkeypatch, caps
     assert receipt["measurement"] == "os_probe"
     assert receipt["live_evidence"]["gpu_device_qualified"] is False
     assert receipt["live_evidence"]["cross_process_admission_guaranteed"] is False
+
+
+def test_forked_sampler_rejects_before_inherited_lock_and_all_os_probes(monkeypatch):
+    configure(monkeypatch)
+    sampler = module.LiveStreamBudgetSampler()
+
+    class ForbiddenLock:
+        def __enter__(self):
+            raise AssertionError("inherited sampler lock must never be acquired")
+        def __exit__(self, *_):
+            return False
+
+    sampler._lock = ForbiddenLock()
+    monkeypatch.setattr(module.os, "getpid", lambda: sampler._owner_pid + 1)
+    monkeypatch.setattr(module, "probe_local_resources",
+                        lambda _: (_ for _ in ()).throw(AssertionError("no probe")))
+    with pytest.raises(RuntimeError, match="forked"):
+        sampler.sample(token_budget=128)
+
+
+def test_invalid_process_identity_never_probes_or_reuses_pressure(monkeypatch):
+    configure(monkeypatch)
+    sampler = module.LiveStreamBudgetSampler()
+    monkeypatch.setattr(module, "probe_local_resources",
+                        lambda _: (_ for _ in ()).throw(AssertionError("no probe")))
+    for value in (None, True, -1, "42"):
+        monkeypatch.setattr(module.os, "getpid", lambda value=value: value)
+        with pytest.raises(RuntimeError, match="identity|forked"):
+            sampler.sample(token_budget=128)
