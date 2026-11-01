@@ -178,11 +178,11 @@ def test_expiry_reclaims_tenant_capacity_for_new_request():
         max_stage_age_ns=10, budget=NativePromptBudget(
             max_staged_bytes=5, max_staged_bytes_per_tenant=5))
     with patch("skeleton.ai.model_runtime.native_fair_stream_backend.monotonic_ns",
-               side_effect=[100, 111, 111]):
+               side_effect=[100, 111, 111, 111]):
         registry.stage(grant(model, "alice", "one"))
         registry.stage(grant(model, "bob", "two"))
         assert registry.budget_status()["staged_bytes"] == 5
-    assert registry.claim("two", "bob").request_id == "two"
+        assert registry.claim("two", "bob").request_id == "two"
 
 
 def test_prompt_claim_before_deadline_succeeds_once():
