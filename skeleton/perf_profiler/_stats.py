@@ -9,12 +9,15 @@ and fail loudly rather than silently computing our own numbers.
 from __future__ import annotations
 
 import importlib
+import math
+from itertools import islice
 import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable
 
+MAX_SUMMARY_SAMPLES = 100_000
 _MODULE_NAME = "skeleton.ai.runtime.observability.profiler"
 _REL = Path("ai") / "runtime" / "observability" / "profiler.py"
 
@@ -46,7 +49,12 @@ UpstreamProfiler = _upstream.Profiler
 
 def percentile_summary(name: str, durations_ms: Iterable[float]) -> Dict[str, Any]:
     """Return main's ``Profiler.stats`` dict for ``durations_ms``."""
-    values = list(durations_ms)
+    values = list(islice(durations_ms, MAX_SUMMARY_SAMPLES + 1))
+    if len(values) > MAX_SUMMARY_SAMPLES:
+        raise ValueError("percentile sample count exceeds bound")
+    if any(isinstance(value, bool) or not isinstance(value, int | float)
+           or not math.isfinite(value) or value < 0 for value in values):
+        raise ValueError("percentile samples must be nonnegative finite numbers")
     profiler = UpstreamProfiler(max_samples_per_name=max(1, len(values)))
     for value in values:
         profiler.record(name, float(value))
