@@ -388,3 +388,42 @@ def test_editor_is_packaged_with_real_playable_director():
         assert b"Content-Security-Policy" in editor
         assert sha256(editor).hexdigest() == manifest["file_hashes"]["npc_knowledge_editor.html"]
         assert manifest["offline_npc_knowledge_editor_receipt"]["html_sha256"] == sha256(editor).hexdigest()
+
+def test_npc_knowledge_restore_rejects_hardlinked_receipt(tmp_path):
+    import os
+
+    docs, source, _, _ = fixture()
+    compiled = compile_npc_knowledge(
+        docs, [], authoring(), authorized=True, expected_source_digest=source)
+    publish_npc_knowledge(
+        compiled, tmp_path, authorized=True, documents=docs, actions=[])
+    if os.name != "posix":
+        pytest.skip("POSIX hardlink custody")
+    alias = tmp_path / "knowledge-alias.json"
+    os.link(tmp_path / "studio_npc_knowledge.json", alias)
+    with pytest.raises(StudioQuestError, match="regular, owned, private"):
+        verify_npc_knowledge(docs, [], tmp_path, authorized=True,
+                             expected_source_digest=source)
+
+
+def test_editor_import_rejects_hardlinked_export(tmp_path):
+    import os
+    from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_editor import (
+        EXPORT_SCHEMA, load_npc_knowledge_editor_export,
+    )
+
+    docs, source, session, _ = fixture()
+    path = tmp_path / "editor.json"
+    path.write_text(json.dumps({
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": session.digest,
+        "authoring": authoring(),
+    }), encoding="utf-8")
+    path.chmod(0o600)
+    if os.name != "posix":
+        pytest.skip("POSIX hardlink custody")
+    os.link(path, tmp_path / "editor-alias.json")
+    with pytest.raises(StudioQuestError, match="private regular file"):
+        load_npc_knowledge_editor_export(
+            path, authorized=True, expected_project_id=PROJECT,
+            expected_source_digest=source, expected_session_digest=session.digest)

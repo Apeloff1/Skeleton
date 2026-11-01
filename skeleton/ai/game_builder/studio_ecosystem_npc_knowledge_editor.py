@@ -207,9 +207,11 @@ def load_npc_knowledge_editor_export(path: Path, *, authorized: bool,
                          dir_fd=directory)
         try:
             info = os.fstat(handle)
-            if (not stat.S_ISREG(info.st_mode) or info.st_size > MAX_EXPORT_BYTES or
+            if (not stat.S_ISREG(info.st_mode) or
+                    not 0 < info.st_size <= MAX_EXPORT_BYTES or
                     os.name == "posix" and
-                    (info.st_uid != os.getuid() or info.st_mode & 0o077)):
+                    (info.st_uid != os.getuid() or info.st_mode & 0o077 or
+                     info.st_nlink != 1)):
                 raise StudioQuestError("NPC knowledge editor import must be private regular file")
             raw = os.read(handle, MAX_EXPORT_BYTES + 1)
         finally:

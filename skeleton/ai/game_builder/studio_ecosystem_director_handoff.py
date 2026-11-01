@@ -256,12 +256,27 @@ def verify_director_handoff(
         raise PermissionError("director restore requires operator authorization")
     fd = _open_directory(directory)
     try:
-        handle = os.open(FILENAME, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+        # A FIFO blocks during open without O_NONBLOCK, before fstat can reject it.
+        # Descriptor-relative, nofollow reads also reject symlink replacement.
+        handle = os.open(FILENAME, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         dir_fd=fd)
         try:
             info = os.fstat(handle)
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BUNDLE_BYTES:
-                raise StudioQuestError("invalid director handoff archive")
-            raw = os.read(handle, MAX_BUNDLE_BYTES + 1)
+            if (not stat.S_ISREG(info.st_mode) or
+                    not 0 < info.st_size <= MAX_BUNDLE_BYTES or
+                    (os.name == "posix" and (
+                        info.st_uid != os.getuid() or info.st_mode & 0o077 or
+                        info.st_nlink != 1))):
+                raise StudioQuestError("director archive must be a private owned regular file")
+            chunks: list[bytes] = []
+            remaining = MAX_BUNDLE_BYTES + 1
+            while remaining:
+                chunk = os.read(handle, min(65536, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
         finally:
             os.close(handle)
     finally:

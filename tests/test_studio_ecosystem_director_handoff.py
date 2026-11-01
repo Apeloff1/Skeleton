@@ -180,3 +180,52 @@ def test_offline_editor_has_csp_safe_embedded_json_and_no_native_claims():
     altered["session_digest"] = "0" * 64
     with pytest.raises(StudioQuestError):
         render_director_editor(timing, altered)
+
+def test_director_restore_rejects_fifo_symlink_hardlink_and_public_file(tmp_path):
+    """An untrusted filesystem entry must not block or lend replay authority."""
+    import os
+    import stat
+
+    docs, source, visual, session, schedule, assignments = fixture()
+    kwargs = dict(authorized=True, expected_source_digest=source,
+                  expected_visual_digest=visual,
+                  expected_session_digest=session.digest)
+    manifest, bundle = compile_director_handoff(
+        docs, [], schedule, assignments, **kwargs)
+    path = tmp_path / "studio_director_handoff.zip"
+    path.write_bytes(bundle)
+    path.chmod(0o600)
+    assert verify_director_handoff(
+        docs, [], schedule, assignments, tmp_path, **kwargs) == manifest
+    if os.name != "posix":
+        pytest.skip("POSIX descriptor custody checks")
+    path.chmod(0o644)
+    with pytest.raises(StudioQuestError, match="private owned regular"):
+        verify_director_handoff(docs, [], schedule, assignments, tmp_path, **kwargs)
+    path.chmod(0o600)
+    alias = tmp_path / "hardlink.zip"
+    os.link(path, alias)
+    with pytest.raises(StudioQuestError, match="private owned regular"):
+        verify_director_handoff(docs, [], schedule, assignments, tmp_path, **kwargs)
+    alias.unlink()
+    path.unlink()
+    os.mkfifo(path, 0o600)
+    with pytest.raises(StudioQuestError, match="private owned regular"):
+        verify_director_handoff(docs, [], schedule, assignments, tmp_path, **kwargs)
+    path.unlink()
+    path.symlink_to(tmp_path / "nonexistent.zip")
+    with pytest.raises(OSError):
+        verify_director_handoff(docs, [], schedule, assignments, tmp_path, **kwargs)
+
+
+def test_director_restore_rejects_truncated_archive_without_promotion(tmp_path):
+    docs, source, visual, session, schedule, assignments = fixture()
+    kwargs = dict(authorized=True, expected_source_digest=source,
+                  expected_visual_digest=visual,
+                  expected_session_digest=session.digest)
+    _, bundle = compile_director_handoff(docs, [], schedule, assignments, **kwargs)
+    path = tmp_path / "studio_director_handoff.zip"
+    path.write_bytes(bundle[: max(1, len(bundle) // 2)])
+    path.chmod(0o600)
+    with pytest.raises(StudioQuestError, match="source-bound replay"):
+        verify_director_handoff(docs, [], schedule, assignments, tmp_path, **kwargs)
