@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Optional
@@ -73,8 +74,13 @@ class LoadTimer:
     """
 
     def __init__(self, label: str = "load", clock: Optional[Clock] = None, budget_ms: Optional[float] = None) -> None:
-        if budget_ms is not None and budget_ms <= 0:
-            raise ValueError("budget_ms must be positive")
+        if (budget_ms is not None and (
+            isinstance(budget_ms, bool) or not isinstance(budget_ms, (int, float))
+            or not math.isfinite(budget_ms) or budget_ms <= 0
+        )):
+            raise ValueError("budget_ms must be finite and positive")
+        if type(label) is not str or not 1 <= len(label) <= 128:
+            raise ValueError("load report label must be bounded text")
         self.label = label
         self.budget_ms = budget_ms
         self.clock: Clock = clock or MonotonicClock()
@@ -84,8 +90,8 @@ class LoadTimer:
 
     @contextmanager
     def phase(self, name: str) -> Iterator[None]:
-        if not name or "/" in name:
-            raise ValueError("phase name must be non-empty and contain no '/'")
+        if type(name) is not str or not 1 <= len(name) <= 128 or "/" in name:
+            raise ValueError("phase name must be bounded text without '/'")
         siblings = self._stack[-1].children if self._stack else self._roots
         if any(n.name == name for n in siblings):
             raise ValueError(f"duplicate phase name at this level: {name!r}")

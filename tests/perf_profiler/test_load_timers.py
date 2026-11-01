@@ -98,3 +98,17 @@ def test_phase_name_validation():
             pass
     with pytest.raises(ValueError):
         LoadTimer(budget_ms=0)
+
+
+def test_load_timer_rejects_nonfinite_budgets_and_unbounded_labels():
+    import pytest
+    for value in (float("nan"), float("inf"), float("-inf"), 0, -1, True):
+        with pytest.raises(ValueError, match="budget_ms"):
+            LoadTimer(budget_ms=value)
+    with pytest.raises(ValueError, match="label"):
+        LoadTimer(label="x" * 129)
+    timer = LoadTimer()
+    for name in ("", "x" * 129, 1, "a/b"):
+        with pytest.raises(ValueError, match="phase name"):
+            with timer.phase(name):
+                pass
