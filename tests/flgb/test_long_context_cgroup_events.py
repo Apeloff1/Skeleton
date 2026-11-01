@@ -142,6 +142,40 @@ class TestCgroupEventMonitor(unittest.TestCase):
         os.link(target, self.root / "cpu.alias")
         self.assertEqual(self.monitor.sample()["state"], "baseline_required")
 
+    def test_file_replacement_between_samples_resets_baseline(self):
+        with patch("skeleton.ai.model_runtime.long_context_cgroup_events.monotonic_ns",
+                   side_effect=[100, 200, 300]):
+            self.monitor.sample()
+            replacement = self.root / "events.new"
+            replacement.write_bytes((self.root / "memory.events").read_bytes())
+            os.replace(replacement, self.root / "memory.events")
+            result = self.monitor.sample()
+            later = self.monitor.sample()
+        self.assertEqual(result["state"], "baseline_required")
+        self.assertIn("cgroup_identity_changed", result["reasons"])
+        self.assertIsNone(result["event_deltas"])
+        self.assertEqual(later["state"], "observed")
+
+    def test_source_replacement_between_pair_reads_is_rejected(self):
+        from skeleton.ai.model_runtime.long_context_cgroup_events import _read_events
+        original = _read_events
+        replaced = [False]
+
+        def replace(directory, name):
+            value = original(directory, name)
+            if name == "memory.events" and not replaced[0]:
+                replaced[0] = True
+                replacement = self.root / "events.new"
+                replacement.write_bytes((self.root / "memory.events").read_bytes())
+                os.replace(replacement, self.root / "memory.events")
+            return value
+
+        with patch("skeleton.ai.model_runtime.long_context_cgroup_events._read_events",
+                   side_effect=replace):
+            result = self.monitor.sample()
+        self.assertTrue(replaced[0])
+        self.assertIn("event_observation_unavailable", result["reasons"])
+
     def test_event_inode_swap_rejected(self):
         original = os.read
         swapped = [False]

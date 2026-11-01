@@ -24,7 +24,7 @@ _REQUIRED = {
 _MAX_COUNT = 2**63 - 1
 
 
-def _read_events(directory: int, name: str) -> dict[str, int]:
+def _read_events(directory: int, name: str) -> tuple[dict[str, int], tuple[int, ...]]:
     if name not in _REQUIRED:
         raise ValueError("unsupported event source")
     fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW |
@@ -59,19 +59,26 @@ def _read_events(directory: int, name: str) -> dict[str, int]:
             result[key] = value
         if not _REQUIRED[name].issubset(result):
             raise ValueError("missing required event counters")
-        return result
+        return result, _identity(after)
     finally:
         os.close(fd)
 
 
-def _sample(root: Path) -> tuple[tuple[int, int], dict[str, int]]:
+def _sample(root: Path) -> tuple[tuple[int, ...], dict[str, int]]:
     if os.name != "posix":
         raise OSError("cgroup event custody unavailable")
     directory = _secure_directory(root)
     try:
         info = os.fstat(directory)
-        memory = _read_events(directory, "memory.events")
-        cpu = _read_events(directory, "cpu.stat")
+        memory, memory_inode = _read_events(directory, "memory.events")
+        cpu, cpu_inode = _read_events(directory, "cpu.stat")
+        # Detect a source replaced after its own read but before the pair
+        # is assembled. Cross-sample identities also fence silent resets.
+        for name, expected in (("memory.events", memory_inode),
+                               ("cpu.stat", cpu_inode)):
+            named = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            if _identity(named) != expected:
+                raise OSError("event source replaced after read")
         reopened = _secure_directory(root)
         try:
             current = os.fstat(reopened)
@@ -79,7 +86,11 @@ def _sample(root: Path) -> tuple[tuple[int, int], dict[str, int]]:
                 raise OSError("cgroup event directory replaced")
         finally:
             os.close(reopened)
-        return (info.st_dev, info.st_ino), {
+        return (
+            info.st_dev, info.st_ino,
+            memory_inode[0], memory_inode[1],
+            cpu_inode[0], cpu_inode[1],
+        ), {
             "oom": memory["oom"],
             "oom_kill": memory["oom_kill"],
             "nr_throttled": cpu["nr_throttled"],
@@ -105,7 +116,7 @@ class CgroupEventMonitor:
         self._max_interval_ns = max_interval_ns
         self._pid = os.getpid()
         self._lock = Lock()
-        self._previous: tuple[tuple[int, int], dict[str, int], int] | None = None
+        self._previous: tuple[tuple[int, ...], dict[str, int], int] | None = None
 
     def sample(self) -> dict[str, object]:
         if os.getpid() != self._pid:
