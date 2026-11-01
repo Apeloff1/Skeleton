@@ -8,7 +8,9 @@ multi-tenant authorization system, model KV snapshot or execution lease.
 `head-init --stream-id S --checkpoint D` verifies complete bounded ancestry
 and binds a stream to a checkpoint. `head-status --stream-id S` audits the
 committed head. `head-window --stream-id S --max-tokens N` observes a bounded
-window and checkpoint expectation; it does **not** authorize execution.
+window and checkpoint expectation under the same durable head lock; the
+head is checked again before return, so a concurrent committed cursor cannot
+be mistaken for a current window. It does **not** authorize execution.
 After work is actually consumed, `head-advance --stream-id S
 --expected-checkpoint D --consumed-tokens N` commits a new immutable child
 with compare-and-swap. A concurrent stale worker is rejected and must

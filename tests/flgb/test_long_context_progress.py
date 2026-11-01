@@ -51,6 +51,31 @@ class TestLongContextProgressHead(unittest.TestCase):
             expected_tokenizer_digest=TOKENIZER, max_tokens=4)["window"]["token_ids"],
             [4, 5, 6, 7])
 
+    def test_window_rejects_head_change_during_observation(self):
+        record = self.init()
+        changed = {**record, "generation": 1}
+        with patch.object(self.heads, "_read", side_effect=[record, changed]):
+            with self.assertRaisesRegex(LongContextSpoolError, "changed during window"):
+                self.heads.window("worker.1",
+                    expected_tokenizer_digest=TOKENIZER, max_tokens=4)
+        self.assertEqual(self.heads.status("worker.1",
+            expected_tokenizer_digest=TOKENIZER)["generation"], 0)
+
+    def test_window_rejects_unknown_tokenizer_before_read(self):
+        self.init()
+        with patch.object(self.spool, "audited_next_window") as observed:
+            with self.assertRaisesRegex(LongContextSpoolError, "tokenizer mismatch"):
+                self.heads.window("worker.1",
+                    expected_tokenizer_digest=SOURCE, max_tokens=4)
+            observed.assert_not_called()
+
+    def test_window_rejects_invalid_token_bound(self):
+        self.init()
+        for bad in (True, 0, -1, self.spool.max_window_tokens + 1):
+            with self.subTest(bad=bad), self.assertRaises(LongContextSpoolError):
+                self.heads.window("worker.1",
+                    expected_tokenizer_digest=TOKENIZER, max_tokens=bad)
+
     def test_stale_progress_fails_without_rewind(self):
         self.init()
         first = self.heads.advance("worker.1", expected_checkpoint_digest=self.genesis,

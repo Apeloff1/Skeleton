@@ -305,18 +305,33 @@ class LongContextProgressHead:
 
     def window(self, stream_id: str, *, expected_tokenizer_digest: str,
                max_tokens: int, max_checkpoints: int = 4096) -> dict[str, object]:
-        record = self.status(stream_id,
-            expected_tokenizer_digest=expected_tokenizer_digest,
-            max_checkpoints=max_checkpoints)
-        window = self.spool.audited_next_window(record["checkpoint_digest"],
-            expected_tokenizer_digest=expected_tokenizer_digest,
-            max_tokens=max_tokens, max_checkpoints=max_checkpoints)
-        return {**record, "window": None if window is None else {
-            "start": window.start, "stop": window.stop,
-            "token_ids": list(window.token_ids),
-            "source_sequence_digest": window.source_sequence_digest,
-            "digest": window.digest,
-        }}
+        """Observe a stable current window under the durable head lock.
+
+        Never report a window as current after a cooperating worker commits
+        a new head. This remains an observation, not an execution lease.
+        """
+        name = _name(stream_id)
+        _digest(expected_tokenizer_digest, "tokenizer digest")
+        _positive(max_tokens, "max_tokens", self.spool.max_window_tokens)
+        _positive(max_checkpoints, "max_checkpoints", 100_000)
+        with self._locked() as directory:
+            record = self._read(directory, name)
+            if record is None:
+                raise LongContextSpoolError("head not initialized")
+            if record["tokenizer_digest"] != expected_tokenizer_digest:
+                raise LongContextSpoolError("head tokenizer mismatch")
+            window = self.spool.audited_next_window(record["checkpoint_digest"],
+                expected_tokenizer_digest=expected_tokenizer_digest,
+                max_tokens=max_tokens, max_checkpoints=max_checkpoints)
+            if self._read(directory, name) != record:
+                raise LongContextSpoolError("head changed during window observation")
+            return {**record, "is_execution_lease": False,
+                    "window": None if window is None else {
+                "start": window.start, "stop": window.stop,
+                "token_ids": list(window.token_ids),
+                "source_sequence_digest": window.source_sequence_digest,
+                "digest": window.digest,
+            }}
 
     def advance(self, stream_id: str, *, expected_checkpoint_digest: str,
                 expected_tokenizer_digest: str, consumed_tokens: int,
