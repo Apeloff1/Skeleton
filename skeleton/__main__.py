@@ -60,6 +60,7 @@ Commands:
     combat-career-author  Transactionally edit and preview coaching careers
     combat-career  Play, train, save and replay a multi-season coaching career
     combat-campaign-variants  Compare replay-proven authored campaign alternatives\n    combat-supply  Play earned supplies, replay and export offline campaigns
+    combat-supply-timeline  Replay, fork and export earned supply checkpoints
     combat-supply-author  Edit source-fenced prices and preview canonical combat
     combat-supply-solve  Find bounded replay-proven winning supply routes
     combat-supply-accept  Run original author→play→save→export acceptance
@@ -900,6 +901,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-supply":
         from skeleton.game.gameplay.combat_campaign_supply import cli as supply_cli
         return supply_cli(rest)
+    if cmd == "combat-supply-timeline":
+        from skeleton.game.gameplay.combat_campaign_supply_timeline import cli as supply_timeline_cli
+        return supply_timeline_cli(rest)
     if cmd == "combat-campaign":
         from skeleton.game.gameplay.combat_campaign import cli as campaign_cli
         return campaign_cli(rest)
