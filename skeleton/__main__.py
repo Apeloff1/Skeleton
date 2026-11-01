@@ -69,6 +69,7 @@ Commands:
     scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
     scene-mission-play  Interactively play authored missions with replayable checkpoints
+    scene-mission-board  Inspect replay-derived mission objectives and legal actions
     scene-mission-route  Solve replayable authored mission ending paths
     scene-mission-accept  Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
@@ -774,6 +775,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-mission-play":
         from skeleton.game.gameplay.scene_mission_interactive import cli as mission_play_cli
         return mission_play_cli(rest)
+    if cmd == "scene-mission-board":
+        from skeleton.game.gameplay.scene_mission_board import cli as mission_board_cli
+        return mission_board_cli(rest)
     if cmd == "scene-author":
         from skeleton.game.gameplay.scene_world_author import cli as scene_author_cli
         return scene_author_cli(rest)
