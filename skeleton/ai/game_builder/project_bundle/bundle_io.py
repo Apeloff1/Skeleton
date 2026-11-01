@@ -39,6 +39,18 @@ class BundleCodec(Protocol):
 NamespaceFn = Callable[..., str]  # (tenant_id, *, purpose) -> "tenant:<fp>:<purpose>"
 
 
+def _bounded_bundle_bytes(raw: str) -> bytes:
+    if type(raw) is not str:
+        raise BundleError("bundle must be UTF-8 text")
+    try:
+        encoded = raw.encode("utf-8")
+    except UnicodeEncodeError:
+        raise BundleError("bundle must be valid UTF-8") from None
+    if len(encoded) > MAX_BUNDLE_BYTES:
+        raise BundleError("bundle exceeds size limit")
+    return encoded
+
+
 def safe_member_path(path: str) -> str:
     """Reject zip-slip style member paths (absolute, traversal, backslash, hidden)."""
     if not isinstance(path, str) or not 1 <= len(path) <= 450 or "\\" in path or "\x00" in path:
@@ -66,16 +78,14 @@ def export_bundle(saver: ProjectSaver, project_id: str, codec: BundleCodec, *,
             sections[name] = body
     raw = codec.encode({"manifest": v.manifest.payload(), "sections": sections,
                         "receipts": receipts.to_state()})
-    if len(raw.encode("utf-8")) > MAX_BUNDLE_BYTES:
-        raise BundleError("bundle exceeds size limit")
+    _bounded_bundle_bytes(raw)
     return raw
 
 
 def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
                   sequence: int | None = None) -> BundleManifest:
     """Verify a bundle end to end, then save it as a new version in ``saver``."""
-    if not isinstance(raw, str) or len(raw.encode("utf-8")) > MAX_BUNDLE_BYTES:
-        raise BundleError("bundle missing or exceeds size limit")
+    _bounded_bundle_bytes(raw)
     try:
         payload = codec.decode(raw).payload
     except ValueError as exc:  # SaveIntegrityError is a ValueError
@@ -164,8 +174,7 @@ def _held_bundle_parent(path: Path, *, create: bool) -> tuple[int, str]:
 
 
 def write_bundle(path: Path, raw: str) -> None:
-    if not isinstance(raw, str) or len(raw.encode("utf-8")) > MAX_BUNDLE_BYTES:
-        raise BundleError("bundle missing or exceeds size limit")
+    data = _bounded_bundle_bytes(raw)
     try:
         parent, leaf = _held_bundle_parent(path, create=True)
     except OSError as exc:
@@ -192,7 +201,7 @@ def write_bundle(path: Path, raw: str) -> None:
         else:
             raise BundleError("could not allocate private bundle staging file")
         with os.fdopen(fd, "wb") as output:
-            output.write(raw.encode("utf-8"))
+            output.write(data)
             output.flush()
             os.fsync(output.fileno())
         os.rename(temporary, leaf, src_dir_fd=parent, dst_dir_fd=parent)

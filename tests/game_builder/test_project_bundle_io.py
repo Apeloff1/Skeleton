@@ -176,3 +176,13 @@ def test_bundle_import_rejects_signed_but_malformed_payload_shape(saver):
         raw = CODEC.encode(malformed)
         with pytest.raises(BundleError, match="payload shape"):
             bio.import_bundle(raw, CODEC, ProjectSaver(GameSavePlane()))
+
+
+def test_bundle_rejects_invalid_utf8_before_filesystem_publication(tmp_path, saver):
+    bad = '{"text":"\ud800"}'  # unpaired surrogate is not valid UTF-8
+    target = tmp_path / "hero.gfbundle.json"
+    with pytest.raises(BundleError, match="UTF-8"):
+        bio.write_bundle(target, bad)
+    assert not target.exists()
+    with pytest.raises(BundleError, match="UTF-8"):
+        bio.import_bundle(bad, CODEC, saver)
