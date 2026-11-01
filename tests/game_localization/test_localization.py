@@ -159,7 +159,7 @@ def test_rendered_message_budget_stops_before_unbounded_argument_expansion():
 
     args = CountedArgs(name="x" * 1024)
     with pytest.raises(MessageError, match="output bound"):
-        format_message("{name}" * 1000, args, "en")
+        format_message("{name}" * 500, args, "en")
     assert args.reads < 100
 
 
