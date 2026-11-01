@@ -11,6 +11,7 @@ from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge import (
     verify_npc_knowledge,
 )
 from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_prompt import propose_npc_knowledge
+from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_compare import compare_npc_knowledge
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from scripts.studio_scene_schedule_cli import _strict
 
@@ -27,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     outputs = ap.add_mutually_exclusive_group()
     outputs.add_argument("--publish-directory", type=Path)
     outputs.add_argument("--verify-directory", type=Path)
+    ap.add_argument("--compare-actions", help="Second canonical quest history for knowledge branch impact")
     ap.add_argument("--include-html", action="store_true",
                     help="Include escaped script-free director companion HTML in output")
     args = ap.parse_args(argv)
@@ -56,6 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         output: dict[str, object] = {"compiled": compiled}
         if proposal is not None:
             output["proposal"] = proposal
+        if args.compare_actions is not None:
+            other_actions = _strict(args.compare_actions, max_bytes=16384)
+            output["comparison"] = compare_npc_knowledge(
+                docs, actions, other_actions, authoring, authorized=True,
+                expected_source_digest=args.expected_source,
+                expected_before_session=args.expected_session)
         if args.publish_directory is not None:
             output["publication"] = publish_npc_knowledge(
                 compiled, args.publish_directory, authorized=True,

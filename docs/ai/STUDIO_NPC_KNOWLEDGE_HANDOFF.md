@@ -35,3 +35,13 @@ overlap, not LLM inference. The CLI and Jeeves share the canonical compiler.
 
 Focused regressions: `pytest -q tests/test_studio_npc_knowledge.py`.
 Full release and device qualification remain independently required.
+
+## Choice-sensitive branch impact
+
+Supply `--compare-actions '[["stage","choice"],...]'` with a second
+canonical quest history. The compiler independently replays both histories
+against the same exact source and authored reveals, returning only gained or
+lost source-fact identities by recipient scene. An optional
+`required_alternative` gates a reveal on an exact authored choice. The
+comparison never equates a changed editor cue with spoken NPC dialogue.
+The Jeeves typed tool supports the same `compare_actions` input.

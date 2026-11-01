@@ -19,6 +19,7 @@ from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge import (
     render_npc_knowledge_html, source_knowledge_facts, verify_npc_knowledge,
 )
 from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_prompt import propose_npc_knowledge
+from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_compare import compare_npc_knowledge
 from skeleton.ai.agents.jeeves.studio_npc_knowledge_tool import (
     REQUEST_SCHEMA as TOOL_SCHEMA, execute_npc_knowledge_tool,
 )
@@ -220,3 +221,51 @@ def test_missing_authored_npc_knowledge_uses_goal_not_fabricated_testimony():
         docs, [], authorized=True, expected_source_digest=source)
     assert all(fact["fact_id"] != rival["scene_id"] + ":npc_knowledge"
                for fact in facts["facts"])
+
+def test_knowledge_branch_compare_is_choice_sensitive_and_replay_proven():
+    docs, source, _, staging = fixture()
+    request = authoring()
+    fact = request["reveals"][0]["fact_id"]
+    source_scene = fact.split(":", 1)[0]
+    card = next(card for card in staging["cards"] if card["scene_id"] == source_scene)
+    program = compile_quest_program(docs)
+    source_stage = next(stage for stage in program.stages if stage.key == card["quest_stage"])
+    if len(source_stage.alternatives) < 2:
+        pytest.skip("no authored alternate source choice")
+    request["reveals"][0]["required_alternative"] = source_stage.alternatives[0]
+    first = [[stage.key, stage.alternatives[0]] for stage in program.stages]
+    second = [[stage.key, (stage.alternatives[1] if stage.key == source_stage.key
+                            else stage.alternatives[0])] for stage in program.stages]
+    compared = compare_npc_knowledge(
+        docs, first, second, request, authorized=True, expected_source_digest=source)
+    assert compared["before_earned_count"] == 1
+    assert compared["after_earned_count"] == 0
+    assert compared["change_count"] == 1
+    assert compared["scene_changes"][0]["lost_fact_ids"] == [fact]
+    assert compared["source_replay_verified"] is True
+    assert compared == compare_npc_knowledge(
+        docs, first, second, request, authorized=True, expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        compare_npc_knowledge(docs, first, second, request, authorized=True,
+                              expected_source_digest="0" * 64)
+    with pytest.raises(PermissionError):
+        compare_npc_knowledge(docs, first, second, request, authorized=False,
+                              expected_source_digest=source)
+
+
+def test_jeeves_branch_compare_matches_canonical_engine():
+    docs, source, _, staging = fixture()
+    request = authoring()
+    stage = compile_quest_program(docs).stages[0]
+    request["reveals"][0]["required_alternative"] = stage.alternatives[0]
+    actions = [[item.key, item.alternatives[0]]
+               for item in compile_quest_program(docs).stages]
+    tool = {"schema": TOOL_SCHEMA, "project_id": PROJECT,
+            "expected_source_digest": source, "actions": actions,
+            "compare_actions": actions, "authoring": request}
+    direct = execute_npc_knowledge_tool(tool, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_npc_knowledge", "arguments": tool},
+        authorized=True)
+    assert routed["result"] == direct
+    assert direct["detail"]["comparison"]["change_count"] == 0

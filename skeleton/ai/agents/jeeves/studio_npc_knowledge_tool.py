@@ -8,12 +8,14 @@ from typing import Any, Mapping
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge import compile_npc_knowledge
 from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_prompt import propose_npc_knowledge
+from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_compare import compare_npc_knowledge
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 REQUEST_SCHEMA = "skeleton.jeeves.studio_npc_knowledge_request.v1"
 RESULT_SCHEMA = "skeleton.jeeves.studio_npc_knowledge_result.v1"
 _ALLOWED = frozenset({"schema", "project_id", "expected_source_digest",
-                      "expected_session_digest", "actions", "prompt", "authoring"})
+                      "expected_session_digest", "actions", "prompt", "authoring",
+                      "compare_actions"})
 
 
 def npc_knowledge_tool_schema() -> dict[str, object]:
@@ -28,6 +30,7 @@ def npc_knowledge_tool_schema() -> dict[str, object]:
                 "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "actions": {"type": "array", "maxItems": 64},
+                "compare_actions": {"type": "array", "maxItems": 64},
                 "prompt": {"type": "string", "minLength": 3, "maxLength": 512},
                 "authoring": {"type": "object", "additionalProperties": False},
             },
@@ -63,6 +66,14 @@ def execute_npc_knowledge_tool(request: Mapping[str, Any], *,
     detail = (propose_npc_knowledge(docs, request["actions"], request["prompt"], **kwargs)
               if "prompt" in request else
               compile_npc_knowledge(docs, request["actions"], request["authoring"], **kwargs))
+    if "compare_actions" in request:
+        if type(request["compare_actions"]) is not list:
+            raise StudioQuestError("invalid NPC knowledge comparison actions")
+        authoring = (detail["authoring"] if "prompt" in request else request["authoring"])
+        detail = {"plan": detail, "comparison": compare_npc_knowledge(
+            docs, request["actions"], request["compare_actions"], authoring,
+            authorized=True, expected_source_digest=request["expected_source_digest"],
+            expected_before_session=request.get("expected_session_digest"))}
     result = {
         "schema": RESULT_SCHEMA, "project_id": request["project_id"],
         "request_digest": sha256(raw).hexdigest(), "detail": detail,
