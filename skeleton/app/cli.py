@@ -139,6 +139,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify installed game, archive and save custody (delivery-assurance --help)",
     )
     sub.add_parser(
+        "inspect-original-provenance", add_help=False,
+        help="inspect original browser/Godot source claim inventory without rights certification",
+    )
+    sub.add_parser(
         "inspect-trust-policy-transition", add_help=False,
         help="inspect independently pinned signer rotation and revocation transition",
     )
@@ -318,6 +322,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "inspect-original-provenance":
+        from skeleton.app.offline_original_content_provenance import main as provenance_main
+        return provenance_main(arguments[1:])
     if arguments and arguments[0] == "inspect-trust-policy-transition":
         from skeleton.app.offline_trust_policy_transition import main as policy_transition_main
         return policy_transition_main(arguments[1:])
