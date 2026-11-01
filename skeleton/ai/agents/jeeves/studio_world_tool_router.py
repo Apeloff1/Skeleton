@@ -146,13 +146,20 @@ def route_world_tool(
         raise StudioQuestError("Jeeves world tool returned non-object result")
     if len(_canonical(result)) > MAX_RESULT_BYTES:
         raise StudioQuestError("Jeeves world tool result exceeds byte budget")
+    write_evidence = result.get("file_write_performed")
+    if type(write_evidence) is not bool:
+        detail = result.get("detail")
+        write_evidence = (detail.get("file_write_performed")
+                          if type(detail) is dict
+                          and type(detail.get("file_write_performed")) is bool
+                          else None)
     payload: dict[str, object] = {
         "schema": ROUTER_SCHEMA, "tool": request["tool"],
         "tool_request_schema": expected,
         "request_digest": _digest(request),
         "result": result,
         "result_digest": _digest(result),
-        "file_write_performed": result.get("file_write_performed") is True,
+        "file_write_performed": write_evidence,
         "release_certified": False,
     }
     payload["receipt_digest"] = _digest(payload)
