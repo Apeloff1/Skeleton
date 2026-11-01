@@ -163,3 +163,64 @@ def test_second_pass_receipt_divergence_is_rejected(delivered, monkeypatch):
     monkeypatch.setattr(module, "_verify", changed)
     with pytest.raises(OfflineGameLibraryAuditError, match="final replay"):
         audit_offline_game_library([_entry(delivered)], authorized=True)
+
+
+def _independent_installed_game(tmp_path, capsys, project, seed):
+    """Build a second genuinely independent source, save, archive and install."""
+    from skeleton.testing.test_app_offline_progress_migration import (
+        _journey, _package, _save,
+    )
+    folder = tmp_path / project
+    folder.mkdir()
+    source, manifest = _journey(folder, capsys, project=project, seed=seed)
+    save, save_pin, _ = _save(folder, capsys, source, manifest)
+    archive, archive_pin = _package(folder, capsys, source, manifest)
+    installed = folder / "installed"
+    assert run_app_cli([
+        "studio-journey", "--install-archive", "--archive", str(archive),
+        "--expected-archive-sha256", archive_pin,
+        "--expected-manifest-sha256", manifest,
+        "--output", str(installed), "--trusted-local-operator",
+    ]) == 0
+    capsys.readouterr()
+    return OfflineGameLibraryEntry(
+        str(installed), str(archive), str(save),
+        manifest, archive_pin, save_pin,
+    )
+
+
+def test_two_independently_authored_games_replay_as_one_library(tmp_path, capsys):
+    first = _independent_installed_game(
+        tmp_path, capsys, "library-original-one", 431,
+    )
+    second = _independent_installed_game(
+        tmp_path, capsys, "library-original-two", 999,
+    )
+    receipt = audit_offline_game_library([first, second], authorized=True)
+    assert receipt["game_count"] == 2
+    assert receipt["games"][0]["project_id"] == "library-original-one"
+    assert receipt["games"][1]["project_id"] == "library-original-two"
+    assert receipt["games"][0]["world_digest"] != receipt["games"][1]["world_digest"]
+    assert receipt["all_offline_gameplay_reexecuted"] is True
+    assert receipt["release_certified"] is False
+    reversed_receipt = audit_offline_game_library(
+        [second, first], authorized=True,
+    )
+    assert reversed_receipt["game_count"] == 2
+    assert reversed_receipt["library_receipt_sha256"] != receipt["library_receipt_sha256"]
+
+
+def test_one_corrupted_game_blocks_whole_library_without_success(
+    tmp_path, capsys,
+):
+    first = _independent_installed_game(
+        tmp_path, capsys, "library-safe-one", 431,
+    )
+    second = _independent_installed_game(
+        tmp_path, capsys, "library-tampered-two", 999,
+    )
+    archive = second.archive
+    with open(archive, "ab") as stream:
+        stream.write(b"tampered")
+    with pytest.raises((ValueError, OSError)):
+        audit_offline_game_library([first, second], authorized=True)
