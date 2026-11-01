@@ -253,3 +253,83 @@ def test_cli_http_and_command_parity_for_f44_audits(capsys) -> None:
     with pytest.raises(HTTPException) as missing:
         asyncio.run(routes.application_cli_shared_audit_row("missing"))
     assert missing.value.status_code == 404
+
+
+
+def test_idempotency_audit_rejects_completion_hidden_in_dead_branch(monkeypatch) -> None:
+    import ast
+    import copy
+    from skeleton.app.runtime import audit_parse
+
+    parse = audit_parse.parse_module_tree
+    modified = copy.deepcopy(parse("skeleton.api.routes"))
+    wrapper = next(
+        x for x in modified.body
+        if isinstance(x, ast.FunctionDef) and x.name == "_forge_idempotent"
+    )
+    guarded = next(x for x in ast.walk(wrapper) if isinstance(x, ast.AsyncFunctionDef)
+                   and x.name == "guarded")
+    operation = next(
+        x for x in ast.walk(guarded)
+        if isinstance(x, ast.With)
+        and any(isinstance(i.context_expr, ast.Call)
+                and isinstance(i.context_expr.func, ast.Attribute)
+                and i.context_expr.func.attr == "operation" for i in x.items)
+    )
+    completion = next(
+        x for x in operation.body
+        if isinstance(x, ast.Expr)
+        and isinstance(x.value, ast.Call)
+        and isinstance(x.value.func, ast.Attribute)
+        and x.value.func.attr == "complete"
+    )
+    idx = operation.body.index(completion)
+    operation.body[idx] = ast.If(
+        test=ast.Constant(value=False), body=[completion], orelse=[]
+    )
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            audit_parse, "parse_module_tree",
+            lambda module: modified if module == "skeleton.api.routes" else parse(module),
+        )
+        result = idempotency_audit_snapshot()
+    expected = {
+        "skeleton.api.routes:forge_materialise",
+        "skeleton.api.routes:forge_archetype",
+        "skeleton.api.routes:gameforge_run",
+        "skeleton.api.routes:game_build",
+        "skeleton.api.routes:gameforge_intake",
+    }
+    assert expected <= set(result["missing_remember"])
+
+
+def test_idempotency_audit_rejects_completion_after_return(monkeypatch) -> None:
+    import ast
+    import copy
+    from skeleton.app.runtime import audit_parse
+
+    parse = audit_parse.parse_module_tree
+    modified = copy.deepcopy(parse("skeleton.api.routes"))
+    wrapper = next(x for x in modified.body if isinstance(x, ast.FunctionDef)
+                   and x.name == "_forge_idempotent")
+    guarded = next(x for x in ast.walk(wrapper) if isinstance(x, ast.AsyncFunctionDef)
+                   and x.name == "guarded")
+    operation = next(
+        x for x in ast.walk(guarded)
+        if isinstance(x, ast.With)
+        and any(isinstance(i.context_expr, ast.Call)
+                and isinstance(i.context_expr.func, ast.Attribute)
+                and i.context_expr.func.attr == "operation" for i in x.items)
+    )
+    completion = next(x for x in operation.body if isinstance(x, ast.Expr)
+                      and isinstance(x.value, ast.Call)
+                      and isinstance(x.value.func, ast.Attribute)
+                      and x.value.func.attr == "complete")
+    operation.body.remove(completion)
+    operation.body.append(completion)
+    with monkeypatch.context() as patch:
+        patch.setattr(audit_parse, "parse_module_tree",
+                      lambda module: modified if module == "skeleton.api.routes" else parse(module))
+        result = idempotency_audit_snapshot()
+    assert "skeleton.api.routes:forge_materialise" in result["missing_remember"]

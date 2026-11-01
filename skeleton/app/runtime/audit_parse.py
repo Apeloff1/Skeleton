@@ -1478,13 +1478,45 @@ def _forge_wrapper_attrs(tree: ast.Module) -> tuple[bool, bool]:
                     )
                     for child in node.body
                 )
-                complete = any(
-                    isinstance(child, ast.Call)
-                    and isinstance(child.func, ast.Attribute)
-                    and isinstance(child.func.value, ast.Name)
-                    and child.func.value.id == "_idempotency"
-                    and child.func.attr == "complete"
-                    for child in ast.walk(node)
+                # Requiring a syntactic call anywhere under the with-body
+                # accepts `if False: complete(...)` and other dead paths.
+                # The guarded decorator's live success path must be ordered:
+                # await the route response, complete its durable custody,
+                # then return the exact response. Only direct statements
+                # qualify; a nested/dead conditional cannot forge coverage.
+                body = node.body
+                awaited = [
+                    i for i, stmt in enumerate(body)
+                    if isinstance(stmt, ast.Assign)
+                    and len(stmt.targets) == 1
+                    and isinstance(stmt.targets[0], ast.Name)
+                    and stmt.targets[0].id == "response"
+                    and isinstance(stmt.value, ast.Await)
+                    and isinstance(stmt.value.value, ast.Call)
+                    and isinstance(stmt.value.value.func, ast.Name)
+                    and stmt.value.value.func.id == "fn"
+                ]
+                completions = [
+                    i for i, stmt in enumerate(body)
+                    if isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Call)
+                    and isinstance(stmt.value.func, ast.Attribute)
+                    and isinstance(stmt.value.func.value, ast.Name)
+                    and stmt.value.func.value.id == "_idempotency"
+                    and stmt.value.func.attr == "complete"
+                    and len(stmt.value.args) >= 2
+                    and isinstance(stmt.value.args[1], ast.Name)
+                    and stmt.value.args[1].id == "response"
+                ]
+                returns = [
+                    i for i, stmt in enumerate(body)
+                    if isinstance(stmt, ast.Return)
+                    and isinstance(stmt.value, ast.Name)
+                    and stmt.value.id == "response"
+                ]
+                complete = (
+                    len(awaited) == len(completions) == len(returns) == 1
+                    and awaited[0] < completions[0] < returns[0]
                 )
                 return replay, complete
         return False, False
