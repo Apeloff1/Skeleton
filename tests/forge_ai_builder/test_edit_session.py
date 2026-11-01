@@ -131,7 +131,7 @@ def test_failed_history_save_does_not_publish_edit_or_advance_ledger():
     with pytest.raises(RuntimeError, match="durable save unavailable"):
         run(s.edit("set player hp to 120"))
     assert s.plan == good_plan() and s.version == base_version and s._seq == 0
-    assert s.undo_stack == [] and s.redo_stack == [] and s.ledger.entries() == ()
+    assert s.undo_stack == [] and s.redo_stack == [] and s.ledger.entries() == []
 
 
 def test_failed_history_rollback_preserves_undo_redo_state():
