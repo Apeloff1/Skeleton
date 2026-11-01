@@ -208,6 +208,7 @@ def test_migrator_rejects_corrupt_or_cross_job_checkpoints_before_skipping(store
         Checkpoint("wrong-job", "", True, 1.0),
         Checkpoint(JOB_ENCRYPT, "x" * 257, False, 1.0),
         Checkpoint(JOB_ENCRYPT, "", True, float("nan")),
+        Checkpoint(JOB_ENCRYPT, "", True, 10**1000),
         Checkpoint(JOB_ENCRYPT, "", 1, 1.0),
     ):
         cps.save(cp if cp.job == JOB_ENCRYPT else Checkpoint(JOB_ENCRYPT, "", False, 1.0))

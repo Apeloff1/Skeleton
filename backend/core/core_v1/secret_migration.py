@@ -91,6 +91,7 @@ class SecretMigrator:
             or type(cp.cursor) is not str or len(cp.cursor) > 256
             or type(cp.done) is not bool
             or type(cp.updated_at) not in (int, float)
+            or not 0 <= cp.updated_at <= 1_000_000_000_000
             or not math.isfinite(cp.updated_at)
         ):
             raise ValueError("invalid secret migration checkpoint")
