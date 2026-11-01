@@ -236,3 +236,10 @@ def test_ingest_many_rejects_malformed_rows_without_losing_batch_budget():
             ("p2", "s2", event)]
     assert c.ingest_many(rows, max_rows=4) == 2
     assert c.counts["rejected"] == 2 and len(c.events) == 2
+
+
+def test_privacy_hmac_key_custody_rejects_unbounded_or_mutable_salts():
+    for bad in (b"x" * 15, b"x" * 4097, bytearray(b"x" * 32), "x" * 32):
+        with pytest.raises(ValueError, match="salt must be"):
+            PrivacyPolicy(bad)
+    assert PrivacyPolicy(b"x" * 4096).pseudonym("player", "p")

@@ -38,8 +38,8 @@ class PrivacyPolicy:
     opt_out: str = "drop"  # "drop" | "anonymise"
 
     def __post_init__(self) -> None:
-        if not isinstance(self.salt, bytes) or len(self.salt) < 16:
-            raise ValueError("salt must be at least 16 bytes")
+        if type(self.salt) is not bytes or not 16 <= len(self.salt) <= 4096:
+            raise ValueError("salt must be 16..4096 bytes")
         if (type(self.sample_rate) not in (int, float)
                 or not 0.0 <= self.sample_rate <= 1.0):
             raise ValueError("sample_rate must be a numeric value in [0, 1]")
