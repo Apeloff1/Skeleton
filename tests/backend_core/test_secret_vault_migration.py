@@ -223,3 +223,25 @@ def test_migrator_rejects_corrupt_or_cross_job_checkpoints_before_skipping(store
         with pytest.raises(ValueError, match="checkpoint"):
             check.encrypt_plaintext()
     assert store.count_by_key() == {"": 1}
+
+
+def test_force_migration_invalid_bounds_preserve_durable_resume_checkpoint(stores):
+    store, checkpoints = stores
+    _seed_plain(store, 3)
+    migrator = SecretMigrator(store, P1, checkpoints, Clock())
+    migrator.encrypt_plaintext(batch_size=1, max_batches=1)
+    encrypted_checkpoint = checkpoints.get(JOB_ENCRYPT)
+    assert encrypted_checkpoint is not None and not encrypted_checkpoint.done
+    for kwargs in ({"batch_size": 0}, {"max_batches": True}, {"batch_size": 1001}):
+        with pytest.raises(ValueError):
+            migrator.encrypt_plaintext(force=True, **kwargs)
+        assert checkpoints.get(JOB_ENCRYPT) == encrypted_checkpoint
+
+    migrator.rewrap(batch_size=1, max_batches=1)
+    rewrap_job = "secrets.rewrap:k1"
+    rewrap_checkpoint = checkpoints.get(rewrap_job)
+    assert rewrap_checkpoint is not None and not rewrap_checkpoint.done
+    for kwargs in ({"batch_size": False}, {"max_batches": 1001}):
+        with pytest.raises(ValueError):
+            migrator.rewrap(force=True, **kwargs)
+        assert checkpoints.get(rewrap_job) == rewrap_checkpoint

@@ -80,11 +80,15 @@ class SecretMigrator:
                  now: Callable[[], float]) -> None:
         self.store, self.provider, self.checkpoints, self.now = store, provider, checkpoints, now
 
-    def _run(self, job: str, transform, batch_size: int, max_batches: int | None) -> JobReport:
+    @staticmethod
+    def _validate_batch_bounds(batch_size: int, max_batches: int | None) -> None:
         if type(batch_size) is not int or not 1 <= batch_size <= 1000:
             raise ValueError("batch_size must be 1..1000")
         if max_batches is not None and (type(max_batches) is not int or not 1 <= max_batches <= 1000):
             raise ValueError("max_batches must be 1..1000 or None")
+
+    def _run(self, job: str, transform, batch_size: int, max_batches: int | None) -> JobReport:
+        self._validate_batch_bounds(batch_size, max_batches)
         cp = self.checkpoints.get(job)
         if cp is not None and (
             not isinstance(cp, Checkpoint) or cp.job != job
@@ -141,6 +145,9 @@ class SecretMigrator:
                           force: bool = False) -> JobReport:
         """``force`` re-scans from the start even if a previous run finished
         (e.g. after a legacy writer inserted plaintext rows)."""
+        # Validate before force-reset; a rejected invocation must preserve
+        # the durable resume checkpoint for the next authorized attempt.
+        self._validate_batch_bounds(batch_size, max_batches)
         if force:
             self.checkpoints.reset(JOB_ENCRYPT)
         def transform(blob: bytes, aad: bytes) -> bytes | None:
@@ -154,6 +161,7 @@ class SecretMigrator:
 
     def rewrap(self, batch_size: int = 200, max_batches: int | None = None,
                force: bool = False) -> JobReport:
+        self._validate_batch_bounds(batch_size, max_batches)
         target = self.provider.active_key_id()
         job = f"{JOB_REWRAP}:{target}"
         if force:
