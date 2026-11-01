@@ -143,6 +143,10 @@ def _parser() -> argparse.ArgumentParser:
         help="inspect original browser/Godot source claim inventory without rights certification",
     )
     sub.add_parser(
+        "recover-policy-chain-signed-install", add_help=False,
+        help="recover quarantined signed game under pinned signer history",
+    )
+    sub.add_parser(
         "migrate-policy-chain-signed-progress", add_help=False,
         help="migrate signed original game and save under pinned signer history",
     )
@@ -341,6 +345,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "inspect-original-provenance":
         from skeleton.app.offline_original_content_provenance import main as provenance_main
         return provenance_main(arguments[1:])
+    if arguments and arguments[0] == "recover-policy-chain-signed-install":
+        from skeleton.app.offline_policy_chain_recovery import main as chain_recovery_main
+        return chain_recovery_main(arguments[1:])
     if arguments and arguments[0] == "migrate-policy-chain-signed-progress":
         from skeleton.app.offline_policy_chain_progress import main as chain_progress_main
         return chain_progress_main(arguments[1:])
