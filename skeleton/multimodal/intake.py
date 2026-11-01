@@ -137,6 +137,48 @@ def _sanitize_metadata(metadata: Mapping[str, object]) -> dict[str, object]:
     return dict(sorted(result.items()))
 
 
+def _verify_declared_media_metadata(
+    metadata: Mapping[str, object], measurement: MediaValidationReceipt,
+) -> None:
+    """Reject untrusted decoder claims that disagree with actual decoded bytes.
+
+    Filtering unknown metadata is insufficient: a caller must not supply
+    dimensions or audio parameters that contradict the verified receipt, even
+    when a claimed field is not retained as harmless display metadata.
+    """
+    measured = measurement.measured_metadata
+    expected = dict(measured)
+    if measurement.sample_rate_hz is not None:
+        expected["sample_rate_hz"] = measurement.sample_rate_hz
+        expected["sample_count"] = measurement.sample_count
+        expected["sample_width_bytes"] = measurement.sample_width_bytes
+        expected["duration_seconds"] = measurement.duration_seconds
+    declared_fields = {
+        "width", "height", "format", "channels", "sample_rate",
+        "sample_rate_hz", "sample_count", "sample_width_bytes",
+        "sample_width_bits", "frame_count", "duration_ms", "duration_seconds",
+    }
+    for raw_key, supplied in metadata.items():
+        key = _text("metadata key", raw_key, maximum=MAX_METADATA_KEY_CHARS).casefold()
+        if key not in declared_fields:
+            continue
+        actual = expected.get(key)
+        if actual is None or isinstance(supplied, bool):
+            raise MultimodalSanitizationError("declared media metadata conflicts with decoded source")
+        if isinstance(actual, str):
+            matches = type(supplied) is str and supplied == actual
+        else:
+            matches = (
+                (
+                    type(supplied) is int
+                    or (type(supplied) is float and math.isfinite(supplied))
+                )
+                and supplied == actual
+            )
+        if not matches:
+            raise MultimodalSanitizationError("declared media metadata conflicts with decoded source")
+
+
 def _detect_embedded_instruction(
     payload: bytes,
     metadata: Mapping[str, object],
@@ -303,6 +345,7 @@ class MultimodalIntake:
             )
         except MediaValidationError as exc:
             raise MultimodalSanitizationError(str(exc)) from exc
+        _verify_declared_media_metadata(raw_metadata, measurement)
         verified = VerifiedMultimodalAsset(
             asset_id=candidate.asset_id,
             modality=candidate.modality,
