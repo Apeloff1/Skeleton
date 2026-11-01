@@ -28,6 +28,10 @@ from skeleton.app.offline_first_playable_batch import (
 from skeleton.app.offline_first_playable_batch_triage import (
     triage_first_playable_delivery_batch,
 )
+from skeleton.app.offline_first_playable_delivery import _preflight, _path
+from skeleton.ai.game_builder.offline_receipt_publication import (
+    preflight_receipt_destination,
+)
 
 SCHEMA = "skeleton.app.first_playable_jobfile.v1"
 MAX_JOBFILE_BYTES = 512 * 1024
@@ -132,7 +136,7 @@ def read_pinned_jobs(
         raise PermissionError("trusted local operator acknowledgement required")
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         raise FirstPlayableJobFileError("POSIX nofollow input required")
-    if mode not in {"publish", "resume", "inspect", "triage"}:
+    if mode not in {"publish", "resume", "inspect", "triage", "preflight"}:
         raise FirstPlayableJobFileError("unsupported delivery mode")
     digest = _pin(expected_sha256)
     path = _absolute(filename)
@@ -152,11 +156,79 @@ def read_pinned_jobs(
     _check_jobs(
         jobs, summary,
         inspect={"publish": False, "resume": None,
-                 "inspect": True, "triage": None}[mode],
+                 "inspect": True, "triage": None, "preflight": False}[mode],
     )
     _disjoint_input(path, jobs, summary)
     return jobs, before
 
+
+
+
+def preflight_pinned_cohort(
+    jobs: tuple[DeliveryJob, ...], summary: str | Path, *,
+    authorized: bool,
+) -> dict[str, object]:
+    """Dry-run canonical source replay and destination admission for all games.
+
+    This is explicitly not a reservation, installer run, native-device test,
+    or permission to publish. Every source is reverified after all others.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    checked = _check_jobs(jobs, summary, inspect=False)
+    roots = tuple(path for job in checked for path in (job.source, job.install))
+    preflight_receipt_destination(
+        summary, protected_roots=roots, authorized=True,
+    )
+    records: list[dict[str, object]] = []
+
+    def verify(job: DeliveryJob) -> dict[str, object]:
+        observed = _preflight(
+            _path(job.source), _path(job.archive), _path(job.install),
+            _path(job.save), _path(job.receipt),
+            expected_manifest_sha256=job.manifest_sha256, authorized=True,
+        )
+        if (type(observed.get("project_id")) is not str
+                or not observed["project_id"]
+                or type(observed.get("world_digest")) is not str
+                or observed.get("offline_gameplay_reexecuted") is not True
+                or observed.get("release_certified") is not False):
+            raise FirstPlayableJobFileError(
+                "original source admission contract missing"
+            )
+        return {
+            "project_id": observed["project_id"],
+            "world_digest": observed["world_digest"],
+            "manifest_sha256": job.manifest_sha256,
+            "source_replay_verified": True,
+        }
+
+    for job in checked:
+        records.append(verify(job))
+    if len({record["project_id"] for record in records}) != len(records):
+        raise FirstPlayableJobFileError(
+            "duplicate original game project ID in admission cohort"
+        )
+    for job, original in zip(checked, records, strict=True):
+        if verify(job) != original:
+            raise FirstPlayableJobFileError(
+                "original source changed during admission"
+            )
+    return {
+        "schema": "skeleton.app.first_playable_jobfile_preflight.v1",
+        "status": "original_game_cohort_admitted_not_reserved_release_blocked",
+        "game_count": len(checked),
+        "games": records,
+        "all_original_sources_replayed": True,
+        "destinations_reserved": False,
+        "outputs_published": False,
+        "read_only": True,
+        "native_device_qualified": False,
+        "package_signed": False,
+        "rights_certified": False,
+        "persistent_rollback_protection": False,
+        "release_certified": False,
+    }
 
 def execute_pinned_jobfile(
     filename: str | Path, *, expected_jobs_sha256: str,
@@ -170,13 +242,15 @@ def execute_pinned_jobfile(
         _pin(expected_summary_sha256)
     elif mode == "triage" and expected_summary_sha256 is not None:
         _pin(expected_summary_sha256)
-    elif mode in {"publish", "resume"} and expected_summary_sha256 is not None:
+    elif mode in {"publish", "resume", "preflight"} and expected_summary_sha256 is not None:
         raise FirstPlayableJobFileError("summary pin is inspection-only")
     jobs, identity = read_pinned_jobs(
         filename, expected_sha256=expected_jobs_sha256,
         summary=summary, mode=mode, authorized=True,
     )
-    if mode == "publish":
+    if mode == "preflight":
+        result = preflight_pinned_cohort(jobs, summary, authorized=True)
+    elif mode == "publish":
         result = publish_first_playable_delivery_batch(
             jobs, summary, authorized=True,
         )
@@ -223,7 +297,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--expected-jobs-sha256", required=True)
     parser.add_argument("--summary", required=True)
     parser.add_argument("--mode", required=True,
-                        choices=("publish", "resume", "inspect", "triage"))
+                        choices=("preflight", "publish", "resume", "inspect", "triage"))
     parser.add_argument("--expected-summary-sha256")
     parser.add_argument("--trusted-local-operator", action="store_true")
     args = parser.parse_args(argv)
@@ -251,5 +325,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "SCHEMA", "FirstPlayableJobFileError", "read_pinned_jobs",
-    "execute_pinned_jobfile", "main",
+    "preflight_pinned_cohort", "execute_pinned_jobfile", "main",
 ]

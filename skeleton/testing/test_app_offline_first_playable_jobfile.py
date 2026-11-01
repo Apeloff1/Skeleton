@@ -186,3 +186,48 @@ def test_untrusted_authorization_and_wrong_mode_pin_rejected(original_games, tmp
             summary=tmp_path / "cohort.json", mode="publish",
             expected_summary_sha256="0" * 64, authorized=True,
         )
+
+
+def test_preflight_replays_both_sources_without_reserving_outputs(
+    original_games, tmp_path, capsys,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+    args = [
+        "first-playable-jobfile", "--jobs-file", str(manifest),
+        "--expected-jobs-sha256", pin, "--summary", str(summary),
+        "--mode", "preflight", "--trusted-local-operator",
+    ]
+    assert run_app_cli(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["game_count"] == 2
+    assert result["all_original_sources_replayed"] is True
+    assert result["destinations_reserved"] is False
+    assert result["outputs_published"] is False
+    assert result["read_only"] is True
+    assert result["native_device_qualified"] is False
+    assert result["release_certified"] is False
+    assert not summary.exists()
+    for job in jobs:
+        assert not Path(job.archive).exists()
+        assert not Path(job.install).exists()
+        assert not Path(job.save).exists()
+
+
+def test_preflight_rejects_occupied_later_output_without_partial_write(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    occupied = Path(jobs[1].receipt)
+    occupied.write_bytes(b"operator-owned")
+    occupied.chmod(0o600)
+    with pytest.raises((OSError, ValueError)):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin,
+            summary=tmp_path / "cohort.json", mode="preflight",
+            authorized=True,
+        )
+    assert occupied.read_bytes() == b"operator-owned"
+    assert not Path(jobs[0].archive).exists()

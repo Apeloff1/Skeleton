@@ -64,3 +64,13 @@ This is POSIX source-level acceptance only. It is not a Windows/macOS device
 test, cryptographic signature, malware approval, rights certification,
 persistent rollback protection, consumer installation approval, or release
 certification. All relevant security and release gates remain mandatory.
+
+## Read-only admission preflight
+
+Use `--mode preflight` with an unpinned publication job file to run the
+canonical source replay and check all destination names **without publishing
+or reserving anything**. It checks every original project ID for uniqueness,
+then repeats source verification to catch input changes. A passing preflight
+is only a point-in-time admission observation: another process can occupy
+the destination before publication. The actual publisher repeats all checks
+at the atomic no-clobber boundaries. It is never device or release readiness.
