@@ -9,6 +9,7 @@ from hashlib import sha256
 from html import escape
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import stat
@@ -51,6 +52,88 @@ def _registry() -> tuple[dict[str, dict[str, Any]], str]:
     return descriptors, catalog["catalog_digest"]
 
 
+def _validate_typed(value: object, schema: object, *, depth: int = 0) -> None:
+    """Validate reviewed descriptor JSON Schema primitives without coercion.
+
+    Unsupported schema constructs fail closed rather than being interpreted as
+    permission to accept arbitrary user-supplied arguments.
+    """
+    if depth > 12 or type(schema) is not dict:
+        raise StudioQuestError("unsupported nested world tool descriptor")
+    supported = {
+        "type", "const", "enum", "pattern", "minLength", "maxLength",
+        "minimum", "maximum", "minItems", "maxItems", "uniqueItems",
+        "items", "properties", "required", "additionalProperties",
+        "minProperties", "maxProperties", "description", "title",
+        "default", "format",
+    }
+    if set(schema) - supported:
+        raise StudioQuestError("unsupported world tool descriptor constraint")
+    allowed = schema.get("type")
+    if allowed is None:
+        raise StudioQuestError("world tool descriptor missing explicit type")
+    types = allowed if type(allowed) is list else [allowed]
+    def matches(kind: str) -> bool:
+        return {
+            "object": lambda: type(value) is dict,
+            "array": lambda: type(value) is list,
+            "string": lambda: type(value) is str,
+            "integer": lambda: type(value) is int,
+            "number": lambda: type(value) in (int, float),
+            "boolean": lambda: type(value) is bool,
+            "null": lambda: value is None,
+        }.get(kind, lambda: False)()
+    if not types or any(type(t) is not str for t in types) or not any(
+            matches(t) for t in types):
+        raise StudioQuestError("world batch tool argument has wrong JSON type")
+    if "const" in schema and value != schema["const"]:
+        raise StudioQuestError("world batch tool argument constant mismatch")
+    if "enum" in schema and value not in schema["enum"]:
+        raise StudioQuestError("world batch tool argument outside enum")
+    if type(value) is str:
+        if ("minLength" in schema and len(value) < schema["minLength"]
+                or "maxLength" in schema and len(value) > schema["maxLength"]
+                or "pattern" in schema and re.fullmatch(
+                    schema["pattern"], value) is None):
+            raise StudioQuestError("world batch tool string violates schema")
+    if type(value) in (int, float):
+        if ("minimum" in schema and value < schema["minimum"]
+                or "maximum" in schema and value > schema["maximum"]):
+            raise StudioQuestError("world batch tool number violates schema")
+    if type(value) is list:
+        if ("minItems" in schema and len(value) < schema["minItems"]
+                or "maxItems" in schema and len(value) > schema["maxItems"]):
+            raise StudioQuestError("world batch tool array violates schema")
+        if schema.get("uniqueItems") and len({
+                _canonical(item) for item in value}) != len(value):
+            raise StudioQuestError("world batch tool array has duplicates")
+        item_schema = schema.get("items")
+        if item_schema is None:
+            raise StudioQuestError("world batch array lacks typed items")
+        for item in value:
+            _validate_typed(item, item_schema, depth=depth + 1)
+    if type(value) is dict:
+        if ("minProperties" in schema and len(value) < schema["minProperties"]
+                or "maxProperties" in schema and len(value) > schema["maxProperties"]):
+            raise StudioQuestError("world batch tool object violates schema")
+        properties = schema.get("properties", {})
+        if type(properties) is not dict:
+            raise StudioQuestError("invalid world batch descriptor properties")
+        required = schema.get("required", [])
+        if type(required) is not list or not set(required).issubset(value):
+            raise StudioQuestError("world batch tool missing required fields")
+        extras = schema.get("additionalProperties", False)
+        for key, item in value.items():
+            if key in properties:
+                _validate_typed(item, properties[key], depth=depth + 1)
+            elif extras is False:
+                raise StudioQuestError("world batch tool has unknown fields")
+            elif type(extras) is dict:
+                _validate_typed(item, extras, depth=depth + 1)
+            else:
+                raise StudioQuestError("unbounded world batch tool object")
+
+
 def compile_world_batch_plan(
     requests: object, *, authorized: bool, expected_catalog_digest: str,
 ) -> dict[str, Any]:
@@ -83,6 +166,7 @@ def compile_world_batch_plan(
         required = descriptor["parameters"].get("required", [])
         if not set(required).issubset(request["arguments"]):
             raise StudioQuestError("world batch tool missing required arguments")
+        _validate_typed(request["arguments"], descriptor["parameters"])
         if len(_canonical(request)) > 64 * 1024:
             raise StudioQuestError("world batch step exceeds router budget")
         steps.append({

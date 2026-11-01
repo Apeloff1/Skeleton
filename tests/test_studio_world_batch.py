@@ -72,6 +72,10 @@ def test_reject_authoring_unknown_schema_and_recursive_batch():
         [{"tool": "studio_canon_proof", "arguments": {}}],
         [{**request, "arguments": {**request["arguments"], "authorized": True}}],
         [{**request, "arguments": {**request["arguments"], "schema": "forged"}}],
+        [{**request, "arguments": {**request["arguments"], "decisions": "not-array"}}],
+        [{**request, "arguments": {**request["arguments"], "decisions": [True]}}],
+        [{**request, "arguments": {**request["arguments"], "project_id": 1}}],
+
         [request] * 9,
     ):
         with pytest.raises(StudioQuestError):
