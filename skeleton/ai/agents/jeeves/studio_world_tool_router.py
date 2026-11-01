@@ -23,6 +23,7 @@ from skeleton.ai.agents.jeeves import studio_npc_continuity_tool as continuity
 from skeleton.ai.agents.jeeves import studio_npc_continuity_merge_tool as continuity_merge
 from skeleton.ai.agents.jeeves import studio_world_batch_tool as batch
 from skeleton.ai.agents.jeeves import studio_world_batch_merge_tool as batch_merge
+from skeleton.ai.agents.jeeves import studio_world_dependency_tool as dependency
 from skeleton.ai.agents.jeeves import studio_quest_hint_tool as hints
 from skeleton.ai.agents.jeeves import studio_original_asset_briefs_tool as asset_briefs
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
@@ -60,6 +61,7 @@ _TOOL_SYMBOLS = (
     ("npc_continuity_merge_tool_schema", "execute_npc_continuity_merge_tool"),
     ("world_batch_tool_schema", "execute_world_batch_tool"),
     ("world_batch_merge_tool_schema", "execute_world_batch_merge_tool"),
+    ("world_dependency_tool_schema", "execute_world_dependency_tool"),
     ("quest_hint_tool_schema", "execute_quest_hint_tool"),
     ("original_asset_briefs_tool_schema", "execute_original_asset_briefs_tool"),
     ("npc_author_tool_schema", "execute_npc_author_tool"),
@@ -126,6 +128,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    continuity_merge if descriptor_name == "npc_continuity_merge_tool_schema" else
                    batch if descriptor_name == "world_batch_tool_schema" else
                    batch_merge if descriptor_name == "world_batch_merge_tool_schema" else
+                   dependency if descriptor_name == "world_dependency_tool_schema" else
                    hints if descriptor_name == "quest_hint_tool_schema" else
                    asset_briefs if descriptor_name == "original_asset_briefs_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
