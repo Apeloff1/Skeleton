@@ -51,6 +51,11 @@ def test_v2_on_unchartered_path_rejected():
         _v(_mint("projects"), domain=None)
 
 
+def test_valid_v2_signature_without_replay_cache_is_rejected():
+    with pytest.raises(AuthError):
+        _v(_mint(), domain="projects", replay_cache=None)
+
+
 def test_replayed_nonce_rejected():
     cache = hs.InMemoryReplayCache()
     tok = _mint()
