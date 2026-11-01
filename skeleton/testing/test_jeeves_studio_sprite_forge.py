@@ -247,7 +247,8 @@ class PersistentSpriteExportTests(unittest.TestCase):
         self.assertEqual(len(list(self.export_root.iterdir())), 1)
 
     def test_no_sprite_record_means_no_synthetic_image(self):
-        with self.assertRaises(StudioSpriteError):
+        # The source store rejects missing graph evidence before sprite compilation.
+        with self.assertRaisesRegex(CreatorSourceError, "unresolved sources"):
             self.export()
         self.assertEqual(list(self.export_root.iterdir()), [])
 
