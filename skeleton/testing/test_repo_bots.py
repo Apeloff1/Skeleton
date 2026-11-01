@@ -44,30 +44,15 @@ def test_generated_python_validation_is_non_executing_and_rejects_syntax():
         })
 
 
-def test_repo_bots_workflow_keeps_matrix_context_at_step_scope():
+def test_retired_repo_bots_workflow_remains_disabled() -> None:
+    """The removed auto-admitted bot workflow must not silently return."""
     workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "repo-bots.yml"
-    source = workflow.read_text(encoding="utf-8")
-    matrix_guard = (
-        "if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' "
-        "|| github.event.inputs.bot == matrix.bot"
-    )
-    assert f"\n    {matrix_guard}\n" not in source
-    assert source.count(f"\n        {matrix_guard}\n") == 3
+    assert not workflow.exists(), "retired repo-bots workflow would expand automatic CI admissions"
 
 
 def test_repo_bots_job_keeps_only_required_read_signal_scopes() -> None:
     workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "repo-bots.yml"
-    source = workflow.read_text(encoding="utf-8")
-
-    assert "permissions:\n  contents: read\n" in source
-    assert (
-        "  bot:\n"
-        "    permissions:\n"
-        "      actions: read\n"
-        "      contents: write\n"
-        "      issues: read\n"
-        "      pull-requests: write\n"
-    ) in source
+    assert not workflow.exists(), "retired privileged bot workflow cannot be re-enabled"
 
     # triage reads Issues and ci reads Actions. These reads must remain
     # available after write scopes are narrowed to the bot job.
