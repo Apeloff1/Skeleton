@@ -56,6 +56,27 @@ class QuestSaveTests(unittest.TestCase):
             {"q1": self.prog},
         )
 
+    def test_quest_section_rejects_duplicate_ids_before_manifest_serialization(self):
+        with self.assertRaisesRegex(QuestProgressSaveError, "duplicate quest identity"):
+            quest_section(self.w, self.state, [self.prog, self.prog])
+        with self.assertRaisesRegex(QuestProgressSaveError, "bounded collection"):
+            quest_section(self.w, self.state, [], failures=[
+                QuestFailure("q2", "turn_limit", "late")
+            ] * 4097)
+
+    def test_restore_rejects_noncanonical_objective_indices(self):
+        for index, key in enumerate(("00", "+0", "٠", "000001", "1" * 7)):
+            plane = GameSavePlane()
+            original = self.prog.as_dict()
+            objective = original["objectives_progress"]["0"]
+            forged = dict(self.section, quests={"q1": {
+                "quest_id": "q1", "status": "active",
+                "objectives_progress": {key: objective},
+            }})
+            save_quest_progress(plane, f"forged-{index}", 1, forged)
+            with self.assertRaisesRegex(QuestProgressSaveError, "invalid objective progress key"):
+                restore_quest_progress(plane, f"forged-{index}", self.w, verified_state=self.state)
+
     def test_restore_rejects_cross_project_section(self):
         plane = GameSavePlane()
         malicious = dict(self.section, project="different-project")

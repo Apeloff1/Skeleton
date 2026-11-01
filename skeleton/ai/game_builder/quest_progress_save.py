@@ -30,6 +30,13 @@ def quest_section(world: DirectorWorld, state: DirectorState,
                   campaign_receipt_sha256: str | None = None) -> dict[str, Any]:
     if state.world_digest != world.digest:
         raise QuestProgressSaveError("director state belongs to another world")
+    if len(quests) > 4096 or len(failures) > 4096:
+        raise QuestProgressSaveError("quest section exceeds bounded collection size")
+    quest_ids = [q.quest_id for q in quests]
+    if any(type(qid) is not str or not qid for qid in quest_ids):
+        raise QuestProgressSaveError("invalid quest identity")
+    if len(set(quest_ids)) != len(quest_ids):
+        raise QuestProgressSaveError("duplicate quest identity in section")
     return {
         "schema": SCHEMA,
         "project": world.project_id,
@@ -63,7 +70,9 @@ def _progress(raw: Mapping[str, Any]) -> QuestProgressState:
         raise QuestProgressSaveError("invalid objective progress collection")
     objectives: dict[str, ObjectiveProgress] = {}
     for key, value in progress.items():
-        if type(key) is not str or not key.isdecimal() or not isinstance(value, Mapping):
+        if (type(key) is not str or not key or len(key) > 6 or not key.isascii()
+                or not key.isdecimal() or (len(key) > 1 and key[0] == "0")
+                or not isinstance(value, Mapping)):
             raise QuestProgressSaveError("invalid objective progress key")
         if set(value) != {"current", "target", "completed"}:
             raise QuestProgressSaveError("invalid objective progress shape")
