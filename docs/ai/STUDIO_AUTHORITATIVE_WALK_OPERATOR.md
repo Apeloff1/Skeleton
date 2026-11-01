@@ -831,3 +831,31 @@ editable through this command. The typed Jeeves
 without writing files. The editor rejects unknown stages, duplicate
 alternatives, stale source/choice digests, invalid text and unapproved modes.
 Exact-head tests and security checks remain required before PR promotion.
+
+## Guided original-world route and authored-choice execution
+
+`--play-walk --walk-guided-choices` composes the existing collision-aware
+shortest-path movement engine with explicit original scene choices. The
+operator supplies a JSON list of 1..3 exact authored alternatives and an
+optimistic lease on the current walk session digest. The engine approaches
+each authored interaction marker, previews the allowed alternatives,
+replays the selected choice, and independently verifies the entire resulting
+movement/choice event history before emitting a new save receipt. A failed
+route, stale lease, locked scene or forged choice produces no new receipt.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --play-walk --walk-guided-choices '["<authored-alternative>"]' \
+  --walk-guided-expected-session <current-session-sha256> > private-guided-save.json
+```
+
+The initial session digest can be obtained from an empty `--play-walk`
+receipt; existing receipts may be passed with `--walk-receipt-stdin`. Guided
+mode is mutually exclusive with other route, forecast, rewind, and inspection
+modes. The typed Jeeves `execute_guided_walk_tool` performs identical
+operator-authorized replay, returning the exact canonical final receipt.
+The trace binds each route and preview to before/after session digests and
+records actual simulated movement and choice events. It does not infer
+consent, generate missing dialogue, or claim a native genre engine, external
+evidence, or consumer release. No filesystem writes occur in the engine;
+private persistence is under the operator's control.

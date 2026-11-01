@@ -178,6 +178,10 @@ def main(argv: list[str] | None = None) -> int:
     receipt_mode.add_argument("--walk-receipt-stdin", action="store_true",
                               help="Read a bounded saved receipt from standard input")
     route_mode = ap.add_mutually_exclusive_group()
+    route_mode.add_argument("--walk-guided-choices", metavar="JSON",
+                            help="Execute 1..3 explicitly selected authored scenes with collision-checked routes")
+    ap.add_argument("--walk-guided-expected-session",
+                    help="Required optimistic walk session digest for guided execution")
     route_mode.add_argument("--walk-route", action="store_true",
                             help="Include a deterministic shortest source-bound interaction route")
     route_mode.add_argument("--walk-follow-route", action="store_true",
@@ -229,9 +233,16 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_forecast_depth is not None and not args.walk_forecast
             and args.walk_commit_forecast_branch is None):
         ap.error("--walk-forecast-depth requires --walk-forecast or --walk-commit-forecast-branch")
+    if (args.walk_guided_choices is None and
+            args.walk_guided_expected_session is not None):
+        ap.error("--walk-guided-expected-session requires --walk-guided-choices")
+    if (args.walk_guided_choices is not None and
+            args.walk_guided_expected_session is None):
+        ap.error("guided walk requires an exact expected session digest")
     if not args.play_walk and (args.walk_events is not None
                                or args.walk_receipt is not None
                                or args.walk_receipt_stdin or args.walk_route or args.walk_follow_route
+                               or args.walk_guided_choices is not None
                                or args.walk_preview_choices or args.walk_forecast
                                or args.walk_commit_forecast_branch is not None or args.walk_continuity
                                or args.walk_compare_events is not None or args.walk_rewind_choices is not None
@@ -1176,6 +1187,27 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps({"receipt": json.loads(receipt),
                                   "choice_rewind": rewind_receipt},
                                  sort_keys=True, separators=(",", ":")))
+            elif args.walk_guided_choices is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_guided_walk import (
+                    execute_guided_walk,
+                )
+                raw_choices = args.walk_guided_choices.encode("utf-8", "strict")
+                if len(raw_choices) > 4096:
+                    raise StudioQuestError("guided authored choice list exceeds byte budget")
+                selected = json.loads(
+                    raw_choices,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite guided authored choice")))
+                session, guided = execute_guided_walk(
+                    docs, [list(event) for event in session.events],
+                    authored_choices=selected,
+                    expected_source_digest=session.source_digest,
+                    expected_session_digest=args.walk_guided_expected_session,
+                    authorized=True)
+                receipt = export_walk_receipt(session, docs, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "guided_tour": guided},
+                                 sort_keys=True, separators=(",", ":")))
             elif args.walk_commit_forecast_branch is not None:
                 session, branch_execution = commit_walk_forecast_branch(
                     session, docs, branch_index=args.walk_commit_forecast_branch,
@@ -1252,7 +1284,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps({"receipt": json.loads(receipt),
                                   "route": walk_route_hint(session, docs, authorized=True)},
                                  sort_keys=True, separators=(",", ":")))
-            elif (not args.walk_follow_route and not args.walk_preview_choices
+            elif (args.walk_guided_choices is None
+                  and not args.walk_follow_route and not args.walk_preview_choices
                   and not args.walk_forecast and args.walk_commit_forecast_branch is None
                   and not args.walk_continuity and alternative_actions is None
                   and args.walk_rewind_choices is None
