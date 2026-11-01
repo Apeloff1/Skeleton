@@ -9,6 +9,7 @@ from pathlib import Path
 from .long_context_spool import LongContextSpool, LongContextSpoolError, read_selected_sequence
 from .long_context_progress import LongContextProgressHead
 from .long_context_fairness import LongContextFairPlanner, PressureSignals, StreamDemand
+from .long_context_host_pressure import observe_host_pressure
 from .tokenization import deserialize_token_sequence
 
 
@@ -71,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     audit_heads.add_argument("--max-heads", type=int, default=64)
     audit_heads.add_argument("--max-checkpoints", type=int, default=4096)
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
+    commands.add_parser("head-observe", help="Read conservative local PSI pressure; no grant")
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
     plan.add_argument("--candidate", action="append", required=True,
                       help="stream-id:checkpoint:generation:weight:max-tokens[:requested-bytes]")
@@ -88,7 +90,9 @@ def main(argv: list[str] | None = None) -> int:
         spool = LongContextSpool(args.root)
         if args.command.startswith("head-"):
             heads = LongContextProgressHead(spool)
-            if args.command == "head-plan":
+            if args.command == "head-observe":
+                result = observe_host_pressure()
+            elif args.command == "head-plan":
                 demands = []
                 for value in args.candidate:
                     parts = value.split(":")
