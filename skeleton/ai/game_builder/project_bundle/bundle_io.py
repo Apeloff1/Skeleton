@@ -80,6 +80,10 @@ def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
         payload = codec.decode(raw).payload
     except ValueError as exc:  # SaveIntegrityError is a ValueError
         raise BundleError("bundle envelope failed integrity check") from exc
+    if (type(payload) is not dict or set(payload) != {"manifest", "sections", "receipts"}
+            or type(payload["sections"]) is not dict
+            or type(payload["sections"].get("files")) is not dict):
+        raise BundleError("invalid bundle payload shape")
     manifest = BundleManifest.from_payload(payload["manifest"])
     if len(manifest.files) > PROJECT_MAX_FILES:
         raise BundleError("bundle has too many files")

@@ -165,3 +165,14 @@ def test_bundle_atomic_publication_holds_parent_descriptor_during_swap(tmp_path,
     assert not (outside / target.name).exists()
     with pytest.raises(BundleError):
         bio.read_bundle(target)
+
+
+def test_bundle_import_rejects_signed_but_malformed_payload_shape(saver):
+    for malformed in (
+        {"manifest": {}},
+        {"manifest": {}, "sections": {}, "receipts": {}},
+        {"manifest": {}, "sections": {"files": []}, "receipts": {}},
+    ):
+        raw = CODEC.encode(malformed)
+        with pytest.raises(BundleError, match="payload shape"):
+            bio.import_bundle(raw, CODEC, ProjectSaver(GameSavePlane()))
