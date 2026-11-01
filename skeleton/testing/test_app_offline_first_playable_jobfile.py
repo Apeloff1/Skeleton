@@ -328,3 +328,47 @@ def test_original_source_replay_option_rejected_for_mutating_modes(
         )
     assert not summary.exists()
     assert all(not Path(job.archive).exists() for job in jobs)
+
+
+def test_failed_publication_still_rechecks_jobfile_custody(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_jobfile as module
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+
+    def fail_after_input_mutation(*args, **kwargs):
+        manifest.write_bytes(manifest.read_bytes() + b" ")
+        raise RuntimeError("simulated interrupted canonical publisher")
+
+    monkeypatch.setattr(module, "publish_first_playable_delivery_batch",
+                        fail_after_input_mutation)
+    with pytest.raises(FirstPlayableJobFileError):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin, summary=summary,
+            mode="publish", authorized=True,
+        )
+    assert not summary.exists()
+
+
+def test_failed_publication_with_stable_input_preserves_original_failure(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_jobfile as module
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+
+    def fail_without_mutation(*args, **kwargs):
+        raise RuntimeError("simulated canonical publisher fault")
+
+    monkeypatch.setattr(module, "publish_first_playable_delivery_batch",
+                        fail_without_mutation)
+    with pytest.raises(RuntimeError, match="canonical publisher fault"):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin, summary=summary,
+            mode="publish", authorized=True,
+        )
+    assert sha256(manifest.read_bytes()).hexdigest() == pin
+    assert not summary.exists()

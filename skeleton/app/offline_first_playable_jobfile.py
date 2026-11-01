@@ -279,36 +279,41 @@ def execute_pinned_jobfile(
         filename, expected_sha256=expected_jobs_sha256,
         summary=summary, mode=mode, authorized=True,
     )
-    if mode == "preflight":
-        result = preflight_pinned_cohort(jobs, summary, authorized=True)
-    elif mode == "publish":
-        result = publish_first_playable_delivery_batch(
-            jobs, summary, authorized=True,
+    # Even a failed/partial publisher may have consumed an input that was
+    # concurrently replaced. Verify custody on BOTH success and exception;
+    # never let an exception skip the final independently pinned read.
+    try:
+        if mode == "preflight":
+            result = preflight_pinned_cohort(jobs, summary, authorized=True)
+        elif mode == "publish":
+            result = publish_first_playable_delivery_batch(
+                jobs, summary, authorized=True,
+            )
+        elif mode == "resume":
+            result = resume_first_playable_delivery_batch(
+                jobs, summary, authorized=True,
+            )
+        elif mode == "inspect":
+            result = inspect_first_playable_delivery_batch(
+                jobs, summary, expected_summary_sha256=expected_summary_sha256,
+                authorized=True, verify_original_sources=verify_original_sources,
+            )
+        elif mode == "triage":
+            result = triage_first_playable_delivery_batch(
+                jobs, summary, expected_summary_sha256=expected_summary_sha256,
+                authorized=True,
+            )
+        else:
+            raise FirstPlayableJobFileError("unsupported delivery mode")
+    finally:
+        again, final_identity = read_pinned_jobs(
+            filename, expected_sha256=expected_jobs_sha256,
+            summary=summary, mode=mode, authorized=True,
         )
-    elif mode == "resume":
-        result = resume_first_playable_delivery_batch(
-            jobs, summary, authorized=True,
-        )
-    elif mode == "inspect":
-        result = inspect_first_playable_delivery_batch(
-            jobs, summary, expected_summary_sha256=expected_summary_sha256,
-            authorized=True, verify_original_sources=verify_original_sources,
-        )
-    elif mode == "triage":
-        result = triage_first_playable_delivery_batch(
-            jobs, summary, expected_summary_sha256=expected_summary_sha256,
-            authorized=True,
-        )
-    else:
-        raise FirstPlayableJobFileError("unsupported delivery mode")
-    again, final_identity = read_pinned_jobs(
-        filename, expected_sha256=expected_jobs_sha256,
-        summary=summary, mode=mode, authorized=True,
-    )
-    if jobs != again or identity != final_identity:
-        raise FirstPlayableJobFileError(
-            "job-file inode or content changed during delivery"
-        )
+        if jobs != again or identity != final_identity:
+            raise FirstPlayableJobFileError(
+                "job-file inode or content changed during delivery"
+            )
     if result.get("release_certified") is not False:
         raise FirstPlayableJobFileError("canonical result made release claim")
     return {
