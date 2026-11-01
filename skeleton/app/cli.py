@@ -306,6 +306,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "verify-archive-signature":
         from skeleton.app.offline_archive_signature import main as signature_main
         return signature_main(arguments[1:])
+    if arguments and arguments[0] == "recover-signed-install":
+        from skeleton.app.offline_signed_install_recovery import main as signed_recovery_main
+        return signed_recovery_main(arguments[1:])
     if arguments and arguments[0] == "recover-install":
         from skeleton.app.offline_install_recovery import main as recovery_main
         return recovery_main(arguments[1:])
