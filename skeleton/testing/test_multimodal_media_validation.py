@@ -163,6 +163,32 @@ def test_metadata_conflicts_and_invalid_values_publish_no_asset(metadata):
     assert intake._assets == {}
 
 
+def test_verified_wave_accepts_matching_decoder_evidence_and_rejects_giant_claims():
+    payload = _audio()
+    metadata = {
+        "channels": 1, "sample_rate": 8000, "sample_rate_hz": 8000,
+        "sample_width_bits": 16, "sample_width_bytes": 2,
+        "frame_count": 800, "sample_count": 800,
+        "duration_ms": 100.0, "duration_seconds": 0.1,
+    }
+    _, asset = _admit(payload, modality=Modality.AUDIO, mime="audio/wav", metadata=metadata)
+    assert asset.validation.sample_count == 800
+    assert asset.sanitized_metadata["sample_rate_hz"] == 8000
+    for claim in ({"frame_count": 10 ** 1000}, {"channels": True}):
+        intake = MultimodalIntake()
+        with pytest.raises(MultimodalSanitizationError, match="conflicts"):
+            _admit(payload, modality=Modality.AUDIO, mime="audio/wav",
+                   metadata=claim, intake=intake)
+        assert intake._assets == {}
+
+
+def test_image_rejects_unrelated_audio_decoder_claim_without_publishing():
+    intake = MultimodalIntake()
+    with pytest.raises(MultimodalSanitizationError, match="conflicts"):
+        _admit(_image(), metadata={"sample_rate": 8000}, intake=intake)
+    assert intake._assets == {}
+
+
 @pytest.mark.parametrize(
     "metadata",
     (
