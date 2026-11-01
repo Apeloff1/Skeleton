@@ -148,6 +148,12 @@ class InMemoryNonceStore:
         now = self._clock()
         if not _finite_number(now):
             return False
+        expires_at = float(ts) + float(ttl_s)
+        # Never admit an already-expired nonce or an unbounded future lease.
+        # Otherwise a stale credential could be accepted repeatedly as fresh.
+        if (ts < 0 or not math.isfinite(expires_at)
+                or not now < expires_at <= now + MAX_NONCE_TTL_S):
+            return False
         key = (scope, nonce)
         with self._lock:
             exp = self._entries.get(key)
@@ -157,5 +163,5 @@ class InMemoryNonceStore:
                 self._purge(now)
                 if len(self._entries) >= self._max:
                     raise self._full(scope, now)
-            self._entries[key] = float(ts) + float(ttl_s)
+            self._entries[key] = expires_at
             return True

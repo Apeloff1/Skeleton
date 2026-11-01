@@ -433,3 +433,14 @@ def test_nonce_store_rejects_unrepresentable_integer_timestamps_and_clocks():
     broken_clock = InMemoryNonceStore(clock=lambda: huge)
     assert broken_clock.check_and_record("seal", "n", NOW, 60) is False
     assert len(broken_clock) == 0
+
+
+def test_nonce_store_refuses_expired_and_unbounded_retention_before_recording():
+    store = InMemoryNonceStore(clock=lambda: 1000.0)
+    # A stale timestamp plus short TTL previously returned True on every call,
+    # silently reopening replay even though the recorded entry was expired.
+    for ts, ttl in ((0, 1), (1000, 0.0), (-1, 2000), (1e308, 1)):
+        assert store.check_and_record("seal", "stale", ts, ttl) is False
+    assert len(store) == 0
+    assert store.check_and_record("seal", "fresh", 1000, 10) is True
+    assert store.check_and_record("seal", "fresh", 1000, 10) is False
