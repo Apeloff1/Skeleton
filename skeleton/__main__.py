@@ -75,6 +75,8 @@ Commands:
     arena-forge-solve  Solve bounded equipment and combat routes
     arena-forge-author  Atomically edit and preview tactical crafting sources
     quest-factions  Play NPC faction reputation and earned quest consequences
+    quest-factions-author  Transactionally author and preview faction consequences
+    quest-factions-route  Solve replayable faction-gated quest endings
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
     quest-expedition-route  Find replayable NPC crafting and combat ending routes
@@ -775,6 +777,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
+    if cmd == "quest-factions-author":
+        from skeleton.game.gameplay.quest_factions_author import cli as faction_author_cli
+        return faction_author_cli(rest)
+    if cmd == "quest-factions-route":
+        from skeleton.game.gameplay.quest_factions_route import cli as faction_route_cli
+        return faction_route_cli(rest)
     if cmd == "quest-factions":
         from skeleton.game.gameplay.quest_factions import cli as faction_cli
         return faction_cli(rest)
