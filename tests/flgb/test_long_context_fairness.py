@@ -84,6 +84,35 @@ class TestLongContextFairPlanner(unittest.TestCase):
         self.assertEqual(held["slots"], [])
         self.assertIn("fair_cycle_budget_insufficient", held["reasons"])
 
+    def test_minimum_viable_budget_never_starves_a_stream(self):
+        a = self.stream("story.alpha", weight=1)
+        b = self.stream("story.beta", weight=3)
+        for budget in (2, 3, 4, 5, 6):
+            with self.subTest(budget=budget):
+                result = self.plan(a, b, total_token_budget=budget)
+                self.assertEqual(result["state"], "proposed")
+                self.assertEqual(len(result["slots"]), 2)
+                self.assertTrue(all(s["proposed_tokens"] >= 1 for s in result["slots"]))
+                self.assertLessEqual(result["proposed_tokens"], budget)
+                self.assertEqual(result, self.plan(b, a, total_token_budget=budget))
+        held = self.plan(a, b, total_token_budget=1)
+        self.assertEqual(held["state"], "hold")
+        self.assertEqual(held["slots"], [])
+
+    def test_weighted_allocation_respects_caps_and_never_exceeds_budget(self):
+        a = self.stream("story.alpha", count=2, weight=8)
+        b = self.stream("story.beta", count=20, weight=1)
+        c = self.stream("story.gamma", count=20, weight=3)
+        for budget in range(3, 25):
+            with self.subTest(budget=budget):
+                result = self.plan(a, b, c, total_token_budget=budget)
+                self.assertEqual(result["state"], "proposed")
+                self.assertEqual(len(result["slots"]), 3)
+                self.assertLessEqual(result["proposed_tokens"], budget)
+                self.assertTrue(all(1 <= s["proposed_tokens"] <=
+                    s["window_stop"] - s["window_start"] for s in result["slots"]))
+                self.assertEqual(result, self.plan(c, a, b, total_token_budget=budget))
+
     def test_finished_stream_does_not_block_active_stream(self):
         a = self.stream("story.alpha", count=2)
         b = self.stream("story.beta", count=9)

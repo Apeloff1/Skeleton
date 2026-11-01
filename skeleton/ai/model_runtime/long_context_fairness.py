@@ -157,16 +157,29 @@ class LongContextFairPlanner:
                 if len(windows) > total_token_budget:
                     reasons.append("fair_cycle_budget_insufficient")
                 else:
-                    remaining = total_token_budget
-                    for demand, window in windows:
-                        amount = min(
-                            remaining, window.stop - window.start,
-                            quantum_tokens * demand.weight,
-                        )
-                        if amount <= 0:
-                            reasons.append("fair_cycle_budget_insufficient")
-                            slots.clear()
-                            break
+                    # Reserve one token for every live stream before distributing
+                    # weighted quanta. Greedy first-fit used to starve the final
+                    # stream and hold the whole cycle despite sufficient budget.
+                    allocations = [1] * len(windows)
+                    remaining = total_token_budget - len(windows)
+                    caps = [
+                        min(window.stop - window.start, quantum_tokens * demand.weight)
+                        for demand, window in windows
+                    ]
+                    active = [i for i, cap in enumerate(caps) if cap > 1]
+                    while remaining and active:
+                        next_active = []
+                        for i in active:
+                            demand, _ = windows[i]
+                            grant = min(
+                                demand.weight, caps[i] - allocations[i], remaining,
+                            )
+                            allocations[i] += grant
+                            remaining -= grant
+                            if allocations[i] < caps[i]:
+                                next_active.append(i)
+                        active = next_active
+                    for (demand, window), amount in zip(windows, allocations):
                         slots.append({
                             "stream_digest": _name(demand.stream_id),
                             "checkpoint_digest": demand.checkpoint_digest,

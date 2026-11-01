@@ -19,8 +19,13 @@ token consumption, and perform generation/window CAS before advancing.
 
 The plan exposes only stream and checkpoint digests, window digests, positions,
 weights and token counts. No token IDs or plaintext stream names are emitted.
-The planner does not mutate cursor state. It does not guarantee fairness across
-repeated calls or independently authenticate a scheduler principal.
+The planner reserves one token for each active stream before distributing
+bounded weighted quanta. This avoids an earlier first-fit failure where a
+small but sufficient cycle budget could starve the last stream and hold the
+entire proposal. The proposal never exceeds its global token budget or
+per-stream window/quantum caps. The planner does not mutate cursor state.
+It does not guarantee fairness across repeated calls or independently
+authenticate a scheduler principal.
 
 CLI: use head-plan with one or more candidate specifications of the form
 stream-id:checkpoint-digest:generation:weight:max-tokens. Explicitly supply
