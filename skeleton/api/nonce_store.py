@@ -26,6 +26,16 @@ MAX_ENTRIES_ENV = "SKELETON_SEAL_NONCE_STORE_MAX"
 FULL_METRIC = "nonce_store_full"
 
 
+def _finite_number(value: object) -> bool:
+    """Reject nonfinite or unrepresentably large numeric evidence without overflow."""
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
 class NonceStoreFull(Exception):
     """Raised by ``check_and_record`` when a fresh nonce cannot be recorded.
 
@@ -132,12 +142,11 @@ class InMemoryNonceStore:
                 or type(nonce) is not str or not 1 <= len(nonce) <= 256
                 or any(ord(ch) < 32 or ord(ch) == 127 for ch in scope + nonce)):
             return False
-        if (type(ts) not in (int, float) or type(ttl_s) not in (int, float)
-                or not math.isfinite(ts) or not math.isfinite(ttl_s)
+        if (not _finite_number(ts) or not _finite_number(ttl_s)
                 or not 0 < ttl_s <= MAX_NONCE_TTL_S):
             return False
         now = self._clock()
-        if type(now) not in (int, float) or not math.isfinite(now):
+        if not _finite_number(now):
             return False
         key = (scope, nonce)
         with self._lock:

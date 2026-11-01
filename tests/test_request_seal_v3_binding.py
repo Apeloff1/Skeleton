@@ -422,3 +422,14 @@ def test_nonce_store_rejects_nonfinite_and_unbounded_replay_evidence():
     assert len(st) == 0
     with pytest.raises(ValueError, match="bounded"):
         max_entries_from_env({"SKELETON_SEAL_NONCE_STORE_MAX": "1000001"})
+
+
+def test_nonce_store_rejects_unrepresentable_integer_timestamps_and_clocks():
+    huge = 10**1000
+    store = InMemoryNonceStore(clock=lambda: NOW)
+    assert store.check_and_record("seal", "n", huge, 60) is False
+    assert store.check_and_record("seal", "n", NOW, huge) is False
+    assert len(store) == 0
+    broken_clock = InMemoryNonceStore(clock=lambda: huge)
+    assert broken_clock.check_and_record("seal", "n", NOW, 60) is False
+    assert len(broken_clock) == 0
