@@ -56,6 +56,7 @@ Commands:
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
     scene-circuit-author  Atomically edit and preview playable circuit sources
+    scene-patrol  Play timed guard routes and replay-verified scene checkpoints
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -780,6 +781,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-circuit":
         from skeleton.game.gameplay.scene_circuit import cli as circuit_cli
         return circuit_cli(rest)
+    if cmd == "scene-patrol":
+        from skeleton.game.gameplay.scene_guard_patrol import cli as patrol_cli
+        return patrol_cli(rest)
     if cmd == "scene-travel":
         from skeleton.game.gameplay.scene_travel import cli as scene_cli
         return scene_cli(rest)
