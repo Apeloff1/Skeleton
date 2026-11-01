@@ -254,6 +254,10 @@ def _parser() -> argparse.ArgumentParser:
         "recover-install", add_help=False,
         help="reinstall pinned offline source while preserving quarantine (recover-install --help)",
     )
+    sub.add_parser(
+        "inspect-uncertain-offline-receipt", add_help=False,
+        help="read-only quarantine triage of an independently pinned offline receipt",
+    )
     sub.add_parser("studio-journey", add_help=False,
                    help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
@@ -465,6 +469,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "audit-mixed-library-epoch-relocation":
         from skeleton.app.offline_mixed_library_epoch_relocation import main as epoch_relocation_main
         return epoch_relocation_main(arguments[1:])
+    if arguments and arguments[0] == "inspect-uncertain-offline-receipt":
+        from skeleton.app.offline_uncertain_receipt_inspection import main as uncertain_main
+        return uncertain_main(arguments[1:])
     if arguments and arguments[0] == "mixed-library-epoch-handoff":
         from skeleton.app.offline_mixed_library_epoch_handoff import main as epoch_handoff_main
         return epoch_handoff_main(arguments[1:])
