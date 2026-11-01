@@ -122,55 +122,58 @@ def _check_references(root_fd: int, report: ImportReport) -> None:
                 report.issues.append(ImportIssue(entry.path, "missing_reference", f"{ref}: {exc}"))
 
 
-def import_files(root: str | Path, paths: Iterable[str]) -> ImportReport:
-    """Import at most a bounded set of assets, without following symlink edges."""
+def _import_from_fd(root_fd: int, paths: Iterable[str]) -> ImportReport:
+    """Import and validate against the exact held root descriptor."""
     report = ImportReport(AssetManifest())
+    # Consume only a bounded prefix, then sort for deterministic manifests.
+    # Do not materialize an attacker-controlled unbounded path iterator.
+    from itertools import islice
+
+    requested = list(islice(paths, MAX_IMPORT_FILES + 1))
+    if len(requested) > MAX_IMPORT_FILES:
+        report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
+        requested = requested[:MAX_IMPORT_FILES]
+    validated: set[str] = set()
+    for item in requested:
+        if not isinstance(item, str):
+            report.issues.append(ImportIssue(str(item), "unsafe", "non-text path"))
+        else:
+            validated.add(item)
+    total = 0
+    for relative in sorted(validated):
+        try:
+            parts = _parts(relative)
+            if PurePosixPath(parts[-1]).suffix.lower() not in _EXT:
+                report.issues.append(ImportIssue(relative, "unsupported", "unsupported extension"))
+                continue
+            payload = _regular(root_fd, relative, read=True)
+            assert payload is not None
+            total += len(payload)
+            if total > MAX_IMPORT_TOTAL_BYTES:
+                report.issues.append(ImportIssue(relative, "broken", "aggregate asset bytes exceed bound"))
+                break
+            asset = import_bytes(relative, payload)
+            added = report.manifest.add(asset)
+            (report.imported if added else report.duplicates).append(relative)
+        except AssetImportError as exc:
+            code = "unsafe" if "unsafe asset path" in str(exc) or "unavailable" in str(exc) else "broken"
+            report.issues.append(ImportIssue(relative, code, str(exc)))
+        except OSError as exc:
+            report.issues.append(ImportIssue(relative, _issue_code(exc), str(exc)))
+    _check_references(root_fd, report)
+    return report
+
+
+def import_files(root: str | Path, paths: Iterable[str]) -> ImportReport:
+    """Import bounded files without reopening an untrusted path after validation."""
     try:
         root_fd = _root_fd(root)
     except (OSError, AssetImportError) as exc:
-        report.issues.append(ImportIssue(".", "unsafe", str(exc)))
-        return report
+        return ImportReport(AssetManifest(), issues=[ImportIssue(".", "unsafe", str(exc))])
     try:
-        # Consume only a bounded prefix, then sort for deterministic manifests.
-        # Do not materialize an attacker-controlled unbounded path iterator.
-        from itertools import islice
-
-        requested = list(islice(paths, MAX_IMPORT_FILES + 1))
-        if len(requested) > MAX_IMPORT_FILES:
-            report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
-            requested = requested[:MAX_IMPORT_FILES]
-        validated: set[str] = set()
-        for item in requested:
-            if not isinstance(item, str):
-                report.issues.append(ImportIssue(str(item), "unsafe", "non-text path"))
-            else:
-                validated.add(item)
-        total = 0
-        for relative in sorted(validated):
-            try:
-                parts = _parts(relative)
-                if PurePosixPath(parts[-1]).suffix.lower() not in _EXT:
-                    report.issues.append(ImportIssue(relative, "unsupported", "unsupported extension"))
-                    continue
-                payload = _regular(root_fd, relative, read=True)
-                assert payload is not None
-                total += len(payload)
-                if total > MAX_IMPORT_TOTAL_BYTES:
-                    report.issues.append(ImportIssue(relative, "broken", "aggregate asset bytes exceed bound"))
-                    break
-                asset = import_bytes(relative, payload)
-                added = report.manifest.add(asset)
-                (report.imported if added else report.duplicates).append(relative)
-            except AssetImportError as exc:
-                code = "unsafe" if "unsafe asset path" in str(exc) or "unavailable" in str(exc) else "broken"
-                report.issues.append(ImportIssue(relative, code, str(exc)))
-            except OSError as exc:
-                report.issues.append(ImportIssue(relative, _issue_code(exc), str(exc)))
-        _check_references(root_fd, report)
+        return _import_from_fd(root_fd, paths)
     finally:
         os.close(root_fd)
-    return report
-
 
 def import_directory(root: str | Path) -> ImportReport:
     """Scan a bounded descriptor-held tree; never follow symlink directories."""
@@ -221,8 +224,8 @@ def import_directory(root: str | Path) -> ImportReport:
 
     try:
         walk(root_fd, "", 0)
+        report = _import_from_fd(root_fd, sorted(paths[:MAX_IMPORT_FILES]))
     finally:
         os.close(root_fd)
-    report = import_files(root, sorted(paths[:MAX_IMPORT_FILES]))
     report.issues.extend(issues)
     return report

@@ -194,3 +194,26 @@ def test_directory_scan_is_bounded_and_skips_symlinked_tree(tmp_path, monkeypatc
     report = pipeline.import_directory(tmp_path)
     assert not report.ok
     assert any("tree entries exceed bound" in issue.detail for issue in report.issues)
+
+
+def test_directory_root_replacement_cannot_switch_imported_bytes(tmp_path, monkeypatch):
+    from skeleton.game.build.asset_ingest import pipeline
+    root = tmp_path / "assets"
+    root.mkdir()
+    (root / "a.png").write_bytes(png())
+    original_scandir = pipeline.os.scandir
+    swapped = [False]
+
+    def replace_root_after_open(fd):
+        if not swapped[0]:
+            swapped[0] = True
+            root.rename(tmp_path / "original")
+            root.mkdir()
+            (root / "a.png").write_bytes(b"forged replacement")
+        return original_scandir(fd)
+
+    monkeypatch.setattr(pipeline.os, "scandir", replace_root_after_open)
+    report = pipeline.import_directory(root)
+    assert report.ok, report.issues
+    assert report.imported == ["a.png"]
+    assert report.manifest.resolve("a.png").size == len(png())
