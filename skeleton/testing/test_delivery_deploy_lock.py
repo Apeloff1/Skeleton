@@ -39,3 +39,16 @@ def test_deploy_lock_rejects_invalid_clocks_and_boolean_ttls():
     lease = t.acquire("dev", "ci", now=0, ttl=10)
     with pytest.raises(DeliveryError, match="ttl"):
         t.renew(lease, now=1, ttl=True)
+
+
+def test_renewed_lease_rejects_stale_pre_renewal_release():
+    t = DeployLockTable()
+    original = t.acquire("prod", "alice", now=0, ttl=10)
+    renewed = t.renew(original, now=5, ttl=10)
+    assert renewed.token == original.token and renewed.expires_at == 15
+    with pytest.raises(DeliveryError, match="stale"):
+        t.release(original, now=6)
+    with pytest.raises(DeliveryError, match="stale"):
+        t.renew(original, now=6, ttl=10)
+    t.release(renewed, now=6)
+    assert t.holder("prod", now=6) is None

@@ -61,5 +61,7 @@ class DeployLockTable:
 
     def check_fence(self, lease: Lease, *, now: int) -> None:
         current = self.holder(lease.environment, now=now)
-        if current is None or current.token != lease.token or current.holder != lease.holder:
+        if (current is None or current.token != lease.token
+                or current.holder != lease.holder
+                or current.expires_at != lease.expires_at):
             raise DeliveryError("stale or expired lease")
