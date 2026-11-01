@@ -151,6 +151,54 @@ class TestLongContextSpool(unittest.TestCase):
                 self.spool.advance(start, expected_tokenizer_digest=TOKENIZER,
                                    consumed_tokens=value)
 
+    def test_spool_quota_blocks_new_object_without_overwriting_old_receipt(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor-relative quota inventory")
+        canonical = serialize_token_sequence(self.sequence)
+        # Genesis object plus its checkpoint fit, but another source does not.
+        start = self.stage()
+        used = self.spool._spool_usage_locked()
+        capped = LongContextSpool(
+            self.root, disk_reserve_bytes=0, max_spool_bytes=used + 1,
+        )
+        other = TokenSequence(TOKENIZER, tuple(range(29)), SOURCE)
+        self.assertGreater(len(serialize_token_sequence(other)), 1)
+        with self.assertRaisesRegex(LongContextSpoolError, "byte quota"):
+            capped.stage(other)
+        self.assertEqual(
+            self.spool.load(start, expected_tokenizer_digest=TOKENIZER)[1],
+            self.sequence,
+        )
+        self.assertEqual(capped.stage(self.sequence), start)
+
+    def test_spool_quota_counts_orphan_temps_and_rejects_untrusted_entries(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor-relative quota inventory")
+        start = self.stage()
+        used = self.spool._spool_usage_locked()
+        path = self.spool._path("checkpoint", start)
+        orphan = path.parent / ("." + start + "." + "f" * 16 + ".tmp")
+        orphan.write_bytes(b"orphan quota")
+        orphan.chmod(0o600)
+        self.assertEqual(
+            self.spool._spool_usage_locked(), used + len(b"orphan quota"),
+        )
+        orphan.unlink()
+        rogue = path.parent / "rogue-link"
+        rogue.symlink_to(path)
+        with self.assertRaisesRegex(LongContextSpoolError, "quota object"):
+            self.spool._spool_usage_locked()
+        rogue.unlink()
+
+    def test_spool_quota_configuration_denies_invalid_values(self):
+        for invalid in (0, -1, True, 1024 ** 4 + 1):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(
+                LongContextSpoolError, "max_spool_bytes",
+            ):
+                LongContextSpool(
+                    self.root, disk_reserve_bytes=0, max_spool_bytes=invalid,
+                )
+
     def test_reject_tight_disk_reserve(self):
         blocked = LongContextSpool(self.root / "reserved", disk_reserve_bytes=2**60)
         with self.assertRaises(LongContextSpoolError):

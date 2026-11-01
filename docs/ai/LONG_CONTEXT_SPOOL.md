@@ -60,8 +60,18 @@ a crash after a model operation proves the operation completed.
 A bounded read verifies file type, canonical encoding, object digest,
 tokenizer identity, sequence identity, cursor bounds and direct ancestry.
 The store enforces a configurable per-sequence byte ceiling and a conservative
-disk free-space reserve before new writes. Reserve checks cannot replace
-filesystem quotas or handle concurrent writers consuming disk after the probe.
+disk free-space reserve before new writes. On POSIX, it also performs a bounded
+descriptor-relative inventory under the cooperative publication lock before
+each new object and checkpoint. The default 4 GiB per-spool byte quota can be
+set with `max_spool_bytes` (1 byte to 1 TiB); it accounts for orphan temp files
+and counts hardlinked temporary/final names only once. Untrusted directory
+entries, unreadable metadata or exhausted scan bounds deny publication.
+This is a cooperative local filesystem budget, not a guarantee against
+malicious same-UID writers or external processes allocating disk concurrently.
+Windows path fallback is not qualified for the POSIX descriptor-relative
+quota; platform and filesystem quotas remain necessary. Reserve checks cannot
+replace filesystem quotas or handle concurrent writers consuming disk after
+the probe.
 The root and its parents must be operator-controlled; on POSIX the root must
 not be group/world writable. Symlink reads use O_NOFOLLOW where supported.
 Windows cannot claim POSIX-equivalent symlink race protection.

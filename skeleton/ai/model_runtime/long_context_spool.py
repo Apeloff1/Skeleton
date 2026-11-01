@@ -33,6 +33,9 @@ _PUBLISH_LOCK_WAIT_NS = 2_000_000_000
 _RECOVERY_MAX_ENTRIES = 64
 _RECOVERY_MAX_SCAN = 4096
 _RECOVERY_MAX_BYTES = 128 * 1024 * 1024
+_DEFAULT_SPOOL_QUOTA_BYTES = 4 * 1024 * 1024 * 1024
+_MAX_SPOOL_QUOTA_BYTES = 1024 * 1024 * 1024 * 1024
+_QUOTA_MAX_ENTRIES = 65_536
 
 
 
@@ -221,12 +224,15 @@ class LongContextSpool:
         max_sequence_bytes: int = MAX_SERIALIZED_SEQUENCE_BYTES,
         max_window_tokens: int = DEFAULT_WINDOW_TOKENS,
         disk_reserve_bytes: int = 128 * 1024 * 1024,
+        max_spool_bytes: int = _DEFAULT_SPOOL_QUOTA_BYTES,
     ) -> None:
         _positive(max_sequence_bytes, "max_sequence_bytes", MAX_SERIALIZED_SEQUENCE_BYTES)
         _positive(max_window_tokens, "max_window_tokens", MAX_WINDOW_TOKENS)
         if (isinstance(disk_reserve_bytes, bool) or not isinstance(disk_reserve_bytes, int)
                 or not 0 <= disk_reserve_bytes <= 2**63 - 1):
             raise LongContextSpoolError("invalid disk reserve")
+        _positive(max_spool_bytes, "max_spool_bytes", _MAX_SPOOL_QUOTA_BYTES)
+        self.max_spool_bytes = max_spool_bytes
         self._owner_pid = os.getpid()
         self.root = Path(os.path.abspath(directory)) if os.name == "posix" else Path(directory)
         self.max_sequence_bytes = max_sequence_bytes
@@ -564,6 +570,79 @@ class LongContextSpool:
         finally:
             os.close(lock_fd)
 
+    def _spool_usage_locked(self) -> int:
+        """Bounded POSIX inventory under the cooperative publication lock.
+
+        Account for all regular files in both content trees, including
+        abandoned temps. Hardlinked temp/final names count once by inode.
+        Unknown entries or an oversized inventory deny admission rather than
+        assuming free capacity. This is not an adversarial same-UID quota.
+        """
+        self._require_owner_process()
+        if os.name != "posix" or self._root_fd is None:
+            raise LongContextSpoolError("secure spool quota inventory unavailable")
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        scanned = 0
+        total = 0
+        seen: set[tuple[int, int]] = set()
+        try:
+            for root_name in ("objects", "checkpoints"):
+                base_fd = os.open(root_name, flags, dir_fd=self._root_fd)
+                try:
+                    base = os.fstat(base_fd)
+                    if (base.st_uid != os.geteuid()
+                            or stat.S_IMODE(base.st_mode) != 0o700):
+                        raise LongContextSpoolError("untrusted spool quota root")
+                    with os.scandir(base_fd) as buckets:
+                        for bucket in buckets:
+                            scanned += 1
+                            if scanned > _QUOTA_MAX_ENTRIES:
+                                raise LongContextSpoolError("spool quota scan bound exceeded")
+                            name = bucket.name
+                            if (len(name) != 2 or
+                                    any(c not in "0123456789abcdef" for c in name)):
+                                raise LongContextSpoolError("untrusted spool quota bucket")
+                            bucket_fd = os.open(name, flags, dir_fd=base_fd)
+                            try:
+                                info = os.fstat(bucket_fd)
+                                if (info.st_uid != os.geteuid()
+                                        or stat.S_IMODE(info.st_mode) != 0o700):
+                                    raise LongContextSpoolError("untrusted spool quota bucket")
+                                with os.scandir(bucket_fd) as entries:
+                                    for entry in entries:
+                                        scanned += 1
+                                        if scanned > _QUOTA_MAX_ENTRIES:
+                                            raise LongContextSpoolError(
+                                                "spool quota scan bound exceeded"
+                                            )
+                                        item = os.stat(
+                                            entry.name, dir_fd=bucket_fd,
+                                            follow_symlinks=False,
+                                        )
+                                        if (not stat.S_ISREG(item.st_mode)
+                                                or item.st_uid != os.geteuid()
+                                                or stat.S_IMODE(item.st_mode) != 0o600
+                                                or item.st_nlink not in (1, 2)
+                                                or item.st_size < 0):
+                                            raise LongContextSpoolError(
+                                                "untrusted spool quota object"
+                                            )
+                                        inode = (item.st_dev, item.st_ino)
+                                        if inode not in seen:
+                                            seen.add(inode)
+                                            total += item.st_size
+                                            if total > self.max_spool_bytes:
+                                                raise LongContextSpoolError(
+                                                    "spool byte quota exhausted"
+                                                )
+                            finally:
+                                os.close(bucket_fd)
+                finally:
+                    os.close(base_fd)
+        except OSError as exc:
+            raise LongContextSpoolError("spool quota inventory failed") from exc
+        return total
+
     def _publish_fd_locked(self, kind: str, digest: str, raw: bytes) -> None:
         """Caller holds the cross-process admission lock."""
         bucket_fd = self._open_bucket(kind, digest)
@@ -592,6 +671,9 @@ class LongContextSpool:
                     return
                 finally:
                     os.close(existing)
+            used = self._spool_usage_locked()
+            if len(raw) > self.max_spool_bytes - used:
+                raise LongContextSpoolError("spool byte quota prevents admission")
             volume = os.fstatvfs(bucket_fd)
             free = volume.f_bavail * volume.f_frsize
             if free < self.disk_reserve_bytes or free - self.disk_reserve_bytes < len(raw):
