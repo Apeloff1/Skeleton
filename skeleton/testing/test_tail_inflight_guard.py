@@ -443,3 +443,20 @@ def test_quantum_lease_recheck_does_not_extend_deadline():
     assert g.status().state == "aborted"
 
 
+
+
+
+def test_inflight_sensor_substitution_latches_hold_and_revokes_quantum():
+    readings = iter((
+        (CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),),
+        (CPUThermalSensor("thermal_zone1", "cpu", 50.0, 90.0),),
+        (CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),),
+    ))
+    g = guard(thermal=lambda: next(readings))
+    assert g.start().state == "running"
+    decision = g.checkpoint(generated_tokens=1)
+    assert decision.state == "hold"
+    assert decision.reason == "thermal_zone_identity_changed"
+    assert decision.authorized_quantum_tokens == 0
+    assert g.resume().state == "hold"
+    assert g.status().reason == "thermal_zone_identity_changed"

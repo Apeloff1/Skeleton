@@ -122,6 +122,8 @@ class CPUThermalController:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._last: tuple[CPUThermalSensor, ...] = ()
+        self._baseline: tuple[tuple[str, str], ...] | None = None
+        self._identity_drift = False
         self._hold = False
         self._transitions = 0
 
@@ -132,14 +134,26 @@ class CPUThermalController:
             raise TypeError("typed thermal sensors required")
         with self._lock:
             self._last = sensors
-            measured = [sensor for sensor in sensors if sensor.trip_c is not None]
-            if not measured:
-                return
             before = self._hold
-            if any(sensor.temperature_c >= sensor.trip_c for sensor in measured):
+            identity = tuple(sorted((s.zone, s.kind) for s in sensors))
+            if sensors and self._baseline is None:
+                if len(set(identity)) != len(identity):
+                    self._identity_drift = True
+                else:
+                    self._baseline = identity
+            elif self._baseline is not None and identity != self._baseline:
+                # Sensor disappearance, substitution or kind drift must not
+                # clear a previously measured thermal hold. Recovery requires
+                # a new app-owned controller and fresh hardware qualification.
+                self._identity_drift = True
+            measured = [sensor for sensor in sensors if sensor.trip_c is not None]
+            if self._identity_drift or (sensors and len(measured) != len(sensors)):
                 self._hold = True
-            elif all(sensor.temperature_c <= sensor.trip_c - 5 for sensor in measured):
-                self._hold = False
+            elif measured:
+                if any(sensor.temperature_c >= sensor.trip_c for sensor in measured):
+                    self._hold = True
+                elif all(sensor.temperature_c <= sensor.trip_c - 5 for sensor in measured):
+                    self._hold = False
             if before != self._hold:
                 self._transitions += 1
 
@@ -148,7 +162,10 @@ class CPUThermalController:
             return {
                 "schema": "skeleton.offline.cpu-thermal.v1",
                 "measured": bool(self._last),
-                "trip_measured": any(s.trip_c is not None for s in self._last),
+                "trip_measured": bool(self._last) and all(
+                    s.trip_c is not None for s in self._last
+                ),
+                "sensor_identity_drift": self._identity_drift,
                 "thermal_backpressure": self._hold,
                 "transitions": self._transitions,
                 "sensors": [

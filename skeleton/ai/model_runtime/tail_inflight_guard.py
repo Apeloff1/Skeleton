@@ -205,14 +205,15 @@ class InFlightCPUResourceGuard:
                 not isinstance(sensor, CPUThermalSensor) for sensor in sensors
             ):
                 return "unknown_thermal_telemetry"
-            # A measured trip on ONE CPU zone does not certify the others.
-            # Unknown CPU/SOC zones must hold the entire local inference
-            # quantum rather than be masked by a healthy measured zone.
-            if not sensors or any(sensor.trip_c is None for sensor in sensors):
-                return "unknown_thermal_trip"
+            # Observe even an empty inventory: disappearance after a valid
+            # sample must permanently fence the previous sensor identity.
+            # A healthy replacement zone cannot clear a prior thermal hold.
             self._thermal.observe(sensors)
             thermal = self._thermal.snapshot()
-            if not thermal["trip_measured"]:
+            if thermal["sensor_identity_drift"]:
+                return "thermal_zone_identity_changed"
+            # A measured trip on ONE CPU zone does not certify the others.
+            if not sensors or not thermal["trip_measured"]:
                 return "unknown_thermal_trip"
             if thermal["thermal_backpressure"]:
                 return "measured_thermal_hold"

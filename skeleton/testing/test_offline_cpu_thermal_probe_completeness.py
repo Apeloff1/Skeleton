@@ -104,3 +104,33 @@ def test_active_kernel_trip_is_a_measured_cpu_threshold(tmp_path):
     controller = CPUThermalController()
     controller.observe(sensors)
     assert controller.snapshot()["thermal_backpressure"] is True
+
+
+
+def test_thermal_sensor_identity_change_latches_hold_across_cool_recovery():
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+
+    controller = CPUThermalController()
+    original = (CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),)
+    substitute = (CPUThermalSensor("thermal_zone1", "cpu", 40.0, 90.0),)
+    controller.observe(original)
+    assert controller.snapshot()["sensor_identity_drift"] is False
+    assert controller.snapshot()["thermal_backpressure"] is False
+    controller.observe(substitute)
+    assert controller.snapshot()["sensor_identity_drift"] is True
+    assert controller.snapshot()["thermal_backpressure"] is True
+    controller.observe(original)
+    assert controller.snapshot()["sensor_identity_drift"] is True
+    assert controller.snapshot()["thermal_backpressure"] is True
+
+
+def test_incomplete_trip_coverage_is_not_a_positive_thermal_measurement():
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+
+    controller = CPUThermalController()
+    controller.observe((
+        CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),
+        CPUThermalSensor("thermal_zone1", "soc", 50.0, None),
+    ))
+    assert controller.snapshot()["trip_measured"] is False
+    assert controller.snapshot()["thermal_backpressure"] is True
