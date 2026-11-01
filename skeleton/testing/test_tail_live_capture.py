@@ -187,3 +187,39 @@ def test_worst_resource_thermal_hold_and_gpu_unknown_are_conservative():
     assert worst.thermal == "measured_hold"
     assert worst.gpu_free_bytes is None
     assert worst.gpu_total_bytes is None
+
+
+def test_forked_capture_rejects_every_public_operation_before_lock(monkeypatch):
+    from skeleton.ai.model_runtime import tail_live_capture as module
+
+    owner = capture([10, 20, 30])
+    owner.begin(request_id="parent", prompt_tokens=1)
+
+    class ForbiddenLock:
+        def __enter__(self):
+            raise AssertionError("inherited lock must never be acquired")
+        def __exit__(self, *_):
+            return False
+
+    owner._lock = ForbiddenLock()
+    monkeypatch.setattr(module.os, "getpid", lambda: owner._owner_pid + 1)
+    operations = (
+        lambda: owner.begin(request_id="child", prompt_tokens=1),
+        lambda: owner.first_token("parent"),
+        lambda: owner.complete("parent", output_tokens=1),
+        lambda: owner.abort("parent"),
+        lambda: owner.snapshot(ttft_slo_ms=10, inter_token_slo_ms=10, e2e_slo_ms=10),
+        lambda: owner.active_count,
+    )
+    for operation in operations:
+        with pytest.raises(RuntimeError, match="forked"):
+            operation()
+
+
+def test_unknown_process_identity_rejects_capture_without_lock(monkeypatch):
+    from skeleton.ai.model_runtime import tail_live_capture as module
+    owner = capture()
+    for identity_value in (None, True, -1, "42"):
+        monkeypatch.setattr(module.os, "getpid", lambda value=identity_value: value)
+        with pytest.raises(RuntimeError, match="process identity|forked"):
+            owner.begin(request_id="x", prompt_tokens=1)

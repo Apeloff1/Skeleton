@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+import os
 from threading import RLock
 from time import monotonic_ns
 from typing import Callable
@@ -96,6 +97,22 @@ class LiveTailCapture:
         self._active: dict[str, _Active] = {}
         self._finished: set[str] = set()
         self._max_active = max_active
+        try:
+            pid = os.getpid()
+        except BaseException as exc:
+            raise RuntimeError("live tail process identity unavailable") from exc
+        if type(pid) is not int or pid <= 0:
+            raise RuntimeError("live tail process identity unavailable")
+        self._owner_pid = pid
+
+    def _require_owner_process(self) -> None:
+        """An inherited lock/profile cannot grant a child execution evidence."""
+        try:
+            pid = os.getpid()
+        except BaseException as exc:
+            raise RuntimeError("live tail process identity unavailable") from exc
+        if type(pid) is not int or pid != self._owner_pid:
+            raise RuntimeError("forked live tail capture requires new owner")
 
     def _now(self) -> int:
         value = self._clock()
@@ -129,6 +146,7 @@ class LiveTailCapture:
         )
 
     def begin(self, *, request_id: str, prompt_tokens: int) -> None:
+        self._require_owner_process()
         if type(request_id) is not str or not request_id:
             raise ValueError("bounded request ID required")
         try:
@@ -153,6 +171,7 @@ class LiveTailCapture:
             self._active[request_id] = _Active(request_id, prompt_tokens, start, resource)
 
     def first_token(self, request_id: str) -> None:
+        self._require_owner_process()
         with self._lock:
             state = self._active.get(request_id)
             if state is None or state.first_token_ns is not None:
@@ -165,6 +184,7 @@ class LiveTailCapture:
     def complete(
         self, request_id: str, *, output_tokens: int, prefix_reused_tokens: int = 0,
     ) -> ExecutionTiming:
+        self._require_owner_process()
         with self._lock:
             state = self._active.get(request_id)
             if state is None or state.first_token_ns is None:
@@ -193,6 +213,7 @@ class LiveTailCapture:
             return timing
 
     def abort(self, request_id: str) -> None:
+        self._require_owner_process()
         with self._lock:
             if request_id not in self._active:
                 raise ValueError("unknown active execution")
@@ -200,6 +221,7 @@ class LiveTailCapture:
             self._finished.add(request_id)
 
     def snapshot(self, *, ttft_slo_ms: int, inter_token_slo_ms: int, e2e_slo_ms: int) -> dict[str, object]:
+        self._require_owner_process()
         with self._lock:
             return self._profile.summary(
                 ttft_slo_ms=ttft_slo_ms,
@@ -209,5 +231,6 @@ class LiveTailCapture:
 
     @property
     def active_count(self) -> int:
+        self._require_owner_process()
         with self._lock:
             return len(self._active)
