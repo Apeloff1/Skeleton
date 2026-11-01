@@ -55,6 +55,7 @@ from skeleton.app.offline_archive_install import (
 )
 from skeleton.app.offline_progress_migration import (
     OfflineProgressMigrationError, migrate_offline_game_progress,
+    preflight_offline_game_migration,
 )
 from skeleton.app.offline_progress_recovery import (
     OfflineProgressReconciliationError, reconcile_migrated_offline_progress,
@@ -463,6 +464,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="install an independently pinned source ZIP into a new private game directory")
     parser.add_argument("--migrate-progress", action="store_true",
                         help="install pinned source ZIP and reexecute a separately pinned private replay")
+    parser.add_argument("--preflight-migration", action="store_true",
+                        help="read-only pinned archive/save and destination admission")
     parser.add_argument("--reconcile-migration", action="store_true",
                         help="read-only reconciliation of independently pinned installed source and replay")
     parser.add_argument("--inspect-archive", action="store_true",
@@ -515,8 +518,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         comparison_values = (
             args.left_save, args.left_sha256, args.right_save, args.right_sha256,
         )
-        if args.reconcile_migration:
-            if (args.migrate_progress or args.install_archive or args.package_existing
+        if args.preflight_migration:
+            if (args.migrate_progress or args.reconcile_migration
+                    or args.install_archive or args.package_existing
+                    or args.inspect_archive or args.play_existing or args.compare_saves
+                    or args.verify_existing or args.reconcile_receipt
+                    or args.inspect_receipt or args.onboard or args.output is None
+                    or args.archive is None or args.expected_archive_sha256 is None
+                    or args.expected_manifest_sha256 is None
+                    or args.load_save is None or args.expected_save_sha256 is None
+                    or args.save is None or args.intent is not None
+                    or args.receipt is not None or args.expected_receipt_sha256 is not None
+                    or any(value is not None for value in onboarding_values)
+                    or any(value is not None for value in comparison_values)
+                    or args.moves is not None or args.fork_at is not None
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid offline migration preflight mode")
+            receipt = preflight_offline_game_migration(
+                args.archive, args.output,
+                expected_archive_sha256=args.expected_archive_sha256,
+                expected_manifest_sha256=args.expected_manifest_sha256,
+                original_save=args.load_save,
+                expected_save_sha256=args.expected_save_sha256,
+                migrated_save=args.save,
+                authorized=args.trusted_local_operator,
+            )
+        elif args.reconcile_migration:
+            if (args.preflight_migration or args.migrate_progress or args.install_archive or args.package_existing
                     or args.inspect_archive or args.play_existing or args.compare_saves
                     or args.verify_existing or args.reconcile_receipt
                     or args.inspect_receipt or args.onboard or args.output is None
@@ -540,7 +568,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.migrate_progress:
-            if (args.install_archive or args.package_existing or args.inspect_archive
+            if (args.preflight_migration or args.install_archive or args.package_existing or args.inspect_archive
                     or args.play_existing or args.compare_saves or args.verify_existing
                     or args.reconcile_receipt or args.inspect_receipt or args.onboard
                     or args.output is None or args.archive is None

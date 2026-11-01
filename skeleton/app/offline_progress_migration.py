@@ -33,7 +33,7 @@ class OfflineProgressMigrationError(ValueError):
     """Pinned offline source and progress could not be migrated safely."""
 
 
-def migrate_offline_game_progress(
+def _validate_migration_inputs(
     archive: str | Path, destination: str | Path, *,
     expected_archive_sha256: str,
     expected_manifest_sha256: str,
@@ -41,15 +41,8 @@ def migrate_offline_game_progress(
     expected_save_sha256: str,
     migrated_save: str | Path,
     authorized: bool,
-) -> dict[str, object]:
-    """Reinstall verified original source and replay a private progress history.
-
-    Archive, source manifest and save have *three independent pins*. This
-    function never uses a saved state snapshot as authority: it reconstructs
-    the canonical world and reexecutes every recorded action. It does not
-    delete or overwrite either source or destination. Both published outputs
-    are retained for explicit quarantine if a late verification fails.
-    """
+) -> tuple[bytes, dict[str, object]]:
+    """Read-only admission shared by migration planning and publication."""
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
     source = Path(destination).expanduser().absolute()
@@ -80,6 +73,81 @@ def migrate_offline_game_progress(
         archive, expected_archive_sha256=expected_archive_sha256,
         expected_manifest_sha256=expected_manifest_sha256, authorized=True,
     )
+
+    return raw_save, inspected
+
+
+def preflight_offline_game_migration(
+    archive: str | Path, destination: str | Path, *,
+    expected_archive_sha256: str,
+    expected_manifest_sha256: str,
+    original_save: str | Path,
+    expected_save_sha256: str,
+    migrated_save: str | Path,
+    authorized: bool,
+) -> dict[str, object]:
+    """Check independent pins and destination admission without publication.
+
+    Save-to-world binding is not asserted until the source has been installed
+    and the canonical replay reexecuted. Preflight is never a reservation.
+    """
+    raw_save, inspected = _validate_migration_inputs(
+        archive, destination,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        original_save=original_save,
+        expected_save_sha256=expected_save_sha256,
+        migrated_save=migrated_save,
+        authorized=authorized,
+    )
+    return {
+        "schema": "skeleton.app.offline_progress_preflight.v1",
+        "status": "offline_migration_inputs_pinned_no_publication",
+        "archive_sha256": expected_archive_sha256,
+        "manifest_sha256": expected_manifest_sha256,
+        "save_sha256": expected_save_sha256,
+        "save_bytes": len(raw_save),
+        "archived_files": inspected["archived_files"],
+        "archive_integrity_verified": True,
+        "private_save_integrity_verified": True,
+        "save_world_binding_verified": False,
+        "destination_reserved": False,
+        "source_installation_verified": False,
+        "private_save_replayed": False,
+        "native_device_qualified": False,
+        "release_certified": False,
+    }
+
+
+def migrate_offline_game_progress(
+    archive: str | Path, destination: str | Path, *,
+    expected_archive_sha256: str,
+    expected_manifest_sha256: str,
+    original_save: str | Path,
+    expected_save_sha256: str,
+    migrated_save: str | Path,
+    authorized: bool,
+) -> dict[str, object]:
+    """Reinstall verified original source and replay a private progress history.
+
+    Archive, source manifest and save have *three independent pins*. This
+    function never uses a saved state snapshot as authority: it reconstructs
+    the canonical world and reexecutes every recorded action. It does not
+    delete or overwrite either source or destination. Both published outputs
+    are retained for explicit quarantine if a late verification fails.
+    """
+    raw_save, inspected = _validate_migration_inputs(
+        archive, destination,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        original_save=original_save,
+        expected_save_sha256=expected_save_sha256,
+        migrated_save=migrated_save,
+        authorized=authorized,
+    )
+    source = Path(destination).expanduser().absolute()
+    old_save = Path(original_save).expanduser().absolute()
+    new_save = Path(migrated_save).expanduser().absolute()
     # This creates a new private directory and independently replay-verifies
     # its installed source. No rollback is attempted across owner-controlled
     # paths because an adversarial replacement could otherwise be deleted.
@@ -154,4 +222,4 @@ def migrate_offline_game_progress(
     }
 
 
-__all__ = ["SCHEMA", "OfflineProgressMigrationError", "migrate_offline_game_progress"]
+__all__ = ["SCHEMA", "OfflineProgressMigrationError", "preflight_offline_game_migration", "migrate_offline_game_progress"]

@@ -66,3 +66,12 @@ python -m skeleton app studio-journey --reconcile-migration \
 
 If the archive is omitted, archive integrity is explicitly **not** verified.
 If either the archive or its pin is provided alone, the command fails closed.
+
+## Read-only migration preflight
+
+The `--preflight-migration` mode accepts the same archive, source, private
+save and destination options as `--migrate-progress`. It checks independently
+pinned archive and save bytes, private-file custody and no-clobber destination
+admission without creating either output. It cannot prove save-to-world
+binding until the canonical world is installed and replayed, and it does not
+reserve paths. The mutating migration repeats the same checks.
