@@ -184,7 +184,8 @@ def test_invalid_native_result_never_marks_pressure_guard_success(monkeypatch):
         ), {
             "measurement": "os_probe", "gpu_device_qualified": False,
             "physical_memory_reserved": False,
-            "auxiliary_telemetry_incomplete": True,            "schema": "skeleton.ai.live-stream-pressure.v1",
+            "auxiliary_telemetry_incomplete": True,
+            "schema": "skeleton.ai.live-stream-pressure.v1",
             "cross_process_admission_guaranteed": False,
             "thermal_trip_measured": True,
             "cgroup_swap_spill_allowed": True,
@@ -236,7 +237,8 @@ def test_postflight_pressure_hold_fences_attested_native_output(monkeypatch):
         ), {
             "measurement": "os_probe", "gpu_device_qualified": False,
             "physical_memory_reserved": False,
-            "auxiliary_telemetry_incomplete": True,            "schema": "skeleton.ai.live-stream-pressure.v1",
+            "auxiliary_telemetry_incomplete": True,
+            "schema": "skeleton.ai.live-stream-pressure.v1",
             "cross_process_admission_guaranteed": False,
             "thermal_trip_measured": True,
             "cgroup_swap_spill_allowed": True,
@@ -285,7 +287,8 @@ def test_forged_native_output_digest_never_reaches_result_vault(monkeypatch):
         ), {
             "measurement": "os_probe", "gpu_device_qualified": False,
             "physical_memory_reserved": False,
-            "auxiliary_telemetry_incomplete": True,            "schema": "skeleton.ai.live-stream-pressure.v1",
+            "auxiliary_telemetry_incomplete": True,
+            "schema": "skeleton.ai.live-stream-pressure.v1",
             "cross_process_admission_guaranteed": False,
             "thermal_trip_measured": True,
             "cgroup_swap_spill_allowed": True,
