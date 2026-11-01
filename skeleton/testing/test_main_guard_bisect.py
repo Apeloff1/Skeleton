@@ -39,6 +39,19 @@ def test_finds_first_bad_commit_and_restores_head(tmp_path: Path, strategy: str,
     assert not (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "BISECT_LOG").exists()
 
 
+def test_git_strategy_rejects_an_unverified_bad_endpoint(tmp_path: Path) -> None:
+    # All eight commits are good: Git bisect treats the supplied bad SHA as
+    # a caller assertion. The product must not certify it without running the
+    # actual test there, even if Git reports an apparent first-bad commit.
+    repo, shas = _history(tmp_path, bad_index=8)
+    head_before = git(repo, "rev-parse", "HEAD")
+    with pytest.raises(BisectError, match="declared bad endpoint"):
+        bisect(repo, shas[0], shas[-1], CHECK, strategy="git")
+    assert git(repo, "rev-parse", "HEAD") == head_before
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert not (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "BISECT_LOG").exists()
+
+
 def test_rejects_good_that_is_not_ancestor(tmp_path: Path) -> None:
     repo, shas = _history(tmp_path, 3)
     with pytest.raises(BisectError):
