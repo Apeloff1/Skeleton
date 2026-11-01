@@ -6447,6 +6447,11 @@
         "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
       },
       {
+        "path": "skeleton/perf_profiler",
+        "owner": "product/runtime performance profiling",
+        "reason": "frame and allocation instrumentation is product/runtime evidence; AI percentile statistics remain delegated to the governed observability profiler"
+      },
+      {
         "path": "skeleton/testing",
         "owner": "evidence/test plane",
         "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
