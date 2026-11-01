@@ -84,3 +84,12 @@ def test_mutant_source_and_site_generation_budgets(monkeypatch):
     monkeypatch.setattr(mutation.inspect, "getsource", lambda fn: "def f(x):\n    return x + 1\n" + " " * 32769)
     with pytest.raises(mutation.MutationUnsupportedError, match="byte bound"):
         mutation.generate_mutants(can_trade)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -0.1, 1.1, True, "0.5"])
+def test_mutation_gate_rejects_invalid_thresholds_without_false_pass(bad):
+    from skeleton.gameforge.batch_b077.mutation import MutationReport
+
+    report = MutationReport("weak")
+    with pytest.raises(ValueError, match="finite fraction"):
+        report.gate(bad)

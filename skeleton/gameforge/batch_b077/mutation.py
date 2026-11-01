@@ -46,6 +46,9 @@ class MutationReport:
         return len(self.killed) / total if total else 1.0
 
     def gate(self, threshold: float = 1.0) -> None:
+        if (type(threshold) not in (int, float) or not math.isfinite(threshold)
+                or not 0.0 <= threshold <= 1.0):
+            raise ValueError("mutation gate threshold must be a finite fraction")
         if self.score < threshold:
             names = "; ".join(m.description for m in self.survived)
             raise AssertionError(f"mutation score {self.score:.2f} < {threshold}: survivors: {names}")
