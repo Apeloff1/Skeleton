@@ -173,6 +173,8 @@ def test_offline_editor_has_csp_safe_embedded_json_and_no_native_claims():
     assert b"innerHTML" not in html
     assert b"eval(" not in html
     assert b"document.write" not in html
+    assert b'JSON.stringify(data,null,2)+"\\n"' in html
+    assert b"structuredClone" not in html
     assert render_director_editor(timing, assets) == (html, receipt)
     altered = dict(assets)
     altered["session_digest"] = "0" * 64

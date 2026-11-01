@@ -37,8 +37,8 @@ _JS = """
 const model=JSON.parse(document.getElementById("director-data").textContent);
 const root=document.getElementById("editor");
 const status=document.getElementById("status");
-const schedule=structuredClone(model.schedule);
-const assignments=structuredClone(model.assignments);
+const schedule=JSON.parse(JSON.stringify(model.schedule));
+const assignments=JSON.parse(JSON.stringify(model.assignments));
 function element(tag,text,parent){
   const node=document.createElement(tag);
   if(text!==null)node.textContent=text;
@@ -88,7 +88,7 @@ for(const scene of model.scenes){
   }
 }
 function download(name,data){
-  const blob=new Blob([JSON.stringify(data,null,2)+"\n"],{type:"application/json"});
+  const blob=new Blob([JSON.stringify(data,null,2)+"\\n"],{type:"application/json"});
   const url=URL.createObjectURL(blob);
   try{
     const anchor=document.createElement("a");
