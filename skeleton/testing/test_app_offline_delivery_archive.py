@@ -187,3 +187,124 @@ def test_archive_write_error_does_not_leave_partial_publication(tmp_path, capsys
     assert not list(tmp_path.glob(".offline-archive-*"))
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     monkeypatch.setattr(offline_delivery_archive.os, "link", original_link)
+
+def test_archive_destination_race_preserves_unrelated_owner_file(tmp_path, capsys, monkeypatch):
+    from skeleton.app import offline_delivery_archive
+
+    root, manifest = _build(tmp_path, capsys)
+    target = tmp_path / "raced.zip"
+    original_link = offline_delivery_archive.os.link
+
+    def race_link(src, dst, *, src_dir_fd, dst_dir_fd, follow_symlinks):
+        handle = os.open(dst, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600,
+                         dir_fd=dst_dir_fd)
+        try:
+            os.write(handle, b"other-operator-data")
+            os.fsync(handle)
+        finally:
+            os.close(handle)
+        return original_link(src, dst, src_dir_fd=src_dir_fd,
+                             dst_dir_fd=dst_dir_fd, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(offline_delivery_archive.os, "link", race_link)
+    assert run_app_cli(_package(root, manifest, target)) == 2
+    assert target.read_bytes() == b"other-operator-data"
+    assert not list(tmp_path.glob(".offline-archive-*"))
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_archive_postpublication_mutation_never_reports_success(tmp_path, capsys, monkeypatch):
+    from skeleton.app import offline_delivery_archive
+
+    root, manifest = _build(tmp_path, capsys)
+    target = tmp_path / "quarantine.zip"
+    original_publish = offline_delivery_archive._publish_private_archive
+
+    def mutate_after_publish(data, destination):
+        original_publish(data, destination)
+        with open(destination, "ab") as output:
+            output.write(b"untrusted-mutation")
+
+    monkeypatch.setattr(offline_delivery_archive, "_publish_private_archive",
+                        mutate_after_publish)
+    assert run_app_cli(_package(root, manifest, target)) == 2
+    assert target.exists()  # explicit owner quarantine; never unsafe path deletion
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_archive_source_mutation_after_publication_is_not_certified(tmp_path, capsys, monkeypatch):
+    from skeleton.app import offline_delivery_archive
+
+    root, manifest = _build(tmp_path, capsys)
+    target = tmp_path / "source-changed.zip"
+    original_publish = offline_delivery_archive._publish_private_archive
+
+    def mutate_source_after_publish(data, destination):
+        original_publish(data, destination)
+        (root / "index.html").write_text("mutated after snapshot", encoding="utf-8")
+
+    monkeypatch.setattr(offline_delivery_archive, "_publish_private_archive",
+                        mutate_source_after_publish)
+    assert run_app_cli(_package(root, manifest, target)) == 2
+    assert target.exists()  # source archive may be intact; handoff still blocked
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_independently_pinned_noncanonical_zip_is_rejected(tmp_path, capsys):
+    from hashlib import sha256
+    from io import BytesIO
+    from zipfile import ZipFile, ZipInfo, ZIP_STORED
+
+    root, manifest = _build(tmp_path, capsys)
+    target = tmp_path / "canonical.zip"
+    assert run_app_cli(_package(root, manifest, target)) == 0
+    capsys.readouterr()
+    with ZipFile(target) as original:
+        files = {name: original.read(name) for name in original.namelist()}
+    changed = BytesIO()
+    with ZipFile(changed, "w", compression=ZIP_STORED) as archive:
+        for name in sorted(files):
+            info = ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_STORED
+            info.create_system = 3
+            info.external_attr = (0o100600 << 16)
+            archive.writestr(info, files[name])
+    target.write_bytes(changed.getvalue())
+    pin = sha256(target.read_bytes()).hexdigest()
+    assert run_app_cli(_inspect(target, pin, manifest)) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_independently_pinned_zip_with_unexpected_entry_is_rejected(tmp_path, capsys):
+    from hashlib import sha256
+    from zipfile import ZIP_STORED
+
+    root, manifest = _build(tmp_path, capsys)
+    target = tmp_path / "extra-entry.zip"
+    assert run_app_cli(_package(root, manifest, target)) == 0
+    capsys.readouterr()
+    with ZipFile(target, "a", compression=ZIP_STORED) as archive:
+        archive.writestr("unexpected.txt", b"extra")
+    pin = sha256(target.read_bytes()).hexdigest()
+    assert run_app_cli(_inspect(target, pin, manifest)) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_archive_readback_preserves_original_export_files(tmp_path, capsys):
+    root, manifest = _build(tmp_path, capsys)
+    source_before = {
+        "index.html": (root / "index.html").read_bytes(),
+        "release.json": (root / "release.json").read_bytes(),
+        "godot/project.godot": (root / "godot" / "project.godot").read_bytes(),
+    }
+    target = tmp_path / "handoff.zip"
+    assert run_app_cli(_package(root, manifest, target)) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["source_gameplay_reexecuted"] is True
+    assert result["archived_files"] >= 7
+    for path, expected_bytes in source_before.items():
+        assert (root / path).read_bytes() == expected_bytes
+    assert run_app_cli(_inspect(
+        target, result["independent_archive_sha256"], manifest,
+    )) == 0
+    assert json.loads(capsys.readouterr().out)["archive_integrity_verified"] is True

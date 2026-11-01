@@ -197,6 +197,23 @@ def publish_offline_game_archive(
     files, verified = _source_payloads(source, expected_manifest_sha256)
     raw = _canonical_zip(files)
     _publish_private_archive(raw, target)
+    # Publication itself is not proof of durable byte custody. Read the
+    # independently named, owner-private file back through a nofollow
+    # descriptor and compare its complete digest before reporting success.
+    # Reverify the source once more: a source mutation after the snapshot
+    # must not be misreported as a successful handoff. If either check fails,
+    # preserve the published inode for explicit operator quarantine rather
+    # than attempting an unsafe pathname-based rollback.
+    published = _read_private_archive(target)
+    if not hmac.compare_digest(sha256(published).digest(), sha256(raw).digest()):
+        raise OfflineGameArchiveError("archive changed after publication")
+    final = verify_exported_package(
+        source, expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    if (final.get("world_digest") != verified.get("world_digest")
+            or final.get("verified_files") != len(files)):
+        raise OfflineGameArchiveError("source changed after archive publication")
     return {
         "schema": SCHEMA,
         "status": "source_archive_published_release_blocked",
