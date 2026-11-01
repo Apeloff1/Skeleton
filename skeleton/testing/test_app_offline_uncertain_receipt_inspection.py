@@ -1,7 +1,6 @@
 """End-to-end quarantine inspection of actual offline game handoff receipts."""
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 import os
 
@@ -29,6 +28,7 @@ def _setup(catalog, tmp_path):
     target = tmp_path / "triage-receipt.json"
     roots = (
         unsigned.installed_source, unsigned.archive, unsigned.private_save,
+        later.private_save,
         signed.installed_source, signed.archive, signed.private_save,
         signed.public_key_file, signed.signature_file, *signed.policies,
     )
@@ -72,7 +72,7 @@ def test_triage_rejects_wrong_independent_pin(catalog, tmp_path):
 
 
 def test_triage_rejects_protected_source_alias(catalog, tmp_path):
-    epochs, target, roots = _setup(catalog, tmp_path)
+    _, _, roots = _setup(catalog, tmp_path)
     with pytest.raises(ValueError):
         inspect_uncertain_receipt(
             roots[0], expected_receipt_sha256="0" * 64,
@@ -95,7 +95,7 @@ def test_triage_rejects_symlink_receipt(catalog, tmp_path):
 
 
 def test_triage_requires_authorization_and_roots(catalog, tmp_path):
-    epochs, target, roots = _setup(catalog, tmp_path)
+    _, target, roots = _setup(catalog, tmp_path)
     with pytest.raises(PermissionError):
         inspect_uncertain_receipt(
             target, expected_receipt_sha256="0" * 64,
@@ -116,3 +116,36 @@ def test_cli_never_reports_success_without_pin_or_authorization(capsys):
         "--protected-root", "/nonexistent/game",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_triage_rejects_valid_hash_of_unknown_envelope(tmp_path):
+    """A self-consistent digest does not authenticate an arbitrary schema."""
+    from hashlib import sha256
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+
+    target = tmp_path / "forged-receipt.json"
+    payload = {
+        "schema": "attacker.unreviewed.receipt.v1",
+        "offline_gameplay_reexecuted": True,
+        "release_certified": False,
+        "package_signed": False,
+        "native_device_qualified": False,
+        "rights_certified": False,
+    }
+    raw = _canonical_bytes(payload)
+    target.write_bytes(raw)
+    target.chmod(0o600)
+    with pytest.raises(ValueError):
+        inspect_uncertain_receipt(
+            target, expected_receipt_sha256=sha256(raw).hexdigest(),
+            protected_roots=[tmp_path / "source"], authorized=True,
+        )
+
+
+def test_triage_rejects_unbounded_protected_root_inventory(tmp_path):
+    with pytest.raises(ValueError):
+        inspect_uncertain_receipt(
+            tmp_path / "receipt.json", expected_receipt_sha256="0" * 64,
+            protected_roots=[str(tmp_path / f"source-{i}") for i in range(65)],
+            authorized=True,
+        )
