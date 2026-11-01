@@ -151,6 +151,10 @@ def _parser() -> argparse.ArgumentParser:
         help="publish or inspect a pinned mixed replay progression receipt",
     )
     sub.add_parser(
+        "audit-mixed-library-epoch-relocation", add_help=False,
+        help="verify multi-generation original-game relocation without replay loss",
+    )
+    sub.add_parser(
         "mixed-library-epoch-handoff", add_help=False,
         help="publish or inspect a pinned multi-epoch original-game receipt",
     )
@@ -458,6 +462,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "mixed-library-continuity-handoff":
         from skeleton.app.offline_mixed_game_library_continuity_handoff import main as continuity_handoff_main
         return continuity_handoff_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-epoch-relocation":
+        from skeleton.app.offline_mixed_library_epoch_relocation import main as epoch_relocation_main
+        return epoch_relocation_main(arguments[1:])
     if arguments and arguments[0] == "mixed-library-epoch-handoff":
         from skeleton.app.offline_mixed_library_epoch_handoff import main as epoch_handoff_main
         return epoch_handoff_main(arguments[1:])
