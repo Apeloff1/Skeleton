@@ -276,7 +276,7 @@ def test_godot_project_file_inventory_is_bounded(tmp_path, monkeypatch):
 
     for i in range(4):
         (tmp_path / f"script{i}.gd").write_text("extends Node")
-    project = project_mod.GodotProject(tmp_path, configfile.loads("[application]\\n"))
+    project = project_mod.GodotProject(tmp_path, configfile.loads("[application]\n"))
     monkeypatch.setattr(project_mod, "MAX_PROJECT_SCAN_ENTRIES", 2)
     with pytest.raises(ValueError, match="entry bound"):
         project.scripts()
