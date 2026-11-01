@@ -134,7 +134,14 @@ def _parser() -> argparse.ArgumentParser:
         help="operator-selected prompt/output protocol for the pinned local executable",
     )
     prepare.add_argument("--json", action="store_true", dest="as_json")
-    sub.add_parser("delivery-assurance", add_help=False, help="verify installed game, archive and save custody (delivery-assurance --help)")
+    sub.add_parser(
+        "delivery-assurance", add_help=False,
+        help="verify installed game, archive and save custody (delivery-assurance --help)",
+    )
+    sub.add_parser(
+        "recover-install", add_help=False,
+        help="reinstall pinned offline source while preserving quarantine (recover-install --help)",
+    )
     sub.add_parser("studio-journey", add_help=False,
                    help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
@@ -271,6 +278,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "recover-install":
+        from skeleton.app.offline_install_recovery import main as recovery_main
+        return recovery_main(arguments[1:])
     if arguments and arguments[0] == "delivery-assurance":
         from skeleton.app.offline_delivery_assurance import main as assurance_main
         return assurance_main(arguments[1:])
