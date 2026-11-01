@@ -49,6 +49,22 @@ def main(argv: list[str] | None = None) -> int:
     head_advance.add_argument("--expected-checkpoint", required=True)
     head_advance.add_argument("--consumed-tokens", type=int, required=True)
     head_advance.add_argument("--max-checkpoints", type=int, default=4096)
+    compare_window = commands.add_parser("head-compare-window",
+        help="Generation-fenced observation, never an execution lease")
+    compare_window.add_argument("--stream-id", required=True)
+    compare_window.add_argument("--expected-checkpoint", required=True)
+    compare_window.add_argument("--expected-generation", type=int, required=True)
+    compare_window.add_argument("--max-tokens", type=int, required=True)
+    compare_window.add_argument("--max-checkpoints", type=int, default=4096)
+    commit_window = commands.add_parser("head-commit-window",
+        help="CAS observed window after separately proven token consumption")
+    commit_window.add_argument("--stream-id", required=True)
+    commit_window.add_argument("--expected-checkpoint", required=True)
+    commit_window.add_argument("--expected-generation", type=int, required=True)
+    commit_window.add_argument("--expected-window-digest", required=True)
+    commit_window.add_argument("--max-tokens", type=int, required=True)
+    commit_window.add_argument("--consumed-tokens", type=int, required=True)
+    commit_window.add_argument("--max-checkpoints", type=int, default=4096)
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
     args = parser.parse_args(argv)
     try:
@@ -72,6 +88,20 @@ def main(argv: list[str] | None = None) -> int:
                     expected_checkpoint_digest=args.expected_checkpoint,
                     expected_tokenizer_digest=args.tokenizer_digest,
                     consumed_tokens=args.consumed_tokens,
+                    max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-compare-window":
+                result = heads.compare_window(args.stream_id,
+                    expected_checkpoint_digest=args.expected_checkpoint,
+                    expected_generation=args.expected_generation,
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    max_tokens=args.max_tokens, max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-commit-window":
+                result = heads.advance_window(args.stream_id,
+                    expected_checkpoint_digest=args.expected_checkpoint,
+                    expected_generation=args.expected_generation,
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    expected_window_digest=args.expected_window_digest,
+                    max_tokens=args.max_tokens, consumed_tokens=args.consumed_tokens,
                     max_checkpoints=args.max_checkpoints)
             else:
                 result = heads.recover_orphan_temps()

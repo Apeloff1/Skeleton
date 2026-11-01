@@ -32,3 +32,28 @@ Focused regression target:
 `python -m unittest tests.flgb.test_long_context_progress`
 and `python -m pytest -q tests/flgb/test_long_context_spool.py`.
 Require exact-head CI, security and review before promotion or release.
+
+## Generation-fenced observation and commit (opt-in)
+
+The existing `head-window` and `head-advance` remain backward-compatible.
+For cooperating operators that need a precise checkpoint/generation/window
+binding, use `head-compare-window --stream-id S --expected-checkpoint D
+--expected-generation G --max-tokens N`. This acquires the same private
+cross-process lock, audits the entire bounded ancestry, and checks the head
+before and after reading. The returned window digest covers exact token IDs,
+start, stop and source-sequence digest. Exhausted windows return null.
+
+Only **after** an independent trusted execution owner durably proves that
+the backend actually consumed tokens, invoke `head-commit-window --stream-id S
+--expected-checkpoint D --expected-generation G --expected-window-digest W
+--max-tokens N --consumed-tokens K`. It verifies the *same* window under
+the head lock, refuses stale generations, changed token windows, exhausted
+streams, oversized consumption, malformed inputs and broken ancestry. A
+successful commit creates an immutable child and fsyncs the new CAS head.
+If publication is ambiguous, inspect status; NEVER blindly retry execution.
+
+Neither observation nor commit is an execution authorization, an HMAC
+publisher identity, an external anti-rollback fence, or an exactly-once
+backend guarantee. A crash after irreversible model work but before the
+external execution journal's durable completion must remain UNCERTAIN.
+Do not infer successful consumption from a window digest alone.

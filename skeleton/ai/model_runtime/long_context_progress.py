@@ -303,6 +303,91 @@ class LongContextProgressHead:
             self._publish(directory, name, updated, creating=False)
             return {**updated, "is_execution_lease": False}
 
+
+    @staticmethod
+    def _expect_observation(record: dict[str, object] | None, *,
+                            checkpoint: str, tokenizer: str, generation: int) -> dict[str, object]:
+        """Reject stale observation even if a checkpoint digest is reused."""
+        if record is None:
+            raise LongContextSpoolError("head not initialized")
+        if (record["checkpoint_digest"] != checkpoint
+                or record["tokenizer_digest"] != tokenizer
+                or record["generation"] != generation):
+            raise LongContextSpoolError("stale window observation")
+        return record
+
+    def compare_window(self, stream_id: str, *, expected_checkpoint_digest: str,
+                       expected_generation: int, expected_tokenizer_digest: str,
+                       max_tokens: int, max_checkpoints: int = 4096) -> dict[str, object]:
+        """Read one bounded window while holding the cooperative head CAS lock.
+
+        This is an observation, NEVER a backend execution grant. A concurrent
+        committed advance invalidates the expected generation/checkpoint.
+        """
+        name = _name(stream_id)
+        _digest(expected_checkpoint_digest, "expected checkpoint")
+        _digest(expected_tokenizer_digest, "tokenizer digest")
+        _positive(max_tokens, "max_tokens", self.spool.max_window_tokens)
+        if type(expected_generation) is not int or not 0 <= expected_generation < 2**63:
+            raise LongContextSpoolError("invalid expected generation")
+        with self._locked() as directory:
+            record = self._expect_observation(self._read(directory, name),
+                checkpoint=expected_checkpoint_digest,
+                tokenizer=expected_tokenizer_digest, generation=expected_generation)
+            window = self.spool.audited_next_window(expected_checkpoint_digest,
+                expected_tokenizer_digest=expected_tokenizer_digest,
+                max_tokens=max_tokens, max_checkpoints=max_checkpoints)
+            if self._read(directory, name) != record:
+                raise LongContextSpoolError("head changed during observation")
+            return {**record, "is_execution_lease": False,
+                    "window": None if window is None else {
+                        "start": window.start, "stop": window.stop,
+                        "token_ids": list(window.token_ids),
+                        "source_sequence_digest": window.source_sequence_digest,
+                        "digest": window.digest,
+                    }}
+
+    def advance_window(self, stream_id: str, *, expected_checkpoint_digest: str,
+                       expected_generation: int, expected_tokenizer_digest: str,
+                       expected_window_digest: str, max_tokens: int,
+                       consumed_tokens: int, max_checkpoints: int = 4096) -> dict[str, object]:
+        """CAS a *previously observed* exact window; never infer backend success.
+
+        Caller MUST durably prove actual token consumption separately. This
+        method only prevents stale/mismatched window accounting and does not
+        authorize retry of an irreversible backend operation after a crash.
+        """
+        name = _name(stream_id)
+        _digest(expected_checkpoint_digest, "expected checkpoint")
+        _digest(expected_tokenizer_digest, "tokenizer digest")
+        _digest(expected_window_digest, "window digest")
+        _positive(max_tokens, "max_tokens", self.spool.max_window_tokens)
+        _positive(consumed_tokens, "consumed_tokens", self.spool.max_window_tokens)
+        if type(expected_generation) is not int or not 0 <= expected_generation < 2**63:
+            raise LongContextSpoolError("invalid expected generation")
+        with self._locked() as directory:
+            record = self._expect_observation(self._read(directory, name),
+                checkpoint=expected_checkpoint_digest,
+                tokenizer=expected_tokenizer_digest, generation=expected_generation)
+            if record["generation"] >= 2**63 - 1:
+                raise LongContextSpoolError("head generation exhausted")
+            window = self.spool.audited_next_window(expected_checkpoint_digest,
+                expected_tokenizer_digest=expected_tokenizer_digest,
+                max_tokens=max_tokens, max_checkpoints=max_checkpoints)
+            if window is None or window.digest != expected_window_digest:
+                raise LongContextSpoolError("window digest mismatch")
+            if consumed_tokens > window.stop - window.start:
+                raise LongContextSpoolError("consumption exceeds observed window")
+            if self._read(directory, name) != record:
+                raise LongContextSpoolError("head changed before publication")
+            child = self.spool.audited_advance(expected_checkpoint_digest,
+                expected_tokenizer_digest=expected_tokenizer_digest,
+                consumed_tokens=consumed_tokens, max_checkpoints=max_checkpoints)
+            updated = _record(name, child, expected_tokenizer_digest,
+                              record["generation"] + 1)
+            self._publish(directory, name, updated, creating=False)
+            return {**updated, "is_execution_lease": False}
+
     def recover_orphan_temps(self) -> dict[str, object]:
         """Explicit bounded recovery; never delete unknown or committed heads."""
         with self._locked() as directory:
