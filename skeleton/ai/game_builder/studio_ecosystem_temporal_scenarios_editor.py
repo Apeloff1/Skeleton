@@ -42,7 +42,13 @@ for(const candidate of model.candidates){
   const section=document.createElement("fieldset");
   const title=document.createElement("legend");
   title.textContent="Scenario: "+candidate.id;section.append(title);
-  for(const [id,window] of Object.entries(candidate.authoring.windows)){
+  const windows=candidate.authoring && candidate.authoring.windows;
+  if(!windows||typeof windows!=="object"||Array.isArray(windows)){
+    const warning=document.createElement("p");
+    warning.textContent="This rejected scenario has no editable scene windows.";
+    section.append(warning);host.append(section);continue;
+  }
+  for(const [id,window] of Object.entries(windows)){
     const group=document.createElement("fieldset");
     const legend=document.createElement("legend");legend.textContent=id;group.append(legend);
     const pair=[];

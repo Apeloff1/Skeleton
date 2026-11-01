@@ -6,7 +6,6 @@ substituted for the baseline. All accepted variants are canonically replayed.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 import os
 from pathlib import Path
