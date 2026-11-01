@@ -315,9 +315,10 @@ def test_invalid_or_expanded_limits_cannot_grant_decoder_authority(value):
 
 
 def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
+    payload = _image()  # Build before simulating missing Pillow; image creation needs Pillow too.
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
     with pytest.raises(MultimodalSanitizationError, match="truncated"):
-        _admit(_image())
+        _admit(payload)
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", False)
     # A None sentinel triggers Python's normal ModuleNotFoundError path
     # without replacing the interpreter's global import primitive.
@@ -325,7 +326,7 @@ def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
     with monkeypatch.context() as missing:
         missing.setitem(sys.modules, "PIL", None)
         with pytest.raises(MultimodalSanitizationError, match="Pillow"):
-            _admit(_image())
+            _admit(payload)
 
 
 def test_constructed_or_mutated_receipts_cannot_bypass_payload_verification():
