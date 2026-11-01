@@ -354,8 +354,15 @@ def verify_seal(
     """
     if type(raw_header) is not str or not 1 <= len(raw_header) <= 1024:
         raise AuthError(_OPAQUE)
-    if now is not None and (type(now) not in (int, float) or not math.isfinite(now)):
-        raise AuthError(_OPAQUE)
+    if now is not None:
+        if type(now) not in (int, float):
+            raise AuthError(_OPAQUE)
+        try:
+            valid_clock = math.isfinite(float(now)) and 0 <= now <= 10**12
+        except (OverflowError, ValueError):
+            valid_clock = False
+        if not valid_clock:
+            raise AuthError(_OPAQUE)
     ring = load_keyring(secret=secret, keyring=keyring)
     # #16 path: secret-only callers still work when keyring env empty.
     if not ring:
