@@ -16,7 +16,7 @@ from typing import Iterator
 
 from .long_context_spool import (
     LongContextSpool, LongContextSpoolError, _canonical, _digest,
-    _require_private_spool_file, _unique_pairs, _volume_available_bytes,
+    _require_private_spool_file, _unique_pairs, _volume_available_bytes, _positive,
 )
 
 _SCHEMA = "skeleton.ai.long-context-head.v1"

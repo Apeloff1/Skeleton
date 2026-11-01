@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
-import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,7 +12,6 @@ from unittest.mock import patch
 from skeleton.ai.model_runtime.flgb_model_runtime import TokenSequence
 from skeleton.ai.model_runtime.long_context_spool import LongContextSpool, LongContextSpoolError
 from skeleton.ai.model_runtime.long_context_progress import LongContextProgressHead
-from skeleton.ai.model_runtime.long_context_cli import main as cli_main
 
 TOKENIZER = sha256(b"window-cas-tokenizer").hexdigest()
 SOURCE = sha256(b"window-cas-source").hexdigest()
