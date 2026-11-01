@@ -1679,3 +1679,65 @@ def execute_npc_author_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+CHOICE_AUTHOR_REQUEST_SCHEMA = "skeleton.jeeves.studio_quest_choice_author_request.v1"
+CHOICE_AUTHOR_RESULT_SCHEMA = "skeleton.jeeves.studio_quest_choice_author_result.v1"
+
+
+def choice_author_tool_schema() -> dict[str, object]:
+    """Typed original quest prose edit and canonical replay preview."""
+    return {
+        "name": "studio_quest_choice_author",
+        "description": "Edit an original quest alternative and verify playable branch replay",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": CHOICE_AUTHOR_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "stage_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "alternative_index": {"type": "integer", "minimum": 0, "maximum": 7},
+                "replacement": {"type": "string", "minLength": 1, "maxLength": 512},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_alternative_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            },
+            "required": ["schema", "project_id", "stage_id", "alternative_index",
+                         "replacement", "expected_source_digest",
+                         "expected_alternative_digest"],
+        },
+    }
+
+
+def execute_choice_author_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves quest choice authoring requires operator authorization")
+    required = {"schema", "project_id", "stage_id", "alternative_index",
+                "replacement", "expected_source_digest", "expected_alternative_digest"}
+    if (type(request) is not dict or set(request) != required
+            or request.get("schema") != CHOICE_AUTHOR_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 8192):
+        raise StudioQuestError("invalid typed Jeeves quest choice request")
+    from skeleton.ai.game_builder.studio_ecosystem_quest_choice_author import (
+        preview_quest_choice_revision,
+    )
+    _, _, _, detail = preview_quest_choice_revision(
+        read_blueprint(request["project_id"]),
+        stage_id=request["stage_id"],
+        alternative_index=request["alternative_index"],
+        replacement=request["replacement"],
+        expected_source_digest=request["expected_source_digest"],
+        expected_alternative_digest=request["expected_alternative_digest"],
+        authorized=True)
+    payload: dict[str, Any] = {
+        "schema": CHOICE_AUTHOR_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

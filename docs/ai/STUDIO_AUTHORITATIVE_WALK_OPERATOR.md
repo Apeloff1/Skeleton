@@ -802,3 +802,32 @@ receipt without performing any filesystem write; operator authorization is
 out-of-band. A source digest lease is mandatory and mismatched sources fail
 closed. This is a real editable authored HTML story handoff, not a claim of
 native engine rendering, original-content legal certification, or release.
+
+## Original quest alternative authoring and deterministic branch replay
+
+`--author-choice` edits one existing original quest alternative by exact
+stage ID and zero-based alternative index. Two independent optimistic leases
+bind the operation to the complete authored source and the exact previous
+alternative text. The canonical revision owner enforces an allowlisted prose
+path, recomputes canon proof, and compiles updated offline story HTML. The
+canonical quest runtime replays the necessary ancestor stages, then executes
+both the old and new alternatives in separate source-bound simulations.
+Neither simulation is a claim of native game play or externally earned proof.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --author-choice --choice-author-stage investigate --choice-author-index 0 \
+  --choice-author-replacement "Survey the glacial shore with a tide ledger." \
+  --choice-author-expected-source <source-sha256> \
+  --choice-author-expected-alternative <old-choice-text-sha256> \
+  --output ./private-original-quest-revision
+```
+
+The output is the existing exclusive, private `source.json`, `story.html`,
+`receipt.json` bundle, and can be reopened through `--revision-source`.
+No stage IDs, prerequisites, rewards, evidence or ending authority are
+editable through this command. The typed Jeeves
+`execute_choice_author_tool` previews identical source/branch receipts
+without writing files. The editor rejects unknown stages, duplicate
+alternatives, stale source/choice digests, invalid text and unapproved modes.
+Exact-head tests and security checks remain required before PR promotion.

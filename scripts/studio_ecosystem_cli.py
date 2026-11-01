@@ -27,6 +27,16 @@ def main(argv: list[str] | None = None) -> int:
                     help="Search authored narrative/quest/asset/audio sections as well")
     ap.add_argument("--limit", type=int, default=20,
                     help="Maximum deterministic search results, 1..100")
+    ap.add_argument("--author-choice", action="store_true",
+                    help="Edit one authored quest choice and replay-verify private playable output")
+    ap.add_argument("--choice-author-stage", help="Exact original quest stage ID")
+    ap.add_argument("--choice-author-index", type=int, default=None,
+                    help="Zero-based original quest alternative index")
+    ap.add_argument("--choice-author-replacement", help="New original choice prose")
+    ap.add_argument("--choice-author-expected-source",
+                    help="Required canonical source SHA-256 lease")
+    ap.add_argument("--choice-author-expected-alternative",
+                    help="Required SHA-256 of previous authored choice text")
     ap.add_argument("--author-npc", action="store_true",
                     help="Edit original NPC prose and export verified private playable bundle")
     ap.add_argument("--npc-author-id", help="Immutable original NPC ID to edit")
@@ -297,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("NPC itinerary requires --dialogue-stage")
     if args.dialogue_stage:
         if (not args.project or args.faction_plan or args.faction_reputation
-                or args.ending_plan or args.author_revision or args.author_npc or args.cherry_pick_revision
+                or args.ending_plan or args.author_revision or args.author_npc or args.author_choice or args.cherry_pick_revision
                 or args.merge_revisions or args.revision_impact or args.revision_lineage
                 or args.audit_canon or args.play_walk or args.play_quest
                 or args.compile_preview or args.materialize_batch
@@ -924,6 +934,51 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.revision_compare_source is not None:
         ap.error("--revision-compare-source requires --revision-impact")
+    if args.author_choice:
+        if (not args.project or not args.choice_author_stage
+                or args.choice_author_index is None
+                or not args.choice_author_replacement
+                or not args.choice_author_expected_source
+                or not args.choice_author_expected_alternative
+                or args.output is None or args.author_revision or args.author_npc
+                or args.dialogue_stage or args.audit_canon or args.play_walk
+                or args.play_quest or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.limit != 20 or args.max_artifact_bytes is not None
+                or args.revision_request is not None or args.quest_actions is not None):
+            ap.error("--author-choice requires exact stage, alternative, leases and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest_choice_author import (
+            preview_quest_choice_revision,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            source = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None
+                      else read_blueprint(args.project))
+            revised, html, receipt, detail = preview_quest_choice_revision(
+                source, stage_id=args.choice_author_stage,
+                alternative_index=args.choice_author_index,
+                replacement=args.choice_author_replacement,
+                expected_source_digest=args.choice_author_expected_source,
+                expected_alternative_digest=args.choice_author_expected_alternative,
+                authorized=True)
+            write_revision_bundle(args.output, revised, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"author": detail, "receipt": receipt,
+                          "output": str(args.output)},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.choice_author_stage is not None or args.choice_author_index is not None
+            or args.choice_author_replacement is not None
+            or args.choice_author_expected_source is not None
+            or args.choice_author_expected_alternative is not None):
+        ap.error("quest choice edit arguments require --author-choice")
     if args.author_npc:
         if (not args.project or not args.npc_author_id
                 or not args.npc_author_expected_digest or args.output is None
