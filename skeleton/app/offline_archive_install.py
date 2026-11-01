@@ -195,4 +195,78 @@ def _stat_identity(parent_fd: int, name: str) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
-__all__ = ["SCHEMA", "OfflineSourceInstallError", "install_offline_game_source"]
+PREFLIGHT_SCHEMA = "skeleton.app.offline_source_install_preflight.v1"
+
+
+def preflight_offline_game_install(
+    archive: str | Path, destination: str | Path, *,
+    expected_archive_sha256: str,
+    expected_manifest_sha256: str,
+    authorized: bool,
+) -> dict[str, object]:
+    """Read-only install admission; does not reserve the destination.
+
+    The installer MUST still repeat all checks and atomically reserve with
+    mkdir. This is operator-facing diagnostic evidence, not an admission
+    lease, a rollback, or a consumer-release qualification.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    before = inspect_offline_game_archive(
+        archive, expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256, authorized=True,
+    )
+    target, parent_fd = _parent(destination)
+    try:
+        initial = os.fstat(parent_fd)
+        try:
+            os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise OfflineSourceInstallError(
+                "installation destination already exists; never overwrite"
+            )
+        _assert_original_root(target.parent, parent_fd)
+        final = os.fstat(parent_fd)
+        identity = lambda item: (
+            item.st_dev, item.st_ino, item.st_uid, item.st_mode,
+            item.st_mtime_ns, item.st_ctime_ns,
+        )
+        if identity(initial) != identity(final):
+            raise OfflineSourceInstallError(
+                "installation parent changed during preflight"
+            )
+    finally:
+        os.close(parent_fd)
+    after = inspect_offline_game_archive(
+        archive, expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256, authorized=True,
+    )
+    if before != after or after.get("archive_integrity_verified") is not True:
+        raise OfflineSourceInstallError(
+            "archive changed during installation preflight"
+        )
+    return {
+        "schema": PREFLIGHT_SCHEMA,
+        "status": "offline_install_preflight_ready_unreserved_release_blocked",
+        "archive_sha256": expected_archive_sha256,
+        "manifest_sha256": expected_manifest_sha256,
+        "archived_files": after["archived_files"],
+        "archive_integrity_verified": True,
+        "destination_available_at_inspection": True,
+        "destination_reserved": False,
+        "source_installation_verified": False,
+        "offline_gameplay_reexecuted": False,
+        "read_only": True,
+        "native_device_qualified": False,
+        "rights_certified": False,
+        "package_signed": False,
+        "release_certified": False,
+    }
+
+
+__all__ = [
+    "SCHEMA", "PREFLIGHT_SCHEMA", "OfflineSourceInstallError",
+    "install_offline_game_source", "preflight_offline_game_install",
+]
