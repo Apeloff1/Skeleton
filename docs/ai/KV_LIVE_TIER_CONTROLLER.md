@@ -27,3 +27,7 @@ increased**, even if available RAM and disk bytes are unchanged. Swap churn
 or kernel pressure can worsen independently of byte headroom; such changes
 fail closed before any KV storage adapter move. Synthetic tests exercise
 worsening swap pressure with stable RAM/disk readings.
+
+## Fork-safe migration ownership
+
+The CPU/disk KV migration controller now binds itself to its creating process. `plan_live` and `apply_live` check process identity before acquiring a potentially inherited lock or touching the KV storage adapter. A forked child or failed PID probe latches quarantine; it must reopen and independently verify manager, storage, journal and authorization before moving pages. No implicit replay or GPU/M-chip qualification is granted. Cross-process disk allocation still requires the independent durable journal and storage backend enforcement.

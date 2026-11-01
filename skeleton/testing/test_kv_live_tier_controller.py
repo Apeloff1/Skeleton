@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from skeleton.app.offline_resources import LocalResourceSnapshot
 from skeleton.ai.runtime.inference.kv import (
@@ -59,6 +60,31 @@ class KVLiveTierTests(unittest.TestCase):
             probe=lambda _: next(observed), clock=lambda: next(clock),
             simulated=True,
         )
+
+    def test_forked_controller_cannot_reuse_inherited_kv_adapter(self):
+        ctl = self.controller([host(), host(), host(), host()])
+        plan, _ = ctl.plan_live()
+        with patch(
+            "skeleton.ai.runtime.inference.kv.live_tier_controller.os.getpid",
+            return_value=ctl._owner_pid + 1,
+        ):
+            with self.assertRaisesRegex(KVPressureDeferred, "process identity changed"):
+                ctl.apply_live(plan)
+        self.assertEqual(self.storage.moves, [])
+        with self.assertRaisesRegex(KVPressureDeferred, "quarantined"):
+            ctl.plan_live()
+
+    def test_unavailable_process_identity_latches_quarantine(self):
+        ctl = self.controller([host()])
+        with patch(
+            "skeleton.ai.runtime.inference.kv.live_tier_controller.os.getpid",
+            side_effect=OSError("injected PID failure"),
+        ):
+            with self.assertRaisesRegex(KVPressureDeferred, "identity unavailable"):
+                ctl.plan_live()
+        with self.assertRaisesRegex(KVPressureDeferred, "quarantined"):
+            ctl.plan_live()
+        self.assertEqual(self.storage.moves, [])
 
     def test_cpu_pressure_demotes_with_two_fresh_samples(self):
         ctl = self.controller([host(), host(), host(), host()])

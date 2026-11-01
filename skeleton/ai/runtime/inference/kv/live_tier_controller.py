@@ -7,6 +7,7 @@ independently enforce backend memory and filesystem quotas.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from threading import RLock
 from time import monotonic_ns
 from typing import Callable
@@ -64,9 +65,29 @@ class KVLiveTierController:
         self._storage_path = storage_path
         self._simulated = simulated
         self._lock = RLock()
+        self._owner_pid = os.getpid()
+        self._quarantined = False
         # A single controller must never accept an older clock sample after
         # observing a newer one, including across separate planning rounds.
         self._last_observed_ns: int | None = None
+
+    def _require_owner_process(self) -> None:
+        """Do not reuse inherited KV manager/adapter state after a fork.
+
+        Check before acquiring a potentially inherited thread lock; a
+        child must reconstruct the manager and journal from independently
+        verified custody. A failed process-identity probe latches quarantine.
+        """
+        if self._quarantined:
+            raise KVPressureDeferred("KV migration controller quarantined")
+        try:
+            pid = os.getpid()
+        except BaseException as exc:
+            self._quarantined = True
+            raise KVPressureDeferred("KV process identity unavailable") from exc
+        if type(pid) is not int or pid != self._owner_pid:
+            self._quarantined = True
+            raise KVPressureDeferred("KV process identity changed; reopen custody")
 
     def _sample(self) -> KVLiveObservation:
         try:
@@ -107,6 +128,7 @@ class KVLiveTierController:
         )
 
     def plan_live(self) -> tuple[TierPlan, KVLiveObservation]:
+        self._require_owner_process()
         with self._lock:
             observation = self._sample()
             plan = self._planner.plan(
@@ -122,6 +144,7 @@ class KVLiveTierController:
         enforce quotas atomically; the journal retains RUNNING on a partial
         or ambiguous migration. Never infer GPU residency from host RAM.
         """
+        self._require_owner_process()
         if not isinstance(plan, TierPlan):
             raise ValueError("canonical tier plan required")
         with self._lock:
