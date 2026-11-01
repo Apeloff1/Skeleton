@@ -116,6 +116,8 @@ def audit_canon_source(documents: Mapping[str, Any], *, authorized: bool) -> dic
             issue("missing_critical_cast", None, "known_cast_id", ident)
     earned = {stage.key for stage in program.stages}
     earned.update(stage.reward for stage in program.stages)
+    earned.update(token for stage in program.stages
+                  for _, tokens in stage.choice_effects for token in tokens)
     ending_obligations = [
         {"ending_id": ending_id,
          "authored_predicates": list(requirements),

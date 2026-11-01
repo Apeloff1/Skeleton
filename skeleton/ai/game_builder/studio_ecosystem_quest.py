@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import re
 from typing import Any, Mapping, Sequence
 
 
@@ -32,6 +33,7 @@ class QuestStage:
     prerequisites: tuple[str, ...]
     alternatives: tuple[str, ...]
     reward: str
+    choice_effects: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,8 +135,29 @@ def compile_quest_program(documents: Mapping[str, Any]) -> QuestProgram:
         if len(set(options)) != len(options):
             raise StudioQuestError("repeated alternative")
         reward = _require_text(item.get("reward"), "stage reward")
+        raw_effects = item.get("choice_effects", {})
+        if (type(raw_effects) is not dict or len(raw_effects) > len(options)
+                or any(type(option) is not str or option not in options
+                       for option in raw_effects)):
+            raise StudioQuestError("invalid authored choice effect mapping")
+        effects: list[tuple[str, tuple[str, ...]]] = []
+        for alternative in options:
+            raw_tokens = raw_effects.get(alternative, [])
+            if type(raw_tokens) is not list or len(raw_tokens) > 8:
+                raise StudioQuestError("invalid authored choice effect list")
+            tokens = tuple(_require_text(token, "choice effect")
+                           for token in raw_tokens)
+            prefix = "choice:" + key + ":"
+            if (len(set(tokens)) != len(tokens)
+                    or any(not token.startswith(prefix)
+                           or re.fullmatch(r"[a-z][a-z0-9_]{0,63}",
+                                           token[len(prefix):]) is None
+                           for token in tokens)):
+                raise StudioQuestError("invalid or forged choice effect token")
+            effects.append((alternative, tokens))
         seen.add(key)
-        stages.append(QuestStage(key, requirements, options, reward))
+        stages.append(QuestStage(key, requirements, options, reward,
+                                 tuple(effects)))
     # The stage graph is deliberately topologically ordered. Cycles and
     # forward references fail instead of producing non-terminating gameplay.
     built: set[str] = set()
@@ -158,6 +181,14 @@ def compile_quest_program(documents: Mapping[str, Any]) -> QuestProgram:
         required = tuple(_require_text(x, "ending requirement") for x in requires)
         if len(set(required)) != len(required):
             raise StudioQuestError("duplicate ending predicate")
+        declared_choice_effects = {
+            token for stage in stages
+            for _, tokens in stage.choice_effects for token in tokens
+        }
+        if any(predicate.startswith("choice:")
+               and predicate not in declared_choice_effects
+               for predicate in required):
+            raise StudioQuestError("undeclared authored choice ending predicate")
         endings.append((key, required))
         ending_keys.add(key)
     return QuestProgram(pid, _digest({"quest": quest, "narrative": narrative}),
@@ -231,6 +262,9 @@ def quest_progress(session: QuestSession, documents: Mapping[str, Any]) -> dict[
     # Stage IDs and their explicitly awarded tokens are *simulation* tokens.
     # Unfulfilled narrative requirements remain unresolved. No forged proof.
     facts = done | {s.reward for s in program.stages if s.key in done}
+    for stage_id, alternative in session.choices:
+        stage = next(s for s in program.stages if s.key == stage_id)
+        facts.update(dict(stage.choice_effects).get(alternative, ()))
     reachable = [key for key, requirements in program.endings
                  if set(requirements).issubset(facts)]
     missing = {key: sorted(set(reqs) - facts)

@@ -54,10 +54,30 @@ def plan_authored_ending(
     for stage in program.stages:
         reward_to_stage.setdefault(stage.reward, stage.key)
     required = ending[1]
-    unbound = sorted(set(required) - set(stage_by_key) - set(reward_to_stage))
+    effect_to_choice = {
+        token: (stage.key, alternative)
+        for stage in program.stages
+        for alternative, tokens in stage.choice_effects
+        for token in tokens
+    }
+    required_choices: dict[str, str] = {}
+    for predicate in required:
+        if predicate not in effect_to_choice:
+            continue
+        stage_id, alternative = effect_to_choice[predicate]
+        if stage_id in required_choices and required_choices[stage_id] != alternative:
+            raise StudioQuestError("conflicting authored ending choice requirements")
+        required_choices[stage_id] = alternative
+    for stage_id, alternative in required_choices.items():
+        completed_choice = dict(session.choices).get(stage_id)
+        if completed_choice is not None and completed_choice != alternative:
+            raise StudioQuestError("required ending choice already completed differently")
+    unbound = sorted(set(required) - set(stage_by_key)
+                     - set(reward_to_stage) - set(effect_to_choice))
     targets = {stage_by_key[key].key if key in stage_by_key
                else reward_to_stage[key] for key in required
                if key in stage_by_key or key in reward_to_stage}
+    targets.update(required_choices)
     # An explicit authored detour is executable even when the selected
     # narrative ending has only external predicates. It does not satisfy
     # those predicates or grant any unobserved evidence.
@@ -69,6 +89,9 @@ def plan_authored_ending(
                     or stage_id not in stage_by_key or stage_id in session.completed
                     or alternative not in stage_by_key[stage_id].alternatives):
                 raise StudioQuestError("preferred ending choice is not executable")
+            if (stage_id in required_choices
+                    and required_choices[stage_id] != alternative):
+                raise StudioQuestError("preferred choice conflicts with authored ending")
             targets.add(stage_id)
     needed: set[str] = set()
     def visit(key: str) -> None:
@@ -93,8 +116,11 @@ def plan_authored_ending(
             continue
         if not set(stage.prerequisites).issubset(set(simulated.completed)):
             raise StudioQuestError("authored ending stage dependency not executable")
-        choice = (preferred_choices.get(stage.key, stage.alternatives[0])
-                  if preferred_choices is not None else stage.alternatives[0])
+        choice = required_choices.get(
+            stage.key,
+            preferred_choices.get(stage.key, stage.alternatives[0])
+            if preferred_choices is not None else stage.alternatives[0],
+        )
         previous_digest = simulated.digest
         simulated = step_quest(simulated, documents, stage=stage.key,
                                alternative=choice, authorized=True)

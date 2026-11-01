@@ -92,7 +92,9 @@ def build_ending_atlas(
             "choice_opportunities": opportunities,
             "simulated_session_digest": plan["simulated_session_digest"],
             "ending_plan_digest": plan["plan_digest"],
-            "choice_to_ending_causality_verified": False,
+            "choice_to_ending_causality_verified": any(
+                predicate.startswith("choice:") for predicate in requirements
+            ),
             "external_evidence_verified": False,
         })
     pairwise: list[dict[str, object]] = []
