@@ -4,8 +4,9 @@
 
 * **Certificate binding** - when the caller's :class:`ServiceIdentity` lists
   ``cert_fingerprints``, the request must present a matching client
-  certificate fingerprint (from a trusted TLS-terminating proxy header,
-  ``x-client-cert-sha256`` by default, or a custom ``cert_source``). A token
+  certificate fingerprint from an explicitly injected trusted ``cert_source``.
+  By default no certificate source is trusted; raw request headers cannot
+  assert mTLS identity. A token
   may also pin one fingerprint via ``ext["cnf"]``; it must then match too.
   Binding is checked *before* token verification so a mismatched request
   never records a nonce.
@@ -46,8 +47,17 @@ BINDING_MISSING = "binding_missing"
 CertSource = Callable[[Mapping[str, str]], Optional[str]]
 
 
+def _missing_cert_source(_headers: Mapping[str, str]) -> Optional[str]:
+    """Fail closed until a verified TLS termination boundary is configured."""
+    return None
+
+
 def header_cert_source(header: str = CERT_HEADER) -> CertSource:
-    """Read a client-cert fingerprint from a header set by a trusted proxy."""
+    """Opt-in adapter ONLY when a trusted proxy strips client-supplied headers.
+
+    The caller must authenticate mTLS upstream and overwrite this header;
+    passing untrusted client headers as proof of a certificate is unsafe.
+    """
     name = header.lower()
 
     def _source(headers: Mapping[str, str]) -> Optional[str]:
@@ -107,7 +117,7 @@ class RegistryS2SAuthGate(S2SAuthGate):
         super().__init__(verifier, policies, matrix=matrix, admission=admission, hooks=hooks)
         self.registry: ServiceRegistry = verifier.registry
         self._local = threading.local()
-        self.cert_source: CertSource = cert_source if cert_source is not None else header_cert_source()
+        self.cert_source: CertSource = cert_source if cert_source is not None else _missing_cert_source
 
     # -- binding -----------------------------------------------------------
     def check_binding(self, headers: Mapping[str, str]) -> Optional[str]:

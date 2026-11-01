@@ -1,13 +1,14 @@
 from skeleton.gate_plane.s2s.audit import InMemoryAuditSink, KIND_DECISION
 from skeleton.gate_plane.s2s.assembly import build_registry_s2s_gate
+from skeleton.gate_plane.s2s.bound_gate import header_cert_source
 from skeleton.gate_plane.s2s.nonce import LocalNonceStoreDouble
 from tests.gate_plane_s2s_auth.conftest import FP_A, FP_B
 
 
-def _asm(ring, registry, nonces, clock, sink=None):
+def _asm(ring, registry, nonces, clock, sink=None, cert_source=None):
     return build_registry_s2s_gate(
         audience="gate", keyring=ring, registry=registry, nonce_store=nonces, clock=clock,
-        admission=False, audit_sinks=[sink] if sink is not None else (),
+        admission=False, audit_sinks=[sink] if sink is not None else (), cert_source=cert_source,
     )
 
 
@@ -35,7 +36,8 @@ def test_replay_rejected_401(ring, registry, nonces, clock, signer_for):
 
 
 def test_binding_required(ring, registry, nonces, clock, signer_for):
-    gate = _asm(ring, registry, nonces, clock).gate
+    # Test-only stand-in for a TLS terminator that strips untrusted headers.
+    gate = _asm(ring, registry, nonces, clock, cert_source=header_cert_source()).gate
     s = signer_for("bound-svc")
     assert gate.evaluate("GET", "/api/v1/forge/x", _h(s.mint("gate", ["forge:read"]))).reason == "binding_missing"
     assert gate.evaluate("GET", "/api/v1/forge/x", _h(s.mint("gate", ["forge:read"]), FP_B)).reason == "binding_mismatch"
@@ -44,7 +46,7 @@ def test_binding_required(ring, registry, nonces, clock, signer_for):
 
 
 def test_cnf_pin(ring, registry, nonces, clock, signer_for):
-    gate = _asm(ring, registry, nonces, clock).gate
+    gate = _asm(ring, registry, nonces, clock, cert_source=header_cert_source()).gate
     tok = signer_for("forge-worker").mint("gate", ["forge:read"], extra={"cnf": FP_A})
     assert gate.evaluate("GET", "/api/v1/forge/x", _h(tok, FP_B)).http_status == 401
     tok2 = signer_for("forge-worker").mint("gate", ["forge:read"], extra={"cnf": FP_A})
@@ -100,3 +102,21 @@ def test_gate_rejects_permissive_registry(ring, clock, nonces):
     )
     with pytest.raises(ValueError, match="requires strict issuer registration"):
         RegistryS2SAuthGate(verifier, default_gate_plane_policies())
+
+
+def test_untrusted_client_cert_header_is_not_mtls_proof_by_default(ring, registry, nonces, clock, signer_for):
+    gate = _asm(ring, registry, nonces, clock).gate
+    tok = signer_for("bound-svc").mint("gate", ["forge:read"])
+    decision = gate.evaluate("GET", "/api/v1/forge/x", _h(tok, FP_A))
+    assert decision.http_status == 401
+    assert decision.reason == "binding_missing"
+    assert nonces.calls == 0
+
+
+def test_untrusted_cnf_header_is_rejected_by_default(ring, registry, nonces, clock, signer_for):
+    gate = _asm(ring, registry, nonces, clock).gate
+    tok = signer_for("forge-worker").mint("gate", ["forge:read"], extra={"cnf": FP_A})
+    decision = gate.evaluate("GET", "/api/v1/forge/x", _h(tok, FP_A))
+    assert decision.http_status == 401
+    assert decision.reason == "binding_missing"
+    assert nonces.calls == 0
