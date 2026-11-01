@@ -458,3 +458,60 @@ def test_resume_rejects_mutated_original_prefix_before_summary_publication(
     assert Path(jobs[0].receipt).exists()
     assert Path(jobs[1].archive).exists()
     assert not summary.exists()
+
+
+def test_cohort_stops_before_second_publication_when_first_source_changes(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_batch as batch
+
+    copied = _copied_original_games(original_games, tmp_path)
+    jobs = jobs_for(copied, tmp_path)
+    original_publish = batch.publish_first_playable_delivery
+    calls = 0
+
+    def mutate_after_first_game(*args, **kwargs):
+        nonlocal calls
+        result = original_publish(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            (copied[0][0] / "release.json").write_bytes(b'{"tampered":true}')
+        return result
+
+    monkeypatch.setattr(batch, "publish_first_playable_delivery",
+                        mutate_after_first_game)
+    summary = tmp_path / "cohort.json"
+    with pytest.raises(ValueError):
+        batch.publish_first_playable_delivery_batch(jobs, summary, authorized=True)
+    assert calls == 1
+    assert Path(jobs[0].archive).exists()  # preserve published evidence
+    assert not Path(jobs[1].archive).exists()  # no unnecessary second write
+    assert not summary.exists()
+
+
+def test_cohort_stops_before_second_publication_when_first_receipt_changes(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_batch as batch
+
+    jobs = jobs_for(original_games, tmp_path)
+    original_publish = batch.publish_first_playable_delivery
+    calls = 0
+
+    def mutate_receipt_after_first_game(*args, **kwargs):
+        nonlocal calls
+        result = original_publish(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            Path(jobs[0].receipt).write_bytes(b'{"untrusted":true}')
+        return result
+
+    monkeypatch.setattr(batch, "publish_first_playable_delivery",
+                        mutate_receipt_after_first_game)
+    summary = tmp_path / "cohort.json"
+    with pytest.raises(ValueError):
+        batch.publish_first_playable_delivery_batch(jobs, summary, authorized=True)
+    assert calls == 1
+    assert Path(jobs[0].archive).exists()
+    assert not Path(jobs[1].archive).exists()
+    assert not summary.exists()

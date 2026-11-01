@@ -228,6 +228,24 @@ def _reverify_original_sources(
             )
 
 
+def _checkpoint_published_cohort(
+    jobs: tuple[DeliveryJob, ...],
+    records: list[dict[str, object]],
+    admissions: Sequence[dict[str, object]],
+    identities: Sequence[tuple[int, ...]],
+) -> None:
+    """Fail closed after EACH game, before another game's first write.
+
+    A previously installed game, private save, receipt or original source may
+    be replaced while the next game is being built. Checking only before the
+    first publication and after the last one unnecessarily publishes further
+    games from a cohort already known to be untrustworthy. This is a bounded
+    observational barrier, not an atomic lock or a rollback mechanism.
+    """
+    _inspect_jobs(jobs[:len(records)], records)
+    _reverify_original_sources(jobs, admissions, identities)
+
+
 def publish_first_playable_delivery_batch(
     jobs: Sequence[DeliveryJob], summary_destination: str | Path, *,
     authorized: bool,
@@ -275,6 +293,7 @@ def publish_first_playable_delivery_batch(
             moves=job.moves, authorized=True,
         )
         records.append(_record(published, job.moves))
+        _checkpoint_published_cohort(checked, records, admissions, identities)
     # Recheck original sources as well as installed games after the last write.
     _inspect_jobs(checked, records)
     _reverify_original_sources(checked, admissions, identities)
@@ -384,6 +403,7 @@ def resume_first_playable_delivery_batch(
             moves=job.moves, authorized=True,
         )
         records.append(_record(published, job.moves))
+        _checkpoint_published_cohort(checked, records, admissions, identities)
     _inspect_jobs(checked, records)
     _reverify_original_sources(checked, admissions, identities)
     envelope = _summary(records)
