@@ -139,3 +139,11 @@ def test_tree_digest_refuses_symlinked_source(built, tmp_path):
     (root / "scripts" / "linked.gd").symlink_to(outside)
     with pytest.raises(ValueError, match="symlink"):
         provenance.tree_digest(root)
+
+
+def test_provenance_build_refuses_symlinked_parent_directory(built, tmp_path):
+    root, out = built
+    linked_dir = root / "linked-build"
+    linked_dir.symlink_to(out, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        provenance.build(root, "4.7.2", "SHIP", {"Linux": linked_dir / "gfd_fixture.x86_64"})

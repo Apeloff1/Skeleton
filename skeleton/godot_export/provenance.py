@@ -110,9 +110,14 @@ def build(root: Path, engine: str, verdict: str, artifacts: dict[str, Path], bas
     for preset, path in artifacts.items():
         if base.is_symlink() or path.is_symlink():
             raise ValueError("artifact path contains a symlink")
-        rel = _safe_relative(path.resolve().relative_to(base.resolve()).as_posix())
-        if _has_symlink(base.resolve(), rel):
+        try:
+            rel = _safe_relative(path.absolute().relative_to(base.absolute()).as_posix())
+        except ValueError as exc:
+            raise ValueError("artifact path escapes base") from exc
+        if _has_symlink(base.absolute(), rel):
             raise ValueError("artifact path contains a symlink")
+        if path.resolve().relative_to(base.resolve()).as_posix() != rel.as_posix():
+            raise ValueError("artifact path resolves to a different source")
         m.artifacts.append(Artifact(preset, rel.as_posix(), sha256_file(path), path.stat().st_size))
     return m
 
