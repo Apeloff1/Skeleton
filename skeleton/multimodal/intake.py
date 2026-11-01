@@ -33,6 +33,7 @@ _INSTRUCTION_PATTERN = re.compile(
     r"ignore\s+(?:all\s+)?previous\s+instructions?"
     r"|system\s+prompt"
     r"|developer\s+message"
+    r"|(?:system|developer)\s*:\s*(?:override|ignore|follow)\b"
     r"|follow\s+(?:these|the)\s+instructions?"
     r"|override\s+(?:the\s+)?(?:system|developer|policy)"
     r")\b"
@@ -320,10 +321,10 @@ class MultimodalIntake:
         self._assets[candidate.asset_id] = verified
         return verified
 
-    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> None:
+    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> VerifiedMultimodalAsset:
         if self._assets.get(getattr(asset, "asset_id", None)) is not asset:
             raise MultimodalSanitizationError("verified asset was not issued by this intake")
-        verify_verified_asset(asset, source)
+        return verify_verified_asset(asset, source)
 
     def safe_sanitize(self, **kwargs) -> MultimodalAsset:
         try:
@@ -361,7 +362,7 @@ class VerifiedMultimodalAsset(MultimodalAsset):
             raise MultimodalSanitizationError("decoder receipt and source identity differ")
 
 
-def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None:
+def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> VerifiedMultimodalAsset:
     if not isinstance(asset, VerifiedMultimodalAsset):
         raise MultimodalSanitizationError("typed verified asset is required")
     if not isinstance(source, bytes) or len(source) != asset.content_bytes:
@@ -379,6 +380,7 @@ def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None
         raise MultimodalSanitizationError("verified source cannot be decoded") from exc
     if measured.as_dict() != asset.validation.as_dict() or asset.instruction_trusted:
         raise MultimodalSanitizationError("actual decoded source differs from issued evidence")
+    return asset
 
 
 _INSTRUCTION_PATTERNS = (re.compile(_INSTRUCTION_PATTERN.pattern.encode()),)

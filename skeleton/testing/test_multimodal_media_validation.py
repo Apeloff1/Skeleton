@@ -88,7 +88,7 @@ def test_real_decoded_image_binds_source_and_exact_pixels(format, mime):
     assert asset.sanitized_metadata["width"] == 3
     assert "system_prompt" not in asset.sanitized_metadata
     assert asset.instruction_trusted is False
-    assert verify_verified_asset(asset, payload).digest == asset.digest
+    assert verify_verified_asset(asset, payload).content_digest == asset.content_digest
     assert intake.verify_verified_asset(asset, payload) == asset
     assert (
         intake.sanitize_verified(
