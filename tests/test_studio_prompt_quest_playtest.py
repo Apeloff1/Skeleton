@@ -80,6 +80,12 @@ def test_budget_and_unobserved_evidence_fail_closed():
     with pytest.raises(PermissionError):
         run(source, authorized=False)
     forged = deepcopy(run(source))
+    forged["sandbox_playable_handoff_verified"] = 1
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        replay_prompt_quest_playtest(
+            forged, authorized=True,
+            expected_compilation_digest=source["receipt_digest"])
+    forged = deepcopy(run(source))
     forged["playable_handoff"]["quest_session_digest"] = "0" * 64
     with pytest.raises(StudioQuestError, match="canonical replay"):
         replay_prompt_quest_playtest(

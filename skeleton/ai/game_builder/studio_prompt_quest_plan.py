@@ -130,7 +130,7 @@ def replay_prompt_quest_plan(receipt: object, *, authorized: bool) -> dict[str, 
     checked = compile_prompt_quest_plan(
         receipt.get("plan"), authorized=True,
         expected_plan_digest=receipt.get("plan_digest"))
-    if checked != receipt:
+    if _canonical(checked) != _canonical(receipt):
         raise StudioQuestError("original quest receipt failed canonical replay")
     return checked
 

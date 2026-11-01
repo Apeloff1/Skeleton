@@ -165,7 +165,7 @@ def replay_ending_witness(
         authorized=True, expected_source_digest=expected_source_digest,
         expected_initial_session_digest=expected_initial_session_digest,
     )
-    if checked != receipt:
+    if _canonical(checked) != _canonical(receipt):
         raise StudioQuestError("ending witness failed canonical replay")
     return checked
 

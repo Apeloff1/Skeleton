@@ -89,6 +89,6 @@ def replay_prompt_quest_playtest(
         target_ending=receipt.get("target_ending"),
         max_states=receipt.get("max_states"), max_depth=receipt.get("max_depth"),
         authorized=True, expected_compilation_digest=expected_compilation_digest)
-    if checked != receipt:
+    if _canonical(checked) != _canonical(receipt):
         raise StudioQuestError("prompt quest playtest failed canonical replay")
     return checked

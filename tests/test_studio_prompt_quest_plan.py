@@ -95,6 +95,10 @@ def test_invalid_typed_plans_fail_closed_and_never_infer_rights():
     assert b"&lt;script&gt;" in html
     assert b"default-src 'none'" in html
     forged = deepcopy(compile_plan())
+    forged["native_gameplay_verified"] = 0
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        replay_prompt_quest_plan(forged, authorized=True)
+    forged = deepcopy(compile_plan())
     forged["native_gameplay_verified"] = True
     with pytest.raises(StudioQuestError, match="canonical replay"):
         replay_prompt_quest_plan(forged, authorized=True)
