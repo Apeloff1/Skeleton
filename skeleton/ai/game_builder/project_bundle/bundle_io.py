@@ -9,7 +9,7 @@ and ``backend.core.tenant_storage_boundary.tenant_storage_namespace``.
 from __future__ import annotations
 
 import os
-import tempfile
+import secrets
 import re
 import stat
 from pathlib import Path, PurePosixPath
@@ -105,81 +105,147 @@ def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
 
 
 def bundle_path(base_dir: str | Path, tenant_id: str, project_id: str, namespace: NamespaceFn) -> Path:
-    """``<base>/<tenant-fingerprint>/<purpose>/<project>.gfbundle.json``, contained in base."""
+    """Build a lexical tenant path; I/O verifies every ancestor by descriptor.
+
+    Resolving the path here would follow attacker-controlled ancestors before
+    the later open. Neither this path value nor a preflight check grants trust.
+    """
     ns = namespace(tenant_id, purpose="game_project_bundles")
     m = _NS.fullmatch(ns)
     if not m:
         raise BundleError("unexpected tenant namespace shape")
-    base = Path(base_dir).resolve()
+    base = os.fspath(base_dir)
+    if not isinstance(base, str) or not base or "\x00" in base or ".." in Path(base).parts:
+        raise BundleError("unsafe bundle storage base")
     rel = PurePosixPath(m.group(1), m.group(2).replace(":", "_"),
                         safe_member_path(project_id + BUNDLE_SUFFIX))
-    target = (base / rel).resolve()
-    if base not in target.parents:
-        raise BundleError("bundle path escapes storage base")
-    return target
+    return Path(os.path.abspath(base)) / rel
 
 
-def write_bundle(path: Path, raw: str) -> None:
-    if len(raw.encode("utf-8")) > MAX_BUNDLE_BYTES:
-        raise BundleError("bundle exceeds size limit")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.is_symlink():
-        raise BundleError("refusing to write through a symlink")
-    # Never open a predictable .tmp path: an attacker could pre-create it
-    # as a symlink and redirect write_text() to an unrelated local file.
-    # mkstemp creates a private, exclusive 0600 file in the target directory.
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+def _held_bundle_parent(path: Path, *, create: bool) -> tuple[int, str]:
+    """Walk the absolute path one component at a time without following links.
+
+    The returned directory descriptor is used for both leaf opening and
+    atomic publication, so renaming/replacing its pathname cannot redirect I/O.
+    Windows must use a separate native handle backend, never path preflight.
+    """
+    if not (hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
+            and hasattr(os, "O_NONBLOCK") and os.open in os.supports_dir_fd
+            and os.mkdir in os.supports_dir_fd and os.rename in os.supports_dir_fd
+            and os.stat in os.supports_dir_fd and os.unlink in os.supports_dir_fd):
+        raise BundleError("descriptor-anchored bundle I/O unavailable")
+    raw = os.fspath(path)
+    if (not isinstance(raw, str) or not raw.startswith(os.sep) or "\x00" in raw
+            or len(raw) > 4096):
+        raise BundleError("bundle path must be a bounded absolute path")
+    parts = raw.split(os.sep)[1:]
+    if not parts or len(parts) > 128 or any(part in ("", ".", "..") for part in parts):
+        raise BundleError("unsafe bundle path component")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    current = os.open(os.sep, flags)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as output:
-            output.write(raw)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path)
+        for part in parts[:-1]:
+            if create:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=current)
+                except FileExistsError:
+                    pass
+            child = os.open(part, flags, dir_fd=current)
+            os.close(current)
+            current = child
+        return current, parts[-1]
     except BaseException:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+        os.close(current)
         raise
 
 
-def read_bundle(path: Path) -> str:
-    """Read a held regular-file descriptor, never check a path then reopen it."""
-    if not hasattr(os, "O_NOFOLLOW"):
-        raise BundleError("secure bundle read unavailable on this platform")
+def write_bundle(path: Path, raw: str) -> None:
+    if not isinstance(raw, str) or len(raw.encode("utf-8")) > MAX_BUNDLE_BYTES:
+        raise BundleError("bundle missing or exceeds size limit")
     try:
-        # Nonblocking open also prevents an untrusted FIFO from hanging the
-        # process before fstat can reject non-regular file types.
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+        parent, leaf = _held_bundle_parent(path, create=True)
     except OSError as exc:
-        raise BundleError("bundle cannot be opened without following links") from exc
+        raise BundleError("unsafe bundle directory ancestor") from exc
+    temporary: str | None = None
     try:
-        before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode):
-            raise BundleError("bundle must be a regular file")
-        if before.st_size > MAX_BUNDLE_BYTES:
-            raise BundleError("bundle exceeds size limit")
-        blocks: list[bytes] = []
-        count = 0
-        while count <= MAX_BUNDLE_BYTES:
-            block = os.read(fd, min(1024 * 1024, MAX_BUNDLE_BYTES + 1 - count))
-            if not block:
-                break
-            count += len(block)
-            blocks.append(block)
-        after = os.fstat(fd)
-        if count > MAX_BUNDLE_BYTES:
-            raise BundleError("bundle exceeds size limit")
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
-            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
-        ) or count != before.st_size:
-            raise BundleError("bundle changed during descriptor read")
         try:
-            return b"".join(blocks).decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise BundleError("bundle must contain UTF-8") from exc
+            existing = os.stat(leaf, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            existing = None
+        if existing is not None and not stat.S_ISREG(existing.st_mode):
+            raise BundleError("bundle target must be a regular file")
+        # Exclusive, unpredictable name within the *held* parent. No pathname
+        # reopening between staging, fsync and rename.
+        for _ in range(4):
+            candidate = "." + secrets.token_hex(16) + ".gfbundle.tmp"
+            try:
+                fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                             os.O_NOFOLLOW, 0o600, dir_fd=parent)
+                temporary = candidate
+                break
+            except FileExistsError:
+                continue
+        else:
+            raise BundleError("could not allocate private bundle staging file")
+        with os.fdopen(fd, "wb") as output:
+            output.write(raw.encode("utf-8"))
+            output.flush()
+            os.fsync(output.fileno())
+        os.rename(temporary, leaf, src_dir_fd=parent, dst_dir_fd=parent)
+        temporary = None
+        os.fsync(parent)
+    except OSError as exc:
+        raise BundleError("bundle publication failed closed") from exc
     finally:
-        os.close(fd)
+        if temporary is not None:
+            try:
+                os.unlink(temporary, dir_fd=parent)
+            except FileNotFoundError:
+                pass
+        os.close(parent)
+
+
+def read_bundle(path: Path) -> str:
+    """Read through held ancestor/leaf descriptors with bounded integrity."""
+    try:
+        parent, leaf = _held_bundle_parent(path, create=False)
+    except OSError as exc:
+        raise BundleError("unsafe bundle directory ancestor") from exc
+    try:
+        try:
+            fd = os.open(leaf, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         dir_fd=parent)
+        except OSError as exc:
+            raise BundleError("bundle cannot be opened without following links") from exc
+        try:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode):
+                raise BundleError("bundle must be a regular file")
+            if before.st_size > MAX_BUNDLE_BYTES:
+                raise BundleError("bundle exceeds size limit")
+            blocks: list[bytes] = []
+            count = 0
+            while count <= MAX_BUNDLE_BYTES:
+                block = os.read(fd, min(1024 * 1024, MAX_BUNDLE_BYTES + 1 - count))
+                if not block:
+                    break
+                count += len(block)
+                blocks.append(block)
+            after = os.fstat(fd)
+            if count > MAX_BUNDLE_BYTES:
+                raise BundleError("bundle exceeds size limit")
+            if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+            ) or count != before.st_size:
+                raise BundleError("bundle changed during descriptor read")
+            try:
+                return b"".join(blocks).decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise BundleError("bundle must contain UTF-8") from exc
+        finally:
+            os.close(fd)
+    finally:
+        os.close(parent)
 
 
 __all__ = ["MAX_BUNDLE_BYTES", "BUNDLE_SUFFIX", "BundleCodec", "safe_member_path", "export_bundle",

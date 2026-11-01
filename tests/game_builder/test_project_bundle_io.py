@@ -121,3 +121,47 @@ def test_tenant_path_write_read(tmp_path, saver):
     with pytest.raises(BundleError):
         bio.bundle_path(tmp_path, "t", "hero", lambda t, purpose: "../../escape")
     assert json.loads(raw)["version"] == BUNDLE_SCHEMA_VERSION
+
+
+def test_bundle_io_rejects_symlinked_ancestor(tmp_path):
+    root = tmp_path / "real"
+    root.mkdir()
+    link = tmp_path / "redirect"
+    try:
+        link.symlink_to(root, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink unavailable")
+    target = link / "hero.gfbundle.json"
+    with pytest.raises(BundleError):
+        bio.write_bundle(target, '{"safe":true}')
+    (root / "hero.gfbundle.json").write_text('{"safe":true}')
+    with pytest.raises(BundleError):
+        bio.read_bundle(target)
+
+
+def test_bundle_atomic_publication_holds_parent_descriptor_during_swap(tmp_path, monkeypatch):
+    """Replacing the path to a parent cannot redirect the held rename."""
+    import os
+
+    root = tmp_path / "tenant"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target = root / "hero.gfbundle.json"
+    original_rename = bio.os.rename
+    changed = [False]
+
+    def swap_parent(src, dst, **kwargs):
+        if not changed[0] and kwargs.get("src_dir_fd") is not None:
+            changed[0] = True
+            root.rename(tmp_path / "retired")
+            root.symlink_to(outside, target_is_directory=True)
+        return original_rename(src, dst, **kwargs)
+
+    monkeypatch.setattr(bio.os, "rename", swap_parent)
+    bio.write_bundle(target, '{"safe":true}')
+    assert changed[0]
+    assert (tmp_path / "retired" / target.name).read_text() == '{"safe":true}'
+    assert not (outside / target.name).exists()
+    with pytest.raises(BundleError):
+        bio.read_bundle(target)
