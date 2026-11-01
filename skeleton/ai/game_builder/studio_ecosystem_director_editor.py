@@ -153,7 +153,8 @@ def render_director_editor(
         } for index, row in enumerate(scenes)],
         "recipes": [{"recipe_id": item["recipe_id"], "recipe_kind": item["recipe_kind"]}
                     for item in recipes],
-        "native_assets_verified": False, "release_certified": False,
+        "native_assets_verified": False, "native_asset_binding_verified": False,
+        "release_certified": False,
     }
     raw = _canonical(model)
     if len(raw) > 128 * 1024:
