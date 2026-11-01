@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import struct
+import zlib
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Callable
@@ -63,18 +64,76 @@ def _texture_dims(w: int, h: int, what: str) -> None:
 
 
 def _png(data: bytes) -> dict[str, Any]:
+    """Inspect PNG chunks with bounded framing, CRC and critical-order checks.
+
+    Metadata extraction does not claim full pixel decompression; a renderer
+    must still decode IDAT under its own bounded image policy.
+    """
     _need(data, 33, "png")
-    if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise AssetImportError("bad png signature")
-    w, h, depth, ctype = struct.unpack(">IIBB", data[16:26])
-    _texture_dims(w, h, "png")
-    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(ctype)
-    if channels is None or depth not in (1, 2, 4, 8, 16):
-        raise AssetImportError("bad png color type or bit depth")
-    if b"IEND" not in data[-12:]:
+    offset = 8
+    chunks = 0
+    seen_idat = seen_iend = seen_plte = seen_trns = False
+    idat_closed = False
+    has_alpha = False
+    w = h = depth = ctype = 0
+    view = memoryview(data)
+    while offset < len(data):
+        chunks += 1
+        if chunks > 8192 or len(data) - offset < 12:
+            raise AssetImportError("truncated or excessive png chunks")
+        length = struct.unpack_from(">I", data, offset)[0]
+        if length > len(data) - offset - 12:
+            raise AssetImportError("truncated png chunk payload")
+        kind = data[offset + 4:offset + 8]
+        end = offset + 12 + length
+        if any(not (65 <= byte <= 90 or 97 <= byte <= 122) for byte in kind):
+            raise AssetImportError("invalid png chunk type")
+        expected_crc = struct.unpack_from(">I", data, end - 4)[0]
+        actual_crc = zlib.crc32(view[offset + 4:end - 4]) & 0xFFFFFFFF
+        if expected_crc != actual_crc:
+            raise AssetImportError("png chunk CRC mismatch")
+        payload = view[offset + 8:end - 4]
+        if chunks == 1:
+            if kind != b"IHDR" or length != 13:
+                raise AssetImportError("png must begin with 13-byte IHDR")
+            w, h, depth, ctype, compression, filtering, interlace = struct.unpack(">IIBBBBB", payload)
+            _texture_dims(w, h, "png")
+            depths = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8),
+                      4: (8, 16), 6: (8, 16)}
+            if depth not in depths.get(ctype, ()) or compression != 0 or filtering != 0 or interlace not in (0, 1):
+                raise AssetImportError("bad png color type or bit depth")
+        elif kind == b"IHDR":
+            raise AssetImportError("duplicate png IHDR")
+        elif kind == b"PLTE":
+            if seen_plte or seen_idat or length == 0 or length > 768 or length % 3:
+                raise AssetImportError("invalid png palette")
+            seen_plte = True
+        elif kind == b"tRNS":
+            if seen_trns or seen_idat or ctype not in (0, 2, 3):
+                raise AssetImportError("invalid png transparency chunk")
+            seen_trns = True
+            has_alpha = True
+        elif kind == b"IDAT":
+            if idat_closed or (ctype == 3 and not seen_plte):
+                raise AssetImportError("invalid png IDAT order")
+            seen_idat = True
+        elif kind == b"IEND":
+            if length or not seen_idat or end != len(data):
+                raise AssetImportError("invalid png IEND or trailing data")
+            seen_iend = True
+            break
+        elif 65 <= kind[0] <= 90:
+            raise AssetImportError("unsupported critical png chunk")
+        if seen_idat and kind != b"IDAT":
+            idat_closed = True
+        offset = end
+    if not seen_iend:
         raise AssetImportError("truncated png (no IEND)")
+    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
     return {"width": w, "height": h, "bit_depth": depth, "channels": channels,
-            "has_alpha": ctype in (4, 6) or b"tRNS" in data, "power_of_two": _pot(w) and _pot(h)}
+            "has_alpha": ctype in (4, 6) or has_alpha, "power_of_two": _pot(w) and _pot(h)}
 
 
 def _jpeg(data: bytes) -> dict[str, Any]:

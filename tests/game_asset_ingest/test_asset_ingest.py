@@ -74,6 +74,21 @@ def test_broken_png(data):
         import_bytes("t.png", data)
 
 
+def test_png_chunk_integrity_and_order_fail_closed():
+    valid = png()
+    crc_corrupt = bytearray(valid)
+    crc_corrupt[29] ^= 1  # First IHDR CRC byte; dimensions remain unchanged.
+    idat_offset = valid.index(b"IDAT") - 4
+    idat_length = struct.unpack_from(">I", valid, idat_offset)[0]
+    without_idat = valid[:idat_offset] + valid[idat_offset + 12 + idat_length:]
+    # Valid-looking terminal marker must not hide arbitrary trailing bytes.
+    for invalid in (bytes(crc_corrupt), without_idat, valid + b"hidden",
+                    valid[:-1], valid[:8] + b"\xff\xff\xff\xff" + valid[12:]):
+        with pytest.raises(AssetImportError):
+            import_bytes("corrupt.png", invalid)
+    assert import_bytes("good.png", valid).metadata["channels"] == 4
+
+
 def test_obj_metadata_and_bad_index():
     m = import_bytes("m.obj", OBJ).metadata
     assert (m["vertices"], m["faces"], m["triangles"]) == (4, 1, 2)
