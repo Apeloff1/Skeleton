@@ -13,6 +13,7 @@ from .long_context_host_pressure import observe_host_pressure
 from .long_context_cgroup import observe_cgroup_pressure
 from .long_context_cgroup_events import CgroupEventMonitor
 from .long_context_telemetry_fusion import LongContextTelemetryFusion
+from .long_context_pressure_latch import LongContextPressureLatch
 from .tokenization import deserialize_token_sequence
 
 
@@ -79,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("head-observe-cgroup", help="Read cgroup-v2 pressure; no grant")
     commands.add_parser("head-observe-events", help="Untrusted cgroup event baseline; no grant")
     commands.add_parser("head-observe-fused", help="Conservative combined local telemetry; no grant")
+    commands.add_parser("head-observe-latched", help="One-shot recovery diagnostic; no grant")
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
     plan.add_argument("--candidate", action="append", required=True,
                       help="stream-id:checkpoint:generation:weight:max-tokens[:requested-bytes]")
@@ -94,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     # Host observation never needs to open, create, or authorize a spool.
     # This keeps unsupported platforms conservatively observable rather
     # than mistaking POSIX spool unavailability for normal pressure.
-    if args.command in ("head-observe", "head-observe-cgroup", "head-observe-events", "head-observe-fused"):
+    if args.command in ("head-observe", "head-observe-cgroup", "head-observe-events", "head-observe-fused", "head-observe-latched"):
         if args.command == "head-observe":
             result = observe_host_pressure()
         elif args.command == "head-observe-cgroup":
@@ -102,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "head-observe-events":
             # One-shot CLI can establish only a baseline, never a safe delta.
             result = CgroupEventMonitor().sample()
+        elif args.command == "head-observe-latched":
+            result = LongContextPressureLatch(LongContextTelemetryFusion()).sample()
         else:
             result = LongContextTelemetryFusion().sample()
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
