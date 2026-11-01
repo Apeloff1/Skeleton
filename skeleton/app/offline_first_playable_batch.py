@@ -110,6 +110,13 @@ def _evidence(result: dict[str, object]) -> dict[str, object]:
     return {key: result[key] for key in keys}
 
 
+def _record(result: dict[str, object], moves: tuple[str, ...]) -> dict[str, object]:
+    return {
+        **_evidence(result),
+        "moves_sha256": sha256(_canonical_bytes(list(moves))).hexdigest(),
+    }
+
+
 def _summary(records: list[dict[str, object]]) -> dict[str, object]:
     if len({record["project_id"] for record in records}) != len(records):
         raise FirstPlayableDeliveryBatchError("duplicate original game project ID")
@@ -145,7 +152,7 @@ def _inspect_jobs(jobs: tuple[DeliveryJob, ...],
             expected_receipt_sha256=record["independent_receipt_sha256"],
             authorized=True,
         )
-        if (_evidence(inspected) != record
+        if (_record(inspected, job.moves) != record
                 or inspected.get("live_source_and_private_replay_reexecuted") is not True
                 or inspected.get("read_only") is not True):
             raise FirstPlayableDeliveryBatchError(
@@ -180,7 +187,7 @@ def publish_first_playable_delivery_batch(
             expected_manifest_sha256=job.manifest_sha256,
             moves=job.moves, authorized=True,
         )
-        records.append(_evidence(published))
+        records.append(_record(published, job.moves))
     # Recheck every earlier delivery after the last game has been installed.
     _inspect_jobs(checked, records)
     envelope = _summary(records)
@@ -233,6 +240,7 @@ def inspect_first_playable_delivery_batch(
             "world_digest": record["world_digest"],
             "replay_digest": record["replay_digest"],
             "action_count": len(job.moves),
+            "moves_sha256": sha256(_canonical_bytes(list(job.moves))).hexdigest(),
         }
         for job, record in zip(checked, stored["games"], strict=True)
     ]

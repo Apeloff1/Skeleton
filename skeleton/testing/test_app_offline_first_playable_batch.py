@@ -217,3 +217,21 @@ def test_cli_full_cohort_publication_and_pinned_reinspection(
     checked = json.loads(capsys.readouterr().out)
     assert checked["all_live_games_reexecuted"] is True
     assert checked["release_certified"] is False
+
+
+def test_reinspection_rejects_same_length_different_player_actions(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    altered = list(pinned(jobs, published))
+    altered[0] = replace(altered[0], moves=("left", "down"))
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        inspect_first_playable_delivery_batch(
+            altered, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
