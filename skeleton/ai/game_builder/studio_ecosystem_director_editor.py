@@ -132,7 +132,9 @@ def render_director_editor(
             or [row.get("scene_id") for row in scenes] != [
                 row.get("scene_id") for row in bound]):
         raise StudioQuestError("director editor scene order mismatch")
-    recipes = assets.get("production_work_orders")
+    # Editing must offer *every* source-authorized recipe, not only recipes
+    # already selected in the current binding work orders.
+    recipes = assets.get("available_recipes")
     if type(recipes) is not list or not recipes:
         raise StudioQuestError("director editor has no original asset recipes")
     model = {

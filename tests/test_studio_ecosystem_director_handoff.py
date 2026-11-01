@@ -165,6 +165,7 @@ def test_offline_editor_has_csp_safe_embedded_json_and_no_native_claims():
     html, receipt = render_director_editor(timing, assets)
     assert sha256(html).hexdigest() == receipt["html_sha256"]
     assert receipt["authoring_export_only"] is True
+    assert len(assets["available_recipes"]) > assets["used_recipe_count"]
     assert b"Content-Security-Policy" in html
     assert b"studio_scene_assignments.json" in html
     assert b"studio_scene_schedule.json" in html

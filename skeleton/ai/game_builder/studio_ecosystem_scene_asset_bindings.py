@@ -191,6 +191,7 @@ def compile_scene_asset_bindings(
         "assignments": assignments, "assignments_digest": _digest(assignments),
         "scene_count": len(scene_cards), "binding_count": binding_count,
         "recipe_count": len(recipes), "used_recipe_count": len(work_orders),
+        "available_recipes": [recipes[key] for key in sorted(recipes)],
         "unreferenced_recipe_ids": sorted(set(recipes) - set(work_orders)),
         "scenes": scene_cards,
         "production_work_orders": [work_orders[key] for key in sorted(work_orders)],

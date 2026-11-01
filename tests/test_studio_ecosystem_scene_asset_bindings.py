@@ -53,6 +53,9 @@ def test_exact_scene_asset_coverage_with_original_recipe_work_orders(project):
     assert result["scene_count"] == len(assignments)
     assert result["binding_count"] == sum(map(len, assignments.values()))
     assert result["used_recipe_count"] == 1
+    assert len(result["available_recipes"]) == result["recipe_count"]
+    assert all(recipe["native_asset_verified"] is False
+               for recipe in result["available_recipes"])
     assert result["replay_verified"] is True
     assert result["native_asset_verified"] is False
     assert result["rights_verified"] is False
