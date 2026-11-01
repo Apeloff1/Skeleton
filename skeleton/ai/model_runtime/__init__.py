@@ -12,6 +12,7 @@ from importlib import import_module
 _LAZY_EXPORTS = {
     "LongContextSpool": ".long_context_spool",
     "CgroupEventMonitor": ".long_context_cgroup_events",
+    "LongContextTelemetryFusion": ".long_context_telemetry_fusion",
     "observe_cgroup_pressure": ".long_context_cgroup",
     "LongContextFairPlanner": ".long_context_fairness",
     "PressureSignals": ".long_context_fairness",
@@ -231,6 +232,8 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".long_context_cgroup", __name__)
     if module_name == ".long_context_cgroup_events":
         return import_module(".long_context_cgroup_events", __name__)
+    if module_name == ".long_context_telemetry_fusion":
+        return import_module(".long_context_telemetry_fusion", __name__)
     if module_name == ".long_context_fairness":
         return import_module(".long_context_fairness", __name__)
     if module_name == ".long_context_spool":
