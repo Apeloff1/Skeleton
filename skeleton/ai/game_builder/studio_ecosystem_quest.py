@@ -155,6 +155,9 @@ def compile_quest_program(documents: Mapping[str, Any]) -> QuestProgram:
                            for token in tokens)):
                 raise StudioQuestError("invalid or forged choice effect token")
             effects.append((alternative, tokens))
+        all_effect_tokens = [token for _, tokens in effects for token in tokens]
+        if len(set(all_effect_tokens)) != len(all_effect_tokens):
+            raise StudioQuestError("ambiguous choice effect attribution")
         seen.add(key)
         stages.append(QuestStage(key, requirements, options, reward,
                                  tuple(effects)))

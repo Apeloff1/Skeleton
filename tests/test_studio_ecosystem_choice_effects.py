@@ -91,6 +91,15 @@ def test_forged_or_malformed_choice_effects_fail_closed(bad):
         compile_quest_program(docs)
 
 
+def test_same_effect_token_cannot_be_attributed_to_two_alternatives():
+    docs, key, left, right, _, token = authored()
+    docs["quest"]["stage_graph"][0]["choice_effects"] = {
+        left: [token], right: [token],
+    }
+    with pytest.raises(StudioQuestError, match="ambiguous"):
+        compile_quest_program(docs)
+
+
 def test_unknown_choice_predicate_and_legacy_compatibility():
     docs, *_ = authored()
     docs["narrative"]["endings"][0]["requires"] = ["choice:investigate:forged"]
