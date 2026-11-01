@@ -21,6 +21,7 @@ from skeleton.app.offline_archive_install import (
     _parent as _install_parent, install_offline_game_source,
 )
 from skeleton.app.offline_delivery_archive import inspect_offline_game_archive
+from skeleton.app.offline_progress_compatibility import verify_archived_progress_binding
 from skeleton.app.private_game_save import (
     read_private_game_save, publish_private_game_save,
 )
@@ -41,7 +42,7 @@ def _validate_migration_inputs(
     expected_save_sha256: str,
     migrated_save: str | Path,
     authorized: bool,
-) -> tuple[bytes, dict[str, object]]:
+) -> tuple[bytes, dict[str, object], dict[str, object]]:
     """Read-only admission shared by migration planning and publication."""
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
@@ -74,7 +75,12 @@ def _validate_migration_inputs(
         expected_manifest_sha256=expected_manifest_sha256, authorized=True,
     )
 
-    return raw_save, inspected
+    compatible = verify_archived_progress_binding(
+        archive, raw_save, expected_archive_sha256=expected_archive_sha256,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_save_sha256=expected_save_sha256, authorized=True,
+    )
+    return raw_save, inspected, compatible
 
 
 def preflight_offline_game_migration(
@@ -91,7 +97,7 @@ def preflight_offline_game_migration(
     Save-to-world binding is not asserted until the source has been installed
     and the canonical replay reexecuted. Preflight is never a reservation.
     """
-    raw_save, inspected = _validate_migration_inputs(
+    raw_save, inspected, compatible = _validate_migration_inputs(
         archive, destination,
         expected_archive_sha256=expected_archive_sha256,
         expected_manifest_sha256=expected_manifest_sha256,
@@ -110,10 +116,14 @@ def preflight_offline_game_migration(
         "archived_files": inspected["archived_files"],
         "archive_integrity_verified": True,
         "private_save_integrity_verified": True,
-        "save_world_binding_verified": False,
+        "save_world_binding_verified": True,
+        "world_digest": compatible["world_digest"],
+        "replay_digest": compatible["replay_digest"],
+        "action_count": compatible["action_count"],
         "destination_reserved": False,
         "source_installation_verified": False,
-        "private_save_replayed": False,
+        "private_save_replayed": True,
+        "source_gameplay_reexecuted_from_archive": False,
         "native_device_qualified": False,
         "release_certified": False,
     }
@@ -136,7 +146,7 @@ def migrate_offline_game_progress(
     delete or overwrite either source or destination. Both published outputs
     are retained for explicit quarantine if a late verification fails.
     """
-    raw_save, inspected = _validate_migration_inputs(
+    raw_save, inspected, compatible = _validate_migration_inputs(
         archive, destination,
         expected_archive_sha256=expected_archive_sha256,
         expected_manifest_sha256=expected_manifest_sha256,
@@ -160,7 +170,9 @@ def migrate_offline_game_progress(
         authorized=True,
     )
     replay = deserialize_replay(world, raw_save, authorized=True)
-    if (installed.get("world_digest") != world.digest
+    if (compatible["world_digest"] != world.digest
+            or compatible["replay_digest"] != replay.digest
+            or installed.get("world_digest") != world.digest
             or inspected.get("archive_integrity_verified") is not True
             or installed.get("source_installation_verified") is not True):
         raise OfflineProgressMigrationError("installed world identity is unqualified")

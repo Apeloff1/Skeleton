@@ -27,9 +27,10 @@ def test_pinned_preflight_does_not_create_installation_or_save(tmp_path, capsys)
     receipt = json.loads(capsys.readouterr().out)
     assert receipt["archive_integrity_verified"] is True
     assert receipt["private_save_integrity_verified"] is True
-    assert receipt["save_world_binding_verified"] is False
+    assert receipt["save_world_binding_verified"] is True
     assert receipt["destination_reserved"] is False
-    assert receipt["private_save_replayed"] is False
+    assert receipt["private_save_replayed"] is True
+    assert receipt["source_gameplay_reexecuted_from_archive"] is False
     assert receipt["release_certified"] is False
     assert not destination.exists()
     assert not migrated.exists()
