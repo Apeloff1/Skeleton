@@ -802,6 +802,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-weather-author":
         from skeleton.game.gameplay.scene_weather_author import cli as weather_author_cli
         return weather_author_cli(rest)
+    if cmd == "weather-deliveries-plan":
+        from skeleton.game.gameplay.scene_weather_delivery_solver import cli as delivery_plan_cli
+        return delivery_plan_cli(rest)
     if cmd == "weather-deliveries":
         from skeleton.game.gameplay.scene_weather_delivery import cli as delivery_cli
         return delivery_cli(rest)
