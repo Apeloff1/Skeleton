@@ -229,3 +229,20 @@ and not writable by group or other users. Two bounded descriptor reads must
 agree, and the original parent path must still resolve to the pinned directory
 inode before typed intent construction. A changed, swapped or concurrently
 rewritten source is blocked before the costly game build or export.
+
+
+### Read-only comparison of private offline playthroughs
+
+After creating two owner-private saves with `studio-journey --play-existing --save`,
+compare their reexecuted histories using `studio-journey --compare-saves
+--output GAME_DIR --expected-manifest-sha256 MANIFEST_PIN --left-save LEFT.json
+--left-sha256 LEFT_PIN --right-save RIGHT.json --right-sha256 RIGHT_PIN
+--trusted-local-operator`. The manifest and both save hashes must be held
+independently. Comparison rejects foreign-world, modified, non-private or
+ambiguous saves, never writes to source or save paths, and reports the first
+zero-based action index at which two canonical replay histories diverge.
+An identical history returns null for the divergent index. A strict prefix
+diverges at the first absent action. This only verifies offline source-level
+gameplay, not AI inference, native Godot execution, device qualification,
+rights certification, or release readiness. Saving a new replay now verifies
+the original source again before publishing any new private save.

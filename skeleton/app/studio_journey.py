@@ -43,6 +43,9 @@ from skeleton.ai.game_builder.playable_simulation import (
 from skeleton.app.private_game_save import (
     PrivateGameSaveError, publish_private_game_save, read_private_game_save,
 )
+from skeleton.app.offline_save_comparison import (
+    OfflineSaveComparisonError, compare_verified_offline_saves,
+)
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, PlayableWorldError
 from skeleton.ai.game_builder.mirror_room_runtime import MirrorRoomError
 from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
@@ -366,6 +369,15 @@ def play_existing_source_game(
     save_pin = None
     if save_destination is not None:
         data = serialize_replay(world, replay, authorized=True)
+        # Fail before publishing a save if the source changed while the
+        # player was replaying. The post-publication verification below
+        # remains mandatory; neither check is a native device claim.
+        before_save = verify_exported_package(
+            source_directory, expected_manifest_sha256=expected_manifest_sha256,
+            authorized=True,
+        )
+        if before_save.get("world_digest") != world.digest:
+            raise FirstPlayableJourneyError("source changed before save publication")
         save_pin = publish_private_game_save(
             data, save_destination, protected_roots=(source_directory,),
             authorized=True,
@@ -430,6 +442,12 @@ def _parser() -> argparse.ArgumentParser:
                         help="read-only re-verification of an existing exported game")
     parser.add_argument("--play-existing", action="store_true",
                         help="run bounded player moves on independently verified offline game source")
+    parser.add_argument("--compare-saves", action="store_true",
+                        help="read-only compare two independently pinned private replay histories")
+    parser.add_argument("--left-save", help="first owner-private offline replay save")
+    parser.add_argument("--left-sha256", help="independent SHA-256 of first save")
+    parser.add_argument("--right-save", help="second owner-private offline replay save")
+    parser.add_argument("--right-sha256", help="independent SHA-256 of second save")
     parser.add_argument("--moves",
                         help="comma-separated up/down/left/right controls for --play-existing")
     parser.add_argument("--load-save",
@@ -468,7 +486,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.project_id, args.title, args.subtitle, args.seed,
             args.theme, args.width, args.height, args.levels,
         )
-        if args.play_existing:
+        comparison_values = (
+            args.left_save, args.left_sha256, args.right_save, args.right_sha256,
+        )
+        if args.compare_saves:
+            if (args.play_existing or args.reconcile_receipt or args.inspect_receipt
+                    or args.verify_existing or args.onboard or args.intent is not None
+                    or args.output is None or args.expected_manifest_sha256 is None
+                    or any(value is None for value in comparison_values)
+                    or any(value is not None for value in onboarding_values)
+                    or args.receipt is not None or args.expected_receipt_sha256 is not None
+                    or args.moves is not None or args.load_save is not None
+                    or args.expected_save_sha256 is not None or args.save is not None
+                    or args.fork_at is not None or args.mirror_attempts != 64
+                    or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid offline save comparison mode")
+            receipt = compare_verified_offline_saves(
+                args.output, expected_manifest_sha256=args.expected_manifest_sha256,
+                left_save=args.left_save, left_sha256=args.left_sha256,
+                right_save=args.right_save, right_sha256=args.right_sha256,
+                authorized=args.trusted_local_operator,
+            )
+        elif any(value is not None for value in comparison_values):
+            raise FirstPlayableJourneyError("save comparison options require --compare-saves")
+        elif args.play_existing:
             if (args.reconcile_receipt or args.inspect_receipt or args.verify_existing
                     or args.onboard or args.output is None
                     or args.expected_manifest_sha256 is None
@@ -572,7 +613,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
     except (
-        FirstPlayableJourneyError, PrivateGameSaveError, StudioError, PlayableWorldError,
+        FirstPlayableJourneyError, PrivateGameSaveError, OfflineSaveComparisonError,
+        StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
         ReceiptPublicationError, ReceiptInspectionError,
