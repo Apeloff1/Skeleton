@@ -102,7 +102,9 @@ def test_exclusive_private_bundle_publication_and_replay(tmp_path):
     assert verify_director_handoff(
         docs, [], schedule, assignments, tmp_path, **kwargs) == manifest
     with pytest.raises(FileExistsError):
-        publish_director_handoff(manifest, bundle, tmp_path, authorized=True)
+        publish_director_handoff(
+            manifest, bundle, tmp_path, authorized=True, documents=docs,
+            actions=[], schedule=schedule, assignments=assignments)
     path.write_bytes(bundle[:-1] + bytes([bundle[-1] ^ 1]))
     with pytest.raises(StudioQuestError):
         verify_director_handoff(
@@ -184,7 +186,6 @@ def test_offline_editor_has_csp_safe_embedded_json_and_no_native_claims():
 def test_director_restore_rejects_fifo_symlink_hardlink_and_public_file(tmp_path):
     """An untrusted filesystem entry must not block or lend replay authority."""
     import os
-    import stat
 
     docs, source, visual, session, schedule, assignments = fixture()
     kwargs = dict(authorized=True, expected_source_digest=source,
