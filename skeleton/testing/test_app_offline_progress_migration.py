@@ -206,3 +206,43 @@ def test_migration_rejects_symlinked_archive_before_install(tmp_path, capsys):
     )) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert not destination.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inode custody")
+@pytest.mark.parametrize("input_name", ["original_save", "archive"])
+def test_same_bytes_inode_replacement_after_install_fails_closed(
+    tmp_path, capsys, monkeypatch, input_name,
+):
+    from skeleton.app import offline_progress_migration as module
+
+    source, pin = _journey(tmp_path, capsys)
+    save, save_pin, _ = _save(tmp_path, capsys, source, pin)
+    archive, archive_pin = _package(tmp_path, capsys, source, pin)
+    destination = tmp_path / "new-install"
+    migrated = tmp_path / "new-save.json"
+    target = save if input_name == "original_save" else archive
+    original = module.install_offline_game_source
+
+    def replace_after_install(*args, **kwargs):
+        receipt = original(*args, **kwargs)
+        replacement = tmp_path / ("replacement-save.json" if input_name == "original_save"
+                                  else "replacement-archive.zip")
+        replacement.write_bytes(target.read_bytes())
+        replacement.chmod(0o600)
+        os.replace(replacement, target)
+        return receipt
+
+    monkeypatch.setattr(module, "install_offline_game_source",
+                        replace_after_install)
+    with pytest.raises(module.OfflineProgressMigrationError):
+        module.migrate_offline_game_progress(
+            archive, destination,
+            expected_archive_sha256=archive_pin,
+            expected_manifest_sha256=pin,
+            original_save=save, expected_save_sha256=save_pin,
+            migrated_save=migrated, authorized=True,
+        )
+    # The already-published install is retained for quarantine; no second
+    # publication should occur after an input inode replacement.
+    assert destination.is_dir()
+    assert not migrated.exists()

@@ -21,7 +21,10 @@ from skeleton.app.offline_archive_install import (
     _parent as _install_parent, install_offline_game_source,
 )
 from skeleton.app.offline_delivery_archive import inspect_offline_game_archive
-from skeleton.app.offline_progress_compatibility import verify_archived_progress_binding
+from skeleton.app.offline_progress_compatibility import (
+    _archive_identity, verify_archived_progress_binding,
+)
+from skeleton.app.offline_delivery_assurance import _save_identity
 from skeleton.app.private_game_save import (
     read_private_game_save, publish_private_game_save,
 )
@@ -147,6 +150,12 @@ def migrate_offline_game_progress(
     delete or overwrite either source or destination. Both published outputs
     are retained for explicit quarantine if a late verification fails.
     """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    # The independent hashes prove bytes, not that a private path retained
+    # its original inode across installation. Fence both original inputs.
+    original_archive_identity = _archive_identity(archive)
+    original_save_identity = _save_identity(original_save)
     raw_save, inspected, compatible = _validate_migration_inputs(
         archive, destination,
         expected_archive_sha256=expected_archive_sha256,
@@ -184,6 +193,11 @@ def migrate_offline_game_progress(
     )
     if not hmac.compare_digest(raw_save, reread):
         raise OfflineProgressMigrationError("original progress changed during migration")
+    if (original_archive_identity != _archive_identity(archive)
+            or original_save_identity != _save_identity(old_save)):
+        raise OfflineProgressMigrationError(
+            "original archive or progress inode replaced before save publication"
+        )
     new_pin = publish_private_game_save(
         raw_save, new_save, protected_roots=(source,), authorized=True,
     )
@@ -203,6 +217,11 @@ def migrate_offline_game_progress(
         archive, expected_archive_sha256=expected_archive_sha256,
         expected_manifest_sha256=expected_manifest_sha256, authorized=True,
     )
+    if (original_archive_identity != _archive_identity(archive)
+            or original_save_identity != _save_identity(old_save)):
+        raise OfflineProgressMigrationError(
+            "original archive or progress inode replaced during migration"
+        )
     if (final.get("world_digest") != world.digest
             or final.get("offline_gameplay_reexecuted") is not True
             or archive_after.get("archive_integrity_verified") is not True
