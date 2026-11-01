@@ -80,12 +80,17 @@ def _bounded_walk_receipt(value: object) -> bytes:
         raise StudioQuestError("invalid bounded walk receipt contract")
     validate_walk_events(value["events"])
     for choice in value["choices"]:
-        if (type(choice) is not list or len(choice) != 2
-                or any(type(text) is not str
-                       or len(text) > MAX_WALK_EVENT_BYTES
-                       or len(text.encode("utf-8", "strict")) > MAX_WALK_EVENT_BYTES
-                       for text in choice)):
+        if type(choice) is not list or len(choice) != 2:
             raise StudioQuestError("invalid bounded walk choice history")
+        for text in choice:
+            if type(text) is not str or len(text) > MAX_WALK_EVENT_BYTES:
+                raise StudioQuestError("invalid bounded walk choice history")
+            try:
+                encoded_size = len(text.encode("utf-8", "strict"))
+            except UnicodeError as exc:
+                raise StudioQuestError("noncanonical walk choice history") from exc
+            if encoded_size > MAX_WALK_EVENT_BYTES:
+                raise StudioQuestError("invalid bounded walk choice history")
     raw = _canonical(value)
     if len(raw) > MAX_BYTES:
         raise StudioQuestError("walk receipt exceeds handoff byte budget")

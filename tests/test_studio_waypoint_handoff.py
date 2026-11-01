@@ -278,3 +278,11 @@ def test_preflight_rejects_nested_unbounded_session_without_serializing(source):
     session["events"] = [["move", "x" * 5000]]
     with pytest.raises(StudioQuestError, match="byte budget"):
         plan(source, session)
+
+
+def test_malformed_unicode_in_walk_choices_is_fail_closed(source):
+    session = new_walk_receipt(source[0], authorized=True,
+                               expected_source_digest=DIGEST)
+    session["choices"] = [["stage", "\\ud800"]]
+    with pytest.raises(StudioQuestError, match="noncanonical"):
+        plan(source, session)

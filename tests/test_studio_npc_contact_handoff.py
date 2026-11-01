@@ -223,3 +223,14 @@ def test_untrusted_jeeves_request_cannot_grant_authority(source, monkeypatch):
              "arguments": {**request, "authorized": True}},
             authorized=True,
         )
+
+
+def test_cast_snapshot_must_match_contact_observation(source, monkeypatch):
+    import skeleton.ai.game_builder.studio_npc_contact_handoff as contact
+    monkeypatch.setattr(contact, "inspect_npc_contact", lambda *args, **kwargs: {
+        "project_id": "original", "npc_id": "archivist",
+        "local_contact_available": True, "real_dialogue_performed": False,
+        "patrol_position": [2, 1], "authored_knowledge": "forged",
+    })
+    with pytest.raises(StudioQuestError, match="diverged"):
+        plan(source)

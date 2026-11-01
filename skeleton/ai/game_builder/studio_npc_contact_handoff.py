@@ -58,10 +58,17 @@ def compile_npc_contact_handoff(
         accepted_moves=session.accepted_moves, scene_index=session.scene_index,
         authorized=True,
     )
+    actor = next((item for item in cast["actors"] if item["id"] == npc_id), None)
+    if actor is None:
+        raise StudioQuestError("NPC missing from source-bound cast snapshot")
+    expected_position = actor["patrol_by_stage"][session.scene_index][
+        session.accepted_moves % 2]
     if (contact["project_id"] != session.project_id
             or contact["npc_id"] != npc_id
             or contact["local_contact_available"] is not True
-            or contact["real_dialogue_performed"] is not False):
+            or contact["real_dialogue_performed"] is not False
+            or contact["patrol_position"] != expected_position
+            or contact["authored_knowledge"] != actor["knows"]):
         raise StudioQuestError("NPC contact evidence diverged from authored source")
     payload: dict[str, Any] = {
         "schema": SCHEMA, "project_id": session.project_id,
