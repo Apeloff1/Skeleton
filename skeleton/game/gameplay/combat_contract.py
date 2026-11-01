@@ -163,7 +163,9 @@ def _advance(session: dict[str, Any], action: Any) -> dict[str, Any]:
     source, previous = session["source"], session["state"]
     if previous["phase"] != "active":
         raise CombatSessionError("contract is already terminal")
-    # Only called with canonical sessions from new_contract or verified replay.\n    # Avoid quadratic nested verification on every internal simulation step.\n    combat = advance_combat(previous["combat"], action)
+    # Only called with canonical sessions from new_contract or verified replay.
+    # Avoid quadratic nested verification on every internal simulation step.
+    combat = advance_combat(previous["combat"], action)
     progress = _progress(source, combat)
     combat_phase = combat["state"]["phase"]
     phase = "active"
