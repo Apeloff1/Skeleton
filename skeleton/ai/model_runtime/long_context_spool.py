@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import stat
+from time import monotonic_ns, sleep
 from typing import Any
 
 from .flgb_model_runtime import TokenSequence
@@ -28,6 +29,7 @@ _SCHEMA = "skeleton.ai.long-context-spool.v1"
 _CHUNK = 1024 * 1024
 MAX_WINDOW_TOKENS = 65_536
 DEFAULT_WINDOW_TOKENS = 4_096
+_PUBLISH_LOCK_WAIT_NS = 2_000_000_000
 
 
 class LongContextSpoolError(TokenizerContractError):
@@ -311,7 +313,64 @@ class LongContextSpool:
         finally:
             os.close(bucket_fd)
 
+    def _publication_lock(self) -> int:
+        """Bounded cross-process lock for cooperative POSIX disk admissions.
+
+        Lock before checking free space and hold through durable publication.
+        This prevents *cooperating* spool writers from each independently
+        spending the same disk reserve. The trusted owner must still enforce
+        per-tenant quotas and exclude malicious same-UID directory mutation.
+        """
+        if self._root_fd is None:
+            raise LongContextSpoolError("secure spool root is closed")
+        import fcntl
+
+        try:
+            fd = os.open(
+                ".publish.lock",
+                os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+                0o600, dir_fd=self._root_fd,
+            )
+        except OSError as exc:
+            raise LongContextSpoolError("spool publication lock unavailable") from exc
+        try:
+            _require_private_spool_file(fd)
+            identity = os.fstat(fd)
+            if identity.st_nlink != 1:
+                raise LongContextSpoolError("spool publication lock has external links")
+            started = monotonic_ns()
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError as exc:
+                    if monotonic_ns() - started >= _PUBLISH_LOCK_WAIT_NS:
+                        raise LongContextSpoolError(
+                            "spool publication lock contention"
+                        ) from exc
+                    sleep(0.01)
+            # An unlinked/replaced lock inode cannot serialize new writers.
+            # Recheck the descriptor-relative name AFTER acquiring the lock.
+            entry = os.stat(
+                ".publish.lock", dir_fd=self._root_fd, follow_symlinks=False,
+            )
+            if ((entry.st_dev, entry.st_ino) !=
+                    (identity.st_dev, identity.st_ino) or entry.st_nlink != 1):
+                raise LongContextSpoolError("spool publication lock replaced")
+            return fd
+        except BaseException:
+            os.close(fd)
+            raise
+
     def _publish_fd(self, kind: str, digest: str, raw: bytes) -> None:
+        lock_fd = self._publication_lock()
+        try:
+            self._publish_fd_locked(kind, digest, raw)
+        finally:
+            os.close(lock_fd)
+
+    def _publish_fd_locked(self, kind: str, digest: str, raw: bytes) -> None:
+        """Caller holds the cross-process admission lock."""
         bucket_fd = self._open_bucket(kind, digest)
         try:
             try:

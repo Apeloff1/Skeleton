@@ -171,6 +171,28 @@ class TestLongContextSpool(unittest.TestCase):
         with self.assertRaises(LongContextSpoolError):
             self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
 
+    def test_posix_publish_lock_symlink_cannot_redirect_spool_writes(self):
+        if os.name != "posix":
+            self.skipTest("POSIX no-follow publication lock")
+        target = Path(self.directory.name) / "untrusted-lock-target"
+        target.write_bytes(b"unchanged")
+        lock = self.root / ".publish.lock"
+        lock.symlink_to(target)
+        with self.assertRaises(LongContextSpoolError):
+            self.stage()
+        self.assertEqual(target.read_bytes(), b"unchanged")
+
+    def test_posix_publish_lock_rejects_untrusted_mode(self):
+        if os.name != "posix":
+            self.skipTest("POSIX private publication lock")
+        start = self.stage()
+        lock = self.root / ".publish.lock"
+        lock.chmod(0o644)
+        with self.assertRaisesRegex(LongContextSpoolError, "owner or mode"):
+            self.spool.advance(
+                start, expected_tokenizer_digest=TOKENIZER, consumed_tokens=1,
+            )
+
     def test_posix_bucket_replacement_cannot_redirect_pinned_io(self):
         if os.name != "posix":
             self.skipTest("POSIX directory-fd contract")

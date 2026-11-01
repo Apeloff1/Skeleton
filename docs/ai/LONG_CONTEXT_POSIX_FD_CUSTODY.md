@@ -30,3 +30,7 @@ A world-readable file with matching content is not accepted as safe custody.
 These checks operate on opened file descriptors, not pathname-only checks.
 Windows remains explicitly unqualified for equivalent ACL and ancestor-race
 assurance. This does not authenticate a malicious same-user publisher.
+
+## Cooperative disk-reserve serialization
+
+POSIX spool publication now takes a descriptor-relative private `.publish.lock` using a bounded nonblocking advisory `flock`. The lock is held across the free-space admission check, temporary write, fsync, no-clobber hardlink and directory fsync. The lock inode is checked for owner, mode, link count and descriptor-relative identity after acquisition. A busy or replaced lock fails closed; reads do not require publication locks. This prevents cooperating processes from simultaneously spending the same free-space reserve, but does **not** implement a per-tenant total-disk quota or protect against a malicious process running with the same filesystem owner identity. The storage backend must still enforce those limits independently.
