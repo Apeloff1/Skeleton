@@ -458,10 +458,19 @@ def resume_first_playable_delivery_batch(
 def inspect_first_playable_delivery_batch(
     jobs: Sequence[DeliveryJob], summary_receipt: str | Path, *,
     expected_summary_sha256: str, authorized: bool,
+    verify_original_sources: bool = False,
 ) -> dict[str, object]:
-    """Reexecute each delivered game with four independent pins per game."""
+    """Reexecute installed games; optionally reverify original source custody.
+
+    The source check is opt-in so archived deliveries remain inspectable after
+    their original authoring workspace has been intentionally removed.
+    """
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
+    if type(verify_original_sources) is not bool:
+        raise FirstPlayableDeliveryBatchError(
+            "original source verification flag must be boolean"
+        )
     checked = _check_jobs(jobs, summary_receipt, inspect=True)
     # An independently pinned digest alone does not bind an inode. Detect a
     # same-byte replacement of the owner-private summary during live replay.
@@ -494,6 +503,27 @@ def inspect_first_playable_delivery_batch(
     ]
     if stored != _summary(records):
         raise FirstPlayableDeliveryBatchError("cohort pins or release holds diverged")
+    original_admissions: list[dict[str, object]] = []
+    original_identities: list[tuple[int, ...]] = []
+    if verify_original_sources:
+        for job, record in zip(checked, records, strict=True):
+            identity = _source_identity(job.source)
+            admission = verify_exported_package(
+                job.source, expected_manifest_sha256=job.manifest_sha256,
+                authorized=True,
+            )
+            if (admission.get("project_id") != record["project_id"]
+                    or admission.get("world_digest") != record["world_digest"]
+                    or admission.get("offline_gameplay_reexecuted") is not True
+                    or admission.get("release_certified") is not False):
+                raise FirstPlayableDeliveryBatchError(
+                    "original source diverged from independently pinned delivery"
+                )
+            original_admissions.append(admission)
+            original_identities.append(identity)
+        _reverify_original_sources(
+            checked, original_admissions, original_identities,
+        )
     _inspect_jobs(checked, records)
     again = read_private_game_save(
         summary_receipt, expected_sha256=expected_summary_sha256,
@@ -509,8 +539,13 @@ def inspect_first_playable_delivery_batch(
         raise FirstPlayableDeliveryBatchError(
             "cohort receipt inode changed during final game replay"
         )
+    if verify_original_sources:
+        _reverify_original_sources(
+            checked, original_admissions, original_identities,
+        )
     return {
         **stored,
+        "original_sources_reverified": verify_original_sources,
         "status": "original_game_delivery_cohort_reverified_release_blocked",
         "independent_summary_sha256": expected_summary_sha256,
         "receipt_integrity_verified": True,
@@ -570,6 +605,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     mode.add_argument("--inspect", action="store_true")
     mode.add_argument("--resume", action="store_true")
     parser.add_argument("--expected-summary-sha256")
+    parser.add_argument("--verify-original-sources", action="store_true",
+                        help="also replay original source trees against pinned delivered games")
     parser.add_argument("--trusted-local-operator", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -585,8 +622,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 jobs, args.summary,
                 expected_summary_sha256=args.expected_summary_sha256,
                 authorized=True,
+                verify_original_sources=args.verify_original_sources,
             )
         else:
+            if args.verify_original_sources:
+                raise FirstPlayableDeliveryBatchError(
+                    "original source inspection is read-only inspection mode only"
+                )
             if args.expected_summary_sha256 is not None:
                 raise FirstPlayableDeliveryBatchError("output pin is inspection-only")
             if args.resume:

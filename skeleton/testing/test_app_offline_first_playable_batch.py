@@ -615,3 +615,51 @@ def test_read_only_cohort_inspection_rejects_same_byte_summary_inode_swap(
         )
     assert reads >= 1
     assert summary.exists()  # read-only inspector never deletes evidence
+
+
+def test_opt_in_original_source_provenance_inspection_detects_post_delivery_change(
+    original_games, tmp_path,
+):
+    copied = _copied_original_games(original_games, tmp_path)
+    jobs = jobs_for(copied, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    independent = pinned(jobs, published)
+    verified = inspect_first_playable_delivery_batch(
+        independent, summary,
+        expected_summary_sha256=published["independent_summary_sha256"],
+        authorized=True, verify_original_sources=True,
+    )
+    assert verified["original_sources_reverified"] is True
+    assert verified["release_certified"] is False
+
+    (copied[0][0] / "release.json").write_bytes(b'{"tampered":true}')
+    with pytest.raises(ValueError):
+        inspect_first_playable_delivery_batch(
+            independent, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True, verify_original_sources=True,
+        )
+    # Offline delivery remains independently verifiable after the authoring
+    # workspace changes, but must never claim to have reverified that source.
+    archived = inspect_first_playable_delivery_batch(
+        independent, summary,
+        expected_summary_sha256=published["independent_summary_sha256"],
+        authorized=True,
+    )
+    assert archived["original_sources_reverified"] is False
+    assert archived["release_certified"] is False
+
+
+def test_original_source_inspection_flag_rejects_non_boolean(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="boolean"):
+        inspect_first_playable_delivery_batch(
+            jobs, tmp_path / "missing-summary",
+            expected_summary_sha256="a" * 64,
+            authorized=True, verify_original_sources="yes",
+        )
