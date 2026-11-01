@@ -130,6 +130,15 @@ def test_v3_without_request_rejected_and_no_fallback():
         _v(tok[:-1] + ("0" if tok[-1] != "0" else "1"))
 
 
+def test_v3_valid_signature_without_atomic_nonce_store_fails_closed():
+    # Direct verification cannot silently turn a single-use seal into a reusable bearer.
+    with pytest.raises(AuthError):
+        hs.verify_seal(
+            _mint(), secret=SECRET, keyring="", now=NOW, domain="projects",
+            enforce_domain=True, request=_sreq(), nonce_store=None,
+        )
+
+
 def test_cross_domain_and_unchartered_rejected():
     tok = _mint()
     with pytest.raises(AuthError):
