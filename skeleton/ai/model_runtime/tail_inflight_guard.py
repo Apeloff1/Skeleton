@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from threading import RLock
+from time import monotonic_ns
 from typing import Callable
 
 from skeleton.app.offline_resources import (
@@ -22,6 +23,7 @@ from skeleton.app.offline_cpu_thermal import (
 SCHEMA = "skeleton.ai.tail-inflight-pressure.v1"
 MAX_TOKENS = 1 << 24
 MAX_QUANTUM = 4096
+MAX_QUANTUM_DURATION_NS = 30_000_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +35,7 @@ class InFlightPressurePolicy:
     max_generated_tokens: int
     max_quantum_tokens: int = 256
     resume_good_samples: int = 2
+    max_quantum_duration_ns: int = 5_000_000_000
 
     def __post_init__(self) -> None:
         for name in ("min_ram_bytes", "min_disk_bytes"):
@@ -50,6 +53,8 @@ class InFlightPressurePolicy:
             or not 1 <= self.max_quantum_tokens <= MAX_QUANTUM
             or type(self.resume_good_samples) is not int
             or not 1 <= self.resume_good_samples <= 16
+            or type(self.max_quantum_duration_ns) is not int
+            or not 1 <= self.max_quantum_duration_ns <= MAX_QUANTUM_DURATION_NS
         ):
             raise ValueError("invalid bounded token or hysteresis policy")
 
@@ -84,6 +89,7 @@ class InFlightCPUResourceGuard:
         simulated: bool = False,
         resource_probe: Callable[[str], LocalResourceSnapshot] | None = None,
         thermal_probe: Callable[[], tuple[CPUThermalSensor, ...]] | None = None,
+        clock: Callable[[], int] | None = None,
     ) -> None:
         if not isinstance(policy, InFlightPressurePolicy):
             raise ValueError("typed in-flight pressure policy required")
@@ -91,16 +97,20 @@ class InFlightCPUResourceGuard:
             raise ValueError("selected storage volume required")
         if type(simulated) is not bool:
             raise ValueError("explicit simulation flag required")
-        if (resource_probe is not None or thermal_probe is not None) and not simulated:
+        if (resource_probe is not None or thermal_probe is not None
+                or clock is not None) and not simulated:
             raise ValueError("injected hardware probes require simulation")
         if resource_probe is not None and not callable(resource_probe):
             raise ValueError("resource probe must be callable")
         if thermal_probe is not None and not callable(thermal_probe):
             raise ValueError("thermal probe must be callable")
+        if clock is not None and not callable(clock):
+            raise ValueError("monotonic clock must be callable")
         self.policy = policy
         self._path = storage_path
         self._resource_probe = resource_probe or probe_local_resources
         self._thermal_probe = thermal_probe or probe_cpu_thermal
+        self._clock = monotonic_ns if clock is None else clock
         self._thermal = CPUThermalController()
         self._simulated = simulated
         self._lock = RLock()
@@ -110,6 +120,35 @@ class InFlightCPUResourceGuard:
         self._generated = 0
         self._good = 0
         self._authorized_quantum = 0
+        self._quantum_started_ns: int | None = None
+        self._last_clock_ns: int | None = None
+
+    def _abort_quantum(self, reason: str) -> None:
+        self._authorized_quantum = 0
+        self._quantum_started_ns = None
+        self._state = "aborted"
+        self._reason = reason
+        self._generation += 1
+        raise InFlightPressureDenied(reason)
+
+    def _clock_now(self) -> int:
+        try:
+            now = self._clock()
+            if (type(now) is not int or now < 0
+                    or (self._last_clock_ns is not None
+                        and now < self._last_clock_ns)):
+                raise ValueError("invalid monotonic clock")
+        except Exception:
+            self._abort_quantum("monotonic_clock_unavailable")
+        self._last_clock_ns = now
+        return now
+
+    def _check_quantum_deadline(self) -> None:
+        if self._authorized_quantum:
+            start = self._quantum_started_ns
+            now = self._clock_now()
+            if start is None or now - start > self.policy.max_quantum_duration_ns:
+                self._abort_quantum("quantum_deadline_exceeded")
 
     def _observe(self) -> str:
         try:
@@ -198,7 +237,11 @@ class InFlightCPUResourceGuard:
                 self._good = 0
                 self._generation += 1
                 return self._receipt()
+            # A measured resource sample does not authorize an unbounded
+            # time slice. Record a monotonic start before issuing the lease.
+            started = self._clock_now()
             self._authorized_quantum = min(requested_tokens, remaining)
+            self._quantum_started_ns = started
             self._reason = "measured_cpu_headroom"
             self._generation += 1
             return self._receipt()
@@ -212,13 +255,16 @@ class InFlightCPUResourceGuard:
                 raise InFlightPressureDenied("execution is not running")
             if not self._simulated and self._authorized_quantum == 0:
                 raise InFlightPressureDenied("quantum must be admitted before execution")
+            self._check_quantum_deadline()
             if self._authorized_quantum and generated_tokens > self._authorized_quantum:
                 self._authorized_quantum = 0
+                self._quantum_started_ns = None
                 self._state = "aborted"
                 self._reason = "quantum_accounting_violation"
                 self._generation += 1
                 raise InFlightPressureDenied("unaccounted generated token quantum")
             self._authorized_quantum = 0
+            self._quantum_started_ns = None
             self._generated += generated_tokens
             if self._generated > self.policy.max_generated_tokens:
                 self._state = "aborted"
@@ -270,10 +316,13 @@ class InFlightCPUResourceGuard:
                 raise InFlightPressureDenied("terminal execution cannot be restarted")
             self._state = "aborted"
             self._authorized_quantum = 0
+            self._quantum_started_ns = None
             self._reason = "operator_abort"
             self._generation += 1
             return self._receipt()
 
     def status(self) -> InFlightPressureDecision:
         with self._lock:
+            # Never expose an expired cooperative authorization as live.
+            self._check_quantum_deadline()
             return self._receipt()

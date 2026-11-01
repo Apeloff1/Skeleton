@@ -259,3 +259,66 @@ def test_bad_requested_quantum_cannot_mutate_state(bad):
     with pytest.raises(ValueError, match="requested token quantum"):
         g.admit_quantum(requested_tokens=bad)
     assert g.status() == before
+
+
+def test_quantum_deadline_fences_unaccounted_inference_without_replay():
+    ticks = iter((100, 151))
+    g = InFlightCPUResourceGuard(
+        replace(policy(), max_quantum_duration_ns=50),
+        storage_path=".", simulated=True,
+        resource_probe=lambda path: snapshot(),
+        thermal_probe=healthy_thermal,
+        clock=lambda: next(ticks),
+    )
+    g.start()
+    assert g.admit_quantum(requested_tokens=8).authorized_quantum_tokens == 8
+    with pytest.raises(InFlightPressureDenied, match="quantum_deadline_exceeded"):
+        g.checkpoint(generated_tokens=8)
+    assert g.status().state == "aborted"
+    assert g.status().generated_tokens == 0
+    assert g.status().authorized_quantum_tokens == 0
+    with pytest.raises(InFlightPressureDenied):
+        g.resume()
+
+
+def test_status_does_not_report_expired_quantum_as_authorized():
+    ticks = iter((100, 101, 300))
+    g = InFlightCPUResourceGuard(
+        replace(policy(), max_quantum_duration_ns=50),
+        storage_path=".", simulated=True,
+        resource_probe=lambda path: snapshot(),
+        thermal_probe=healthy_thermal,
+        clock=lambda: next(ticks),
+    )
+    g.start()
+    g.admit_quantum(requested_tokens=2)
+    assert g.status().authorized_quantum_tokens == 2
+    with pytest.raises(InFlightPressureDenied, match="quantum_deadline_exceeded"):
+        g.status()
+    assert g.status().state == "aborted"
+
+
+def test_clock_regression_aborts_quantum_fail_closed():
+    ticks = iter((200, 199))
+    g = InFlightCPUResourceGuard(
+        policy(), storage_path=".", simulated=True,
+        resource_probe=lambda path: snapshot(),
+        thermal_probe=healthy_thermal,
+        clock=lambda: next(ticks),
+    )
+    g.start()
+    g.admit_quantum(requested_tokens=1)
+    with pytest.raises(InFlightPressureDenied, match="monotonic_clock_unavailable"):
+        g.checkpoint(generated_tokens=1)
+    assert g.status().state == "aborted"
+    assert g.status().authorized_quantum_tokens == 0
+
+
+def test_injected_clock_requires_simulation_and_policy_is_bounded():
+    with pytest.raises(ValueError, match="simulation"):
+        InFlightCPUResourceGuard(
+            policy(), storage_path=".", clock=lambda: 1,
+        )
+    for invalid in (True, 0, -1, 30_000_000_001):
+        with pytest.raises(ValueError, match="bounded token or hysteresis"):
+            replace(policy(), max_quantum_duration_ns=invalid)
