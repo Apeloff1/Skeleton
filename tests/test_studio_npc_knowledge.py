@@ -427,3 +427,74 @@ def test_editor_import_rejects_hardlinked_export(tmp_path):
         load_npc_knowledge_editor_export(
             path, authorized=True, expected_project_id=PROJECT,
             expected_source_digest=source, expected_session_digest=session.digest)
+
+def test_source_replayed_npc_lineage_cli_and_director_parity(capsys):
+    from hashlib import sha256
+    import zipfile
+    from skeleton.ai.game_builder.studio_ecosystem_npc_lineage import (
+        compile_npc_lineage, render_npc_lineage_html,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
+        compile_director_handoff,
+    )
+    from scripts.studio_npc_knowledge_cli import main
+    docs, source, session, _ = fixture()
+    request = authoring()
+    lineage = compile_npc_lineage(
+        docs, [], request, authorized=True, expected_source_digest=source,
+        expected_session_digest=session.digest)
+    assert lineage["model_inference_performed"] is False
+    assert lineage["reveal_count"] == len(request["reveals"])
+    assert all("source_text" not in edge for edge in lineage["edges"])
+    html = render_npc_lineage_html(lineage)
+    assert b"Content-Security-Policy" in html
+    assert b"<script" not in html
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--authoring-json", json.dumps(request),
+                 "--include-lineage"]) == 0
+    cli = json.loads(capsys.readouterr().out)
+    assert cli["lineage"] == lineage
+    assert cli["lineage_html"] == html.decode("utf-8")
+    scenes = docs["scene"]["episode_plan"]
+    schedule = {"scene_ticks": {scene["id"]: 5 for scene in scenes},
+                "npc_turnaround_ticks": 2, "min_start_ticks": {}}
+    recipe = docs["visual"]["asset_recipes"][0]["id"]
+    assignments = {scene["id"]: {
+        asset: recipe for asset in scene["assets"] + scene["interactive_objects"]}
+        for scene in scenes}
+    visual = sha256(json.dumps(
+        docs["visual"], sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False).encode("ascii")).hexdigest()
+    manifest, bundle = compile_director_handoff(
+        docs, [], schedule, assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual,
+        knowledge_authoring=request)
+    assert manifest["npc_lineage_digest"] == lineage["lineage_digest"]
+    with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+        assert json.loads(archive.read("npc_lineage.json")) == lineage
+        assert archive.read("npc_lineage.html") == html
+        for name in ("npc_lineage.json", "npc_lineage.html"):
+            assert sha256(archive.read(name)).hexdigest() == manifest["file_hashes"][name]
+
+
+def test_npc_lineage_rejects_stale_leases_and_forged_display():
+    from skeleton.ai.game_builder.studio_ecosystem_npc_lineage import (
+        compile_npc_lineage, render_npc_lineage_html,
+    )
+    docs, source, session, _ = fixture()
+    request = authoring()
+    with pytest.raises(PermissionError):
+        compile_npc_lineage(docs, [], request, authorized=False,
+                            expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        compile_npc_lineage(docs, [], request, authorized=True,
+                            expected_source_digest="0" * 64)
+    with pytest.raises(StudioQuestError):
+        compile_npc_lineage(docs, [], request, authorized=True,
+                            expected_source_digest=source,
+                            expected_session_digest="0" * 64)
+    lineage = compile_npc_lineage(
+        docs, [], request, authorized=True, expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        render_npc_lineage_html({**lineage, "earned_count": 999})
+    assert lineage["session_digest"] == session.digest

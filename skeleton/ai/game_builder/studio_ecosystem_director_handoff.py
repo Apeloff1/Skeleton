@@ -32,6 +32,9 @@ from .studio_ecosystem_npc_knowledge import (
     compile_npc_knowledge, render_npc_knowledge_html,
 )
 from .studio_ecosystem_npc_knowledge_editor import render_npc_knowledge_editor
+from .studio_ecosystem_npc_lineage import (
+    compile_npc_lineage, render_npc_lineage_html,
+)
 
 SCHEMA = "skeleton.game_builder.studio_director_handoff.v1"
 FILENAME = "studio_director_handoff.zip"
@@ -41,7 +44,7 @@ _FILES = ("index.html", "director_editor.html", "choice_rehearsal.html",
           "scene_asset_bindings.json", "director_manifest.json")
 _AUDIO_FILES = ("audio_cues.json", "audio_captions.html", "audio_editor.html")
 _KNOWLEDGE_FILES = ("npc_knowledge.json", "npc_knowledge.html",
-                    "npc_knowledge_editor.html")
+                    "npc_knowledge_editor.html", "npc_lineage.json", "npc_lineage.html")
 
 
 def compile_director_handoff(
@@ -110,6 +113,8 @@ def compile_director_handoff(
     knowledge_html = None
     knowledge_editor = None
     knowledge_editor_receipt = None
+    knowledge_lineage = None
+    knowledge_lineage_html = None
     if knowledge_authoring is not None:
         knowledge_plan = compile_npc_knowledge(
             documents, actions, knowledge_authoring, authorized=True,
@@ -124,6 +129,13 @@ def compile_director_handoff(
         knowledge_html = render_npc_knowledge_html(knowledge_plan)
         knowledge_editor, knowledge_editor_receipt = render_npc_knowledge_editor(
             documents, actions, knowledge_plan, authorized=True)
+        knowledge_lineage = compile_npc_lineage(
+            documents, actions, knowledge_authoring, authorized=True,
+            expected_source_digest=expected_source_digest,
+            expected_session_digest=timing["session_digest"])
+        if knowledge_lineage["knowledge_digest"] != knowledge_plan["knowledge_digest"]:
+            raise StudioQuestError("director NPC lineage source replay diverged")
+        knowledge_lineage_html = render_npc_lineage_html(knowledge_lineage)
     files = {
         "index.html": playable,
         "director_editor.html": editor_html,
@@ -139,6 +151,8 @@ def compile_director_handoff(
         files["npc_knowledge.json"] = _canonical(knowledge_plan) + b"\n"
         files["npc_knowledge.html"] = knowledge_html
         files["npc_knowledge_editor.html"] = knowledge_editor
+        files["npc_lineage.json"] = _canonical(knowledge_lineage) + b"\n"
+        files["npc_lineage.html"] = knowledge_lineage_html
     manifest: dict[str, object] = {
         "schema": SCHEMA, "project_id": timing["project_id"],
         "source_digest": expected_source_digest,
@@ -167,6 +181,7 @@ def compile_director_handoff(
         manifest["audio_recorded_verified"] = False
     if knowledge_plan is not None:
         manifest["npc_knowledge_digest"] = knowledge_plan["knowledge_digest"]
+        manifest["npc_lineage_digest"] = knowledge_lineage["lineage_digest"]
         manifest["npc_knowledge_earned_count"] = knowledge_plan["earned_count"]
         manifest["npc_knowledge_spoken_verified"] = False
         manifest["offline_npc_knowledge_editor_receipt"] = knowledge_editor_receipt

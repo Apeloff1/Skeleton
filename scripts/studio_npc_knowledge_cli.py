@@ -16,6 +16,9 @@ from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_editor import (
 )
 from skeleton.ai.game_builder.studio_ecosystem_quest import replay_quest
 from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_compare import compare_npc_knowledge
+from skeleton.ai.game_builder.studio_ecosystem_npc_lineage import (
+    compile_npc_lineage, render_npc_lineage_html,
+)
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from scripts.studio_scene_schedule_cli import _strict
 
@@ -37,6 +40,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--compare-actions", help="Second canonical quest history for knowledge branch impact")
     ap.add_argument("--include-editor-html", action="store_true",
                     help="Include offline source-bound editable HTML form")
+    ap.add_argument("--include-lineage", action="store_true",
+                    help="Include source-replayed NPC knowledge lineage and operator HTML")
     ap.add_argument("--include-html", action="store_true",
                     help="Include escaped script-free director companion HTML in output")
     args = ap.parse_args(argv)
@@ -83,6 +88,14 @@ def main(argv: list[str] | None = None) -> int:
             output["publication"] = publish_npc_knowledge(
                 compiled, args.publish_directory, authorized=True,
                 documents=docs, actions=actions)
+        if args.include_lineage:
+            lineage = compile_npc_lineage(
+                docs, actions, authoring, authorized=True,
+                expected_source_digest=args.expected_source,
+                expected_session_digest=compiled["session_digest"])
+            output["lineage"] = lineage
+            output["lineage_html"] = render_npc_lineage_html(
+                lineage).decode("utf-8")
         if args.include_editor_html:
             editor, editor_receipt = render_npc_knowledge_editor(
                 docs, actions, compiled, authorized=True)
