@@ -13,7 +13,9 @@ import sys
 from typing import Sequence
 
 from skeleton.app.offline_signed_source_install import install_signed_offline_game_source
-from skeleton.app.offline_source_trust_policy import verify_policy_signed_offline_source
+from skeleton.app.offline_source_trust_policy import (
+    _read_policy, verify_policy_signed_offline_source,
+)
 
 SCHEMA = "skeleton.app.policy_signed_source_install.v1"
 
@@ -46,6 +48,7 @@ def install_policy_signed_offline_game_source(
         "expected_policy_sha256": expected_policy_sha256,
         "authorized": True,
     }
+    policy_identity = _read_policy(policy_file)[1]
     policy_before = verify_policy_signed_offline_source(
         archive, public_key_file, signature_file, policy_file, **kwargs,
     )
@@ -59,7 +62,8 @@ def install_policy_signed_offline_game_source(
     policy_after = verify_policy_signed_offline_source(
         archive, public_key_file, signature_file, policy_file, **kwargs,
     )
-    if (policy_before != policy_after
+    if (policy_identity != _read_policy(policy_file)[1]
+            or policy_before != policy_after
             or installed.get("source_archive_signature_verified") is not True
             or installed.get("installed_source_archive_binding_verified") is not True
             or installed.get("offline_gameplay_reexecuted") is not True

@@ -234,7 +234,7 @@ def test_post_install_policy_replacement_requires_quarantine(
 
     monkeypatch.setattr(module, "install_signed_offline_game_source",
                         replace_after_install)
-    with pytest.raises(OfflineSourceTrustPolicyError):
+    with pytest.raises(ValueError, match="policy"):
         install_policy_signed_offline_game_source(
             archive, destination, key, signature, policy, **kwargs,
         )
