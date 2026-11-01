@@ -53,6 +53,7 @@ Commands:
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat-contract-author  Transactionally edit and preview combat missions
+    combat-delivery-accept  Verify original combat package against playable acceptance
     combat-contract-package  Build, verify and play portable original combat games
     combat-contract-solve  Find replayable earned combat mission routes
     combat-contract-play  Play interactive offline combat mission objectives
@@ -793,6 +794,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-contract-solve":
         from skeleton.game.gameplay.combat_contract_solver import cli as contract_solver_cli
         return contract_solver_cli(rest)
+    if cmd == "combat-delivery-accept":
+        from skeleton.game.gameplay.combat_delivery_acceptance import cli as combat_delivery_cli
+        return combat_delivery_cli(rest)
     if cmd == "combat-contract-package":
         from skeleton.game.gameplay.combat_contract_package import cli as contract_package_cli
         return contract_package_cli(rest)
