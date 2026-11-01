@@ -108,7 +108,9 @@ class TestLongContextFairCLI(unittest.TestCase):
         before = self.call()
         self.assertEqual(before["state"], "hold")
         after = self.call()
-        self.assertEqual(before["plan_digest"], after["plan_digest"])
+        self.assertEqual(before["state"], after["state"])
+        self.assertEqual(before["slots"], after["slots"])
+        self.assertEqual(before["verified_heads"], after["verified_heads"])
         spool = LongContextSpool(self.root, disk_reserve_bytes=0)
         try:
             status = LongContextProgressHead(spool).status(

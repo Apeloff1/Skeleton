@@ -188,7 +188,7 @@ class LongContextFairPlanner:
                 "reasons": sorted(set(reasons)),
                 "verified_heads": len(verified),
                 "slots": slots if state == "proposed" else [],
-                "proposed_tokens": sum(slot["proposed_tokens"] for slot in slots)
+                "proposed_tokens": sum(int(slot["proposed_tokens"]) for slot in slots)
                     if state == "proposed" else 0,
                 "observed_publishable_bytes": capacity["observed_publishable_bytes"],
                 "pressure_signals_attested": False,

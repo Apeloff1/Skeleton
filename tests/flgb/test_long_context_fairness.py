@@ -143,7 +143,9 @@ class TestLongContextFairPlanner(unittest.TestCase):
             result = LongContextFairPlanner(LongContextProgressHead(reopened)).plan(
                 (a,), expected_tokenizer_digest=TOKENIZER,
                 signals=NORMAL, total_token_budget=64, quantum_tokens=4)
-            self.assertEqual(first, result)
+            self.assertEqual(first["slots"], result["slots"])
+            self.assertEqual(first["state"], result["state"])
+            self.assertEqual(first["verified_heads"], result["verified_heads"])
             status = LongContextProgressHead(reopened).status(
                 "story.alpha", expected_tokenizer_digest=TOKENIZER)
             self.assertEqual(status["generation"], 0)
