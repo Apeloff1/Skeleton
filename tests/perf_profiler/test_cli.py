@@ -74,3 +74,26 @@ def test_verify(tmp_path):
 def test_usage_errors():
     assert main([]) == 2
     assert main(["bogus"]) == 2
+
+
+def test_cli_rejects_oversized_input_and_frame_counts(tmp_path, monkeypatch):
+    from skeleton.perf_profiler import cli
+    monkeypatch.setattr(cli, "MAX_INPUT_BYTES", 16)
+    too_big = tmp_path / "huge.json"
+    too_big.write_text("[1, 2, 3, 4, 5, 6, 7]")
+    assert cli.main(["frames", str(too_big)]) == 2
+    monkeypatch.setattr(cli, "MAX_INPUT_BYTES", 1024)
+    monkeypatch.setattr(cli, "MAX_FRAMES", 2)
+    assert cli.main(["frames", str(too_big)]) == 2
+
+
+def test_cli_rejects_nonfinite_ratio_and_invalid_allocation_limits(tmp_path, monkeypatch):
+    from skeleton.perf_profiler import cli
+    path = tmp_path / "frames.json"
+    path.write_text("[16, 17]")
+    for ratio in ("nan", "inf", "-0.1", "1.1"):
+        assert cli.main(["frames", str(path), "--max-hitch-ratio", ratio]) == 2
+    assert cli.main(["frames", str(path), "--budget-ms", "nan"]) == 2
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--top", "101"]) == 2
+    assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--max-peak-bytes", "-1"]) == 2

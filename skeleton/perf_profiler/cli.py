@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import math
 import os
 import sys
 from typing import Any, Callable, List, Optional, Sequence
@@ -29,14 +30,24 @@ class UsageError(Exception):
     pass
 
 
+MAX_INPUT_BYTES = 8 * 1024 * 1024
+MAX_FRAMES = 100_000
+MAX_TOP_TRACES = 100
+
+
 def _read_json(path: str) -> Any:
+    """Read only a bounded input prefix; never load an unbounded JSON file."""
     try:
         if path == "-":
-            return json.load(sys.stdin)
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise UsageError(f"cannot read JSON from {path}: {exc}") from exc
+            raw = sys.stdin.read(MAX_INPUT_BYTES + 1)
+        else:
+            with open(path, encoding="utf-8") as handle:
+                raw = handle.read(MAX_INPUT_BYTES + 1)
+        if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
+            raise UsageError("JSON input exceeds byte bound")
+        return json.loads(raw)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise UsageError(f"cannot read JSON from {path}: {type(exc).__name__}") from exc
 
 
 def _resolve(target: str) -> Callable[[], Any]:
@@ -56,8 +67,12 @@ def _cmd_frames(args: argparse.Namespace) -> int:
     data = _read_json(args.input)
     if not isinstance(data, list):
         raise UsageError("frames input must be a JSON list of numbers")
-    sampler = FrameSampler(budget_ms=args.budget_ms, capacity=max(1, len(data)), hitch_factor=args.hitch_factor)
+    if len(data) > MAX_FRAMES:
+        raise UsageError("frame sample count exceeds bound")
+    if not (math.isfinite(args.max_hitch_ratio) and 0 <= args.max_hitch_ratio <= 1):
+        raise UsageError("max hitch ratio must be finite in [0, 1]")
     try:
+        sampler = FrameSampler(budget_ms=args.budget_ms, capacity=max(1, len(data)), hitch_factor=args.hitch_factor)
         for value in data:
             sampler.record(value)
     except ValueError as exc:
@@ -73,6 +88,10 @@ def _cmd_alloc(args: argparse.Namespace) -> int:
     # Require two operator-controlled gates before importing the target.
     if os.environ.get("SKELETON_PERF_TRUSTED_EXECUTION") != "1" or not args.allow_local_callable:
         raise UsageError("alloc requires trusted local operator execution and --allow-local-callable")
+    if not 0 <= args.top <= MAX_TOP_TRACES or any(
+        value is not None and value < 0 for value in (args.max_alloc_bytes, args.max_peak_bytes)
+    ):
+        raise UsageError("allocation limits or top trace count are invalid")
     fn = _resolve(args.target)
     with AllocationTracker(top_n=args.top) as tracker:
         with tracker.scope(args.target) as result:
