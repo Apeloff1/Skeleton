@@ -143,6 +143,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify detached source signature before no-clobber game installation",
     )
     sub.add_parser(
+        "migrate-signed-progress", add_help=False,
+        help="verify signed source, migrate pinned private progress, replay and reconcile",
+    )
+    sub.add_parser(
         "signed-delivery-assurance", add_help=False,
         help="verify signed source archive, installed game and saved replay",
     )
@@ -293,6 +297,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "install-signed-source":
         from skeleton.app.offline_signed_source_install import main as signed_install_main
         return signed_install_main(arguments[1:])
+    if arguments and arguments[0] == "migrate-signed-progress":
+        from skeleton.app.offline_signed_progress_migration import main as migrate_signed_main
+        return migrate_signed_main(arguments[1:])
     if arguments and arguments[0] == "signed-delivery-assurance":
         from skeleton.app.offline_signed_delivery import main as signed_delivery_main
         return signed_delivery_main(arguments[1:])
