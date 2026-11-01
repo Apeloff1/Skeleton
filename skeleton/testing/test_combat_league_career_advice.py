@@ -55,7 +55,7 @@ class AdviceTests(unittest.TestCase):
     def test_forged_choice_and_score_are_rejected(self):
         result = advise_career(self.saved, "amber_guard")
         for key, value in (
-            ("recommended_choice", {"kind": "rest"}),
+            ("recommended_choice", {"kind": "train", "entrant_id": "missing", "stat": "attack"}),
             ("predicted_state_digest", "0" * 64),
             ("claim", "globally_optimal"),
         ):
