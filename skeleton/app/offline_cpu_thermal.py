@@ -31,9 +31,22 @@ class CPUThermalSensor:
                 raise ValueError("invalid measured thermal value")
 
 
+def _read_sysfs_ascii(path: Path, max_bytes: int) -> str:
+    """Read a single bounded kernel attribute; never allocate by file size.
+
+    The trusted Linux sysfs root is still a platform boundary, not an
+    arbitrary user-supplied filesystem capability or a symlink-safe opener.
+    """
+    with path.open("rb") as stream:
+        raw = stream.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise ValueError("oversized kernel thermal attribute")
+    return raw.decode("ascii", errors="strict").strip()
+
+
 def _temperature(path: Path) -> float | None:
     try:
-        raw = path.read_text(encoding="ascii").strip()
+        raw = _read_sysfs_ascii(path, 64)
         milli = int(raw)
         value = milli / 1000
         return value if -50 <= value <= 200 else None
@@ -53,13 +66,20 @@ def probe_cpu_thermal(root: str | Path = "/sys/class/thermal") -> tuple[CPUTherm
         return ()  # Unbounded host topology is not a trustworthy sample.
     result: list[CPUThermalSensor] = []
     for zone in zones:
+        # The glob prefix also matches suffixes like thermal_zone0_backup.
+        # Never silently skip an unexpected matching entry: inventory
+        # completeness is required for a positive CPU thermal decision.
+        if not zone.name.startswith("thermal_zone") or not zone.name[12:].isdigit():
+            return ()
         try:
-            kind = (zone / "type").read_text(encoding="ascii").strip()
-        except (OSError, UnicodeError):
+            kind = _read_sysfs_ascii(zone / "type", 128)
+        except (OSError, UnicodeError, ValueError):
             # Unknown zone type could conceal a CPU/SOC sensor. Do not
             # certify the remaining zones as complete.
             return ()
-        if not kind or len(kind) > 128 or not any(
+        if not kind:
+            return ()
+        if not any(
             word in kind.lower() for word in ("cpu", "soc", "package", "x86_pkg")
         ):
             continue
@@ -77,12 +97,14 @@ def probe_cpu_thermal(root: str | Path = "/sys/class/thermal") -> tuple[CPUTherm
         for candidate in candidates:
             kind_path = candidate.with_name(candidate.name.replace("_temp", "_type"))
             try:
-                trip_type = kind_path.read_text(encoding="ascii").strip().lower()
-            except (OSError, UnicodeError):
+                trip_type = _read_sysfs_ascii(kind_path, 64).lower()
+            except (OSError, UnicodeError, ValueError):
                 # A missing trip type could hide the lowest trip point.
                 return ()
-            if trip_type not in {"passive", "hot", "critical"}:
-                continue
+            # An active cooling trip is still a thermal threshold; unknown
+            # types might conceal a lower threshold and invalidate the sample.
+            if trip_type not in {"active", "passive", "hot", "critical"}:
+                return ()
             measured = _temperature(candidate)
             if measured is None:
                 return ()

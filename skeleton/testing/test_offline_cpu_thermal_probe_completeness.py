@@ -69,3 +69,38 @@ def test_unknown_trip_type_does_not_mask_lowest_trip(tmp_path):
     (first / "trip_point_1_type").write_text("critical", encoding="ascii")
     (first / "trip_point_1_temp").write_text("95000", encoding="ascii")
     assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_oversized_kernel_attribute_is_bounded_and_fails_closed(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "type").write_bytes(b"cpu" + b"x" * (1 << 20))
+    assert probe_cpu_thermal(tmp_path) == ()
+    (first / "type").write_text("cpu", encoding="ascii")
+    (first / "temp").write_bytes(b"50000" + b"0" * (1 << 20))
+    assert probe_cpu_thermal(tmp_path) == ()
+    (first / "temp").write_text("50000", encoding="ascii")
+    (first / "trip_point_0_type").write_bytes(b"critical" + b"x" * (1 << 20))
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_unexpected_matching_zone_suffix_does_not_hide_inventory(tmp_path):
+    zone(tmp_path, "thermal_zone0")
+    zone(tmp_path, "thermal_zone0_backup", kind="cpu")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_unknown_kernel_trip_type_does_not_hide_lower_threshold(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_type").write_text("unclassified", encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_active_kernel_trip_is_a_measured_cpu_threshold(tmp_path):
+    first = zone(tmp_path, "thermal_zone0", temp="85000", trip="80000")
+    (first / "trip_point_0_type").write_text("active", encoding="ascii")
+    sensors = probe_cpu_thermal(tmp_path)
+    assert len(sensors) == 1
+    assert sensors[0].trip_c == 80.0
+    controller = CPUThermalController()
+    controller.observe(sensors)
+    assert controller.snapshot()["thermal_backpressure"] is True

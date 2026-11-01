@@ -23,3 +23,14 @@ unknown telemetry and holds rather than authorizing a token quantum.
 Deterministic fake-sysfs tests exercise both complete and incomplete zone
 inventories. This is deliberately conservative and does not assert physical
 hardware qualification.
+
+## Bounded kernel attribute reads and complete trip inventory
+
+Every Linux CPU/SOC sysfs temperature, zone type and trip type is read through
+a bounded binary read (64 or 128 bytes) and strict ASCII decode. Oversized,
+malformed or missing attributes invalidate the entire sample; they cannot
+allocate unbounded memory or disappear from the measured CPU zone inventory.
+Unexpected thermal-zone filename suffixes and unknown trip categories likewise
+fail closed. Active cooling trips are included as measured thresholds rather
+than ignored. The default Linux sysfs root is a trusted OS input; this is not
+a general-purpose secure opener for attacker-controlled directory trees.
