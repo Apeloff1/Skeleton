@@ -410,6 +410,41 @@ def test_sparse_oversize_and_aggregate_volume_limits(tmp_path, monkeypatch):
     assert any("file count exceeds bound" in issue.detail for issue in report.issues)
 
 
+def test_global_input_limits_never_publish_partial_manifest(tmp_path, monkeypatch):
+    """An input-volume failure must not leave apparently usable partial assets."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    (tmp_path / "a.png").write_bytes(png(4, 4))
+    (tmp_path / "b.png").write_bytes(png(8, 4))
+
+    monkeypatch.setattr(pipeline, "MAX_IMPORT_FILES", 1)
+    report = pipeline.import_files(tmp_path, ["a.png", "b.png"])
+    assert not report.ok
+    assert report.imported == [] and report.duplicates == []
+    assert report.manifest.entries == []
+    assert any("file count exceeds bound" in issue.detail for issue in report.issues)
+
+    monkeypatch.setattr(pipeline, "MAX_IMPORT_FILES", 8192)
+    monkeypatch.setattr(pipeline, "MAX_IMPORT_TOTAL_BYTES", len(png(4, 4)) + 1)
+    report = pipeline.import_files(tmp_path, ["a.png", "b.png"])
+    assert not report.ok
+    assert report.imported == [] and report.duplicates == []
+    assert report.manifest.entries == []
+    assert any("aggregate asset bytes exceed bound" in issue.detail for issue in report.issues)
+
+
+def test_directory_tree_limit_never_publishes_partial_manifest(tmp_path, monkeypatch):
+    from skeleton.game.build.asset_ingest import pipeline
+
+    (tmp_path / "a.png").write_bytes(png(4, 4))
+    (tmp_path / "b.png").write_bytes(png(8, 4))
+    monkeypatch.setattr(pipeline, "MAX_TREE_ENTRIES", 1)
+    report = pipeline.import_directory(tmp_path)
+    assert not report.ok
+    assert report.imported == [] and report.manifest.entries == []
+    assert any("tree entries exceed bound" in issue.detail for issue in report.issues)
+
+
 def test_directory_rejects_regular_leaf_replacement_after_scan(tmp_path, monkeypatch):
     """Scanning a pathname must not authorize opening a different inode."""
     from skeleton.game.build.asset_ingest import pipeline

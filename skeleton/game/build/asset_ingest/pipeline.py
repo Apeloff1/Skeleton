@@ -186,7 +186,9 @@ def _import_from_fd(
     requested = list(islice(paths, MAX_IMPORT_FILES + 1))
     if len(requested) > MAX_IMPORT_FILES:
         report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
-        requested = requested[:MAX_IMPORT_FILES]
+        # A global input bound is a transaction boundary: never publish a
+        # plausible partial manifest from an oversized untrusted package.
+        return report
     validated: set[str] = set()
     for item in requested:
         if not isinstance(item, str):
@@ -205,7 +207,9 @@ def _import_from_fd(
             total += len(payload)
             if total > MAX_IMPORT_TOTAL_BYTES:
                 report.issues.append(ImportIssue(relative, "broken", "aggregate asset bytes exceed bound"))
-                break
+                # Discard prior assets, not just the oversized leaf: callers
+                # must never observe a partial manifest after a global cap.
+                return ImportReport(AssetManifest(), issues=report.issues)
             asset = import_bytes(relative, payload)
             added = report.manifest.add(asset)
             (report.imported if added else report.duplicates).append(relative)
@@ -292,6 +296,15 @@ def import_directory(root: str | Path) -> ImportReport:
 
     try:
         walk(root_fd, "", 0)
+        if any(
+            issue.detail in {
+                "tree entries exceed bound",
+                "file count exceeds bound",
+                "directory depth exceeds bound",
+            }
+            for issue in issues
+        ):
+            return ImportReport(AssetManifest(), issues=issues)
         report = _import_from_fd(root_fd, sorted(paths[:MAX_IMPORT_FILES]), observed=observed)
     finally:
         os.close(root_fd)
