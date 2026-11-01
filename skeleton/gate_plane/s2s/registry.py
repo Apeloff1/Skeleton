@@ -79,7 +79,9 @@ class ServiceIdentity:
         except ValueError as exc:
             raise RegistryError(str(exc)) from exc
         fps = frozenset(normalize_fingerprint(f) for f in cert_fingerprints)
-        return cls(name, ceiling, auds, fps, bool(enabled), str(owner), str(description))
+        if type(enabled) is not bool:
+            raise RegistryError("enabled must be a boolean")
+        return cls(name, ceiling, auds, fps, enabled, str(owner), str(description))
 
     @property
     def requires_binding(self) -> bool:
@@ -124,7 +126,7 @@ class ServiceIdentity:
             scopes=data.get("scopes", ()),
             audiences=data.get("audiences", ()),
             cert_fingerprints=data.get("cert_fingerprints", ()),
-            enabled=bool(data.get("enabled", True)),
+            enabled=data.get("enabled", True),
             owner=data.get("owner", ""),
             description=data.get("description", ""),
         )
@@ -144,7 +146,9 @@ class ServiceRegistry:
     """Thread-safe service name -> :class:`ServiceIdentity` table."""
 
     def __init__(self, identities: Iterable[ServiceIdentity] = (), *, strict: bool = True) -> None:
-        self.strict = bool(strict)  # unknown callers rejected when True
+        if type(strict) is not bool:
+            raise RegistryError("strict must be a boolean")
+        self.strict = strict  # unknown callers rejected when True
         self._ids: Dict[str, ServiceIdentity] = {}
         self._events: List[RegistryEvent] = []
         self._listeners: List[Any] = []

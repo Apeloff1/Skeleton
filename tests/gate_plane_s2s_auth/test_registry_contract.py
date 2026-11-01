@@ -36,3 +36,26 @@ def test_fingerprint_normalization():
 def test_audience_restriction():
     ident = ServiceIdentity.build("svc-a", audiences=["gate"])
     assert ident.may_address("gate") and not ident.may_address("other")
+
+
+@pytest.mark.parametrize("invalid", ["false", "true", 0, 1, None, [], {}])
+def test_identity_enabled_rejects_truthy_configuration_coercion(invalid):
+    with pytest.raises(RegistryError, match="enabled must be a boolean"):
+        ServiceIdentity.build("svc-a", enabled=invalid)
+    with pytest.raises(RegistryError, match="enabled must be a boolean"):
+        ServiceIdentity.from_dict({"service": "svc-a", "enabled": invalid})
+
+
+@pytest.mark.parametrize("invalid", ["false", "true", 0, 1, None])
+def test_registry_strict_requires_explicit_boolean(invalid):
+    with pytest.raises(RegistryError, match="strict must be a boolean"):
+        ServiceRegistry(strict=invalid)
+    with pytest.raises(RegistryError, match="strict must be a boolean"):
+        ServiceRegistry.from_dicts([], strict=invalid)
+
+
+def test_explicit_disabled_identity_remains_disabled_after_roundtrip():
+    disabled = ServiceIdentity.from_dict({"service": "svc-a", "enabled": False})
+    assert not disabled.enabled
+    registry = ServiceRegistry([disabled])
+    assert not ServiceRegistry.from_dicts(registry.to_dicts()).require("svc-a").enabled
