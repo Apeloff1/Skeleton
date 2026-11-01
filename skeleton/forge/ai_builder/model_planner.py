@@ -42,6 +42,10 @@ _SYSTEM = (
 
 def grant_providers(issuer: TokenIssuer, provider_ids: Iterable[str], *, subject: str = "forge.ai_builder") -> str:
     """Mint a token covering exactly ``provider.<id>``/``call`` for each id."""
+    if isinstance(provider_ids, (str, bytes, bytearray)):
+        raise ValueError("provider grant identities require a bounded iterable of provider IDs")
+    if type(subject) is not str or not _REQUEST_ID.fullmatch(subject):
+        raise ValueError("provider grant subject is invalid or unbounded")
     ids = list(islice(provider_ids, 33))
     if len(ids) > 32 or any(type(pid) is not str or not _PROVIDER_ID.fullmatch(pid) for pid in ids):
         raise ValueError("provider grant identities exceed bounded allowlist")

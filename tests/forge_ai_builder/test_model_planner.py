@@ -117,3 +117,13 @@ def test_planner_output_and_request_identity_budgets_fail_closed():
     for rid in ("", "x" * 129, "../escape", "req\nforged"):
         with pytest.raises(ValueError, match="request identity"):
             run(ModelPlanner(FakeRouter(), gate=gate, cap=cap).plan(BRIEF, request_id=rid))
+
+
+def test_provider_grant_rejects_scalar_string_and_unbounded_subject():
+    _, issuer = gate_and_issuer()
+    for providers in ("alpha", b"alpha", bytearray(b"alpha")):
+        with pytest.raises(ValueError, match="bounded iterable"):
+            grant_providers(issuer, providers)
+    for subject in ("", "../admin", "forge\\nforged", "x" * 129, None):
+        with pytest.raises(ValueError, match="subject"):
+            grant_providers(issuer, ["alpha"], subject=subject)
