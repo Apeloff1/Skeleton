@@ -106,7 +106,45 @@ class LongContextProgressHead:
                 if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
                         or stat.S_IMODE(info.st_mode) != 0o700):
                     raise LongContextSpoolError("untrusted head directory")
-                yield directory
+
+                def verify_pinned_names() -> None:
+                    # Opening with O_NOFOLLOW pins an inode, not its name.
+                    # A renamed directory would otherwise accept writes to
+                    # unreachable heads while a new directory becomes visible.
+                    try:
+                        named_dir = os.stat("heads", dir_fd=root,
+                                            follow_symlinks=False)
+                        named_lock = os.stat(".heads.lock", dir_fd=root,
+                                             follow_symlinks=False)
+                    except OSError as exc:
+                        raise LongContextSpoolError(
+                            "head directory or lock name unavailable"
+                        ) from exc
+                    if ((named_dir.st_dev, named_dir.st_ino) !=
+                            (info.st_dev, info.st_ino)
+                            or not stat.S_ISDIR(named_dir.st_mode)
+                            or named_dir.st_uid != os.geteuid()
+                            or stat.S_IMODE(named_dir.st_mode) != 0o700):
+                        raise LongContextSpoolError(
+                            "head directory replaced during operation"
+                        )
+                    if ((named_lock.st_dev, named_lock.st_ino) !=
+                            (before.st_dev, before.st_ino)
+                            or not stat.S_ISREG(named_lock.st_mode)
+                            or named_lock.st_nlink != 1
+                            or named_lock.st_uid != os.geteuid()
+                            or stat.S_IMODE(named_lock.st_mode) != 0o600):
+                        raise LongContextSpoolError(
+                            "head lock replaced during operation"
+                        )
+
+                verify_pinned_names()
+                try:
+                    yield directory
+                finally:
+                    # Never acknowledge a successful read or commit when the
+                    # visible head/lock names diverged from the pinned inodes.
+                    verify_pinned_names()
             finally:
                 os.close(directory)
         except OSError as exc:
