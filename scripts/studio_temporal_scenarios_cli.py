@@ -8,6 +8,9 @@ from pathlib import Path
 from scripts.studio_scene_schedule_cli import _strict
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import (
+    load_temporal_scenarios_editor_export, publish_temporal_scenarios_editor,
+)
 from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios import (
     PROMPT, compile_temporal_scenarios, propose_temporal_scenarios,
     publish_temporal_scenarios, restore_temporal_scenarios,
@@ -64,9 +67,6 @@ def main(argv: list[str] | None = None) -> int:
                     from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios import (
                         replay_temporal_scenarios,
                     )
-                    from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import (
-                        load_temporal_scenarios_editor_export,
-                    )
                     if args.baseline_scenarios is None:
                         raise StudioQuestError("scenario import requires original receipt")
                     original = replay_temporal_scenarios(
@@ -94,9 +94,6 @@ def main(argv: list[str] | None = None) -> int:
                     expected_session_digest=args.expected_session)
         result = {"scenarios": receipt}
         if args.editor_directory:
-            from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import (
-                publish_temporal_scenarios_editor,
-            )
             result["editor"] = publish_temporal_scenarios_editor(
                 docs, receipt, args.editor_directory, authorized=True)
         if args.select:

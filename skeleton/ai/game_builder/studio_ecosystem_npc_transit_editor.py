@@ -65,7 +65,15 @@ function addEdge(edge){
   to.value=edge.to_site||model.sites[1]||model.sites[0]||"";
   ticks.value=String(edge.ticks===undefined?0:edge.ticks);
   group.append(fromLabel,toLabel,tickLabel);
-  host.append(group);rows.push([from,to,ticks]);
+  const remove=document.createElement("button");
+  remove.type="button";remove.textContent="Remove this directed edge";
+  remove.addEventListener("click",()=>{
+    const index=rows.findIndex(x=>x[3]===group);
+    if(index>=0)rows.splice(index,1);
+    group.remove();
+  });
+  group.append(remove);
+  host.append(group);rows.push([from,to,ticks,group]);
 }
 for(const edge of model.graph.edges)addEdge(edge);
 document.getElementById("add").addEventListener("click",()=>addEdge({}));

@@ -15,7 +15,9 @@ import stat
 from typing import Any, Mapping
 
 from .studio_ecosystem_quest import StudioQuestError
-from .studio_ecosystem_scene_schedule import _canonical, _digest, _lease, _open_directory, _write_all
+from .studio_ecosystem_scene_schedule import (
+    _canonical, _digest, _lease, _open_directory, _write_all,
+)
 from .studio_ecosystem_temporal_windows import (
     MAX_TOTAL_TICKS, compile_temporal_windows, compile_temporal_playable,
 )
