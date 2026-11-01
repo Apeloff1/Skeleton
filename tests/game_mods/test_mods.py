@@ -116,6 +116,24 @@ def test_permissions_targets_and_safety_enforced():
                    {"m1": hook(mm("m1"), [{"op": "merge", "path": "player", "value": {"hp": 99}}])})
 
 
+def test_mod_scale_overflow_fails_closed_even_when_clamped():
+    m = mm("large")
+    h = hook(m, [{"op": "scale", "path": "player.speed", "factor": 1e308, "max": 5}])
+    original = {"player": {"speed": 1e308}}
+    with pytest.raises(HookError, match="scale result is not finite"):
+        apply_mods(original, resolve_load_order([m]), {"large": h})
+    assert original["player"]["speed"] == 1e308
+
+
+def test_mod_scale_rejects_nonfinite_and_huge_integer_targets():
+    m = mm("large")
+    h = hook(m, [{"op": "scale", "path": "player.speed", "factor": 2}])
+    with pytest.raises(HookError, match="not finite"):
+        h.apply({"plan": {"player": {"speed": float("inf")}}})
+    with pytest.raises(HookError, match="numeric overflow"):
+        h.apply({"plan": {"player": {"speed": 10 ** 400}}})
+
+
 def test_override_conflict_unless_explicitly_ordered():
     a, b = mm("aaa"), mm("bbb")
     ops = [{"op": "set", "path": "levels[0].name", "value": "A"}]
