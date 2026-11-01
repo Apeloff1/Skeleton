@@ -99,6 +99,13 @@ def test_authorization_tamper_cross_project_and_stale_leases_fail_closed():
         matrix(before, other)
     result = matrix(before, after)
     forged = deepcopy(result)
+    forged["sandbox_replay_verified"] = 1
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        replay_quest_regression_matrix(
+            forged, authorized=True,
+            expected_baseline_digest=before["receipt_digest"],
+            expected_candidate_digest=after["receipt_digest"])
+    forged = deepcopy(result)
     forged["rows"][0]["regression_proven"] = False
     with pytest.raises(StudioQuestError, match="canonical replay"):
         replay_quest_regression_matrix(

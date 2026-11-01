@@ -84,6 +84,8 @@ def compile_quest_structural_edit(
         raise PermissionError("structural quest authoring requires authorization")
     _lease(expected_baseline_digest, "structural quest baseline")
     original = replay_prompt_quest_plan(baseline, authorized=True)
+    if _canonical(original) != _canonical(baseline):
+        raise StudioQuestError("noncanonical structural quest baseline")
     if original["receipt_digest"] != expected_baseline_digest:
         raise StudioQuestError("stale structural quest baseline lease")
     if (type(edits) is not list or not 1 <= len(edits) <= MAX_EDITS
@@ -130,6 +132,6 @@ def replay_quest_structural_edit(
     checked = compile_quest_structural_edit(
         receipt.get("baseline_compilation"), receipt.get("edits"),
         authorized=True, expected_baseline_digest=expected_baseline_digest)
-    if checked != receipt:
+    if _canonical(checked) != _canonical(receipt):
         raise StudioQuestError("structural quest edit failed canonical replay")
     return checked

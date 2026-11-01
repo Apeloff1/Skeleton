@@ -32,6 +32,8 @@ MAX_ENDINGS = 16
 def _checked(value: object, digest: str, label: str) -> dict[str, Any]:
     _lease(digest, label)
     receipt = replay_prompt_quest_plan(value, authorized=True)
+    if _canonical(value) != _canonical(receipt):
+        raise StudioQuestError("noncanonical " + label + " payload")
     if receipt["receipt_digest"] != digest:
         raise StudioQuestError("stale " + label + " lease")
     return receipt
@@ -50,7 +52,7 @@ def _witness(compilation: dict[str, Any], ending: str,
         expected_source_digest=compilation["quest_source_digest"],
         expected_initial_session_digest=compilation["initial_quest_session_digest"],
     )
-    if result != checked:
+    if _canonical(result) != _canonical(checked):
         raise StudioQuestError("ending witness replay diverged")
     return result
 
@@ -163,7 +165,7 @@ def replay_quest_regression_matrix(
         expected_candidate_digest=expected_candidate_digest,
         max_states=receipt.get("max_states"), max_depth=receipt.get("max_depth"),
     )
-    if checked != receipt:
+    if _canonical(checked) != _canonical(receipt):
         raise StudioQuestError("quest regression matrix failed canonical replay")
     return checked
 

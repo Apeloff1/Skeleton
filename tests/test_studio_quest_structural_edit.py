@@ -118,6 +118,12 @@ def test_stale_lease_duplicate_id_and_invalid_graph_fail_closed():
                                 "value": "Valid"}, {"op": "bogus",
                                 "id": "prompt", "value": "bad"}])
     forged = deepcopy(compile_edits(source))
+    forged["typed_edit_compiled"] = 1
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        replay_quest_structural_edit(
+            forged, authorized=True,
+            expected_baseline_digest=source["receipt_digest"])
+    forged = deepcopy(compile_edits(source))
     forged["candidate_compilation"]["native_gameplay_verified"] = True
     with pytest.raises(StudioQuestError, match="canonical replay"):
         replay_quest_structural_edit(
