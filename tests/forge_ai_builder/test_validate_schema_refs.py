@@ -62,3 +62,21 @@ def test_refs_start_goal_and_unused_warnings():
     probs = check_references(p)
     assert {"start_level 'x' unknown", "goal level 'y' unknown"} <= set(msgs(probs, "ERROR"))
     assert {"asset 'spare' unused", "scene 'idle' unused"} <= set(msgs(probs, "WARNING"))
+
+
+def test_schema_rejects_huge_numeric_and_unbounded_sections():
+    p = good_plan()
+    p["player"]["hp"] = 10 ** 1000
+    p["triggers"] = [{"id": str(i), "on": "event", "emits": []} for i in range(8193)]
+    messages = msgs(check_schema(p))
+    assert "player.hp: expected pos" in messages
+    assert "triggers: exceeds entry budget" in messages
+
+
+def test_schema_rejects_oversized_reference_lists_and_scalar_fields():
+    p = good_plan()
+    p["title"] = "T" * 1025
+    p["levels"][0]["exits"] = ["l2"] * 257
+    messages = msgs(check_schema(p))
+    assert "title: expected str" in messages
+    assert "levels[0].exits: expected strs" in messages
