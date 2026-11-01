@@ -8,7 +8,6 @@ rights, signing, malware, marketplace or consumer-release qualification.
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 import hmac
 import json
 import os
@@ -212,6 +211,7 @@ def publish_first_playable_delivery(
         expected_manifest_sha256=expected_manifest_sha256,
         authorized=authorized,
     )
+    original_source_identity = _source_identity(source)
     published = publish_offline_game_archive(
         source, archive, expected_manifest_sha256=expected_manifest_sha256,
         authorized=True,
@@ -273,7 +273,12 @@ def publish_first_playable_delivery(
         envelope, receipt, protected_roots=(source, install),
         authorized=True,
     )
-    if (_read_receipt(receipt, receipt_pin) != envelope
+    if (original_source_identity != _source_identity(source)
+            or source_verified != verify_exported_package(
+                source, expected_manifest_sha256=expected_manifest_sha256,
+                authorized=True,
+            )
+            or _read_receipt(receipt, receipt_pin) != envelope
             or assurance != _assure(
                 install, archive, save,
                 expected_manifest_sha256=expected_manifest_sha256,
