@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_director_authoring import _parse
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError, replay_quest
-from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _canonical
+from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _canonical, _digest
 from .studio_director_handoff_tool import (
     REQUEST_SCHEMA as HANDOFF_SCHEMA, execute_director_handoff_tool,
 )
@@ -74,6 +74,7 @@ def execute_director_authoring_tool(
     result: dict[str, Any] = {
         "schema": RESULT_SCHEMA,
         "project_id": request["project_id"],
+        "request_digest": _digest(request),
         "editor_export_source_digest": export["source_digest"],
         "editor_export_session_digest": current_session,
         "detail": handoff["detail"],
@@ -82,4 +83,5 @@ def execute_director_authoring_tool(
         "native_asset_binding_verified": False,
         "release_certified": False,
     }
+    result["result_digest"] = _digest(result)
     return result

@@ -53,6 +53,9 @@ def test_editor_import_routes_to_real_compiler_with_explicit_authoring_permissio
     assert result["source_replay_verified"] is True
     assert result["detail"]["canonical_html5_gameplay_replay_verified"] is True
     assert result["file_write_performed"] is False
+    assert len(result["request_digest"]) == 64
+    assert len(result["result_digest"]) == 64
+    assert result == execute_director_authoring_tool(req, authorized=True)
     assert result["release_certified"] is False
     catalog = world_tool_catalog()
     descriptor = next(x for x in catalog["tools"]
