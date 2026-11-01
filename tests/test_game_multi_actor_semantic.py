@@ -83,3 +83,19 @@ def test_event_signals_feed_rpg_environment():
     assert sig["native_contact_count"] == 1.0
     from skeleton.forge.game_frontier_rpg_events import RPG_ENVIRONMENT_SIGNALS
     assert set(sig) <= RPG_ENVIRONMENT_SIGNALS
+
+
+def test_multi_actor_bounded_inputs_and_duplicate_static_ids(monkeypatch):
+    from skeleton.game.simulation import multi_actor_semantic as mod
+
+    a = actor("a", 0)
+    wall = AABB("wall", (0, 0, 0), (100, 100, 100))
+    with pytest.raises(MultiActorError, match="duplicate static"):
+        step_actors((a,), {}, tick=0, step_ns=STEP, statics=(wall, wall))
+    with pytest.raises(MultiActorError, match="bounded integer pair"):
+        step_actors((a,), {"a": (10**100, 0)}, tick=0, step_ns=STEP)
+    with pytest.raises(MultiActorError, match="receipt digest"):
+        step_actors((a,), {}, tick=0, step_ns=STEP, prev_digest="not-a-digest")
+    monkeypatch.setattr(mod, "MAX_TICKS", 1)
+    with pytest.raises(MultiActorError, match="tick count"):
+        run_actors((a,), [{}, {}], step_ns=STEP)

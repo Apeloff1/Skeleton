@@ -34,6 +34,9 @@ GRAVITY_MM_S2 = -9_810
 HARD_IMPACT_MM_S = 6_000
 SHOVE_MM = 50
 MAX_ACTORS = 512
+MAX_STATICS = 4096
+MAX_TICKS = 10_000
+MAX_INTENT_MM_S = 1_000_000_000
 
 
 class MultiActorError(SimulationContractError):
@@ -49,9 +52,10 @@ class ActorBody:
     role: str = "npc"
 
     def __post_init__(self) -> None:
-        if any(type(v) is not int or v <= 0 for v in self.half_extent_mm) or len(self.half_extent_mm) != 3:
+        if (len(self.half_extent_mm) != 3 or any(
+                type(v) is not int or not 1 <= v <= MAX_INTENT_MM_S for v in self.half_extent_mm)):
             raise MultiActorError("half extents must be 3 positive ints")
-        if type(self.mass_g) is not int or self.mass_g <= 0:
+        if type(self.mass_g) is not int or not 1 <= self.mass_g <= MAX_INTENT_MM_S:
             raise MultiActorError("mass must be positive grams")
         if self.role not in ("player", "npc", "creature", "prop"):
             raise MultiActorError("unknown actor role")
@@ -121,6 +125,13 @@ def step_actors(
 ) -> TickReceipt:
     if not 1 <= len(actors) <= MAX_ACTORS:
         raise MultiActorError("1..512 actors required")
+    if len(statics) > MAX_STATICS:
+        raise MultiActorError("static collider count exceeds bound")
+    if type(tick) is not int or not 0 <= tick <= MAX_TICKS:
+        raise MultiActorError("simulation tick exceeds bound")
+    if (type(prev_digest) is not str or len(prev_digest) != 64
+            or any(c not in "0123456789abcdef" for c in prev_digest)):
+        raise MultiActorError("previous receipt digest is invalid")
     if type(step_ns) is not int or not 1_000_000 <= step_ns <= 100_000_000:
         raise MultiActorError("step must be 1..100 ms")
     ids = [a.actor_id for a in actors]
@@ -128,7 +139,13 @@ def step_actors(
         raise MultiActorError("duplicate actor id")
     if set(intents) - set(ids):
         raise MultiActorError("intent for unknown actor")
+    if any(type(v) not in (tuple, list) or len(v) != 2
+           or any(type(n) is not int or abs(n) > MAX_INTENT_MM_S for n in v)
+           for v in intents.values()):
+        raise MultiActorError("actor intent is not a bounded integer pair")
     static_ids = {s.collider_id for s in statics}
+    if len(static_ids) != len(statics):
+        raise MultiActorError("duplicate static collider id")
     if static_ids & set(ids):
         raise MultiActorError("static collider id collides with actor id")
     events: list[SemanticEvent] = []
@@ -205,6 +222,8 @@ def run_actors(actors: Sequence[ActorBody],
                intents_per_tick: Sequence[Mapping[str, tuple[int, int]]], *,
                step_ns: int, statics: Sequence[AABB] = (),
                floor_y_mm: int = 0) -> tuple[TickReceipt, ...]:
+    if len(intents_per_tick) > MAX_TICKS:
+        raise MultiActorError("simulation tick count exceeds bound")
     receipts: list[TickReceipt] = []
     current = tuple(actors)
     contacts: frozenset[tuple[str, str]] = frozenset()
