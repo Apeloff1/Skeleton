@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from skeleton.ai.model_runtime import LongContextSpool, LongContextProgressHead
 from skeleton.ai.model_runtime.flgb_model_runtime import TokenSequence
@@ -34,13 +35,14 @@ class TestLongContextFairCLI(unittest.TestCase):
         finally:
             spool.close()
 
-    def call(self, *args):
+    def call(self, *args, candidate=None):
         out = StringIO()
+        if candidate is None:
+            candidate = "original.story:" + self.checkpoint + ":0:2:6"
         with redirect_stdout(out):
             code = main(["--root", str(self.root),
                          "--tokenizer-digest", TOKENIZER,
-                         "head-plan", "--candidate",
-                         "original.story:" + self.checkpoint + ":0:2:6",
+                         "head-plan", "--candidate", candidate,
                          "--total-token-budget", "6", *args])
         self.assertEqual(code, 0)
         result = json.loads(out.getvalue())
@@ -84,6 +86,31 @@ class TestLongContextFairCLI(unittest.TestCase):
                 )
                 self.assertEqual(result["state"], "hold")
                 self.assertIn("device_not_qualified", result["reasons"])
+
+    def test_requested_disk_bytes_are_checked_before_any_proposal(self):
+        candidate = "original.story:" + self.checkpoint + ":0:2:6:4096"
+        with patch.object(LongContextSpool, "capacity_snapshot", return_value={
+            "request_observed_sufficient": False,
+            "observed_publishable_bytes": 0,
+        }) as capacity:
+            result = self.call(
+                "--cpu-pressure", "normal", "--memory-pressure", "normal",
+                "--thermal-pressure", "normal", "--energy-pressure", "normal",
+                candidate=candidate)
+        self.assertEqual(result["state"], "hold")
+        self.assertEqual(result["slots"], [])
+        self.assertIn("spool_capacity_hold", result["reasons"])
+        capacity.assert_called_once_with(requested_bytes=4096)
+
+    def test_oversized_disk_candidate_fails_without_partial_output(self):
+        candidate = "original.story:" + self.checkpoint + ":0:2:6:1073741825"
+        out = StringIO()
+        with redirect_stdout(out), self.assertRaises(SystemExit) as caught:
+            main(["--root", str(self.root), "--tokenizer-digest", TOKENIZER,
+                  "head-plan", "--candidate", candidate,
+                  "--total-token-budget", "6"])
+        self.assertEqual(caught.exception.code, 2)
+        self.assertEqual(out.getvalue(), "")
 
     def test_malformed_candidate_fails_without_partial_json(self):
         out = StringIO()

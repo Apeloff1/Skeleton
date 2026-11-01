@@ -28,7 +28,9 @@ It does not guarantee fairness across repeated calls or independently
 authenticate a scheduler principal.
 
 CLI: use head-plan with one or more candidate specifications of the form
-stream-id:checkpoint-digest:generation:weight:max-tokens. Explicitly supply
+stream-id:checkpoint-digest:generation:weight:max-tokens[:requested-bytes].
+The optional nonnegative requested-bytes field is checked against the bounded
+spool quota and measured volume headroom before any proposal. Explicitly supply
 cpu, memory, thermal and energy pressure, plus a total token budget.
 Defaults are unknown pressure, which correctly holds. CLI output remains
 non-authorizing and payload-free.

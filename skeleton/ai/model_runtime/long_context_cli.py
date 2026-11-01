@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
     plan.add_argument("--candidate", action="append", required=True,
-                      help="stream-id:checkpoint:generation:weight:max-tokens")
+                      help="stream-id:checkpoint:generation:weight:max-tokens[:requested-bytes]")
     for signal in ("cpu", "memory", "thermal", "energy"):
         plan.add_argument("--" + signal + "-pressure",
                           choices=("normal", "elevated", "critical", "unknown"),
@@ -92,11 +92,12 @@ def main(argv: list[str] | None = None) -> int:
                 demands = []
                 for value in args.candidate:
                     parts = value.split(":")
-                    if len(parts) != 5:
+                    if len(parts) not in (5, 6):
                         raise LongContextSpoolError("invalid candidate")
                     demands.append(StreamDemand(
                         parts[0], parts[1], int(parts[2]), int(parts[4]),
-                        weight=int(parts[3])))
+                        weight=int(parts[3]),
+                        requested_bytes=int(parts[5]) if len(parts) == 6 else 0))
                 signals = PressureSignals(
                     args.cpu_pressure, args.memory_pressure,
                     args.thermal_pressure, args.energy_pressure,
