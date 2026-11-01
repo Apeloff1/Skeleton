@@ -291,3 +291,17 @@ def test_godot_res_paths_reject_uri_ambiguity_and_invisible_controls(tmp_path):
     for bad in bad_names:
         with pytest.raises(ValueError, match="unsafe res://"):
             res_to_path(tmp_path, "res://" + bad)
+
+
+def test_godot_project_rejects_noninteger_or_unbounded_physics_tick_rate(tmp_path):
+    from skeleton.godot_export.project import GodotProject
+
+    cfg = configfile.loads("[physics]\n")
+    project = GodotProject(tmp_path, cfg)
+    for bad in (True, False, 0, -1, 1001, 60.5, float("nan"), "60.5", "99999"):
+        cfg.set("physics", "common/physics_ticks_per_second", bad)
+        with pytest.raises(ValueError, match="physics tick rate"):
+            _ = project.physics_ticks
+    for valid in (60, "60", 1000):
+        cfg.set("physics", "common/physics_ticks_per_second", valid)
+        assert project.physics_ticks == int(valid)

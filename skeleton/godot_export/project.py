@@ -80,7 +80,11 @@ class GodotProject:
     @property
     def physics_ticks(self) -> int:
         v = self.config.get("physics", "common/physics_ticks_per_second", 60)
-        return int(v)
+        if type(v) is str and 1 <= len(v) <= 4 and v.isascii() and v.isdecimal():
+            v = int(v)
+        if type(v) is not int or not 1 <= v <= 1000:
+            raise ValueError("invalid bounded Godot physics tick rate")
+        return v
 
     @property
     def autoloads(self) -> dict[str, str]:
