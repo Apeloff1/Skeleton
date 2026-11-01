@@ -13,7 +13,7 @@ from typing import Any
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.scene_survival_campaign import (
-    SCHEMA as CAMPAIGN_SCHEMA, _json, export_campaign, normalize_campaign,
+    _json, export_campaign, normalize_campaign,
     original_campaign, simulate_campaign,
 )
 from skeleton.game.gameplay.scene_survival_campaign_route import solve_campaign

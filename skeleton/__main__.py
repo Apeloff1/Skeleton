@@ -65,6 +65,7 @@ Commands:
     scene-survival-campaign-author  Edit and preview multi-stage survival campaigns
     scene-survival-campaign-route  Solve and verify campaign stage routes
     scene-survival-campaign-play  Play campaigns with restartable checkpoints
+    scene-survival-campaign-accept  Verify end-to-end playable campaign delivery
     scene-survival-play  Interactively play survival with restartable checkpoints
     scene-survival-author  Transactionally edit survival sources and preview play
     scene-survival-route  Find replay-proven bounded survival routes
@@ -861,6 +862,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-survival-campaign-route":
         from skeleton.game.gameplay.scene_survival_campaign_route import cli as campaign_route_cli
         return campaign_route_cli(rest)
+    if cmd == "scene-survival-campaign-accept":
+        from skeleton.game.gameplay.scene_survival_campaign_acceptance import cli as campaign_accept_cli
+        return campaign_accept_cli(rest)
     if cmd == "scene-survival-campaign-play":
         from skeleton.game.gameplay.scene_survival_campaign_interactive import cli as campaign_play_cli
         return campaign_play_cli(rest)
