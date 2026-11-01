@@ -69,6 +69,8 @@ Commands:
     combat-drill-solve  Find replayable bounded shortest combat lesson solutions
     combat-balance  Analyze source-bound combat victory and verify replay receipts
     combat-arena    Play source-bound tactical grid combat with offline replay
+    arena-control   Play, save, replay and package tactical beacon captures
+    arena-control-author  Edit and preview original control-point matches
     arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
@@ -771,6 +773,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
+    if cmd == "arena-control":
+        from skeleton.game.gameplay.arena_control import cli as control_cli
+        return control_cli(rest)
+    if cmd == "arena-control-author":
+        from skeleton.game.gameplay.arena_control_author import cli as control_author_cli
+        return control_author_cli(rest)
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
         return author_cli(rest)
