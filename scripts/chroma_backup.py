@@ -12,6 +12,7 @@ import argparse
 import ctypes
 import errno
 import hashlib
+from itertools import islice
 import json
 import os
 import stat
@@ -23,6 +24,7 @@ from pathlib import Path
 SCHEMA = "skeleton.chroma.legacy-backup.v1"
 CONTAINER = "tutolage-chroma"
 MAX_FILES = 100_000
+MAX_TREE_ENTRIES = 200_000
 MAX_BYTES = 100 * 1024 ** 3
 MAX_MANIFEST_BYTES = 32 * 1024 ** 2
 
@@ -120,28 +122,59 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
 
 
 def _manifest_files(root: Path, *, exclude_root_manifest: bool = False) -> list[dict]:
+    """Bound the full tree before sorting, then hash stable regular descriptors."""
+    paths = list(islice(root.rglob("*"), MAX_TREE_ENTRIES + 1))
+    if len(paths) > MAX_TREE_ENTRIES:
+        raise BackupRejected("Chroma backup exceeds tree entry admission budget")
     entries: list[dict] = []
     count = total = 0
-    for path in sorted(root.rglob("*")):
-        mode = path.lstat().st_mode
-        if stat.S_ISLNK(mode) or not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+    for path in sorted(paths):
+        before_path = path.lstat()
+        if stat.S_ISLNK(before_path.st_mode) or not (
+                stat.S_ISDIR(before_path.st_mode) or stat.S_ISREG(before_path.st_mode)):
             raise BackupRejected("backed-up Chroma contains a link or special file")
-        if stat.S_ISDIR(mode):
+        if stat.S_ISDIR(before_path.st_mode):
             continue
         if exclude_root_manifest and path == root / "manifest.json":
             continue
         count += 1
         if count > MAX_FILES:
             raise BackupRejected("Chroma backup exceeds file admission budget")
+        if before_path.st_size > MAX_BYTES - total:
+            raise BackupRejected("Chroma backup exceeds byte admission budget")
+        if not hasattr(os, "O_NOFOLLOW"):
+            raise BackupRejected("no-follow file opening is unavailable")
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+        except OSError as exc:
+            raise BackupRejected("Chroma file changed before descriptor opening") from exc
         digest = hashlib.sha256()
         size = 0
-        with path.open("rb") as stream:
+        with os.fdopen(fd, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or (
+                    before.st_dev, before.st_ino, before.st_size,
+                    before.st_mtime_ns, before.st_ctime_ns
+            ) != (
+                    before_path.st_dev, before_path.st_ino, before_path.st_size,
+                    before_path.st_mtime_ns, before_path.st_ctime_ns
+            ):
+                raise BackupRejected("Chroma file identity changed before read")
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 size += len(chunk)
                 total += len(chunk)
-                if total > MAX_BYTES:
+                if size > before.st_size or total > MAX_BYTES:
                     raise BackupRejected("Chroma backup exceeds byte admission budget")
                 digest.update(chunk)
+            after = os.fstat(stream.fileno())
+            if size != before.st_size or (
+                    before.st_dev, before.st_ino, before.st_size,
+                    before.st_mtime_ns, before.st_ctime_ns
+            ) != (
+                    after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns
+            ):
+                raise BackupRejected("Chroma file changed during descriptor read")
         entries.append({
             "path": path.relative_to(root).as_posix(),
             "bytes": size,

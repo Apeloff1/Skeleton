@@ -211,3 +211,11 @@ def test_symlink_or_existing_target_is_rejected(tmp_path, monkeypatch):
     with pytest.raises(chroma_backup.BackupRejected, match="link"):
         chroma_backup.backup_legacy_chroma(tmp_path / "backup")
     assert not (tmp_path / "backup").exists()
+
+
+def test_chroma_manifest_rejects_unbounded_tree_before_hashing(tmp_path, monkeypatch):
+    for i in range(3):
+        (tmp_path / f"file{i}.bin").write_bytes(b"ok")
+    monkeypatch.setattr(chroma_backup, "MAX_TREE_ENTRIES", 2)
+    with pytest.raises(chroma_backup.BackupRejected, match="tree entry"):
+        chroma_backup._manifest_files(tmp_path)
