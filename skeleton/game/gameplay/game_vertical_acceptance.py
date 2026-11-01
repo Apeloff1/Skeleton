@@ -41,6 +41,13 @@ def _engine(kind: Any):
         )
         return (simulate_campaign, resume_campaign, verify_campaign,
                 export_campaign, import_campaign)
+    if kind == "expedition_quest":
+        from skeleton.game.gameplay.expedition_quest import (
+            simulate_quest, resume_quest, verify_quest,
+            export_quest, import_quest,
+        )
+        return (simulate_quest, resume_quest, verify_quest,
+                export_quest, import_quest)
     if kind == "forge":
         from skeleton.game.gameplay.arena_forge_run import (
             simulate_forge, resume_forge, verify_forge, export_forge, import_forge,
@@ -72,7 +79,12 @@ def accept_vertical(kind: str, source: Any, actions: Any, *,
     imported = import_save(portable)
     if imported != full:
         raise CombatSessionError("portable save round-trip mismatch")
-    phase = full["state"]["phase"]
+    if kind == "expedition_quest":
+        if full["state"]["phase"] != "finished":
+            raise CombatSessionError("playable quest has no earned ending")
+        phase = full["state"]["expedition"]["state"]["phase"]
+    else:
+        phase = full["state"]["phase"]
     if phase != "won":
         raise CombatSessionError("playable vertical has no earned victory")
     report = {
@@ -150,6 +162,11 @@ def demo_acceptance(kind: str) -> dict[str, Any]:
             original_campaign, demo_campaign_actions,
         )
         return accept_vertical(kind, original_campaign(), demo_campaign_actions())
+    if kind == "expedition_quest":
+        from skeleton.game.gameplay.expedition_quest import (
+            original_quest, demo_actions,
+        )
+        return accept_vertical(kind, original_quest(), demo_actions())
     if kind == "forge":
         from skeleton.game.gameplay.arena_forge_run import original_forge
         return accept_vertical(kind, original_forge(), [
@@ -163,9 +180,9 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton game-vertical-accept")
     sub = parser.add_subparsers(dest="command", required=True)
     demo = sub.add_parser("demo")
-    demo.add_argument("--kind", choices=("forge", "quest"), required=True)
+    demo.add_argument("--kind", choices=("forge", "quest", "expedition_quest"), required=True)
     run = sub.add_parser("run")
-    run.add_argument("--kind", choices=("forge", "quest"), required=True)
+    run.add_argument("--kind", choices=("forge", "quest", "expedition_quest"), required=True)
     run.add_argument("--source-json", required=True)
     run.add_argument("--actions-json", required=True)
     run.add_argument("--checkpoint-at", type=int)
