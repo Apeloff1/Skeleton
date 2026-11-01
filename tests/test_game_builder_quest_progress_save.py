@@ -82,6 +82,19 @@ class QuestSaveTests(unittest.TestCase):
             with self.assertRaisesRegex(QuestProgressSaveError, "invalid objective progress key"):
                 restore_quest_progress(plane, f"forged-{index}", self.w, verified_state=self.state)
 
+    def test_restore_rejects_malformed_section_container_before_access(self):
+        class MalformedPlane:
+            def __init__(self, value):
+                self.value = value
+
+            def restore(self, slot, *, sequence=None):
+                return {SECTION: self.value}, None
+
+        for malformed in ([], "forged", {"schema": "x", **{f"k{i}": i for i in range(17)}}):
+            with self.assertRaisesRegex(QuestProgressSaveError, "section shape"):
+                restore_quest_progress(MalformedPlane(malformed), "s", self.w,
+                                       verified_state=self.state)
+
     def test_restore_rejects_cross_project_section(self):
         plane = GameSavePlane()
         malicious = dict(self.section, project="different-project")

@@ -113,6 +113,8 @@ def restore_quest_progress(plane: GameSavePlane, slot: str, world: DirectorWorld
     section = sections.get(SECTION)
     if section is None:
         raise QuestProgressSaveError("save has no quest progress section")
+    if not isinstance(section, Mapping) or len(section) > 16:
+        raise QuestProgressSaveError("invalid quest progress section shape")
     if section.get("schema") != SCHEMA:
         raise QuestProgressSaveError("unknown quest progress schema")
     if section.get("project") != world.project_id:
