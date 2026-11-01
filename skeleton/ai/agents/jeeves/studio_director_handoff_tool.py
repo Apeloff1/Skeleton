@@ -15,7 +15,7 @@ REQUEST_SCHEMA = "skeleton.jeeves.studio_director_handoff_request.v1"
 RESULT_SCHEMA = "skeleton.jeeves.studio_director_handoff_result.v1"
 _FIELDS = frozenset({"schema", "project_id", "expected_source_digest",
                      "expected_visual_digest", "expected_session_digest",
-                     "actions", "schedule", "assignments"})
+                     "actions", "schedule", "assignments", "audio_authoring"})
 
 
 def director_handoff_tool_schema() -> dict[str, object]:
@@ -33,6 +33,7 @@ def director_handoff_tool_schema() -> dict[str, object]:
                 "actions": {"type": "array", "maxItems": 64},
                 "schedule": {"type": "object"},
                 "assignments": {"type": "object"},
+                "audio_authoring": {"type": "object"},
             },
             "required": ["schema", "project_id", "expected_source_digest",
                          "expected_visual_digest", "actions", "schedule", "assignments"],
@@ -65,7 +66,8 @@ def execute_director_handoff_tool(request: Mapping[str, Any], *,
         request.get("schedule"), request.get("assignments"),
         authorized=True, expected_source_digest=request.get("expected_source_digest"),
         expected_visual_digest=request.get("expected_visual_digest"),
-        expected_session_digest=request.get("expected_session_digest"))
+        expected_session_digest=request.get("expected_session_digest"),
+        audio_authoring=request.get("audio_authoring"))
     result: dict[str, Any] = {
         "schema": RESULT_SCHEMA, "project_id": project,
         "request_digest": sha256(raw).hexdigest(),

@@ -25,6 +25,7 @@ from .studio_ecosystem_scene_schedule import (
 from .studio_ecosystem_scene_asset_bindings import compile_scene_asset_bindings
 from .studio_ecosystem_director_editor import render_director_editor
 from .studio_ecosystem_director_choice_rehearsal import render_choice_rehearsal
+from .studio_ecosystem_audio_cues import compile_audio_cues, render_caption_preview
 
 SCHEMA = "skeleton.game_builder.studio_director_handoff.v1"
 FILENAME = "studio_director_handoff.zip"
@@ -32,6 +33,7 @@ MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 _FILES = ("index.html", "director_editor.html", "choice_rehearsal.html",
           "scene_schedule.json",
           "scene_asset_bindings.json", "director_manifest.json")
+_AUDIO_FILES = ("audio_cues.json", "audio_captions.html")
 
 
 def compile_director_handoff(
@@ -40,6 +42,7 @@ def compile_director_handoff(
     authorized: bool, expected_source_digest: str,
     expected_visual_digest: str,
     expected_session_digest: str | None = None,
+    audio_authoring: object | None = None,
 ) -> tuple[dict[str, object], bytes]:
     """Compile and package an exact, replayable original HTML5 director handoff."""
     if authorized is not True:
@@ -79,6 +82,18 @@ def compile_director_handoff(
     choice_html, choice_receipt = render_choice_rehearsal(
         documents, actions, timing, authorized=True,
         expected_source_digest=expected_source_digest)
+    audio_plan = None
+    audio_preview = None
+    audio_preview_receipt = None
+    if audio_authoring is not None:
+        audio_plan = compile_audio_cues(
+            documents, actions, schedule, audio_authoring, authorized=True,
+            expected_source_digest=expected_source_digest,
+            expected_session_digest=timing["session_digest"])
+        if (audio_plan["schedule_digest"] != timing["schedule_digest"]
+                or audio_plan["project_id"] != timing["project_id"]):
+            raise StudioQuestError("director audio and scene timeline diverged")
+        audio_preview, audio_preview_receipt = render_caption_preview(audio_plan)
     files = {
         "index.html": playable,
         "director_editor.html": editor_html,
@@ -86,6 +101,9 @@ def compile_director_handoff(
         "scene_schedule.json": _canonical(timing) + b"\n",
         "scene_asset_bindings.json": _canonical(assets) + b"\n",
     }
+    if audio_plan is not None:
+        files["audio_cues.json"] = _canonical(audio_plan) + b"\n"
+        files["audio_captions.html"] = audio_preview
     manifest: dict[str, object] = {
         "schema": SCHEMA, "project_id": timing["project_id"],
         "source_digest": expected_source_digest,
@@ -107,6 +125,10 @@ def compile_director_handoff(
         "asset_rights_verified": False,
         "release_certified": False,
     }
+    if audio_plan is not None:
+        manifest["audio_cue_plan_digest"] = audio_plan["plan_digest"]
+        manifest["audio_caption_preview_receipt"] = audio_preview_receipt
+        manifest["audio_recorded_verified"] = False
     manifest["manifest_digest"] = _digest(manifest)
     files["director_manifest.json"] = _canonical(manifest) + b"\n"
     if sum(map(len, files.values())) > MAX_BUNDLE_BYTES:
@@ -114,7 +136,7 @@ def compile_director_handoff(
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9, allowZip64=False) as archive:
-        for name in _FILES:
+        for name in _FILES + (_AUDIO_FILES if audio_authoring is not None else ()):
             item = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             item.compress_type = zipfile.ZIP_DEFLATED
             item.external_attr = 0o100600 << 16
@@ -130,7 +152,8 @@ def compile_director_handoff(
 def publish_director_handoff(manifest: Mapping[str, Any], bundle: bytes,
                              directory: Path, *, authorized: bool,
                              documents: Mapping[str, Any], actions: list[list[str]],
-                             schedule: object, assignments: object) -> dict[str, object]:
+                             schedule: object, assignments: object,
+                             audio_authoring: object | None = None) -> dict[str, object]:
     if authorized is not True:
         raise PermissionError("director publication requires operator authorization")
     if (type(manifest) is not dict or manifest.get("schema") != SCHEMA
@@ -143,7 +166,8 @@ def publish_director_handoff(manifest: Mapping[str, Any], bundle: bytes,
         documents, actions, schedule, assignments, authorized=True,
         expected_source_digest=manifest.get("source_digest"),
         expected_visual_digest=manifest.get("visual_digest"),
-        expected_session_digest=manifest.get("session_digest"))
+        expected_session_digest=manifest.get("session_digest"),
+        audio_authoring=audio_authoring)
     if manifest != rebuilt_manifest or bundle != rebuilt_bundle:
         raise StudioQuestError("director publication lacks canonical playable proof")
     directory_fd = _open_directory(directory)
@@ -180,6 +204,7 @@ def verify_director_handoff(
     schedule: object, assignments: object, directory: Path, *,
     authorized: bool, expected_source_digest: str, expected_visual_digest: str,
     expected_session_digest: str | None = None,
+    audio_authoring: object | None = None,
 ) -> dict[str, object]:
     """Independently rebuild and byte-compare an existing private handoff."""
     if authorized is not True:
@@ -202,7 +227,8 @@ def verify_director_handoff(
         documents, actions, schedule, assignments, authorized=True,
         expected_source_digest=expected_source_digest,
         expected_visual_digest=expected_visual_digest,
-        expected_session_digest=expected_session_digest)
+        expected_session_digest=expected_session_digest,
+        audio_authoring=audio_authoring)
     if raw != expected:
         raise StudioQuestError("director archive does not match source-bound replay")
     return manifest

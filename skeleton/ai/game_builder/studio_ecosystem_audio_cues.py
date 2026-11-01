@@ -268,7 +268,67 @@ def verify_published_audio_cues(
     return expected
 
 
+def render_caption_preview(plan: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
+    """Accessible offline text timeline; not a sound player or caption QA pass.
+
+    The caller must first compile the plan from canonical source. This renderer
+    rejects a tampered digest, escapes all authored text and includes no scripts.
+    """
+    from html import escape
+
+    if (type(plan) is not dict or plan.get("schema") != SCHEMA
+            or type(plan.get("scenes")) is not list
+            or len(plan["scenes"]) > MAX_SCENES):
+        raise StudioQuestError("invalid caption preview plan")
+    digest = _lease(plan.get("plan_digest"), "caption preview")
+    if _digest({key: value for key, value in plan.items()
+                if key != "plan_digest"}) != digest:
+        raise StudioQuestError("caption preview plan digest mismatch")
+    parts = [
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
+        "<meta http-equiv=\"Content-Security-Policy\" ",
+        "content=\"default-src 'none'; base-uri 'none'; form-action 'none'\">",
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+        "<title>Original scene caption rehearsal</title></head><body>",
+        "<main><h1>Original scene caption rehearsal</h1>",
+        "<p>Authored text only. No sound recorded, audio played, or native caption timing verified.</p>",
+    ]
+    count = 0
+    for scene in plan["scenes"]:
+        if (type(scene) is not dict or type(scene.get("scene_id")) is not str
+                or type(scene.get("cues")) is not list
+                or len(scene["cues"]) > 16):
+            raise StudioQuestError("invalid caption preview scene")
+        parts.append("<section aria-label=\"Scene captions\"><h2>" +
+                     escape(scene["scene_id"], quote=True) + "</h2><ol>")
+        for cue in scene["cues"]:
+            if (type(cue) is not dict or type(cue.get("caption")) is not str
+                    or type(cue.get("start_tick")) is not int
+                    or type(cue.get("end_tick")) is not int):
+                raise StudioQuestError("invalid caption preview cue")
+            caption = _text(cue["caption"], "preview caption")
+            start = _number(cue["start_tick"], "preview start")
+            end = _number(cue["end_tick"], "preview end", minimum=start + 1)
+            parts.append("<li><strong>Ticks " + str(start) + "–" + str(end) +
+                         "</strong>: " + escape(caption, quote=True) + "</li>")
+            count += 1
+        parts.append("</ol></section>")
+    if count != plan.get("cue_count"):
+        raise StudioQuestError("caption preview cue count mismatch")
+    parts.append("</main></body></html>")
+    output = "".join(parts).encode("utf-8", "strict")
+    if len(output) > MAX_BYTES:
+        raise StudioQuestError("caption preview exceeds bounded size")
+    return output, {
+        "schema": "skeleton.game_builder.studio_audio_caption_preview.v1",
+        "plan_digest": digest, "html_sha256": sha256(output).hexdigest(),
+        "caption_count": count, "authored_text_only": True,
+        "native_caption_runtime_verified": False,
+        "audio_playback_verified": False, "release_certified": False,
+    }
+
+
 __all__ = [
     "SCHEMA", "REQUEST_SCHEMA", "FILENAME", "compile_audio_cues",
-    "publish_audio_cues", "verify_published_audio_cues",
+    "publish_audio_cues", "verify_published_audio_cues", "render_caption_preview",
 ]

@@ -58,7 +58,7 @@ def test_deterministic_complete_html5_and_editor_handoff():
     assert sha256(archive).hexdigest() == manifest["bundle_sha256"]
     with zipfile.ZipFile(io.BytesIO(archive)) as z:
         assert sorted(z.namelist()) == sorted([
-            "index.html", "director_editor.html", "scene_schedule.json",
+            "index.html", "director_editor.html", "choice_rehearsal.html", "scene_schedule.json",
             "scene_asset_bindings.json", "director_manifest.json"])
         for name, expected in manifest["file_hashes"].items():
             assert sha256(z.read(name)).hexdigest() == expected

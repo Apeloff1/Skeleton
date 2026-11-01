@@ -218,3 +218,103 @@ def test_cli_persist_and_verify_replay(capsys, tmp_path):
     assert published["plan"] == plan
     assert main(args + ["--verify-directory", str(tmp_path)]) == 0
     assert json.loads(capsys.readouterr().out) == plan
+
+
+def test_audio_caption_html_escapes_original_text_without_script_execution():
+    from skeleton.ai.game_builder.studio_ecosystem_audio_cues import (
+        render_caption_preview,
+    )
+    docs, source, session, schedule, authored = fixture()
+    authored["scene_cues"]["origin"][0]["caption"] = "<script>alert(1)</script>"
+    plan = compile_audio_cues(
+        docs, [], schedule, authored, authorized=True,
+        expected_source_digest=source, expected_session_digest=session)
+    html, receipt = render_caption_preview(plan)
+    assert receipt["plan_digest"] == plan["plan_digest"]
+    assert receipt["html_sha256"] == sha256(html).hexdigest()
+    assert receipt["audio_playback_verified"] is False
+    assert b"Content-Security-Policy" in html
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert b"<script>" not in html
+    assert b"<iframe" not in html
+    assert render_caption_preview(plan) == (html, receipt)
+
+
+def test_audio_cues_packaged_with_actual_playable_director_and_replayed(tmp_path):
+    import io
+    import zipfile
+
+    from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
+        compile_director_handoff, publish_director_handoff,
+        verify_director_handoff,
+    )
+    docs, source, session, schedule, authored, plan = compile_fixture()
+    visual = sha256(json.dumps(
+        docs["visual"], sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False).encode("ascii")).hexdigest()
+    recipe = docs["visual"]["asset_recipes"][0]["id"]
+    assignments = {
+        scene["id"]: {
+            asset: recipe for asset in (
+                scene["assets"] + scene["interactive_objects"])
+        } for scene in docs["scene"]["episode_plan"]
+    }
+    kwargs = {
+        "authorized": True, "expected_source_digest": source,
+        "expected_visual_digest": visual, "expected_session_digest": session,
+        "audio_authoring": authored,
+    }
+    manifest, archive = compile_director_handoff(
+        docs, [], schedule, assignments, **kwargs)
+    assert manifest["canonical_playable_receipt"]["validated_gameplay_proof"] is True
+    assert manifest["audio_cue_plan_digest"] == plan["plan_digest"]
+    assert manifest["audio_recorded_verified"] is False
+    assert manifest["release_certified"] is False
+    with zipfile.ZipFile(io.BytesIO(archive)) as z:
+        assert "index.html" in z.namelist()
+        assert "audio_cues.json" in z.namelist()
+        assert "audio_captions.html" in z.namelist()
+        assert json.loads(z.read("audio_cues.json")) == plan
+        assert b"Content-Security-Policy" in z.read("audio_captions.html")
+        for name, digest in manifest["file_hashes"].items():
+            assert sha256(z.read(name)).hexdigest() == digest
+    assert (manifest, archive) == compile_director_handoff(
+        docs, [], schedule, assignments, **kwargs)
+    published = publish_director_handoff(
+        manifest, archive, tmp_path, authorized=True, documents=docs,
+        actions=[], schedule=schedule, assignments=assignments,
+        audio_authoring=authored)
+    assert published["file_write_performed"] is True
+    assert verify_director_handoff(
+        docs, [], schedule, assignments, tmp_path, **kwargs) == manifest
+    with pytest.raises(StudioQuestError):
+        verify_director_handoff(
+            docs, [], schedule, assignments, tmp_path,
+            authorized=True, expected_source_digest=source,
+            expected_visual_digest=visual, expected_session_digest=session,
+            audio_authoring=None)
+
+
+def test_director_cli_audio_authoring_round_trip(capsys):
+    from scripts.studio_director_handoff_cli import main
+    docs, source, session, schedule, authored, plan = compile_fixture()
+    visual = sha256(json.dumps(
+        docs["visual"], sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False).encode("ascii")).hexdigest()
+    recipe = docs["visual"]["asset_recipes"][0]["id"]
+    assignments = {
+        scene["id"]: {
+            asset: recipe for asset in (
+                scene["assets"] + scene["interactive_objects"])
+        } for scene in docs["scene"]["episode_plan"]
+    }
+    assert main([
+        "--project", PROJECT, "--expected-source", source,
+        "--expected-visual", visual, "--expected-session", session,
+        "--schedule", json.dumps(schedule),
+        "--assignments", json.dumps(assignments),
+        "--audio-authoring-json", json.dumps(authored),
+    ]) == 0
+    manifest = json.loads(capsys.readouterr().out)
+    assert manifest["audio_cue_plan_digest"] == plan["plan_digest"]
+    assert manifest["canonical_html5_gameplay_replay_verified"] is True
