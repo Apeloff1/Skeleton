@@ -25,6 +25,12 @@ def test_original_npc_rescue_uses_canonical_weather_and_earned_reward():
     assert result["weather_session"]["state"]["scene"]["state"]["scene_id"] == "gate"
     assert verify_rescue(json.loads(json.dumps(result))) == result
     assert len(result["state"]["journal"]) == 4
+    for checkpoint in [play_rescue(source, actions[:i]) for i in range(1, 5)]:
+        event = checkpoint["state"]["journal"][-1]
+        state = checkpoint["state"]
+        projection = {key: state[key] for key in ("tick", "phase", "earned", "npcs")}
+        from skeleton.game.gameplay.flgb_gameplay_runtime import dig
+        assert event["after"] == dig(projection)
 
 
 def test_checkpoint_resume_is_bit_identical_and_source_not_mutated():

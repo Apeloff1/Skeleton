@@ -185,20 +185,19 @@ def _advance(snapshot: dict[str, Any], raw: Any) -> dict[str, Any]:
         phase = "lost"
     else:
         phase = "active"
+    # Hash the post-action NPC projection, not a partially built journal
+    # containing the event itself. This avoids self-referential receipts.
+    projection = {
+        "tick": tick, "phase": phase, "earned": earned, "npcs": npc_state,
+    }
     event = {
         "sequence": old["tick"], "action": action,
-        "before": snapshot["state_digest"],
+        "before": snapshot["state_digest"], "after": dig(projection),
         "weather_state_digest": weather["state_digest"],
         "changes": changes, "earned_delta": earned - old["earned"],
     }
-    state = {
-        "tick": tick, "phase": phase, "earned": earned,
-        "npcs": npc_state, "journal": [*old["journal"], event],
-    }
-    event["after"] = dig(state)
     event["receipt"] = dig(event)
-    # State contains the final event receipt, so rebuild its digest after stamping.
-    state["journal"][-1] = event
+    state = {**projection, "journal": [*old["journal"], event]}
     return _snapshot(source, weather, state, snapshot["save"])
 
 
