@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import os
+import json
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -11,6 +14,8 @@ from skeleton.ai.model_runtime.long_context_cgroup_events import (
     CgroupEventMonitor, _read_events,
 )
 from skeleton.ai.model_runtime.long_context_host_pressure import _secure_directory
+from skeleton.ai.model_runtime.long_context_cli import main as long_context_main
+from skeleton.ai.model_runtime import CgroupEventMonitor as ExportedCgroupEventMonitor
 
 
 @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
@@ -34,6 +39,25 @@ class TestCgroupEventMonitor(unittest.TestCase):
         (self.root / "cpu.stat").write_text(
             f"usage_usec 123\nnr_periods 4\nnr_throttled {throttled}\n",
             encoding="ascii")
+
+    def test_package_export_and_cli_baseline_are_non_authorizing(self):
+        self.assertIs(ExportedCgroupEventMonitor, CgroupEventMonitor)
+        output = StringIO()
+        with patch("skeleton.ai.model_runtime.long_context_cli.LongContextSpool",
+                   side_effect=AssertionError("must not open spool")):
+            with patch("skeleton.ai.model_runtime.long_context_cli.CgroupEventMonitor",
+                       return_value=self.monitor):
+                with redirect_stdout(output):
+                    code = long_context_main([
+                        "--root", str(self.root / "unused"),
+                        "--tokenizer-digest", "a" * 64,
+                        "head-observe-events",
+                    ])
+        self.assertEqual(code, 0)
+        self.assertFalse((self.root / "unused").exists())
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["state"], "baseline_required")
+        self.assertFalse(result["is_admission_grant"])
 
     def test_first_sample_is_not_delta_or_grant(self):
         result = self.monitor.sample()

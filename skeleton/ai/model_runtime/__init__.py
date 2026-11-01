@@ -11,6 +11,8 @@ from importlib import import_module
 # Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
     "LongContextSpool": ".long_context_spool",
+    "CgroupEventMonitor": ".long_context_cgroup_events",
+    "observe_cgroup_pressure": ".long_context_cgroup",
     "LongContextFairPlanner": ".long_context_fairness",
     "PressureSignals": ".long_context_fairness",
     "StreamDemand": ".long_context_fairness",
@@ -225,6 +227,10 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".execution_telemetry", __name__)
     if module_name == ".flgb_model_runtime":
         return import_module(".flgb_model_runtime", __name__)
+    if module_name == ".long_context_cgroup":
+        return import_module(".long_context_cgroup", __name__)
+    if module_name == ".long_context_cgroup_events":
+        return import_module(".long_context_cgroup_events", __name__)
     if module_name == ".long_context_fairness":
         return import_module(".long_context_fairness", __name__)
     if module_name == ".long_context_spool":
@@ -286,6 +292,8 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "CgroupEventMonitor",
+    "observe_cgroup_pressure",
     "LongContextFairPlanner",
     "PressureSignals",
     "StreamDemand",

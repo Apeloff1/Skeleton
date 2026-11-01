@@ -5,3 +5,5 @@
 The monitor is process-bound and guarded by a thread lock. It rejects inherited state after fork. It never persists or reuses stale event counters across restart. A zero delta is **not** evidence of safe CPU, RAM, thermal, energy or device operation. The sampled directory is not proof of process membership; no result is an execution lease or authorization. To use this in an actual execution controller, independently verify the process cgroup, live resource budgets, policy identity, and all required device telemetry. Never infer normal pressure from a single cumulative sample.
 
 Focused regressions: `tests/flgb/test_long_context_cgroup_events.py`.
+
+The one-shot `head-observe-events` CLI establishes only an untrusted baseline. A long-lived controller must retain the monitor instance across observations; the CLI never opens the token spool or grants execution.
