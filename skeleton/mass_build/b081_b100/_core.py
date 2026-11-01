@@ -17,8 +17,21 @@ class ContractError(ValueError):
     """Raised when evidence input is malformed or a gate cannot be evaluated."""
 
 
+MAX_CANONICAL_BYTES = 4 * 1024 * 1024
+
+
 def canonical(obj: Any) -> str:
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=_reject)
+    """Reject nonfinite values and oversized evidence before hashing or release use."""
+    try:
+        result = json.dumps(
+            obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            allow_nan=False, default=_reject,
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ContractError("non-canonical evidence value") from exc
+    if len(result) > MAX_CANONICAL_BYTES:
+        raise ContractError("canonical evidence exceeds byte bound")
+    return result
 
 
 def _reject(obj: Any) -> Any:

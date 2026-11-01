@@ -39,3 +39,15 @@ def test_forged_local_success_cannot_claim_provider_release():
     assert not result.passed
     assert m.UNVERIFIED_AUTHORITY in result.findings
     assert result.facts["release_authorized"] is False
+
+
+def test_canonical_evidence_rejects_nonfinite_and_oversized_facts(monkeypatch):
+    from skeleton.mass_build.b081_b100 import _core
+
+    with pytest.raises(ContractError, match="non-canonical"):
+        _core.digest({"bad": float("nan")})
+    with pytest.raises(ContractError, match="non-canonical"):
+        _core.digest({"bad": float("inf")})
+    monkeypatch.setattr(_core, "MAX_CANONICAL_BYTES", 64)
+    with pytest.raises(ContractError, match="byte bound"):
+        _core.digest({"large": "x" * 128})
