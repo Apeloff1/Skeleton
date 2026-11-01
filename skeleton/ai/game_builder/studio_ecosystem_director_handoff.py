@@ -25,7 +25,9 @@ from .studio_ecosystem_scene_schedule import (
 from .studio_ecosystem_scene_asset_bindings import compile_scene_asset_bindings
 from .studio_ecosystem_director_editor import render_director_editor
 from .studio_ecosystem_director_choice_rehearsal import render_choice_rehearsal
-from .studio_ecosystem_audio_cues import compile_audio_cues, render_caption_preview
+from .studio_ecosystem_audio_cues import (
+    compile_audio_cues, render_caption_preview, render_audio_cue_editor,
+)
 
 SCHEMA = "skeleton.game_builder.studio_director_handoff.v1"
 FILENAME = "studio_director_handoff.zip"
@@ -33,7 +35,7 @@ MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 _FILES = ("index.html", "director_editor.html", "choice_rehearsal.html",
           "scene_schedule.json",
           "scene_asset_bindings.json", "director_manifest.json")
-_AUDIO_FILES = ("audio_cues.json", "audio_captions.html")
+_AUDIO_FILES = ("audio_cues.json", "audio_captions.html", "audio_editor.html")
 
 
 def compile_director_handoff(
@@ -85,6 +87,8 @@ def compile_director_handoff(
     audio_plan = None
     audio_preview = None
     audio_preview_receipt = None
+    audio_editor = None
+    audio_editor_receipt = None
     if audio_authoring is not None:
         audio_plan = compile_audio_cues(
             documents, actions, schedule, audio_authoring, authorized=True,
@@ -94,6 +98,7 @@ def compile_director_handoff(
                 or audio_plan["project_id"] != timing["project_id"]):
             raise StudioQuestError("director audio and scene timeline diverged")
         audio_preview, audio_preview_receipt = render_caption_preview(audio_plan)
+        audio_editor, audio_editor_receipt = render_audio_cue_editor(audio_plan, documents)
     files = {
         "index.html": playable,
         "director_editor.html": editor_html,
@@ -104,6 +109,7 @@ def compile_director_handoff(
     if audio_plan is not None:
         files["audio_cues.json"] = _canonical(audio_plan) + b"\n"
         files["audio_captions.html"] = audio_preview
+        files["audio_editor.html"] = audio_editor
     manifest: dict[str, object] = {
         "schema": SCHEMA, "project_id": timing["project_id"],
         "source_digest": expected_source_digest,
@@ -128,6 +134,7 @@ def compile_director_handoff(
     if audio_plan is not None:
         manifest["audio_cue_plan_digest"] = audio_plan["plan_digest"]
         manifest["audio_caption_preview_receipt"] = audio_preview_receipt
+        manifest["offline_audio_editor_receipt"] = audio_editor_receipt
         manifest["audio_recorded_verified"] = False
     manifest["manifest_digest"] = _digest(manifest)
     files["director_manifest.json"] = _canonical(manifest) + b"\n"

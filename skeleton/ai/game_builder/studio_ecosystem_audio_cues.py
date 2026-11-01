@@ -331,7 +331,141 @@ def render_caption_preview(plan: Mapping[str, Any]) -> tuple[bytes, dict[str, An
     }
 
 
+def render_audio_cue_editor(
+    plan: Mapping[str, Any], documents: Mapping[str, Any],
+) -> tuple[bytes, dict[str, Any]]:
+    """Offline editable caption timeline exporting typed JSON for CLI replay.
+
+    This browser is untrusted: it can propose edits but never signs or
+    publishes receipts. The CLI/Jeeves compiler must independently revalidate.
+    """
+    import base64
+    from html import escape
+
+    if (type(plan) is not dict or plan.get("schema") != SCHEMA
+            or type(plan.get("scenes")) is not list):
+        raise StudioQuestError("invalid audio editor plan")
+    digest = _lease(plan.get("plan_digest"), "audio editor")
+    if _digest({key: value for key, value in plan.items()
+                if key != "plan_digest"}) != digest:
+        raise StudioQuestError("audio editor plan digest mismatch")
+    audio_digest, layers = _layers(documents)
+    if audio_digest != plan.get("audio_source_digest"):
+        raise StudioQuestError("stale audio editor source lease")
+    scenes: dict[str, list[dict[str, Any]]] = {}
+    for row in plan["scenes"]:
+        if type(row) is not dict or type(row.get("cues")) is not list:
+            raise StudioQuestError("invalid audio editor scene")
+        scene_id = _text(row.get("scene_id"), "editor scene", maximum=256)
+        if scene_id in scenes:
+            raise StudioQuestError("duplicate audio editor scene")
+        start = _number(row.get("start_tick"), "editor scene start")
+        cues: list[dict[str, Any]] = []
+        for cue in row["cues"]:
+            if type(cue) is not dict or cue.get("layer_id") not in layers:
+                raise StudioQuestError("invalid audio editor cue")
+            cue_start = _number(cue.get("start_tick"), "editor cue start")
+            cue_end = _number(cue.get("end_tick"), "editor cue end",
+                              minimum=cue_start + 1)
+            if cue_start < start:
+                raise StudioQuestError("audio editor cue starts before scene")
+            cues.append({
+                "layer_id": cue["layer_id"],
+                "start_offset": cue_start - start,
+                "duration_ticks": cue_end - cue_start,
+                "caption": _text(cue.get("caption"), "editor caption"),
+            })
+        scenes[scene_id] = cues
+    if len(scenes) != plan.get("scene_count"):
+        raise StudioQuestError("audio editor scene count mismatch")
+    seed = {
+        "schema": REQUEST_SCHEMA, "scene_cues": scenes,
+    }
+    seed_json = _canonical(seed).decode("ascii").replace("<", "\\u003c")
+    layer_json = _canonical(sorted(layers)).decode("ascii").replace("<", "\\u003c")
+    script = """(function(){
+"use strict";
+const seed=JSON.parse(document.getElementById("audio-seed").textContent);
+const layers=JSON.parse(document.getElementById("audio-layers").textContent);
+const host=document.getElementById("audio-editor");
+function node(tag,text){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;}
+function field(label,value,kind){const wrap=node("label",label+" ");const input=node("input");
+ input.type=kind||"text";input.value=String(value);input.setAttribute("aria-label",label);
+ if(kind==="number"){input.min="0";input.step="1";}wrap.appendChild(input);return [wrap,input];}
+function addCue(list,cue){const item=node("li");item.className="audio-cue";
+ const select=node("select");select.setAttribute("aria-label","Authored sound layer");
+ for(const layer of layers){const opt=node("option",layer);opt.value=layer;select.appendChild(opt);}
+ select.value=cue.layer_id;item.appendChild(select);
+ const start=field("Start offset",cue.start_offset,"number");
+ const duration=field("Duration ticks",cue.duration_ticks,"number");
+ const caption=field("Accessible caption",cue.caption);
+ item.appendChild(start[0]);item.appendChild(duration[0]);item.appendChild(caption[0]);
+ const remove=node("button","Remove cue");remove.type="button";
+ remove.addEventListener("click",function(){item.remove();});
+ item.appendChild(remove);list.appendChild(item);
+}
+for(const sceneId of Object.keys(seed.scene_cues)){
+ const section=node("section");section.dataset.sceneId=sceneId;
+ section.appendChild(node("h2",sceneId));const list=node("ol");
+ for(const cue of seed.scene_cues[sceneId])addCue(list,cue);
+ section.appendChild(list);const add=node("button","Add cue");add.type="button";
+ add.addEventListener("click",function(){
+   addCue(list,{layer_id:layers[0],start_offset:0,duration_ticks:1,
+     caption:"Describe original audible event"});
+ });section.appendChild(add);host.appendChild(section);
+}
+document.getElementById("audio-export").addEventListener("click",function(){
+ const result={schema:seed.schema,scene_cues:{}};
+ for(const section of host.querySelectorAll("section")){
+  const cues=[];for(const row of section.querySelectorAll("li.audio-cue")){
+   const inputs=row.querySelectorAll("input");
+   cues.push({layer_id:row.querySelector("select").value,
+    start_offset:Number(inputs[0].value),duration_ticks:Number(inputs[1].value),
+    caption:inputs[2].value});
+  }result.scene_cues[section.dataset.sceneId]=cues;
+ }
+ const data=JSON.stringify(result,null,2)+"\\n";
+ const blob=new Blob([data],{type:"application/json"});
+ const url=URL.createObjectURL(blob);const link=node("a");
+ link.href=url;link.download="studio_audio_cue_authoring.json";
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(function(){URL.revokeObjectURL(url);},0);
+});
+})();"""
+    script_hash = base64.b64encode(sha256(script.encode("utf-8")).digest()).decode("ascii")
+    csp = ("default-src 'none'; script-src 'sha256-" + script_hash +
+           "'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'")
+    page = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta http-equiv="Content-Security-Policy" content="' +
+        escape(csp, quote=True) + '">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>Original audio cue editor</title></head><body><main>'
+        '<h1>Original audio cue editor</h1>'
+        '<p>Offline authoring only. Recompile exported JSON with the canonical CLI; '
+        'browser exports do not prove audio playback or release readiness.</p>'
+        '<div id="audio-editor"></div><button id="audio-export" type="button">'
+        'Export typed cue edits</button></main>'
+        '<script type="application/json" id="audio-seed">' + seed_json + '</script>'
+        '<script type="application/json" id="audio-layers">' + layer_json + '</script>'
+        '<script>' + script + '</script></body></html>'
+    )
+    html = page.encode("utf-8", "strict")
+    if len(html) > MAX_BYTES:
+        raise StudioQuestError("audio editor HTML exceeds byte budget")
+    return html, {
+        "schema": "skeleton.game_builder.studio_audio_cue_editor.v1",
+        "plan_digest": digest, "audio_source_digest": audio_digest,
+        "html_sha256": sha256(html).hexdigest(),
+        "script_sha256": sha256(script.encode("utf-8")).hexdigest(),
+        "export_schema": REQUEST_SCHEMA,
+        "browser_export_authoritative": False, "file_write_performed": False,
+        "native_audio_verified": False, "release_certified": False,
+    }
+
+
 __all__ = [
     "SCHEMA", "REQUEST_SCHEMA", "FILENAME", "compile_audio_cues",
     "publish_audio_cues", "verify_published_audio_cues", "render_caption_preview",
+    "render_audio_cue_editor",
 ]

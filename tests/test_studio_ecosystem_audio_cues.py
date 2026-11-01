@@ -274,6 +274,10 @@ def test_audio_cues_packaged_with_actual_playable_director_and_replayed(tmp_path
         assert "index.html" in z.namelist()
         assert "audio_cues.json" in z.namelist()
         assert "audio_captions.html" in z.namelist()
+        assert "audio_editor.html" in z.namelist()
+        assert b"Content-Security-Policy" in z.read("audio_editor.html")
+        assert b"innerHTML" not in z.read("audio_editor.html")
+        assert b"eval(" not in z.read("audio_editor.html")
         assert json.loads(z.read("audio_cues.json")) == plan
         assert b"Content-Security-Policy" in z.read("audio_captions.html")
         for name, digest in manifest["file_hashes"].items():
@@ -404,3 +408,32 @@ def test_prompt_jeeves_route_and_cli_produce_identical_editable_proposal(capsys)
     output = json.loads(capsys.readouterr().out)
     assert output["proposal"] == direct["detail"]
     assert output["output"] == direct["detail"]["compiled_plan"]
+
+
+def test_offline_audio_editor_is_source_bound_and_escapes_browser_json():
+    from skeleton.ai.game_builder.studio_ecosystem_audio_cues import (
+        render_audio_cue_editor,
+    )
+    docs, source, session, schedule, authored = fixture()
+    authored["scene_cues"]["origin"][0]["caption"] = "</script><script>alert(1)</script>"
+    plan = compile_audio_cues(
+        docs, [], schedule, authored, authorized=True,
+        expected_source_digest=source, expected_session_digest=session)
+    html, receipt = render_audio_cue_editor(plan, docs)
+    assert receipt["plan_digest"] == plan["plan_digest"]
+    assert receipt["html_sha256"] == sha256(html).hexdigest()
+    assert receipt["browser_export_authoritative"] is False
+    assert receipt["export_schema"] == REQUEST_SCHEMA
+    assert b"Content-Security-Policy" in html
+    assert b"\\u003c/script>" in html
+    assert b"</script><script>alert(1)" not in html
+    assert b"innerHTML" not in html
+    assert b"eval(" not in html
+    assert b"fetch(" not in html
+    assert b"XMLHttpRequest" not in html
+    assert b"studio_audio_cue_authoring.json" in html
+    assert render_audio_cue_editor(plan, docs) == (html, receipt)
+    modified = deepcopy(docs)
+    modified["audio"]["sound_layers"][0]["trigger"] = "forged"
+    with pytest.raises(StudioQuestError):
+        render_audio_cue_editor(plan, modified)
