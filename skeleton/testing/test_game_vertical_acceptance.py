@@ -24,15 +24,18 @@ def test_real_playable_victory_is_replay_verified_and_portable(kind):
     assert report["kind"] == kind
     assert verify_acceptance(json.loads(json.dumps(report))) == report
     assert import_acceptance(json.loads(json.dumps(export_acceptance(report)))) == report
-    assert report["portable_bundle"]["state_digest"] == report["state_digest"] if kind == "quest" else True
+    if kind == "quest":
+        assert report["portable_bundle"]["state_digest"] == report["state_digest"]
 
 
 @pytest.mark.parametrize("kind", ["forge", "quest"])
 def test_checkpoint_boundary_does_not_change_earned_outcome(kind):
     report = demo_acceptance(kind)
     source, actions = report["source"], report["actions"]
-    assert accept_vertical(kind, source, actions, checkpoint_at=0)["state_digest"] == report["state_digest"]
-    assert accept_vertical(kind, source, actions, checkpoint_at=len(actions))["state_digest"] == report["state_digest"]
+    initial = accept_vertical(kind, source, actions, checkpoint_at=0)
+    assert initial["state_digest"] == report["state_digest"]
+    final = accept_vertical(kind, source, actions, checkpoint_at=len(actions))
+    assert final["state_digest"] == report["state_digest"]
 
 
 def test_quest_source_must_be_authored_and_played():
