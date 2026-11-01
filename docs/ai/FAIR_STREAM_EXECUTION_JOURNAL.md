@@ -26,3 +26,15 @@ a database rollback or same-UID attacker remains outside its security claim.
 This is CPU-only admission/receipt custody, not a GPU allocator or device
 qualification. Tests use synthetic backends, crash simulation, forged
 receipts and deterministic restart scenarios.
+
+## Durable request identity across lease replacement
+
+The execution journal now requires a verified, non-partial SQLite UNIQUE index
+on `(session_id, request_id)`. A persisted RUNNING intent fences the request
+even if a caller invents a new lease ID after a crash. The replay check is
+performed inside the same `BEGIN IMMEDIATE` transaction that commits RUNNING,
+and the unique index provides a second database-enforced concurrency fence.
+A forged nonunique index with the expected name is rejected on restart.
+The encrypted result vault separately enforces the same request identity for
+COMMITTED outputs. Neither layer replaces the independent custody CAS anchor.
+No uncertain backend execution is automatically retried.

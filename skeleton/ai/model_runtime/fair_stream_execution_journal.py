@@ -19,6 +19,7 @@ from .fair_stream_session import DispatchPermit
 SCHEMA = "skeleton.ai.fair-stream-execution-journal.v1"
 MAX_JOURNAL_ROWS = 10_000
 MAX_RECEIPT_BYTES = 2048
+_REQUEST_INDEX = "local_fair_stream_execution_request_identity"
 
 
 class ExecutionOutcomeUnknown(RuntimeError):
@@ -94,6 +95,26 @@ class FairStreamExecutionJournal:
         ))
         if actual != expected:
             raise ValueError("untrusted execution journal schema")
+        # RUNNING is already outcome-uncertain. A new lease identifier must
+        # never allow the same request to execute again after a crash.
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS " + _REQUEST_INDEX
+            + " ON local_fair_stream_execution_journal"
+            + " (session_id, request_id)"
+        )
+        matches = [
+            row for row in connection.execute(
+                "PRAGMA index_list(local_fair_stream_execution_journal)"
+            ) if row[1] == _REQUEST_INDEX
+        ]
+        if (
+            len(matches) != 1 or matches[0][2] != 1
+            or matches[0][4] != 0
+            or tuple(row[2] for row in connection.execute(
+                "PRAGMA index_info(" + _REQUEST_INDEX + ")"
+            )) != ("session_id", "request_id")
+        ):
+            raise ValueError("untrusted journal request replay index")
 
     def _begin(self) -> None:
         if self._connection.in_transaction:
@@ -125,6 +146,12 @@ class FairStreamExecutionJournal:
             try:
                 if self._row(permit.lease_id) is not None:
                     raise ExecutionOutcomeUnknown("lease already executed or reserved")
+                if self._connection.execute(
+                    "SELECT 1 FROM local_fair_stream_execution_journal"
+                    " WHERE session_id=? AND request_id=? LIMIT 1",
+                    (self.session_id, permit.request_id),
+                ).fetchone() is not None:
+                    raise ExecutionOutcomeUnknown("request already executed or reserved")
                 count = self._connection.execute(
                     "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
                 ).fetchone()[0]

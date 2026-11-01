@@ -95,6 +95,45 @@ def test_restart_retains_running_intent(tmp_path):
         second.recover_committed_receipt(permit())
 
 
+def test_restart_running_request_cannot_replay_with_different_lease(tmp_path):
+    path = tmp_path / "separate-journal.db"
+    connection = sqlite3.connect(path)
+    first = journal(connection)
+    first.begin(permit())
+    connection.close()
+    restarted = journal(sqlite3.connect(path))
+    forged_lease = DispatchPermit("f" * 64, "request-1", 3, CHECKPOINT, 16, 1024)
+    with pytest.raises(ExecutionOutcomeUnknown, match="request already"):
+        restarted.begin(forged_lease)
+    assert restarted._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 1
+
+
+def test_distinct_request_can_begin_after_existing_running_intent():
+    j = journal()
+    j.begin(permit())
+    independent = DispatchPermit("f" * 64, "request-2", 3, CHECKPOINT, 4, 256)
+    j.begin(independent)
+    assert j._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 2
+
+
+def test_nonunique_request_replay_index_is_rejected_on_restart(tmp_path):
+    path = tmp_path / "separate-journal.db"
+    connection = sqlite3.connect(path)
+    journal(connection)
+    connection.execute("DROP INDEX local_fair_stream_execution_request_identity")
+    connection.execute(
+        "CREATE INDEX local_fair_stream_execution_request_identity"
+        " ON local_fair_stream_execution_journal (session_id, request_id)"
+    )
+    connection.close()
+    with pytest.raises(ValueError, match="request replay index"):
+        journal(sqlite3.connect(path))
+
+
 def test_restart_recovers_committed_receipt_without_execution(tmp_path):
     path = tmp_path / "separate-journal.db"
     connection = sqlite3.connect(path)
