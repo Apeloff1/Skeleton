@@ -529,3 +529,52 @@ def test_first_run_rejects_deeply_nested_intent_json_without_export(
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert not output.exists()
+
+
+def test_first_run_accepts_independently_pinned_original_intent(
+    tmp_path, capsys,
+):
+    from hashlib import sha256
+    source = _intent(tmp_path)
+    pin = sha256(source.read_bytes()).hexdigest()
+    output = tmp_path / "pinned-game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source),
+        "--expected-intent-sha256", pin, "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["original_intent_independently_pinned"] is True
+    assert result["independent_intent_sha256"] == pin
+    assert result["offline_gameplay_reexecuted"] is True
+    assert result["release_certified"] is False
+    assert (output / "release.json").exists()
+
+
+@pytest.mark.parametrize("pin", ["0" * 64, "A" * 64, "abc", "z" * 64])
+def test_first_run_rejects_wrong_or_malformed_intent_pin_before_export(
+    tmp_path, capsys, pin,
+):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source),
+        "--expected-intent-sha256", pin, "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()
+
+
+def test_independent_intent_pin_rejected_for_inline_onboarding(
+    tmp_path, capsys,
+):
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--onboard", "--project-id", "fresh",
+        "--title", "Original Game", "--seed", "42",
+        "--expected-intent-sha256", "a" * 64,
+        "--output", str(output), "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()

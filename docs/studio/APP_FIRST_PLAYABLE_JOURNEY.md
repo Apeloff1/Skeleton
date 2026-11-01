@@ -295,3 +295,20 @@ rejection, never a partially exported game. This is a POSIX source-custody
 contract, not hardware or consumer-device qualification.
 
 Focused acceptance: `python -m pytest -q skeleton/testing/test_app_studio_journey.py`.
+
+
+### Independently pinned original JSON input
+
+For an operator-supplied first-run JSON intent, `studio-journey` now accepts
+`--expected-intent-sha256 <64-lowercase-hex>`. The digest must be acquired
+independently of the input file, not copied from a field inside that file.
+The importer checks its owner-controlled nofollow descriptor reads, file inode
+continuity and independently supplied digest before the canonical game builder
+is invoked. Wrong or malformed pins fail without exporting game source.
+
+The resulting source-level receipt explicitly distinguishes pinned from
+unpinned JSON input. Inline `--onboard` does not accept a file pin because
+there is no external input file to authenticate. This feature does not sign
+a game, establish intellectual-property rights, or qualify a consumer device.
+
+Focused acceptance: `python -m pytest -q skeleton/testing/test_app_studio_journey.py`.

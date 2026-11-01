@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import argparse
 from hashlib import sha256
+import hmac
 import json
 import os
+import re
 from pathlib import Path
 import sys
 from typing import Sequence
@@ -87,12 +89,19 @@ class FirstPlayableJourneyError(ValueError):
 
 
 
-def _load_operator_intent(path: str | Path) -> GameBuildIntent:
+def _load_operator_intent(
+    path: str | Path, *, expected_sha256: str | None = None,
+) -> GameBuildIntent:
     """Read a bounded original intent from stable nofollow file descriptors.
 
     The shared game CLI's path-based JSON helper is not used here: a normal
     stat/read path can race a symlink replacement during first-run import.
     """
+    if expected_sha256 is not None and (
+        type(expected_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+    ):
+        raise FirstPlayableJourneyError("independent lowercase intent SHA-256 required")
     source = Path(path).expanduser().absolute()
     if source.name in ("", ".", ".."):
         raise FirstPlayableJourneyError("invalid intent filename")
@@ -118,6 +127,10 @@ def _load_operator_intent(path: str | Path) -> GameBuildIntent:
                     info.st_uid, info.st_mode, info.st_mtime_ns, info.st_ctime_ns)
         if identity(before) != identity(after):
             raise FirstPlayableJourneyError("original game intent inode changed during import")
+        if (expected_sha256 is not None and not hmac.compare_digest(
+            sha256(raw).hexdigest(), expected_sha256,
+        )):
+            raise FirstPlayableJourneyError("original intent differs from independent pin")
         _assert_original_root(source.parent, parent_fd)
     finally:
         os.close(parent_fd)
@@ -141,6 +154,7 @@ def build_first_playable_journey(
     authorized: bool, mirror_attempts: int = 64,
     practice_games: int = 0,
     receipt_destination: str | Path | None = None,
+    expected_intent_sha256: str | None = None,
 ) -> dict[str, object]:
     """Build, export and independently reexecute one real original game.
 
@@ -162,8 +176,14 @@ def build_first_playable_journey(
         preflight_receipt_destination(
             receipt_destination, protected_roots=(destination,), authorized=True,
         )
-    intent = (intent_path if isinstance(intent_path, GameBuildIntent)
-              else _load_operator_intent(intent_path))
+    if isinstance(intent_path, GameBuildIntent):
+        if expected_intent_sha256 is not None:
+            raise FirstPlayableJourneyError("in-memory onboarding has no pinned input file")
+        intent = intent_path
+    else:
+        intent = _load_operator_intent(
+            intent_path, expected_sha256=expected_intent_sha256,
+        )
     run = run_original_game_studio(
         intent, authorized=True, mirror_attempts=mirror_attempts,
         companion_practice_games=practice_games,
@@ -204,6 +224,8 @@ def build_first_playable_journey(
         "studio_digest": run.digest,
         "world_digest": run.project.world.digest,
         "trusted_in_process_manifest_sha256": expected_pin,
+        "original_intent_independently_pinned": expected_intent_sha256 is not None,
+        "independent_intent_sha256": expected_intent_sha256,
         "verified_source_files": verified["verified_files"],
         "replayed_actions": verified["replayed_actions"],
         "replay_digest": verified["replay_digest"],
@@ -462,6 +484,8 @@ def _parser() -> argparse.ArgumentParser:
         description="Build an original game, export browser/Godot source and replay-verify it offline.",
     )
     parser.add_argument("--intent", help="bounded original game intent JSON for new builds")
+    parser.add_argument("--expected-intent-sha256",
+                        help="independently held SHA-256 for a new JSON intent build only")
     parser.add_argument("--onboard", action="store_true",
                         help="build an original offline game from typed first-run CLI inputs")
     parser.add_argument("--project-id", help="stable original game project ID for --onboard")
@@ -539,6 +563,19 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.expected_intent_sha256 is not None and (
+            args.intent is None or args.onboard or any((
+                args.verify_existing, args.play_existing, args.compare_saves,
+                args.package_existing, args.install_archive, args.reconcile_install,
+                args.preflight_install, args.inspect_install_quarantine,
+                args.migrate_progress, args.check_archive_save,
+                args.preflight_migration, args.reconcile_migration,
+                args.inspect_archive, args.inspect_receipt, args.reconcile_receipt,
+            ))
+        ):
+            raise FirstPlayableJourneyError(
+                "independent intent pin is only valid for new JSON game builds"
+            )
         onboarding_values = (
             args.project_id, args.title, args.subtitle, args.seed,
             args.theme, args.width, args.height, args.levels,
@@ -900,6 +937,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 mirror_attempts=args.mirror_attempts,
                 practice_games=args.practice_games,
                 receipt_destination=args.receipt,
+                expected_intent_sha256=args.expected_intent_sha256,
             )
     except (
         FirstPlayableJourneyError, PrivateGameSaveError, OfflineSaveComparisonError,
