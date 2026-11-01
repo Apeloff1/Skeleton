@@ -90,3 +90,9 @@ or non-hex optional output pins before publication or resumed delivery.
 Focused regression entrypoints (not a test result):
 `python -m pytest skeleton/testing/test_app_offline_first_playable_delivery.py skeleton/testing/test_app_offline_first_playable_batch.py -q`.
 No device, signing, rights, malware or release qualification is asserted.
+
+Read-only interrupted-cohort triage also reopens each artifact parent after
+its nofollow descriptor-relative existence check, **including missing names**.
+A replaced parent must yield `unsafe_custody_quarantine`, not a false
+`missing_unpublished` state that could be mistaken for resume eligibility.
+The diagnostic still does not reserve names, repair outputs, or certify release.

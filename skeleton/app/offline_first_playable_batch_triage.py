@@ -14,7 +14,9 @@ import stat
 import sys
 from typing import Sequence
 
-from skeleton.ai.game_builder.dual_runtime_verify import verify_exported_package
+from skeleton.ai.game_builder.dual_runtime_verify import (
+    _assert_original_root, verify_exported_package,
+)
 from skeleton.app.offline_archive_install import _parent as install_parent
 from skeleton.app.offline_delivery_archive import _parent as archive_parent
 from skeleton.app.offline_first_playable_batch import (
@@ -41,15 +43,21 @@ def _entry(path: str | Path, opener, *, directory: bool) -> str:
                     target.name, dir_fd=parent_fd, follow_symlinks=False,
                 )
             except FileNotFoundError:
-                return "missing"
-            if (info.st_uid != os.geteuid()
-                    or info.st_mode & 0o077
-                    or (not stat.S_ISDIR(info.st_mode) if directory
-                        else not stat.S_ISREG(info.st_mode))
-                    or (not directory and (info.st_nlink != 1
-                                           or info.st_size <= 0))):
-                return "unsafe"
-            return "present"
+                state = "missing"
+            else:
+                if (info.st_uid != os.geteuid()
+                        or info.st_mode & 0o077
+                        or (not stat.S_ISDIR(info.st_mode) if directory
+                            else not stat.S_ISREG(info.st_mode))
+                        or (not directory and (info.st_nlink != 1
+                                               or info.st_size <= 0))):
+                    state = "unsafe"
+                else:
+                    state = "present"
+            # Even a missing name can become a false 'resume-safe' signal
+            # if the parent was replaced after its descriptor was opened.
+            _assert_original_root(target.parent, parent_fd)
+            return state
         finally:
             os.close(parent_fd)
     except (OSError, ValueError, TypeError):

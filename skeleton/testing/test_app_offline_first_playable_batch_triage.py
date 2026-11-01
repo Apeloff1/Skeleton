@@ -133,3 +133,40 @@ def test_cli_missing_authorization_blocks_without_touching_files(
     assert result["summary_state"] == "missing"
     assert result["read_only"] is True
     assert not Path(jobs[0].archive).exists()
+
+
+def test_parent_replacement_during_missing_entry_triage_is_unsafe(
+    original_games, tmp_path, monkeypatch,
+):
+    """Missing-name diagnosis cannot trust a replaced directory pathname."""
+    from skeleton.app import offline_first_playable_batch_triage as module
+
+    parent = tmp_path / "owned-archive-parent"
+    parent.mkdir()
+    moved = tmp_path / "old-archive-parent"
+    jobs = list(jobs_for(original_games, tmp_path))
+    archive = parent / "original-game.zip"
+    jobs[0] = replace(jobs[0], archive=archive)
+    original_stat = module.os.stat
+    swapped = False
+
+    def replace_after_descriptor_open(path, *args, **kwargs):
+        nonlocal swapped
+        if (not swapped and path == archive.name
+                and kwargs.get("dir_fd") is not None):
+            swapped = True
+            parent.rename(moved)
+            parent.mkdir()
+            raise FileNotFoundError(path)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "stat", replace_after_descriptor_open)
+    result = triage_first_playable_delivery_batch(
+        jobs, tmp_path / "cohort.json", authorized=True,
+    )
+    assert swapped is True
+    assert result["jobs"][0]["state"] == "unsafe_custody_quarantine"
+    assert result["resume_eligible_with_independent_pins"] is False
+    assert result["read_only"] is True
+    assert result["release_certified"] is False
+    assert not archive.exists()
