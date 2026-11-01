@@ -212,3 +212,45 @@ def test_semantic_audit_rejects_nul_in_document_identity(
     )
     with pytest.raises(OfflineAuditError, match="invalid fields"):
         audit_database(library, "library")
+
+
+def test_semantic_audit_verifies_disk_offload_and_rejects_chunk_forgery(
+    tmp_path: Path,
+) -> None:
+    from skeleton.app.offline_disk_index import DiskChunkWriter
+
+    _, library, _ = _fixtures(tmp_path)
+    with sqlite3.connect(library) as conn:
+        docid, body, size = conn.execute(
+            "SELECT id, body, size_bytes FROM offline_documents"
+        ).fetchone()
+        assert len(body.encode("utf-8")) == size
+        conn.execute("DELETE FROM offline_document_fts WHERE rowid=?", (docid,))
+        conn.execute("UPDATE offline_documents SET body='' WHERE id=?", (docid,))
+        writer = DiskChunkWriter(conn, docid, 256)
+        writer.feed(body)
+        assert writer.finish() == 1
+    assert audit_database(library, "library")["indexed_bytes"] == size
+
+    _change(library, "UPDATE offline_document_chunk_fts SET body='forged'")
+    with pytest.raises(OfflineAuditError, match="chunk|projection"):
+        audit_database(library, "library")
+
+
+def test_semantic_audit_rejects_orphaned_disk_chunks_and_fts(
+    tmp_path: Path,
+) -> None:
+    _, library, _ = _fixtures(tmp_path)
+    _change(
+        library,
+        "INSERT INTO offline_document_chunks "
+        "(document_id, ordinal, char_start, body, body_sha256) "
+        "VALUES (999999, 0, 0, 'orphan', ?)",
+        (hashlib.sha256(b"orphan").hexdigest(),),
+    )
+    with pytest.raises(OfflineAuditError, match="orphaned disk document chunk"):
+        audit_database(library, "library")
+    _change(library, "DELETE FROM offline_document_chunks WHERE document_id=999999")
+    _change(library, "INSERT INTO offline_document_chunk_fts(rowid, body) VALUES (999999, 'orphan')")
+    with pytest.raises(OfflineAuditError, match="orphaned disk chunk FTS5"):
+        audit_database(library, "library")

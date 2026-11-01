@@ -18,7 +18,7 @@ from typing import Sequence
 from .offline_workspace import DurableOfflineSession
 from .offline_library import OfflineDocumentLibrary, OfflineLibraryError, render_local_context
 from .offline_readiness import inspect_local_readiness
-from .offline_index_queue import OfflineIndexQueue
+from .offline_index_queue import MAX_RUN_BATCH, OfflineIndexQueue
 from .offline_snapshot import (
     create_snapshot, verify_snapshot, restore_snapshot,
 )
@@ -478,7 +478,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             or (args.cancel_queue_job and (args.enqueue_dir or args.run_queue))
             or (args.retry_queue_job and (args.enqueue_dir or args.run_queue))
             or (args.drain_limit is not None and
-                (type(args.drain_limit) is not int or args.drain_limit < 1))
+                (type(args.drain_limit) is not int or not 1 <= args.drain_limit <= MAX_RUN_BATCH))
         ):
             print("invalid offline queue arguments; select explicit local queue and index paths", file=sys.stderr)
             return 2
