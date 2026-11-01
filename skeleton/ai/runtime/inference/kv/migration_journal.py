@@ -366,6 +366,10 @@ class KVMigrationJournal:
                 }
             except (sqlite3.Error, ValueError, TypeError, KeyError,
                     OverflowError, RecursionError) as exc:
+                # A forged historical row is not a transient admission
+                # failure. Keep this owner quarantined even if another
+                # process later rewrites the row to look healthy.
+                self._quarantined = True
                 raise KVMigrationOutcomeUnknown(
                     "migration journal history unverifiable"
                 ) from exc

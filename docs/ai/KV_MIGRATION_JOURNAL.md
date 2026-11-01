@@ -47,3 +47,13 @@ simulation/device-qualification flags to the application. A valid journal
 receipt is NOT evidence of current page residency, a disk quota reservation,
 or GPU/M-chip device qualification. SQLite rollback protection and physical
 backend reconciliation remain separate application responsibilities.
+
+## Persistent quarantine on corrupted historical rows
+
+If any historical plan, receipt, signature or bounded encoding fails verification,
+the migration journal now latches a process-local quarantine. A later database
+rewrite cannot silently turn that same owner back into a physical-migration
+authority. Only explicit operator reconciliation with the independent durable
+anchor and resident page inventory can establish a new trusted owner. The
+regression test corrupts a committed MAC, verifies quarantine, restores the
+original bytes, and confirms the old owner still refuses migration.

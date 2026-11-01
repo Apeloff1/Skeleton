@@ -197,6 +197,34 @@ def test_verified_history_rejects_tampered_committed_plan_before_new_move():
     assert storage.calls == 1
 
 
+def test_corrupted_history_quarantines_even_after_database_repair():
+    connection = sqlite3.connect(":memory:")
+    service, journal, storage = setup(connection=connection)
+    plan, _ = service.plan_live()
+    service.apply_once(plan)
+    original = connection.execute(
+        "SELECT plan_mac FROM local_kv_migration_journal"
+    ).fetchone()[0]
+    connection.execute(
+        "UPDATE local_kv_migration_journal SET plan_mac = ?",
+        ("0" * 64,),
+    )
+    connection.commit()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unverifiable"):
+        journal.verified_inventory()
+    assert journal._quarantined
+    connection.execute(
+        "UPDATE local_kv_migration_journal SET plan_mac = ?",
+        (original,),
+    )
+    connection.commit()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="quarantined"):
+        journal.verified_inventory()
+    with pytest.raises(KVMigrationOutcomeUnknown):
+        journal.begin(plan)
+    assert storage.calls == 1
+
+
 def test_verified_history_distinguishes_running_without_replaying():
     service, journal, storage = setup()
     plan, _ = service.plan_live()
