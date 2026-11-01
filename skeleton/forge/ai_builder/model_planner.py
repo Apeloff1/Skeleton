@@ -38,7 +38,7 @@ _SYSTEM = (
 )
 
 
-_PROVIDER_ID = re.compile(r"[a-z][a-z0-9._-]{0,63}\\Z")
+_PROVIDER_ID = re.compile(r"[a-z][a-z0-9._-]{0,63}")
 
 
 def grant_providers(issuer: TokenIssuer, provider_ids: Iterable[str], *, subject: str = "forge.ai_builder") -> str:
