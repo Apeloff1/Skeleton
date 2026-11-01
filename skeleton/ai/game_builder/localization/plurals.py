@@ -6,7 +6,7 @@ the "other"-only rule rather than guessing.
 """
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Callable
 
 PLURAL_CATEGORIES = ("zero", "one", "two", "few", "many", "other")
@@ -16,10 +16,18 @@ LRI, RLI, FSI, PDI = "\u2066", "\u2067", "\u2068", "\u2069"
 
 
 def _operands(n: int | float | Decimal | str) -> tuple[Decimal, int, int, int]:
-    d = Decimal(str(n)).copy_abs()
-    if not d.is_finite():
-        raise ValueError("plural operand must be finite")
+    raw = str(n)
+    if len(raw) > 64:
+        raise ValueError("plural operand exceeds bounded decimal length")
+    try:
+        d = Decimal(raw).copy_abs()
+    except InvalidOperation as exc:
+        raise ValueError("invalid plural operand") from exc
+    if not d.is_finite() or not -12 <= d.adjusted() <= 12:
+        raise ValueError("plural operand exceeds finite exponent bound")
     s = format(d, "f")
+    if len(s) > 64:
+        raise ValueError("plural operand exceeds expanded decimal bound")
     frac = s.split(".", 1)[1] if "." in s else ""
     return d, int(d), len(frac), int(frac) if frac else 0
 

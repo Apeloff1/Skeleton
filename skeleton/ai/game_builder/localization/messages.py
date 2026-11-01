@@ -8,12 +8,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any, Mapping, Union
 
 from .plurals import PLURAL_CATEGORIES, categories_for, is_rtl, plural_category, wrap_bidi
 
 MAX_MESSAGE = 4096
 MAX_DEPTH = 6
+MAX_RENDERED_CHARS = 65_536
+MAX_ARG_CHARS = 1_024
 
 
 class MessageError(ValueError):
@@ -199,7 +202,15 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
     rtl = is_rtl(locale)
 
     def val(v: Any) -> str:
+        if type(v) not in (str, int, float, bool):
+            raise MessageError("unsupported message argument type")
+        if type(v) is int and abs(v) > 10**12:
+            raise MessageError("message numeric argument exceeds bound")
+        if type(v) is float and not math.isfinite(v):
+            raise MessageError("message numeric argument must be finite")
         s = str(v)
+        if len(s) > MAX_ARG_CHARS:
+            raise MessageError("message argument exceeds text bound")
         return wrap_bidi(s) if isolate or (rtl and s.isascii() and s.strip()) else s
 
     def render(nodes, number=None) -> str:
@@ -218,13 +229,17 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
                     raise MessageError(f"missing argument {n.name!r}")
                 v = args[n.name]
                 if n.kind == "plural":
-                    if isinstance(v, bool) or not isinstance(v, int | float):
-                        raise MessageError(f"plural argument {n.name!r} must be a number")
+                    if (isinstance(v, bool) or not isinstance(v, int | float)
+                            or abs(v) > 10**12 or not math.isfinite(v)):
+                        raise MessageError(f"plural argument {n.name!r} must be a bounded finite number")
                     exact = f"={v}" if float(v).is_integer() else None
                     key = exact if exact in n.options else plural_category(locale, v)
                     out.append(render(n.options.get(key, n.options["other"]), v))
                 else:
                     out.append(render(n.options.get(str(v), n.options["other"]), number))
-        return "".join(out)
+        result = "".join(out)
+        if len(result) > MAX_RENDERED_CHARS:
+            raise MessageError("rendered message exceeds output bound")
+        return result
 
     return render(parse_message(text))

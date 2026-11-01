@@ -135,3 +135,15 @@ def test_json_roundtrip():
     assert g2.to_json() == g.to_json() and g2.table("ar").direction == "rtl"
     with pytest.raises(ValueError):
         LocalizedGame.from_json('{"schema": "nope"}')
+
+
+def test_plural_numeric_exponent_and_format_arguments_are_bounded():
+    for huge in ("1e1000000", "0." + "0" * 10000, "1e-1000000"):
+        with pytest.raises(ValueError, match="bound"):
+            plural_category("en", huge)
+    with pytest.raises(MessageError, match="bounded finite"):
+        format_message("{n, plural, other {#}}", {"n": 10**100}, "en")
+    with pytest.raises(MessageError, match="finite"):
+        format_message("{n, plural, other {#}}", {"n": float("inf")}, "en")
+    with pytest.raises(MessageError, match="text bound"):
+        format_message("{name}", {"name": "x" * 100_000}, "en")
