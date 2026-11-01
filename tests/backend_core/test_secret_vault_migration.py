@@ -111,7 +111,7 @@ def test_encrypt_reports_unknown_rows(stores):
     r = SecretMigrator(store, P1, cps, Clock()).encrypt_plaintext()
     assert r.failed == ["sec_bad"] and r.changed == 2 and not r.done
     assert cps.get(JOB_ENCRYPT).cursor == "sec_0001"
-    assert store.compare_and_set("sec_bad", b"\\x00garbage", b"whsec_fixed", "")
+    assert store.compare_and_set("sec_bad", b"\x00garbage", b"whsec_fixed", "")
     resumed = SecretMigrator(store, P1, cps, Clock()).encrypt_plaintext()
     assert resumed.changed == 1 and resumed.done and not resumed.failed
 
