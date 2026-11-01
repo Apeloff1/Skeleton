@@ -189,10 +189,16 @@ def test_transcript_declarations_must_match_issued_frame(changes):
     frame(session)
     before = local_state(session)
     segment = TranscriptSegment("conversation", 0, "declared text", 0, 0.25, True)
-    with pytest.raises(MultimodalFoundationError):
-        session.submit_transcript(
-            replace(segment, **changes), extractor_ref="operator:human", command_id="bad-text"
-        )
+    if changes == {"sequence": True}:
+        # The frozen typed declaration rejects bool before it reaches the
+        # session boundary; no command can be published or partially applied.
+        with pytest.raises(ValueError, match="sequence"):
+            replace(segment, **changes)
+    else:
+        with pytest.raises(MultimodalFoundationError):
+            session.submit_transcript(
+                replace(segment, **changes), extractor_ref="operator:human", command_id="bad-text"
+            )
     assert local_state(session) == before
 
 
