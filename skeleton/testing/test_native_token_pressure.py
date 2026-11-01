@@ -8,6 +8,7 @@ import pytest
 from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
 from skeleton.ai.model_runtime.fair_stream_queue import MeasuredStreamBudget
 from skeleton.ai.model_runtime.fair_stream_session import DispatchPermit
+from skeleton.ai.model_runtime import native_token_pressure as pressure_module
 from skeleton.ai.model_runtime.native_token_pressure import (
     NativePressureInterrupted, NativeTokenPressureGuard,
 )
@@ -121,3 +122,78 @@ def test_one_callback_is_not_proof_of_postflight_and_model_probes(monkeypatch):
     with pytest.raises(NativePressureInterrupted, match="unverified"):
         guard.finish(success=True)
     assert guard.status().stopped
+
+
+def test_monotonic_deadline_interrupts_before_another_token(monkeypatch):
+    probe(monkeypatch, [budget()])
+    clock = iter((0, 100, 200, 1_000_001))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(clock))
+    guard = NativeTokenPressureGuard(
+        LiveStreamBudgetSampler(), storage_path=".", max_duration_ns=1_000_000,
+    )
+    callback = guard.start(P)
+    callback()
+    with pytest.raises(NativePressureInterrupted, match="deadline"):
+        callback()
+    assert guard.status().samples == 1
+    assert guard.status().stopped
+    guard.finish(success=False)
+
+
+def test_probe_time_counts_toward_execution_deadline(monkeypatch):
+    probe(monkeypatch, [budget()])
+    clock = iter((0, 10, 1_000_001))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(clock))
+    guard = NativeTokenPressureGuard(
+        LiveStreamBudgetSampler(), storage_path=".", max_duration_ns=1_000_000,
+    )
+    with pytest.raises(NativePressureInterrupted, match="deadline"):
+        guard.start(P)()
+    assert guard.status().samples == 1
+    assert guard.status().stopped
+
+
+def test_clock_regression_quarantines_active_native_lease(monkeypatch):
+    clock = iter((1000, 999))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(clock))
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="regressed"):
+        guard.start(P)()
+    assert guard.status().stopped
+
+
+def test_deadline_expiry_at_finish_cannot_certify_success(monkeypatch):
+    probe(monkeypatch, [budget(), budget()])
+    clock = iter((0, 10, 20, 30, 40, 1_000_001))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(clock))
+    guard = NativeTokenPressureGuard(
+        LiveStreamBudgetSampler(), storage_path=".", max_duration_ns=1_000_000,
+    )
+    callback = guard.start(P)
+    callback()
+    callback()
+    with pytest.raises(NativePressureInterrupted, match="deadline"):
+        guard.finish(success=True)
+    assert guard.status().samples == 2
+    assert guard.status().stopped
+    with pytest.raises(NativePressureInterrupted, match="not available"):
+        guard.start(P)
+
+
+def test_monotonic_clock_failure_at_start_is_fail_closed(monkeypatch):
+    def broken_clock():
+        raise OSError("clock failed")
+    monkeypatch.setattr(pressure_module, "monotonic_ns", broken_clock)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="unavailable"):
+        guard.start(P)
+    assert guard.status().stopped
+
+
+@pytest.mark.parametrize("duration", [0, True, 999_999, 86_400_000_000_001])
+def test_native_execution_duration_must_be_bounded(duration):
+    with pytest.raises(ValueError, match="duration"):
+        NativeTokenPressureGuard(
+            LiveStreamBudgetSampler(), storage_path=".",
+            max_duration_ns=duration,
+        )

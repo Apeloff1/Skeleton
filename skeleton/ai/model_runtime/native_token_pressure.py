@@ -8,12 +8,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from threading import RLock
+from time import monotonic_ns
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
 from .fair_stream_queue import MeasuredStreamBudget
 from .fair_stream_session import DispatchPermit
 
 MAX_PROBES_PER_LEASE = 4096
+MAX_DURATION_NS = 86_400_000_000_000  # 24h ceiling, not a hard preemption guarantee
+DEFAULT_DURATION_NS = 900_000_000_000  # 15m cooperative lease quantum
 
 
 class NativePressureInterrupted(RuntimeError):
@@ -40,6 +43,7 @@ class NativeTokenPressureGuard:
     def __init__(
         self, sampler: LiveStreamBudgetSampler, *, storage_path: str,
         max_probes: int = MAX_PROBES_PER_LEASE,
+        max_duration_ns: int = DEFAULT_DURATION_NS,
     ) -> None:
         if type(sampler) is not LiveStreamBudgetSampler:
             raise ValueError("canonical OS sampler required")
@@ -47,14 +51,41 @@ class NativeTokenPressureGuard:
             raise ValueError("selected storage volume required")
         if type(max_probes) is not int or not 1 <= max_probes <= MAX_PROBES_PER_LEASE:
             raise ValueError("bounded pressure probe count required")
+        if (type(max_duration_ns) is not int
+                or not 1_000_000 <= max_duration_ns <= MAX_DURATION_NS):
+            raise ValueError("bounded monotonic execution duration required")
         self._sampler = sampler
         self._storage_path = storage_path
         self._max_probes = max_probes
+        self._max_duration_ns = max_duration_ns
         self._lock = RLock()
         self._active: str | None = None
         self._samples = 0
         self._stopped = False
         self._pressure: int | None = None
+        self._start_ns: int | None = None
+        self._last_ns: int | None = None
+
+    def _check_deadline(self) -> None:
+        """Fail closed on timeout, clock regression or an unreadable clock.
+
+        The caller holds _lock. This is cooperative: a native backend must
+        invoke the callback at each token; a blocked native call still needs
+        an independent process-level cancellation boundary.
+        """
+        try:
+            now = monotonic_ns()
+        except BaseException as exc:
+            self._stopped = True
+            raise NativePressureInterrupted("monotonic execution clock unavailable") from exc
+        if (type(now) is not int or now < 0 or self._start_ns is None
+                or self._last_ns is None or now < self._last_ns):
+            self._stopped = True
+            raise NativePressureInterrupted("monotonic execution clock regressed")
+        self._last_ns = now
+        if now - self._start_ns > self._max_duration_ns:
+            self._stopped = True
+            raise NativePressureInterrupted("native execution lease deadline exceeded")
 
     def start(self, permit: DispatchPermit):
         """Return an interrupt callback; one active generation per guard."""
@@ -63,6 +94,16 @@ class NativeTokenPressureGuard:
         with self._lock:
             if self._active is not None or self._stopped:
                 raise NativePressureInterrupted("pressure guard not available")
+            try:
+                started = monotonic_ns()
+            except BaseException as exc:
+                self._stopped = True
+                raise NativePressureInterrupted("monotonic execution clock unavailable") from exc
+            if type(started) is not int or started < 0:
+                self._stopped = True
+                raise NativePressureInterrupted("invalid monotonic execution clock")
+            self._start_ns = started
+            self._last_ns = started
             self._active = permit.lease_id
             self._samples = 0
             self._pressure = None
@@ -71,6 +112,7 @@ class NativeTokenPressureGuard:
             with self._lock:
                 if self._active != permit.lease_id or self._stopped:
                     raise NativePressureInterrupted("pressure guard no longer active")
+                self._check_deadline()
                 if self._samples >= self._max_probes:
                     self._stopped = True
                     raise NativePressureInterrupted("per-lease probe budget exhausted")
@@ -82,6 +124,8 @@ class NativeTokenPressureGuard:
                 except BaseException as exc:
                     self._stopped = True
                     raise NativePressureInterrupted("live OS pressure unavailable") from exc
+                # Probe latency itself consumes the lease's deadline.
+                self._check_deadline()
                 if (type(budget) is not MeasuredStreamBudget
                         or budget.measurement != "os_probe"
                         or type(evidence) is not dict
@@ -105,6 +149,12 @@ class NativeTokenPressureGuard:
         with self._lock:
             if type(success) is not bool:
                 raise ValueError("explicit completion outcome required")
+            if success and self._active is not None and not self._stopped:
+                try:
+                    self._check_deadline()
+                except NativePressureInterrupted:
+                    self._active = None
+                    raise
             # A success without a model callback AND postflight probe, or a tripped guard
             # cannot be promoted to a reusable CPU execution permit.
             if success and (
