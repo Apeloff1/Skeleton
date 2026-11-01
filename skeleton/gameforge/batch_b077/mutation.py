@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import math
 import operator
 import textwrap
 from dataclasses import dataclass, field
@@ -112,16 +113,27 @@ _ARITHMETIC = {
 _UNARY = {ast.Not: operator.not_, ast.UAdd: operator.pos, ast.USub: operator.neg}
 
 
+def _scalar(value):
+    """Only bounded inert scalar values may enter an interpreted mutant."""
+    if type(value) not in (bool, int, float, str):
+        raise MutationUnsupportedError("mutant operand must be a plain scalar")
+    if type(value) is int and abs(value) > 10**12:
+        raise MutationUnsupportedError("mutant integer exceeds bound")
+    if type(value) is float and (not math.isfinite(value) or abs(value) > 10**12):
+        raise MutationUnsupportedError("mutant float exceeds bound")
+    if type(value) is str and len(value) > 1024:
+        raise MutationUnsupportedError("mutant string exceeds bound")
+    return value
+
+
 def _interpret(node: ast.AST, variables: dict, depth: int = 0):
     """Pure expression interpreter: no eval/exec/imports/calls/attributes."""
     if depth > 32:
         raise MutationUnsupportedError("mutant expression exceeds depth bound")
-    if isinstance(node, ast.Constant) and type(node.value) in (bool, int, float, str):
-        if type(node.value) is int and abs(node.value) > 10**9:
-            raise MutationUnsupportedError("mutant integer exceeds bound")
-        return node.value
+    if isinstance(node, ast.Constant):
+        return _scalar(node.value)
     if isinstance(node, ast.Name) and node.id in variables:
-        return variables[node.id]
+        return _scalar(variables[node.id])
     if isinstance(node, ast.BoolOp) and type(node.op) in (ast.And, ast.Or):
         if isinstance(node.op, ast.And):
             value = True
@@ -201,6 +213,8 @@ def run_mutation(fn: Callable, test: Callable[[Callable], object]) -> MutationRe
         cand = _compile(m, fn.__name__, env)
         try:
             killed = test(cand) is False
+        except MutationUnsupportedError:
+            raise  # An unexecutable mutant is not evidence of a killed mutant.
         except Exception:  # noqa: BLE001 - test failure kills an executable mutant
             killed = True
         (rep.killed if killed else rep.survived).append(m)

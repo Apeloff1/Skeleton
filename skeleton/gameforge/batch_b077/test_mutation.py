@@ -52,3 +52,25 @@ def test_unsupported_mutant_is_not_counted_as_a_kill():
 
     with pytest.raises(MutationUnsupportedError):
         run_mutation(uses_a_call, lambda f: f(1))
+
+
+def test_runtime_unsupported_operands_never_inflate_mutation_score():
+    from skeleton.gameforge.batch_b077.mutation import MutationUnsupportedError
+
+    def truthy(x):
+        return not x
+
+    def checks(f):
+        assert f(object()) is False
+
+    with pytest.raises(MutationUnsupportedError, match="plain scalar"):
+        run_mutation(truthy, checks)
+
+
+def test_interpreter_rejects_unbounded_inputs_and_nonfinite_floats():
+    from skeleton.gameforge.batch_b077.mutation import MutationUnsupportedError, _interpret
+    import ast
+
+    for value in (10**100, float("nan"), float("inf"), "x" * 1025, object()):
+        with pytest.raises(MutationUnsupportedError):
+            _interpret(ast.Name(id="x", ctx=ast.Load()), {"x": value})
