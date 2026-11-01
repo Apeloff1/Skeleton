@@ -279,3 +279,29 @@ def test_html_preview_is_authority_bound_and_publication_is_exclusive(harness, t
     target.chmod(0o644)
     with pytest.raises(StudioQuestError, match="private"):
         restore_npc_dialogue_choice_commit(harness[0], private, **params())
+
+def test_cli_private_contact_file_supports_large_receipts_and_rejects_links(
+    harness, tmp_path, capsys,
+):
+    from scripts.studio_npc_dialogue_choice_commit_cli import main
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    source = private / "contact.json"
+    source.write_text(json.dumps(harness[1]))
+    source.chmod(0o600)
+    args = [
+        "--project", "original", "--expected-contact", CONTACT,
+        "--expected-source", SOURCE, "--expected-walk", WALK,
+        "--expected-quest", QUEST, "--contact-file", str(source),
+        "--alternative", "leave",
+    ]
+    assert main(args) == 0
+    assert json.loads(capsys.readouterr().out)[
+        "choice_commit"]["next_quest_session_digest"] == NEXT_LEAVE
+    source.chmod(0o644)
+    with pytest.raises(SystemExit):
+        main(args)
+    source.unlink()
+    source.symlink_to(private / "missing")
+    with pytest.raises(SystemExit):
+        main(args)

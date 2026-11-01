@@ -35,3 +35,9 @@ The optional `--html-preview` CLI flag renders an escaped, script-free, CSP-
 restricted operator proof without writing files. HTML preview and publication
 are mutually exclusive. Restore also checks that file identity, length and
 modification metadata remain stable across the read.
+
+For larger source-bound contact receipts, use `--contact-file` instead of
+`--contact-json`. The CLI opens the file relative to a private directory,
+rejects symlinks and non-regular files, requires owner-only permissions, and
+checks stable file identity and length before strict JSON parsing. This keeps
+large receipts out of shell argument limits and command-line process listings.
