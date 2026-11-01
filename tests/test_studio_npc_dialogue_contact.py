@@ -36,10 +36,19 @@ def harness(monkeypatch):
          "choice_committed": False}
         for alt in card["authored_alternatives"]
     ]
+    card["card_digest"] = "d" * 64
+    summary = {
+        "npc_id": "archivist", "scene_id": "first", "status": "available",
+        "card_digest": card["card_digest"],
+        "available_alternatives": ["listen", "leave"],
+    }
     preview = {
         "source_digest": SOURCE, "project_id": "original",
         "session_digest": QUEST, "choice_committed": False,
-        "file_write_performed": False, "cards": [card], "previews": previews,
+        "file_write_performed": False, "cards": [summary], "previews": previews,
+    }
+    staging = {
+        "source_digest": SOURCE, "session_digest": QUEST, "cards": [card],
     }
     session = type("Session", (), {"digest": QUEST, "project_id": "original"})()
     walk = {
@@ -54,6 +63,7 @@ def harness(monkeypatch):
     monkeypatch.setattr(impl, "compile_npc_contact_handoff", lambda *a, **kw: deepcopy(contact))
     monkeypatch.setattr(impl, "replay_quest", lambda *a, **kw: session)
     monkeypatch.setattr(impl, "preview_dialogue_choices", lambda *a, **kw: deepcopy(preview))
+    monkeypatch.setattr(impl, "compile_dialogue_staging", lambda *a, **kw: deepcopy(staging))
     monkeypatch.setattr(adapter, "read_blueprint", lambda _: {"original": True})
     return {"original": True}, walk, contact, preview, card, session
 
@@ -85,14 +95,14 @@ def test_contact_and_quest_replay_are_both_required(harness):
 
 
 def test_wrong_npc_locked_scene_and_knowledge_drift_fail(harness):
-    harness[4]["npc_id"] = "stranger"
+    harness[3]["cards"][0]["npc_id"] = "stranger"
     with pytest.raises(StudioQuestError, match="different NPC"):
         make(harness)
-    harness[4]["npc_id"] = "archivist"
-    harness[4]["status"] = "locked"
+    harness[3]["cards"][0]["npc_id"] = "archivist"
+    harness[3]["cards"][0]["status"] = "locked"
     with pytest.raises(StudioQuestError, match="locked"):
         make(harness)
-    harness[4]["status"] = "available"
+    harness[3]["cards"][0]["status"] = "available"
     harness[2]["authored_knowledge"] = "forged"
     with pytest.raises(StudioQuestError, match="knowledge"):
         make(harness)

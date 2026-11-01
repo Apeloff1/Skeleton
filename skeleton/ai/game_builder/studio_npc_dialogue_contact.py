@@ -18,6 +18,7 @@ from .studio_ecosystem_scene_schedule import (
     _canonical, _digest, _lease, _open_directory, _write_all,
 )
 from .studio_ecosystem_dialogue_choice_preview import preview_dialogue_choices
+from .studio_ecosystem_dialogue_staging import compile_dialogue_staging
 from .studio_npc_contact_handoff import compile_npc_contact_handoff
 from .studio_waypoint_handoff import _bounded_walk_receipt
 
@@ -86,24 +87,38 @@ def compile_npc_dialogue_contact(
             or preview["choice_committed"] is not False
             or preview["file_write_performed"] is not False):
         raise StudioQuestError("NPC dialogue source or quest replay diverged")
+    # The choice-preview contract deliberately omits authored cue text.
+    # Retrieve the canonical staging card independently and cross-check its
+    # digest, rather than trusting fields the preview never supplies.
+    staged = compile_dialogue_staging(
+        documents, actions, scene_id=scene_id, authorized=True,
+        expected_source_digest=expected_source_digest,
+    )
     cards = preview["cards"]
-    if len(cards) != 1:
+    if len(cards) != 1 or len(staged["cards"]) != 1:
         raise StudioQuestError("NPC dialogue scene must identify exactly one card")
     card = cards[0]
-    if card["npc_id"] != npc_id:
+    authored_card = staged["cards"][0]
+    if (card["npc_id"] != npc_id or authored_card["npc_id"] != npc_id):
         raise StudioQuestError("NPC dialogue scene belongs to a different NPC")
-    if card["status"] != "available":
+    if (card["status"] != "available"
+            or authored_card["status"] != "available"):
         raise StudioQuestError("NPC dialogue scene is locked or already completed")
-    cues = [cue for cue in card["authored_cues"]
+    if (card["card_digest"] != authored_card["card_digest"]
+            or card["scene_id"] != scene_id
+            or staged["session_digest"] != expected_quest_digest
+            or staged["source_digest"] != expected_source_digest):
+        raise StudioQuestError("NPC dialogue staging differs from preview")
+    cues = [cue for cue in authored_card["authored_cues"]
             if cue["kind"] == "npc_knowledge"]
     if cues and (len(cues) != 1
                  or cues[0]["text"] != contact["authored_knowledge"]):
         raise StudioQuestError("NPC dialogue knowledge differs from contact source")
     choices = [item for item in preview["previews"]
                if item["npc_id"] == npc_id and item["scene_id"] == scene_id]
-    if (not choices or len(choices) != len(card["authored_alternatives"])
+    if (not choices or len(choices) != len(authored_card["authored_alternatives"])
             or {choice["alternative"] for choice in choices}
-               != set(card["authored_alternatives"])
+               != set(authored_card["authored_alternatives"])
             or any(choice["choice_committed"] is not False for choice in choices)):
         raise StudioQuestError("NPC dialogue authored alternatives diverged")
     result: dict[str, Any] = {
