@@ -17,6 +17,7 @@ from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import (
 )
 from skeleton.ai.game_builder.studio_world_dependency import (
     SCHEMA, MAX_GRAPH_BYTES, replay_dependency_world_batch,
+    compile_dependency_world_batch,
 )
 
 EXPORT_SCHEMA = "skeleton.jeeves.studio_world_dependency_editor.v1"
@@ -178,4 +179,11 @@ def load_dependency_editor_export(
         raise StudioQuestError("stale or invalid dependency editor export")
     if record["graph"].get("schema") != SCHEMA:
         raise StudioQuestError("invalid dependency editor graph schema")
+    # An editor export may change the order and arguments of authorized steps,
+    # but cannot silently transplant a baseline into a different world epoch.
+    candidate = compile_dependency_world_batch(
+        record["graph"], authorized=True,
+        expected_catalog_digest=expected_catalog_digest)
+    if candidate["source_projects"] != baseline["source_projects"]:
+        raise StudioQuestError("dependency editor crosses canonical source custody")
     return record["graph"]

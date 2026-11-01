@@ -289,3 +289,40 @@ def test_offline_dependency_editor_import_and_lease(tmp_path, monkeypatch):
         load_dependency_editor_export(
             path, authorized=True, expected_catalog_digest="a" * 64,
             baseline_proof=proof)
+
+
+def test_editor_refuses_canon_transplant_even_with_valid_baseline(monkeypatch, tmp_path):
+    import skeleton.ai.game_builder.studio_world_dependency as mod
+    from skeleton.ai.game_builder.studio_world_dependency_editor import (
+        EXPORT_SCHEMA, load_dependency_editor_export,
+    )
+    def compile_plan(requests, *, authorized, expected_catalog_digest):
+        world = requests[0]["arguments"]["world"]
+        return {
+            "catalog_digest": expected_catalog_digest,
+            "provenance": {"projects": [
+                {"project_id": world, "source_digest": "b" * 64}
+            ]},
+            "plan_digest": "c" * 64,
+        }
+    monkeypatch.setattr(mod, "compile_world_batch_plan", compile_plan)
+    original = _graph()
+    original["steps"][0]["request"]["arguments"]["world"] = "original"
+    proof = compile_dependency_world_batch(
+        original, authorized=True, expected_catalog_digest="a" * 64)
+    edited = deepcopy(original)
+    edited["steps"][0]["request"]["arguments"]["world"] = "other"
+    record = {
+        "schema": EXPORT_SCHEMA,
+        "catalog_digest": proof["catalog_digest"],
+        "baseline_proof_digest": proof["proof_digest"],
+        "baseline_graph_digest": proof["graph_digest"],
+        "graph": edited,
+    }
+    path = tmp_path / "edited.json"
+    path.write_text(json.dumps(record))
+    path.chmod(0o600)
+    with pytest.raises(StudioQuestError, match="canonical source custody"):
+        load_dependency_editor_export(
+            path, authorized=True, expected_catalog_digest="a" * 64,
+            baseline_proof=proof)
