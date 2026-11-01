@@ -76,6 +76,8 @@ Commands:
     scene-mission-timeline  Play replay-verified offline mission checkpoints
     scene-mission-league  Rank completed source-bound mission replays offline
     scene-mission-league-author  Transactionally edit and preview league scoring
+    scene-escort  Play source-bound convoy deliveries, save/replay and export
+    scene-escort-author  Transactionally edit and preview escort missions
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -760,6 +762,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "scene-escort":
+        from skeleton.game.gameplay.scene_escort import cli as escort_cli
+        return escort_cli(rest)
+    if cmd == "scene-escort-author":
+        from skeleton.game.gameplay.scene_escort_author import cli as escort_author_cli
+        return escort_author_cli(rest)
     if cmd == "scene-mission-league-author":
         from skeleton.game.gameplay.scene_mission_league_author import cli as league_author_cli
         return league_author_cli(rest)
