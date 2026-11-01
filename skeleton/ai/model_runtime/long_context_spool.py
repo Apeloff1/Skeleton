@@ -572,6 +572,20 @@ class LongContextSpool:
                     stream.write(raw)
                     stream.flush()
                     os.fsync(fd)
+                # The name may be replaced even while our writer FD stays
+                # pinned. Verify both the temporary name and inode BEFORE
+                # linking, then verify the final link against the same FD.
+                writer_info = os.fstat(fd)
+                temp_info = os.stat(temp, dir_fd=bucket_fd, follow_symlinks=False)
+                if (not stat.S_ISREG(writer_info.st_mode)
+                        or not stat.S_ISREG(temp_info.st_mode)
+                        or writer_info.st_uid != os.geteuid()
+                        or stat.S_IMODE(writer_info.st_mode) != 0o600
+                        or writer_info.st_nlink != 1
+                        or writer_info.st_size != len(raw)
+                        or (writer_info.st_dev, writer_info.st_ino)
+                        != (temp_info.st_dev, temp_info.st_ino)):
+                    raise LongContextSpoolError("publication temp inode replaced")
                 try:
                     os.link(
                         temp, digest, src_dir_fd=bucket_fd,
@@ -590,10 +604,51 @@ class LongContextSpool:
                             raise LongContextSpoolError("concurrent immutable object mismatch")
                     finally:
                         os.close(existing)
+                else:
+                    # The link operation can race a same-UID replacement of
+                    # the temp name. Never certify a final inode other than
+                    # the writer FD, even if a pathname lookup succeeded.
+                    published = os.open(
+                        digest, os.O_RDONLY | os.O_NOFOLLOW |
+                        getattr(os, "O_NONBLOCK", 0), dir_fd=bucket_fd,
+                    )
+                    try:
+                        published_info = os.fstat(published)
+                        writer_info = os.fstat(fd)
+                        if (not stat.S_ISREG(published_info.st_mode)
+                                or (published_info.st_dev, published_info.st_ino)
+                                != (writer_info.st_dev, writer_info.st_ino)
+                                or published_info.st_nlink != 2
+                                or writer_info.st_size != len(raw)):
+                            raise LongContextSpoolError(
+                                "published spool inode mismatch"
+                            )
+                    finally:
+                        os.close(published)
                 os.fsync(bucket_fd)
             finally:
+                # Do not unlink a replacement temp name: preserve evidence
+                # and fail closed rather than deleting a different inode.
+                writer_info = os.fstat(fd)
                 os.close(fd)
+                try:
+                    cleanup_info = os.stat(
+                        temp, dir_fd=bucket_fd, follow_symlinks=False,
+                    )
+                except FileNotFoundError as exc:
+                    raise LongContextSpoolError(
+                        "publication temp vanished; recovery required"
+                    ) from exc
+                if ((cleanup_info.st_dev, cleanup_info.st_ino)
+                        != (writer_info.st_dev, writer_info.st_ino)):
+                    raise LongContextSpoolError(
+                        "publication temp replaced; recovery required"
+                    )
                 os.unlink(temp, dir_fd=bucket_fd)
+                # The second directory sync durably removes the temporary
+                # hardlink. A crash before this point is recoverable by the
+                # bounded orphan-temp scanner.
+                os.fsync(bucket_fd)
         except OSError as exc:
             raise LongContextSpoolError("secure spool publication failed") from exc
         finally:

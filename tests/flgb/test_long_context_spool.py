@@ -606,5 +606,63 @@ class TestLongContextSpool(unittest.TestCase):
             self.spool.stage(self.sequence)
 
 
+    def test_posix_temp_name_swap_during_link_never_publishes_trusted_progress(self):
+        if os.name != "posix":
+            self.skipTest("POSIX inode custody required")
+        from unittest.mock import patch
+        original_link = os.link
+
+        def replace_temp_before_link(src, dst, **kwargs):
+            bucket_fd = kwargs["src_dir_fd"]
+            os.unlink(src, dir_fd=bucket_fd)
+            forged_fd = os.open(
+                src, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600, dir_fd=bucket_fd,
+            )
+            try:
+                os.write(forged_fd, b"forged replacement")
+            finally:
+                os.close(forged_fd)
+            return original_link(src, dst, **kwargs)
+
+        with patch(
+            "skeleton.ai.model_runtime.long_context_spool.os.link",
+            side_effect=replace_temp_before_link,
+        ):
+            with self.assertRaisesRegex(LongContextSpoolError, "publication temp replaced"):
+                self.stage()
+        # The digest-addressed rogue final is never silently accepted.
+        with self.assertRaises(LongContextSpoolError):
+            self.stage()
+
+    def test_posix_final_inode_replacement_after_link_is_not_a_receipt(self):
+        if os.name != "posix":
+            self.skipTest("POSIX inode custody required")
+        from unittest.mock import patch
+        original_link = os.link
+
+        def replace_final_after_link(src, dst, **kwargs):
+            original_link(src, dst, **kwargs)
+            bucket_fd = kwargs["dst_dir_fd"]
+            os.unlink(dst, dir_fd=bucket_fd)
+            rogue_fd = os.open(
+                dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600, dir_fd=bucket_fd,
+            )
+            try:
+                os.write(rogue_fd, b"forged final")
+            finally:
+                os.close(rogue_fd)
+
+        with patch(
+            "skeleton.ai.model_runtime.long_context_spool.os.link",
+            side_effect=replace_final_after_link,
+        ):
+            with self.assertRaisesRegex(LongContextSpoolError, "published spool inode mismatch"):
+                self.stage()
+        with self.assertRaises(LongContextSpoolError):
+            self.stage()
+
+
 if __name__ == "__main__":
     unittest.main()
