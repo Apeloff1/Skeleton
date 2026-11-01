@@ -178,3 +178,25 @@ def test_authority_rejected_before_any_game_read(transition, monkeypatch):
         module.publish_mixed_library_continuity_handoff(
             [old], [new], [signed], [signed], receipt, authorized=False,
         )
+
+
+def test_same_byte_receipt_swap_after_publication_is_not_success(
+    transition, tmp_path, monkeypatch,
+):
+    old, new, signed, receipt = transition
+    import skeleton.app.offline_mixed_game_library_continuity_handoff as module
+    original = module._read_envelope
+
+    def replace_after_read(*args, **kwargs):
+        value = original(*args, **kwargs)
+        other = tmp_path / "post-publish-replacement.json"
+        other.write_bytes(receipt.read_bytes())
+        other.chmod(0o600)
+        os.replace(other, receipt)
+        return value
+
+    monkeypatch.setattr(module, "_read_envelope", replace_after_read)
+    with pytest.raises((OSError, ValueError)):
+        _publish(transition)
+    # An uncertain published receipt remains for operator quarantine.
+    assert receipt.exists()
