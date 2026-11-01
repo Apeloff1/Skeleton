@@ -158,3 +158,54 @@ def test_incomplete_trip_coverage_is_not_a_positive_thermal_measurement():
     ))
     assert controller.snapshot()["trip_measured"] is False
     assert controller.snapshot()["thermal_backpressure"] is True
+
+
+def test_symlinked_zone_is_not_cpu_thermal_authority(tmp_path):
+    real = tmp_path / "real"
+    real.mkdir()
+    zone(real, "thermal_zone0")
+    (tmp_path / "thermal_zone0").symlink_to(real / "thermal_zone0",
+                                            target_is_directory=True)
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("attribute", ["type", "temp", "trip_point_0_type",
+                                         "trip_point_0_temp"])
+def test_symlinked_cpu_attribute_is_rejected(tmp_path, attribute):
+    first = zone(tmp_path, "thermal_zone0")
+    target = tmp_path / "external"
+    target.write_text("50000", encoding="ascii")
+    (first / attribute).unlink()
+    (first / attribute).symlink_to(target)
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_symlinked_sysfs_ancestor_is_rejected(tmp_path):
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    zone(actual, "thermal_zone0")
+    (tmp_path / "alias").symlink_to(actual, target_is_directory=True)
+    assert probe_cpu_thermal(tmp_path / "alias") == ()
+
+
+def test_trip_type_without_temperature_is_not_positive_thermal_evidence(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_temp").unlink()
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_temperature_without_trip_type_is_not_positive_thermal_evidence(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_type").unlink()
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_thermal_root_traversal_is_denied(tmp_path):
+    zone(tmp_path, "thermal_zone0")
+    assert probe_cpu_thermal(str(tmp_path) + "/../" + tmp_path.name) == ()
+
+
+def test_unknown_trip_temperature_suffix_blocks_whole_sample(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_1_temp_backup").write_text("60000", encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()

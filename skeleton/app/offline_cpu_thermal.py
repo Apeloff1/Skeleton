@@ -8,6 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import islice
 import math
+import os
+import re
+import stat
 from pathlib import Path
 import sys
 import threading
@@ -38,94 +41,140 @@ class CPUThermalSensor:
                 raise ValueError("invalid measured thermal value")
 
 
-def _read_sysfs_ascii(path: Path, max_bytes: int) -> str:
-    """Read a single bounded kernel attribute; never allocate by file size.
-
-    The trusted Linux sysfs root is still a platform boundary, not an
-    arbitrary user-supplied filesystem capability or a symlink-safe opener.
-    """
-    with path.open("rb") as stream:
-        raw = stream.read(max_bytes + 1)
-    if len(raw) > max_bytes:
-        raise ValueError("oversized kernel thermal attribute")
-    return raw.decode("ascii", errors="strict").strip()
-
-
-def _temperature(path: Path) -> float | None:
+def _open_pinned_root(root: str | Path) -> int:
+    """Open every Linux sysfs ancestor without following a symlink."""
+    path = os.fspath(root)
+    if type(path) is not str or not path.startswith("/") or "\x00" in path:
+        raise ValueError("absolute sysfs root required")
+    if any(part in (".", "..") for part in path.split("/")):
+        raise ValueError("sysfs parent traversal forbidden")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    fd = os.open("/", flags)
     try:
-        raw = _read_sysfs_ascii(path, 64)
-        # int() accepts underscores and leading plus signs; these are not
-        # canonical kernel millidegree evidence for an admission decision.
+        for part in path.split("/"):
+            if not part:
+                continue
+            child = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _read_pinned_ascii(zone_fd: int, name: str, limit: int) -> str:
+    """Descriptor/name identity-fenced bounded sysfs attribute read."""
+    if not re.fullmatch(r"[a-z0-9_]+", name):
+        raise ValueError("invalid thermal attribute name")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(name, flags, dir_fd=zone_fd)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("non-regular thermal attribute")
+        raw = os.read(fd, limit + 1)
+        after = os.fstat(fd)
+        named = os.stat(name, dir_fd=zone_fd, follow_symlinks=False)
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_mtime_ns, s.st_ctime_ns)
+        if (identity(before) != identity(after) or identity(after) != identity(named)
+                or not raw or len(raw) > limit):
+            raise ValueError("thermal attribute changed or exceeded read bound")
+        return raw.decode("ascii", errors="strict").strip()
+    finally:
+        os.close(fd)
+
+
+def _pinned_temperature(zone_fd: int, name: str) -> float | None:
+    try:
+        raw = _read_pinned_ascii(zone_fd, name, 64)
         digits = raw[1:] if raw.startswith("-") else raw
         if not digits or any(ch < "0" or ch > "9" for ch in digits):
             return None
-        milli = int(raw)
-        value = milli / 1000
+        value = int(raw) / 1000
         return value if -50 <= value <= 200 else None
     except (OSError, UnicodeError, ValueError):
         return None
 
 
 def probe_cpu_thermal(root: str | Path = "/sys/class/thermal") -> tuple[CPUThermalSensor, ...]:
-    """Bounded Linux sysfs probe; only CPU/SOC zones with valid temperatures."""
+    """Fail-closed, descriptor-pinned Linux CPU/SOC thermal inventory.
+
+    Missing or mismatched trip type/temperature pairs, symlinks, unexpected
+    names, inode replacement and oversized topology invalidate the whole
+    observation. No GPU/SoC hardware qualification is inferred.
+    """
     if sys.platform != "linux":
         return ()
     try:
-        zones = sorted(islice(Path(root).glob("thermal_zone[0-9]*"), 257))
-    except OSError:
+        root_fd = _open_pinned_root(root)
+    except (OSError, ValueError, TypeError):
         return ()
-    if len(zones) > 256:
-        return ()  # Unbounded host topology is not a trustworthy sample.
-    result: list[CPUThermalSensor] = []
-    for zone in zones:
-        # The glob prefix also matches suffixes like thermal_zone0_backup.
-        # Never silently skip an unexpected matching entry: inventory
-        # completeness is required for a positive CPU thermal decision.
-        if not zone.name.startswith("thermal_zone") or not zone.name[12:].isdigit():
-            return ()
-        try:
-            kind = _read_sysfs_ascii(zone / "type", 128)
-        except (OSError, UnicodeError, ValueError):
-            # Unknown zone type could conceal a CPU/SOC sensor. Do not
-            # certify the remaining zones as complete.
-            return ()
-        if not kind:
-            return ()
-        if not any(
-            word in kind.lower() for word in ("cpu", "soc", "package", "x86_pkg")
-        ):
-            continue
-        temp = _temperature(zone / "temp")
-        if temp is None:
-            # A missing CPU/SOC temperature is not evidence of a cool CPU.
-            return ()
-        trip: float | None = None
-        try:
-            candidates = sorted(islice(zone.glob("trip_point_*_temp"), 65))
-        except OSError:
-            candidates = []
-        if len(candidates) > 64:
-            return ()
-        for candidate in candidates:
-            kind_path = candidate.with_name(candidate.name.replace("_temp", "_type"))
+    try:
+        zone_names: list[str] = []
+        with os.scandir(root_fd) as entries:
+            for entry in entries:
+                name = entry.name
+                if not name.startswith("thermal_zone"):
+                    continue
+                if (not re.fullmatch(r"thermal_zone[0-9]+", name)
+                        or len(zone_names) >= 256):
+                    return ()
+                zone_names.append(name)
+        result: list[CPUThermalSensor] = []
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        for name in sorted(zone_names):
+            zone_fd = os.open(name, flags, dir_fd=root_fd)
             try:
-                trip_type = _read_sysfs_ascii(kind_path, 64).lower()
-            except (OSError, UnicodeError, ValueError):
-                # A missing trip type could hide the lowest trip point.
-                return ()
-            # An active cooling trip is still a thermal threshold; unknown
-            # types might conceal a lower threshold and invalidate the sample.
-            if trip_type not in {"active", "passive", "hot", "critical"}:
-                return ()
-            measured = _temperature(candidate)
-            if measured is None:
-                return ()
-            trip = measured if trip is None else min(trip, measured)
-        try:
-            result.append(CPUThermalSensor(zone.name, kind, temp, trip))
-        except ValueError:
-            return ()
-    return tuple(result)
+                kind = _read_pinned_ascii(zone_fd, "type", 128)
+                if not kind:
+                    return ()
+                if not any(word in kind.lower()
+                           for word in ("cpu", "soc", "package", "x86_pkg")):
+                    continue
+                temp = _pinned_temperature(zone_fd, "temp")
+                if temp is None:
+                    return ()
+                trip_temps: set[str] = set()
+                trip_types: set[str] = set()
+                scanned = 0
+                with os.scandir(zone_fd) as entries:
+                    for entry in entries:
+                        scanned += 1
+                        if scanned > 4096:
+                            return ()
+                        attr = entry.name
+                        if not attr.startswith("trip_point_"):
+                            continue
+                        if attr.endswith("_temp") or "_temp" in attr:
+                            if not re.fullmatch(r"trip_point_[0-9]+_temp", attr):
+                                return ()
+                            trip_temps.add(attr[len("trip_point_"):-len("_temp")])
+                        elif attr.endswith("_type") or "_type" in attr:
+                            if not re.fullmatch(r"trip_point_[0-9]+_type", attr):
+                                return ()
+                            trip_types.add(attr[len("trip_point_"):-len("_type")])
+                if trip_temps != trip_types or len(trip_temps) > 64:
+                    return ()
+                trip: float | None = None
+                for index in sorted(trip_temps, key=int):
+                    trip_type = _read_pinned_ascii(zone_fd,
+                        "trip_point_" + index + "_type", 64).lower()
+                    if trip_type not in {"active", "passive", "hot", "critical"}:
+                        return ()
+                    measured = _pinned_temperature(zone_fd,
+                        "trip_point_" + index + "_temp")
+                    if measured is None:
+                        return ()
+                    trip = measured if trip is None else min(trip, measured)
+                result.append(CPUThermalSensor(name, kind, temp, trip))
+            finally:
+                os.close(zone_fd)
+        return tuple(result)
+    except (OSError, ValueError, UnicodeError):
+        return ()
+    finally:
+        os.close(root_fd)
 
 
 class CPUThermalController:
