@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .long_context_spool import LongContextSpool, LongContextSpoolError, read_selected_sequence
+from .long_context_progress import LongContextProgressHead
 from .tokenization import deserialize_token_sequence
 
 
@@ -32,10 +33,49 @@ def main(argv: list[str] | None = None) -> int:
     advance.add_argument("--max-checkpoints", type=int, default=4096)
     status = commands.add_parser("capacity", help="Read bounded payload-free POSIX spool capacity")
     status.add_argument("--request-bytes", type=int, default=0)
+    head_init = commands.add_parser("head-init", help="Bind durable stream cursor")
+    head_init.add_argument("--stream-id", required=True)
+    head_init.add_argument("--checkpoint", required=True)
+    head_init.add_argument("--max-checkpoints", type=int, default=4096)
+    head_status = commands.add_parser("head-status", help="Verify current stream cursor")
+    head_status.add_argument("--stream-id", required=True)
+    head_status.add_argument("--max-checkpoints", type=int, default=4096)
+    head_window = commands.add_parser("head-window", help="Observe bounded stream window")
+    head_window.add_argument("--stream-id", required=True)
+    head_window.add_argument("--max-tokens", type=int, required=True)
+    head_window.add_argument("--max-checkpoints", type=int, default=4096)
+    head_advance = commands.add_parser("head-advance", help="CAS committed progress")
+    head_advance.add_argument("--stream-id", required=True)
+    head_advance.add_argument("--expected-checkpoint", required=True)
+    head_advance.add_argument("--consumed-tokens", type=int, required=True)
+    head_advance.add_argument("--max-checkpoints", type=int, default=4096)
+    commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
     args = parser.parse_args(argv)
     try:
         spool = LongContextSpool(args.root)
-        if args.command == "capacity":
+        if args.command.startswith("head-"):
+            heads = LongContextProgressHead(spool)
+            if args.command == "head-init":
+                result = heads.initialize(args.stream_id, args.checkpoint,
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-status":
+                result = heads.status(args.stream_id,
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-window":
+                result = heads.window(args.stream_id,
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    max_tokens=args.max_tokens, max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-advance":
+                result = heads.advance(args.stream_id,
+                    expected_checkpoint_digest=args.expected_checkpoint,
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    consumed_tokens=args.consumed_tokens,
+                    max_checkpoints=args.max_checkpoints)
+            else:
+                result = heads.recover_orphan_temps()
+        elif args.command == "capacity":
             result = spool.capacity_snapshot(requested_bytes=args.request_bytes)
         elif args.command == "stage":
             raw = read_selected_sequence(
