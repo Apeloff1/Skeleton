@@ -97,8 +97,10 @@ def _regular(root_fd: int, relative: str, *, read: bool) -> bytes | None:
             after = os.fstat(leaf)
             if count > MAX_ASSET_BYTES:
                 raise AssetImportError("asset exceeds size limit")
-            if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
+            # mtime may be restored by a concurrent writer. ctime is owned
+            # by the filesystem and also detects same-size in-place rewrites.
+            if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
             ) or count != before.st_size:
                 raise AssetImportError("asset changed during descriptor read")
             return b"".join(chunks)

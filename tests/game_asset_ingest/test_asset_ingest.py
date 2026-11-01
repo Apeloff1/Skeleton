@@ -1,4 +1,5 @@
 import json
+import os
 import struct
 import zlib
 
@@ -270,3 +271,33 @@ def test_manifest_rejects_nul_and_windows_separator_paths():
         with pytest.raises(AssetImportError, match="invalid manifest asset path"):
             m.add(replace(original, path=bad))
     assert m.to_dict()["paths"] == 0
+
+
+def test_same_size_in_place_mutation_with_restored_mtime_is_rejected(tmp_path, monkeypatch):
+    from skeleton.game.build.asset_ingest import pipeline
+
+    asset = tmp_path / "hero.png"
+    asset.write_bytes(png())
+    original_read = pipeline.os.read
+    changed = [False]
+
+    def rewrite_after_read(fd, size):
+        chunk = original_read(fd, size)
+        if chunk and not changed[0]:
+            changed[0] = True
+            before = os.fstat(fd)
+            with asset.open("r+b") as writer:
+                writer.seek(40)
+                writer.write(b"X")
+                writer.flush()
+                os.fsync(writer.fileno())
+            os.utime(asset, ns=(before.st_atime_ns, before.st_mtime_ns))
+        return chunk
+
+    monkeypatch.setattr(pipeline.os, "read", rewrite_after_read)
+    report = pipeline.import_files(tmp_path, ["hero.png"])
+    assert changed[0]
+    assert not report.ok
+    assert any(issue.code == "broken" and "changed during descriptor read" in issue.detail
+               for issue in report.issues)
+    assert report.imported == []
