@@ -59,8 +59,9 @@ def test_craft_and_delivery_require_position_and_earned_inventory():
     with pytest.raises(SceneTravelError, match="recipient position"):
         _advance(gate, {"kind": "deliver", "delivery_id": "sanctuary_seal"})
     moved = simulate_market(source, actions[:7])
+    recipient = _advance(moved, {"kind": "tile", "action": {"kind": "move", "direction": "east"}})
     with pytest.raises(SceneTravelError, match="earned goods"):
-        _advance(moved, {"kind": "deliver", "delivery_id": "sanctuary_seal"})
+        _advance(recipient, {"kind": "deliver", "delivery_id": "sanctuary_seal"})
     crafted = _advance(moved, {"kind": "craft", "recipe_id": "seal_press"})
     with pytest.raises(SceneTravelError, match="earned goods"):
         _advance(crafted, {"kind": "craft", "recipe_id": "seal_press"})
