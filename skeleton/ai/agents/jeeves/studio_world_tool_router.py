@@ -22,6 +22,7 @@ from skeleton.ai.agents.jeeves import studio_npc_knowledge_exchange_tool as exch
 from skeleton.ai.agents.jeeves import studio_npc_continuity_tool as continuity
 from skeleton.ai.agents.jeeves import studio_npc_continuity_merge_tool as continuity_merge
 from skeleton.ai.agents.jeeves import studio_world_batch_tool as batch
+from skeleton.ai.agents.jeeves import studio_quest_hint_tool as hints
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 ROUTER_SCHEMA = "skeleton.jeeves.studio_world_tool_router.v1"
@@ -56,6 +57,7 @@ _TOOL_SYMBOLS = (
     ("npc_continuity_tool_schema", "execute_npc_continuity_tool"),
     ("npc_continuity_merge_tool_schema", "execute_npc_continuity_merge_tool"),
     ("world_batch_tool_schema", "execute_world_batch_tool"),
+    ("quest_hint_tool_schema", "execute_quest_hint_tool"),
     ("npc_author_tool_schema", "execute_npc_author_tool"),
     ("choice_author_tool_schema", "execute_choice_author_tool"),
     ("guided_walk_tool_schema", "execute_guided_walk_tool"),
@@ -119,7 +121,8 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    exchange if descriptor_name == "npc_knowledge_exchange_tool_schema" else
                    continuity if descriptor_name == "npc_continuity_tool_schema" else
                    continuity_merge if descriptor_name == "npc_continuity_merge_tool_schema" else
-                   batch if descriptor_name == "world_batch_tool_schema" else studio)
+                   batch if descriptor_name == "world_batch_tool_schema" else
+                   hints if descriptor_name == "quest_hint_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
         executor = getattr(adapter, executor_name)
         if (type(descriptor) is not dict or type(descriptor.get("name")) is not str
