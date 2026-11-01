@@ -9,9 +9,28 @@ import pytest
 from skeleton.app import offline_cgroup_memory_headroom as module
 from skeleton.ai.model_runtime import fair_stream_live_budget as budget_module
 from skeleton.app.offline_resources import LocalResourceSnapshot
+from skeleton.app.offline_resources import LocalResourceSnapshot
 
 
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux cgroup-v2 only")
+
+
+
+def configure_sampler(monkeypatch):
+    """Independent fixture: tests must not import sibling test modules."""
+    monkeypatch.setattr(budget_module, "probe_local_resources", lambda _: LocalResourceSnapshot(
+        total_ram_bytes=8_000_000_000,
+        available_ram_bytes=4_000_000_000,
+        total_disk_bytes=10_000_000_000,
+        free_disk_bytes=5_000_000_000,
+        cpu_count=8, cpu_load_ratio=0.1,
+    ))
+    monkeypatch.setattr(budget_module, "probe_cpu_thermal", lambda: ())
+    monkeypatch.setattr(budget_module, "probe_io_pressure", lambda: None)
+    monkeypatch.setattr(budget_module, "probe_cgroup_events", lambda: None)
+    monkeypatch.setattr(budget_module, "probe_cpu_throttle", lambda: None)
+    monkeypatch.setattr(budget_module, "probe_swap_counters", lambda: None)
+    monkeypatch.setattr(budget_module, "probe_reclaim_counters", lambda: None)
 
 
 def fixture(root, *, current="1048576", maximum="1073741824", high="max"):
@@ -112,8 +131,7 @@ def test_tighter_limit_during_sampling_is_conservative(tmp_path, monkeypatch):
 
 
 def test_sampler_caps_host_headroom_and_holds_at_cgroup_boundary(monkeypatch):
-    from skeleton.testing.test_fair_stream_live_budget import configure
-    configure(monkeypatch)
+    configure_sampler(monkeypatch)
     monkeypatch.setattr(
         budget_module, "probe_cgroup_memory_headroom",
         lambda: module.CgroupMemoryHeadroom(
@@ -130,8 +148,7 @@ def test_sampler_caps_host_headroom_and_holds_at_cgroup_boundary(monkeypatch):
 
 
 def test_invalid_capacity_telemetry_stops_sampler(monkeypatch):
-    from skeleton.testing.test_fair_stream_live_budget import configure
-    configure(monkeypatch)
+    configure_sampler(monkeypatch)
     def unavailable():
         raise module.CgroupMemoryUnavailable("corrupt")
     monkeypatch.setattr(budget_module, "probe_cgroup_memory_headroom", unavailable)
@@ -160,3 +177,5 @@ def test_invalid_unlimited_observation_is_not_an_authority():
         module.CgroupMemoryHeadroom(None, 0, 1, 0, False)
     with pytest.raises(ValueError):
         module.CgroupMemoryHeadroom(1024, 100, 900, 0, True)
+    with pytest.raises(ValueError):
+        module.CgroupMemoryHeadroom(1024, 100, 924, 0, False)

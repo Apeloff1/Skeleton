@@ -48,8 +48,13 @@ class CgroupMemoryHeadroom:
                 or type(self.headroom_bytes) is not int
                 or self.headroom_bytes != max(0, self.limit_bytes - self.used_bytes)
                 or type(self.pressure_ppm) is not int
-                or not 0 <= self.pressure_ppm <= 1_000_000
-                or type(self.hard_hold) is not bool):
+                or self.pressure_ppm != min(
+                    1_000_000, self.used_bytes * 1_000_000 // self.limit_bytes
+                )
+                or type(self.hard_hold) is not bool
+                or self.hard_hold != (
+                    self.headroom_bytes <= max(64 << 20, self.limit_bytes // 20)
+                )):
             raise ValueError("inconsistent cgroup memory observation")
 
 
