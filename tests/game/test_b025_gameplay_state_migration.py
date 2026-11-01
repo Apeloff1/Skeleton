@@ -135,3 +135,15 @@ def test_migration_rejects_unbounded_oldest_and_missing_section_fields():
             GameplayStateEnvelope.from_section(invalid)
     with pytest.raises(GameplayMigrationError, match="schema"):
         GameplayStateEnvelope.from_section(None)
+
+
+@pytest.mark.parametrize("bad", [10**2000, -(10**2000)])
+def test_gameplay_save_rejects_oversized_integer_before_digest(bad):
+    with pytest.raises(GameplayMigrationError, match="integer exceeds bound"):
+        GameplayStateEnvelope("w1", 1, 0, {"value": bad}, CANON)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -float("inf")])
+def test_gameplay_save_rejects_nonfinite_float_before_copy(bad):
+    with pytest.raises(GameplayMigrationError, match="nonfinite"):
+        GameplayStateEnvelope("w1", 1, 0, {"value": bad}, CANON)

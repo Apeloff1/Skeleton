@@ -17,6 +17,7 @@ emits a plain section dict for a GF-B save.
 from __future__ import annotations
 
 import copy
+import math
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Mapping
 
@@ -84,7 +85,13 @@ def _bounded_payload(payload: Mapping[str, Any]) -> None:
         elif type(value) is str:
             if len(value) > 4096:
                 raise GameplayMigrationError("gameplay payload text exceeds bound")
-        elif type(value) not in (int, float, bool, type(None)):
+        elif type(value) is int:
+            if value.bit_length() > 4096:
+                raise GameplayMigrationError("gameplay payload integer exceeds bound")
+        elif type(value) is float:
+            if not math.isfinite(value):
+                raise GameplayMigrationError("nonfinite gameplay payload value")
+        elif type(value) not in (bool, type(None)):
             raise GameplayMigrationError("noncanonical gameplay payload value")
 
     walk(payload, 0)
