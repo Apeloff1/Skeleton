@@ -88,6 +88,7 @@ Commands:
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
     quest-expedition-route  Find replayable NPC crafting and combat ending routes
     quest-checkpoints  Replay historical quest saves and alternate endings
+    quest-decisions  Preview and apply source-bound playable NPC/crafting decisions
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
     game-vertical-accept  Replay-verify complete playable quests and crafting games
@@ -824,6 +825,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-expedition-play":
         from skeleton.game.gameplay.expedition_quest_interactive import cli as quest_play_cli
         return quest_play_cli(rest)
+    if cmd == "quest-decisions":
+        from skeleton.game.gameplay.expedition_quest_decisions import cli as quest_decision_cli
+        return quest_decision_cli(rest)
     if cmd == "quest-checkpoints":
         from skeleton.game.gameplay.expedition_quest_checkpoints import cli as quest_checkpoint_cli
         return quest_checkpoint_cli(rest)
