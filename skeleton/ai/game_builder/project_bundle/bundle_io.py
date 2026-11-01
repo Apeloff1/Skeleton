@@ -44,6 +44,10 @@ def safe_member_path(path: str) -> str:
     if not isinstance(path, str) or not 1 <= len(path) <= 450 or "\\" in path or "\x00" in path:
         raise BundleError("unsafe bundle member path")
     pp = PurePosixPath(path)
+    # PurePosixPath normalizes repeated separators and dot components; aliases
+    # must not be accepted as distinct signed bundle member identities.
+    if path != pp.as_posix():
+        raise BundleError("noncanonical bundle member path")
     if pp.is_absolute() or len(pp.parts) > 12 or any(
             p in (".", "..") or p.startswith(".") or not _SEGMENT.fullmatch(p) for p in pp.parts):
         raise BundleError(f"unsafe bundle member path: {path!r}")

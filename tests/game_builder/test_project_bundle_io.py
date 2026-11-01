@@ -38,7 +38,8 @@ def test_zip_slip_member_rejected_even_with_valid_envelope(saver):
     payload["manifest"].pop("content_digest")
     with pytest.raises(BundleError):
         bio.import_bundle(CODEC.encode(payload), CODEC, ProjectSaver(GameSavePlane()))
-    for bad in ("/abs.md", "a\\b.md", ".hidden", "a/../b.md", ""):
+    for bad in ("/abs.md", "a\\b.md", ".hidden", "a/../b.md", "",
+                "a//b.md", "a/./b.md", "a/b.md/"):
         with pytest.raises(BundleError):
             bio.safe_member_path(bad)
 
