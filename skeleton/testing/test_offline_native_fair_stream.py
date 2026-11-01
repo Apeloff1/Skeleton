@@ -60,7 +60,19 @@ def install_probe(monkeypatch):
             "measurement": "os_probe",
             "gpu_device_qualified": False,
             "physical_memory_reserved": False,
-            "auxiliary_telemetry_incomplete": True,
+            "auxiliary_telemetry_incomplete": True,            "schema": "skeleton.ai.live-stream-pressure.v1",
+            "cross_process_admission_guaranteed": False,
+            "thermal_trip_measured": True,
+            "cgroup_swap_spill_allowed": True,
+            "cgroup_swap_limit_measured": True,
+            "cgroup_memory_limit_measured": True,
+            "holds": {
+                "thermal": False, "cgroup_high": False, "cgroup_oom": False,
+                "cgroup_memory": False, "cgroup_swap_spill": False,
+                "io": False, "cpu_throttle": False, "swap_churn": False,
+                "reclaim": False, "disk_reserve": False,
+            },
+
         }
     monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
 

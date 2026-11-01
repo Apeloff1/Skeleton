@@ -21,6 +21,62 @@ MAX_DURATION_NS = 86_400_000_000_000  # 24h ceiling, not a hard preemption guara
 DEFAULT_DURATION_NS = 900_000_000_000  # 15m cooperative lease quantum
 
 
+_LIVE_EVIDENCE_SCHEMA = "skeleton.ai.live-stream-pressure.v1"
+_REQUIRED_HOLDS = frozenset((
+    "thermal", "cgroup_high", "cgroup_oom", "cgroup_memory",
+    "cgroup_swap_spill", "io", "cpu_throttle", "swap_churn",
+    "reclaim", "disk_reserve",
+))
+_HARD_HOLDS = frozenset((
+    "thermal", "cgroup_oom", "cgroup_memory", "disk_reserve",
+))
+
+
+def _verified_live_evidence(
+    budget: MeasuredStreamBudget, evidence: object,
+) -> bool:
+    """Cross-check independently reported OS holds against actual admission.
+
+    A forged or partially upgraded sampler must not silently turn an OOM,
+    thermal, or missing-sensor observation into a CPU execution permit.
+    The canonical sampler remains observational, never a RAM reservation.
+    """
+    if type(evidence) is not dict:
+        return False
+    if (evidence.get("schema") != _LIVE_EVIDENCE_SCHEMA
+            or evidence.get("measurement") != "os_probe"
+            or evidence.get("gpu_device_qualified") is not False
+            or evidence.get("physical_memory_reserved") is not False
+            or evidence.get("cross_process_admission_guaranteed") is not False):
+        return False
+    for field in (
+        "auxiliary_telemetry_incomplete", "thermal_trip_measured",
+        "cgroup_swap_spill_allowed", "cgroup_swap_limit_measured",
+        "cgroup_memory_limit_measured",
+    ):
+        if type(evidence.get(field)) is not bool:
+            return False
+    holds = evidence.get("holds")
+    if (type(holds) is not dict or set(holds) != _REQUIRED_HOLDS
+            or any(type(value) is not bool for value in holds.values())):
+        return False
+    if holds["cgroup_swap_spill"] == evidence["cgroup_swap_spill_allowed"]:
+        return False
+    if any(holds[field] for field in _HARD_HOLDS) and (
+        not budget.thermal_hold or budget.effective_slots != 0
+    ):
+        return False
+    # Unknown auxiliary/thermal telemetry or any OS hold cannot authorize
+    # multiple concurrent streams, regardless of a forged slot count.
+    if budget.stream_slots > 1 and (
+        evidence["auxiliary_telemetry_incomplete"]
+        or not evidence["thermal_trip_measured"]
+        or any(holds.values())
+    ):
+        return False
+    return True
+
+
 class NativePressureInterrupted(RuntimeError):
     """Native execution must stop; no replay without explicit reconciliation."""
 
@@ -201,7 +257,7 @@ class NativeTokenPressureGuard:
                         or evidence.get("measurement") != "os_probe"
                         or evidence.get("gpu_device_qualified") is not False
                         or evidence.get("physical_memory_reserved") is not False
-                        or type(evidence.get("auxiliary_telemetry_incomplete")) is not bool):
+                        or not _verified_live_evidence(budget, evidence)):
                     self._stopped = True
                     raise NativePressureInterrupted("untrusted OS pressure provenance")
                 self._pressure = budget.pressure_ppm

@@ -27,19 +27,36 @@ def budget(*, tokens=2, slots=1, ram=4096, pressure=0):
     )
 
 
-def probe(monkeypatch, readings):
+def canonical_evidence():
+    """Complete canonical OS evidence fixture; never simulated hardware authority."""
+    return {
+        "schema": "skeleton.ai.live-stream-pressure.v1",
+        "measurement": "os_probe",
+        "gpu_device_qualified": False,
+        "physical_memory_reserved": False,
+        "cross_process_admission_guaranteed": False,
+        "auxiliary_telemetry_incomplete": True,
+        "thermal_trip_measured": True,
+        "cgroup_swap_spill_allowed": True,
+        "cgroup_swap_limit_measured": True,
+        "cgroup_memory_limit_measured": True,
+        "holds": {
+            "thermal": False, "cgroup_high": False, "cgroup_oom": False,
+            "cgroup_memory": False, "cgroup_swap_spill": False,
+            "io": False, "cpu_throttle": False, "swap_churn": False,
+            "reclaim": False, "disk_reserve": False,
+        },
+    }
+
+
+def probe(monkeypatch, readings, *, evidence=None):
     iterator = iter(readings)
 
     def sample(self, *, token_budget, storage_path):
         item = next(iterator)
         if isinstance(item, BaseException):
             raise item
-        return item, {
-            "measurement": "os_probe",
-            "gpu_device_qualified": False,
-            "physical_memory_reserved": False,
-            "auxiliary_telemetry_incomplete": True,
-        }
+        return item, canonical_evidence() if evidence is None else evidence
     monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
 
 
@@ -283,3 +300,43 @@ def test_pressure_guard_rejects_unreadable_process_identity(monkeypatch):
             guard.start(P)
     assert guard.status().stopped
     assert guard.status().samples == 0
+
+@pytest.mark.parametrize("mutation", [
+    lambda e: e.pop("schema"),
+    lambda e: e.pop("holds"),
+    lambda e: e.update(cross_process_admission_guaranteed=True),
+    lambda e: e["holds"].update(cgroup_oom=True),
+    lambda e: e["holds"].update(thermal=True),
+    lambda e: e["holds"].update(cgroup_swap_spill=True),
+    lambda e: e.update(thermal_trip_measured="unknown"),
+    lambda e: e["holds"].update(io=1),
+])
+def test_untrusted_live_pressure_evidence_quarantines_lease(monkeypatch, mutation):
+    evidence = canonical_evidence()
+    mutation(evidence)
+    probe(monkeypatch, [budget()], evidence=evidence)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="untrusted OS pressure provenance"):
+        guard.start(P)()
+    assert guard.status().stopped
+    assert guard.status().samples == 1
+
+
+@pytest.mark.parametrize("change", ["missing", "soft_hold", "unknown_thermal"])
+def test_ambiguous_pressure_never_grants_parallel_native_streams(monkeypatch, change):
+    evidence = canonical_evidence()
+    if change == "missing":
+        evidence["auxiliary_telemetry_incomplete"] = True
+    elif change == "soft_hold":
+        evidence["auxiliary_telemetry_incomplete"] = False
+        evidence["holds"]["cpu_throttle"] = True
+    else:
+        evidence["auxiliary_telemetry_incomplete"] = False
+        evidence["thermal_trip_measured"] = False
+    probe(monkeypatch, [budget(slots=2)], evidence=evidence)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="untrusted OS pressure provenance"):
+        guard.start(P)()
+    assert guard.status().stopped
+
+
