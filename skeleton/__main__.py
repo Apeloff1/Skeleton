@@ -64,6 +64,7 @@ Commands:
     combat-expedition  Play original multi-arena campaigns with earned inventory
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
     arena-forge-solve  Solve bounded equipment and combat routes
+    arena-forge-author  Atomically edit and preview tactical crafting sources
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
@@ -773,6 +774,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-campaign-author":
         from skeleton.game.gameplay.quest_chapter_campaign_author import cli as campaign_author_cli
         return campaign_author_cli(rest)
+    if cmd == "arena-forge-author":
+        from skeleton.game.gameplay.arena_forge_author import cli as forge_author_cli
+        return forge_author_cli(rest)
     if cmd == "arena-forge-solve":
         from skeleton.game.gameplay.arena_forge_solver import cli as forge_solver_cli
         return forge_solver_cli(rest)
