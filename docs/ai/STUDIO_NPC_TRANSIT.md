@@ -20,3 +20,13 @@ The static Jeeves tool `studio_original_npc_transit` exposes the same
 typed, authorization-gated read-only proof. It never calls an external
 provider or executes user-supplied source. All receipts carry exact
 source/session/temporal identities and fail closed on tampering.
+
+## Offline site-edge editing
+
+Use `--editor-directory PRIVATE_DIRECTORY` to publish a CSP-hashed,
+no-network HTML editor. Add directed site edges and export strict JSON.
+Import with `--import-graph PRIVATE_JSON --baseline-transit ORIGINAL_RECEIPT_JSON
+--temporal-receipt ORIGINAL_TEMPORAL_JSON`. Import is source/session/temporal/
+baseline-digest leased and rejects duplicate JSON keys, nonfinite numbers,
+symlinks, unsafe permissions and stale source. Every edit is recompiled
+against the canonical quest schedule before private publication or handoff.

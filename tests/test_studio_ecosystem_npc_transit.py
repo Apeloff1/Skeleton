@@ -154,3 +154,82 @@ def test_jeeves_router_and_cli_prompt(capsys):
     assert json.loads(capsys.readouterr().out)["transit"] == direct["detail"]
     with pytest.raises(PermissionError):
         execute_npc_transit_tool(request, authorized=False)
+
+def test_offline_transit_editor_export_import_and_custody(tmp_path):
+    from hashlib import sha256
+    from skeleton.ai.game_builder.studio_ecosystem_npc_transit_editor import (
+        EXPORT_SCHEMA, render_npc_transit_editor, publish_npc_transit_editor,
+        load_npc_transit_editor_export,
+    )
+    docs, source, temporal = fixture()
+    report = propose_npc_transit(docs, temporal, PROMPT, authorized=True)
+    html, proof = render_npc_transit_editor(docs, report, authorized=True)
+    assert sha256(html).hexdigest() == proof["html_sha256"]
+    assert b"Content-Security-Policy" in html
+    assert b"Export typed NPC transit edits" in html
+    assert publish_npc_transit_editor(
+        docs, report, tmp_path, authorized=True)["file_write_performed"]
+    assert (tmp_path / "npc_transit_editor.html").stat().st_mode & 0o077 == 0
+    with pytest.raises(FileExistsError):
+        publish_npc_transit_editor(docs, report, tmp_path, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": report["session_digest"],
+        "temporal_digest": report["temporal_digest"],
+        "baseline_transit_digest": report["transit_digest"],
+        "graph": report["graph"],
+    }
+    path = tmp_path / "edits.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    kwargs = {
+        "authorized": True, "expected_project_id": PROJECT,
+        "expected_source_digest": source,
+        "expected_session_digest": report["session_digest"],
+        "expected_temporal_digest": report["temporal_digest"],
+        "expected_baseline_digest": report["transit_digest"],
+    }
+    assert load_npc_transit_editor_export(path, **kwargs) == report["graph"]
+    with pytest.raises(StudioQuestError):
+        load_npc_transit_editor_export(
+            path, **{**kwargs, "expected_baseline_digest": "0" * 64})
+    path.write_text('{"schema":"a","schema":"b"}', encoding="utf-8")
+    with pytest.raises(StudioQuestError):
+        load_npc_transit_editor_export(path, **kwargs)
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_npc_transit_editor_export(path, **kwargs)
+
+
+def test_cli_editor_import_uses_exact_original_transit_receipt(tmp_path, capsys):
+    from scripts.studio_npc_transit_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_npc_transit_editor import EXPORT_SCHEMA
+    docs, source, temporal = fixture()
+    original = propose_npc_transit(docs, temporal, PROMPT, authorized=True)
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--temporal-receipt", json.dumps(temporal), "--prompt",
+                 "--editor-directory", str(tmp_path)]) == 0
+    assert json.loads(capsys.readouterr().out)["editor"]["file_write_performed"]
+    path = tmp_path / "edits.json"
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": original["session_digest"],
+        "temporal_digest": original["temporal_digest"],
+        "baseline_transit_digest": original["transit_digest"],
+        "graph": original["graph"],
+    }
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--temporal-receipt", json.dumps(temporal),
+                 "--baseline-transit", json.dumps(original),
+                 "--import-graph", str(path)]) == 0
+    assert json.loads(capsys.readouterr().out)["transit"] == original
+    record["baseline_transit_digest"] = "0" * 64
+    path.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(SystemExit):
+        main(["--project", PROJECT, "--expected-source", source,
+              "--temporal-receipt", json.dumps(temporal),
+              "--baseline-transit", json.dumps(original),
+              "--import-graph", str(path)])
