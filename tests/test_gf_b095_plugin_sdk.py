@@ -44,3 +44,18 @@ def test_duplicate_and_nondeterministic_plugins():
 
     h.register(m.Manifest("f", "exporter", (1, 0), ()), Flaky())
     assert m.conformance(h, "f", [({}, lambda o: True)])["passed"] is False
+
+
+def test_plugin_sdk_rejects_malformed_manifest_and_unbounded_payloads():
+    for api in ((), (1,), (1, 0, 0), (True, 0), ("1", 0)):
+        with pytest.raises(m.ContractError):
+            m.Manifest("x", "exporter", api, ())
+    with pytest.raises(m.ContractError):
+        m.Manifest("../unsafe", "exporter", (1, 0), ())
+    h = m.Host(frozenset())
+    h.register(m.Manifest("e", "exporter", (1, 0), ()), Exp())
+    for payload in ({"n": float("nan")}, {"n": object()}, {"n": "x" * 100_000}):
+        with pytest.raises(m.ContractError):
+            h.call("e", "export", payload)
+    with pytest.raises(m.ContractError, match="conformance cases"):
+        m.conformance(h, "e", [({"n": 1}, lambda x: True)] * 129)
