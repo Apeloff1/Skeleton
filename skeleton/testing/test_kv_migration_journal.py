@@ -89,6 +89,27 @@ def test_durable_intent_and_committed_receipt_restart(tmp_path):
     assert storage.calls == 1
 
 
+def test_postflight_os_regression_keeps_journal_running_without_replay():
+    from dataclasses import replace
+    service, journal, storage = setup()
+    plan, _ = service.plan_live()
+    readings = iter((
+        host(), host(), replace(host(), free_disk_bytes=700),
+    ))
+    service._controller._probe = lambda _: next(readings)
+    with pytest.raises(KVMigrationOutcomeUnknown, match="uncertain"):
+        service.apply_once(plan)
+    assert storage.calls == 1  # physical adapter already moved the page
+    inventory = journal.verified_inventory()
+    assert inventory["running"] == 1
+    assert inventory["committed"] == 0
+    with pytest.raises(KVMigrationOutcomeUnknown, match="committed"):
+        journal.recover_committed(plan)
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unresolved"):
+        journal.begin(plan)
+    assert storage.calls == 1  # no automatic replay of uncertain outcome
+
+
 def test_backend_failure_is_not_automatically_retried(tmp_path):
     path = tmp_path / "migration.db"
     connection = sqlite3.connect(path)
