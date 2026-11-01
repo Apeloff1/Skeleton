@@ -18,6 +18,7 @@ import importlib
 import json
 import math
 import os
+import re
 import sys
 from typing import Any, Callable, List, Optional, Sequence
 
@@ -39,21 +40,23 @@ def _read_json(path: str) -> Any:
     """Read only a bounded input prefix; never load an unbounded JSON file."""
     try:
         if path == "-":
-            raw = sys.stdin.read(MAX_INPUT_BYTES + 1)
+            raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
         else:
-            with open(path, encoding="utf-8") as handle:
+            with open(path, "rb") as handle:
                 raw = handle.read(MAX_INPUT_BYTES + 1)
-        if len(raw.encode("utf-8")) > MAX_INPUT_BYTES:
+        if len(raw) > MAX_INPUT_BYTES:
             raise UsageError("JSON input exceeds byte bound")
-        return json.loads(raw)
+        return json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise UsageError(f"cannot read JSON from {path}: {type(exc).__name__}") from exc
 
 
 def _resolve(target: str) -> Callable[[], Any]:
     module_name, sep, attr = target.partition(":")
-    if not sep or not module_name or not attr:
-        raise UsageError("target must look like 'package.module:function'")
+    if not sep or not module_name or not attr or len(target) > 256 or not re.fullmatch(
+        r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*", target
+    ):
+        raise UsageError("target must be a bounded 'package.module:function' identifier")
     try:
         fn = getattr(importlib.import_module(module_name), attr)
     except (ImportError, AttributeError) as exc:
@@ -88,6 +91,13 @@ def _cmd_alloc(args: argparse.Namespace) -> int:
     # Require two operator-controlled gates before importing the target.
     if os.environ.get("SKELETON_PERF_TRUSTED_EXECUTION") != "1" or not args.allow_local_callable:
         raise UsageError("alloc requires trusted local operator execution and --allow-local-callable")
+    # Pin the exact operator-trusted callable before any dynamic module import.
+    raw_targets = os.environ.get("SKELETON_PERF_ALLOWED_TARGETS", "")
+    if len(raw_targets) > 4096:
+        raise UsageError("trusted target allowlist exceeds the configured bound")
+    allowed = tuple(value.strip() for value in raw_targets.split(",") if value.strip())
+    if len(allowed) > 64 or args.target not in allowed:
+        raise UsageError("alloc target is not in the explicit trusted allowlist")
     if not 0 <= args.top <= MAX_TOP_TRACES or any(
         value is not None and value < 0 for value in (args.max_alloc_bytes, args.max_peak_bytes)
     ):

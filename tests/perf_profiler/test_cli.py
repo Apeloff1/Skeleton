@@ -49,6 +49,9 @@ def test_alloc_limits(capsys, monkeypatch):
     assert main(["alloc", target, "--allow-local-callable"]) == 2
     assert _KEEP == []
     monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    assert main(["alloc", target, "--allow-local-callable"]) == 2
+    assert _KEEP == []
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
     assert main(["alloc", target, "--allow-local-callable"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["alloc_bytes"] >= 2 * 1024 * 1024
@@ -56,6 +59,19 @@ def test_alloc_limits(capsys, monkeypatch):
     assert main(["alloc", "no_colon", "--allow-local-callable"]) == 2
     assert main(["alloc", "json:does_not_exist", "--allow-local-callable"]) == 2
     _KEEP.clear()
+
+
+def test_alloc_rejects_unpinned_target_before_import(monkeypatch):
+    import skeleton.perf_profiler.cli as cli
+
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", "json:loads")
+
+    def forbidden_import(_module):
+        raise AssertionError("untrusted module was imported")
+
+    monkeypatch.setattr(cli.importlib, "import_module", forbidden_import)
+    assert main(["alloc", "untrusted.module:run", "--allow-local-callable"]) == 2
 
 
 def test_verify(tmp_path):
@@ -78,6 +94,7 @@ def test_usage_errors():
 
 def test_cli_rejects_oversized_input_and_frame_counts(tmp_path, monkeypatch):
     from skeleton.perf_profiler import cli
+
     monkeypatch.setattr(cli, "MAX_INPUT_BYTES", 16)
     too_big = tmp_path / "huge.json"
     too_big.write_text("[1, 2, 3, 4, 5, 6, 7]")
@@ -89,11 +106,13 @@ def test_cli_rejects_oversized_input_and_frame_counts(tmp_path, monkeypatch):
 
 def test_cli_rejects_nonfinite_ratio_and_invalid_allocation_limits(tmp_path, monkeypatch):
     from skeleton.perf_profiler import cli
+
     path = tmp_path / "frames.json"
     path.write_text("[16, 17]")
     for ratio in ("nan", "inf", "-0.1", "1.1"):
         assert cli.main(["frames", str(path), "--max-hitch-ratio", ratio]) == 2
     assert cli.main(["frames", str(path), "--budget-ms", "nan"]) == 2
     monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", "json:dumps")
     assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--top", "101"]) == 2
     assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--max-peak-bytes", "-1"]) == 2
