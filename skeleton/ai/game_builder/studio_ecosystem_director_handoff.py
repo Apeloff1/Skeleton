@@ -28,6 +28,9 @@ from .studio_ecosystem_director_choice_rehearsal import render_choice_rehearsal
 from .studio_ecosystem_audio_cues import (
     compile_audio_cues, render_caption_preview, render_audio_cue_editor,
 )
+from .studio_ecosystem_npc_knowledge import (
+    compile_npc_knowledge, render_npc_knowledge_html,
+)
 
 SCHEMA = "skeleton.game_builder.studio_director_handoff.v1"
 FILENAME = "studio_director_handoff.zip"
@@ -36,6 +39,7 @@ _FILES = ("index.html", "director_editor.html", "choice_rehearsal.html",
           "scene_schedule.json",
           "scene_asset_bindings.json", "director_manifest.json")
 _AUDIO_FILES = ("audio_cues.json", "audio_captions.html", "audio_editor.html")
+_KNOWLEDGE_FILES = ("npc_knowledge.json", "npc_knowledge.html")
 
 
 def compile_director_handoff(
@@ -45,6 +49,7 @@ def compile_director_handoff(
     expected_visual_digest: str,
     expected_session_digest: str | None = None,
     audio_authoring: object | None = None,
+    knowledge_authoring: object | None = None,
 ) -> tuple[dict[str, object], bytes]:
     """Compile and package an exact, replayable original HTML5 director handoff."""
     if authorized is not True:
@@ -99,6 +104,20 @@ def compile_director_handoff(
             raise StudioQuestError("director audio and scene timeline diverged")
         audio_preview, audio_preview_receipt = render_caption_preview(audio_plan)
         audio_editor, audio_editor_receipt = render_audio_cue_editor(audio_plan, documents)
+    knowledge_plan = None
+    knowledge_html = None
+    if knowledge_authoring is not None:
+        knowledge_plan = compile_npc_knowledge(
+            documents, actions, knowledge_authoring, authorized=True,
+            expected_source_digest=expected_source_digest,
+            expected_session_digest=timing["session_digest"])
+        if (knowledge_plan["project_id"] != timing["project_id"] or
+                knowledge_plan["session_digest"] != timing["session_digest"] or
+                knowledge_plan["source_digest"] != timing["source_digest"] or
+                [row["scene_id"] for row in knowledge_plan["scenes"]] !=
+                [row["scene_id"] for row in timing["timeline"]]):
+            raise StudioQuestError("director NPC knowledge and playable scene contract diverged")
+        knowledge_html = render_npc_knowledge_html(knowledge_plan)
     files = {
         "index.html": playable,
         "director_editor.html": editor_html,
@@ -110,6 +129,9 @@ def compile_director_handoff(
         files["audio_cues.json"] = _canonical(audio_plan) + b"\n"
         files["audio_captions.html"] = audio_preview
         files["audio_editor.html"] = audio_editor
+    if knowledge_plan is not None:
+        files["npc_knowledge.json"] = _canonical(knowledge_plan) + b"\\n"
+        files["npc_knowledge.html"] = knowledge_html
     manifest: dict[str, object] = {
         "schema": SCHEMA, "project_id": timing["project_id"],
         "source_digest": expected_source_digest,
@@ -136,6 +158,10 @@ def compile_director_handoff(
         manifest["audio_caption_preview_receipt"] = audio_preview_receipt
         manifest["offline_audio_editor_receipt"] = audio_editor_receipt
         manifest["audio_recorded_verified"] = False
+    if knowledge_plan is not None:
+        manifest["npc_knowledge_digest"] = knowledge_plan["knowledge_digest"]
+        manifest["npc_knowledge_earned_count"] = knowledge_plan["earned_count"]
+        manifest["npc_knowledge_spoken_verified"] = False
     manifest["manifest_digest"] = _digest(manifest)
     files["director_manifest.json"] = _canonical(manifest) + b"\n"
     if sum(map(len, files.values())) > MAX_BUNDLE_BYTES:
@@ -143,7 +169,8 @@ def compile_director_handoff(
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9, allowZip64=False) as archive:
-        for name in _FILES + (_AUDIO_FILES if audio_authoring is not None else ()):
+        for name in (_FILES + (_AUDIO_FILES if audio_authoring is not None else ())
+                     + (_KNOWLEDGE_FILES if knowledge_authoring is not None else ())):
             item = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             item.compress_type = zipfile.ZIP_DEFLATED
             item.external_attr = 0o100600 << 16
@@ -160,7 +187,8 @@ def publish_director_handoff(manifest: Mapping[str, Any], bundle: bytes,
                              directory: Path, *, authorized: bool,
                              documents: Mapping[str, Any], actions: list[list[str]],
                              schedule: object, assignments: object,
-                             audio_authoring: object | None = None) -> dict[str, object]:
+                             audio_authoring: object | None = None,
+                             knowledge_authoring: object | None = None) -> dict[str, object]:
     if authorized is not True:
         raise PermissionError("director publication requires operator authorization")
     if (type(manifest) is not dict or manifest.get("schema") != SCHEMA
@@ -174,7 +202,8 @@ def publish_director_handoff(manifest: Mapping[str, Any], bundle: bytes,
         expected_source_digest=manifest.get("source_digest"),
         expected_visual_digest=manifest.get("visual_digest"),
         expected_session_digest=manifest.get("session_digest"),
-        audio_authoring=audio_authoring)
+        audio_authoring=audio_authoring,
+        knowledge_authoring=knowledge_authoring)
     if manifest != rebuilt_manifest or bundle != rebuilt_bundle:
         raise StudioQuestError("director publication lacks canonical playable proof")
     directory_fd = _open_directory(directory)
@@ -212,6 +241,7 @@ def verify_director_handoff(
     authorized: bool, expected_source_digest: str, expected_visual_digest: str,
     expected_session_digest: str | None = None,
     audio_authoring: object | None = None,
+    knowledge_authoring: object | None = None,
 ) -> dict[str, object]:
     """Independently rebuild and byte-compare an existing private handoff."""
     if authorized is not True:
@@ -235,7 +265,8 @@ def verify_director_handoff(
         expected_source_digest=expected_source_digest,
         expected_visual_digest=expected_visual_digest,
         expected_session_digest=expected_session_digest,
-        audio_authoring=audio_authoring)
+        audio_authoring=audio_authoring,
+        knowledge_authoring=knowledge_authoring)
     if raw != expected:
         raise StudioQuestError("director archive does not match source-bound replay")
     return manifest

@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--assignments", help="Strict inline assignments JSON (requires --schedule)")
     ap.add_argument("--audio-authoring-json",
                     help="Optional strict authored caption/audio cue JSON")
+    ap.add_argument("--knowledge-authoring-json",
+                    help="Optional strict source-bound NPC knowledge reveal JSON")
     ap.add_argument("--editor-export", type=Path,
                     help="Import the single source-bound JSON exported by director_editor.html")
     modes = ap.add_mutually_exclusive_group()
@@ -75,8 +77,11 @@ def main(argv: list[str] | None = None) -> int:
             assignments = _strict(args.assignments, max_bytes=32768)
         audio_authoring = (_strict(args.audio_authoring_json, max_bytes=65536)
                            if args.audio_authoring_json is not None else None)
+        knowledge_authoring = (_strict(args.knowledge_authoring_json, max_bytes=65536)
+                               if args.knowledge_authoring_json is not None else None)
         kwargs = dict(
             audio_authoring=audio_authoring,
+            knowledge_authoring=knowledge_authoring,
             authorized=True, expected_source_digest=args.expected_source,
             expected_visual_digest=args.expected_visual,
             expected_session_digest=session_lease)
@@ -91,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
                     manifest, bundle, args.publish_directory, authorized=True,
                     documents=docs, actions=actions,
                     schedule=schedule, assignments=assignments,
-                    audio_authoring=audio_authoring)
+                    audio_authoring=audio_authoring,
+                    knowledge_authoring=knowledge_authoring)
                 manifest = {"manifest": manifest, "publication": published}
     except (StudioQuestError, PermissionError, ValueError, TypeError,
             OSError, UnicodeError, RecursionError) as exc:

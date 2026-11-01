@@ -269,3 +269,48 @@ def test_jeeves_branch_compare_matches_canonical_engine():
         authorized=True)
     assert routed["result"] == direct
     assert direct["detail"]["comparison"]["change_count"] == 0
+
+def test_actual_playable_director_zip_contains_source_verified_npc_knowledge():
+    from hashlib import sha256
+    import zipfile
+    from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
+        compile_director_handoff,
+    )
+    docs, source, _, _ = fixture()
+    scenes = docs["scene"]["episode_plan"]
+    schedule = {"scene_ticks": {scene["id"]: 5 for scene in scenes},
+                "npc_turnaround_ticks": 2, "min_start_ticks": {}}
+    recipe = docs["visual"]["asset_recipes"][0]["id"]
+    assignments = {scene["id"]: {
+        asset: recipe for asset in scene["assets"] + scene["interactive_objects"]}
+        for scene in scenes}
+    visual = sha256(json.dumps(docs["visual"], sort_keys=True,
+                               separators=(",", ":"), ensure_ascii=True,
+                               allow_nan=False).encode("ascii")).hexdigest()
+    request = authoring()
+    manifest, bundle = compile_director_handoff(
+        docs, [], schedule, assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual,
+        knowledge_authoring=request)
+    assert manifest["npc_knowledge_earned_count"] == 0
+    assert manifest["npc_knowledge_spoken_verified"] is False
+    assert manifest["canonical_html5_gameplay_replay_verified"] is True
+    with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+        assert "index.html" in archive.namelist()
+        assert "npc_knowledge.json" in archive.namelist()
+        assert "npc_knowledge.html" in archive.namelist()
+        receipt = json.loads(archive.read("npc_knowledge.json"))
+        assert receipt["knowledge_digest"] == manifest["npc_knowledge_digest"]
+        assert b"<script" not in archive.read("npc_knowledge.html").lower()
+        for name, expected in manifest["file_hashes"].items():
+            assert sha256(archive.read(name)).hexdigest() == expected
+    assert (manifest, bundle) == compile_director_handoff(
+        docs, [], schedule, assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual,
+        knowledge_authoring=request)
+    with pytest.raises(StudioQuestError):
+        compile_director_handoff(
+            docs, [], schedule, assignments, authorized=True,
+            expected_source_digest=source, expected_visual_digest=visual,
+            knowledge_authoring={"schema": REQUEST_SCHEMA, "reveals": [{
+                **request["reveals"][0], "fact_id": "forged"}]})

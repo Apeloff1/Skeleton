@@ -45,3 +45,17 @@ lost source-fact identities by recipient scene. An optional
 `required_alternative` gates a reveal on an exact authored choice. The
 comparison never equates a changed editor cue with spoken NPC dialogue.
 The Jeeves typed tool supports the same `compare_actions` input.
+
+## Verified playable director integration
+
+The existing canonical director compiler now accepts optional
+`knowledge_authoring` alongside scene schedule, asset assignments and audio.
+It independently compiles the exact source/session-leased knowledge handoff,
+checks ordered scene identity, and embeds `npc_knowledge.json` and a
+script-free `npc_knowledge.html` companion inside the same deterministic
+`studio_director_handoff.zip` as the actual playable `index.html`.
+The archive manifest records each file's digest and the knowledge receipt.
+Publish and restore rebuild the complete archive from canonical source,
+including the knowledge plan; a rehashed forged manifest cannot qualify.
+The CLI uses `--knowledge-authoring-json`, and the typed Jeeves director tool
+uses `knowledge_authoring`. NPC speech/native execution remains unverified.
