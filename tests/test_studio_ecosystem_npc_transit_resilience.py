@@ -159,3 +159,61 @@ def test_cli_and_jeeves_router(capsys):
     with pytest.raises(StudioQuestError):
         execute_npc_transit_resilience_tool(
             {**request, "authorized": True}, authorized=True)
+
+
+def test_offline_editor_private_export_import_and_cli_roundtrip(tmp_path, capsys):
+    from hashlib import sha256
+    from skeleton.ai.game_builder.studio_ecosystem_npc_transit_resilience_editor import (
+        EXPORT_SCHEMA, render_npc_resilience_editor,
+        load_npc_resilience_editor_export, publish_npc_resilience_editor,
+    )
+    from scripts.studio_npc_transit_resilience_cli import main
+    docs, source, baseline = fixture()
+    report = propose_npc_transit_resilience(
+        docs, baseline, PROMPT, authorized=True, expected_source_digest=source)
+    html, proof = render_npc_resilience_editor(docs, report, authorized=True)
+    assert sha256(html).hexdigest() == proof["html_sha256"]
+    assert b"Content-Security-Policy" in html
+    assert b"Export typed NPC disruption edits" in html
+    published = publish_npc_resilience_editor(docs, report, tmp_path, authorized=True)
+    assert published["file_write_performed"]
+    assert (tmp_path / "npc_transit_resilience_editor.html").stat().st_mode & 0o077 == 0
+    with pytest.raises(FileExistsError):
+        publish_npc_resilience_editor(docs, report, tmp_path, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": report["project_id"],
+        "source_digest": source, "session_digest": report["session_digest"],
+        "temporal_digest": report["temporal_digest"],
+        "baseline_transit_digest": report["baseline_transit_digest"],
+        "baseline_resilience_digest": report["resilience_digest"],
+        "variants": report["variants"],
+    }
+    path = tmp_path / "npc_resilience_variants.json"
+    path.write_text(json.dumps(record))
+    path.chmod(0o600)
+    kwargs = {
+        "authorized": True, "expected_project_id": report["project_id"],
+        "expected_source_digest": source,
+        "expected_session_digest": report["session_digest"],
+        "expected_temporal_digest": report["temporal_digest"],
+        "expected_transit_digest": report["baseline_transit_digest"],
+        "expected_resilience_digest": report["resilience_digest"],
+    }
+    assert load_npc_resilience_editor_export(path, **kwargs) == report["variants"]
+    assert main([
+        "--project", PROJECT, "--expected-source", source,
+        "--baseline-transit", json.dumps(baseline),
+        "--baseline-resilience", json.dumps(report),
+        "--import-variants", str(path),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["resilience"] == report
+    path.write_text(json.dumps({**record, "source_digest": "0" * 64}))
+    with pytest.raises(StudioQuestError):
+        load_npc_resilience_editor_export(path, **kwargs)
+    path.write_text('{"schema":"a","schema":"b"}')
+    with pytest.raises(StudioQuestError):
+        load_npc_resilience_editor_export(path, **kwargs)
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_npc_resilience_editor_export(path, **kwargs)
