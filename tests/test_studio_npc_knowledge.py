@@ -498,3 +498,24 @@ def test_npc_lineage_rejects_stale_leases_and_forged_display():
     with pytest.raises(StudioQuestError):
         render_npc_lineage_html({**lineage, "earned_count": 999})
     assert lineage["session_digest"] == session.digest
+
+def test_jeeves_typed_lineage_opt_in_preserves_default_tool_contract():
+    from skeleton.ai.game_builder.studio_ecosystem_npc_lineage import compile_npc_lineage
+    docs, source, _, _ = fixture()
+    request = {
+        "schema": TOOL_SCHEMA, "project_id": PROJECT,
+        "expected_source_digest": source, "actions": [],
+        "authoring": authoring(), "include_lineage": True,
+    }
+    direct = execute_npc_knowledge_tool(request, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_npc_knowledge", "arguments": request},
+        authorized=True)
+    assert routed["result"] == direct
+    assert direct["detail"]["lineage"] == compile_npc_lineage(
+        docs, [], authoring(), authorized=True, expected_source_digest=source)
+    assert direct["file_write_performed"] is False
+    assert direct["detail"]["lineage"]["npc_speech_verified"] is False
+    with pytest.raises(StudioQuestError):
+        execute_npc_knowledge_tool({**request, "include_lineage": 1},
+                                   authorized=True)
