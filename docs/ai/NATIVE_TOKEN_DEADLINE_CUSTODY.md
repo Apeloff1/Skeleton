@@ -18,3 +18,7 @@ Callbacks are additionally bound to the exact in-memory execution epoch, so
 stale callbacks cannot sample a later lease. This is defense in depth only:
 SQLite journal and authenticated high-watermark remain authoritative across
 process restarts, and none of these controls qualify GPU/M-chip execution.
+
+## Fork and process-owner fence
+
+The native CPU token pressure guard now pins the creating OS process identity. Every start, callback, completion and status read checks the PID **before** acquiring its thread lock. A forked child must construct a fresh guard and acquire a new durable execution authorization; inherited callbacks fail closed without probing or issuing a token. A PID probe error permanently stops the inherited guard. This is a process-local defense in depth, not a substitute for the SQLite one-use execution journal, and it does not qualify GPU or M-chip devices.

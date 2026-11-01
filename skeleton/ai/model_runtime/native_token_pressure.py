@@ -7,6 +7,7 @@ the app MUST NOT automatically retry an uncertain model execution.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from threading import RLock
 from time import monotonic_ns
 
@@ -82,6 +83,9 @@ class NativeTokenPressureGuard:
         if (type(max_duration_ns) is not int
                 or not 1_000_000 <= max_duration_ns <= MAX_DURATION_NS):
             raise ValueError("bounded monotonic execution duration required")
+        # A fork inherits Python object state but not execution authority.
+        # Check PID before acquiring an inherited lock or sampling hardware.
+        self._owner_pid = os.getpid()
         self._sampler = sampler
         self._storage_path = storage_path
         self._max_probes = max_probes
@@ -95,6 +99,26 @@ class NativeTokenPressureGuard:
         self._pressure: int | None = None
         self._start_ns: int | None = None
         self._last_ns: int | None = None
+
+    def _require_owner_process(self) -> None:
+        """A copied guard in a forked worker is never a reusable CPU lease.
+
+        Called before the lock: an inherited lock can be held by a thread
+        that no longer exists in the child. The durable journal remains the
+        independent cross-process replay authority.
+        """
+        try:
+            current = os.getpid()
+        except BaseException as exc:
+            self._stopped = True
+            raise NativePressureInterrupted(
+                "native execution process identity unavailable"
+            ) from exc
+        if type(current) is not int or current != self._owner_pid:
+            self._stopped = True
+            raise NativePressureInterrupted(
+                "native execution process identity changed; reauthorize"
+            )
 
     def _check_deadline(self) -> None:
         """Fail closed on timeout, clock regression or an unreadable clock.
@@ -119,6 +143,7 @@ class NativeTokenPressureGuard:
 
     def start(self, permit: DispatchPermit):
         """Return an interrupt callback; one active generation per guard."""
+        self._require_owner_process()
         if not _canonical_cpu_permit(permit):
             raise NativePressureInterrupted("CPU-only canonical typed permit required")
         with self._lock:
@@ -151,6 +176,7 @@ class NativeTokenPressureGuard:
             self._pressure = None
 
         def interrupt() -> None:
+            self._require_owner_process()
             with self._lock:
                 if (self._active != permit.lease_id
                         or self._epoch != epoch or self._stopped):
@@ -189,6 +215,7 @@ class NativeTokenPressureGuard:
 
     def finish(self, *, success: bool) -> None:
         """After failure the guard remains stopped; caller must reauthorize."""
+        self._require_owner_process()
         with self._lock:
             if type(success) is not bool:
                 raise ValueError("explicit completion outcome required")
@@ -213,6 +240,7 @@ class NativeTokenPressureGuard:
                 self._stopped = True
 
     def status(self) -> NativePressureStatus:
+        self._require_owner_process()
         with self._lock:
             return NativePressureStatus(
                 schema="skeleton.ai.native-token-pressure.v1",

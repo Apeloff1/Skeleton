@@ -252,3 +252,34 @@ def test_native_pressure_guard_lifetime_capacity_is_bounded(monkeypatch):
     with pytest.raises(NativePressureInterrupted, match="capacity"):
         guard.start(replace(P, lease_id="e" * 64, request_id="next"))
     assert guard.status().stopped
+
+
+def test_forked_pressure_guard_rejects_inherited_callback_before_probe(monkeypatch):
+    probe(monkeypatch, [budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+    original = guard._owner_pid
+    with monkeypatch.context() as scoped:
+        scoped.setattr(pressure_module.os, "getpid", lambda: original + 1)
+        with pytest.raises(NativePressureInterrupted, match="process identity changed"):
+            callback()
+        with pytest.raises(NativePressureInterrupted, match="process identity changed"):
+            guard.finish(success=True)
+        with pytest.raises(NativePressureInterrupted, match="process identity changed"):
+            guard.status()
+        with pytest.raises(NativePressureInterrupted, match="process identity changed"):
+            guard.start(replace(P, lease_id="f" * 64))
+    assert guard.status().stopped
+    assert guard.status().samples == 0
+    with pytest.raises(NativePressureInterrupted, match="not available"):
+        guard.start(replace(P, lease_id="f" * 64))
+
+
+def test_pressure_guard_rejects_unreadable_process_identity(monkeypatch):
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with monkeypatch.context() as scoped:
+        scoped.setattr(pressure_module.os, "getpid", lambda: (_ for _ in ()).throw(OSError("pid unavailable")))
+        with pytest.raises(NativePressureInterrupted, match="identity unavailable"):
+            guard.start(P)
+    assert guard.status().stopped
+    assert guard.status().samples == 0
