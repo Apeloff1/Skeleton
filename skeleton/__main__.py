@@ -74,6 +74,7 @@ Commands:
     scene-mission-route  Solve replayable authored mission ending paths
     scene-mission-assist  Offer replay-proven non-mutating mission hints\n    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
+    scene-mission-league  Rank completed source-bound mission replays offline
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -758,6 +759,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "scene-mission-league":
+        from skeleton.game.gameplay.scene_mission_league import cli as league_cli
+        return league_cli(rest)
     if cmd == "scene-mission-timeline":
         from skeleton.game.gameplay.scene_mission_timeline import cli as timeline_cli
         return timeline_cli(rest)
