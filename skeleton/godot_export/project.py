@@ -9,15 +9,24 @@ from . import configfile
 from .variant import Constructor
 
 IGNORED_DIRS = {".godot", ".import", ".git", "build", "export"}
+MAX_PROJECT_SCAN_ENTRIES = 20_000
 
 
 def res_to_path(root: Path, res: str) -> Path:
-    if not res.startswith("res://"):
-        raise ValueError(f"not a res:// path: {res}")
+    if type(res) is not str or not res.startswith("res://") or len(res) > 4096:
+        raise ValueError("not a bounded res:// path")
     rel = res[len("res://"):]
-    if ".." in Path(rel).parts:
-        raise ValueError(f"res:// path escapes project: {res}")
-    return root / rel
+    parts = rel.split("/")
+    if (not rel or rel.startswith("/") or "\\\\" in rel or "\\x00" in rel
+            or any(part in ("", ".", "..") for part in parts)):
+        raise ValueError("unsafe res:// path component")
+    target = root.joinpath(*parts)
+    # Reject already-present symlink components. This is a conservative
+    # reference validator, not a substitute for descriptor-bound file reads.
+    for depth in range(1, len(parts) + 1):
+        if root.joinpath(*parts[:depth]).is_symlink():
+            raise ValueError("symlinked res:// path is not trusted")
+    return target
 
 
 def path_to_res(root: Path, path: Path) -> str:
@@ -88,13 +97,17 @@ class GodotProject:
 
     def iter_files(self, suffixes: tuple[str, ...]) -> list[Path]:
         out = []
-        for p in sorted(self.root.rglob("*")):
-            if not p.is_file() or p.suffix not in suffixes:
+        visited = 0
+        for p in self.root.rglob("*"):
+            visited += 1
+            if visited > MAX_PROJECT_SCAN_ENTRIES:
+                raise ValueError("project scan exceeds entry bound")
+            if p.is_symlink() or not p.is_file() or p.suffix not in suffixes:
                 continue
             if any(part in IGNORED_DIRS for part in p.relative_to(self.root).parts):
                 continue
             out.append(p)
-        return out
+        return sorted(out)
 
     def scripts(self) -> list[Path]:
         return self.iter_files((".gd",))

@@ -249,3 +249,34 @@ def test_pck_rejects_bad_input(tmp_path):
         pck.read(plain)
     assert pck.find_embedded(b"short") is None
     assert pck.find_embedded(b"\0" * 20 + struct.pack("<Q", 999) + pck.MAGIC) is None
+
+
+def test_godot_project_res_paths_reject_absolute_and_symlink_escapes(tmp_path):
+    from skeleton.godot_export.project import res_to_path
+
+    (tmp_path / "safe.gd").write_text("extends Node")
+    assert res_to_path(tmp_path, "res://safe.gd") == tmp_path / "safe.gd"
+    for bad in ("res:////etc/passwd", "res:///etc/passwd", "res://../escape.gd",
+                "res://a//b.gd", "res://a/./b.gd", "res://a\\\\b.gd", "res://"):
+        with pytest.raises(ValueError):
+            res_to_path(tmp_path, bad)
+    outside = tmp_path.parent / "outside_godot.gd"
+    outside.write_text("outside")
+    link = tmp_path / "shortcut.gd"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlink"):
+        res_to_path(tmp_path, "res://shortcut.gd")
+
+
+def test_godot_project_file_inventory_is_bounded(tmp_path, monkeypatch):
+    from skeleton.godot_export import project as project_mod
+
+    for i in range(4):
+        (tmp_path / f"script{i}.gd").write_text("extends Node")
+    project = project_mod.GodotProject(tmp_path, configfile.loads("[application]\\n"))
+    monkeypatch.setattr(project_mod, "MAX_PROJECT_SCAN_ENTRIES", 2)
+    with pytest.raises(ValueError, match="entry bound"):
+        project.scripts()
