@@ -53,6 +53,51 @@ def _require_private_spool_file(fd: int) -> None:
         raise LongContextSpoolError("spool object owner or mode is untrusted")
 
 
+
+def _read_stable_named_fd(directory: int, name: str, *, limit: int) -> bytes:
+    """Pin an immutable POSIX object across its complete bounded read.
+
+    A correct digest after a read is not enough if the pathname was swapped
+    while a caller was loading the checkpoint or a pre-existing object.
+    Recheck the open descriptor AND descriptor-relative name, including
+    metadata that changes on an in-place write. Same-UID adversaries remain
+    outside the cooperative writer trust boundary; unexpected mutation holds.
+    """
+    if type(limit) is not int or limit < 0:
+        raise LongContextSpoolError("invalid spool read byte limit")
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW |
+                     getattr(os, "O_NONBLOCK", 0) |
+                     getattr(os, "O_CLOEXEC", 0), dir_fd=directory)
+    except OSError as exc:
+        raise LongContextSpoolError("secure spool object open denied") from exc
+    try:
+        _require_private_spool_file(fd)
+        before = os.fstat(fd)
+        if before.st_size < 0 or before.st_size > limit:
+            raise LongContextSpoolError("spool object exceeds byte budget")
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            raw = stream.read(limit + 1)
+        after = os.fstat(fd)
+        try:
+            named = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise LongContextSpoolError("spool object changed during read") from exc
+        identity = lambda s: (
+            s.st_dev, s.st_ino, s.st_uid, s.st_mode, s.st_nlink,
+            s.st_size, s.st_mtime_ns, s.st_ctime_ns,
+        )
+        if (identity(before) != identity(after)
+                or identity(after) != identity(named)
+                or len(raw) != before.st_size):
+            raise LongContextSpoolError("spool object changed during read")
+        return raw
+    except OSError as exc:
+        raise LongContextSpoolError("secure spool object read denied") from exc
+    finally:
+        os.close(fd)
+
+
 def _positive(value: int, name: str, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
         raise LongContextSpoolError(f"invalid {name}")
@@ -375,19 +420,7 @@ class LongContextSpool:
         kind = "object" if parts[0] == "objects" else "checkpoint"
         bucket_fd = self._open_bucket(kind, digest)
         try:
-            flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
-            fd = os.open(digest, flags, dir_fd=bucket_fd)
-            try:
-                _require_private_spool_file(fd)
-                with os.fdopen(fd, "rb", closefd=False) as stream:
-                    raw = stream.read(limit + 1)
-            finally:
-                os.close(fd)
-            if len(raw) > limit:
-                raise LongContextSpoolError("spool object exceeds byte budget")
-            return raw
-        except OSError as exc:
-            raise LongContextSpoolError("secure spool read failed") from exc
+            return _read_stable_named_fd(bucket_fd, digest, limit=limit)
         finally:
             os.close(bucket_fd)
 
@@ -729,22 +762,14 @@ class LongContextSpool:
                 max_bytes=_RECOVERY_MAX_BYTES,
             )
             try:
-                existing = os.open(
-                    digest, os.O_RDONLY | os.O_NOFOLLOW |
-                    getattr(os, "O_NONBLOCK", 0), dir_fd=bucket_fd,
-                )
+                os.stat(digest, dir_fd=bucket_fd, follow_symlinks=False)
             except FileNotFoundError:
-                existing = None
-            if existing is not None:
-                try:
-                    _require_private_spool_file(existing)
-                    with os.fdopen(existing, "rb", closefd=False) as stream:
-                        observed = stream.read(len(raw) + 1)
-                    if observed != raw:
-                        raise LongContextSpoolError("existing immutable object mismatch")
-                    return
-                finally:
-                    os.close(existing)
+                pass
+            else:
+                observed = _read_stable_named_fd(bucket_fd, digest, limit=len(raw))
+                if observed != raw:
+                    raise LongContextSpoolError("existing immutable object mismatch")
+                return
             used = self._spool_usage_locked()
             if len(raw) > self.max_spool_bytes - used:
                 raise LongContextSpoolError("spool byte quota prevents admission")
@@ -781,18 +806,9 @@ class LongContextSpool:
                         dst_dir_fd=bucket_fd, follow_symlinks=False,
                     )
                 except FileExistsError:
-                    existing = os.open(
-                        digest, os.O_RDONLY | os.O_NOFOLLOW |
-                        getattr(os, "O_NONBLOCK", 0), dir_fd=bucket_fd,
-                    )
-                    try:
-                        _require_private_spool_file(existing)
-                        with os.fdopen(existing, "rb", closefd=False) as stream:
-                            observed = stream.read(len(raw) + 1)
-                        if observed != raw:
-                            raise LongContextSpoolError("concurrent immutable object mismatch")
-                    finally:
-                        os.close(existing)
+                    observed = _read_stable_named_fd(bucket_fd, digest, limit=len(raw))
+                    if observed != raw:
+                        raise LongContextSpoolError("concurrent immutable object mismatch")
                 else:
                     # The link operation can race a same-UID replacement of
                     # the temp name. Never certify a final inode other than
