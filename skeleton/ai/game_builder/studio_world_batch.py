@@ -109,7 +109,11 @@ def _validate_typed(value: object, schema: object, *, depth: int = 0) -> None:
             raise StudioQuestError("world batch tool array has duplicates")
         item_schema = schema.get("items")
         if item_schema is None:
-            raise StudioQuestError("world batch array lacks typed items")
+            # Some vetted descriptors intentionally leave nested receipt arrays
+            # opaque. Their source-replayed executor validates exact contents.
+            if len(_canonical(value)) > 64 * 1024:
+                raise StudioQuestError("opaque world batch array exceeds budget")
+            return
         for item in value:
             _validate_typed(item, item_schema, depth=depth + 1)
     if type(value) is dict:
@@ -119,6 +123,12 @@ def _validate_typed(value: object, schema: object, *, depth: int = 0) -> None:
         properties = schema.get("properties", {})
         if type(properties) is not dict:
             raise StudioQuestError("invalid world batch descriptor properties")
+        if not properties and "additionalProperties" not in schema:
+            # Nested source receipts are opaque objects at the router boundary,
+            # but the downstream canonical owner must replay their full source.
+            if len(_canonical(value)) > 64 * 1024:
+                raise StudioQuestError("opaque world batch object exceeds budget")
+            return
         required = schema.get("required", [])
         if type(required) is not list or not set(required).issubset(value):
             raise StudioQuestError("world batch tool missing required fields")
