@@ -380,3 +380,66 @@ def test_process_identity_probe_failure_fails_closed(monkeypatch):
     with pytest.raises(InFlightPressureDenied, match="forked"):
         g.complete()
     assert g._state == "aborted"
+
+
+def test_quantum_lease_reprobe_requires_current_generation():
+    g = guard()
+    g.start()
+    lease = g.admit_quantum(requested_tokens=4)
+    valid = g.validate_quantum_lease(
+        generation=lease.generation, required_tokens=4,
+    )
+    assert valid.state == "running"
+    assert valid.authorized_quantum_tokens == 4
+    assert valid.continue_execution is False  # simulated evidence is not authority
+    with pytest.raises(InFlightPressureDenied, match="stale"):
+        g.validate_quantum_lease(
+            generation=lease.generation - 1, required_tokens=1,
+        )
+    with pytest.raises(InFlightPressureDenied, match="insufficient"):
+        g.validate_quantum_lease(
+            generation=lease.generation, required_tokens=5,
+        )
+    g.checkpoint(generated_tokens=4)
+    with pytest.raises(InFlightPressureDenied, match="stale"):
+        g.validate_quantum_lease(
+            generation=lease.generation, required_tokens=1,
+        )
+
+
+def test_quantum_reprobe_revokes_on_new_memory_pressure():
+    calls = 0
+
+    def resources(path):
+        nonlocal calls
+        calls += 1
+        return snapshot() if calls < 3 else snapshot(available_ram_bytes=1)
+
+    g = guard(resource=resources)
+    g.start()
+    lease = g.admit_quantum(requested_tokens=3)
+    denied = g.validate_quantum_lease(
+        generation=lease.generation, required_tokens=1,
+    )
+    assert denied.state == "hold"
+    assert denied.authorized_quantum_tokens == 0
+    assert not denied.continue_execution
+    with pytest.raises(InFlightPressureDenied):
+        g.checkpoint(generated_tokens=3)
+
+
+def test_quantum_lease_recheck_does_not_extend_deadline():
+    ticks = iter([0, 1, 2, 5_000_000_005])
+    g = guard(clock=ticks.__next__)
+    g.start()
+    lease = g.admit_quantum(requested_tokens=2)
+    assert g.validate_quantum_lease(
+        generation=lease.generation, required_tokens=2,
+    ).state == "running"
+    with pytest.raises(InFlightPressureDenied, match="deadline"):
+        g.validate_quantum_lease(
+            generation=lease.generation, required_tokens=1,
+        )
+    assert g.status().state == "aborted"
+
+

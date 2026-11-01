@@ -188,6 +188,21 @@ class OfflineTailInFlightSession:
                 lambda: self._guard.admit_quantum(requested_tokens=requested_tokens)
             ))
 
+    def validate_quantum_lease(
+        self, *, generation: int, required_tokens: int = 1,
+    ) -> OfflineInFlightStatus:
+        """Recheck the exact in-flight generation at the app/backend boundary."""
+        self._require_owner_process()
+        with self._lock:
+            self._require_healthy()
+            if self._request_id is None:
+                raise InFlightPressureDenied("no in-flight request")
+            return self._status(self._checked_guard(
+                lambda: self._guard.validate_quantum_lease(
+                    generation=generation, required_tokens=required_tokens,
+                )
+            ))
+
     def checkpoint(self, *, generated_tokens: int) -> OfflineInFlightStatus:
         self._require_owner_process()
         with self._lock:

@@ -301,6 +301,39 @@ class InFlightCPUResourceGuard:
             self._generation += 1
             return self._receipt()
 
+    def validate_quantum_lease(
+        self, *, generation: int, required_tokens: int = 1,
+    ) -> InFlightPressureDecision:
+        """Re-probe before a backend consumes a previously issued quantum.
+
+        A stale generation, expired deadline or inadequate reservation never
+        grants token execution. A new pressure HOLD revokes the whole quantum,
+        not just the requested token count. Rechecks cannot extend the lease.
+        This is a cooperative boundary; the backend must call it immediately
+        before emitting tokens and still enforce actual allocation limits.
+        """
+        self._require_owner_process()
+        with self._lock:
+            if (type(generation) is not int or generation < 0
+                    or type(required_tokens) is not int
+                    or not 1 <= required_tokens <= self.policy.max_quantum_tokens):
+                raise InFlightPressureDenied("invalid CPU quantum lease identity")
+            self._check_quantum_deadline()
+            if (self._state != "running"
+                    or self._authorized_quantum < required_tokens
+                    or generation != self._generation):
+                raise InFlightPressureDenied("stale or insufficient CPU quantum lease")
+            reason = self._observe()
+            if reason != "measured_cpu_headroom":
+                self._authorized_quantum = 0
+                self._quantum_started_ns = None
+                self._enter_hold(reason)
+                self._generation += 1
+                return self._receipt()
+            # Vendor sampling may itself outlive a short quantum deadline.
+            self._check_quantum_deadline()
+            return self._receipt()
+
     def checkpoint(self, *, generated_tokens: int) -> InFlightPressureDecision:
         """Check AFTER at most one bounded token quantum, before next quantum."""
         if type(generated_tokens) is not int or not 0 <= generated_tokens <= self.policy.max_quantum_tokens:

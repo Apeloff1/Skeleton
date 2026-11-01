@@ -314,3 +314,26 @@ def test_unavailable_app_process_identity_quarantines(monkeypatch):
     with pytest.raises(InFlightLifecycleQuarantined, match="forked"):
         app.begin(request_id="never-staged", prompt_tokens=1)
     assert app._quarantined
+
+
+def test_app_quantum_recheck_is_generation_bound_and_simulated():
+    app = controller()
+    app.begin(request_id="lease", prompt_tokens=1)
+    lease = app.admit_quantum(requested_tokens=3)
+    assert lease.authorized_quantum_tokens == 3
+    checked = app.validate_quantum_lease(
+        generation=lease.generation, required_tokens=2,
+    )
+    assert checked.state == "running"
+    assert not checked.continue_execution
+    with pytest.raises(InFlightPressureDenied):
+        app.validate_quantum_lease(
+            generation=lease.generation - 1, required_tokens=1,
+        )
+    app.checkpoint(generated_tokens=3)
+    with pytest.raises(InFlightPressureDenied):
+        app.validate_quantum_lease(
+            generation=lease.generation, required_tokens=1,
+        )
+
+
