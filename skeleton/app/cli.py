@@ -135,6 +135,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     prepare.add_argument("--json", action="store_true", dest="as_json")
     sub.add_parser(
+        "audit-offline-game-library", add_help=False,
+        help="audit 1-8 independently pinned original game installations and saves",
+    )
+    sub.add_parser(
         "delivery-assurance", add_help=False,
         help="verify installed game, archive and save custody (delivery-assurance --help)",
     )
@@ -402,6 +406,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "recover-install":
         from skeleton.app.offline_install_recovery import main as recovery_main
         return recovery_main(arguments[1:])
+    if arguments and arguments[0] == "audit-offline-game-library":
+        from skeleton.app.offline_game_library_audit import main as library_audit_main
+        return library_audit_main(arguments[1:])
     if arguments and arguments[0] == "delivery-assurance":
         from skeleton.app.offline_delivery_assurance import main as assurance_main
         return assurance_main(arguments[1:])
