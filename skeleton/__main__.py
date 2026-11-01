@@ -79,6 +79,7 @@ Commands:
     arena-control-render  Render replay-verified tactical ASCII capture boards
     arena-control-contracts  Play source-bound capture bounties and portable saves
     arena-control-contracts-author  Atomically edit and preview capture bounties
+    arena-control-contracts-play  Play player-controlled capture bounties with safe saves
     arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
@@ -805,6 +806,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "arena-control-contracts":
         from skeleton.game.gameplay.arena_control_contracts import cli as contracts_cli
         return contracts_cli(rest)
+    if cmd == "arena-control-contracts-play":
+        from skeleton.game.gameplay.arena_control_contracts_interactive import cli as contracts_play_cli
+        return contracts_play_cli(rest)
     if cmd == "arena-control-contracts-author":
         from skeleton.game.gameplay.arena_control_contracts_author import cli as contracts_author_cli
         return contracts_author_cli(rest)
