@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import unicodedata
 
 from dataclasses import dataclass, replace
@@ -32,6 +33,9 @@ MOD_PERMISSIONS = frozenset({"read_save", "add_content", "ui_overlay"})
 MAX_FILES = 512
 MAX_FILE_BYTES = 256 * 1024
 MAX_TOTAL_BYTES = 8 * 1024 * 1024
+_MOD_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
+_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,95}$")
+_SIG = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -82,6 +86,16 @@ def install(
     """
     if not isinstance(pkg, ModPackage) or not isinstance(pkg.files, dict) or len(pkg.files) > MAX_FILES:
         return "rejected:files", []
+    if not isinstance(pkg.mod_id, str) or not _MOD_ID.fullmatch(pkg.mod_id):
+        return "rejected:identity", []
+    if not isinstance(pkg.version, str) or not _VERSION.fullmatch(pkg.version):
+        return "rejected:identity", []
+    if (not isinstance(pkg.sdk_api, tuple) or len(pkg.sdk_api) != 2
+            or any(type(n) is not int or n < 0 for n in pkg.sdk_api)
+            or pkg.sdk_api[0] != SDK_API[0] or pkg.sdk_api[1] > SDK_API[1]):
+        return "rejected:incompatible", []
+    if not isinstance(pkg.permissions, tuple) or any(type(x) is not str for x in pkg.permissions):
+        return "rejected:permissions", []
     # Snapshot untrusted mutable inputs before validating and verifying the
     # signature: moderation, policy and the capability plan see the same bytes.
     snapshot_files = {}
@@ -97,19 +111,13 @@ def install(
                 return "rejected:files", []
             total += size
             snapshot_files[name] = json.loads(raw)
-    except (ValueError, TypeError, OverflowError, RecursionError):
+    except (ValueError, TypeError, OverflowError, RecursionError, RuntimeError):
         return "rejected:files", []
-    if not isinstance(pkg.signature, str) or not isinstance(key, bytes):
+    if not isinstance(pkg.signature, str) or not _SIG.fullmatch(pkg.signature) or not isinstance(key, bytes):
         return "rejected:signature", []
     signed_pkg = replace(pkg, files=snapshot_files)
     if not hmac.compare_digest(signed_pkg.signature, sign(signed_pkg, key)):
         return "rejected:signature", []
-    if (not isinstance(pkg.sdk_api, tuple) or len(pkg.sdk_api) != 2
-            or any(type(n) is not int or n < 0 for n in pkg.sdk_api)
-            or pkg.sdk_api[0] != SDK_API[0] or pkg.sdk_api[1] > SDK_API[1]):
-        return "rejected:incompatible", []
-    if not isinstance(pkg.permissions, tuple) or any(not isinstance(x, str) for x in pkg.permissions):
-        return "rejected:permissions", []
     bad = set(pkg.permissions) - MOD_PERMISSIONS
     if bad:
         return f"rejected:permissions:{','.join(sorted(bad))}", []
@@ -125,7 +133,7 @@ def install(
     ) for p in snapshot_files):
         return "rejected:native_code", []
     try:
-        if not moderate(signed_pkg):
+        if moderate(signed_pkg) is not True:
             return "rejected:moderation", []
     except Exception:
         return "rejected:moderation", []
