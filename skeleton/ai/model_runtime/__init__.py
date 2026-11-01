@@ -11,6 +11,7 @@ from importlib import import_module
 # Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
     "LongContextSpool": ".long_context_spool",
+    "LongContextProgressHead": ".long_context_progress",
     "LongContextSpoolError": ".long_context_spool",
     "SpoolCheckpoint": ".long_context_spool",
     "ALLOWED_TRANSITIONS": ".flgb_model_runtime",

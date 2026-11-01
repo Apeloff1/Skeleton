@@ -70,6 +70,7 @@ class LongContextProgressHead:
             raise LongContextSpoolError("closed spool")
         try:
             lock = os.open(".heads.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW |
+                           getattr(os, "O_NONBLOCK", 0) |
                            getattr(os, "O_CLOEXEC", 0), 0o600, dir_fd=root)
         except OSError as exc:
             raise LongContextSpoolError("head lock unavailable") from exc
