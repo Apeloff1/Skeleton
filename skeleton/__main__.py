@@ -68,6 +68,7 @@ Commands:
     scene-atlas  Explore fog-of-war maps, legal known routes and portable replay
     scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
+    scene-mission-play  Interactively play authored missions with replayable checkpoints
     scene-mission-route  Solve replayable authored mission ending paths
     scene-mission-accept  Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
@@ -770,6 +771,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-mission":
         from skeleton.game.gameplay.scene_mission import cli as mission_cli
         return mission_cli(rest)
+    if cmd == "scene-mission-play":
+        from skeleton.game.gameplay.scene_mission_interactive import cli as mission_play_cli
+        return mission_play_cli(rest)
     if cmd == "scene-author":
         from skeleton.game.gameplay.scene_world_author import cli as scene_author_cli
         return scene_author_cli(rest)
