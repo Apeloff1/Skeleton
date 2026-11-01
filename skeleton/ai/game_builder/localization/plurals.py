@@ -7,7 +7,10 @@ the "other"-only rule rather than guessing.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+import re
 from typing import Callable
+
+_LOCALE_SUBTAG = re.compile(r"^[A-Za-z0-9]{1,8}$")
 
 PLURAL_CATEGORIES = ("zero", "one", "two", "few", "many", "other")
 _RTL_LANGS = frozenset({"ar", "he", "fa", "ur", "ps", "sd", "yi", "dv", "ug", "ckb"})
@@ -109,7 +112,10 @@ def _locale_parts(locale: str) -> list[str]:
     if (type(locale) is not str or not 1 <= len(locale) <= 128
             or any(ord(ch) < 33 or ord(ch) == 127 for ch in locale)):
         raise ValueError("locale must be a bounded printable tag")
-    return locale.replace("_", "-").split("-")
+    parts = locale.replace("_", "-").split("-")
+    if any(_LOCALE_SUBTAG.fullmatch(part) is None for part in parts):
+        raise ValueError("locale must be a bounded printable tag")
+    return parts
 
 
 def _language(locale: str) -> str:

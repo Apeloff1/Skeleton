@@ -178,3 +178,14 @@ def test_untrusted_locale_tags_are_bounded_before_direction_and_plural_rules():
         with pytest.raises(ValueError, match="bounded printable tag"):
             format_message("Hello {name}", {"name": "Ada"}, bad)
     assert is_rtl("pa-Arab") and not is_rtl("az-Latn")
+
+
+def test_locale_tags_reject_noncanonical_separators_and_unicode_controls():
+    for bad in ("en--US", "-en", "en-", "en/US", "en:US",
+                "en\\u202eUS", "en\\u2066US", "en-abcdefghij", "é-FR"):
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            is_rtl(bad)
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            plural_category(bad, 1)
+    assert is_rtl("pa-Arab")
+    assert not is_rtl("en_US")
