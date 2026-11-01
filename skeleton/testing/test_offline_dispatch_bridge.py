@@ -59,7 +59,7 @@ def install_probe(monkeypatch, *, hold=False):
     def sample(self, *, token_budget, storage_path):
         return (
             MeasuredStreamBudget(
-                4096, 1024, token_budget, 4, 0, hold, "os_probe",
+                4096, 1024, token_budget, 1, 0, hold, "os_probe",
             ),
             {
                 "measurement": "os_probe",
@@ -78,7 +78,6 @@ def install_probe(monkeypatch, *, hold=False):
                     "io": False, "cpu_throttle": False, "swap_churn": False,
                     "reclaim": False, "disk_reserve": False,
                 },
-
             },
         )
     monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)

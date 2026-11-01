@@ -74,6 +74,23 @@ def _verified_live_evidence(
         or any(holds.values())
     ):
         return False
+    # The canonical sampler caps an incomplete OS observation to a small
+    # cooperative quantum. A forged large token grant must not override it.
+    if (evidence["auxiliary_telemetry_incomplete"]
+            or not evidence["thermal_trip_measured"]) and budget.token_budget > 128:
+        return False
+    if (not evidence["cgroup_memory_limit_measured"]
+            and not evidence["auxiliary_telemetry_incomplete"]):
+        return False
+    if (evidence["cgroup_swap_spill_allowed"]
+            and not evidence["cgroup_swap_limit_measured"]):
+        return False
+    if any(holds[k] for k in ("cgroup_high", "io", "cpu_throttle")):
+        if budget.pressure_ppm < 850_000:
+            return False
+    if holds["swap_churn"] or holds["reclaim"]:
+        if budget.pressure_ppm < 900_000:
+            return False
     return True
 
 

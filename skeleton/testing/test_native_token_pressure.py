@@ -340,3 +340,34 @@ def test_ambiguous_pressure_never_grants_parallel_native_streams(monkeypatch, ch
     assert guard.status().stopped
 
 
+
+@pytest.mark.parametrize("mutation", [
+    lambda e: e.update(auxiliary_telemetry_incomplete=False,
+                       cgroup_memory_limit_measured=False),
+    lambda e: e.update(cgroup_swap_spill_allowed=True,
+                       cgroup_swap_limit_measured=False),
+    lambda e: e["holds"].update(cgroup_high=True),
+    lambda e: e["holds"].update(swap_churn=True),
+])
+def test_inconsistent_pressure_floor_or_limit_evidence_denies(monkeypatch, mutation):
+    evidence = canonical_evidence()
+    mutation(evidence)
+    probe(monkeypatch, [budget()], evidence=evidence)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="untrusted OS pressure provenance"):
+        guard.start(P)()
+    assert guard.status().stopped
+
+
+@pytest.mark.parametrize("unknown", ["auxiliary", "thermal"])
+def test_unknown_sensor_large_quantum_cannot_authorize_native_cpu(monkeypatch, unknown):
+    evidence = canonical_evidence()
+    if unknown == "thermal":
+        evidence["auxiliary_telemetry_incomplete"] = False
+        evidence["thermal_trip_measured"] = False
+    probe(monkeypatch, [budget(tokens=256)], evidence=evidence)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with pytest.raises(NativePressureInterrupted, match="untrusted OS pressure provenance"):
+        guard.start(P)()
+    assert guard.status().stopped
+
