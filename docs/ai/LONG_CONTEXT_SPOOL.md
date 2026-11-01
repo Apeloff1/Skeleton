@@ -72,6 +72,11 @@ Windows path fallback is not qualified for the POSIX descriptor-relative
 quota; platform and filesystem quotas remain necessary. Reserve checks cannot
 replace filesystem quotas or handle concurrent writers consuming disk after
 the probe.
+POSIX publication also bounds cooperative lock contention by both monotonic
+elapsed time and an independent maximum retry count. Invalid or regressing
+monotonic clock observations fail closed; a frozen clock cannot spin forever
+or authorize an unchecked write. The lock is not a defense against hostile
+same-UID filesystem writers.
 The root and its parents must be operator-controlled; on POSIX the root must
 not be group/world writable. Symlink reads use O_NOFOLLOW where supported.
 Windows cannot claim POSIX-equivalent symlink race protection.

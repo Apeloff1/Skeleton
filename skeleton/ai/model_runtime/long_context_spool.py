@@ -418,12 +418,25 @@ class LongContextSpool:
             if identity.st_nlink != 1:
                 raise LongContextSpoolError("spool publication lock has external links")
             started = monotonic_ns()
+            if type(started) is not int or started < 0:
+                raise LongContextSpoolError("invalid spool lock clock")
+            # An unavailable/frozen clock must not turn a busy local writer
+            # into an unbounded wait. The attempt cap is independent of time.
+            attempts = 0
+            max_attempts = _PUBLISH_LOCK_WAIT_NS // 10_000_000 + 1
             while True:
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
                 except BlockingIOError as exc:
-                    if monotonic_ns() - started >= _PUBLISH_LOCK_WAIT_NS:
+                    attempts += 1
+                    now = monotonic_ns()
+                    if type(now) is not int or now < started:
+                        raise LongContextSpoolError(
+                            "spool lock monotonic clock unavailable or regressed"
+                        ) from exc
+                    if (now - started >= _PUBLISH_LOCK_WAIT_NS
+                            or attempts >= max_attempts):
                         raise LongContextSpoolError(
                             "spool publication lock contention"
                         ) from exc

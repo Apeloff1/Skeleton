@@ -133,6 +133,42 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertNotIn("token_ids", output.getvalue())
         self.assertFalse(receipt["is_admission_lease"])
 
+    @unittest.skipUnless(os.name == "posix", "POSIX flock required")
+    def test_publication_lock_rejects_regressed_or_invalid_monotonic_clock(self):
+        from unittest.mock import patch
+
+        for value in (True, -1, "not-a-clock"):
+            with self.subTest(value=value):
+                with patch("skeleton.ai.model_runtime.long_context_spool.monotonic_ns",
+                           return_value=value):
+                    with self.assertRaisesRegex(
+                        LongContextSpoolError, "invalid spool lock clock"
+                    ):
+                        self.stage()
+        with patch("skeleton.ai.model_runtime.long_context_spool.monotonic_ns",
+                   side_effect=(100, 99)):
+            with patch("fcntl.flock", side_effect=BlockingIOError()):
+                with self.assertRaisesRegex(
+                    LongContextSpoolError, "spool lock monotonic clock unavailable or regressed"
+                ):
+                    self.stage()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX flock required")
+    def test_publication_lock_has_attempt_bound_when_clock_freezes(self):
+        from unittest.mock import patch
+
+        with patch("skeleton.ai.model_runtime.long_context_spool.monotonic_ns",
+                   return_value=100):
+            with patch("skeleton.ai.model_runtime.long_context_spool.sleep") as sleeper:
+                with patch("fcntl.flock", side_effect=BlockingIOError()) as locker:
+                    with self.assertRaisesRegex(
+                        LongContextSpoolError, "spool publication lock contention"
+                    ):
+                        self.stage()
+        self.assertLessEqual(locker.call_count, 201)
+        self.assertLessEqual(sleeper.call_count, 200)
+        self.assertFalse(any(self.spool.objects.rglob("[0-9a-f]" * 64)))
+
     @unittest.skipUnless(os.name == "posix", "descriptor-relative publication requires POSIX")
     def test_actual_publication_denies_malformed_volume_telemetry(self):
         """A positive-looking product of invalid counters must never admit writes."""
