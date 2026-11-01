@@ -56,36 +56,41 @@ def probe_cpu_thermal(root: str | Path = "/sys/class/thermal") -> tuple[CPUTherm
         try:
             kind = (zone / "type").read_text(encoding="ascii").strip()
         except (OSError, UnicodeError):
-            continue
+            # Unknown zone type could conceal a CPU/SOC sensor. Do not
+            # certify the remaining zones as complete.
+            return ()
         if not kind or len(kind) > 128 or not any(
             word in kind.lower() for word in ("cpu", "soc", "package", "x86_pkg")
         ):
             continue
         temp = _temperature(zone / "temp")
         if temp is None:
-            continue
+            # A missing CPU/SOC temperature is not evidence of a cool CPU.
+            return ()
         trip: float | None = None
         try:
             candidates = sorted(islice(zone.glob("trip_point_*_temp"), 65))
         except OSError:
             candidates = []
         if len(candidates) > 64:
-            continue
+            return ()
         for candidate in candidates:
             kind_path = candidate.with_name(candidate.name.replace("_temp", "_type"))
             try:
                 trip_type = kind_path.read_text(encoding="ascii").strip().lower()
             except (OSError, UnicodeError):
-                continue
+                # A missing trip type could hide the lowest trip point.
+                return ()
             if trip_type not in {"passive", "hot", "critical"}:
                 continue
             measured = _temperature(candidate)
-            if measured is not None:
-                trip = measured if trip is None else min(trip, measured)
+            if measured is None:
+                return ()
+            trip = measured if trip is None else min(trip, measured)
         try:
             result.append(CPUThermalSensor(zone.name, kind, temp, trip))
         except ValueError:
-            continue
+            return ()
     return tuple(result)
 
 
