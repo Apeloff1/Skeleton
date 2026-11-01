@@ -742,7 +742,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "5fe6a4acaf644cac0283a83c0e3081af3b72bea2",
+      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -2364,7 +2364,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "2b846c1f529b5f34665aeab90fb0b4bb8e0bb16b",
+      "source_git_object_sha": "fcca3be28de9f6ba2a3f9eacbf4b0ce5b1f0612c",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -6235,7 +6235,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "6dfaaf3dfaf2bc21217b6e245f295ceccd23c9d2",
+      "source_git_object_sha": "6f9897545ee1be69d3cfe23aa424c29faca951f3",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
