@@ -280,3 +280,14 @@ def test_godot_project_file_inventory_is_bounded(tmp_path, monkeypatch):
     monkeypatch.setattr(project_mod, "MAX_PROJECT_SCAN_ENTRIES", 2)
     with pytest.raises(ValueError, match="entry bound"):
         project.scripts()
+
+
+def test_godot_res_paths_reject_uri_ambiguity_and_invisible_controls(tmp_path):
+    from skeleton.godot_export.project import res_to_path
+
+    bad_names = ("folder/%2e%2e/escape.gd", "file.gd?query", "file.gd#fragment",
+                 "file" + chr(10) + ".gd", "file" + chr(0x202e) + ".gd",
+                 "file" + chr(0x2066) + ".gd")
+    for bad in bad_names:
+        with pytest.raises(ValueError, match="unsafe res://"):
+            res_to_path(tmp_path, "res://" + bad)

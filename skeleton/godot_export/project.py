@@ -1,6 +1,7 @@
 """Model of a Godot 4 project directory."""
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,9 @@ def res_to_path(root: Path, res: str) -> Path:
     if (not rel or rel.startswith("/") or "\\" in rel or "\x00" in rel
             or any(part in ("", ".", "..") for part in parts)):
         raise ValueError("unsafe res:// path component")
+    if any(char in rel for char in ("%", "?", "#", ":")) or any(
+            unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} for char in rel):
+        raise ValueError("unsafe res:// URI or control character")
     target = root.joinpath(*parts)
     # Reject already-present symlink components. This is a conservative
     # reference validator, not a substitute for descriptor-bound file reads.
