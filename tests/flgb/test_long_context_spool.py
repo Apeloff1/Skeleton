@@ -296,6 +296,73 @@ class TestLongContextSpool(unittest.TestCase):
             serialize_token_sequence(self.sequence),
         )
 
+    def test_selected_source_rejects_mutation_during_bounded_read(self):
+        if os.name != "posix":
+            self.skipTest("POSIX selected-source identity fence")
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.long_context_spool import read_selected_sequence
+        source = Path(self.directory.name) / "mutating-tokens.json"
+        source.write_bytes(serialize_token_sequence(self.sequence))
+        original_read = os.read
+        changed = False
+
+        def mutate_after_read(fd, count):
+            nonlocal changed
+            result = original_read(fd, count)
+            if not changed:
+                changed = True
+                with source.open("ab") as output:
+                    output.write(b"!")
+            return result
+
+        with patch(
+            "skeleton.ai.model_runtime.long_context_spool.os.read",
+            side_effect=mutate_after_read,
+        ):
+            with self.assertRaisesRegex(LongContextSpoolError, "changed during read"):
+                read_selected_sequence(source, limit=4096)
+        self.assertTrue(changed)
+
+    def test_selected_source_rejects_name_replacement_during_read(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor-relative selected-source name fence")
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.long_context_spool import read_selected_sequence
+        source = Path(self.directory.name) / "replaceable-tokens.json"
+        canonical = serialize_token_sequence(self.sequence)
+        source.write_bytes(canonical)
+        original_read = os.read
+        replaced = False
+
+        def replace_name_after_read(fd, count):
+            nonlocal replaced
+            result = original_read(fd, count)
+            if not replaced:
+                replaced = True
+                source.rename(source.with_name("previous-tokens.json"))
+                source.write_bytes(canonical)
+            return result
+
+        with patch(
+            "skeleton.ai.model_runtime.long_context_spool.os.read",
+            side_effect=replace_name_after_read,
+        ):
+            with self.assertRaisesRegex(LongContextSpoolError, "path changed during read"):
+                read_selected_sequence(source, limit=4096)
+        self.assertTrue(replaced)
+
+    def test_selected_source_rejects_oversize_before_read(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.long_context_spool import read_selected_sequence
+        source = Path(self.directory.name) / "oversize-tokens.json"
+        source.write_bytes(b"x" * 128)
+        with patch(
+            "skeleton.ai.model_runtime.long_context_spool.os.read",
+            side_effect=AssertionError("oversize source must not be read"),
+        ):
+            with self.assertRaisesRegex(LongContextSpoolError, "byte budget"):
+                read_selected_sequence(source, limit=64)
+
     def test_cli_stage_inspect_window_advance(self):
         sequence_file = Path(self.directory.name) / "tokens.json"
         sequence_file.write_bytes(serialize_token_sequence(self.sequence))

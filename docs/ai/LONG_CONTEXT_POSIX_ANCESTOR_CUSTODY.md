@@ -8,9 +8,15 @@ an attacker-controlled directory. The final pinned root remains valid
 when a path is renamed, and no existing checkpoint is overwritten.
 
 The installed long-context CLI uses the same no-follow ancestor walk for
-selected token-sequence input. It checks a regular-file descriptor and
-enforces the serialized byte limit before parsing. On Windows, path-based
-fallback remains explicitly unqualified against same-user ancestor races;
+selected token-sequence input. It checks a regular-file descriptor,
+rejects oversized sources before reading, and compares descriptor identity,
+size, mode and modification metadata before and after bounded materialization.
+On POSIX it also rechecks the final selected filename relative to the pinned
+parent descriptor, rejecting name substitution even when replacement content
+is byte-for-byte identical. These checks are detection fences, not protection
+against a malicious same-UID writer able to modify files and metadata.
+On Windows, path-based fallback remains explicitly unqualified against
+same-user ancestor races;
 this is not a claim of a native handle-relative Windows security boundary.
 The spool still requires trusted checkpoint digest custody for rollback
 detection and does not serialize model KV tensors.

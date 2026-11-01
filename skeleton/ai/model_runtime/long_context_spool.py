@@ -141,35 +141,69 @@ def _open_directory_chain(path: Path, *, create: bool) -> int:
         raise
 
 
-def read_selected_sequence(path: Path, *, limit: int) -> bytes:
-    """Read a user-selected token file without POSIX ancestor races.
+def _selected_source_identity(info: os.stat_result) -> tuple[int, ...]:
+    """Descriptor identity plus mutation metadata; never trust path alone."""
+    return (
+        info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+        info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+    )
 
-    On Windows the legacy selected-path read remains unqualified for ancestor
-    substitution; it never grants a model execution or trusted-publisher claim.
+
+def _read_stable_selected_fd(fd: int, *, limit: int) -> tuple[bytes, os.stat_result]:
+    """Bound reads and reject source changes observed during materialization."""
+    before = os.fstat(fd)
+    if not stat.S_ISREG(before.st_mode):
+        raise LongContextSpoolError("sequence source is not regular")
+    if before.st_size < 0 or before.st_size > limit:
+        raise LongContextSpoolError("selected token sequence exceeds byte budget")
+    chunks: list[bytes] = []
+    remaining = limit + 1
+    while remaining:
+        part = os.read(fd, min(_CHUNK, remaining))
+        if not part:
+            break
+        chunks.append(part)
+        remaining -= len(part)
+    after = os.fstat(fd)
+    if _selected_source_identity(before) != _selected_source_identity(after):
+        raise LongContextSpoolError("selected sequence changed during read")
+    raw = b"".join(chunks)
+    if len(raw) > limit or len(raw) != before.st_size:
+        raise LongContextSpoolError("selected sequence size changed during read")
+    return raw, before
+
+
+def read_selected_sequence(path: Path, *, limit: int) -> bytes:
+    """Read a bounded selected token file with POSIX inode/name fencing.
+
+    A selected file replaced during reading cannot silently become the
+    source of an acknowledged checkpoint. Same-UID hostile filesystem writers
+    remain outside this local spool's authorization boundary. Windows lacks
+    the descriptor-relative final-name fence and is not security-qualified.
     """
     _positive(limit, "sequence byte limit", MAX_SERIALIZED_SEQUENCE_BYTES)
     if os.name != "posix":
         if path.is_symlink():
             raise LongContextSpoolError("symlinked sequence source rejected")
         with path.open("rb") as stream:
-            raw = stream.read(limit + 1)
-    else:
-        parent_fd = _open_directory_chain(path.parent, create=False)
+            raw, _ = _read_stable_selected_fd(stream.fileno(), limit=limit)
+        return raw
+    parent_fd = _open_directory_chain(path.parent, create=False)
+    try:
+        flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+        fd = os.open(path.name, flags, dir_fd=parent_fd)
         try:
-            flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
-            fd = os.open(path.name, flags, dir_fd=parent_fd)
-            try:
-                if not stat.S_ISREG(os.fstat(fd).st_mode):
-                    raise LongContextSpoolError("sequence source is not regular")
-                with os.fdopen(fd, "rb", closefd=False) as stream:
-                    raw = stream.read(limit + 1)
-            finally:
-                os.close(fd)
+            raw, before = _read_stable_selected_fd(fd, limit=limit)
+            # Resolve the final name only against the pinned parent directory,
+            # not against a path that can be redirected by ancestor mutation.
+            named = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+            if _selected_source_identity(named) != _selected_source_identity(before):
+                raise LongContextSpoolError("selected sequence path changed during read")
+            return raw
         finally:
-            os.close(parent_fd)
-    if len(raw) > limit:
-        raise LongContextSpoolError("selected token sequence exceeds byte budget")
-    return raw
+            os.close(fd)
+    finally:
+        os.close(parent_fd)
 
 class LongContextSpool:
     """Content-addressed offline token store with immutable progress receipts.
