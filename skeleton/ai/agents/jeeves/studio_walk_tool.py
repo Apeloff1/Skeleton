@@ -1991,3 +1991,9 @@ def execute_objective_board_tool(
 from .studio_scene_schedule_tool import (  # noqa: E402
     scene_schedule_tool_schema, execute_scene_schedule_tool,
 )
+
+
+# Static reviewed original scene asset work-order adapter (no source writes).
+from .studio_scene_asset_binding_tool import (  # noqa: E402
+    scene_asset_binding_tool_schema, execute_scene_asset_binding_tool,
+)

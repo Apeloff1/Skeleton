@@ -49,6 +49,7 @@ _TOOL_SYMBOLS = (
     ("choice_impact_tool_schema", "execute_choice_impact_tool"),
     ("objective_board_tool_schema", "execute_objective_board_tool"),
     ("scene_schedule_tool_schema", "execute_scene_schedule_tool"),
+    ("scene_asset_binding_tool_schema", "execute_scene_asset_binding_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
