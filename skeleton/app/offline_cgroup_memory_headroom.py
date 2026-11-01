@@ -36,7 +36,11 @@ class CgroupMemoryHeadroom:
         if type(self.used_bytes) is not int or not 0 <= self.used_bytes <= _MAX_COUNTER:
             raise ValueError("invalid cgroup memory usage")
         if self.limit_bytes is None:
-            if self.headroom_bytes is not None or self.pressure_ppm != 0 or self.hard_hold:
+            if (self.headroom_bytes is not None
+                    or type(self.pressure_ppm) is not int
+                    or self.pressure_ppm != 0
+                    or type(self.hard_hold) is not bool
+                    or self.hard_hold):
                 raise ValueError("unlimited cgroup cannot claim bounded headroom")
             return
         if (type(self.limit_bytes) is not int
@@ -89,6 +93,25 @@ def _read_value(dir_fd: int, name: str, *, allow_max: bool) -> int | None:
         os.close(fd)
 
 
+def _open_cgroup_directory(root: str) -> int:
+    """Walk every absolute path component with O_NOFOLLOW, never resolve()."""
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    current = os.open("/", flags)
+    try:
+        for part in root.split("/"):
+            if not part:
+                continue
+            following = os.open(part, flags, dir_fd=current)
+            os.close(current)
+            current = following
+        if not stat.S_ISDIR(os.fstat(current).st_mode):
+            raise CgroupMemoryUnavailable("cgroup directory inode not a directory")
+        return current
+    except BaseException:
+        os.close(current)
+        raise
+
+
 def probe_cgroup_memory_headroom(
     root: str = "/sys/fs/cgroup",
 ) -> CgroupMemoryHeadroom | None:
@@ -105,9 +128,8 @@ def probe_cgroup_memory_headroom(
         raise ValueError("absolute cgroup root required")
     if any(part in (".", "..") for part in root.split("/")):
         raise ValueError("cgroup parent traversal forbidden")
-    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     try:
-        directory = os.open(root, flags)
+        directory = _open_cgroup_directory(root)
     except FileNotFoundError:
         return None
     except OSError as exc:

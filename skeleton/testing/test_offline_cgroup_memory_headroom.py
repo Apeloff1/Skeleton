@@ -142,3 +142,21 @@ def test_invalid_capacity_telemetry_stops_sampler(monkeypatch):
 def test_non_linux_is_unknown_even_if_root_is_supplied(monkeypatch, tmp_path):
     monkeypatch.setattr(module.sys, "platform", "darwin")
     assert module.probe_cgroup_memory_headroom(str(tmp_path)) is None
+
+
+def test_ancestor_symlink_and_parent_traversal_are_rejected(tmp_path):
+    actual = tmp_path / "actual"
+    root = fixture(actual)
+    alias = tmp_path / "alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    with pytest.raises(module.CgroupMemoryUnavailable):
+        module.probe_cgroup_memory_headroom(str(alias))
+    with pytest.raises(ValueError, match="parent traversal"):
+        module.probe_cgroup_memory_headroom(root + "/../actual")
+
+
+def test_invalid_unlimited_observation_is_not_an_authority():
+    with pytest.raises(ValueError):
+        module.CgroupMemoryHeadroom(None, 0, 1, 0, False)
+    with pytest.raises(ValueError):
+        module.CgroupMemoryHeadroom(1024, 100, 900, 0, True)
