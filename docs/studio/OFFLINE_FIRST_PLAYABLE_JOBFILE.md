@@ -159,3 +159,24 @@ cannot substitute an identical-byte source root between games and obtain a
 stable-source preflight receipt. This is a point-in-time read-only custody
 check; it does not reserve outputs, lock source directories, qualify hardware,
 or grant release, signing, or rights approval.
+
+
+## Opt-in original-source provenance during read-only inspection
+
+An independently pinned delivery summary proves installed-source/archive/save
+replay, but it does **not** prove that the original authoring workspace still
+exists. To require that additional custody property, supply
+`--verify-original-sources` together with `--mode inspect` and the already
+required independent job-file, per-game output and summary digests. The
+canonical inspector replays every original source, checks each against the
+installed project's world and identity, and rechecks source-root inode custody
+after replay. Missing, replaced or modified original sources fail closed.
+
+The option is deliberately rejected for publication, resume, triage and
+preflight, and does not create or repair files. Without the option, a fully
+pinned archived delivery remains inspectable even if its original authoring
+workspace has been intentionally retired. Neither mode certifies rights,
+native devices, signed packages, persistent rollback protection or release.
+
+Focused acceptance (must be executed before promotion):
+`python -m pytest -q skeleton/testing/test_app_offline_first_playable_jobfile.py skeleton/testing/test_app_offline_first_playable_batch.py`.

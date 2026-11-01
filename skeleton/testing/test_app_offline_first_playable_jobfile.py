@@ -75,7 +75,14 @@ def test_cli_pinned_jobfile_publish_and_replay_inspect(original_games, tmp_path,
     inspected = json.loads(capsys.readouterr().out)
     assert inspected["all_live_games_reexecuted"] is True
     assert inspected["read_only"] is True
+    assert inspected["original_sources_reverified"] is False
     assert inspected["release_certified"] is False
+    assert run_app_cli(inspect_args + ["--verify-original-sources"]) == 0
+    source_bound = json.loads(capsys.readouterr().out)
+    assert source_bound["original_sources_reverified"] is True
+    assert source_bound["all_live_games_reexecuted"] is True
+    assert source_bound["input_manifest_unchanged"] is True
+    assert source_bound["release_certified"] is False
 
 
 def test_triage_from_private_file_does_not_create_outputs(original_games, tmp_path):
@@ -265,4 +272,59 @@ def test_preflight_rejects_same_byte_original_source_root_replacement(
         )
     assert calls == 2
     assert not (tmp_path / "cohort.json").exists()
+    assert all(not Path(job.archive).exists() for job in jobs)
+
+
+def test_inspection_with_original_source_replay_rejects_missing_authoring_tree(
+    original_games, tmp_path, capsys,
+):
+    """Archived installed games stay inspectable, but cannot claim source custody."""
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+    published = execute_pinned_jobfile(
+        manifest, expected_jobs_sha256=pin, summary=summary,
+        mode="publish", authorized=True,
+    )
+    inspected_file, inspected_pin = _file(
+        tmp_path, pinned(jobs, published), "inspect-pinned-jobs.json",
+    )
+    first_source = Path(jobs[0].source)
+    first_source.rename(tmp_path / "archived-original-source")
+    archived = execute_pinned_jobfile(
+        inspected_file, expected_jobs_sha256=inspected_pin,
+        summary=summary, mode="inspect",
+        expected_summary_sha256=published["independent_summary_sha256"],
+        authorized=True,
+    )
+    assert archived["all_live_games_reexecuted"] is True
+    assert archived["original_sources_reverified"] is False
+    with pytest.raises((OSError, ValueError)):
+        execute_pinned_jobfile(
+            inspected_file, expected_jobs_sha256=inspected_pin,
+            summary=summary, mode="inspect",
+            expected_summary_sha256=published["independent_summary_sha256"],
+            verify_original_sources=True, authorized=True,
+        )
+    assert summary.exists()
+    assert Path(jobs[0].install).exists()
+
+
+def test_original_source_replay_option_rejected_for_mutating_modes(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+    with pytest.raises(FirstPlayableJobFileError, match="inspection-only"):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin, summary=summary,
+            mode="publish", verify_original_sources=True, authorized=True,
+        )
+    with pytest.raises(FirstPlayableJobFileError, match="inspection-only"):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin, summary=summary,
+            mode="preflight", verify_original_sources=1, authorized=True,
+        )
+    assert not summary.exists()
     assert all(not Path(job.archive).exists() for job in jobs)

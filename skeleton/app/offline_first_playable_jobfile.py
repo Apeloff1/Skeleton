@@ -255,10 +255,20 @@ def execute_pinned_jobfile(
     filename: str | Path, *, expected_jobs_sha256: str,
     summary: str | Path, mode: str,
     expected_summary_sha256: str | None = None, authorized: bool,
+    verify_original_sources: bool = False,
 ) -> dict[str, object]:
-    """Run the canonical delivery/triage path, then revalidate input custody."""
+    """Run the canonical delivery/triage path, then revalidate input custody.
+
+    Source replay during inspection is explicit: archived games remain
+    inspectable when their original authoring directory no longer exists.
+    The stronger source-provenance check cannot authorize publication.
+    """
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
+    if type(verify_original_sources) is not bool or (verify_original_sources and mode != "inspect"):
+        raise FirstPlayableJobFileError(
+            "original-source replay is an inspection-only boolean option"
+        )
     if mode == "inspect":
         _pin(expected_summary_sha256)
     elif mode == "triage" and expected_summary_sha256 is not None:
@@ -282,7 +292,7 @@ def execute_pinned_jobfile(
     elif mode == "inspect":
         result = inspect_first_playable_delivery_batch(
             jobs, summary, expected_summary_sha256=expected_summary_sha256,
-            authorized=True,
+            authorized=True, verify_original_sources=verify_original_sources,
         )
     elif mode == "triage":
         result = triage_first_playable_delivery_batch(
@@ -320,6 +330,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--mode", required=True,
                         choices=("preflight", "publish", "resume", "inspect", "triage"))
     parser.add_argument("--expected-summary-sha256")
+    parser.add_argument(
+        "--verify-original-sources", action="store_true",
+        help="during read-only inspect, reexecute and bind every original source",
+    )
     parser.add_argument("--trusted-local-operator", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -328,6 +342,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary=args.summary, mode=args.mode,
             expected_summary_sha256=args.expected_summary_sha256,
             authorized=args.trusted_local_operator,
+            verify_original_sources=args.verify_original_sources,
         )
     except (PermissionError, OSError, ValueError, TypeError, KeyError) as exc:
         print(json.dumps({
