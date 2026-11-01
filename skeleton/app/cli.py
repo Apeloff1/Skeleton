@@ -139,6 +139,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify installed game, archive and save custody (delivery-assurance --help)",
     )
     sub.add_parser(
+        "recover-policy-signed-install", add_help=False,
+        help="recover quarantined original game from policy-authorized signed source",
+    )
+    sub.add_parser(
         "policy-signed-delivery-assurance", add_help=False,
         help="verify pinned policy, source signature, installed game and private replay",
     )
@@ -310,6 +314,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "recover-policy-signed-install":
+        from skeleton.app.offline_policy_signed_install_recovery import main as policy_recover_main
+        return policy_recover_main(arguments[1:])
     if arguments and arguments[0] == "policy-signed-delivery-assurance":
         from skeleton.app.offline_policy_signed_delivery import main as policy_delivery_main
         return policy_delivery_main(arguments[1:])
