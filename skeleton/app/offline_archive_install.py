@@ -20,7 +20,7 @@ from skeleton.ai.game_builder.dual_runtime_verify import (
     _assert_original_root, _parts, _root_fd, verify_exported_package,
 )
 from skeleton.app.offline_delivery_archive import (
-    OfflineGameArchiveError, _read_private_archive, inspect_offline_game_archive,
+    _read_private_archive, inspect_offline_game_archive,
 )
 
 SCHEMA = "skeleton.app.offline_source_install.v1"

@@ -118,7 +118,6 @@ def _publish_private_archive(data: bytes, destination: str | Path) -> None:
     target, fd = _parent(destination)
     temporary = ".offline-archive-" + secrets.token_hex(16)
     identity: tuple[int, int] | None = None
-    linked = False
     try:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         if hasattr(os, "O_CLOEXEC"):
@@ -139,7 +138,6 @@ def _publish_private_archive(data: bytes, destination: str | Path) -> None:
         _assert_original_root(target.parent, fd)
         os.link(temporary, target.name, src_dir_fd=fd, dst_dir_fd=fd,
                 follow_symlinks=False)
-        linked = True
         final = os.stat(target.name, dir_fd=fd, follow_symlinks=False)
         if (not stat.S_ISREG(final.st_mode) or final.st_nlink != 2
                 or (final.st_dev, final.st_ino) != identity
