@@ -199,7 +199,8 @@ def _write_all(fd: int, data: bytes) -> None:
 
 
 def publish_scene_schedule(receipt: Mapping[str, Any], directory: Path, *,
-                           authorized: bool) -> dict[str, object]:
+                           authorized: bool, documents: Mapping[str, Any],
+                           actions: list[list[str]]) -> dict[str, object]:
     """Atomically publish a new private schedule; never replace an old one.
 
     A complete fsynced temporary file is hard-linked into its final name only
@@ -215,6 +216,14 @@ def publish_scene_schedule(receipt: Mapping[str, Any], directory: Path, *,
                       if key != "schedule_digest"}
     if _digest(without_digest) != digest:
         raise StudioQuestError("forged scene schedule receipt")
+    # A caller can recompute a SHA-256 of arbitrary claims. Re-run the actual
+    # canonical source and quest owners before accepting publication authority.
+    verified = compile_scene_schedule(
+        documents, actions, receipt.get("schedule_request"), authorized=True,
+        expected_source_digest=receipt.get("source_digest"),
+        expected_session_digest=receipt.get("session_digest"))
+    if receipt != verified:
+        raise StudioQuestError("schedule publication lacks canonical replay proof")
     raw = _canonical(receipt) + b"\n"
     if len(raw) > MAX_RECEIPT_BYTES:
         raise StudioQuestError("schedule publication exceeds byte budget")
@@ -234,9 +243,11 @@ def publish_scene_schedule(receipt: Mapping[str, Any], directory: Path, *,
                 follow_symlinks=False)
         os.fsync(fd)
     finally:
-        if created:
-            os.unlink(temporary, dir_fd=fd)
-        os.close(fd)
+        try:
+            if created:
+                os.unlink(temporary, dir_fd=fd)
+        finally:
+            os.close(fd)
     return {"path": str(Path(directory) / FILENAME), "schedule_digest": digest,
             "bytes": len(raw), "file_write_performed": True,
             "native_genre_runtime_verified": False, "release_certified": False}

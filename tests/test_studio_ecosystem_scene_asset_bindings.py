@@ -96,7 +96,8 @@ def test_private_publication_restore_and_tamper(tmp_path):
     receipt = compile_scene_asset_bindings(
         docs, [], assignments, authorized=True,
         expected_source_digest=source, expected_visual_digest=visual)
-    published = publish_scene_asset_bindings(receipt, tmp_path, authorized=True)
+    published = publish_scene_asset_bindings(receipt, tmp_path, authorized=True,
+                                            documents=docs, actions=[])
     assert published["file_write_performed"] is True
     path = tmp_path / "scene_asset_bindings.json"
     assert path.is_file() and path.stat().st_mode & 0o077 == 0
@@ -143,3 +144,19 @@ def test_jeeves_router_and_cli_exact_parity(capsys):
         main(["--project", PROJECT, "--expected-source", source,
               "--expected-visual", visual,
               "--assignments", '{"origin":{},"origin":{}}'])
+
+def test_rehashed_forged_asset_receipt_cannot_be_published(tmp_path):
+    docs, source, visual, _, assignments = fixture()
+    receipt = compile_scene_asset_bindings(
+        docs, [], assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual)
+    forged = dict(receipt)
+    forged["binding_count"] += 1
+    forged["asset_binding_digest"] = sha256(json.dumps(
+        {k: v for k, v in forged.items() if k != "asset_binding_digest"},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False).encode("ascii")).hexdigest()
+    with pytest.raises(StudioQuestError):
+        publish_scene_asset_bindings(forged, tmp_path, authorized=True,
+                                     documents=docs, actions=[])
+    assert not (tmp_path / "scene_asset_bindings.json").exists()

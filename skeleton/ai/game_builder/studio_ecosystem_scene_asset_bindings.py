@@ -205,7 +205,8 @@ def compile_scene_asset_bindings(
 
 
 def publish_scene_asset_bindings(receipt: dict[str, Any], directory: Path, *,
-                                 authorized: bool) -> dict[str, object]:
+                                 authorized: bool, documents: Mapping[str, Any],
+                                 actions: list[list[str]]) -> dict[str, object]:
     if authorized is not True:
         raise PermissionError("scene asset publication requires operator authorization")
     if type(receipt) is not dict or receipt.get("schema") != SCHEMA:
@@ -213,6 +214,13 @@ def publish_scene_asset_bindings(receipt: dict[str, Any], directory: Path, *,
     digest = _lease(receipt.get("asset_binding_digest"), "asset binding")
     if _digest({k: v for k, v in receipt.items() if k != "asset_binding_digest"}) != digest:
         raise StudioQuestError("forged original asset binding receipt")
+    verified = compile_scene_asset_bindings(
+        documents, actions, receipt.get("assignments"), authorized=True,
+        expected_source_digest=receipt.get("source_digest"),
+        expected_visual_digest=receipt.get("visual_digest"),
+        expected_session_digest=receipt.get("session_digest"))
+    if receipt != verified:
+        raise StudioQuestError("asset publication lacks canonical replay proof")
     raw = _canonical(receipt) + b"\n"
     if len(raw) > MAX_BYTES:
         raise StudioQuestError("scene asset publication exceeds byte budget")

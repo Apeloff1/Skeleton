@@ -93,7 +93,9 @@ def test_exclusive_private_bundle_publication_and_replay(tmp_path):
                   expected_session_digest=session.digest)
     manifest, bundle = compile_director_handoff(
         docs, [], schedule, assignments, **kwargs)
-    publication = publish_director_handoff(manifest, bundle, tmp_path, authorized=True)
+    publication = publish_director_handoff(manifest, bundle, tmp_path, authorized=True,
+                                         documents=docs, actions=[],
+                                         schedule=schedule, assignments=assignments)
     assert publication["file_write_performed"] is True
     path = tmp_path / "studio_director_handoff.zip"
     assert path.is_file() and path.stat().st_mode & 0o077 == 0
@@ -130,3 +132,16 @@ def test_jeeves_router_cli_and_static_authority(capsys):
         execute_director_handoff_tool({**request, "forged": True}, authorized=True)
     with pytest.raises(PermissionError):
         execute_director_handoff_tool(request, authorized=False)
+
+def test_rehashed_forged_director_bundle_cannot_be_published(tmp_path):
+    docs, source, visual, _, schedule, assignments = fixture()
+    manifest, bundle = compile_director_handoff(
+        docs, [], schedule, assignments, authorized=True,
+        expected_source_digest=source, expected_visual_digest=visual)
+    forged = dict(manifest)
+    forged["native_asset_binding_verified"] = True
+    with pytest.raises(StudioQuestError):
+        publish_director_handoff(forged, bundle, tmp_path, authorized=True,
+                                 documents=docs, actions=[],
+                                 schedule=schedule, assignments=assignments)
+    assert not (tmp_path / "studio_director_handoff.zip").exists()

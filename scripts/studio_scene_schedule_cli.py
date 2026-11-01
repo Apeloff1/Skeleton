@@ -64,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
                 expected_session_digest=args.expected_session)
             if args.publish_directory:
                 publication = publish_scene_schedule(
-                    result, args.publish_directory, authorized=True)
+                    result, args.publish_directory, authorized=True,
+                    documents=docs, actions=actions)
                 result = {"schedule": result, "publication": publication}
     except (StudioQuestError, PermissionError, ValueError, TypeError, OSError,
             UnicodeError, RecursionError) as exc:

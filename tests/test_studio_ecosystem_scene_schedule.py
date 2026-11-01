@@ -91,7 +91,8 @@ def test_private_exclusive_publish_and_verified_restore(tmp_path):
     docs, source, session, schedule = fixture()
     receipt = compile_scene_schedule(
         docs, [], schedule, authorized=True, expected_source_digest=source)
-    published = publish_scene_schedule(receipt, tmp_path, authorized=True)
+    published = publish_scene_schedule(receipt, tmp_path, authorized=True,
+                                      documents=docs, actions=[])
     assert published["file_write_performed"] is True
     path = tmp_path / "scene_schedule.json"
     assert path.is_file()
@@ -119,8 +120,10 @@ def test_tampering_and_symlink_destination_fail_closed(tmp_path):
     except (OSError, NotImplementedError):
         pytest.skip("symlinks not supported by this platform")
     with pytest.raises(OSError):
-        publish_scene_schedule(receipt, linked, authorized=True)
-    published = publish_scene_schedule(receipt, other, authorized=True)
+        publish_scene_schedule(receipt, linked, authorized=True,
+                               documents=docs, actions=[])
+    published = publish_scene_schedule(receipt, other, authorized=True,
+                                       documents=docs, actions=[])
     path = Path(published["path"])
     altered = dict(receipt)
     altered["critical_path_ticks"] += 1
@@ -155,3 +158,19 @@ def test_jeeves_router_and_operator_cli_parity(capsys):
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--expected-source", source,
               "--schedule", '{"scene_ticks":{},"scene_ticks":{}}'])
+
+def test_rehashed_forged_schedule_cannot_be_published(tmp_path):
+    from hashlib import sha256
+    docs, source, _, schedule = fixture()
+    receipt = compile_scene_schedule(
+        docs, [], schedule, authorized=True, expected_source_digest=source)
+    forged = dict(receipt)
+    forged["critical_path_ticks"] += 1
+    forged["schedule_digest"] = sha256(json.dumps(
+        {k: v for k, v in forged.items() if k != "schedule_digest"},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False).encode("ascii")).hexdigest()
+    with pytest.raises(StudioQuestError):
+        publish_scene_schedule(forged, tmp_path, authorized=True,
+                               documents=docs, actions=[])
+    assert not (tmp_path / "scene_schedule.json").exists()

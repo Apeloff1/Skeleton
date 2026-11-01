@@ -43,7 +43,9 @@ def main(argv: list[str] | None = None) -> int:
                 docs, actions, schedule, assignments, **kwargs)
             if args.publish_directory:
                 published = publish_director_handoff(
-                    manifest, bundle, args.publish_directory, authorized=True)
+                    manifest, bundle, args.publish_directory, authorized=True,
+                    documents=docs, actions=actions,
+                    schedule=schedule, assignments=assignments)
                 manifest = {"manifest": manifest, "publication": published}
     except (StudioQuestError, PermissionError, ValueError, TypeError,
             OSError, UnicodeError, RecursionError) as exc:

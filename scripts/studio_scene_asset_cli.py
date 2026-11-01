@@ -49,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
                 expected_session_digest=args.expected_session)
             if args.publish_directory:
                 published = publish_scene_asset_bindings(
-                    result, args.publish_directory, authorized=True)
+                    result, args.publish_directory, authorized=True,
+                    documents=docs, actions=actions)
                 result = {"binding": result, "publication": published}
         if args.compile_preview:
             preview = compile_preview(args.project, authorized=True)

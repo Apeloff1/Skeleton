@@ -117,7 +117,9 @@ def compile_director_handoff(
 
 
 def publish_director_handoff(manifest: Mapping[str, Any], bundle: bytes,
-                             directory: Path, *, authorized: bool) -> dict[str, object]:
+                             directory: Path, *, authorized: bool,
+                             documents: Mapping[str, Any], actions: list[list[str]],
+                             schedule: object, assignments: object) -> dict[str, object]:
     if authorized is not True:
         raise PermissionError("director publication requires operator authorization")
     if (type(manifest) is not dict or manifest.get("schema") != SCHEMA
@@ -126,6 +128,13 @@ def publish_director_handoff(manifest: Mapping[str, Any], bundle: bytes,
             or sha256(bundle).hexdigest() != manifest.get("bundle_sha256")
             or len(bundle) != manifest.get("bundle_bytes")):
         raise StudioQuestError("invalid director handoff publication")
+    rebuilt_manifest, rebuilt_bundle = compile_director_handoff(
+        documents, actions, schedule, assignments, authorized=True,
+        expected_source_digest=manifest.get("source_digest"),
+        expected_visual_digest=manifest.get("visual_digest"),
+        expected_session_digest=manifest.get("session_digest"))
+    if manifest != rebuilt_manifest or bundle != rebuilt_bundle:
+        raise StudioQuestError("director publication lacks canonical playable proof")
     directory_fd = _open_directory(directory)
     temporary = ".studio-director-" + secrets.token_hex(16) + ".tmp"
     created = False
