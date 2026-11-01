@@ -73,6 +73,20 @@ def test_broken_png(data):
         import_bytes("t.png", data)
 
 
+def test_png_chunk_crc_bounds_and_terminal_iend():
+    good = png()
+    corrupt = bytearray(good)
+    corrupt[30] ^= 1
+    with pytest.raises(AssetImportError, match="CRC"):
+        import_bytes("t.png", bytes(corrupt))
+    with pytest.raises(AssetImportError, match="IEND"):
+        import_bytes("t.png", good + b"trailing")
+    # A forged IEND marker inside an ancillary payload is not a terminal chunk.
+    forged = good[:-12] + b"\x00\x00\x00\x04tEXtIEND" + struct.pack(">I", zlib.crc32(b"tEXtIEND"))
+    with pytest.raises(AssetImportError):
+        import_bytes("t.png", forged)
+
+
 def test_obj_metadata_and_bad_index():
     m = import_bytes("m.obj", OBJ).metadata
     assert (m["vertices"], m["faces"], m["triangles"]) == (4, 1, 2)

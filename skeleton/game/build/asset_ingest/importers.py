@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import struct
+import zlib
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Callable
@@ -64,17 +65,51 @@ def _texture_dims(w: int, h: int, what: str) -> None:
 
 def _png(data: bytes) -> dict[str, Any]:
     _need(data, 33, "png")
-    if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise AssetImportError("bad png signature")
-    w, h, depth, ctype = struct.unpack(">IIBB", data[16:26])
-    _texture_dims(w, h, "png")
-    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(ctype)
-    if channels is None or depth not in (1, 2, 4, 8, 16):
-        raise AssetImportError("bad png color type or bit depth")
-    if b"IEND" not in data[-12:]:
-        raise AssetImportError("truncated png (no IEND)")
-    return {"width": w, "height": h, "bit_depth": depth, "channels": channels,
-            "has_alpha": ctype in (4, 6) or b"tRNS" in data, "power_of_two": _pot(w) and _pot(h)}
+    pos, chunks, has_idat, transparency = 8, 0, False, False
+    w = h = depth = ctype = 0
+    while pos < len(data):
+        if len(data) - pos < 12:
+            raise AssetImportError("truncated png chunk header")
+        length = struct.unpack_from(">I", data, pos)[0]
+        if length > len(data) - pos - 12:
+            raise AssetImportError("truncated png chunk data")
+        kind = data[pos + 4:pos + 8]
+        end = pos + 12 + length
+        payload = data[pos + 8:end - 4]
+        stored_crc = struct.unpack_from(">I", data, end - 4)[0]
+        if zlib.crc32(kind + payload) & 0xFFFFFFFF != stored_crc:
+            raise AssetImportError("png chunk CRC mismatch")
+        chunks += 1
+        if chunks > 4096:
+            raise AssetImportError("png chunk count exceeds bound")
+        if chunks == 1:
+            if kind != b"IHDR" or length != 13:
+                raise AssetImportError("png first chunk must be IHDR")
+            w, h, depth, ctype, compression, filtering, interlace = struct.unpack(">IIBBBBB", payload)
+            _texture_dims(w, h, "png")
+            valid_depths = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8),
+                            4: (8, 16), 6: (8, 16)}
+            if depth not in valid_depths.get(ctype, ()) or compression != 0 or filtering != 0 or interlace not in (0, 1):
+                raise AssetImportError("bad png color type or bit depth")
+        elif kind == b"IHDR":
+            raise AssetImportError("duplicate png IHDR")
+        elif kind == b"IDAT":
+            has_idat = True
+        elif kind == b"tRNS":
+            transparency = True
+        elif kind == b"IEND":
+            if length != 0 or end != len(data) or not has_idat:
+                raise AssetImportError("invalid png IEND or missing image data")
+            channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
+            return {"width": w, "height": h, "bit_depth": depth, "channels": channels,
+                    "has_alpha": ctype in (4, 6) or transparency,
+                    "power_of_two": _pot(w) and _pot(h)}
+        elif kind and kind[0] & 0x20 == 0 and kind not in (b"PLTE",):
+            raise AssetImportError("unsupported critical png chunk")
+        pos = end
+    raise AssetImportError("truncated png (no IEND)")
 
 
 def _jpeg(data: bytes) -> dict[str, Any]:
