@@ -421,4 +421,4 @@ def test_nonce_store_rejects_nonfinite_and_unbounded_replay_evidence():
         assert st.check_and_record(bad, "nonce", NOW, 60) is False
     assert len(st) == 0
     with pytest.raises(ValueError, match="bounded"):
-        max_entries_from_env({MAX_ENTRIES_ENV: "1000001"})
+        max_entries_from_env({"SKELETON_SEAL_NONCE_STORE_MAX": "1000001"})
