@@ -266,7 +266,7 @@ def test_manifest_rejects_nul_and_windows_separator_paths():
     from dataclasses import replace
     original = import_bytes("hero.png", png())
     m = AssetManifest()
-    for bad in ("folder\\\\hero.png", "folder\\x00hero.png", "../hero.png"):
+    for bad in ("folder" + chr(92) + "hero.png", "folder" + chr(0) + "hero.png", "../hero.png"):
         with pytest.raises(AssetImportError, match="invalid manifest asset path"):
             m.add(replace(original, path=bad))
     assert m.to_dict()["paths"] == 0
