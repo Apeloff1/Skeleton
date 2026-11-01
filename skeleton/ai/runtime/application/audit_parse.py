@@ -105,24 +105,76 @@ def parse_genesis_tree() -> ast.AST | None:
 
 
 def genesis_boot_phase_order(tree: ast.AST | None = None) -> list[str]:
+    """Read direct calls or the statically proven BOOT_PHASES dispatch loop.
+
+    The current Genesis boot uses a bounded named phase catalogue rather than
+    direct calls. Do not treat an unrelated constant as executed boot evidence:
+    require the loop, the dynamic phase binding and all method owners.
+    """
     parsed = tree if tree is not None else parse_genesis_tree()
-    if parsed is None:
+    if not isinstance(parsed, ast.Module):
         return []
-    for node in parsed.body if isinstance(parsed, ast.Module) else []:
+    for node in parsed.body:
         if not isinstance(node, ast.ClassDef) or node.name != "Genesis":
             continue
-        for item in node.body:
-            if not isinstance(item, ast.FunctionDef) or item.name != "boot":
+        methods = {
+            item.name: item for item in node.body
+            if isinstance(item, ast.FunctionDef)
+        }
+        boot = methods.get("boot")
+        if boot is None:
+            return []
+        direct: list[str] = []
+        for stmt in boot.body:
+            call = stmt.value if isinstance(stmt, ast.Expr) else None
+            if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
                 continue
-            phases: list[str] = []
-            for stmt in item.body:
-                call = stmt.value if isinstance(stmt, ast.Expr) else None
-                if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
-                    continue
-                attr = call.func.attr
-                if attr.startswith("_phase_") and len(attr) > 7:
-                    phases.append(attr[7:])
-            return phases
+            attr = call.func.attr
+            if attr.startswith("_phase_") and len(attr) > 7:
+                direct.append(attr[7:])
+        if direct:
+            return direct
+        steps = methods.get("_boot_steps")
+        catalog = assigned_str_tuple(parsed, "BOOT_PHASES")
+        if steps is None or not catalog or len(set(catalog)) != len(catalog):
+            return []
+        if any(f"_phase_{phase}" not in methods for phase in catalog):
+            return []
+        dispatch = [
+            stmt for stmt in boot.body
+            if isinstance(stmt, ast.For)
+            and isinstance(stmt.iter, ast.Call)
+            and isinstance(stmt.iter.func, ast.Attribute)
+            and isinstance(stmt.iter.func.value, ast.Name)
+            and stmt.iter.func.value.id == "self"
+            and stmt.iter.func.attr == "_boot_steps"
+        ]
+        if len(dispatch) != 1 or not any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "step"
+            for child in ast.walk(dispatch[0])
+        ):
+            return []
+        binds_phases = any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "getattr"
+            and len(child.args) >= 2
+            and isinstance(child.args[1], ast.JoinedStr)
+            and any(
+                isinstance(part, ast.Constant) and part.value == "_phase_"
+                for part in child.args[1].values
+            )
+            for child in ast.walk(steps)
+        )
+        iterates_catalog = any(
+            isinstance(child, ast.comprehension)
+            and isinstance(child.iter, ast.Name)
+            and child.iter.id == "BOOT_PHASES"
+            for child in ast.walk(steps)
+        )
+        return catalog if binds_phases and iterates_catalog else []
     return []
 
 
