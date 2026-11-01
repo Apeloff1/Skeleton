@@ -372,3 +372,19 @@ def test_failed_publication_with_stable_input_preserves_original_failure(
         )
     assert sha256(manifest.read_bytes()).hexdigest() == pin
     assert not summary.exists()
+
+
+def test_deeply_nested_untrusted_jobfile_fails_as_typed_rejection(
+    original_games, tmp_path,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, _ = _file(tmp_path, jobs)
+    # Well below the byte budget but beyond the JSON parser recursion budget.
+    manifest.write_bytes(b"[" * 1500 + b"0" + b"]" * 1500)
+    pin = sha256(manifest.read_bytes()).hexdigest()
+    with pytest.raises(FirstPlayableJobFileError, match="invalid strict UTF-8"):
+        read_pinned_jobs(
+            manifest, expected_sha256=pin, summary=tmp_path / "cohort.json",
+            mode="publish", authorized=True,
+        )
+    assert all(not Path(job.archive).exists() for job in jobs)

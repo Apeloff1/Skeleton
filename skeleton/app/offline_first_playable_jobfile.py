@@ -97,7 +97,9 @@ def _parse_jobs(raw: bytes) -> tuple[DeliveryJob, ...]:
             raw.decode("utf-8", "strict"),
             object_pairs_hook=_unique_pairs, parse_constant=_no_constant,
         )
-    except (UnicodeError, ValueError, TypeError) as exc:
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        # Deeply nested, otherwise small JSON must fail as a typed input
+        # rejection rather than escaping the CLI's fail-closed error boundary.
         raise FirstPlayableJobFileError("invalid strict UTF-8 job-file JSON") from exc
     if (type(payload) is not dict
             or set(payload) != {"schema", "jobs"}
