@@ -301,3 +301,51 @@ def test_anchor_bootstrap_cannot_reset_existing_migration_history():
         journal.bootstrap_anchor()
     assert journal._quarantined
     assert storage.calls == 0
+
+
+def test_concurrent_anchor_advance_invalidates_read_only_inventory():
+    connection = sqlite3.connect(":memory:")
+    anchor = SimulatedMigrationCAS()
+    service, journal, storage = setup(connection=connection)
+    journal._anchor = anchor
+    journal.bootstrap_anchor()
+    reads = 0
+
+    def racing_read():
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            anchor.value = (1, "f" * 64)
+        return anchor.value
+
+    anchor.read = racing_read
+    with pytest.raises(KVMigrationOutcomeUnknown, match="anchor unverifiable"):
+        journal.verified_inventory()
+    assert reads == 2
+    assert journal._quarantined
+    assert storage.calls == 0
+
+
+def test_concurrent_anchor_advance_invalidates_committed_receipt_read():
+    connection = sqlite3.connect(":memory:")
+    anchor = SimulatedMigrationCAS()
+    service, journal, storage = setup(connection=connection)
+    journal._anchor = anchor
+    journal.bootstrap_anchor()
+    plan, _ = service.plan_live()
+    service.apply_once(plan)
+    reads = 0
+
+    def racing_read():
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            anchor.value = (anchor.value[0] + 1, "f" * 64)
+        return anchor.value
+
+    anchor.read = racing_read
+    with pytest.raises(KVMigrationOutcomeUnknown, match="anchor unverifiable"):
+        journal.recover_committed(plan)
+    assert reads == 2
+    assert journal._quarantined
+    assert storage.calls == 1

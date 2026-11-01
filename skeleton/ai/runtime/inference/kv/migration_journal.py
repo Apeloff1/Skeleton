@@ -249,7 +249,7 @@ class KVMigrationJournal:
         """
         with self._lock:
             try:
-                self._anchor_snapshot()
+                anchor_before = self._anchor_snapshot()
                 rows = self._connection.execute(
                     "SELECT plan_digest, session_id, inventory_digest,"
                     " plan_payload, plan_mac, state, receipt_payload, receipt_mac"
@@ -351,6 +351,14 @@ class KVMigrationJournal:
                         committed += 1
                     else:
                         raise ValueError("invalid historical migration state")
+                # Read-only status is not an exclusive transaction across
+                # the external CAS and SQLite. A concurrent writer advancing
+                # the anchor during the scan must invalidate this snapshot.
+                if anchor_before != self._anchor_snapshot():
+                    self._quarantined = True
+                    raise KVMigrationOutcomeUnknown(
+                        "migration anchor changed during inventory read"
+                    )
                 return {
                     "schema": "skeleton.ai.kv-migration-inventory.v1",
                     "rows": len(rows), "running": running,
@@ -447,7 +455,7 @@ class KVMigrationJournal:
         """Read only an authenticated receipt; NEVER replay physical movement."""
         expected_plan = _encode(_plan_body(plan, self.session_id))
         with self._lock:
-            self._anchor_snapshot()
+            anchor_before = self._anchor_snapshot()
             row = self._connection.execute(
                 "SELECT session_id, inventory_digest, plan_payload,"
                 " plan_mac, state, receipt_payload, receipt_mac FROM "
@@ -505,6 +513,11 @@ class KVMigrationJournal:
                 )
                 if _receipt_body(plan, canonical) != receipt:
                     raise ValueError("committed migration accounting mismatch")
+                if anchor_before != self._anchor_snapshot():
+                    self._quarantined = True
+                    raise KVMigrationOutcomeUnknown(
+                        "migration anchor changed during receipt read"
+                    )
                 return receipt
             except (TypeError, ValueError, KeyError) as exc:
                 raise KVMigrationOutcomeUnknown(
