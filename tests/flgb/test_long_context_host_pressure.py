@@ -1,12 +1,16 @@
 """Fail-closed host PSI observation: fixtures are never hardware attestation."""
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+from io import StringIO
+import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+from skeleton.ai.model_runtime.long_context_cli import main as long_context_main
 from skeleton.ai.model_runtime.long_context_host_pressure import (
     _avg10, _read_psi, _secure_directory, observe_host_pressure,
 )
@@ -30,6 +34,22 @@ class TestLongContextHostPressure(unittest.TestCase):
 
     def observe(self):
         return observe_host_pressure(self.root)
+
+    def test_head_observe_does_not_open_spool_or_publish_state(self):
+        out = StringIO()
+        with patch("skeleton.ai.model_runtime.long_context_cli.LongContextSpool",
+                   side_effect=AssertionError("spool must remain unopened")):
+            with redirect_stdout(out):
+                code = long_context_main([
+                    "--root", str(self.root / "unused"),
+                    "--tokenizer-digest", "a" * 64, "head-observe",
+                ])
+        self.assertEqual(code, 0)
+        result = json.loads(out.getvalue())
+        self.assertFalse(result["is_admission_grant"])
+        self.assertFalse(result["device_qualified"])
+        self.assertEqual(result["signals"]["thermal"], "unknown")
+        self.assertFalse((self.root / "unused").exists())
 
     def test_normal_cpu_and_memory_never_authorize(self):
         result = self.observe()

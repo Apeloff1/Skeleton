@@ -24,3 +24,7 @@ paths. `pressure_signals_attested`, `device_qualified`, and
 
 Focused tests: `python -m unittest tests.flgb.test_long_context_host_pressure`.
 Exact-head CI and security gates are still required before promotion.
+
+The `head-observe` command is side-effect-free and does not open or create a
+spool root. Unsupported host telemetry is reported as unknown; no fallback
+is promoted into an execution grant.

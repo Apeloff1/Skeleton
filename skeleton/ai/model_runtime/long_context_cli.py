@@ -85,14 +85,19 @@ def main(argv: list[str] | None = None) -> int:
     plan.add_argument("--quantum-tokens", type=int, default=256)
     plan.add_argument("--max-checkpoints", type=int, default=4096)
     args = parser.parse_args(argv)
+    # Host observation never needs to open, create, or authorize a spool.
+    # This keeps unsupported platforms conservatively observable rather
+    # than mistaking POSIX spool unavailability for normal pressure.
+    if args.command == "head-observe":
+        print(json.dumps(observe_host_pressure(), sort_keys=True,
+                         separators=(",", ":")))
+        return 0
     spool = None
     try:
         spool = LongContextSpool(args.root)
         if args.command.startswith("head-"):
             heads = LongContextProgressHead(spool)
-            if args.command == "head-observe":
-                result = observe_host_pressure()
-            elif args.command == "head-plan":
+            if args.command == "head-plan":
                 demands = []
                 for value in args.candidate:
                     parts = value.split(":")
