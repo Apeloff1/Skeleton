@@ -102,3 +102,28 @@ def test_plugin_result_is_detached_from_mutable_plugin_owned_state():
     assert returned == {"items": [1]}
     assert returned is not plugin.value
     assert returned["items"] is not plugin.value["items"]
+
+
+def test_host_rejects_malformed_scope_policy_before_registration():
+    for bad in (["fs_read"], frozenset({"*"}), frozenset({"a" * 97}),
+                frozenset(f"scope{i}" for i in range(129))):
+        with pytest.raises(m.ContractError, match="scope policy"):
+            m.Host(bad)
+
+
+def test_conformance_validates_all_cases_before_any_plugin_dispatch():
+    class CountingPlugin:
+        calls = 0
+
+        def export(self, payload):
+            self.calls += 1
+            return payload
+
+    plugin = CountingPlugin()
+    host = m.Host(frozenset())
+    host.register(m.Manifest("safe", "exporter", (1, 0), ()), plugin)
+    with pytest.raises(m.ContractError, match="unknown conformance plugin"):
+        m.conformance(host, "missing", [])
+    with pytest.raises(m.ContractError, match="invalid plugin conformance case"):
+        m.conformance(host, "safe", [({}, lambda output: True), ({}, None)])
+    assert plugin.calls == 0

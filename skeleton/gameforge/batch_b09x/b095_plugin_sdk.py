@@ -89,6 +89,11 @@ class Manifest:
 
 class Host:
     def __init__(self, allowed_scopes: frozenset[str]) -> None:
+        require(type(allowed_scopes) is frozenset and len(allowed_scopes) <= 128
+                and all(type(scope) is str
+                        and bool(re.fullmatch(r"[A-Za-z0-9_.:-]{1,96}", scope))
+                        for scope in allowed_scopes),
+                "host scope policy exceeds bound")
         self.allowed = allowed_scopes
         self.plugins: dict[str, tuple[Manifest, Any]] = {}
 
@@ -122,6 +127,12 @@ def conformance(
 ) -> dict[str, Any]:
     require(type(cases) is list and len(cases) <= 128,
             "plugin conformance cases exceed bound")
+    require(type(name) is str and name in host.plugins,
+            "unknown conformance plugin")
+    require(all(type(case) is tuple and len(case) == 2
+                and type(case[0]) is dict and callable(case[1])
+                for case in cases),
+            "invalid plugin conformance case")
     m, _ = host.plugins[name]
     method = KINDS[m.kind][0]
     results = []
