@@ -177,8 +177,12 @@ def publish_offline_game_archive(
         raise PermissionError("trusted local operator acknowledgement required")
     if type(expected_manifest_sha256) is not str or not _HEX.fullmatch(expected_manifest_sha256):
         raise OfflineGameArchiveError("independent source manifest pin required")
-    target = Path(destination).expanduser().absolute()
-    source_path = Path(source).expanduser().absolute()
+    # Collapse lexical '..' before source/output overlap validation. Path.absolute()
+    # preserves these components, and descriptor-relative nofollow alone does
+    # not prevent a writable archive name inside the original source tree.
+    # Do not resolve symlinks: the owner-controlled descriptor openers reject them.
+    target = Path(os.path.abspath(os.fspath(Path(destination).expanduser())))
+    source_path = Path(os.path.abspath(os.fspath(Path(source).expanduser())))
     if os.path.commonpath((str(source_path), str(target))) == str(source_path):
         raise OfflineGameArchiveError("archive cannot be placed inside game source")
     # Validate destination ownership and collision before reading source.

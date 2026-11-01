@@ -317,3 +317,24 @@ def test_archive_inspection_rejects_fifo_without_blocking(tmp_path, capsys):
     os.mkfifo(fifo, 0o600)
     assert run_app_cli(_inspect(fifo, "a" * 64, "b" * 64)) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_archive_dotdot_alias_into_original_source_is_rejected(
+    tmp_path, capsys,
+):
+    """Archive publisher must not write through an existing sibling/.. alias."""
+    from skeleton.app.offline_delivery_archive import (
+        OfflineGameArchiveError, publish_offline_game_archive,
+    )
+
+    root, manifest = _build(tmp_path, capsys)
+    sibling = tmp_path / "existing-archive-sibling"
+    sibling.mkdir()
+    disguised = sibling / ".." / root.name / "untrusted.zip"
+    with pytest.raises(OfflineGameArchiveError, match="inside game source"):
+        publish_offline_game_archive(
+            root, disguised, expected_manifest_sha256=manifest,
+            authorized=True,
+        )
+    assert not (root / "untrusted.zip").exists()
+    assert not list(root.glob("*.zip"))

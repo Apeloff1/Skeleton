@@ -96,3 +96,10 @@ its nofollow descriptor-relative existence check, **including missing names**.
 A replaced parent must yield `unsafe_custody_quarantine`, not a false
 `missing_unpublished` state that could be mistaken for resume eligibility.
 The diagnostic still does not reserve names, repair outputs, or certify release.
+
+The canonical standalone ZIP publisher now applies the same lexical path
+normalization before its source/archive containment check. Without it,
+`existing-sibling/../original-source/unsafe.zip` could bypass the source
+containment guard even though each opened component was not a symlink.
+Source and destination still require descriptor-anchored ownership checks;
+no archive or game source is rewritten on rejection.
