@@ -63,6 +63,20 @@ class QuestSaveTests(unittest.TestCase):
         with self.assertRaisesRegex(QuestProgressSaveError, "another project"):
             restore_quest_progress(plane, "s", self.w, verified_state=self.state)
 
+    def test_restore_rejects_forged_objective_progress(self):
+        plane = GameSavePlane()
+        forged = dict(self.section, quests={"q1": {
+            "quest_id": "q1", "status": "completed",
+            "objectives_progress": {"0": {"current": 0, "target": 3, "completed": True}},
+        }})
+        save_quest_progress(plane, "forged", 1, forged)
+        with self.assertRaisesRegex(QuestProgressSaveError, "objective progress counters"):
+            restore_quest_progress(plane, "forged", self.w, verified_state=self.state)
+        forged["quests"]["q1"]["objectives_progress"]["0"]["completed"] = False
+        with self.assertRaisesRegex(QuestProgressSaveError, "status disagrees"):
+            save_quest_progress(plane, "forged2", 1, forged)
+            restore_quest_progress(plane, "forged2", self.w, verified_state=self.state)
+
     def test_rejects_mismatched_state_world_or_receipt(self):
         plane = GameSavePlane()
         save_quest_progress(plane, "s", 1, self.section)

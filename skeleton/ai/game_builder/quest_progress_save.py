@@ -53,9 +53,28 @@ def save_quest_progress(plane: GameSavePlane, slot: str, sequence: int,
 
 
 def _progress(raw: Mapping[str, Any]) -> QuestProgressState:
-    objectives = {k: ObjectiveProgress(int(v["current"]), int(v["target"]), bool(v["completed"]))
-                  for k, v in raw["objectives_progress"].items()}
-    return QuestProgressState(str(raw["quest_id"]), str(raw["status"]), objectives)
+    if not isinstance(raw, Mapping) or set(raw) != {"quest_id", "status", "objectives_progress"}:
+        raise QuestProgressSaveError("invalid quest progress shape")
+    quest_id, status = raw["quest_id"], raw["status"]
+    if type(quest_id) is not str or not quest_id or status not in ("active", "completed", "failed"):
+        raise QuestProgressSaveError("invalid quest progress identity or status")
+    progress = raw["objectives_progress"]
+    if not isinstance(progress, Mapping) or len(progress) > 1024:
+        raise QuestProgressSaveError("invalid objective progress collection")
+    objectives: dict[str, ObjectiveProgress] = {}
+    for key, value in progress.items():
+        if type(key) is not str or not key.isdecimal() or not isinstance(value, Mapping):
+            raise QuestProgressSaveError("invalid objective progress key")
+        if set(value) != {"current", "target", "completed"}:
+            raise QuestProgressSaveError("invalid objective progress shape")
+        current, target, completed = value["current"], value["target"], value["completed"]
+        if (type(current) is not int or type(target) is not int or type(completed) is not bool
+                or target < 1 or current < 0 or current > target or completed != (current == target)):
+            raise QuestProgressSaveError("invalid objective progress counters")
+        objectives[key] = ObjectiveProgress(current, target, completed)
+    if status != "failed" and (status == "completed") != all(p.completed for p in objectives.values()):
+        raise QuestProgressSaveError("quest status disagrees with objective completion")
+    return QuestProgressState(quest_id, status, objectives)
 
 
 def restore_quest_progress(plane: GameSavePlane, slot: str, world: DirectorWorld, *,
@@ -92,7 +111,13 @@ def restore_quest_progress(plane: GameSavePlane, slot: str, world: DirectorWorld
     if (campaign_receipt_sha256 is not None
             and section.get("campaign_receipt_sha256") != campaign_receipt_sha256):
         raise QuestProgressSaveError("quest progress does not match the campaign save receipt")
-    return {qid: _progress(raw) for qid, raw in section["quests"].items()}
+    quests = section.get("quests")
+    if not isinstance(quests, Mapping) or len(quests) > 4096:
+        raise QuestProgressSaveError("invalid quest progress collection")
+    restored = {qid: _progress(raw) for qid, raw in quests.items()}
+    if any(type(qid) is not str or qid != state.quest_id for qid, state in restored.items()):
+        raise QuestProgressSaveError("quest progress key does not match quest identity")
+    return restored
 
 
 __all__ = ["SCHEMA", "SECTION", "QuestProgressSaveError", "quest_section",
