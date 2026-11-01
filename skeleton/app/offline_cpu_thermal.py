@@ -21,7 +21,14 @@ class CPUThermalSensor:
     trip_c: float | None
 
     def __post_init__(self) -> None:
-        if not self.zone or not self.kind or len(self.zone) > 128 or len(self.kind) > 128:
+        # Thermal sensor identity is used to fence CPU authorization.
+        # Reject injected non-string or control-text identities.
+        if any(
+            type(value) is not str or not 1 <= len(value) <= 128
+            or value != value.strip()
+            or any(ord(ch) < 32 or ord(ch) > 126 for ch in value)
+            for value in (self.zone, self.kind)
+        ):
             raise ValueError("invalid thermal sensor identity")
         for value in (self.temperature_c, self.trip_c):
             if value is not None and (
@@ -47,6 +54,11 @@ def _read_sysfs_ascii(path: Path, max_bytes: int) -> str:
 def _temperature(path: Path) -> float | None:
     try:
         raw = _read_sysfs_ascii(path, 64)
+        # int() accepts underscores and leading plus signs; these are not
+        # canonical kernel millidegree evidence for an admission decision.
+        digits = raw[1:] if raw.startswith("-") else raw
+        if not digits or any(ch < "0" or ch > "9" for ch in digits):
+            return None
         milli = int(raw)
         value = milli / 1000
         return value if -50 <= value <= 200 else None

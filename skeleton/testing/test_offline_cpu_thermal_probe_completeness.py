@@ -56,6 +56,30 @@ def test_corrupt_cpu_telemetry_invalidates_whole_sample(tmp_path, corrupt):
     assert probe_cpu_thermal(tmp_path) == ()
 
 
+@pytest.mark.parametrize("value", [
+    "5_0000", "+50000", "50 000", "50000\\x00", "0xC350", "50000.0",
+])
+@pytest.mark.parametrize("attribute", ["temp", "trip_point_0_temp"])
+def test_noncanonical_millidegree_evidence_holds_all_cpu_zones(tmp_path, value, attribute):
+    zone(tmp_path, "thermal_zone0", kind="cpu")
+    second = zone(tmp_path, "thermal_zone1", kind="soc")
+    (second / attribute).write_text(value, encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("identity", [
+    None, 1, (), "", " cpu", "cpu ", "cpu\\n", "cpu\\x00", "cpú",
+])
+@pytest.mark.parametrize("field", ["zone", "kind"])
+def test_typed_sensor_identity_rejects_untrusted_control_text(identity, field):
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+
+    values = {"zone": "thermal_zone0", "kind": "cpu"}
+    values[field] = identity
+    with pytest.raises(ValueError, match="invalid thermal sensor identity"):
+        CPUThermalSensor(values["zone"], values["kind"], 50.0, 90.0)
+
+
 def test_irrelevant_sensor_does_not_certify_missing_cpu_trip(tmp_path):
     zone(tmp_path, "thermal_zone0", kind="gpu", temp="40000")
     second = zone(tmp_path, "thermal_zone1", kind="cpu")

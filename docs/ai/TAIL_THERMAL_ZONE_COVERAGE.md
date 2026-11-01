@@ -34,3 +34,14 @@ Unexpected thermal-zone filename suffixes and unknown trip categories likewise
 fail closed. Active cooling trips are included as measured thresholds rather
 than ignored. The default Linux sysfs root is a trusted OS input; this is not
 a general-purpose secure opener for attacker-controlled directory trees.
+
+## Canonical identity and millidegree evidence
+
+A CPU/SOC zone identity must be a bounded printable ASCII string with no
+leading/trailing whitespace or control characters; typed sensor construction
+rejects non-string identities. Kernel temperature and trip values accept only
+optional-minus decimal millidegrees (no underscores, plus signs, embedded
+spaces, hexadecimal, NULs or floating-point spellings). Invalid readings
+invalidate the entire CPU/SOC sample and keep inference on HOLD. Fake-sysfs
+and injected-identity regressions exercise the fail-closed boundary. This
+remains a simulated contract, not a hardware or device certification.
