@@ -55,12 +55,13 @@ def build_runtime(db_path: str, *, clock: Clock | None = None, transport: Transp
                   url_policy: UrlPolicy | None = None, cursor_key: bytes | None = None,
                   key_provider: "KeyProvider | None | object" = _FROM_ENV) -> CoreRuntime:
     """Default requires an environment KEK; explicit ``None`` is dev-only plaintext."""
-    db = open_database(db_path)
-    clock = clock or SystemClock()
-    policy = url_policy or PublicHttpsPolicy()
+    # Validate key custody before opening or creating any durable SQLite state.
     provider = provider_from_env() if key_provider is _FROM_ENV else key_provider
     if provider is None and key_provider is _FROM_ENV:
         raise KeyProviderError(f"{KEYS_ENV} is required for backend core webhook secret custody")
+    db = open_database(db_path)
+    clock = clock or SystemClock()
+    policy = url_policy or PublicHttpsPolicy()
     blob_store = SqliteSecretRepository(db)
     if provider is None:
         log.warning("backend core v1: explicit development plaintext secret repository selected")

@@ -169,6 +169,7 @@ def test_build_runtime_reads_keyring_from_env(tmp_path, monkeypatch):
     # Default composition must never silently persist signing secrets in cleartext.
     with pytest.raises(KeyProviderError, match="required"):
         build_runtime(str(tmp_path / "no-key.db"), url_policy=AllowAllPolicy(), cursor_key=b"k" * 32)
+    assert not (tmp_path / "no-key.db").exists()  # no side effects on missing custody
     # Explicit test-only plaintext mode remains available for migration fixtures.
     dev = build_runtime(str(tmp_path / "dev.db"), url_policy=AllowAllPolicy(),
                         cursor_key=b"k" * 32, key_provider=None)
