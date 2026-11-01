@@ -195,12 +195,12 @@ def _joypad_wake():
         _verify(core.stopped and core.divider == divider, "STOP oscillator advanced despite missing joypad input")
         core.write(0xFF00, 0x10)
         core.set_buttons(("a",))
-        _verify(not core.stopped and core.memory[0xFF0F] & 0x10, "physical joypad failed to raise IF and wake CPU")
+        _verify(not core.stopped and bool(core.memory[0xFF0F] & 0x10), "physical joypad failed to raise IF and wake CPU")
         return before + 4
 
     def check(core, cycles):
         _verify(cycles == 8 and core.pc == 0x102 and not core.stopped
-                and core.memory[0xFF0F] & 0x10, "STOP joypad wake evidence differs")
+                and bool(core.memory[0xFF0F] & 0x10), "STOP joypad wake evidence differs")
 
     return _replay("stop_frozen_until_joypad_edge", m, op, check)
 
