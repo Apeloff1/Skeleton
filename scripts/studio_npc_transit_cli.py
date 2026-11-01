@@ -9,7 +9,7 @@ from scripts.studio_scene_schedule_cli import _strict
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_npc_transit import (
-    PROMPT, compile_npc_transit, propose_npc_transit, replay_npc_transit,
+    PROMPT, compile_npc_transit, propose_npc_transit,
     publish_npc_transit, restore_npc_transit, compile_transit_playable,
 )
 

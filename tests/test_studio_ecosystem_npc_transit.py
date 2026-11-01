@@ -55,10 +55,16 @@ def test_explicit_graph_determinism_and_handoff():
     schedule = compile_scene_schedule(
         docs, [], temporal["authoring"]["schedule_request"], authorized=True,
         expected_source_digest=source)
-    sites = sorted({row["site"] for row in schedule["timeline"]})
+    last = {}
+    required = set()
+    for row in schedule["timeline"]:
+        prior = last.get(row["npc_id"])
+        if prior is not None and prior != row["site"]:
+            required.add((prior, row["site"]))
+        last[row["npc_id"]] = row["site"]
     graph = {"edges": [
         {"from_site": left, "to_site": right, "ticks": 0}
-        for left in sites for right in sites if left != right
+        for left, right in sorted(required)
     ]}
     report = compile_npc_transit(
         docs, temporal, graph, authorized=True)
@@ -130,7 +136,7 @@ def test_private_nooverwrite_restore_and_symlink_fence(tmp_path):
 
 def test_jeeves_router_and_cli_prompt(capsys):
     from scripts.studio_npc_transit_cli import main
-    docs, source, temporal = fixture()
+    _, source, temporal = fixture()
     request = {
         "schema": REQUEST_SCHEMA, "project_id": PROJECT,
         "expected_source_digest": source,
