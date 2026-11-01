@@ -52,6 +52,7 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    combat-contract  Play, checkpoint and export earned offline combat missions
     combat      Run and replay deterministic offline turn combat encounters
     tournament-author  Edit and preview replay-verifiable tournament brackets
     combat-league-author  Transactionally edit and preview offline league
@@ -773,6 +774,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat":
         from skeleton.game.gameplay.turn_combat import cli as combat_cli
         return combat_cli(rest)
+    if cmd == "combat-contract":
+        from skeleton.game.gameplay.combat_contract import cli as contract_cli
+        return contract_cli(rest)
     if cmd == "arena-terrain":
         from skeleton.game.gameplay.arena_terrain import cli as terrain_cli
         return terrain_cli(rest)
