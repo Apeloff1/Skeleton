@@ -152,7 +152,10 @@ class EdgeAuthenticator:
                 p = self.resolve(scope)
             except EdgeError:
                 p = None
-            return p or Principal("anonymous", header(scope, "x-tenant-id") or "public", "anonymous")
+            # Caller-supplied tenant headers are never authentication authority.
+            # Public traffic remains in a single anonymous tenant unless the
+            # request carries a separately verified principal.
+            return p or Principal("anonymous", "public", "anonymous")
         p = self.resolve(scope)
         if p is None:
             raise EdgeError(401, "EDGE.AUTH.REQUIRED", "authentication required",
