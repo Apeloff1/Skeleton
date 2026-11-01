@@ -59,7 +59,8 @@ Commands:
     combat-career-advice  Compare bounded replayed training choices
     combat-career-author  Transactionally edit and preview coaching careers
     combat-career  Play, train, save and replay a multi-season coaching career
-    combat-campaign-variants  Compare replay-proven authored campaign alternatives\n    combat-campaign-captions  Replay-verified accessible combat narration
+    combat-campaign-variants  Compare replay-proven authored campaign alternatives\n    combat-campaign-play  Player-controlled hero campaign with offline saves
+    combat-campaign-captions  Replay-verified accessible combat narration
     combat-campaign-package  Export, verify and resume portable offline campaigns
     combat-campaign-author  Edit and replay source-bound offline combat campaigns
     combat-tournament  Play and replay a source-bound four-entrant bracket
@@ -827,6 +828,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-campaign-variants":
         from skeleton.game.gameplay.combat_campaign_variants import cli as variants_cli
         return variants_cli(rest)
+    if cmd == "combat-campaign-play":
+        from skeleton.game.gameplay.combat_campaign_interactive import cli as campaign_play_cli
+        return campaign_play_cli(rest)
     if cmd == "combat-campaign-captions":
         from skeleton.game.gameplay.combat_campaign_captions import cli as captions_cli
         return captions_cli(rest)
