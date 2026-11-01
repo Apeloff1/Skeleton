@@ -29,3 +29,17 @@ def test_secret_diagnostics_reject_unbounded_artifacts_and_audit_logs(monkeypatc
     assert ledger.use(c, "read", 1)
     with pytest.raises(m.ContractError, match="audit log"):
         ledger.use(c, "read", 2)
+
+
+def test_secret_evidence_rejects_control_and_bidi_diagnostic_labels():
+    for bad in ("log\\nforged", "log\\x1b[31m", "log\\u202efake"):
+        with pytest.raises(m.ContractError, match="artifact path"):
+            m.evaluate({bad: "safe"}, [])
+        with pytest.raises(m.ContractError, match="credential name"):
+            m.Credential(bad, ("read",), 0, 60)
+        with pytest.raises(m.ContractError, match="credential scopes"):
+            m.Credential("valid", (bad,), 0, 60)
+        ledger = m.CredentialLedger()
+        with pytest.raises(m.ContractError, match="audit scope"):
+            ledger.use(m.Credential("valid", ("read",), 0, 60), bad, 1)
+        assert not ledger.events
