@@ -33,6 +33,7 @@ from skeleton.ai.agents.jeeves import studio_npc_dialogue_contact_tool as npc_di
 from skeleton.ai.agents.jeeves import studio_npc_dialogue_choice_commit_tool as npc_dialogue_choice
 from skeleton.ai.agents.jeeves import studio_npc_dialogue_chain_tool as npc_dialogue_chain
 from skeleton.ai.agents.jeeves import studio_quest_ending_witness_tool as ending_witness
+from skeleton.ai.agents.jeeves import studio_prompt_quest_plan_tool as prompt_quest
 from skeleton.ai.agents.jeeves import studio_quest_hint_tool as hints
 from skeleton.ai.agents.jeeves import studio_original_asset_briefs_tool as asset_briefs
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
@@ -80,6 +81,7 @@ _TOOL_SYMBOLS = (
     ("npc_dialogue_choice_commit_tool_schema", "execute_npc_dialogue_choice_commit_tool"),
     ("npc_dialogue_chain_tool_schema", "execute_npc_dialogue_chain_tool"),
     ("quest_ending_witness_tool_schema", "execute_quest_ending_witness_tool"),
+    ("prompt_quest_plan_tool_schema", "execute_prompt_quest_plan_tool"),
     ("quest_hint_tool_schema", "execute_quest_hint_tool"),
     ("original_asset_briefs_tool_schema", "execute_original_asset_briefs_tool"),
     ("npc_author_tool_schema", "execute_npc_author_tool"),
@@ -112,6 +114,7 @@ _AUTHORING_SYMBOLS = frozenset({
     "dialogue_commit_tool_schema",
     "npc_dialogue_choice_commit_tool_schema",
     "npc_dialogue_chain_tool_schema",
+    "prompt_quest_plan_tool_schema",
     "dialogue_fork_tool_schema",
     "npc_author_tool_schema",
     "choice_author_tool_schema",
@@ -158,6 +161,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    npc_dialogue_choice if descriptor_name == "npc_dialogue_choice_commit_tool_schema" else
                    npc_dialogue_chain if descriptor_name == "npc_dialogue_chain_tool_schema" else
                    ending_witness if descriptor_name == "quest_ending_witness_tool_schema" else
+                   prompt_quest if descriptor_name == "prompt_quest_plan_tool_schema" else
                    hints if descriptor_name == "quest_hint_tool_schema" else
                    asset_briefs if descriptor_name == "original_asset_briefs_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
