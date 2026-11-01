@@ -246,3 +246,22 @@ diverges at the first absent action. This only verifies offline source-level
 gameplay, not AI inference, native Godot execution, device qualification,
 rights certification, or release readiness. Saving a new replay now verifies
 the original source again before publishing any new private save.
+
+### Deterministic offline source delivery archive
+
+After the exported source passes canonical gameplay verification, publish a
+private reproducible browser/Godot source ZIP with `studio-journey
+--package-existing --output GAME_DIR --expected-manifest-sha256 MANIFEST_PIN
+--archive DELIVERY.zip --trusted-local-operator`. The archive contains only
+independently verified source files and `release.json`, in deterministic
+uncompressed ZIP format. Publication uses an owner-private, descriptor-safe,
+no-clobber destination; no existing operator file is overwritten. Preserve the
+returned archive SHA-256 outside the archive.
+
+Read-only inspection uses `studio-journey --inspect-archive --archive
+DELIVERY.zip --expected-archive-sha256 ARCHIVE_PIN
+--expected-manifest-sha256 MANIFEST_PIN --trusted-local-operator`. Inspection
+requires both pins, rejects ambiguous ZIPs, unsafe entries and mismatched
+content, and never extracts or executes archive members. Inspection does not
+reexecute source gameplay. A ZIP is **not** a signed installer, verified native
+Godot build, device qualification, rights clearance or release certification.

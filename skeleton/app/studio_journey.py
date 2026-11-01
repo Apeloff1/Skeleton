@@ -46,6 +46,10 @@ from skeleton.app.private_game_save import (
 from skeleton.app.offline_save_comparison import (
     OfflineSaveComparisonError, compare_verified_offline_saves,
 )
+from skeleton.app.offline_delivery_archive import (
+    OfflineGameArchiveError, publish_offline_game_archive,
+    inspect_offline_game_archive,
+)
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, PlayableWorldError
 from skeleton.ai.game_builder.mirror_room_runtime import MirrorRoomError
 from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
@@ -444,6 +448,13 @@ def _parser() -> argparse.ArgumentParser:
                         help="run bounded player moves on independently verified offline game source")
     parser.add_argument("--compare-saves", action="store_true",
                         help="read-only compare two independently pinned private replay histories")
+    parser.add_argument("--package-existing", action="store_true",
+                        help="publish a deterministic verified browser/Godot source ZIP")
+    parser.add_argument("--inspect-archive", action="store_true",
+                        help="read-only integrity inspection of a separately pinned source ZIP")
+    parser.add_argument("--archive", help="new or existing owner-private ZIP destination")
+    parser.add_argument("--expected-archive-sha256",
+                        help="independent archive digest required for inspection")
     parser.add_argument("--left-save", help="first owner-private offline replay save")
     parser.add_argument("--left-sha256", help="independent SHA-256 of first save")
     parser.add_argument("--right-save", help="second owner-private offline replay save")
@@ -489,7 +500,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         comparison_values = (
             args.left_save, args.left_sha256, args.right_save, args.right_sha256,
         )
-        if args.compare_saves:
+        if args.package_existing or args.inspect_archive:
+            if (args.package_existing == args.inspect_archive
+                    or args.archive is None or args.expected_manifest_sha256 is None
+                    or args.onboard or args.play_existing or args.compare_saves
+                    or args.verify_existing or args.reconcile_receipt or args.inspect_receipt
+                    or args.intent is not None or args.receipt is not None
+                    or args.expected_receipt_sha256 is not None
+                    or any(value is not None for value in onboarding_values)
+                    or any(value is not None for value in comparison_values)
+                    or args.moves is not None or args.load_save is not None
+                    or args.expected_save_sha256 is not None or args.save is not None
+                    or args.fork_at is not None or args.mirror_attempts != 64
+                    or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid offline archive mode")
+            if args.package_existing:
+                if args.output is None or args.expected_archive_sha256 is not None:
+                    raise FirstPlayableJourneyError("package requires source and no archive pin")
+                receipt = publish_offline_game_archive(
+                    args.output, args.archive,
+                    expected_manifest_sha256=args.expected_manifest_sha256,
+                    authorized=args.trusted_local_operator,
+                )
+            else:
+                if args.output is not None or args.expected_archive_sha256 is None:
+                    raise FirstPlayableJourneyError("inspection requires archive and both pins")
+                receipt = inspect_offline_game_archive(
+                    args.archive, expected_archive_sha256=args.expected_archive_sha256,
+                    expected_manifest_sha256=args.expected_manifest_sha256,
+                    authorized=args.trusted_local_operator,
+                )
+        elif args.archive is not None or args.expected_archive_sha256 is not None:
+            raise FirstPlayableJourneyError("archive options require explicit archive mode")
+        elif args.compare_saves:
             if (args.play_existing or args.reconcile_receipt or args.inspect_receipt
                     or args.verify_existing or args.onboard or args.intent is not None
                     or args.output is None or args.expected_manifest_sha256 is None
@@ -614,7 +657,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
     except (
         FirstPlayableJourneyError, PrivateGameSaveError, OfflineSaveComparisonError,
-        StudioError, PlayableWorldError,
+        OfflineGameArchiveError, StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
         ReceiptPublicationError, ReceiptInspectionError,
