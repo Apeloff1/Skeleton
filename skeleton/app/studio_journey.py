@@ -56,6 +56,9 @@ from skeleton.app.offline_archive_install import (
 from skeleton.app.offline_progress_migration import (
     OfflineProgressMigrationError, migrate_offline_game_progress,
 )
+from skeleton.app.offline_progress_recovery import (
+    OfflineProgressReconciliationError, reconcile_migrated_offline_progress,
+)
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, PlayableWorldError
 from skeleton.ai.game_builder.mirror_room_runtime import MirrorRoomError
 from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
@@ -460,6 +463,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="install an independently pinned source ZIP into a new private game directory")
     parser.add_argument("--migrate-progress", action="store_true",
                         help="install pinned source ZIP and reexecute a separately pinned private replay")
+    parser.add_argument("--reconcile-migration", action="store_true",
+                        help="read-only reconciliation of independently pinned installed source and replay")
     parser.add_argument("--inspect-archive", action="store_true",
                         help="read-only integrity inspection of a separately pinned source ZIP")
     parser.add_argument("--archive", help="new or existing owner-private ZIP destination")
@@ -510,7 +515,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         comparison_values = (
             args.left_save, args.left_sha256, args.right_save, args.right_sha256,
         )
-        if args.migrate_progress:
+        if args.reconcile_migration:
+            if (args.migrate_progress or args.install_archive or args.package_existing
+                    or args.inspect_archive or args.play_existing or args.compare_saves
+                    or args.verify_existing or args.reconcile_receipt
+                    or args.inspect_receipt or args.onboard or args.output is None
+                    or args.load_save is None or args.expected_save_sha256 is None
+                    or args.expected_manifest_sha256 is None
+                    or (args.archive is None) != (args.expected_archive_sha256 is None)
+                    or args.intent is not None or args.receipt is not None
+                    or args.expected_receipt_sha256 is not None
+                    or any(value is not None for value in onboarding_values)
+                    or any(value is not None for value in comparison_values)
+                    or args.moves is not None or args.save is not None
+                    or args.fork_at is not None or args.mirror_attempts != 64
+                    or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid offline progress reconciliation mode")
+            receipt = reconcile_migrated_offline_progress(
+                args.output, args.load_save,
+                expected_manifest_sha256=args.expected_manifest_sha256,
+                expected_save_sha256=args.expected_save_sha256,
+                archive=args.archive,
+                expected_archive_sha256=args.expected_archive_sha256,
+                authorized=args.trusted_local_operator,
+            )
+        elif args.migrate_progress:
             if (args.install_archive or args.package_existing or args.inspect_archive
                     or args.play_existing or args.compare_saves or args.verify_existing
                     or args.reconcile_receipt or args.inspect_receipt or args.onboard
@@ -714,7 +743,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (
         FirstPlayableJourneyError, PrivateGameSaveError, OfflineSaveComparisonError,
         OfflineGameArchiveError, OfflineSourceInstallError,
-        OfflineProgressMigrationError,
+        OfflineProgressMigrationError, OfflineProgressReconciliationError,
         StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
