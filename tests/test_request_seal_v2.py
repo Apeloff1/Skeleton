@@ -230,3 +230,12 @@ def test_middleware_legacy_allow_flag(gated, monkeypatch):
     monkeypatch.setenv("GF_SEAL_LEGACY", "allow")
     legacy = {"x-gf-seal": hs.mint_seal("svc", 60, secret=SECRET)}
     assert gated.get("/api/v1/presence", headers=legacy).status_code == 200
+
+
+def test_seal_verifier_rejects_unbounded_headers_and_invalid_clocks():
+    for header in ("v2." + "a" * 2000, "svc." + "9" * 5000 + "." + "0" * 64):
+        with pytest.raises(AuthError):
+            _v(header, domain="projects", replay_cache=hs.InMemoryReplayCache())
+    for clock in (float("nan"), float("inf"), True, "now"):
+        with pytest.raises(AuthError):
+            _v(_mint(), now=clock, domain="projects", replay_cache=hs.InMemoryReplayCache())

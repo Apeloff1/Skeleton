@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import os
 import re
 import secrets
@@ -351,6 +352,10 @@ def verify_seal(
     legacy seals are subject to ``GF_SEAL_LEGACY`` (``legacy=`` overrides).
     Default ``False`` keeps the pre-v2 helper semantics for direct callers.
     """
+    if type(raw_header) is not str or not 1 <= len(raw_header) <= 1024:
+        raise AuthError(_OPAQUE)
+    if now is not None and (type(now) not in (int, float) or not math.isfinite(now)):
+        raise AuthError(_OPAQUE)
     ring = load_keyring(secret=secret, keyring=keyring)
     # #16 path: secret-only callers still work when keyring env empty.
     if not ring:
@@ -382,7 +387,8 @@ def verify_seal(
         if len(parts) != 3:
             return None
         attester, expiry_s, sig = parts
-        if not attester or not expiry_s or not sig:
+        if (not attester or not expiry_s or not sig or len(expiry_s) > 12
+                or not expiry_s.isascii() or not expiry_s.isdecimal()):
             return None
         try:
             expiry = int(expiry_s)
@@ -408,7 +414,8 @@ def verify_seal(
         if len(parts) != 4:
             return None
         principal, attester, expiry_s, sig = parts
-        if not principal or not attester or "." in principal or "." in attester:
+        if (not principal or not attester or "." in principal or "." in attester
+                or len(expiry_s) > 12 or not expiry_s.isascii() or not expiry_s.isdecimal()):
             return None
         try:
             expiry = int(expiry_s)
