@@ -4,6 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import unicodedata
+
+def _member_path_ok(path: object) -> bool:
+    """Validate signed package member names without rewriting signed bytes."""
+    if not isinstance(path, str) or not path or len(path) > 240:
+        return False
+    normalized = unicodedata.normalize("NFKC", path).replace("\\", "/")
+    if normalized.startswith("/") or ":" in normalized:
+        return False
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in normalized):
+        return False
+    return all(part not in ("", ".", "..") for part in normalized.split("/"))
+
+
 from dataclasses import dataclass
 from typing import Callable
 
@@ -66,7 +80,15 @@ def install(
     bad = set(pkg.permissions) - MOD_PERMISSIONS
     if bad:
         return f"rejected:permissions:{','.join(sorted(bad))}", []
-    if any(p.endswith((".exe", ".dll", ".so", ".dylib")) for p in pkg.files):
+    if not isinstance(pkg.files, dict) or len(pkg.files) > 512:
+        return "rejected:files", []
+    if not all(_member_path_ok(p) for p in pkg.files):
+        return "rejected:unsafe_path", []
+    if len(set(pkg.permissions)) != len(pkg.permissions):
+        return "rejected:permissions:duplicate", []
+    if any(unicodedata.normalize("NFKC", p).casefold().endswith(
+        (".exe", ".dll", ".so", ".dylib")
+    ) for p in pkg.files):
         return "rejected:native_code", []
     if not moderate(pkg):
         return "rejected:moderation", []

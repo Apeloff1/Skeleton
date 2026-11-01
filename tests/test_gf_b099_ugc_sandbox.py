@@ -57,3 +57,28 @@ def test_signature_covers_file_contents():
     p = pkg()
     tampered = replace(p, files={"hat.tres": "evil"})
     assert m.install(tampered, K, lambda p: True)[0] == "rejected:signature"
+
+
+def test_signed_unsafe_member_paths_fail_closed_before_grants():
+    seen = []
+    for name in ("../escape.tres", "/absolute.tres", "C:\\\\system.dll", "dir/./x.tres",
+                 "dir//x.tres", "dir/../x.tres", "dir/\\\\x.tres", "dir/\u0000x.tres"):
+        status, caps = m.install(
+            pkg(files={name: "data"}), K, lambda p: True,
+            grant=lambda *a: seen.append(a),
+        )
+        assert status == "rejected:unsafe_path" and caps == []
+    assert seen == []
+
+
+def test_casefolded_native_extensions_and_duplicate_grants_rejected():
+    seen = []
+    grant = lambda *a: seen.append(a)
+    for name in ("MOD.EXE", "lib.DlL", "lib.SO", "plugin.DYLIB"):
+        status, caps = m.install(pkg(files={name: "data"}), K, lambda p: True, grant)
+        assert status == "rejected:native_code" and caps == []
+    status, caps = m.install(
+        pkg(permissions=("add_content", "add_content")), K, lambda p: True, grant
+    )
+    assert status == "rejected:permissions:duplicate" and caps == []
+    assert seen == []
