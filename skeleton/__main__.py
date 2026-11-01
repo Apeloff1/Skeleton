@@ -59,6 +59,7 @@ Commands:
     combat-career-advice  Compare bounded replayed training choices
     combat-career-author  Transactionally edit and preview coaching careers
     combat-career  Play, train, save and replay a multi-season coaching career
+    combat-campaign-package  Export, verify and resume portable offline campaigns
     combat-campaign-author  Edit and replay source-bound offline combat campaigns
     combat-tournament  Play and replay a source-bound four-entrant bracket
     combat-inspect  Inspect verified combat timelines and compare saved branches
@@ -813,6 +814,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-tournament":
         from skeleton.game.gameplay.combat_tournament import cli as tournament_cli
         return tournament_cli(rest)
+    if cmd == "combat-campaign-package":
+        from skeleton.game.gameplay.combat_campaign_package import cli as campaign_package_cli
+        return campaign_package_cli(rest)
     if cmd == "combat-campaign-author":
         from skeleton.game.gameplay.combat_campaign_author import cli as campaign_author_cli
         return campaign_author_cli(rest)
