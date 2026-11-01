@@ -311,6 +311,8 @@ def restore_npc_dialogue_chain(
             parse_constant=lambda _: (_ for _ in ()).throw(
                 StudioQuestError("nonfinite NPC dialogue chain JSON")),
         )
+    except StudioQuestError:
+        raise
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise StudioQuestError("invalid NPC dialogue chain JSON") from exc
     return replay_npc_dialogue_chain(
