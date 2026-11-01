@@ -49,8 +49,8 @@ class CursorCodec:
         return hmac.new(self._key, body, hashlib.sha256).hexdigest()[:16]
 
     def encode(self, scope: str, created_at: float, item_id: str) -> str:
-        if (type(scope) is not str or not 1 <= len(scope) <= 256
-                or type(item_id) is not str or not 1 <= len(item_id) <= 128
+        if (type(scope) is not str or not 1 <= len(scope) <= 128
+                or type(item_id) is not str or not 1 <= len(item_id) <= 96
                 or type(created_at) not in (int, float) or not math.isfinite(created_at)):
             raise ValueError("cursor inputs must be bounded and finite")
         body = json.dumps({"s": scope, "t": created_at, "i": item_id},
@@ -74,7 +74,7 @@ class CursorCodec:
             raise bad
         t, i = data.get("t"), data.get("i")
         if (type(t) not in (int, float) or not math.isfinite(t)
-                or type(i) is not str or not 1 <= len(i) <= 128):
+                or type(i) is not str or not 1 <= len(i) <= 96):
             raise bad
         return float(t), i
 
