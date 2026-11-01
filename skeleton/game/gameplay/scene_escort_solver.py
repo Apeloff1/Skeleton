@@ -16,7 +16,7 @@ from typing import Any
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.scene_atlas import _strict_json
 from skeleton.game.gameplay.scene_escort import (
-    MAX_BYTES, _advance, _bounded, demo_actions, export_escort,
+    MAX_BYTES, _advance, _bounded, export_escort,
     new_escort, normalize_escort_source, original_escort, simulate_escort,
 )
 from skeleton.game.gameplay.scene_mission_solver import _options as mission_options
