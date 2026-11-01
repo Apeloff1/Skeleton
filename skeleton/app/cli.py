@@ -147,6 +147,10 @@ def _parser() -> argparse.ArgumentParser:
         help="publish or inspect a pinned mixed original-game receipt",
     )
     sub.add_parser(
+        "mixed-library-continuity-handoff", add_help=False,
+        help="publish or inspect a pinned mixed replay progression receipt",
+    )
+    sub.add_parser(
         "audit-mixed-library-continuity", add_help=False,
         help="verify that mixed signed/unsigned private replays advance without forks",
     )
@@ -443,6 +447,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "mixed-library-handoff":
         from skeleton.app.offline_mixed_game_library_handoff import main as mixed_handoff_main
         return mixed_handoff_main(arguments[1:])
+    if arguments and arguments[0] == "mixed-library-continuity-handoff":
+        from skeleton.app.offline_mixed_game_library_continuity_handoff import main as continuity_handoff_main
+        return continuity_handoff_main(arguments[1:])
     if arguments and arguments[0] == "audit-mixed-library-continuity":
         from skeleton.app.offline_mixed_game_library_continuity import main as continuity_main
         return continuity_main(arguments[1:])
