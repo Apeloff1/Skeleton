@@ -31,3 +31,9 @@ exports a source/session/baseline-bound JSON candidate. The CLI accepts
 candidate against canonical scene/quest source before any playable compilation.
 The HTML publisher independently recompiles the editor before accepting bytes;
 caller-supplied self-consistent hashes alone are never publication authority.
+
+A bounded deterministic prompt-to-typed-generation route supports the exact
+editorial intents: tighten pacing, preserve pacing, slow down for accessibility,
+and reduce npc turnaround. Use --prompt instead of --candidate, or pass prompt
+to the typed Jeeves tool. Unknown instructions fail closed. This is an explicit
+rule-based authoring proposal, not a claim that a language model ran.

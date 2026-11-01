@@ -133,6 +133,72 @@ def compile_scene_rehearsal(
     return result
 
 
+
+
+PROMPT_INTENTS = {
+    "tighten pacing": "tighten_pacing",
+    "preserve pacing": "preserve_pacing",
+    "slow down for accessibility": "accessibility_pacing",
+    "reduce npc turnaround": "reduce_npc_turnaround",
+}
+
+
+def propose_scene_rehearsal(
+    documents: Mapping[str, Any], actions: list[list[str]],
+    baseline: object, prompt: str, *, authorized: bool,
+    expected_source_digest: str, expected_session_digest: str | None = None,
+) -> dict[str, object]:
+    """Convert one bounded editorial prompt to typed schedule and verified replay.
+
+    This intentionally supports a small, explicit vocabulary, rather than
+    pretending a provider or a trained language model generated novel timing.
+    """
+    if authorized is not True:
+        raise PermissionError("prompt rehearsal requires operator authorization")
+    if (type(prompt) is not str or not 1 <= len(prompt) <= 512
+            or prompt != prompt.strip()
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in prompt)):
+        raise StudioQuestError("invalid scene rehearsal prompt")
+    intent = PROMPT_INTENTS.get(prompt.casefold())
+    if intent is None:
+        raise StudioQuestError("unsupported scene rehearsal prompt intent")
+    original = compile_scene_schedule(
+        documents, actions, baseline, authorized=True,
+        expected_source_digest=expected_source_digest,
+        expected_session_digest=expected_session_digest)
+    authored = original["schedule_request"]
+    durations = dict(authored["scene_ticks"])
+    turnaround = authored["npc_turnaround_ticks"]
+    if intent == "tighten_pacing":
+        durations = {sid: max(1, (ticks * 3 + 3) // 4)
+                     for sid, ticks in durations.items()}
+        turnaround = (turnaround * 3 + 3) // 4
+    elif intent == "accessibility_pacing":
+        durations = {sid: min(100000, (ticks * 5 + 3) // 4)
+                     for sid, ticks in durations.items()}
+    elif intent == "reduce_npc_turnaround":
+        turnaround //= 2
+    candidate = {
+        "scene_ticks": durations, "npc_turnaround_ticks": turnaround,
+        "min_start_ticks": dict(authored["min_start_ticks"]),
+    }
+    report = compile_scene_rehearsal(
+        documents, actions, authored, candidate, authorized=True,
+        expected_source_digest=expected_source_digest,
+        expected_session_digest=original["session_digest"])
+    plan: dict[str, object] = {
+        "schema": "skeleton.game_builder.studio_scene_rehearsal_prompt.v1",
+        "project_id": original["project_id"], "prompt": prompt,
+        "intent": intent, "source_digest": original["source_digest"],
+        "session_digest": original["session_digest"],
+        "candidate_schedule": candidate,
+        "rehearsal": report, "source_replay_verified": True,
+        "model_inference_performed": False, "file_write_performed": False,
+        "native_timing_verified": False, "release_certified": False,
+    }
+    plan["prompt_plan_digest"] = _digest(plan)
+    return plan
+
 def compile_rehearsed_playable(
     documents: Mapping[str, Any], actions: list[list[str]],
     report: Mapping[str, Any], assignments: object, *, authorized: bool,

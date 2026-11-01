@@ -166,3 +166,40 @@ def test_rehearsal_compiles_existing_verified_html5_playable():
         compile_rehearsed_playable(
             docs, [], {**report, "candidate_critical_ticks": 0},
             assignments, authorized=True, expected_visual_digest=visual)
+
+
+def test_prompt_to_typed_schedule_and_cli_jeeves_parity(capsys):
+    from scripts.studio_scene_rehearsal_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_scene_rehearsal import (
+        propose_scene_rehearsal,
+    )
+    docs, source, session, old, new = fixture()
+    plan = propose_scene_rehearsal(
+        docs, [], old, "tighten pacing", authorized=True,
+        expected_source_digest=source, expected_session_digest=session.digest)
+    assert plan["model_inference_performed"] is False
+    assert plan["rehearsal"]["candidate_is_shorter"] is True
+    assert plan == propose_scene_rehearsal(
+        docs, [], old, "tighten pacing", authorized=True,
+        expected_source_digest=source, expected_session_digest=session.digest)
+    request = {"schema": REQUEST_SCHEMA, "project_id": PROJECT,
+               "expected_source_digest": source,
+               "expected_session_digest": session.digest,
+               "actions": [], "baseline_schedule": old, "prompt": "tighten pacing"}
+    result = execute_scene_rehearsal_tool(request, authorized=True)
+    assert result["prompt_plan"] == plan
+    assert route_world_tool(
+        {"tool": "studio_original_scene_rehearsal", "arguments": request},
+        authorized=True)["result"] == result
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--baseline", json.dumps(old), "--prompt", "tighten pacing"]) == 0
+    assert json.loads(capsys.readouterr().out)["prompt_plan"] == plan
+    with pytest.raises(StudioQuestError):
+        propose_scene_rehearsal(docs, [], old, "invent a teleporting NPC",
+                                authorized=True, expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        propose_scene_rehearsal(docs, [], old, "bad\ncontrol",
+                                authorized=True, expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        execute_scene_rehearsal_tool(
+            {**request, "candidate_schedule": new}, authorized=True)

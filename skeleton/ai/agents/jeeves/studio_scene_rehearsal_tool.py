@@ -4,14 +4,14 @@ from typing import Any, Mapping
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_scene_rehearsal import (
-    _canonical, _digest, compile_scene_rehearsal,
+    _canonical, _digest, compile_scene_rehearsal, propose_scene_rehearsal,
 )
 REQUEST_SCHEMA = "skeleton.jeeves.studio_scene_rehearsal_request.v1"
 RESULT_SCHEMA = "skeleton.jeeves.studio_scene_rehearsal_result.v1"
 _FIELDS = {"schema", "project_id", "expected_source_digest",
            "expected_session_digest", "actions", "baseline_schedule",
-           "candidate_schedule"}
-_REQUIRED = _FIELDS - {"expected_session_digest"}
+           "candidate_schedule", "prompt"}
+_REQUIRED = _FIELDS - {"expected_session_digest", "candidate_schedule", "prompt"}
 
 
 def scene_rehearsal_tool_schema() -> dict[str, object]:
@@ -30,7 +30,8 @@ def scene_rehearsal_tool_schema() -> dict[str, object]:
                     "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                     "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                     "actions": {"type": "array", "maxItems": 64},
-                    "baseline_schedule": schedule, "candidate_schedule": schedule},
+                    "baseline_schedule": schedule, "candidate_schedule": schedule,
+                    "prompt": {"type": "string", "minLength": 1, "maxLength": 512}},
                 "required": sorted(_REQUIRED)}}
 
 
@@ -47,17 +48,30 @@ def execute_scene_rehearsal_tool(request: Mapping[str, Any], *,
         raise StudioQuestError("invalid rehearsal project")
     if type(request["actions"]) is not list:
         raise StudioQuestError("invalid rehearsal actions")
+    if ("prompt" in request) == ("candidate_schedule" in request):
+        raise StudioQuestError("choose exactly one prompt or candidate schedule")
     if len(_canonical(request)) > 32768:
         raise StudioQuestError("Jeeves rehearsal exceeds request budget")
-    detail = compile_scene_rehearsal(
-        read_blueprint(project), request["actions"], request["baseline_schedule"],
-        request["candidate_schedule"], authorized=True,
-        expected_source_digest=request["expected_source_digest"],
-        expected_session_digest=request.get("expected_session_digest"))
+    prompt_plan = None
+    if "prompt" in request:
+        prompt_plan = propose_scene_rehearsal(
+            read_blueprint(project), request["actions"], request["baseline_schedule"],
+            request["prompt"], authorized=True,
+            expected_source_digest=request["expected_source_digest"],
+            expected_session_digest=request.get("expected_session_digest"))
+        detail = prompt_plan["rehearsal"]
+    else:
+        detail = compile_scene_rehearsal(
+            read_blueprint(project), request["actions"], request["baseline_schedule"],
+            request["candidate_schedule"], authorized=True,
+            expected_source_digest=request["expected_source_digest"],
+            expected_session_digest=request.get("expected_session_digest"))
     result: dict[str, Any] = {
         "schema": RESULT_SCHEMA, "project_id": project,
         "request_digest": _digest(request), "detail": detail,
         "file_write_performed": False, "source_replay_verified": True,
         "native_timing_verified": False, "release_certified": False}
+    if prompt_plan is not None:
+        result["prompt_plan"] = prompt_plan
     result["result_digest"] = _digest(result)
     return result

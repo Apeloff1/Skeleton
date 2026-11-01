@@ -6,7 +6,7 @@ from pathlib import Path
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_scene_rehearsal import (
-    compile_scene_rehearsal, compile_rehearsed_playable,
+    compile_scene_rehearsal, propose_scene_rehearsal, compile_rehearsed_playable,
     publish_scene_rehearsal, verify_scene_rehearsal,
 )
 from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
@@ -26,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--actions", default="[]")
     ap.add_argument("--baseline")
     ap.add_argument("--candidate")
+    ap.add_argument("--prompt")
     ap.add_argument("--import-candidate", type=Path)
     ap.add_argument("--editor-directory", type=Path)
     ap.add_argument("--publish-directory", type=Path)
@@ -37,11 +38,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.verify_directory and (args.baseline or args.candidate or args.publish_directory):
         ap.error("restore reads persisted schedule, not new authoring")
     if not args.verify_directory and (
-            args.baseline is None or (args.candidate is None and args.import_candidate is None)):
-        ap.error("rehearsal requires --baseline and candidate or imported candidate")
+            args.baseline is None or sum(x is not None for x in (
+                args.candidate, args.import_candidate, args.prompt)) != 1):
+        ap.error("rehearsal requires --baseline and exactly one candidate, import or prompt")
     if args.candidate is not None and args.import_candidate is not None:
         ap.error("candidate JSON and imported candidate are mutually exclusive")
-    if args.verify_directory and (args.import_candidate or args.editor_directory):
+    if args.verify_directory and (args.import_candidate or args.editor_directory or args.prompt):
         ap.error("editor and import require an explicit current baseline")
     if bool(args.playable_assignments is not None) != bool(args.visual_digest is not None):
         ap.error("playable assignments and visual digest must be paired")
@@ -60,7 +62,14 @@ def main(argv: list[str] | None = None) -> int:
                 expected_session_digest=args.expected_session)
         else:
             baseline = _strict(args.baseline, max_bytes=16384)
-            if args.import_candidate:
+            prompt_plan = None
+            if args.prompt is not None:
+                prompt_plan = propose_scene_rehearsal(
+                    docs, actions, baseline, args.prompt, authorized=True,
+                    expected_source_digest=args.expected_source,
+                    expected_session_digest=args.expected_session)
+                candidate = prompt_plan["candidate_schedule"]
+            elif args.import_candidate:
                 from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import (
                     compile_scene_schedule,
                 )
@@ -81,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_digest=args.expected_source,
                 expected_session_digest=args.expected_session)
         result: dict[str, object] = {"rehearsal": report}
+        if not args.verify_directory and prompt_plan is not None:
+            result["prompt_plan"] = prompt_plan
         if args.editor_directory:
             from skeleton.ai.game_builder.studio_ecosystem_scene_rehearsal_editor import (
                 publish_scene_rehearsal_editor,
