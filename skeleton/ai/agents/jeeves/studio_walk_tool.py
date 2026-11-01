@@ -2015,3 +2015,9 @@ from .studio_director_authoring_tool import (  # noqa: E402
 from .studio_audio_cue_tool import (  # noqa: E402
     audio_cue_tool_schema, execute_audio_cue_tool,
 )
+
+
+# Static source-reviewed prompt-to-original-caption planning adapter.
+from .studio_audio_prompt_tool import (  # noqa: E402
+    audio_prompt_tool_schema, execute_audio_prompt_tool,
+)

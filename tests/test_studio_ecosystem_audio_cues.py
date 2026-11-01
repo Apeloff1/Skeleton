@@ -340,3 +340,67 @@ def test_published_audio_custody_rejects_symlink_and_fifo(tmp_path):
         os.mkfifo(directory / FILENAME)
         with pytest.raises((OSError, StudioQuestError)):
             verify_published_audio_cues(directory, **kwargs)
+
+
+def test_prompt_to_typed_original_audio_cues_round_trips_without_provider():
+    from skeleton.ai.game_builder.studio_ecosystem_audio_prompt import (
+        propose_audio_from_prompt,
+    )
+    docs, source, session, schedule, _ = fixture()
+    kwargs = {
+        "authorized": True, "expected_source_digest": source,
+        "expected_session_digest": session,
+    }
+    prompt = "Prioritize warning cues for fracturing ice; caption every scene."
+    proposal = propose_audio_from_prompt(
+        docs, [], schedule, prompt, **kwargs)
+    assert proposal["model_inference_performed"] is False
+    assert proposal["audio_generated"] is False
+    assert proposal["file_write_performed"] is False
+    assert proposal["release_certified"] is False
+    assert proposal["authoring"]["schema"] == REQUEST_SCHEMA
+    assert proposal["compiled_plan"] == compile_audio_cues(
+        docs, [], schedule, proposal["authoring"], **kwargs)
+    assert proposal == propose_audio_from_prompt(
+        docs, [], schedule, prompt, **kwargs)
+    with pytest.raises(PermissionError):
+        propose_audio_from_prompt(
+            docs, [], schedule, prompt, authorized=False,
+            expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        propose_audio_from_prompt(
+            docs, [], schedule, "forged\ncaption",
+            authorized=True, expected_source_digest=source)
+
+
+def test_prompt_jeeves_route_and_cli_produce_identical_editable_proposal(capsys):
+    from scripts.studio_audio_cues_cli import main
+    from skeleton.ai.agents.jeeves.studio_audio_prompt_tool import (
+        REQUEST_SCHEMA as PROMPT_SCHEMA, execute_audio_prompt_tool,
+    )
+    docs, source, session, schedule, _ = fixture()
+    prompt = "Create accessible warning captions for each original scene."
+    request = {
+        "schema": PROMPT_SCHEMA, "project_id": PROJECT,
+        "expected_source_digest": source, "expected_session_digest": session,
+        "actions": [], "schedule": schedule, "prompt": prompt,
+    }
+    direct = execute_audio_prompt_tool(request, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_audio_prompt_planner", "arguments": request},
+        authorized=True)
+    assert routed["result"] == direct
+    assert direct["detail"]["source_replay_verified"] is True
+    assert direct["model_inference_performed"] is False
+    assert any(entry["name"] == "studio_original_audio_prompt_planner"
+               for entry in world_tool_catalog()["tools"])
+    with pytest.raises(PermissionError):
+        execute_audio_prompt_tool(request, authorized=False)
+    assert main([
+        "--project", PROJECT, "--expected-source", source,
+        "--expected-session", session,
+        "--schedule", json.dumps(schedule), "--prompt", prompt,
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["proposal"] == direct["detail"]
+    assert output["output"] == direct["detail"]["compiled_plan"]

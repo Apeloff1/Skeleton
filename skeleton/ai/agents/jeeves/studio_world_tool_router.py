@@ -53,6 +53,7 @@ _TOOL_SYMBOLS = (
     ("director_handoff_tool_schema", "execute_director_handoff_tool"),
     ("director_authoring_tool_schema", "execute_director_authoring_tool"),
     ("audio_cue_tool_schema", "execute_audio_cue_tool"),
+    ("audio_prompt_tool_schema", "execute_audio_prompt_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",

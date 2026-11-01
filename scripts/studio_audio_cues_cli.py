@@ -10,6 +10,7 @@ from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_audio_cues import (
     compile_audio_cues, publish_audio_cues, verify_published_audio_cues,
 )
+from skeleton.ai.game_builder.studio_ecosystem_audio_prompt import propose_audio_from_prompt
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from scripts.studio_scene_schedule_cli import _strict
 
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = parser.add_mutually_exclusive_group(required=True)
     inputs.add_argument("--authoring-json")
     inputs.add_argument("--authoring-file", type=Path)
+    inputs.add_argument("--prompt", help="Original source-derived caption planning prompt")
     outputs = parser.add_mutually_exclusive_group()
     outputs.add_argument("--publish-directory", type=Path)
     outputs.add_argument("--verify-directory", type=Path)
@@ -50,7 +52,13 @@ def main(argv: list[str] | None = None) -> int:
         documents = read_blueprint(args.project)
         actions = _strict(args.actions, max_bytes=16384)
         schedule = _strict(args.schedule, max_bytes=16384)
-        authoring = (_read_authoring(args.authoring_file)
+        proposal = (propose_audio_from_prompt(
+            documents, actions, schedule, args.prompt, authorized=True,
+            expected_source_digest=args.expected_source,
+            expected_session_digest=args.expected_session)
+            if args.prompt is not None else None)
+        authoring = (proposal["authoring"] if proposal is not None
+                     else _read_authoring(args.authoring_file)
                      if args.authoring_file is not None
                      else _strict(args.authoring_json, max_bytes=65536))
         kwargs = {
@@ -71,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
                     documents=documents, actions=actions, schedule=schedule,
                     request=authoring)
                 receipt = {"plan": receipt, "publication": published}
+        if proposal is not None:
+            receipt = {"proposal": proposal, "output": receipt}
     except (StudioQuestError, ValueError, TypeError, OSError,
             UnicodeError, RecursionError, PermissionError) as exc:
         parser.error(str(exc))
