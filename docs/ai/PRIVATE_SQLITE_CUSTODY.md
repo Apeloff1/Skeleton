@@ -27,3 +27,16 @@ without required openat/O_NOFOLLOW facilities. This is not an Apple Silicon,
 Metal, GPU, encrypted-disk, multi-process isolation, or physical memory
 qualification. Tests are synthetic and verify only the documented bootstrap
 and filesystem checks. No automatic pending-lease re-execution is introduced.
+
+## Descriptor-pinned execution journal
+
+The native app binder now requires a second `PrivateSQLiteHandle` for the
+execution journal, distinct from the encrypted result database handle. It
+checks the exact journal SQLite connection, descriptor-backed inode,
+directory ownership, file permissions, attachment identity and byte budget.
+The journal binds this handle once and revalidates it before each durable
+intent transaction and receipt read. Path replacement after initial binding
+is therefore a hard failure before native execution, not an opportunity to
+silently recreate a journal. A compromised same-UID process remains outside
+this primitive's threat model; the app must isolate accounts and preserve
+exclusive handles, external rollback anchors and bounded disk custody.

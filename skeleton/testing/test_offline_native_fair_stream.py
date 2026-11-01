@@ -103,7 +103,8 @@ def test_real_cpu_app_dispatch_publishes_encrypted_result(private_files, monkeyp
     sampler = LiveStreamBudgetSampler()
     service, vault = bind_native_cpu_dispatch_service(
         session=session, runtime=runtime, registry=registry,
-        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
         sampler=sampler, storage_path=".",
     )
     stage_native_cpu_prompt(
@@ -137,7 +138,8 @@ def test_wrong_native_session_rejected_before_owner_creation(private_files):
     with pytest.raises(ValueError, match="session"):
         bind_native_cpu_dispatch_service(
             session=session, runtime=runtime, registry=registry,
-            result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+            result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
             sampler=LiveStreamBudgetSampler(), storage_path=".",
         )
 
@@ -153,7 +155,7 @@ def test_result_and_journal_same_inode_denied(private_files):
     with pytest.raises(ValueError, match="separate connections"):
         bind_native_cpu_result_owner(
             runtime=runtime, registry=registry, result_handle=result_handle,
-            journal=journal, result_key=RESULT_KEY,
+            journal_handle=result_handle, journal=journal, result_key=RESULT_KEY,
             sampler=LiveStreamBudgetSampler(), storage_path=".",
         )
 
@@ -191,7 +193,8 @@ def test_authenticated_native_submission_stages_exact_bound_owner(
     runtime, registry, journal, session, result_handle = build(private_files)
     service, vault = bind_native_cpu_dispatch_service(
         session=session, runtime=runtime, registry=registry,
-        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
         sampler=LiveStreamBudgetSampler(), storage_path=".",
     )
     request = StreamRequest(
@@ -217,7 +220,8 @@ def test_authenticated_native_submission_denies_wrong_tenant_before_staging(
     runtime, registry, journal, session, result_handle = build(private_files)
     service, vault = bind_native_cpu_dispatch_service(
         session=session, runtime=runtime, registry=registry,
-        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
         sampler=LiveStreamBudgetSampler(), storage_path=".",
     )
     request = StreamRequest(
@@ -241,7 +245,8 @@ def test_failed_native_submission_revokes_ephemeral_grant(
     runtime, registry, journal, session, result_handle = build(private_files)
     service, vault = bind_native_cpu_dispatch_service(
         session=session, runtime=runtime, registry=registry,
-        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
         sampler=LiveStreamBudgetSampler(), storage_path=".",
     )
     request = StreamRequest(
@@ -258,3 +263,48 @@ def test_failed_native_submission_revokes_ephemeral_grant(
         )
     assert registry.budget_status()["staged_bytes"] == 0
     assert registry.status()["consumed_or_revoked"] == 1
+
+
+def test_native_owner_rejects_unrelated_journal_descriptor(private_files):
+    from skeleton.app.offline_native_fair_stream import bind_native_cpu_result_owner
+    result_handle, journal_handle = private_files
+    runtime, registry, journal, session, _ = build(private_files)
+    with pytest.raises(ValueError, match="mismatch"):
+        bind_native_cpu_result_owner(
+            runtime=runtime, registry=registry, result_handle=result_handle,
+            journal_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+            sampler=LiveStreamBudgetSampler(), storage_path=".",
+        )
+
+
+def test_native_owner_detects_journal_path_replacement_before_execution(
+    private_files, monkeypatch,
+):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry,
+        request_id="inode-race", tenant_id="alice",
+        prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest(
+        "inode-race", "alice", InferencePhase.PREFILL, 2, 16,
+    ))
+    handle = private_files[1]
+    # Replacing a directory entry after binding cannot turn the old SQLite
+    # connection into an authorized fresh journal inode.
+    os.rename(
+        handle._filename, handle._filename + ".moved",
+        src_dir_fd=handle._directory_fd, dst_dir_fd=handle._directory_fd,
+    )
+    with pytest.raises(DispatchUncertain, match="uncertain"):
+        service.execute_next(token_budget=2)
+    assert registry.status()["staged"] == 1
+    assert service.status().execution_uncertain

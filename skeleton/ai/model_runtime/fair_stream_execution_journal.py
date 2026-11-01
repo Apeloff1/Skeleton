@@ -15,6 +15,7 @@ from typing import Mapping, Protocol
 
 from .fair_stream_custody import sign_execution_result
 from .fair_stream_session import DispatchPermit
+from .private_sqlite import PrivateSQLiteHandle
 
 SCHEMA = "skeleton.ai.fair-stream-execution-journal.v1"
 MAX_JOURNAL_ROWS = 10_000
@@ -71,6 +72,7 @@ class FairStreamExecutionJournal:
         if type(execution_key) is not bytes or not 32 <= len(execution_key) <= 128:
             raise ValueError("independent execution key required")
         self._connection = connection
+        self._private_handle: PrivateSQLiteHandle | None = None
         self._key = execution_key
         self._lock = RLock()
         connection.execute(
@@ -116,12 +118,28 @@ class FairStreamExecutionJournal:
         ):
             raise ValueError("untrusted journal request replay index")
 
+    def bind_private_handle(self, handle: PrivateSQLiteHandle) -> None:
+        """Bind the exact owned journal inode for all later read/write operations."""
+        with self._lock:
+            if (type(handle) is not PrivateSQLiteHandle
+                    or handle.connection is not self._connection
+                    or self._private_handle is not None):
+                raise ValueError("journal private handle missing, mismatched or rebound")
+            handle.assert_current()
+            self._private_handle = handle
+
+    def _assert_private(self) -> None:
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
+
     def _begin(self) -> None:
+        self._assert_private()
         if self._connection.in_transaction:
             raise ExecutionOutcomeUnknown("journal connection has active transaction")
         self._connection.execute("BEGIN IMMEDIATE")
 
     def _row(self, lease_id: str) -> tuple[object, ...] | None:
+        self._assert_private()
         return self._connection.execute(
             "SELECT session_id, generation, checkpoint_digest, request_id,"
             " state, consumed_tokens, result_digest, receipt"
