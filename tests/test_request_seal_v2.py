@@ -239,3 +239,22 @@ def test_seal_verifier_rejects_unbounded_headers_and_invalid_clocks():
     for clock in (float("nan"), float("inf"), True, "now", 10**1000, -1):
         with pytest.raises(AuthError):
             _v(_mint(), now=clock, domain="projects", replay_cache=hs.InMemoryReplayCache())
+
+
+def test_v2_rejects_noncanonical_expiry_aliases_and_invalid_expected_domain():
+    token = _mint()
+    parts = token.split(".")
+    expiry = parts[4]
+    # The MAC signs the integer timestamp; alternate wire representations
+    # must not reuse the same signature and nonce under a different header.
+    for alias in (
+        "0" + expiry,
+        "".join(chr(0x0660 + int(digit)) for digit in expiry),
+    ):
+        modified = parts.copy()
+        modified[4] = alias
+        with pytest.raises(AuthError):
+            _v(".".join(modified), domain="projects", replay_cache=hs.InMemoryReplayCache())
+    for domain in ("proje\u00e7ts", 7, True):
+        with pytest.raises(AuthError):
+            _v(token, domain=domain, replay_cache=hs.InMemoryReplayCache())

@@ -305,7 +305,8 @@ def _verify_v2(
         raise AuthError(_OPAQUE)
     if not _V2_NONCE_RE.fullmatch(nonce) or not _HEX64_RE.fullmatch(mac):
         raise AuthError(_OPAQUE)
-    if not expiry_s.isdigit() or len(expiry_s) > 12:
+    if (not expiry_s.isascii() or not expiry_s.isdecimal() or len(expiry_s) > 12
+            or (len(expiry_s) > 1 and expiry_s.startswith("0"))):
         raise AuthError(_OPAQUE)
     expiry = int(expiry_s)
     if ts > expiry or expiry > ts + MAX_V2_TTL_SECS + REPLAY_SKEW_SECS:
@@ -317,8 +318,11 @@ def _verify_v2(
     if not ok:
         raise AuthError(_OPAQUE)
     # Domain binding: only after MAC so a forged domain never reaches here.
-    if expected_domain is not None and not hmac.compare_digest(domain, expected_domain):
-        raise AuthError(_OPAQUE)
+    if expected_domain is not None:
+        if (type(expected_domain) is not str
+                or not _V2_FIELD_RE.fullmatch(expected_domain)
+                or not hmac.compare_digest(domain, expected_domain)):
+            raise AuthError(_OPAQUE)
     # A valid MAC is not a single-use credential without atomic nonce custody.
     # Direct verification must fail closed when no replay store is supplied.
     if replay_cache is None:
