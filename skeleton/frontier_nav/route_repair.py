@@ -47,8 +47,11 @@ class WorldChange:
     def __post_init__(self) -> None:
         if self.kind not in CHANGE_KINDS:
             raise ValueError(f"unknown world change kind {self.kind!r}")
-        if not self.change_id:
-            raise ValueError("change_id required")
+        if (type(self.change_id) is not str or not 1 <= len(self.change_id) <= 128
+                or any(ord(char) < 32 or ord(char) == 127 for char in self.change_id)):
+            raise ValueError("change_id must be a bounded printable identifier")
+        if type(self.frame) is not int or not 0 <= self.frame <= 2**63 - 1:
+            raise ValueError("world change frame must be a bounded integer")
 
 
 @dataclass
@@ -210,6 +213,16 @@ class RouteMonitor:
     deviation_frames: int = 3
     tracks: dict[str, _Track] = field(default_factory=dict)
     triggers: list[RepairTrigger] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        for name in ("corridor", "arrive_radius"):
+            value = getattr(self, name)
+            if (type(value) not in (int, float) or not math.isfinite(value)
+                    or not 0 <= value <= 1_000_000):
+                raise ValueError(f"{name} must be a bounded finite distance")
+        if (type(self.deviation_frames) is not int
+                or not 1 <= self.deviation_frames <= 10_000):
+            raise ValueError("deviation_frames must be a bounded positive integer")
 
     def follow(self, entity_id: str, plan: GroundedPlan) -> None:
         self.tracks[entity_id] = _Track(plan)

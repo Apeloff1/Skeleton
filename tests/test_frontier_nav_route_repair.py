@@ -145,3 +145,31 @@ def test_untracked_entities_ignored_and_goal_reached_is_quiet():
     hub, mon, _ = _hub_monitor()
     hub.submit_frame("pc", "modern", 0, [PositionFix("other", 50, 50), PositionFix("npc", 20, 0)])
     assert mon.triggers == []
+
+
+@pytest.mark.parametrize("bad", [True, -1, float("nan"), 1.5, 2**64])
+def test_world_change_rejects_invalid_frame_order_evidence(bad):
+    with pytest.raises(ValueError, match="world change frame"):
+        WorldChange("change", "flood", bad)
+
+
+@pytest.mark.parametrize("bad", ["", "x" * 129, "change\\nforged", None])
+def test_world_change_rejects_ambiguous_change_ids(bad):
+    with pytest.raises(ValueError, match="change_id"):
+        WorldChange(bad, "flood", 1)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -1, True, "2"])
+def test_route_monitor_rejects_invalid_corridor_thresholds(bad):
+    _, repairer = setup()
+    with pytest.raises(ValueError, match="corridor"):
+        RouteMonitor(repairer, corridor=bad)
+    with pytest.raises(ValueError, match="arrive_radius"):
+        RouteMonitor(repairer, arrive_radius=bad)
+
+
+@pytest.mark.parametrize("bad", [0, True, -1, 10001, 1.5])
+def test_route_monitor_rejects_invalid_deviation_frame_thresholds(bad):
+    _, repairer = setup()
+    with pytest.raises(ValueError, match="deviation_frames"):
+        RouteMonitor(repairer, deviation_frames=bad)
