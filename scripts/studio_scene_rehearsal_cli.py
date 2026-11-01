@@ -13,6 +13,9 @@ from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
     publish_director_handoff,
 )
 from scripts.studio_scene_schedule_cli import _strict
+from skeleton.ai.game_builder.studio_ecosystem_scene_rehearsal_editor import (
+    render_scene_rehearsal_editor, load_scene_rehearsal_export,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,6 +26,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--actions", default="[]")
     ap.add_argument("--baseline")
     ap.add_argument("--candidate")
+    ap.add_argument("--import-candidate", type=Path)
+    ap.add_argument("--editor-directory", type=Path)
     ap.add_argument("--publish-directory", type=Path)
     ap.add_argument("--verify-directory", type=Path)
     ap.add_argument("--playable-assignments")
@@ -31,8 +36,13 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.verify_directory and (args.baseline or args.candidate or args.publish_directory):
         ap.error("restore reads persisted schedule, not new authoring")
-    if not args.verify_directory and (args.baseline is None or args.candidate is None):
-        ap.error("rehearsal requires --baseline and --candidate")
+    if not args.verify_directory and (
+            args.baseline is None or (args.candidate is None and args.import_candidate is None)):
+        ap.error("rehearsal requires --baseline and candidate or imported candidate")
+    if args.candidate is not None and args.import_candidate is not None:
+        ap.error("candidate JSON and imported candidate are mutually exclusive")
+    if args.verify_directory and (args.import_candidate or args.editor_directory):
+        ap.error("editor and import require an explicit current baseline")
     if bool(args.playable_assignments is not None) != bool(args.visual_digest is not None):
         ap.error("playable assignments and visual digest must be paired")
     if args.publish_playable_directory and (
@@ -49,12 +59,36 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_digest=args.expected_source,
                 expected_session_digest=args.expected_session)
         else:
+            baseline = _strict(args.baseline, max_bytes=16384)
+            if args.import_candidate:
+                from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import (
+                    compile_scene_schedule,
+                )
+                original = compile_scene_schedule(
+                    docs, actions, baseline, authorized=True,
+                    expected_source_digest=args.expected_source,
+                    expected_session_digest=args.expected_session)
+                candidate = load_scene_rehearsal_export(
+                    args.import_candidate, authorized=True,
+                    expected_project_id=original["project_id"],
+                    expected_source_digest=original["source_digest"],
+                    expected_session_digest=original["session_digest"],
+                    expected_baseline_digest=original["schedule_digest"])
+            else:
+                candidate = _strict(args.candidate, max_bytes=16384)
             report = compile_scene_rehearsal(
-                docs, actions, _strict(args.baseline, max_bytes=16384),
-                _strict(args.candidate, max_bytes=16384), authorized=True,
+                docs, actions, baseline, candidate, authorized=True,
                 expected_source_digest=args.expected_source,
                 expected_session_digest=args.expected_session)
         result: dict[str, object] = {"rehearsal": report}
+        if args.editor_directory:
+            from skeleton.ai.game_builder.studio_ecosystem_scene_rehearsal_editor import (
+                publish_scene_rehearsal_editor,
+            )
+            html, editor_receipt = render_scene_rehearsal_editor(
+                docs, actions, report, authorized=True)
+            result["editor"] = publish_scene_rehearsal_editor(
+                html, editor_receipt, args.editor_directory, authorized=True)
         if args.playable_assignments is not None:
             assignments = _strict(args.playable_assignments, max_bytes=32768)
             manifest, bundle = compile_rehearsed_playable(
