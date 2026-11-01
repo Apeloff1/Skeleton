@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import time
 import uuid
+import re
+from itertools import islice
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
@@ -36,11 +38,19 @@ _SYSTEM = (
 )
 
 
+_PROVIDER_ID = re.compile(r"[a-z][a-z0-9._-]{0,63}\\Z")
+
+
 def grant_providers(issuer: TokenIssuer, provider_ids: Iterable[str], *, subject: str = "forge.ai_builder") -> str:
-    """Mint a token covering exactly ``provider.<id>``/``call`` for each id."""
-    caps = [Capability(f"provider.{pid}", "call") for pid in dict.fromkeys(provider_ids)]
-    if not caps:
-        raise ValueError("grant at least one provider")
+    """Mint a bounded exact provider-call grant; refuse ambiguous identifiers."""
+    if isinstance(provider_ids, (str, bytes)):
+        raise ValueError("provider ids must be an iterable of explicit slugs")
+    ids = list(islice(provider_ids, 33))
+    if not ids or len(ids) > 32 or any(
+        type(pid) is not str or _PROVIDER_ID.fullmatch(pid) is None for pid in ids
+    ):
+        raise ValueError("provider ids must be 1..32 bounded lowercase slugs")
+    caps = [Capability(f"provider.{pid}", "call") for pid in dict.fromkeys(ids)]
     return issuer.mint(subject, caps)
 
 
@@ -74,7 +84,7 @@ def _response_payload(result: Any) -> Any:
     if response is None:
         return None
     structured = getattr(response, "structured", None)
-    return dict(structured) if structured else getattr(response, "text", None)
+    return dict(structured) if isinstance(structured, Mapping) else getattr(response, "text", None)
 
 
 class ModelPlanner:
@@ -82,6 +92,8 @@ class ModelPlanner:
                  budget: CallBudget | None = None, max_output_tokens: int = 800) -> None:
         if gate is None:
             raise ValueError("a capsec gate is required")
+        if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 8192:
+            raise ValueError("max_output_tokens must be a bounded positive integer")
         self._router = router
         self._gate = gate
         self._cap = cap

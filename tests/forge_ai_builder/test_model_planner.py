@@ -97,3 +97,24 @@ def test_request_carries_schema_and_bounds():
     req = router.requests[0]
     assert req.response_schema["properties"]["schema"]["const"].endswith("plan_proposal.v1")
     assert req.max_output_tokens == 800 and req.messages[0].role == "system"
+
+
+def test_grants_reject_ambiguous_or_unbounded_provider_ids():
+    _, issuer = gate_and_issuer()
+    for ids in ([""], ["../admin"], ["Alpha"], ["alpha", "beta" * 40], "alpha", ["alpha"] * 33):
+        with pytest.raises(ValueError, match="provider"):
+            grant_providers(issuer, ids)
+
+
+def test_model_planner_refuses_unbounded_output_budgets():
+    gate, _ = gate_and_issuer()
+    for bound in (0, -1, 8193, True, 2.5):
+        with pytest.raises(ValueError, match="max_output_tokens"):
+            ModelPlanner(FakeRouter(), gate=gate, cap=None, max_output_tokens=bound)
+
+
+def test_non_mapping_structured_payload_does_not_override_valid_text():
+    from types import SimpleNamespace
+    from skeleton.forge.ai_builder.model_planner import _response_payload
+    call = SimpleNamespace(response=SimpleNamespace(structured=["untrusted"], text="fallback"))
+    assert _response_payload(call) == "fallback"
