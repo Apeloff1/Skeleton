@@ -144,7 +144,9 @@ def read_bundle(path: Path) -> str:
     if not hasattr(os, "O_NOFOLLOW"):
         raise BundleError("secure bundle read unavailable on this platform")
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        # Nonblocking open also prevents an untrusted FIFO from hanging the
+        # process before fstat can reject non-regular file types.
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
     except OSError as exc:
         raise BundleError("bundle cannot be opened without following links") from exc
     try:

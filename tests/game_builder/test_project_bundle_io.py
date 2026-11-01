@@ -96,6 +96,17 @@ def test_bundle_read_refuses_symlink_and_same_size_rewrite(tmp_path, monkeypatch
     assert changed[0]
 
 
+def test_bundle_read_rejects_fifo_without_waiting_for_writer(tmp_path):
+    import os
+
+    if not hasattr(os, "mkfifo") or not hasattr(os, "O_NOFOLLOW"):
+        pytest.skip("POSIX FIFO and nofollow unavailable")
+    fifo = tmp_path / "blocked.gfbundle.json"
+    os.mkfifo(fifo)
+    with pytest.raises(BundleError, match="regular file"):
+        bio.read_bundle(fifo)
+
+
 def test_tenant_path_write_read(tmp_path, saver):
     saver.save_files("hero", "platformer", {"a.md": "abc"})
     p = bio.bundle_path(tmp_path, "tenant-one", "hero", tenant_storage_namespace)
