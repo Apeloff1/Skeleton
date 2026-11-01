@@ -46,3 +46,12 @@ def test_rollback_rejects_nonfinite_and_boolean_error_evidence():
             decide(health, error_rate=bad)
         with pytest.raises(DeliveryError, match="fractions"):
             decide(health, error_budget=bad)
+
+
+def test_rollback_rejects_nonboolean_degraded_policy():
+    report = HealthReport("degraded", (), ("readiness",))
+    for bad in ("false", 0, 1, None):
+        with pytest.raises(DeliveryError, match="tolerate_degraded"):
+            decide(report, tolerate_degraded=bad)
+    assert decide(report, tolerate_degraded=False).should_rollback
+    assert not decide(report, tolerate_degraded=True).should_rollback

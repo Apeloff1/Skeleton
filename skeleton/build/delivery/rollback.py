@@ -41,6 +41,8 @@ def decide(
             or not math.isfinite(error_rate) or not math.isfinite(error_budget)
             or not 0 <= error_rate <= 1 or not 0 < error_budget <= 1):
         raise DeliveryError("error rates must be fractions")
+    if type(tolerate_degraded) is not bool:
+        raise DeliveryError("tolerate_degraded must be a boolean")
     if report.verdict == "unhealthy":
         return RollbackDecision(True, "health:" + ",".join(report.failing_probes), None)
     if report.verdict == "degraded" and not tolerate_degraded:
