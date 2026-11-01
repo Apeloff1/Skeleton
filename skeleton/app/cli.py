@@ -270,6 +270,8 @@ def _parser() -> argparse.ArgumentParser:
         "inspect-uncertain-offline-receipt", add_help=False,
         help="read-only quarantine triage of an independently pinned offline receipt",
     )
+    sub.add_parser("first-playable-jobfile", add_help=False,
+                   help="run original playable cohort from independently pinned private job file")
     sub.add_parser("first-playable-batch-triage", add_help=False,
                    help="read-only quarantine inspection of interrupted playable deliveries")
     sub.add_parser("first-playable-batch", add_help=False,
@@ -523,6 +525,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "delivery-assurance":
         from skeleton.app.offline_delivery_assurance import main as assurance_main
         return assurance_main(arguments[1:])
+    if arguments and arguments[0] == "first-playable-jobfile":
+        from skeleton.app.offline_first_playable_jobfile import main as jobfile_main
+        return jobfile_main(arguments[1:])
     if arguments and arguments[0] == "first-playable-batch-triage":
         from skeleton.app.offline_first_playable_batch_triage import main as triage_main
         return triage_main(arguments[1:])

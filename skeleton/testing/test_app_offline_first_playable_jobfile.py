@@ -1,0 +1,188 @@
+"""Real original-game cohort integration through a private pinned job file."""
+from __future__ import annotations
+
+from dataclasses import replace
+from hashlib import sha256
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+from skeleton.app.cli import run_app_cli
+from skeleton.app.offline_first_playable_jobfile import (
+    SCHEMA, FirstPlayableJobFileError, execute_pinned_jobfile,
+    read_pinned_jobs,
+)
+from skeleton.testing.test_app_offline_first_playable_batch import (
+    jobs_for, original_games, pinned,
+)
+
+
+def _payload(jobs):
+    return {
+        "schema": SCHEMA,
+        "jobs": [
+            {
+                "source": str(job.source), "archive": str(job.archive),
+                "install": str(job.install), "save": str(job.save),
+                "receipt": str(job.receipt),
+                "manifest_sha256": job.manifest_sha256,
+                "moves": list(job.moves),
+                **({
+                    "archive_sha256": job.archive_sha256,
+                    "save_sha256": job.save_sha256,
+                    "receipt_sha256": job.receipt_sha256,
+                } if job.archive_sha256 is not None else {}),
+            }
+            for job in jobs
+        ],
+    }
+
+
+def _file(root, jobs, name="jobs.json"):
+    path = root / name
+    path.write_text(json.dumps(_payload(jobs), sort_keys=True), encoding="utf-8")
+    path.chmod(0o600)
+    return path, sha256(path.read_bytes()).hexdigest()
+
+
+def test_cli_pinned_jobfile_publish_and_replay_inspect(original_games, tmp_path, capsys):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+    base = ["first-playable-jobfile", "--jobs-file", str(manifest),
+            "--expected-jobs-sha256", pin, "--summary", str(summary),
+            "--trusted-local-operator"]
+    assert run_app_cli(base + ["--mode", "publish"]) == 0
+    published = json.loads(capsys.readouterr().out)
+    assert published["game_count"] == 2
+    assert published["input_manifest_sha256"] == pin
+    assert published["input_manifest_unchanged"] is True
+    assert published["release_certified"] is False
+    assert (tmp_path / "installed-0" / "index.html").is_file()
+    assert (tmp_path / "installed-1" / "index.html").is_file()
+    inspected_file, inspected_pin = _file(
+        tmp_path, pinned(jobs, published), "pinned-jobs.json",
+    )
+    inspect_args = [
+        "first-playable-jobfile", "--jobs-file", str(inspected_file),
+        "--expected-jobs-sha256", inspected_pin, "--summary", str(summary),
+        "--mode", "inspect", "--expected-summary-sha256",
+        published["independent_summary_sha256"], "--trusted-local-operator",
+    ]
+    assert run_app_cli(inspect_args) == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["all_live_games_reexecuted"] is True
+    assert inspected["read_only"] is True
+    assert inspected["release_certified"] is False
+
+
+def test_triage_from_private_file_does_not_create_outputs(original_games, tmp_path):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    summary = tmp_path / "cohort.json"
+    result = execute_pinned_jobfile(
+        manifest, expected_jobs_sha256=pin, summary=summary,
+        mode="triage", authorized=True,
+    )
+    assert result["summary_state"] == "missing"
+    assert result["read_only"] is True
+    assert result["input_manifest_unchanged"] is True
+    assert not Path(jobs[0].archive).exists()
+    assert not summary.exists()
+
+
+@pytest.mark.parametrize("mutation", [
+    "wrong_pin", "symlink", "hardlink", "world_writable",
+    "duplicate_key", "nan", "missing_schema",
+])
+def test_untrusted_jobfile_rejected_before_publication(
+    original_games, tmp_path, mutation,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    if mutation == "wrong_pin":
+        pin = "0" * 64
+    elif mutation == "symlink":
+        alias = tmp_path / "alias.json"
+        alias.symlink_to(manifest)
+        manifest = alias
+    elif mutation == "hardlink":
+        alias = tmp_path / "alias.json"
+        os.link(manifest, alias)
+        manifest = alias
+    elif mutation == "world_writable":
+        manifest.chmod(0o666)
+    elif mutation == "duplicate_key":
+        manifest.write_text('{"schema":"x","schema":"y","jobs":[]}')
+        pin = sha256(manifest.read_bytes()).hexdigest()
+    elif mutation == "nan":
+        manifest.write_text('{"schema":NaN,"jobs":[]}')
+        pin = sha256(manifest.read_bytes()).hexdigest()
+    elif mutation == "missing_schema":
+        manifest.write_text('{"jobs":[]}')
+        pin = sha256(manifest.read_bytes()).hexdigest()
+    with pytest.raises((FirstPlayableJobFileError, OSError, ValueError)):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin,
+            summary=tmp_path / "cohort.json", mode="publish", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+
+
+def test_jobfile_must_not_overlap_output_or_source(original_games, tmp_path):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    with pytest.raises(FirstPlayableJobFileError):
+        read_pinned_jobs(
+            manifest, expected_sha256=pin, summary=manifest,
+            mode="publish", authorized=True,
+        )
+    with pytest.raises(FirstPlayableJobFileError):
+        read_pinned_jobs(
+            manifest, expected_sha256=pin, summary=tmp_path / "cohort.json",
+            mode="unsupported", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+
+
+def test_jobfile_mutation_during_delivery_fails_closed(
+    original_games, tmp_path, monkeypatch,
+):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    from skeleton.app import offline_first_playable_jobfile as module
+
+    def fake_publish(*args, **kwargs):
+        manifest.write_text(json.dumps(_payload(jobs)) + " ", encoding="utf-8")
+        return {"release_certified": False}
+
+    monkeypatch.setattr(module, "publish_first_playable_delivery_batch", fake_publish)
+    with pytest.raises(FirstPlayableJobFileError):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin,
+            summary=tmp_path / "cohort.json", mode="publish", authorized=True,
+        )
+    assert not Path(jobs[0].archive).exists()
+
+
+def test_untrusted_authorization_and_wrong_mode_pin_rejected(original_games, tmp_path):
+    jobs = jobs_for(original_games, tmp_path)
+    manifest, pin = _file(tmp_path, jobs)
+    with pytest.raises(PermissionError):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin,
+            summary=tmp_path / "cohort.json", mode="publish", authorized=False,
+        )
+    with pytest.raises(FirstPlayableJobFileError):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin,
+            summary=tmp_path / "cohort.json", mode="inspect", authorized=True,
+        )
+    with pytest.raises(FirstPlayableJobFileError):
+        execute_pinned_jobfile(
+            manifest, expected_jobs_sha256=pin,
+            summary=tmp_path / "cohort.json", mode="publish",
+            expected_summary_sha256="0" * 64, authorized=True,
+        )
