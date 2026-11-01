@@ -41,6 +41,10 @@ def normalize_career(raw: Any) -> dict[str, Any]:
     if len(career_id) > 48:
         raise CombatSessionError("career id too long")
     league = normalize_league(obj["league"])
+    # Leave space for the deterministic .sN season suffix within the
+    # canonical league ID bound, so source validity implies playability.
+    if len(league["league_id"]) > 45:
+        raise CombatSessionError("career league id too long for season identity")
     if league["schema_version"] != LEAGUE_SCHEMA:
         raise CombatSessionError("unsupported career league")
     seasons = _integer(obj["seasons"], "seasons", 1, MAX_SEASONS)
