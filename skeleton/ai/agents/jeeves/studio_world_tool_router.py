@@ -35,6 +35,7 @@ from skeleton.ai.agents.jeeves import studio_npc_dialogue_chain_tool as npc_dial
 from skeleton.ai.agents.jeeves import studio_quest_ending_witness_tool as ending_witness
 from skeleton.ai.agents.jeeves import studio_prompt_quest_plan_tool as prompt_quest
 from skeleton.ai.agents.jeeves import studio_prompt_quest_playtest_tool as prompt_playtest
+from skeleton.ai.agents.jeeves import studio_quest_regression_matrix_tool as regression_matrix
 from skeleton.ai.agents.jeeves import studio_quest_hint_tool as hints
 from skeleton.ai.agents.jeeves import studio_original_asset_briefs_tool as asset_briefs
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
@@ -84,6 +85,7 @@ _TOOL_SYMBOLS = (
     ("quest_ending_witness_tool_schema", "execute_quest_ending_witness_tool"),
     ("prompt_quest_plan_tool_schema", "execute_prompt_quest_plan_tool"),
     ("prompt_quest_playtest_tool_schema", "execute_prompt_quest_playtest_tool"),
+    ("quest_regression_matrix_tool_schema", "execute_quest_regression_matrix_tool"),
     ("quest_hint_tool_schema", "execute_quest_hint_tool"),
     ("original_asset_briefs_tool_schema", "execute_original_asset_briefs_tool"),
     ("npc_author_tool_schema", "execute_npc_author_tool"),
@@ -165,6 +167,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    ending_witness if descriptor_name == "quest_ending_witness_tool_schema" else
                    prompt_quest if descriptor_name == "prompt_quest_plan_tool_schema" else
                    prompt_playtest if descriptor_name == "prompt_quest_playtest_tool_schema" else
+                   regression_matrix if descriptor_name == "quest_regression_matrix_tool_schema" else
                    hints if descriptor_name == "quest_hint_tool_schema" else
                    asset_briefs if descriptor_name == "original_asset_briefs_tool_schema" else studio)
         descriptor = getattr(adapter, descriptor_name)()
