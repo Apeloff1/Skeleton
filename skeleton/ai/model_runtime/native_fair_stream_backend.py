@@ -12,6 +12,7 @@ from hashlib import sha256
 import hmac
 import os
 from threading import RLock
+from time import monotonic_ns
 from typing import Mapping
 
 from .fair_stream_result_vault import MAX_RESULT_BYTES
@@ -25,6 +26,8 @@ from .native_prompt_budget import NativePromptBudget, PromptBudgetLedger
 MAX_PROMPT_BYTES = 64 << 10
 MAX_STAGED_PROMPTS = 256
 MAX_ID_BYTES = 128
+MAX_PROMPT_STAGE_AGE_NS = 3_600_000_000_000
+DEFAULT_PROMPT_STAGE_AGE_NS = 300_000_000_000
 
 
 class NativeFairStreamDenied(RuntimeError):
@@ -50,9 +53,13 @@ def _require_owner_process(owner_pid: int) -> None:
 
 
 def _id(value: object, label: str) -> str:
-    if (type(value) is not str or not value
-            or len(value.encode("utf-8")) > MAX_ID_BYTES
-            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+    if type(value) is not str or not value:
+        raise NativeFairStreamDenied("invalid " + label)
+    try:
+        raw = value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise NativeFairStreamDenied("invalid " + label + " Unicode") from exc
+    if len(raw) > MAX_ID_BYTES or any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise NativeFairStreamDenied("invalid " + label)
     return value
 
@@ -168,16 +175,50 @@ class NativePromptRegistry:
 
     def __init__(
         self, *, session_id: str, budget: NativePromptBudget | None = None,
+        max_stage_age_ns: int = DEFAULT_PROMPT_STAGE_AGE_NS,
     ) -> None:
         self.session_id = _id(session_id, "session")
+        if (type(max_stage_age_ns) is not int
+                or not 1 <= max_stage_age_ns <= MAX_PROMPT_STAGE_AGE_NS):
+            raise NativeFairStreamDenied("invalid prompt staging lifetime")
         self._owner_pid = os.getpid()
         self._lock = RLock()
         self._staged: dict[str, PinnedNativePrompt] = {}
+        self._staged_at: dict[str, int] = {}
         self._used: set[str] = set()
         self._budget = PromptBudgetLedger(budget or NativePromptBudget())
+        self._max_stage_age_ns = max_stage_age_ns
+        self._last_clock_ns = -1
 
     def _require_owner_process(self) -> None:
         _require_owner_process(self._owner_pid)
+
+    def _clock_locked(self) -> int:
+        """Never grant on unknown, nonmonotonic or malformed local time."""
+        try:
+            now = monotonic_ns()
+        except BaseException as exc:
+            raise NativeFairStreamDenied("prompt monotonic clock unavailable") from exc
+        if type(now) is not int or now < 0 or now < self._last_clock_ns:
+            raise NativeFairStreamDenied("prompt monotonic clock regressed")
+        self._last_clock_ns = now
+        return now
+
+    def _expire_locked(self, now: int) -> None:
+        """Burn stale identities before admitting any new prompt RAM."""
+        if (set(self._staged) != set(self._staged_at)
+                or any(type(ts) is not int or ts < 0 or ts > now
+                       for ts in self._staged_at.values())):
+            raise NativeFairStreamDenied("prompt staging timestamp invariant failed")
+        # A bounded registry guarantees this sweep is never unbounded.
+        expired = [request_id for request_id, staged_at in self._staged_at.items()
+                   if now - staged_at >= self._max_stage_age_ns]
+        for request_id in expired:
+            pinned = self._staged[request_id]
+            self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
+            del self._staged[request_id]
+            del self._staged_at[request_id]
+            self._used.add(request_id)
 
     def stage(self, pinned: PinnedNativePrompt) -> None:
         _require_owner_process(self._owner_pid)
@@ -186,6 +227,8 @@ class NativePromptRegistry:
         if pinned.session_id != self.session_id:
             raise NativeFairStreamDenied("prompt session mismatch")
         with self._lock:
+            now = self._clock_locked()
+            self._expire_locked(now)
             if pinned.request_id in self._used or pinned.request_id in self._staged:
                 raise NativeFairStreamDenied("duplicate or consumed request identity")
             if len(self._staged) + len(self._used) >= MAX_STAGED_PROMPTS:
@@ -195,33 +238,39 @@ class NativePromptRegistry:
             # visible to a concurrent claimant.
             self._budget.reserve(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
             self._staged[pinned.request_id] = pinned
+            self._staged_at[pinned.request_id] = now
 
     def claim(self, request_id: str, tenant_id: str) -> PinnedNativePrompt:
         """Consume before invoking a potentially side-effecting model."""
         _require_owner_process(self._owner_pid)
         with self._lock:
+            self._expire_locked(self._clock_locked())
             pinned = self._staged.get(_id(request_id, "request"))
             if pinned is None or pinned.tenant_id != _id(tenant_id, "tenant"):
                 raise NativeFairStreamDenied("missing authorized prompt")
             self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
             self._used.add(request_id)
             del self._staged[request_id]
+            del self._staged_at[request_id]
             return pinned
 
     def revoke(self, request_id: str) -> None:
         """Burn a pending grant without authorizing an execution."""
         _require_owner_process(self._owner_pid)
         with self._lock:
+            self._expire_locked(self._clock_locked())
             _id(request_id, "request")
             pinned = self._staged.get(request_id)
             if pinned is not None:
                 self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
                 del self._staged[request_id]
+                del self._staged_at[request_id]
             self._used.add(request_id)
 
     def status(self) -> dict[str, int | str]:
         _require_owner_process(self._owner_pid)
         with self._lock:
+            self._expire_locked(self._clock_locked())
             return {
                 "schema": "skeleton.ai.native-fair-stream-prompt-status.v1",
                 "staged": len(self._staged),
@@ -233,6 +282,7 @@ class NativePromptRegistry:
         """Payload-free operator telemetry; never expose prompts or tenant IDs."""
         _require_owner_process(self._owner_pid)
         with self._lock:
+            self._expire_locked(self._clock_locked())
             return self._budget.snapshot()
 
 

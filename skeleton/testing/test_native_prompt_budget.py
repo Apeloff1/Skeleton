@@ -152,3 +152,94 @@ def test_corrupt_multi_grant_release_does_not_partially_mutate():
     ledger.release("alice", 3)
     ledger.release("alice", 3)
     assert ledger.snapshot()["staged_grants"] == 0
+
+
+def test_expired_prompt_releases_ram_but_never_replays_identity():
+    from unittest.mock import patch
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION,
+        max_stage_age_ns=10, budget=NativePromptBudget(
+            max_staged_bytes=5, max_staged_bytes_per_tenant=5))
+    with patch("skeleton.ai.model_runtime.native_fair_stream_backend.monotonic_ns",
+               side_effect=[100, 110, 110, 110, 110]):
+        registry.stage(grant(model, "alice", "one"))
+        assert registry.status()["staged"] == 0
+        assert registry.budget_status()["staged_bytes"] == 0
+        with pytest.raises(NativeFairStreamDenied, match="missing authorized"):
+            registry.claim("one", "alice")
+        with pytest.raises(NativeFairStreamDenied, match="duplicate or consumed"):
+            registry.stage(grant(model, "alice", "one"))
+
+
+def test_expiry_reclaims_tenant_capacity_for_new_request():
+    from unittest.mock import patch
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION,
+        max_stage_age_ns=10, budget=NativePromptBudget(
+            max_staged_bytes=5, max_staged_bytes_per_tenant=5))
+    with patch("skeleton.ai.model_runtime.native_fair_stream_backend.monotonic_ns",
+               side_effect=[100, 111, 111]):
+        registry.stage(grant(model, "alice", "one"))
+        registry.stage(grant(model, "bob", "two"))
+        assert registry.budget_status()["staged_bytes"] == 5
+    assert registry.claim("two", "bob").request_id == "two"
+
+
+def test_prompt_claim_before_deadline_succeeds_once():
+    from unittest.mock import patch
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION, max_stage_age_ns=10)
+    with patch("skeleton.ai.model_runtime.native_fair_stream_backend.monotonic_ns",
+               side_effect=[100, 109]):
+        registry.stage(grant(model, "alice", "one"))
+        assert registry.claim("one", "alice").request_id == "one"
+
+
+@pytest.mark.parametrize("invalid", [0, -1, True, 1.5, 3_600_000_000_001])
+def test_invalid_staging_lifetime_denied(invalid):
+    with pytest.raises(NativeFairStreamDenied, match="lifetime"):
+        NativePromptRegistry(session_id=SESSION, max_stage_age_ns=invalid)
+
+
+@pytest.mark.parametrize("invalid_clock", [True, -1, "unknown"])
+def test_unknown_prompt_clock_fails_closed_without_grant(invalid_clock):
+    from unittest.mock import patch
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    with patch("skeleton.ai.model_runtime.native_fair_stream_backend.monotonic_ns",
+               return_value=invalid_clock):
+        with pytest.raises(NativeFairStreamDenied, match="clock"):
+            registry.stage(grant(model, "alice", "one"))
+    assert registry._staged == {}
+
+
+def test_clock_regression_denies_claim_without_releasing_grant():
+    from unittest.mock import patch
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    with patch("skeleton.ai.model_runtime.native_fair_stream_backend.monotonic_ns",
+               side_effect=[100, 99]):
+        registry.stage(grant(model, "alice", "one"))
+        with pytest.raises(NativeFairStreamDenied, match="clock"):
+            registry.claim("one", "alice")
+    assert registry._staged["one"].tenant_id == "alice"
+
+
+def test_timestamp_registry_corruption_denies_telemetry_and_claim():
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    registry.stage(grant(model, "alice", "one"))
+    registry._staged_at.clear()
+    with pytest.raises(NativeFairStreamDenied, match="timestamp invariant"):
+        registry.status()
+    with pytest.raises(NativeFairStreamDenied, match="timestamp invariant"):
+        registry.claim("one", "alice")
+
+
+def test_surrogate_tenant_or_request_is_typed_denial():
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    with pytest.raises(NativeFairStreamDenied):
+        registry.revoke("\ud800")
+    with pytest.raises(NativeFairStreamDenied):
+        grant(model, "\ud800", "one")
