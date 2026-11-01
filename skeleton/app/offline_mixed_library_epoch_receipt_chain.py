@@ -11,11 +11,14 @@ import argparse
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Sequence
 
-from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+from skeleton.ai.game_builder.dual_runtime_verify import (
+    _assert_original_root, _canonical_bytes, _read, _root_fd,
+)
 from skeleton.app.offline_delivery_assurance import _save_identity
 from skeleton.app.offline_game_library_audit import _unique_pairs
 from skeleton.app.offline_mixed_library_epoch_chain import (
@@ -224,25 +227,79 @@ def _parse_checkpoint(raw: str) -> EpochReceiptCheckpoint:
     )
 
 
+def _read_checkpoint_file(path: str | Path) -> EpochReceiptCheckpoint:
+    """Read a private checkpoint descriptor-safely, never trusting its own pin.
+
+    Command-line JSON is retained for compatibility, but large batches should
+    use owner-private files to avoid shell argument limits and history exposure.
+    Two descriptor reads plus inode fencing reject path substitution; every
+    receipt SHA-256 still comes from operator custody, not the receipt itself.
+    """
+    if os.name != "posix" or type(path) is not str or not path:
+        raise OfflineMixedLibraryEpochReceiptChainError(
+            "POSIX owner-private checkpoint filename required"
+        )
+    target = Path(path).expanduser().absolute()
+    before = _save_identity(target)
+    parent_fd = _root_fd(target.parent)
+    try:
+        first = _read(
+            parent_fd, target.name, MAX_CHECKPOINT_JSON_BYTES,
+            owner_controlled=True,
+        )
+        second = _read(
+            parent_fd, target.name, MAX_CHECKPOINT_JSON_BYTES,
+            owner_controlled=True,
+        )
+        _assert_original_root(target.parent, parent_fd)
+    finally:
+        os.close(parent_fd)
+    if first != second or before != _save_identity(target):
+        raise OfflineMixedLibraryEpochReceiptChainError(
+            "checkpoint file inode or contents changed during import"
+        )
+    try:
+        raw = first.decode("utf-8", "strict")
+    except UnicodeError as exc:
+        raise OfflineMixedLibraryEpochReceiptChainError(
+            "checkpoint file must be UTF-8"
+        ) from exc
+    return _parse_checkpoint(raw)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton app audit-mixed-library-epoch-receipts",
         description="Independently replay a bounded series of pinned handoffs",
     )
-    parser.add_argument(
-        "--checkpoint", action="append", required=True,
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument(
+        "--checkpoint", action="append",
         help="JSON with unsigned_generations, signed_generations, receipt, sha256",
+    )
+    source.add_argument(
+        "--checkpoint-file", action="append",
+        help="owner-private UTF-8 checkpoint JSON file (POSIX, no symlinks)",
     )
     parser.add_argument("--trusted-local-operator", action="store_true")
     args = parser.parse_args(argv)
     try:
         if not args.trusted_local_operator:
             raise PermissionError("trusted local operator acknowledgement required")
-        if not 2 <= len(args.checkpoint) <= MAX_CHECKPOINTS:
+        supplied = args.checkpoint if args.checkpoint is not None else args.checkpoint_file
+        if not 2 <= len(supplied) <= MAX_CHECKPOINTS:
             raise OfflineMixedLibraryEpochReceiptChainError(
                 "2-5 checkpoints required"
             )
-        checkpoints = tuple(_parse_checkpoint(raw) for raw in args.checkpoint)
+        if args.checkpoint_file is not None:
+            names = [str(Path(p).expanduser().absolute()) for p in supplied]
+            if len(set(names)) != len(names):
+                raise OfflineMixedLibraryEpochReceiptChainError(
+                    "checkpoint file path reused"
+                )
+            checkpoints = tuple(_read_checkpoint_file(path) for path in supplied)
+        else:
+            checkpoints = tuple(_parse_checkpoint(raw) for raw in supplied)
         result = audit_mixed_library_epoch_receipt_chain(
             checkpoints, authorized=True,
         )

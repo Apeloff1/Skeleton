@@ -189,3 +189,105 @@ def test_checkpoint_duplicate_json_keys_rejected(capsys):
         "--trusted-local-operator",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def _private_checkpoint_file(path, payload):
+    import os
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        stream.write(payload)
+    return str(path)
+
+
+def test_private_checkpoint_files_replay_real_game_history(
+    catalog, tmp_path, capsys,
+):
+    """End-to-end CLI path: owner-private files -> pinned receipts -> replay."""
+    checkpoints = _checkpoints(catalog, tmp_path)
+    inline = _cli(checkpoints)
+    files = [
+        _private_checkpoint_file(
+            tmp_path / f"operator-checkpoint-{index}.json", inline[position + 1],
+        )
+        for index, position in enumerate(range(1, len(inline) - 1, 2))
+    ]
+    args = ["audit-mixed-library-epoch-receipts"]
+    for path in files:
+        args += ["--checkpoint-file", path]
+    args += ["--trusted-local-operator"]
+    assert run_app_cli(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["checkpoint_count"] == 3
+    assert result["all_pinned_receipts_reverified"] is True
+    assert result["all_historical_games_reexecuted"] is True
+    assert result["native_device_qualified"] is False
+    assert result["release_certified"] is False
+
+
+def test_private_checkpoint_files_reject_symlink_and_open_permissions(
+    tmp_path, capsys,
+):
+    target = tmp_path / "private.json"
+    _private_checkpoint_file(target, "{}")
+    symlink = tmp_path / "alias.json"
+    symlink.symlink_to(target)
+    args = ["audit-mixed-library-epoch-receipts", "--checkpoint-file"]
+    assert run_app_cli(
+        args + [str(symlink), "--checkpoint-file", str(target),
+                "--trusted-local-operator"]
+    ) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    os.chmod(target, 0o644)
+    assert run_app_cli(
+        args + [str(target), "--checkpoint-file", str(target) + "2",
+                "--trusted-local-operator"]
+    ) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_private_checkpoint_file_rejects_same_byte_inode_replacement(
+    tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_mixed_library_epoch_receipt_chain as module
+    source = tmp_path / "checkpoint.json"
+    _private_checkpoint_file(source, "{}")
+    original = module._read
+    calls = 0
+
+    def replace_after_first(*args, **kwargs):
+        nonlocal calls
+        data = original(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            replacement = tmp_path / "replacement.json"
+            _private_checkpoint_file(replacement, "{}")
+            os.replace(replacement, source)
+        return data
+
+    monkeypatch.setattr(module, "_read", replace_after_first)
+    with pytest.raises(ValueError):
+        module._read_checkpoint_file(str(source))
+    assert calls == 2
+
+
+def test_checkpoint_file_cli_rejects_mixed_input_and_oversize(tmp_path, capsys):
+    from skeleton.app.offline_mixed_library_epoch_receipt_chain import (
+        MAX_CHECKPOINT_JSON_BYTES,
+    )
+    oversized = tmp_path / "oversized.json"
+    _private_checkpoint_file(
+        oversized, "x" * (MAX_CHECKPOINT_JSON_BYTES + 1),
+    )
+    base = ["audit-mixed-library-epoch-receipts"]
+    assert run_app_cli(
+        base + ["--checkpoint-file", str(oversized),
+                "--checkpoint-file", str(oversized) + "2",
+                "--trusted-local-operator"]
+    ) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    # argparse must reject ambiguous JSON/file mode instead of ignoring one.
+    assert run_app_cli(
+        base + ["--checkpoint", "{}",
+                "--checkpoint-file", str(oversized),
+                "--trusted-local-operator"]
+    ) == 2
