@@ -59,7 +59,8 @@ Commands:
     scene-patrol-solve  Find bounded legal routes through timed guards
     scene-patrol-author  Transactionally edit and preview timed patrols
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
-    scene-weather-play  Play weather-gated scenes with durable checkpoints\n    scene-weather-package  Export, verify and resume portable weather saves\n    scene-weather-author  Edit weather gates with source-fenced playable previews\n    scene-weather  Play deterministic weather-gated scene travel and replay
+    scene-weather-play  Play weather-gated scenes with durable checkpoints\n    weather-market  Play and settle replay-verified offline caravan trade
+    scene-weather-package  Export, verify and resume portable weather saves\n    scene-weather-author  Edit weather gates with source-fenced playable previews\n    scene-weather  Play deterministic weather-gated scene travel and replay
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -808,6 +809,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "weather-deliveries-plan":
         from skeleton.game.gameplay.scene_weather_delivery_solver import cli as delivery_plan_cli
         return delivery_plan_cli(rest)
+    if cmd == "weather-market":
+        from skeleton.game.gameplay.scene_weather_market import cli as market_cli
+        return market_cli(rest)
     if cmd == "weather-deliveries":
         from skeleton.game.gameplay.scene_weather_delivery import cli as delivery_cli
         return delivery_cli(rest)
