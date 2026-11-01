@@ -147,3 +147,18 @@ def test_provenance_build_refuses_symlinked_parent_directory(built, tmp_path):
     linked_dir.symlink_to(out, target_is_directory=True)
     with pytest.raises(ValueError, match="symlink"):
         provenance.build(root, "4.7.2", "SHIP", {"Linux": linked_dir / "gfd_fixture.x86_64"})
+
+
+def test_manifest_loads_rejects_traversal_duplicate_and_oversized_evidence(built):
+    root, out = built
+    m = provenance.build(root, "4.7.2", "SHIP", {"Linux": out / "gfd_fixture.x86_64"})
+    doc = json.loads(m.dumps())
+    doc["artifacts"][0]["path"] = "../outside"
+    with pytest.raises(ValueError, match="unsafe artifact path"):
+        provenance.Manifest.loads(json.dumps(doc))
+    doc = json.loads(m.dumps())
+    doc["artifacts"].append(dict(doc["artifacts"][0]))
+    with pytest.raises(ValueError, match="duplicated"):
+        provenance.Manifest.loads(json.dumps(doc))
+    with pytest.raises(ValueError, match="byte bound"):
+        provenance.Manifest.loads(" " * (8 * 1024 * 1024 + 1))

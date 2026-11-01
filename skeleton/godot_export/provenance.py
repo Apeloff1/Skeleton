@@ -97,11 +97,35 @@ class Manifest:
 
     @classmethod
     def loads(cls, text: str) -> "Manifest":
-        d = json.loads(text)
-        if d.get("schema") != SCHEMA:
-            raise ValueError(f"unknown provenance schema {d.get('schema')!r}")
-        return cls(d["project"], d["tree"], d["engine"], d["verdict"], d.get("git"),
-                   [Artifact(**a) for a in d.get("artifacts", [])])
+        if type(text) is not str or len(text.encode("utf-8")) > 8 * 1024 * 1024:
+            raise ValueError("provenance manifest exceeds byte bound")
+        try:
+            d = json.loads(text)
+        except (ValueError, RecursionError) as exc:
+            raise ValueError("invalid provenance JSON") from exc
+        if type(d) is not dict or d.get("schema") != SCHEMA:
+            raise ValueError("unknown provenance schema")
+        items = d.get("artifacts")
+        if type(items) is not list or len(items) > 256:
+            raise ValueError("provenance artifacts exceed bound")
+        artifacts: list[Artifact] = []
+        seen: set[str] = set()
+        for item in items:
+            if type(item) is not dict or set(item) != {"preset", "path", "sha256", "size"}:
+                raise ValueError("provenance artifact shape invalid")
+            rel = _safe_relative(item["path"]).as_posix()
+            sha, size, preset = item["sha256"], item["size"], item["preset"]
+            if (rel in seen or type(preset) is not str or not 1 <= len(preset) <= 128
+                    or type(sha) is not str or len(sha) != 64
+                    or any(ch not in "0123456789abcdef" for ch in sha)
+                    or type(size) is not int or not 0 <= size <= 16 * 1024**3):
+                raise ValueError("provenance artifact identity invalid or duplicated")
+            seen.add(rel)
+            artifacts.append(Artifact(preset, rel, sha, size))
+        for name in ("project", "tree", "engine", "verdict"):
+            if type(d.get(name)) is not str or not d[name]:
+                raise ValueError("provenance metadata invalid")
+        return cls(d["project"], d["tree"], d["engine"], d["verdict"], d.get("git"), artifacts)
 
 
 def build(root: Path, engine: str, verdict: str, artifacts: dict[str, Path], base: Path | None = None) -> Manifest:
