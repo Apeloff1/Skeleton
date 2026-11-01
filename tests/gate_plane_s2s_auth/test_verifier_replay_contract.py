@@ -84,3 +84,21 @@ def test_external_capacity_signal_is_recognized_without_api_import():
 
     assert is_nonce_store_full(NonceStoreFull())
     assert not is_nonce_store_full(RuntimeError("unexpected store failure"))
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), True, "60", 10**1000])
+def test_local_nonce_double_rejects_nonfinite_or_unbounded_evidence(bad):
+    store = LocalNonceStoreDouble(clock=lambda: 1000.0)
+    assert store.check_and_record("s2s:svc", "n", bad, 60) is False
+    assert store.check_and_record("s2s:svc", "n", 1000, bad) is False
+    assert len(store) == 0
+
+
+def test_local_nonce_double_rejects_bad_clock_and_control_identifiers():
+    store = LocalNonceStoreDouble(clock=lambda: float("nan"))
+    assert store.check_and_record("s2s:svc", "n", 1000, 60) is False
+    store = LocalNonceStoreDouble(clock=lambda: 1000.0)
+    assert store.check_and_record("s2s:svc" + chr(10), "n", 1000, 60) is False
+    assert store.check_and_record("s2s:svc", "n" * 257, 1000, 60) is False
+    with pytest.raises(ValueError, match="max_entries"):
+        LocalNonceStoreDouble(max_entries=1_000_001)

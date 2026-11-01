@@ -61,6 +61,15 @@ def is_nonce_store(obj: object) -> bool:
     return callable(fn)
 
 
+def _finite_number(value: object) -> bool:
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
 class LocalNonceStoreDouble:
     """In-memory **test double** mirroring ``InMemoryNonceStore`` semantics.
 
@@ -71,7 +80,7 @@ class LocalNonceStoreDouble:
     """
 
     def __init__(self, max_entries: int = 100_000, *, clock: Optional[Callable[[], float]] = None) -> None:
-        if isinstance(max_entries, bool) or not isinstance(max_entries, int) or max_entries <= 0:
+        if type(max_entries) is not int or not 1 <= max_entries <= 1_000_000:
             raise ValueError("max_entries must be a positive integer")
         self.max_entries = max_entries
         self._clock = clock if clock is not None else time.time
@@ -81,11 +90,16 @@ class LocalNonceStoreDouble:
         self.full_rejections = 0
 
     def check_and_record(self, scope: str, nonce: str, ts: float, ttl_s: float) -> bool:
-        if not isinstance(scope, str) or not scope or not isinstance(nonce, str) or not nonce:
+        if (type(scope) is not str or not 1 <= len(scope) <= 256
+                or type(nonce) is not str or not 1 <= len(nonce) <= 256
+                or any(ord(char) < 32 or ord(char) == 127 for char in scope + nonce)):
             return False
-        if ttl_s is None or ttl_s <= 0:
+        if (not _finite_number(ts) or not _finite_number(ttl_s)
+                or not 0 < ttl_s <= 1_000_000_000_000):
             return False
         now = self._clock()
+        if not _finite_number(now):
+            return False
         key = (scope, nonce)
         with self._lock:
             self.calls += 1
