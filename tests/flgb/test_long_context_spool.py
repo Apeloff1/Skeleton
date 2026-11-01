@@ -156,6 +156,32 @@ class TestLongContextSpool(unittest.TestCase):
         with self.assertRaises(LongContextSpoolError):
             blocked.stage(self.sequence)
 
+    def test_reject_hardlinked_immutable_object_and_checkpoint(self):
+        if os.name != "posix" or not hasattr(os, "link"):
+            self.skipTest("POSIX hardlink inode validation")
+        start = self.stage()
+        receipt, _ = self.spool.load(
+            start, expected_tokenizer_digest=TOKENIZER,
+        )
+        for kind, digest in (("object", receipt.object_digest),
+                             ("checkpoint", start)):
+            with self.subTest(kind=kind):
+                path = self.spool._path(kind, digest)
+                alias = Path(self.directory.name) / ("alias-" + kind)
+                try:
+                    os.link(path, alias)
+                except (OSError, NotImplementedError):
+                    self.skipTest("hardlink unavailable")
+                try:
+                    with self.assertRaisesRegex(LongContextSpoolError, "owner or mode"):
+                        self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
+                    if kind == "object":
+                        with self.assertRaisesRegex(LongContextSpoolError, "owner or mode"):
+                            self.stage()
+                finally:
+                    alias.unlink()
+
+
     def test_reject_symlinked_object(self):
         if not hasattr(os, "symlink"):
             self.skipTest("symlink unavailable")

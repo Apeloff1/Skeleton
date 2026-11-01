@@ -41,6 +41,7 @@ def _require_private_spool_file(fd: int) -> None:
     info = os.fstat(fd)
     if (not stat.S_ISREG(info.st_mode)
             or info.st_uid != os.geteuid()
+            or info.st_nlink != 1
             or stat.S_IMODE(info.st_mode) != 0o600):
         raise LongContextSpoolError("spool object owner or mode is untrusted")
 
