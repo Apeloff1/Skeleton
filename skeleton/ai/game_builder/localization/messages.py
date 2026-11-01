@@ -215,15 +215,24 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
 
     def render(nodes, number=None) -> str:
         out: list[str] = []
+        rendered_chars = 0
+
+        def append_bounded(piece: str) -> None:
+            nonlocal rendered_chars
+            rendered_chars += len(piece)
+            if rendered_chars > MAX_RENDERED_CHARS:
+                raise MessageError("rendered message exceeds output bound")
+            out.append(piece)
+
         for n in nodes:
             if isinstance(n, str):
-                out.append(n)
+                append_bounded(n)
             elif isinstance(n, Hash):
-                out.append(str(number))
+                append_bounded(str(number))
             elif isinstance(n, Arg):
                 if n.name not in args:
                     raise MessageError(f"missing argument {n.name!r}")
-                out.append(val(args[n.name]))
+                append_bounded(val(args[n.name]))
             else:
                 if n.name not in args:
                     raise MessageError(f"missing argument {n.name!r}")
@@ -234,12 +243,9 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
                         raise MessageError(f"plural argument {n.name!r} must be a bounded finite number")
                     exact = f"={v}" if float(v).is_integer() else None
                     key = exact if exact in n.options else plural_category(locale, v)
-                    out.append(render(n.options.get(key, n.options["other"]), v))
+                    append_bounded(render(n.options.get(key, n.options["other"]), v))
                 else:
-                    out.append(render(n.options.get(str(v), n.options["other"]), number))
-        result = "".join(out)
-        if len(result) > MAX_RENDERED_CHARS:
-            raise MessageError("rendered message exceeds output bound")
-        return result
+                    append_bounded(render(n.options.get(str(v), n.options["other"]), number))
+        return "".join(out)
 
     return render(parse_message(text))

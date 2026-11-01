@@ -147,3 +147,23 @@ def test_plural_numeric_exponent_and_format_arguments_are_bounded():
         format_message("{n, plural, other {#}}", {"n": float("inf")}, "en")
     with pytest.raises(MessageError, match="text bound"):
         format_message("{name}", {"name": "x" * 100_000}, "en")
+
+
+def test_rendered_message_budget_stops_before_unbounded_argument_expansion():
+    class CountedArgs(dict):
+        reads = 0
+
+        def __getitem__(self, key):
+            self.reads += 1
+            return super().__getitem__(key)
+
+    args = CountedArgs(name="x" * 1024)
+    with pytest.raises(MessageError, match="output bound"):
+        format_message("{name}" * 1000, args, "en")
+    assert args.reads < 100
+
+
+def test_nested_render_budget_is_cumulative_across_selects():
+    message = "{s, select, a {" + "{name}" * 70 + "} other {safe}}"
+    with pytest.raises(MessageError, match="output bound"):
+        format_message(message, {"s": "a", "name": "x" * 1024}, "en")
