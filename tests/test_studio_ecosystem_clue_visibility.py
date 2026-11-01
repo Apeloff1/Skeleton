@@ -173,3 +173,56 @@ def test_private_playable_publication_is_deterministic_and_no_overwrite(tmp_path
     with pytest.raises(StudioQuestError):
         publish_clue_playable(docs, {**report, "visible_count": 100},
                               tmp_path, authorized=True)
+
+
+def test_offline_editor_source_bound_export_import_and_private_publication(tmp_path):
+    from skeleton.ai.game_builder.studio_ecosystem_clue_editor import (
+        EXPORT_SCHEMA, render_clue_editor, load_clue_editor_export,
+        publish_clue_editor,
+    )
+    docs, source, session = fixture()
+    report = propose_clue_visibility(
+        docs, [], PROMPT, authorized=True, expected_source_digest=source)["detail"]
+    html, receipt = render_clue_editor(docs, report, authorized=True)
+    assert sha256(html).hexdigest() == receipt["html_sha256"]
+    assert b"Content-Security-Policy" in html
+    assert b"Export typed clue edits" in html
+    published = publish_clue_editor(docs, report, tmp_path, authorized=True)
+    assert published["file_write_performed"] is True
+    assert (tmp_path / "clue_editor.html").stat().st_mode & 0o077 == 0
+    with pytest.raises(FileExistsError):
+        publish_clue_editor(docs, report, tmp_path, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": report["project_id"],
+        "source_digest": source, "session_digest": report["session_digest"],
+        "baseline_clue_digest": report["clue_digest"],
+        "authoring": report["authoring"],
+    }
+    path = tmp_path / "export.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    imported = load_clue_editor_export(
+        path, authorized=True, expected_project_id=report["project_id"],
+        expected_source_digest=source, expected_session_digest=report["session_digest"],
+        expected_baseline_digest=report["clue_digest"])
+    assert imported == report["authoring"]
+    assert compile_clue_visibility(docs, [], imported, authorized=True,
+                                   expected_source_digest=source) == report
+    with pytest.raises(StudioQuestError):
+        load_clue_editor_export(
+            path, authorized=True, expected_project_id=report["project_id"],
+            expected_source_digest=source, expected_session_digest=report["session_digest"],
+            expected_baseline_digest="0" * 64)
+    path.write_text('{"schema":"one","schema":"two"}', encoding="utf-8")
+    with pytest.raises(StudioQuestError):
+        load_clue_editor_export(
+            path, authorized=True, expected_project_id=report["project_id"],
+            expected_source_digest=source, expected_session_digest=report["session_digest"],
+            expected_baseline_digest=report["clue_digest"])
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_clue_editor_export(
+            path, authorized=True, expected_project_id=report["project_id"],
+            expected_source_digest=source, expected_session_digest=report["session_digest"],
+            expected_baseline_digest=report["clue_digest"])

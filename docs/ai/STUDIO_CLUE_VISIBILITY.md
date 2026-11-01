@@ -38,3 +38,17 @@ then final-head CI. Reject pending/skipped/cancelled checks as evidence.
 Rollback is removal of the opt-in adapter and authored receipt; canonical
 source is unchanged. Maximum 64 clues, 64 quest actions, bounded canonical
 request/receipt and no external network calls.
+
+## Private offline editing
+
+Supply `--editor-directory <private-existing-dir>` with a compiled prompt
+or authoring request to publish a CSP-hashed accessible HTML editor. It
+renders only operator-authorized source-replayed authoring, with editable
+textareas and a JSON export button. No browser network or provider access.
+Reimport with `--import-authoring <private-export.json>` and
+`--baseline-authoring <exact-original-authoring-json>`. The export must be
+owner-private (0600 on POSIX) and the containing directory private. The
+import binds project, canonical source, quest session and baseline receipt
+digest; the resulting edited authoring must pass the full canonical compiler
+before any durable publication or playable handoff. Hidden clues are
+operator-visible in this private editor, never in public player handoffs.

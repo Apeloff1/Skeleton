@@ -21,12 +21,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--actions", default="[]")
     ap.add_argument("--prompt")
     ap.add_argument("--authoring")
+    ap.add_argument("--import-authoring", type=Path)
+    ap.add_argument("--baseline-authoring")
+    ap.add_argument("--editor-directory", type=Path)
     ap.add_argument("--restore", type=Path)
     ap.add_argument("--publish", type=Path)
     ap.add_argument("--handoff-manifest", action="store_true")
     ap.add_argument("--publish-playable", type=Path)
     args = ap.parse_args(argv)
-    if sum(x is not None for x in (args.prompt, args.authoring, args.restore)) != 1:
+    if sum(x is not None for x in (args.prompt, args.authoring, args.import_authoring, args.restore)) != 1:
         ap.error("choose exactly one prompt, authoring or restore")
     if args.restore and args.publish:
         ap.error("cannot overwrite a restored receipt")
@@ -49,12 +52,36 @@ def main(argv: list[str] | None = None) -> int:
             report = proposal["detail"]
             result = {"proposal": proposal, "clues": report}
         else:
-            authoring = _strict(args.authoring, max_bytes=32768)
+            if args.import_authoring:
+                from skeleton.ai.game_builder.studio_ecosystem_clue_editor import (
+                    load_clue_editor_export,
+                )
+                if args.baseline_authoring is None:
+                    raise StudioQuestError("import requires exact baseline authoring")
+                baseline = _strict(args.baseline_authoring, max_bytes=32768)
+                original = compile_clue_visibility(
+                    docs, actions, baseline, authorized=True,
+                    expected_source_digest=args.expected_source,
+                    expected_session_digest=args.expected_session)
+                authoring = load_clue_editor_export(
+                    args.import_authoring, authorized=True,
+                    expected_project_id=original["project_id"],
+                    expected_source_digest=original["source_digest"],
+                    expected_session_digest=original["session_digest"],
+                    expected_baseline_digest=original["clue_digest"])
+            else:
+                authoring = _strict(args.authoring, max_bytes=32768)
             report = compile_clue_visibility(
                 docs, actions, authoring, authorized=True,
                 expected_source_digest=args.expected_source,
                 expected_session_digest=args.expected_session)
             result = {"clues": report}
+        if args.editor_directory:
+            from skeleton.ai.game_builder.studio_ecosystem_clue_editor import (
+                publish_clue_editor,
+            )
+            result["editor"] = publish_clue_editor(
+                docs, report, args.editor_directory, authorized=True)
         if args.publish:
             result["publication"] = publish_clue_visibility(
                 docs, report, args.publish, authorized=True)
