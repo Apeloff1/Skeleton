@@ -98,6 +98,11 @@ def parse_limit(raw: int | str | None) -> int:
     try:
         if type(raw) not in (int, str):
             raise ValueError("non-integer limit")
+        if type(raw) is str and (
+            not 1 <= len(raw) <= 3 or not raw.isascii() or not raw.isdecimal()
+            or (len(raw) > 1 and raw.startswith("0"))
+        ):
+            raise ValueError("non-canonical limit encoding")
         value = int(raw)
     except (TypeError, ValueError):
         raise validation("CORE.PAGINATION.INVALID_LIMIT", "limit must be an integer",

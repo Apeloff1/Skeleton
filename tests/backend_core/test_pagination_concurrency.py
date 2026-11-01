@@ -100,3 +100,13 @@ def test_limit_rejects_non_integer_input_types_without_truncation():
         with pytest.raises(CoreError) as exc:
             parse_limit(bad)
         assert exc.value.code == "CORE.PAGINATION.INVALID_LIMIT"
+
+
+def test_limit_rejects_noncanonical_decimal_aliases():
+    for bad in ("", "00", "01", "001", "+1", "-1", " 1", "1 ", "1.0",
+                "１２", "١", "0001", "1\\n"):
+        with pytest.raises(CoreError) as exc:
+            parse_limit(bad)
+        assert exc.value.code == "CORE.PAGINATION.INVALID_LIMIT"
+    assert parse_limit("1") == 1
+    assert parse_limit("200") == 200
