@@ -54,6 +54,7 @@ Commands:
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat      Run and replay deterministic offline turn combat encounters
     tournament-author  Edit and preview replay-verifiable tournament brackets
+    combat-league-author  Transactionally edit and preview offline league
     combat-league  Play source-bound offline eight-entrant combat league
     combat-tournament  Play and replay a source-bound four-entrant bracket
     combat-inspect  Inspect verified combat timelines and compare saved branches
@@ -790,6 +791,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "tournament-author":
         from skeleton.game.gameplay.combat_tournament_author import cli as author_cli
         return author_cli(rest)
+    if cmd == "combat-league-author":
+        from skeleton.game.gameplay.combat_league_author import cli as league_author_cli
+        return league_author_cli(rest)
     if cmd == "combat-league":
         from skeleton.game.gameplay.combat_league import cli as league_cli
         return league_cli(rest)
