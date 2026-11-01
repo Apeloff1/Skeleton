@@ -88,13 +88,34 @@ def _parse(raw: bytes, *, project_id: str, manifest_pin: str) -> list[tuple[str,
 
 
 def _file_identity(fd: int, path: str) -> tuple[int, ...]:
-    handle = _child_fd(fd, _parts(path), directory=False)
+    """Bind both the claimed inode and each path ancestor's directory inode.
+
+    A source directory can be exchanged while its original file inodes are
+    moved into the replacement directory. File hashes and file-only inode
+    checks cannot distinguish that directory substitution.
+    """
+    parts = _parts(path)
+    ancestor_identity: list[int] = []
+    for depth in range(1, len(parts)):
+        parent = _child_fd(fd, parts[:depth], directory=True)
+        try:
+            directory = os.fstat(parent)
+            if not stat.S_ISDIR(directory.st_mode):
+                raise OriginalContentProvenanceError(
+                    "claimed source ancestor is not a directory"
+                )
+            ancestor_identity.extend((
+                directory.st_dev, directory.st_ino, directory.st_ctime_ns,
+            ))
+        finally:
+            os.close(parent)
+    handle = _child_fd(fd, parts, directory=False)
     try:
         info = os.fstat(handle)
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
                 or info.st_uid != os.geteuid() or info.st_mode & 0o022):
             raise OriginalContentProvenanceError("unsafe claimed source file")
-        return (
+        return tuple(ancestor_identity) + (
             info.st_dev, info.st_ino, info.st_size, info.st_nlink,
             info.st_uid, info.st_mode, info.st_mtime_ns, info.st_ctime_ns,
         )

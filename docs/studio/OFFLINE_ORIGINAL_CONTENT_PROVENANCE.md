@@ -37,3 +37,9 @@ and gameplay replay still match. Hostile inode replacement fails closed; it
 does not delete, quarantine, repair, sign, approve rights or certify release.
 This is point-in-time inspection, not a claim of exclusive filesystem locking
 or durable rollback protection against a privileged concurrent attacker.
+
+
+The custody identity also binds every intermediate claimed-source directory.
+Replacing a parent directory while moving the original child file inodes into
+it is rejected, even when all file hashes, source manifests, and gameplay
+replays remain identical. This check is descriptor-relative and read-only.

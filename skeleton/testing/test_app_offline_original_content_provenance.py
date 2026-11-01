@@ -227,3 +227,36 @@ def test_same_byte_source_inode_replacement_during_first_read_rejected(
         inspect_original_content_provenance(**data)
     assert swapped is True
     assert source.read_bytes() == original_bytes
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_same_file_inodes_with_replaced_parent_directory_rejected(
+    provenance, tmp_path, monkeypatch,
+):
+    """Replacing godot/ while moving its original files is not stable custody."""
+    import skeleton.app.offline_original_content_provenance as module
+
+    data, _ = provenance
+    source_root = data["installed_source"]
+    godot = source_root / "godot"
+    original_directory = tmp_path / "moved-original-godot"
+    original_file = godot / "project.godot"
+    original_inode = original_file.stat().st_ino
+    original_verify = module.verify_exported_package
+    calls = 0
+
+    def replace_parent_during_replay(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            os.rename(godot, original_directory)
+            godot.mkdir(mode=0o755)
+            for child in original_directory.iterdir():
+                os.rename(child, godot / child.name)
+            original_directory.rmdir()
+            assert (godot / "project.godot").stat().st_ino == original_inode
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(module, "verify_exported_package", replace_parent_during_replay)
+    with pytest.raises(OriginalContentProvenanceError, match="inode replaced"):
+        inspect_original_content_provenance(**data)
