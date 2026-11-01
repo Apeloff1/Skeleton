@@ -103,8 +103,15 @@ def compile_dialogue_staging(
             raise StudioQuestError("scene dialogue references unknown quest or NPC")
         npc = people[npc_id]
         beat = beats[index]
+        # Some original NPCs have a documented goal rather than an authored
+        # knowledge claim. Preserve that distinction instead of manufacturing
+        # a witness statement or rejecting an otherwise valid original cast.
+        cue_field = ("knows" if npc.get("knows") is not None else
+                     "goal" if npc.get("goal") is not None else "role")
+        cue_kind = {"knows": "npc_knowledge", "goal": "npc_goal",
+                    "role": "npc_role"}[cue_field]
         cues = [
-            ("npc_knowledge", npc.get("knows"), f"cast.support.{npc_id}.knows"),
+            (cue_kind, npc.get(cue_field), f"cast.support.{npc_id}.{cue_field}"),
             ("npc_relationship", npc.get("relationship"),
              f"cast.support.{npc_id}.relationship"),
             ("scene_goal", beat.get("goal"), f"narrative.plot_beats.{sid}.goal"),

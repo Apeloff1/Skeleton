@@ -206,3 +206,17 @@ def test_cli_strict_authoring_round_trip(capsys):
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--expected-source", source,
               "--authoring-json", '{"schema":"a","schema":"b"}'])
+
+
+def test_missing_authored_npc_knowledge_uses_goal_not_fabricated_testimony():
+    docs, source, _, staging = fixture()
+    rival = next(card for card in staging["cards"] if card["npc_id"] == "rival")
+    first = rival["authored_cues"][0]
+    assert first["kind"] == "npc_goal"
+    assert first["source_ref"] == "cast.support.rival.goal"
+    assert first["text"] == next(member["goal"] for member in
+                                 docs["cast"]["support"] if member["id"] == "rival")
+    facts = source_knowledge_facts(
+        docs, [], authorized=True, expected_source_digest=source)
+    assert all(fact["fact_id"] != rival["scene_id"] + ":npc_knowledge"
+               for fact in facts["facts"])
