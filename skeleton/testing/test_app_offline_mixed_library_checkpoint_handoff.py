@@ -138,3 +138,42 @@ def test_checkpoint_handoff_file_cli_requires_private_inputs(
     result = json.loads(capsys.readouterr().out)
     assert result["receipt_published"] is True
     assert result["release_certified"] is False
+
+
+def test_handoff_cli_detects_checkpoint_file_swap_during_publication(
+    catalog, tmp_path, monkeypatch, capsys,
+):
+    from skeleton.app import offline_mixed_library_checkpoint_handoff as module
+
+    checkpoints = _checkpoints(catalog, tmp_path)
+    inline = _cli(checkpoints)
+    files = [
+        _private_checkpoint_file(
+            tmp_path / f"swap-checkpoint-{index}.json", inline[position + 1],
+        )
+        for index, position in enumerate(range(1, len(inline) - 1, 2))
+    ]
+    original = module.publish_mixed_library_checkpoint_handoff
+
+    def swap_after_publication(*args, **kwargs):
+        result = original(*args, **kwargs)
+        target = Path(files[1])
+        replacement = tmp_path / "replacement-input.json"
+        _private_checkpoint_file(replacement, target.read_text())
+        os.replace(replacement, target)
+        return result
+
+    monkeypatch.setattr(
+        module, "publish_mixed_library_checkpoint_handoff",
+        swap_after_publication,
+    )
+    args = ["mixed-library-checkpoint-handoff"]
+    for file in files:
+        args += ["--checkpoint-file", file]
+    args += ["--output", str(tmp_path / "uncertain-handoff.json"),
+             "--trusted-local-operator"]
+    assert run_app_cli(args) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    # A post-publication failure is an uncertain receipt requiring quarantine;
+    # never delete or silently reissue it.
+    assert (tmp_path / "uncertain-handoff.json").exists()

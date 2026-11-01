@@ -291,3 +291,38 @@ def test_checkpoint_file_cli_rejects_mixed_input_and_oversize(tmp_path, capsys):
                 "--checkpoint-file", str(oversized),
                 "--trusted-local-operator"]
     ) == 2
+
+
+def test_checkpoint_file_cli_detects_same_byte_swap_during_replay(
+    catalog, tmp_path, monkeypatch, capsys,
+):
+    from pathlib import Path
+    from skeleton.app import offline_mixed_library_epoch_receipt_chain as module
+
+    checkpoints = _checkpoints(catalog, tmp_path)
+    inline = _cli(checkpoints)
+    files = [
+        _private_checkpoint_file(
+            tmp_path / f"chain-swap-{index}.json", inline[position + 1],
+        )
+        for index, position in enumerate(range(1, len(inline) - 1, 2))
+    ]
+    original = module.audit_mixed_library_epoch_receipt_chain
+
+    def swap_after_replay(*args, **kwargs):
+        result = original(*args, **kwargs)
+        target = Path(files[0])
+        replacement = tmp_path / "chain-swap-replacement.json"
+        _private_checkpoint_file(replacement, target.read_text())
+        os.replace(replacement, target)
+        return result
+
+    monkeypatch.setattr(
+        module, "audit_mixed_library_epoch_receipt_chain", swap_after_replay,
+    )
+    args = ["audit-mixed-library-epoch-receipts"]
+    for file in files:
+        args += ["--checkpoint-file", file]
+    args += ["--trusted-local-operator"]
+    assert run_app_cli(args) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"

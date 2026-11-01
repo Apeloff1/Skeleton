@@ -229,12 +229,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise OfflineMixedLibraryCheckpointHandoffError(
                 "2-5 checkpoints required"
             )
+        file_custody = None
         if args.checkpoint_file is not None:
             names = [str(Path(p).expanduser().absolute()) for p in supplied]
             if len(set(names)) != len(names):
                 raise OfflineMixedLibraryCheckpointHandoffError(
                     "checkpoint file path reused"
                 )
+            file_custody = tuple(_save_identity(p) for p in supplied)
             checkpoints = tuple(_read_checkpoint_file(p) for p in supplied)
         else:
             checkpoints = tuple(_parse_checkpoint(p) for p in supplied)
@@ -251,6 +253,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 checkpoints, args.inspect_receipt,
                 expected_receipt_sha256=args.expected_receipt_sha256,
                 authorized=True,
+            )
+        if file_custody is not None and (
+            file_custody != tuple(_save_identity(p) for p in supplied)
+            or checkpoints != tuple(_read_checkpoint_file(p) for p in supplied)
+            or file_custody != tuple(_save_identity(p) for p in supplied)
+        ):
+            raise OfflineMixedLibraryCheckpointHandoffError(
+                "checkpoint input changed during publication or replay"
             )
     except (PermissionError, OSError, ValueError, TypeError) as exc:
         print(json.dumps({

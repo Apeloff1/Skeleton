@@ -291,18 +291,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise OfflineMixedLibraryEpochReceiptChainError(
                 "2-5 checkpoints required"
             )
+        file_custody = None
         if args.checkpoint_file is not None:
             names = [str(Path(p).expanduser().absolute()) for p in supplied]
             if len(set(names)) != len(names):
                 raise OfflineMixedLibraryEpochReceiptChainError(
                     "checkpoint file path reused"
                 )
+            file_custody = tuple(_save_identity(path) for path in supplied)
             checkpoints = tuple(_read_checkpoint_file(path) for path in supplied)
         else:
             checkpoints = tuple(_parse_checkpoint(raw) for raw in supplied)
         result = audit_mixed_library_epoch_receipt_chain(
             checkpoints, authorized=True,
         )
+        if file_custody is not None and (
+            file_custody != tuple(_save_identity(path) for path in supplied)
+            or checkpoints != tuple(
+                _read_checkpoint_file(path) for path in supplied
+            )
+            or file_custody != tuple(_save_identity(path) for path in supplied)
+        ):
+            raise OfflineMixedLibraryEpochReceiptChainError(
+                "checkpoint input changed during full game replay"
+            )
     except (PermissionError, OSError, ValueError, TypeError) as exc:
         print(json.dumps({
             "schema": SCHEMA, "status": "blocked",
