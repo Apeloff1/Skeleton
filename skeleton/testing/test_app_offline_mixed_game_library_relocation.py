@@ -139,6 +139,38 @@ def test_tampered_relocated_unsigned_game_denied(relocated):
         _call(relocated)
 
 
+def test_malformed_signed_entry_rejected_before_custody_reads(
+    relocated, monkeypatch,
+):
+    import skeleton.app.offline_mixed_game_library_relocation as module
+    monkeypatch.setattr(
+        module, "_snapshot",
+        lambda *_: pytest.fail("invalid entry was read"),
+    )
+    old_unsigned, new_unsigned, _, new_signed = relocated
+    with pytest.raises((ValueError, TypeError)):
+        assure_mixed_game_library_relocation(
+            [old_unsigned], [new_unsigned], [object()], [new_signed],
+            authorized=True,
+        )
+
+
+def test_cross_mode_custody_alias_rejected_before_reads(
+    relocated, monkeypatch,
+):
+    import skeleton.app.offline_mixed_game_library_relocation as module
+    monkeypatch.setattr(
+        module, "_snapshot",
+        lambda *_: pytest.fail("cross-mode alias was read"),
+    )
+    old_unsigned, new_unsigned, old_signed, new_signed = relocated
+    with pytest.raises(OfflineMixedGameLibraryRelocationError, match="path alias"):
+        assure_mixed_game_library_relocation(
+            [replace(old_unsigned, archive=old_signed.archive)],
+            [new_unsigned], [old_signed], [new_signed], authorized=True,
+        )
+
+
 def test_missing_operator_authority_precedes_any_custody_reads(
     relocated, monkeypatch,
 ):

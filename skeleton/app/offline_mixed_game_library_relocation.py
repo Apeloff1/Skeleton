@@ -14,16 +14,18 @@ import sys
 from typing import Sequence
 
 from skeleton.app.offline_game_library_audit import (
-    OfflineGameLibraryEntry, parse_library_entry,
+    OfflineGameLibraryEntry, _validate as _validate_unsigned,
+    parse_library_entry,
 )
 from skeleton.app.offline_game_library_relocation import (
     assure_offline_library_relocation,
 )
 from skeleton.app.offline_mixed_game_library_audit import (
-    _snapshot, audit_mixed_game_library,
+    _paths, _snapshot, audit_mixed_game_library,
 )
 from skeleton.app.offline_signed_game_library_audit import (
-    SignedGameLibraryEntry, parse_signed_game_entry,
+    SignedGameLibraryEntry, _validate as _validate_signed,
+    parse_signed_game_entry,
 )
 from skeleton.app.offline_signed_game_library_relocation import (
     assure_signed_library_relocation,
@@ -76,6 +78,18 @@ def assure_mixed_game_library_relocation(
         raise OfflineMixedGameLibraryRelocationError(
             "matching bounded signed/unsigned library inventories required"
         )
+
+    # Reject malformed entries and cross-mode custody aliases before opening
+    # any game or historical signer material, on both sides independently.
+    for plain, trusted in ((before_unsigned, before_signed),
+                           (after_unsigned, after_signed)):
+        _validate_unsigned(plain)
+        _validate_signed(trusted)
+        plain_paths, trusted_paths = _paths(plain, trusted)
+        if plain_paths.intersection(trusted_paths):
+            raise OfflineMixedGameLibraryRelocationError(
+                "signed/unsigned custody path alias"
+            )
 
     old_roots = _roots(before_unsigned, before_signed)
     new_roots = _roots(after_unsigned, after_signed)
