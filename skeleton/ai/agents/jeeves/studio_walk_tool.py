@@ -2009,3 +2009,9 @@ from .studio_director_handoff_tool import (  # noqa: E402
 from .studio_director_authoring_tool import (  # noqa: E402
     director_authoring_tool_schema, execute_director_authoring_tool,
 )
+
+
+# Static source-leased original caption/audio cue rehearsal adapter.
+from .studio_audio_cue_tool import (  # noqa: E402
+    audio_cue_tool_schema, execute_audio_cue_tool,
+)

@@ -52,6 +52,7 @@ _TOOL_SYMBOLS = (
     ("scene_asset_binding_tool_schema", "execute_scene_asset_binding_tool"),
     ("director_handoff_tool_schema", "execute_director_handoff_tool"),
     ("director_authoring_tool_schema", "execute_director_authoring_tool"),
+    ("audio_cue_tool_schema", "execute_audio_cue_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
