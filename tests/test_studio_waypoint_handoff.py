@@ -231,3 +231,50 @@ def test_jeeves_tool_cannot_claim_operator_authority(source, monkeypatch):
              "arguments": {**request, "authorized": True}},
             authorized=True,
         )
+
+
+def test_offline_editor_typed_request_to_cli_and_csp(source, tmp_path,
+                                                      monkeypatch, capsys):
+    import scripts.studio_waypoint_handoff_cli as cli
+    from skeleton.ai.game_builder.studio_waypoint_handoff_editor import (
+        render_waypoint_handoff_editor_html, publish_waypoint_handoff_editor,
+    )
+    from skeleton.ai.agents.jeeves.studio_waypoint_handoff_tool import REQUEST_SCHEMA
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: source[0])
+    session = new_walk_receipt(source[0], authorized=True,
+                               expected_source_digest=DIGEST)
+    request = {
+        "schema": REQUEST_SCHEMA, "project_id": "original",
+        "expected_source_digest": DIGEST,
+        "expected_session_digest": session["session_digest"],
+        "session_receipt": session, "waypoints": [],
+        "max_hazard_contacts": 0,
+    }
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    assert cli.main([
+        "--project", "original", "--expected-source", DIGEST,
+        "--request-json", json.dumps(request),
+        "--editor-directory", str(private),
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["handoff"]["collision_replay_verified"]
+    assert output["editor"]["file_write_performed"]
+    html = render_waypoint_handoff_editor_html()
+    assert b"default-src 'none'" in html
+    assert b"connect-src 'none'" in html
+    assert b"studio_waypoint_handoff_request.v1" in html
+    with pytest.raises(FileExistsError):
+        publish_waypoint_handoff_editor(private, authorized=True)
+
+
+def test_preflight_rejects_nested_unbounded_session_without_serializing(source):
+    session = new_walk_receipt(source[0], authorized=True,
+                               expected_source_digest=DIGEST)
+    session["unexpected"] = ["x" * 1_000_000]
+    with pytest.raises(StudioQuestError, match="typed"):
+        plan(source, session)
+    session.pop("unexpected")
+    session["events"] = [["move", "x" * 5000]]
+    with pytest.raises(StudioQuestError, match="byte budget"):
+        plan(source, session)

@@ -19,7 +19,8 @@ from .studio_ecosystem_scene_schedule import (
     _canonical, _digest, _lease, _open_directory, _write_all,
 )
 from .studio_ecosystem_walk_replay import (
-    MAX_WALK_EVENTS, replay_walk, restore_walk_receipt, start_walk,
+    MAX_WALK_EVENTS, MAX_WALK_EVENT_BYTES, replay_walk,
+    restore_walk_receipt, start_walk, validate_walk_events,
 )
 from .studio_ecosystem_encounters import replay_hazard_health
 from .studio_waypoint_risk import compile_waypoint_risk
@@ -40,6 +41,57 @@ def new_walk_receipt(documents: Mapping[str, Any], *, authorized: bool,
     return session.receipt()
 
 
+
+
+def _bounded_walk_receipt(value: object) -> bytes:
+    """Preflight typed user data *before* JSON serialization or source replay.
+
+    A malicious caller may supply an arbitrarily large nested Python object;
+    neither serialization nor a client-supplied digest is a resource boundary.
+    """
+    fields = {
+        "schema", "project_id", "source_digest", "events", "scene_index",
+        "position", "choices", "accepted_moves", "session_digest",
+        "external_evidence_verified", "native_genre_runtime_verified",
+        "release_certified",
+    }
+    if type(value) is not dict or set(value) != fields:
+        raise StudioQuestError("invalid typed walk receipt for handoff")
+    if (value["schema"] != "skeleton.game_builder.studio_walk_replay.v1"
+            or type(value["project_id"]) is not str
+            or not 1 <= len(value["project_id"]) <= 128
+            or type(value["source_digest"]) is not str
+            or len(value["source_digest"]) != 64
+            or type(value["session_digest"]) is not str
+            or len(value["session_digest"]) != 64
+            or any(value[key] is not False for key in (
+                "external_evidence_verified", "native_genre_runtime_verified",
+                "release_certified"))
+            or type(value["scene_index"]) is not int
+            or not 0 <= value["scene_index"] <= MAX_WALK_EVENTS
+            or type(value["accepted_moves"]) is not int
+            or not 0 <= value["accepted_moves"] <= MAX_WALK_EVENTS
+            or type(value["position"]) is not list
+            or len(value["position"]) != 2
+            or any(type(n) is not int for n in value["position"])
+            or type(value["events"]) is not list
+            or type(value["choices"]) is not list
+            or len(value["choices"]) > MAX_WALK_EVENTS):
+        raise StudioQuestError("invalid bounded walk receipt contract")
+    validate_walk_events(value["events"])
+    for choice in value["choices"]:
+        if (type(choice) is not list or len(choice) != 2
+                or any(type(text) is not str
+                       or len(text) > MAX_WALK_EVENT_BYTES
+                       or len(text.encode("utf-8", "strict")) > MAX_WALK_EVENT_BYTES
+                       for text in choice)):
+            raise StudioQuestError("invalid bounded walk choice history")
+    raw = _canonical(value)
+    if len(raw) > MAX_BYTES:
+        raise StudioQuestError("walk receipt exceeds handoff byte budget")
+    return raw
+
+
 def compile_waypoint_handoff(
     documents: Mapping[str, Any], session_receipt: object, *,
     waypoints: object, max_hazard_contacts: int, authorized: bool,
@@ -50,11 +102,7 @@ def compile_waypoint_handoff(
         raise PermissionError("waypoint handoff requires authorization")
     _lease(expected_source_digest, "waypoint handoff source")
     _lease(expected_session_digest, "waypoint handoff session")
-    if type(session_receipt) is not dict:
-        raise StudioQuestError("typed walk receipt required for handoff")
-    raw = _canonical(session_receipt)
-    if len(raw) > MAX_BYTES:
-        raise StudioQuestError("walk receipt exceeds handoff byte budget")
+    raw = _bounded_walk_receipt(session_receipt)
     before = restore_walk_receipt(documents, raw, authorized=True)
     if (before.source_digest != expected_source_digest
             or before.digest != expected_session_digest):

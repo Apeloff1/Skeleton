@@ -31,3 +31,14 @@ bounded payloads, source/session leases, exact collision and health replay,
 no action after defeat, no implicit quest choice, and no claims about native
 devices or external evidence. Run focused tests and exact-head CI before
 promoting or merging this WIP branch.
+
+## Offline editor round trip
+
+Add `--editor-directory /path/to/private-0700-directory` to a successful
+CLI compilation. Open the private HTML file, paste the source/session SHA-256
+leases and canonical walk receipt, edit waypoint coordinates and hazard budget,
+then copy the exported typed JSON into `--request-json`. The CLI verifies the
+request's project and source against its explicit arguments, replays collision
+and health, and optionally publishes the new immutable playable handoff. The
+editor never runs game logic or sends data over a network. Its inline script
+and CSS are CSP hash-bound; all dynamic output uses textarea values.
