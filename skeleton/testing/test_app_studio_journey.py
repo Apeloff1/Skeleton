@@ -487,3 +487,45 @@ def test_first_run_rejects_intent_changed_between_descriptor_reads(
     assert reads == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert not output.exists()
+
+
+def test_first_run_rejects_same_byte_intent_inode_substitution(
+    tmp_path, capsys, monkeypatch,
+):
+    from skeleton.app import studio_journey
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    real_read = studio_journey._read
+    reads = 0
+
+    def replace_same_bytes_after_first(fd, path, budget, **kwargs):
+        nonlocal reads
+        value = real_read(fd, path, budget, **kwargs)
+        reads += 1
+        if reads == 1:
+            source.rename(tmp_path / "old-intent.json")
+            source.write_bytes(value)
+        return value
+
+    monkeypatch.setattr(studio_journey, "_read", replace_same_bytes_after_first)
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert reads == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()
+
+
+def test_first_run_rejects_deeply_nested_intent_json_without_export(
+    tmp_path, capsys,
+):
+    source = tmp_path / "intent.json"
+    source.write_bytes(b"[" * 1500 + b"0" + b"]" * 1500)
+    output = tmp_path / "game"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not output.exists()

@@ -281,3 +281,17 @@ replay or save the actual original game offline. An interrupted install leaves
 a nonqualified directory for explicit operator quarantine; it is never
 mistaken for a completed consumer installation. This is source-level
 installation, not a signed package, native device test or release approval.
+
+
+### First-run original intent custody
+
+The app first-run importer now pins the original intent file's device, inode,
+size, link count, ownership, mode and nanosecond timestamps across two
+bounded nofollow descriptor reads. Identical JSON bytes from a substituted
+inode are not accepted as continuous source custody. The parent directory
+remains independently re-opened and checked before the intent can reach the
+canonical game builder. Excessively nested JSON is a typed fail-closed input
+rejection, never a partially exported game. This is a POSIX source-custody
+contract, not hardware or consumer-device qualification.
+
+Focused acceptance: `python -m pytest -q skeleton/testing/test_app_studio_journey.py`.

@@ -101,6 +101,10 @@ def _load_operator_intent(path: str | Path) -> GameBuildIntent:
     except (OSError, TypeError, ValueError) as exc:
         raise FirstPlayableJourneyError("unsafe intent parent") from exc
     try:
+        # Two equal byte reads are insufficient: the input can be replaced by
+        # a different inode containing identical JSON between opens. Capture
+        # identity through the already pinned nofollow parent descriptor.
+        before = os.stat(source.name, dir_fd=parent_fd, follow_symlinks=False)
         raw = _read(
             parent_fd, source.name, MAX_INPUT_BYTES, owner_controlled=True,
         )
@@ -108,6 +112,12 @@ def _load_operator_intent(path: str | Path) -> GameBuildIntent:
             parent_fd, source.name, MAX_INPUT_BYTES, owner_controlled=True,
         ) != raw:
             raise FirstPlayableJourneyError("original game intent changed during import")
+        after = os.stat(source.name, dir_fd=parent_fd, follow_symlinks=False)
+        def identity(info):
+            return (info.st_dev, info.st_ino, info.st_size, info.st_nlink,
+                    info.st_uid, info.st_mode, info.st_mtime_ns, info.st_ctime_ns)
+        if identity(before) != identity(after):
+            raise FirstPlayableJourneyError("original game intent inode changed during import")
         _assert_original_root(source.parent, parent_fd)
     finally:
         os.close(parent_fd)
@@ -119,7 +129,7 @@ def _load_operator_intent(path: str | Path) -> GameBuildIntent:
                 FirstPlayableJourneyError("nonfinite intent value")
             ),
         )
-    except (UnicodeError, ValueError, TypeError) as exc:
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise FirstPlayableJourneyError("invalid bounded intent JSON") from exc
     if type(payload) is not dict:
         raise FirstPlayableJourneyError("original intent must be a JSON object")
