@@ -152,3 +152,86 @@ def test_cli_and_typed_jeeves_router(capsys):
     with pytest.raises(StudioQuestError):
         execute_temporal_scenarios_tool({**request, "authorized": True},
                                         authorized=True)
+
+def test_editor_render_import_replay_and_private_custody(tmp_path):
+    from hashlib import sha256
+    from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import (
+        EXPORT_SCHEMA, render_temporal_scenarios_editor,
+        load_temporal_scenarios_editor_export, publish_temporal_scenarios_editor,
+    )
+    docs, source, baseline = fixture()
+    report = propose_temporal_scenarios(
+        docs, [], baseline, PROMPT, authorized=True,
+        expected_source_digest=source)
+    html, proof = render_temporal_scenarios_editor(
+        docs, report, authorized=True)
+    assert sha256(html).hexdigest() == proof["html_sha256"]
+    assert b"Content-Security-Policy" in html
+    assert b"Export typed scenario edits" in html
+    assert publish_temporal_scenarios_editor(
+        docs, report, tmp_path, authorized=True)["file_write_performed"]
+    assert (tmp_path / "temporal_scenarios_editor.html").stat().st_mode & 0o077 == 0
+    with pytest.raises(FileExistsError):
+        publish_temporal_scenarios_editor(
+            docs, report, tmp_path, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": report["project_id"],
+        "source_digest": source, "session_digest": report["session_digest"],
+        "baseline_scenario_digest": report["scenario_digest"],
+        "candidates": report["candidates"],
+    }
+    path = tmp_path / "edits.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    kwargs = {"authorized": True, "expected_project_id": report["project_id"],
+              "expected_source_digest": source,
+              "expected_session_digest": report["session_digest"],
+              "expected_baseline_digest": report["scenario_digest"]}
+    assert load_temporal_scenarios_editor_export(path, **kwargs) == report["candidates"]
+    with pytest.raises(StudioQuestError):
+        load_temporal_scenarios_editor_export(
+            path, **{**kwargs, "expected_baseline_digest": "0" * 64})
+    path.write_text('{"schema":"a","schema":"b"}', encoding="utf-8")
+    with pytest.raises(StudioQuestError):
+        load_temporal_scenarios_editor_export(path, **kwargs)
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_temporal_scenarios_editor_export(path, **kwargs)
+
+
+def test_cli_editor_import_requires_exact_original_scenario_lease(tmp_path, capsys):
+    from scripts.studio_temporal_scenarios_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import EXPORT_SCHEMA
+    docs, source, baseline = fixture()
+    original = propose_temporal_scenarios(
+        docs, [], baseline, PROMPT, authorized=True,
+        expected_source_digest=source)
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--baseline-authoring", json.dumps(baseline), "--prompt",
+                 "--editor-directory", str(tmp_path)]) == 0
+    assert json.loads(capsys.readouterr().out)["editor"]["file_write_performed"]
+    path = tmp_path / "edits.json"
+    path.write_text(json.dumps({
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": original["session_digest"],
+        "baseline_scenario_digest": original["scenario_digest"],
+        "candidates": original["candidates"],
+    }), encoding="utf-8")
+    path.chmod(0o600)
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--baseline-authoring", json.dumps(baseline),
+                 "--baseline-scenarios", json.dumps(original),
+                 "--import-candidates", str(path), "--select", "tight-deadlines"]) == 0
+    assert json.loads(capsys.readouterr().out)["scenarios"] == original
+    path.write_text(json.dumps({
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": original["session_digest"],
+        "baseline_scenario_digest": "0" * 64,
+        "candidates": original["candidates"],
+    }), encoding="utf-8")
+    with pytest.raises(SystemExit):
+        main(["--project", PROJECT, "--expected-source", source,
+              "--baseline-authoring", json.dumps(baseline),
+              "--baseline-scenarios", json.dumps(original),
+              "--import-candidates", str(path)])

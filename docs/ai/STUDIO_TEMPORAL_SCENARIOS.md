@@ -22,3 +22,14 @@ must preserve project, source, quest and session identity. Receipts are
 recomputed on replay, bound to the exact canonical source, size-limited,
 private, nofollow, and never silently overwritten. Operator ticks are
 estimates; native timing and consumer-device qualification remain held.
+
+## Offline editing
+
+Use `--editor-directory PRIVATE_DIRECTORY` to publish a no-overwrite,
+CSP-hashed HTML editor for all typed candidate scene windows. The browser
+exports a JSON record without network access. Reimport with
+`--import-candidates PRIVATE_JSON --baseline-scenarios ORIGINAL_RECEIPT_JSON
+--baseline-authoring ORIGINAL_AUTHORING_JSON`. Import requires the exact
+project/source/session/scenario baseline lease; only canonical compilation
+can accept a revised scenario. Private regular files, nofollow reads,
+duplicate-key rejection, and deterministic replay remain mandatory.

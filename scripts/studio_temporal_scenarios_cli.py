@@ -24,16 +24,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline-authoring")
     ap.add_argument("--prompt", action="store_true")
     ap.add_argument("--candidates")
+    ap.add_argument("--import-candidates", type=Path)
+    ap.add_argument("--baseline-scenarios")
+    ap.add_argument("--editor-directory", type=Path)
     ap.add_argument("--restore", type=Path)
     ap.add_argument("--publish", type=Path)
     ap.add_argument("--select")
     ap.add_argument("--playable-manifest", action="store_true")
     args = ap.parse_args(argv)
     if args.restore is not None:
-        if args.prompt or args.candidates is not None or args.baseline_authoring is not None:
+        if (args.prompt or args.candidates is not None or args.baseline_authoring is not None
+                or args.import_candidates is not None or args.baseline_scenarios is not None):
             ap.error("restore cannot be combined with scenario generation")
     elif (args.baseline_authoring is None or
-          (args.prompt == (args.candidates is not None))):
+          (sum((args.prompt, args.candidates is not None,
+                args.import_candidates is not None)) != 1)):
         ap.error("supply baseline and exactly one of --prompt or --candidates")
     if args.playable_manifest and not args.select:
         ap.error("playable manifest requires --select")
@@ -55,12 +60,45 @@ def main(argv: list[str] | None = None) -> int:
                     expected_source_digest=args.expected_source,
                     expected_session_digest=args.expected_session)
             else:
-                candidates = _strict(args.candidates, max_bytes=65536)
+                if args.import_candidates is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios import (
+                        replay_temporal_scenarios,
+                    )
+                    from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import (
+                        load_temporal_scenarios_editor_export,
+                    )
+                    if args.baseline_scenarios is None:
+                        raise StudioQuestError("scenario import requires original receipt")
+                    original = replay_temporal_scenarios(
+                        docs, _strict(args.baseline_scenarios, max_bytes=262144),
+                        authorized=True)
+                    if (original["baseline_authoring"] != baseline
+                            or original["actions"] != actions
+                            or original["source_digest"] != args.expected_source
+                            or (args.expected_session is not None
+                                and original["session_digest"] != args.expected_session)):
+                        raise StudioQuestError("stale temporal scenario import baseline")
+                    candidates = load_temporal_scenarios_editor_export(
+                        args.import_candidates, authorized=True,
+                        expected_project_id=original["project_id"],
+                        expected_source_digest=original["source_digest"],
+                        expected_session_digest=original["session_digest"],
+                        expected_baseline_digest=original["scenario_digest"])
+                else:
+                    if args.baseline_scenarios is not None:
+                        raise StudioQuestError("original scenario receipt only valid with import")
+                    candidates = _strict(args.candidates, max_bytes=65536)
                 receipt = compile_temporal_scenarios(
                     docs, actions, baseline, candidates, authorized=True,
                     expected_source_digest=args.expected_source,
                     expected_session_digest=args.expected_session)
         result = {"scenarios": receipt}
+        if args.editor_directory:
+            from skeleton.ai.game_builder.studio_ecosystem_temporal_scenarios_editor import (
+                publish_temporal_scenarios_editor,
+            )
+            result["editor"] = publish_temporal_scenarios_editor(
+                docs, receipt, args.editor_directory, authorized=True)
         if args.select:
             result["selection"] = select_temporal_scenario(
                 docs, receipt, args.select, authorized=True,
