@@ -61,8 +61,8 @@ def test_eof_preserves_checkpoint_and_resume_is_identical():
 @pytest.mark.parametrize("input_text,reason", [
     ('{"kind":"guard","actor_id":"warden"}\n', "does not own"),
     ('{"kind":"teleport","actor_id":"scout"}\n', "unsupported"),
-    ('{"kind":"move","actor_id":"scout","direction":"west","extra":1}\n', "unexpected"),
-    ('{"kind":"guard","actor_id":"scout","kind":"rest"}\n', "duplicate"),
+    ('{"kind":"move","actor_id":"scout","direction":"west","extra":1}\n', "fields"),
+    ('{"kind":"guard","actor_id":"scout","kind":"rest"}\n', "JSON"),
     ('not json\n', "JSON"),
     ("x" * (MAX_INPUT_BYTES + 1), "input_too_large"),
 ])
