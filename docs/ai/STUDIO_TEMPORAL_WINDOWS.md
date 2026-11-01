@@ -31,3 +31,13 @@ propose authoring separately, but this compiler never claims inference.
 Focused regression fixture:
 `pytest -q tests/test_studio_ecosystem_temporal_windows.py`.
 Required exact-head security and CI gates remain release holds.
+
+## Offline browser editing
+
+Pass `--editor-directory EXISTING_PRIVATE_DIRECTORY` to publish an offline,
+CSP-hashed HTML editor. Edit each earliest/latest integer and the comma-separated
+mutual exclusion groups. Export `temporal_authoring.json`, then recompile with
+`--import-authoring PATH --baseline-authoring BASELINE_JSON`. The import is
+descriptor-anchored, private, duplicate-key rejecting, bounded and bound to
+the exact source, session and baseline temporal digest. Browser exports never
+grant authority; canonical Python recompilation is required.

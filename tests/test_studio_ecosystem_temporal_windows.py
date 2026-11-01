@@ -160,3 +160,68 @@ def test_jeeves_router_cli_and_negative_authoring(capsys):
     with pytest.raises(StudioQuestError):
         execute_temporal_windows_tool({**request, "authorized": True},
                                       authorized=True)
+
+
+def test_offline_editor_export_import_private_custody(tmp_path):
+    from skeleton.ai.game_builder.studio_ecosystem_temporal_editor import (
+        EXPORT_SCHEMA, render_temporal_editor, load_temporal_editor_export,
+        publish_temporal_editor,
+    )
+    docs, source, proposal = fixture()
+    report = proposal["detail"]
+    html, proof = render_temporal_editor(docs, report, authorized=True)
+    assert sha256(html).hexdigest() == proof["html_sha256"]
+    assert b"Content-Security-Policy" in html
+    assert b"Export typed temporal edits" in html
+    receipt = publish_temporal_editor(docs, report, tmp_path, authorized=True)
+    assert receipt["file_write_performed"] is True
+    assert (tmp_path / "temporal_editor.html").stat().st_mode & 0o077 == 0
+    with pytest.raises(FileExistsError):
+        publish_temporal_editor(docs, report, tmp_path, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": report["project_id"],
+        "source_digest": source, "session_digest": report["session_digest"],
+        "baseline_temporal_digest": report["temporal_digest"],
+        "authoring": report["authoring"],
+    }
+    path = tmp_path / "authoring.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    args = {"authorized": True, "expected_project_id": report["project_id"],
+            "expected_source_digest": source,
+            "expected_session_digest": report["session_digest"],
+            "expected_baseline_digest": report["temporal_digest"]}
+    authoring = load_temporal_editor_export(path, **args)
+    assert compile_temporal_windows(
+        docs, [], authoring, authorized=True, expected_source_digest=source) == report
+    with pytest.raises(StudioQuestError):
+        load_temporal_editor_export(path, **{**args, "expected_baseline_digest": "0" * 64})
+    path.write_text('{"schema":"one","schema":"two"}', encoding="utf-8")
+    with pytest.raises(StudioQuestError):
+        load_temporal_editor_export(path, **args)
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_temporal_editor_export(path, **args)
+
+
+def test_cli_editor_and_import_replay(tmp_path, capsys):
+    from scripts.studio_temporal_windows_cli import main
+    docs, source, proposal = fixture()
+    report = proposal["detail"]
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--prompt", PROMPT, "--editor-directory", str(tmp_path)]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["editor"]["file_write_performed"] is True
+    from skeleton.ai.game_builder.studio_ecosystem_temporal_editor import EXPORT_SCHEMA
+    record = {"schema": EXPORT_SCHEMA, "project_id": report["project_id"],
+              "source_digest": source, "session_digest": report["session_digest"],
+              "baseline_temporal_digest": report["temporal_digest"],
+              "authoring": proposal["authoring"]}
+    path = tmp_path / "edit.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    assert main(["--project", PROJECT, "--expected-source", source,
+                 "--import-authoring", str(path), "--baseline-authoring",
+                 json.dumps(proposal["authoring"])]) == 0
+    assert json.loads(capsys.readouterr().out)["temporal"] == report
