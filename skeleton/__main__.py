@@ -61,6 +61,7 @@ Commands:
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
     scene-accept  Audit playable scenes, verify replay and portable exports
     scene-travel  Simulate, verify and resume original offline scene journeys
+    scene-survival-campaign  Play replay-verified multi-stage survival campaigns
     scene-survival-play  Interactively play survival with restartable checkpoints
     scene-survival-author  Transactionally edit survival sources and preview play
     scene-survival-route  Find replay-proven bounded survival routes
@@ -851,6 +852,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-tiles-route":
         from skeleton.game.gameplay.scene_tile_route import cli as scene_tile_route_cli
         return scene_tile_route_cli(rest)
+    if cmd == "scene-survival-campaign":
+        from skeleton.game.gameplay.scene_survival_campaign import cli as survival_campaign_cli
+        return survival_campaign_cli(rest)
     if cmd == "scene-survival-play":
         from skeleton.game.gameplay.scene_tile_survival_interactive import cli as survival_play_cli
         return survival_play_cli(rest)
