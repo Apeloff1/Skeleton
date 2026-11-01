@@ -217,3 +217,47 @@ def test_directory_root_replacement_cannot_switch_imported_bytes(tmp_path, monke
     assert report.ok, report.issues
     assert report.imported == ["a.png"]
     assert report.manifest.resolve("a.png").size == len(png())
+
+
+def test_manifest_duplicate_kind_rejection_is_transactional():
+    from dataclasses import replace
+    m = AssetManifest()
+    original = import_bytes("z/hero.png", png())
+    assert m.add(original)
+    before = m.to_json()
+    with pytest.raises(AssetImportError, match="incompatible metadata"):
+        m.add(replace(original, path="a/forged.obj", kind="mesh", format="obj"))
+    assert m.to_json() == before
+    with pytest.raises(AssetImportError, match="not in manifest"):
+        m.resolve("a/forged.obj")
+
+
+def test_manifest_canonical_alias_receipt_tracks_canonical_source():
+    m = AssetManifest()
+    m.add(import_bytes("z/hero.png", png()))
+    canonical = import_bytes("a/hero.png", png())
+    assert not m.add(canonical)
+    assert m.resolve("z/hero.png").receipt_digest == canonical.receipt().digest
+    assert AssetManifest.from_json(m.to_json()).to_json() == m.to_json()
+
+
+def test_manifest_rejects_collision_summary_and_receipt_rewrites():
+    from skeleton.game.build.flgb_build_runtime import dig
+    m = AssetManifest()
+    m.add(import_bytes("a/hero.png", png()))
+    m.add(import_bytes("music.wav", wav()))
+    original = json.loads(m.to_json())
+    forged = json.loads(m.to_json())
+    forged["entries"][1]["aliases"].append("a/hero.png")
+    forged["digest"] = dig(forged["entries"])
+    with pytest.raises(AssetImportError, match="collide"):
+        AssetManifest.from_json(json.dumps(forged))
+    forged = json.loads(m.to_json())
+    forged["paths"] += 1
+    with pytest.raises(AssetImportError, match="summary"):
+        AssetManifest.from_json(json.dumps(forged))
+    forged = json.loads(m.to_json())
+    forged["entries"][0]["receipt_digest"] = "0" * 64
+    forged["digest"] = dig(forged["entries"])
+    with pytest.raises(AssetImportError, match="receipt identity"):
+        AssetManifest.from_json(json.dumps(forged))
