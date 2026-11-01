@@ -18,6 +18,7 @@ from types import ModuleType
 from typing import Any, Dict, Iterable
 
 MAX_SUMMARY_SAMPLES = 100_000
+MAX_DURATION_MS = 1_000_000_000_000  # 31,000 years; bounds upstream sums
 _MODULE_NAME = "skeleton.ai.runtime.observability.profiler"
 _REL = Path("ai") / "runtime" / "observability" / "profiler.py"
 
@@ -49,6 +50,9 @@ UpstreamProfiler = _upstream.Profiler
 
 def percentile_summary(name: str, durations_ms: Iterable[float]) -> Dict[str, Any]:
     """Return main's ``Profiler.stats`` dict for ``durations_ms``."""
+    if (type(name) is not str or not 1 <= len(name) <= 128
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)):
+        raise ValueError("percentile name must be bounded and printable")
     values = list(islice(durations_ms, MAX_SUMMARY_SAMPLES + 1))
     if len(values) > MAX_SUMMARY_SAMPLES:
         raise ValueError("percentile sample count exceeds bound")
@@ -60,8 +64,8 @@ def percentile_summary(name: str, durations_ms: Iterable[float]) -> Dict[str, An
             duration = float(value)
         except (OverflowError, ValueError):
             raise ValueError("percentile samples must be nonnegative finite numbers") from None
-        if not math.isfinite(duration):
-            raise ValueError("percentile samples must be nonnegative finite numbers")
+        if not math.isfinite(duration) or duration > MAX_DURATION_MS:
+            raise ValueError("percentile samples must be nonnegative finite numbers within bound")
         normalized.append(duration)
     profiler = UpstreamProfiler(max_samples_per_name=max(1, len(normalized)))
     for duration in normalized:

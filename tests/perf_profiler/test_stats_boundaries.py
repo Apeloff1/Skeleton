@@ -34,3 +34,14 @@ def test_percentile_summary_rejects_numeric_subclasses():
 def test_percentile_summary_preserves_canonical_profiler_contract():
     result = _stats.percentile_summary("frame", [1.0, 2.0, 3.0])
     assert result["samples"] == 3
+
+
+def test_percentile_summary_rejects_aggregate_overflow_and_unsafe_metric_names():
+    # Upstream Profiler.stats sums samples; finite 1e308 values otherwise
+    # overflow to infinity and create non-JSON performance evidence.
+    with pytest.raises(ValueError, match="nonnegative finite"):
+        _stats.percentile_summary("frame", [1e308, 1e308])
+    for bad_name in ("", "x" * 129, "frame\nforged", "frame\x00hidden", True):
+        with pytest.raises(ValueError, match="bounded and printable"):
+            _stats.percentile_summary(bad_name, [1.0])
+    assert _stats.percentile_summary("frame/render", [1.0, 2.0])["samples"] == 2
