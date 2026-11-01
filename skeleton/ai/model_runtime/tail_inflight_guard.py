@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+import os
 from threading import RLock
 from time import monotonic_ns
 from typing import Callable
@@ -110,6 +111,8 @@ class InFlightCPUResourceGuard:
             raise ValueError("thermal probe must be callable")
         if clock is not None and not callable(clock):
             raise ValueError("monotonic clock must be callable")
+        # A forked child inherits Python locks and state, not execution rights.
+        self._owner_pid = os.getpid()
         self.policy = policy
         self._path = storage_path
         self._resource_probe = resource_probe or probe_local_resources
@@ -127,6 +130,24 @@ class InFlightCPUResourceGuard:
         self._quantum_started_ns: int | None = None
         self._last_clock_ns: int | None = None
         self._hold_started_ns: int | None = None
+
+    def _require_owner_process(self) -> None:
+        """Reject inherited CPU quantum before touching a potentially dead lock."""
+        try:
+            pid = os.getpid()
+        except BaseException:
+            pid = None
+        if type(pid) is not int or pid != self._owner_pid:
+            # The child has its own copy of this object. No inherited RLock
+            # can be safely acquired because the owning thread may be gone.
+            if self._reason != "process_identity_changed":
+                self._generation += 1
+            self._state = "aborted"
+            self._reason = "process_identity_changed"
+            self._authorized_quantum = 0
+            self._quantum_started_ns = None
+            self._hold_started_ns = None
+            raise InFlightPressureDenied("forked CPU pressure lease is invalid")
 
     def _abort_quantum(self, reason: str) -> None:
         self._authorized_quantum = 0
@@ -231,6 +252,7 @@ class InFlightCPUResourceGuard:
         )
 
     def start(self) -> InFlightPressureDecision:
+        self._require_owner_process()
         with self._lock:
             if self._state != "new":
                 raise InFlightPressureDenied("request already started")
@@ -253,6 +275,7 @@ class InFlightCPUResourceGuard:
         if (type(requested_tokens) is not int
                 or not 1 <= requested_tokens <= self.policy.max_quantum_tokens):
             raise ValueError("bounded positive requested token quantum required")
+        self._require_owner_process()
         with self._lock:
             if self._state != "running":
                 raise InFlightPressureDenied("execution is not running")
@@ -282,6 +305,7 @@ class InFlightCPUResourceGuard:
         """Check AFTER at most one bounded token quantum, before next quantum."""
         if type(generated_tokens) is not int or not 0 <= generated_tokens <= self.policy.max_quantum_tokens:
             raise ValueError("bounded generated token quantum required")
+        self._require_owner_process()
         with self._lock:
             if self._state != "running":
                 raise InFlightPressureDenied("execution is not running")
@@ -309,6 +333,7 @@ class InFlightCPUResourceGuard:
             return self._receipt()
 
     def resume(self) -> InFlightPressureDecision:
+        self._require_owner_process()
         with self._lock:
             if self._state != "hold":
                 raise InFlightPressureDenied("no paused request to resume")
@@ -329,6 +354,7 @@ class InFlightCPUResourceGuard:
             return self._receipt()
 
     def complete(self) -> InFlightPressureDecision:
+        self._require_owner_process()
         with self._lock:
             if self._state != "running":
                 raise InFlightPressureDenied("completion requires running execution")
@@ -345,6 +371,7 @@ class InFlightCPUResourceGuard:
             return self._receipt()
 
     def abort(self) -> InFlightPressureDecision:
+        self._require_owner_process()
         with self._lock:
             if self._state in ("completed", "aborted"):
                 raise InFlightPressureDenied("terminal execution cannot be restarted")
@@ -357,6 +384,7 @@ class InFlightCPUResourceGuard:
             return self._receipt()
 
     def status(self) -> InFlightPressureDecision:
+        self._require_owner_process()
         with self._lock:
             # Never expose an expired cooperative authorization as live.
             self._check_quantum_deadline()

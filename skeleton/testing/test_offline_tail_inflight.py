@@ -282,3 +282,35 @@ def test_guard_abort_failure_quarantines_and_cleans_capture(monkeypatch):
     assert not app.status().continue_execution
     with pytest.raises(InFlightLifecycleQuarantined):
         app.complete(output_tokens=1)
+
+
+def test_forked_app_session_rejects_before_inherited_lock(monkeypatch):
+    from skeleton.app import offline_tail_inflight as module
+    app = controller()
+    app.begin(request_id="fork-guard", prompt_tokens=2)
+    parent = app._owner_pid
+
+    class InheritedLock:
+        def __enter__(self):
+            raise AssertionError("forked app must never enter inherited RLock")
+        def __exit__(self, *_):
+            return False
+
+    app._lock = InheritedLock()
+    monkeypatch.setattr(module.os, "getpid", lambda: parent + 1)
+    with pytest.raises(InFlightLifecycleQuarantined, match="forked"):
+        app.status()
+    assert app._quarantined
+    with pytest.raises(InFlightLifecycleQuarantined, match="forked"):
+        app.admit_quantum(requested_tokens=1)
+
+
+def test_unavailable_app_process_identity_quarantines(monkeypatch):
+    from skeleton.app import offline_tail_inflight as module
+    app = controller()
+    def unavailable():
+        raise OSError("process identity unavailable")
+    monkeypatch.setattr(module.os, "getpid", unavailable)
+    with pytest.raises(InFlightLifecycleQuarantined, match="forked"):
+        app.begin(request_id="never-staged", prompt_tokens=1)
+    assert app._quarantined

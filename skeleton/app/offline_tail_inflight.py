@@ -7,6 +7,7 @@ No simulated sample authorizes production inference; no restart is replayed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from threading import RLock
 from typing import Callable
 
@@ -51,11 +52,24 @@ class OfflineTailInFlightSession:
             raise ValueError("canonical in-flight pressure guard required")
         if type(capture) is not LiveTailCapture:
             raise ValueError("canonical local tail capture required")
+        self._owner_pid = os.getpid()
         self._guard = guard
         self._capture = capture
         self._lock = RLock()
         self._request_id: str | None = None
         self._quarantined = False
+
+    def _require_owner_process(self) -> None:
+        """Never acquire a fork-inherited application RLock."""
+        try:
+            pid = os.getpid()
+        except BaseException:
+            pid = None
+        if type(pid) is not int or pid != self._owner_pid:
+            self._quarantined = True
+            raise InFlightLifecycleQuarantined(
+                "forked in-flight app session requires fresh authorization"
+            )
 
     def _require_healthy(self) -> None:
         if self._quarantined:
@@ -108,6 +122,7 @@ class OfflineTailInFlightSession:
     def begin(
         self, *, request_id: str, prompt_tokens: int,
     ) -> OfflineInFlightStatus:
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is not None:
@@ -130,6 +145,7 @@ class OfflineTailInFlightSession:
             return self._status(decision)
 
     def first_token(self) -> None:
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is None or self._checked_guard(
@@ -163,6 +179,7 @@ class OfflineTailInFlightSession:
         and continue_execution together; simulated receipts never authorize
         hardware execution or GPU qualification.
         """
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is None:
@@ -172,6 +189,7 @@ class OfflineTailInFlightSession:
             ))
 
     def checkpoint(self, *, generated_tokens: int) -> OfflineInFlightStatus:
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is None:
@@ -181,6 +199,7 @@ class OfflineTailInFlightSession:
             ))
 
     def resume(self) -> OfflineInFlightStatus:
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is None:
@@ -190,6 +209,7 @@ class OfflineTailInFlightSession:
     def complete(
         self, *, output_tokens: int, prefix_reused_tokens: int = 0,
     ) -> tuple[OfflineInFlightStatus, ExecutionTiming]:
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is None:
@@ -222,6 +242,7 @@ class OfflineTailInFlightSession:
             return self._status(decision), timing
 
     def abort(self) -> OfflineInFlightStatus:
+        self._require_owner_process()
         with self._lock:
             self._require_healthy()
             if self._request_id is None:
@@ -249,5 +270,6 @@ class OfflineTailInFlightSession:
             return self._status(decision)
 
     def status(self) -> OfflineInFlightStatus:
+        self._require_owner_process()
         with self._lock:
             return self._status(self._checked_guard(self._guard.status))

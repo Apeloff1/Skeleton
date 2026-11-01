@@ -344,3 +344,39 @@ def test_injected_clock_requires_simulation_and_policy_is_bounded():
     for invalid in (True, 0, -1, 30_000_000_001):
         with pytest.raises(ValueError, match="bounded token or hysteresis"):
             replace(policy(), max_quantum_duration_ns=invalid)
+
+
+def test_forked_guard_revokes_inherited_quantum_before_lock(monkeypatch):
+    from skeleton.ai.model_runtime import tail_inflight_guard as module
+    g = guard()
+    g.start()
+    g.admit_quantum(requested_tokens=8)
+    parent_pid = g._owner_pid
+
+    class InheritedLock:
+        def __enter__(self):
+            raise AssertionError("inherited lock must not be acquired")
+        def __exit__(self, *_):
+            return False
+
+    g._lock = InheritedLock()
+    monkeypatch.setattr(module.os, "getpid", lambda: parent_pid + 1)
+    with pytest.raises(InFlightPressureDenied, match="forked"):
+        g.status()
+    assert g._state == "aborted"
+    assert g._authorized_quantum == 0
+    assert g._reason == "process_identity_changed"
+    with pytest.raises(InFlightPressureDenied, match="forked"):
+        g.admit_quantum(requested_tokens=1)
+
+
+def test_process_identity_probe_failure_fails_closed(monkeypatch):
+    from skeleton.ai.model_runtime import tail_inflight_guard as module
+    g = guard()
+    g.start()
+    def unavailable():
+        raise OSError("simulated process identity failure")
+    monkeypatch.setattr(module.os, "getpid", unavailable)
+    with pytest.raises(InFlightPressureDenied, match="forked"):
+        g.complete()
+    assert g._state == "aborted"
