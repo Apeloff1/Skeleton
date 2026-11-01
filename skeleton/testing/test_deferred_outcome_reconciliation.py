@@ -2,19 +2,31 @@ from __future__ import annotations
 import hashlib
 import pytest
 
-from skeleton.ai.runtime.deferred.contracts import Budget, canonical_json, sha256_json
+from skeleton.ai.runtime.deferred.contracts import Budget, EvidenceReceipt, canonical_json, sha256_json
 from skeleton.ai.runtime.deferred.catalog import build_registry
 from skeleton.ai.runtime.deferred.executor import DeferredExecutor
 from skeleton.ai.runtime.deferred.journal import DeferredJournalConflict, SqliteDeferredExecutionJournal
 from skeleton.ai.runtime.deferred.reconciliation import DeferredOutcomeReconciler, ProviderOutcomeEvidence
 
 
+def _enable_test_record(record):
+    """Exercise the legal evidence-gated lifecycle with synthetic fixture receipts."""
+    common = dict(
+        volume_id=record.spec.volume_id,
+        head_sha="a" * 40,
+        artifact_digests=("b" * 64,),
+        tests=("synthetic-deferred-reconciliation-fixture",),
+        created_at="2026-10-31T00:00:00+00:00",
+    )
+    record.candidate(EvidenceReceipt(**common, status="implementation_candidate"))
+    record.verify(EvidenceReceipt(**common, status="verified"))
+    record.enable({dependency: "verified" for dependency in record.spec.dependencies})
+
+
 def _started(tmp_path):
     registry = build_registry()
     record = registry.get("VOL-160")
-    record.transition("implementation_candidate")
-    record.transition("verified")
-    record.transition("enabled")
+    _enable_test_record(record)
     journal = SqliteDeferredExecutionJournal(tmp_path / "reconcile.sqlite3")
     executor = DeferredExecutor(registry, journal=journal)
     executor.register_handler("VOL-160", lambda payload: {"ok": True}, handler_identity=record.spec.handler)
@@ -64,9 +76,7 @@ def test_reconciles_success_without_redispatch(tmp_path):
 
     restarted = DeferredExecutor(build_registry(), journal=SqliteDeferredExecutionJournal(tmp_path / "reconcile.sqlite3"))
     restarted_record = restarted.registry.get("VOL-160")
-    restarted_record.transition("implementation_candidate")
-    restarted_record.transition("verified")
-    restarted_record.transition("enabled")
+    _enable_test_record(restarted_record)
     restarted.register_handler("VOL-160", lambda payload: pytest.fail("reconciled effect must never redispatch"), handler_identity=restarted_record.spec.handler)
     restarted.set_budget("VOL-160", Budget(max_attempts=1, max_cost_units=4, max_latency_ms=20))
     replay = restarted.execute(invocation, {"value": 1})
