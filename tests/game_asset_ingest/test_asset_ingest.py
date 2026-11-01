@@ -282,7 +282,9 @@ def test_manifest_rejects_nul_and_windows_separator_paths():
     from dataclasses import replace
     original = import_bytes("hero.png", png())
     m = AssetManifest()
-    for bad in ("folder" + chr(92) + "hero.png", "folder" + chr(0) + "hero.png", "../hero.png"):
+    for bad in ("folder" + chr(92) + "hero.png", "folder" + chr(0) + "hero.png",
+                "../hero.png", "folder/line\nfeed.png", "folder/tab\tasset.png",
+                "folder/bidi\u202easset.png", "folder/paragraph\u2029asset.png"):
         with pytest.raises(AssetImportError, match="invalid manifest asset path"):
             m.add(replace(original, path=bad))
     assert m.to_dict()["paths"] == 0
@@ -529,3 +531,16 @@ def test_descriptor_leaf_fifo_fails_closed_without_blocking(tmp_path):
     assert not report.imported
     assert any(issue.path == "swapped.png" and issue.code == "broken"
                and "not a regular file" in issue.detail for issue in report.issues)
+
+
+def test_descriptor_import_rejects_invisible_and_control_character_paths(tmp_path):
+    """Untrusted filenames must not carry log controls or bidi overrides into manifests."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    for char in ("\n", "\r", "\t", "\x1b", "\x7f", "\x85", "\u202e", "\u2066", "\u2028", "\u2029"):
+        name = "asset" + char + ".png"
+        report = pipeline.import_files(tmp_path, [name])
+        assert not report.ok
+        assert report.manifest.entries == []
+        assert report.imported == []
+        assert any(issue.code == "unsafe" for issue in report.issues)

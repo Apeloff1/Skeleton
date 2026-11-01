@@ -6,6 +6,7 @@ that carried the same bytes becomes an alias of the canonical entry.
 from __future__ import annotations
 
 import json
+import unicodedata
 from pathlib import PurePosixPath
 from dataclasses import dataclass, field
 from typing import Any
@@ -48,6 +49,8 @@ def _valid_path(path: object) -> bool:
     if type(path) is not str or not path or len(path) > 4096:
         return False
     if any(char in path for char in (chr(92), chr(0), ":", "%", "?", "#")):
+        return False
+    if any(unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} for char in path):
         return False
     parts = path.split("/")
     return (len(parts) <= 32 and all(part not in ("", ".", "..") for part in parts)

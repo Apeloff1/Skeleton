@@ -9,6 +9,7 @@ from __future__ import annotations
 import errno
 import os
 import stat
+import unicodedata
 from itertools import islice
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -63,6 +64,8 @@ def _parts(relative: str) -> tuple[str, ...]:
         raise AssetImportError("unsafe asset path")
     if any(char in relative for char in ("\\", "\x00", ":", "%", "?", "#")):
         raise AssetImportError("unsafe asset path or URI")
+    if any(unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} for char in relative):
+        raise AssetImportError("unsafe asset path control character")
     parts = tuple(relative.split("/"))
     if len(parts) > MAX_TREE_DEPTH or any(part in ("", ".", "..") for part in parts):
         raise AssetImportError("unsafe asset path")
