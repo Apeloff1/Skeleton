@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import pytest
 
 from skeleton.build.delivery._util import DeliveryError
@@ -52,3 +55,23 @@ def test_renewed_lease_rejects_stale_pre_renewal_release():
         t.renew(original, now=6, ttl=10)
     t.release(renewed, now=6)
     assert t.holder("prod", now=6) is None
+
+
+def test_parallel_acquires_have_one_owner_and_one_fencing_token():
+    table = DeployLockTable()
+    workers = 12
+    gate = Barrier(workers)
+
+    def contender(index: int):
+        gate.wait(timeout=10)
+        try:
+            return table.acquire("prod", f"worker-{index}", now=1, ttl=30)
+        except DeliveryError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(contender, range(workers)))
+    winners = [lease for lease in results if lease is not None]
+    assert len(winners) == 1
+    assert winners[0].token == 1
+    assert table.holder("prod", now=1) == winners[0]
