@@ -24,7 +24,7 @@ def test_original_source_to_fight_to_save_to_export():
     first = advance_supply(initial, {"kind": "fight"})
     assert first["state"]["currency"] == 10
     assert first["state"]["hp"] < 12
-    assert first["save"]["parent_digest"] is not None
+    assert first["save"]["parent_save_digest"] is not None
     assert first["state"]["battles"][0]["combat"]["state"]["phase"] == "won"
     final = finish_supply(source, resume=first)
     assert final["state"]["phase"] == "won"
@@ -73,8 +73,10 @@ def test_unearned_or_malformed_commands_fail_closed(command):
 
 def test_medkit_cannot_waste_item_at_full_health():
     source = original_supply()
+    source["prices"]["medkit"] = 1
     first = advance_supply(new_supply(source), {"kind": "fight"})
     bought = advance_supply(first, {"kind": "buy", "item": "medkit"})
+    bought = advance_supply(bought, {"kind": "buy", "item": "medkit"})
     healed = advance_supply(bought, {"kind": "use", "item": "medkit"})
     with pytest.raises(CombatSessionError, match="would not restore"):
         advance_supply(healed, {"kind": "use", "item": "medkit"})
