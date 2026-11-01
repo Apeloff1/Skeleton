@@ -135,6 +135,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     prepare.add_argument("--json", action="store_true", dest="as_json")
     sub.add_parser(
+        "audit-signed-library-relocation", add_help=False,
+        help="verify signed game relocation without policy or replay rollback",
+    )
+    sub.add_parser(
         "audit-offline-library-relocation", add_help=False,
         help="verify original-game installation relocation without replay loss",
     )
@@ -414,6 +418,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "recover-install":
         from skeleton.app.offline_install_recovery import main as recovery_main
         return recovery_main(arguments[1:])
+    if arguments and arguments[0] == "audit-signed-library-relocation":
+        from skeleton.app.offline_signed_game_library_relocation import main as signed_relocation_main
+        return signed_relocation_main(arguments[1:])
     if arguments and arguments[0] == "audit-offline-library-relocation":
         from skeleton.app.offline_game_library_relocation import main as relocation_main
         return relocation_main(arguments[1:])
