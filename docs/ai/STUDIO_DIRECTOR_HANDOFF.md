@@ -61,3 +61,41 @@ qualification. It never silently edits canonical
 source, grants model permissions, or asserts that an exported JSON file is a
 playable runtime. The editor uses text-only DOM construction and exact CSP
 hashes, with no external scripts, network requests, or dynamic code evaluation.
+
+## Offline quest-choice rehearsal and canonical import
+
+The director ZIP also includes `choice_rehearsal.html`, linked from
+`director_editor.html`. It presents the authored quest stages, prerequisites,
+alternatives, NPC/scene labels, source-leased schedule ticks, choice effects and
+ending predicates. Buttons unlock only after prerequisite stages are selected;
+undo never removes the baseline actions used to compile the handoff.
+The browser runs offline with text-only DOM writes, exact CSP script and
+style hashes, no network access, and no dynamic evaluation. It cannot
+modify source or claim real NPC dialogue or native gameplay.
+
+The **Export source-bound choices** button downloads
+`studio_choice_rehearsal.json`. This is an untrusted proposed edit, not
+a signature, authority token, canonical save or release certificate.
+Validate the complete history, including the unchanged original baseline:
+
+```bash
+python -m scripts.studio_choice_rehearsal_cli \
+  --project PROJECT --expected-source CANON_DIGEST \
+  --expected-session ORIGINAL_QUEST_SESSION_DIGEST \
+  --export EXISTING_DIR/studio_choice_rehearsal.json
+```
+
+The verifier rejects symlinked ancestors and leaves, nonregular files,
+oversized input, duplicate JSON keys, nonfinite JSON, stale source/session
+identities, rewritten baseline actions, locked stages and unauthored choices.
+It replays every choice through the canonical quest engine and returns an
+independently derived result session digest, verified action list, stage
+progress and sandbox ending eligibility. Browser fields are never proof.
+
+The verified action list can be supplied to the existing director CLI
+`--actions` parameter with new schedule and asset authoring for that exact
+replay session. Existing schedule/asset receipts remain leased to their
+original session and cannot be silently reused after choices change.
+The HTML5 geometry game remains independently playable and replay-verified;
+the quest-choice page is a source-bound rehearsal companion, not a claim
+that NPC speech, native timing, rights or consumer release are qualified.
