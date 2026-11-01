@@ -100,6 +100,24 @@ class KVLiveTierTests(unittest.TestCase):
         receipt = ctl.apply_live(plan)
         self.assertEqual(receipt.moved, self.keys)
 
+    def test_clock_regression_between_plan_and_apply_blocks_migration(self):
+        ctl = self.controller(
+            [host(), host()], ticks=(1000, 999),
+        )
+        plan, _ = ctl.plan_live()
+        with self.assertRaisesRegex(KVPressureDeferred, "regressed"):
+            ctl.apply_live(plan)
+        self.assertEqual(self.storage.moves, [])
+
+    def test_clock_regression_between_planning_rounds_is_not_fresh(self):
+        ctl = self.controller(
+            [host(), host()], ticks=(1000, 999),
+        )
+        ctl.plan_live()
+        with self.assertRaisesRegex(KVPressureDeferred, "regressed"):
+            ctl.plan_live()
+        self.assertEqual(self.storage.moves, [])
+
     def test_stale_probe_prevents_any_movement(self):
         ctl = self.controller([host(), host()], ticks=(1000, 2000))
         plan, _ = ctl.plan_live()

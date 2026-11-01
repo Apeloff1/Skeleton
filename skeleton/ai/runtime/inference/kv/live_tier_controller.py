@@ -64,6 +64,9 @@ class KVLiveTierController:
         self._storage_path = storage_path
         self._simulated = simulated
         self._lock = RLock()
+        # A single controller must never accept an older clock sample after
+        # observing a newer one, including across separate planning rounds.
+        self._last_observed_ns: int | None = None
 
     def _sample(self) -> KVLiveObservation:
         try:
@@ -78,6 +81,9 @@ class KVLiveTierController:
             raise KVPressureDeferred("canonical resource snapshot required")
         if type(now) is not int or now < 0:
             raise KVPressureDeferred("invalid monotonic observation clock")
+        if self._last_observed_ns is not None and now < self._last_observed_ns:
+            raise KVPressureDeferred("monotonic observation clock regressed")
+        self._last_observed_ns = now
         # Memory pressure is a conservative MAX across physical RAM usage,
         # kernel memory pressure and swap occupancy. Never count swap as RAM.
         physical_used = 100 - (host.available_ram_bytes * 100 // host.total_ram_bytes)
