@@ -50,6 +50,7 @@ _TOOL_SYMBOLS = (
     ("objective_board_tool_schema", "execute_objective_board_tool"),
     ("scene_schedule_tool_schema", "execute_scene_schedule_tool"),
     ("scene_asset_binding_tool_schema", "execute_scene_asset_binding_tool"),
+    ("director_handoff_tool_schema", "execute_director_handoff_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",

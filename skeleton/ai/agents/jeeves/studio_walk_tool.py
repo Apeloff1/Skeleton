@@ -1997,3 +1997,9 @@ from .studio_scene_schedule_tool import (  # noqa: E402
 from .studio_scene_asset_binding_tool import (  # noqa: E402
     scene_asset_binding_tool_schema, execute_scene_asset_binding_tool,
 )
+
+
+# Static original playable director handoff, read-only Jeeves descriptor.
+from .studio_director_handoff_tool import (  # noqa: E402
+    director_handoff_tool_schema, execute_director_handoff_tool,
+)
