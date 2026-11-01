@@ -18,6 +18,10 @@ from .events import EventError, GameplayEvent
 ANON = "anon"
 
 
+class EventCapacityError(EventError):
+    """Collector reached its bounded event custody; no silent data loss."""
+
+
 @dataclass(frozen=True)
 class PrivacyPolicy:
     salt: bytes
@@ -46,10 +50,17 @@ class PrivacyPolicy:
 @dataclass
 class Collector:
     policy: PrivacyPolicy
+    max_events: int = 100_000
     opted_out: set[str] = field(default_factory=set)  # raw ids, held in memory only
     events: list[GameplayEvent] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=lambda: {"kept": 0, "anonymised": 0, "opted_out_dropped": 0,
                                                             "unsampled": 0, "rejected": 0})
+
+    def __post_init__(self) -> None:
+        if type(self.max_events) is not int or not 1 <= self.max_events <= 1_000_000:
+            raise ValueError("max_events must be an integer in [1, 1000000]")
+        if len(self.events) > self.max_events:
+            raise ValueError("initial events exceed bounded collector capacity")
 
     def opt_out(self, raw_player: str) -> None:
         """Record opt-out and purge (or anonymise) what was already stored for the player."""
@@ -83,6 +94,9 @@ class Collector:
         except EventError:
             self.counts["rejected"] += 1
             raise
+        if len(self.events) >= self.max_events:
+            self.counts["rejected"] += 1
+            raise EventCapacityError("analytics event retention capacity exhausted")
         if raw_player in self.opted_out:
             ev = self._anon(ev)
             self.counts["anonymised"] += 1
@@ -96,6 +110,8 @@ class Collector:
         for p, s, ev in rows:
             try:
                 n += self.ingest(p, s, ev) is not None
+            except EventCapacityError:
+                raise
             except EventError:
                 continue
         return n

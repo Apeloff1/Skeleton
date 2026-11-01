@@ -90,6 +90,28 @@ def test_opt_out_anonymise_unlinkable():
     assert stage_stats(c.events)[("l1", None)].attempts == 2
 
 
+def test_collector_bounded_retention_and_purge_releases_capacity():
+    from skeleton.ai.game_builder.analytics.privacy import EventCapacityError
+
+    c = Collector(PrivacyPolicy(SALT), max_events=2)
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    c.ingest("a", "s1", event)
+    c.ingest("a", "s2", event)
+    with pytest.raises(EventCapacityError, match="capacity"):
+        c.ingest("b", "s3", event)
+    assert len(c.events) == 2
+    assert c.counts["kept"] == 2
+    assert c.counts["rejected"] == 1
+    with pytest.raises(EventCapacityError, match="capacity"):
+        c.ingest_many([("b", "s3", event)])
+    c.opt_out("a")
+    assert not c.events
+    assert c.ingest("b", "s3", event) is not None
+    assert len(c.events) == 1
+    with pytest.raises(ValueError, match="max_events"):
+        Collector(PrivacyPolicy(SALT), max_events=0)
+
+
 def test_sampling_is_per_player_and_deterministic():
     c = collector(sample_rate=0.3)
     for i in range(400):
