@@ -305,3 +305,26 @@ def test_godot_project_rejects_noninteger_or_unbounded_physics_tick_rate(tmp_pat
     for valid in (60, "60", 1000):
         cfg.set("physics", "common/physics_ticks_per_second", valid)
         assert project.physics_ticks == int(valid)
+
+
+def test_godot_rejects_symlinked_project_root_before_reference_or_scan(tmp_path):
+    from skeleton.godot_export import project as project_mod
+
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    (actual / "project.godot").write_text("[application]\\n")
+    (actual / "script.gd").write_text("extends Node")
+    link = tmp_path / "alias"
+    try:
+        link.symlink_to(actual, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project_mod.res_to_path(link, "res://script.gd")
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project_mod.path_to_res(link, link / "script.gd")
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project_mod.GodotProject.load(link)
+    project = project_mod.GodotProject(link, configfile.loads("[application]\\n"))
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project.scripts()

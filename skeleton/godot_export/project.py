@@ -14,6 +14,8 @@ MAX_PROJECT_SCAN_ENTRIES = 20_000
 
 
 def res_to_path(root: Path, res: str) -> Path:
+    if root.is_symlink():
+        raise ValueError("symlinked Godot project root is not trusted")
     if type(res) is not str or not res.startswith("res://") or len(res) > 4096:
         raise ValueError("not a bounded res:// path")
     rel = res[len("res://"):]
@@ -34,6 +36,8 @@ def res_to_path(root: Path, res: str) -> Path:
 
 
 def path_to_res(root: Path, path: Path) -> str:
+    if root.is_symlink():
+        raise ValueError("symlinked Godot project root is not trusted")
     return "res://" + path.resolve().relative_to(root.resolve()).as_posix()
 
 
@@ -45,6 +49,8 @@ class GodotProject:
     @classmethod
     def load(cls, root: str | Path) -> "GodotProject":
         r = Path(root)
+        if r.is_symlink():
+            raise ValueError("symlinked Godot project root is not trusted")
         return cls(r, configfile.load(r / "project.godot"))
 
     @property
@@ -104,6 +110,8 @@ class GodotProject:
             return False
 
     def iter_files(self, suffixes: tuple[str, ...]) -> list[Path]:
+        if self.root.is_symlink():
+            raise ValueError("symlinked Godot project root is not trusted")
         out = []
         visited = 0
         for p in self.root.rglob("*"):
