@@ -39,6 +39,13 @@ class Page(Generic[T]):
                 "has_more": self.next_cursor is not None}
 
 
+def _finite_timestamp(value: object) -> bool:
+    """Bound JSON cursor time evidence before float conversion."""
+    if type(value) not in (int, float) or not 0 <= value <= 1_000_000_000_000:
+        return False
+    return math.isfinite(float(value))
+
+
 class CursorCodec:
     def __init__(self, key: bytes) -> None:
         if type(key) is not bytes or len(key) < 16:
@@ -51,7 +58,7 @@ class CursorCodec:
     def encode(self, scope: str, created_at: float, item_id: str) -> str:
         if (type(scope) is not str or not 1 <= len(scope) <= 128
                 or type(item_id) is not str or not 1 <= len(item_id) <= 96
-                or type(created_at) not in (int, float) or not math.isfinite(created_at)):
+                or not _finite_timestamp(created_at)):
             raise ValueError("cursor inputs must be bounded and finite")
         body = json.dumps({"s": scope, "t": created_at, "i": item_id},
                           separators=(",", ":"), sort_keys=True).encode()
@@ -73,7 +80,7 @@ class CursorCodec:
         if not isinstance(data, dict) or data.get("s") != scope:
             raise bad
         t, i = data.get("t"), data.get("i")
-        if (type(t) not in (int, float) or not math.isfinite(t)
+        if (not _finite_timestamp(t)
                 or type(i) is not str or not 1 <= len(i) <= 96):
             raise bad
         return float(t), i

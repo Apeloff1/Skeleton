@@ -65,10 +65,10 @@ def test_cursor_rejects_nonfinite_boolean_and_malformed_base64():
     import json
 
     c = CursorCodec(b"s" * 32)
-    for value in (float("nan"), float("inf"), True):
+    for value in (float("nan"), float("inf"), True, 10**1000):
         with pytest.raises(ValueError, match="bounded and finite"):
             c.encode("scope", value, "id")
-    for bad in (float("nan"), float("inf"), True):
+    for bad in (float("nan"), float("inf"), True, 10**200):
         body = json.dumps({"s": "scope", "t": bad, "i": "id"}).encode()
         forged = base64.urlsafe_b64encode(body).decode().rstrip("=") + "." + c._mac(body)
         with pytest.raises(CoreError):
