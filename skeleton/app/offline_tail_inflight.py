@@ -89,7 +89,9 @@ class OfflineTailInFlightSession:
             generation=decision.generation,
             continue_execution=decision.continue_execution and not self._quarantined,
             telemetry_quarantined=self._quarantined,
-            authorized_quantum_tokens=decision.authorized_quantum_tokens,
+            authorized_quantum_tokens=(
+                0 if self._quarantined else decision.authorized_quantum_tokens
+            ),
         )
 
     def begin(
@@ -160,7 +162,7 @@ class OfflineTailInFlightSession:
             self._require_healthy()
             if self._request_id is None:
                 raise InFlightPressureDenied("no in-flight request")
-            return self._status(self._guard.resume())
+            return self._status(self._checked_guard(self._guard.resume))
 
     def complete(
         self, *, output_tokens: int, prefix_reused_tokens: int = 0,

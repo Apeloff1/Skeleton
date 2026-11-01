@@ -71,6 +71,28 @@ def test_unknown_thermal_is_a_hold_not_qualification():
         g.checkpoint(generated_tokens=1)
 
 
+def test_partial_thermal_trip_coverage_never_authorizes_cpu():
+    g = guard(thermal=lambda: (
+        CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),
+        CPUThermalSensor("thermal_zone1", "soc", 55.0, None),
+    ))
+    d = g.start()
+    assert d.state == "hold"
+    assert d.reason == "unknown_thermal_trip"
+    assert not d.continue_execution
+
+
+def test_unexpected_vendor_probe_exception_fails_closed():
+    def broken(path):
+        raise AssertionError("simulated vendor probe malfunction")
+
+    g = guard(resource=broken)
+    d = g.start()
+    assert d.state == "hold"
+    assert d.reason == "unavailable_resource_telemetry"
+    assert d.authorized_quantum_tokens == 0
+
+
 def test_measured_trip_forces_hold():
     g = guard(thermal=lambda: (
         CPUThermalSensor("thermal_zone0", "cpu", 92.0, 90.0),

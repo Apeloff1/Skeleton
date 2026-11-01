@@ -160,6 +160,11 @@ class InFlightCPUResourceGuard:
                 not isinstance(sensor, CPUThermalSensor) for sensor in sensors
             ):
                 return "unknown_thermal_telemetry"
+            # A measured trip on ONE CPU zone does not certify the others.
+            # Unknown CPU/SOC zones must hold the entire local inference
+            # quantum rather than be masked by a healthy measured zone.
+            if not sensors or any(sensor.trip_c is None for sensor in sensors):
+                return "unknown_thermal_trip"
             self._thermal.observe(sensors)
             thermal = self._thermal.snapshot()
             if not thermal["trip_measured"]:
@@ -185,7 +190,9 @@ class InFlightCPUResourceGuard:
             ):
                 return "swap_exhaustion"
             return "measured_cpu_headroom"
-        except (OSError, ValueError, TypeError, RuntimeError, OverflowError):
+        except Exception:
+            # Vendor telemetry adapters may fail with unexpected ordinary
+            # exceptions. Never convert probe failure into an admission.
             return "unavailable_resource_telemetry"
 
     def _receipt(self) -> InFlightPressureDecision:
