@@ -9,6 +9,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -246,9 +247,11 @@ def verify_published_audio_cues(
         expected_session_digest=expected_session_digest)
     directory_fd = _open_directory(directory)
     try:
-        fd = os.open(FILENAME, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+        fd = os.open(FILENAME, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     dir_fd=directory_fd)
         try:
-            if os.fstat(fd).st_size > MAX_BYTES + 1:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES + 1:
                 raise StudioQuestError("published audio plan exceeds byte budget")
             chunks: list[bytes] = []
             remaining = MAX_BYTES + 2

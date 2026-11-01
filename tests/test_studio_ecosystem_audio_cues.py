@@ -318,3 +318,25 @@ def test_director_cli_audio_authoring_round_trip(capsys):
     manifest = json.loads(capsys.readouterr().out)
     assert manifest["audio_cue_plan_digest"] == plan["plan_digest"]
     assert manifest["canonical_html5_gameplay_replay_verified"] is True
+
+
+def test_published_audio_custody_rejects_symlink_and_fifo(tmp_path):
+    import os
+    docs, source, session, schedule, authored, _ = compile_fixture()
+    kwargs = {
+        "documents": docs, "actions": [], "schedule": schedule,
+        "request": authored, "authorized": True,
+        "expected_source_digest": source, "expected_session_digest": session,
+    }
+    outside = tmp_path / "outside.json"
+    outside.write_text("forged", encoding="utf-8")
+    directory = tmp_path / "output"
+    directory.mkdir()
+    (directory / FILENAME).symlink_to(outside)
+    with pytest.raises((OSError, StudioQuestError)):
+        verify_published_audio_cues(directory, **kwargs)
+    (directory / FILENAME).unlink()
+    if hasattr(os, "mkfifo"):
+        os.mkfifo(directory / FILENAME)
+        with pytest.raises((OSError, StudioQuestError)):
+            verify_published_audio_cues(directory, **kwargs)
