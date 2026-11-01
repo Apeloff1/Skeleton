@@ -13,9 +13,8 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from skeleton.game.gameplay.arena_bundle import _size as _unused_bundle_size
 from skeleton.game.gameplay.expedition_quest import (
-    MAX_ACTIONS, MAX_BYTES, MAX_SOURCE_BYTES, _action, _advance,
+    MAX_ACTIONS, MAX_BYTES, _action, _advance,
     export_quest, import_quest, new_quest, original_quest, verify_quest,
 )
 from skeleton.game.gameplay.turn_combat import (
@@ -107,7 +106,9 @@ def legal_quest_actions(session: Any) -> list[dict[str, Any]]:
                 candidates.append({"kind": "expedition", "action": {
                     "kind": "buy", "item_id": item["id"],
                 }})
-            if expedition["inventory"].get(item["id"], 0) > 0:
+            hero_max = next(a["max_hp"] for a in source["expedition"]["arenas"][0]["arena"]["actors"] if a["id"] == source["expedition"]["hero_id"])
+            if (expedition["inventory"].get(item["id"], 0) > 0
+                    and expedition["hero_hp"] < hero_max):
                 candidates.append({"kind": "expedition", "action": {
                     "kind": "use", "item_id": item["id"],
                 }})

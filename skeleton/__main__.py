@@ -75,6 +75,7 @@ Commands:
     arena-forge-solve  Solve bounded equipment and combat routes
     arena-forge-author  Atomically edit and preview tactical crafting sources
     quest-expedition  Play authored NPC/choice/crafting quest over combat
+    quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
     quest-campaign-author  Edit and preview replay-verified chapter campaigns
