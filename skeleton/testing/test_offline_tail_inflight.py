@@ -213,3 +213,23 @@ def test_unexpected_guard_start_exception_never_begins_tail_capture(monkeypatch)
     assert app.status().request_id is None
     with pytest.raises(InFlightLifecycleQuarantined):
         app.begin(request_id="retry", prompt_tokens=2)
+
+
+def test_app_quarantines_when_unknown_thermal_hold_exceeds_deadline():
+    from dataclasses import replace
+    app = controller(guard_clock=iter((100, 201)).__next__)
+    app._guard.policy = replace(app._guard.policy, max_hold_duration_ns=50)
+    app._guard._resource_probe = lambda _: replace(
+        snapshot("."), available_ram_bytes=1,
+    )
+    start = app.begin(request_id="held", prompt_tokens=1)
+    assert start.state == "hold"
+    assert not start.continue_execution
+    with pytest.raises(InFlightLifecycleQuarantined, match="journal reconciliation"):
+        app.status()
+    after = app.status()
+    assert after.state == "aborted"
+    assert after.telemetry_quarantined
+    assert not after.continue_execution
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.resume()
