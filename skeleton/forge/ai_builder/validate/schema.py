@@ -19,6 +19,9 @@ from ._common import err
 
 GAME_PLAN_SCHEMA = "skeleton.forge.ai_builder.game_plan.v1"
 RULE = "schema"
+MAX_SECTION_ENTRIES = 8192
+MAX_LIST_REFS = 256
+MAX_TEXT = 1024
 
 _STR, _STRS, _POS, _NONNEG, _BOOL = "str", "strs", "pos", "nonneg", "bool"
 _SECTIONS: dict[str, dict[str, str]] = {
@@ -33,13 +36,19 @@ _OPTIONAL_SECTIONS = {"triggers"}
 
 def _ok(kind: str, v: Any) -> bool:
     if kind == _STR:
-        return isinstance(v, str) and bool(v.strip())
+        return isinstance(v, str) and bool(v.strip()) and len(v) <= MAX_TEXT
     if kind == _STRS:
-        return isinstance(v, list) and all(isinstance(x, str) and x for x in v)
+        return (isinstance(v, list) and len(v) <= MAX_LIST_REFS
+                and all(isinstance(x, str) and x and len(x) <= MAX_TEXT for x in v))
     if kind == _BOOL:
         return isinstance(v, bool)
-    num = isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
-    return num and (v > 0 if kind == _POS else v >= 0)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return False
+    try:
+        finite = math.isfinite(v)
+    except (OverflowError, TypeError, ValueError):
+        return False
+    return finite and (v > 0 if kind == _POS else v >= 0)
 
 
 def check_schema(plan: Any) -> list:
@@ -66,6 +75,9 @@ def check_schema(plan: Any) -> list:
             continue
         if not isinstance(value, list) or (not value and section not in _OPTIONAL_SECTIONS):
             out.append(err(RULE, f"{section}: expected non-empty list"))
+            continue
+        if len(value) > MAX_SECTION_ENTRIES:
+            out.append(err(RULE, f"{section}: exceeds entry budget"))
             continue
         seen: set[str] = set()
         for i, entry in enumerate(value):

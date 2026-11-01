@@ -89,3 +89,27 @@ def test_engine_default_unchanged_and_opt_in_adds_qa():
     asyncio.run(ValidatingEngine(_planner(), build_fn=b4, validate=True).build(brief, qa=mine))
     assert kept["qa"] is mine
     assert eng.score(good_plan()).verdict == "accept"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"accept": float("nan")},
+    {"repair": float("inf")},
+    {"error_penalty": float("nan")},
+    {"warning_penalty": float("-inf")},
+    {"error_penalty": -0.1},
+    {"warning_penalty": 2.0},
+    {"warning_penalty": True},
+])
+def test_nonfinite_or_invalid_scoring_configuration_never_authorizes(kwargs):
+    with pytest.raises(ValueError):
+        Thresholds(**kwargs)
+
+
+def test_malformed_collections_regenerate_without_graph_traversal():
+    p = good_plan()
+    p["levels"][0]["exits"] = [{"unhashable": "x"}]
+    p["triggers"][0]["emits"] = {"not": "a list"}
+    v = score_plan(p)
+    assert v.verdict == "regenerate"
+    assert v.by_rule["schema"] == 0.0
+    assert all(problem.rule == "schema" for problem in v.problems)
