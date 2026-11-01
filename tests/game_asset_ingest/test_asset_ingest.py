@@ -153,3 +153,44 @@ def test_import_directory_resolves_sidecars_and_skips_symlinks(tmp_path):
     r = import_directory(tmp_path)
     assert r.ok, r.issues
     assert sorted(e.kind for e in r.manifest.entries) == ["mesh", "mesh"]
+
+
+def test_descriptor_import_rejects_intermediate_symlink_and_external_reference(tmp_path):
+    from skeleton.game.build.asset_ingest.pipeline import import_files
+    source = tmp_path / "safe"
+    source.mkdir()
+    (source / "asset.png").write_bytes(png())
+    (tmp_path / "link").symlink_to(source, target_is_directory=True)
+    report = import_files(tmp_path, ["link/asset.png"])
+    assert not report.ok
+    assert report.imported == []
+    assert any(issue.code == "unsafe" for issue in report.issues)
+    (tmp_path / "mesh.obj").write_bytes(b"mtllib link/missing.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+    report = import_files(tmp_path, ["mesh.obj"])
+    assert any(issue.code == "missing_reference" for issue in report.issues)
+
+
+def test_descriptor_import_rejects_parent_traversal_and_symlink_root(tmp_path):
+    from skeleton.game.build.asset_ingest.pipeline import import_files
+    root = tmp_path / "assets"
+    root.mkdir()
+    (root / "good.png").write_bytes(png())
+    assert import_files(root, ["../good.png"]).issues[0].code == "unsafe"
+    link = tmp_path / "root_link"
+    link.symlink_to(root, target_is_directory=True)
+    report = import_files(link, ["good.png"])
+    assert report.imported == []
+    assert report.issues[0].code == "unsafe"
+
+
+def test_directory_scan_is_bounded_and_skips_symlinked_tree(tmp_path, monkeypatch):
+    from skeleton.game.build.asset_ingest import pipeline
+    source = tmp_path / "assets"
+    source.mkdir()
+    (source / "a.png").write_bytes(png())
+    (source / "b.png").write_bytes(png())
+    (tmp_path / "shortcut").symlink_to(source, target_is_directory=True)
+    monkeypatch.setattr(pipeline, "MAX_TREE_ENTRIES", 1)
+    report = pipeline.import_directory(tmp_path)
+    assert not report.ok
+    assert any("tree entries exceed bound" in issue.detail for issue in report.issues)
