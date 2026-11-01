@@ -14,6 +14,7 @@ from .long_context_cgroup import observe_cgroup_pressure
 from .long_context_cgroup_events import CgroupEventMonitor
 from .long_context_telemetry_fusion import LongContextTelemetryFusion
 from .long_context_pressure_latch import LongContextPressureLatch
+from .long_context_live_plan import LongContextLivePlanner
 from .tokenization import deserialize_token_sequence
 
 
@@ -82,6 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("head-observe-fused", help="Conservative combined local telemetry; no grant")
     commands.add_parser("head-observe-latched", help="One-shot recovery diagnostic; no grant")
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
+    live_plan = commands.add_parser("head-plan-live", help="Fair proposal bound to live telemetry; no grant")
+    for argument in (live_plan,):
+        argument.add_argument("--candidate", action="append", required=True,
+                              help="stream-id:checkpoint:generation:weight:max-tokens[:requested-bytes]")
+        argument.add_argument("--total-token-budget", type=int, required=True)
+        argument.add_argument("--quantum-tokens", type=int, default=256)
+        argument.add_argument("--max-checkpoints", type=int, default=4096)
     plan.add_argument("--candidate", action="append", required=True,
                       help="stream-id:checkpoint:generation:weight:max-tokens[:requested-bytes]")
     for signal in ("cpu", "memory", "thermal", "energy"):
@@ -115,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         spool = LongContextSpool(args.root)
         if args.command.startswith("head-"):
             heads = LongContextProgressHead(spool)
-            if args.command == "head-plan":
+            if args.command in ("head-plan", "head-plan-live"):
                 demands = []
                 for value in args.candidate:
                     parts = value.split(":")
@@ -125,15 +133,23 @@ def main(argv: list[str] | None = None) -> int:
                         parts[0], parts[1], int(parts[2]), int(parts[4]),
                         weight=int(parts[3]),
                         requested_bytes=int(parts[5]) if len(parts) == 6 else 0))
-                signals = PressureSignals(
-                    args.cpu_pressure, args.memory_pressure,
-                    args.thermal_pressure, args.energy_pressure,
-                    device_kind=args.device_kind)
-                result = LongContextFairPlanner(heads).plan(
-                    tuple(demands), expected_tokenizer_digest=args.tokenizer_digest,
-                    signals=signals, total_token_budget=args.total_token_budget,
-                    quantum_tokens=args.quantum_tokens,
-                    max_checkpoints=args.max_checkpoints)
+                if args.command == "head-plan-live":
+                    result = LongContextLivePlanner(
+                        heads, LongContextTelemetryFusion()).plan(
+                        tuple(demands), expected_tokenizer_digest=args.tokenizer_digest,
+                        total_token_budget=args.total_token_budget,
+                        quantum_tokens=args.quantum_tokens,
+                        max_checkpoints=args.max_checkpoints)
+                else:
+                    signals = PressureSignals(
+                        args.cpu_pressure, args.memory_pressure,
+                        args.thermal_pressure, args.energy_pressure,
+                        device_kind=args.device_kind)
+                    result = LongContextFairPlanner(heads).plan(
+                        tuple(demands), expected_tokenizer_digest=args.tokenizer_digest,
+                        signals=signals, total_token_budget=args.total_token_budget,
+                        quantum_tokens=args.quantum_tokens,
+                        max_checkpoints=args.max_checkpoints)
             elif args.command == "head-init":
                 result = heads.initialize(args.stream_id, args.checkpoint,
                     expected_tokenizer_digest=args.tokenizer_digest,
