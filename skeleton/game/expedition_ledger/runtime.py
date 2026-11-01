@@ -254,6 +254,13 @@ def step(ep: Episode, state: State, direction: str) -> State:
             elif tile == "L":
                 score += effects["lore_score"]
                 events.append("lore_discovered")
+        # A first visit to a locked objective must not permanently consume
+        # the pickup. Revisiting after recovering the source key is legal,
+        # while the score and recovery event remain strictly one-shot.
+        if tile == "O" and has_key and not objective:
+            objective = True
+            events.append("objective_recovered")
+            score += 20
         if tile == "E":
             if objective:
                 status = "won"
