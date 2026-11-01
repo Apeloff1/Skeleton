@@ -51,6 +51,7 @@ _TOOL_SYMBOLS = (
     ("scene_schedule_tool_schema", "execute_scene_schedule_tool"),
     ("scene_asset_binding_tool_schema", "execute_scene_asset_binding_tool"),
     ("director_handoff_tool_schema", "execute_director_handoff_tool"),
+    ("director_authoring_tool_schema", "execute_director_authoring_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -61,6 +62,7 @@ _AUTHORING_SYMBOLS = frozenset({
     "dialogue_fork_tool_schema",
     "npc_author_tool_schema",
     "choice_author_tool_schema",
+    "director_authoring_tool_schema",
 })
 
 

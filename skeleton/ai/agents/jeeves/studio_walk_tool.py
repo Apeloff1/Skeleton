@@ -2003,3 +2003,9 @@ from .studio_scene_asset_binding_tool import (  # noqa: E402
 from .studio_director_handoff_tool import (  # noqa: E402
     director_handoff_tool_schema, execute_director_handoff_tool,
 )
+
+
+# Static, permission-gated source-leased browser export adapter.
+from .studio_director_authoring_tool import (  # noqa: E402
+    director_authoring_tool_schema, execute_director_authoring_tool,
+)
