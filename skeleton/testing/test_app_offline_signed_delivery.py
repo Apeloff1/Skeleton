@@ -165,3 +165,17 @@ def test_unacknowledged_cli_handoff_fails_closed(complete, capsys):
     command.remove("--trusted-local-operator")
     assert run_app_cli(command) == 2
     assert json.loads(capsys.readouterr().err)["release_certified"] is False
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+@pytest.mark.parametrize("pin", ["archive", "manifest", "save", "public_key"])
+def test_malformed_trust_pin_rejected_before_any_custody_read(
+    complete, monkeypatch, pin,
+):
+    import skeleton.app.offline_signed_delivery as module
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("file read before external pin validation")
+
+    monkeypatch.setattr(module, "_identities", unexpected)
+    with pytest.raises(ValueError):
+        _call(complete, **{"expected_" + pin + "_sha256": "not-a-pin"})

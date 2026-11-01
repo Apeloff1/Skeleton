@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Sequence
 
 from skeleton.app.offline_archive_signature import (
-    _read_detached_file, verify_offline_source_archive_signature,
+    _pin, _read_detached_file, verify_offline_source_archive_signature,
 )
 from skeleton.app.offline_delivery_assurance import (
     _save_identity, _source_identity, assure_offline_delivery,
@@ -53,6 +53,14 @@ def assure_signed_offline_delivery(
     """Bind original ZIP signature to real installed source and saved actions."""
     if authorized is not True:
         raise PermissionError("trusted local operator acknowledgement required")
+    # Reject malformed external trust pins before reading any filesystem input.
+    for name, value in (
+        ("archive", expected_archive_sha256),
+        ("manifest", expected_manifest_sha256),
+        ("save", expected_save_sha256),
+        ("public key", expected_public_key_sha256),
+    ):
+        _pin(value, name)
     before = _identities(
         installed_source, archive, private_save, public_key_file, signature_file,
     )
