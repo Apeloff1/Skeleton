@@ -300,7 +300,8 @@ def original_forge() -> dict[str, Any]:
     second = json.loads(json.dumps(first))
     second["arena_id"] = "tide_forge_gate"
     second["actors"][1]["id"] = "tide_guard"
-    second["actors"][1]["max_hp"] = 12
+    second["actors"][1]["max_hp"] = 24
+    second["actors"][1]["defense"] = 4
     return {"schema_version": SCHEMA, "run_id": "lantern_forge",
             "world_id": "lantern_harbor", "hero_id": "scout",
             "hero_team": "wayfarers",
