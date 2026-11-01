@@ -65,6 +65,28 @@ def _digest(value: str, name: str) -> str:
     return value
 
 
+def _volume_available_bytes(fd: int) -> int:
+    """Fail closed on malformed kernel volume counters before disk admission.
+
+    A capacity diagnostic and the actual durable publication must use exactly
+    the same validation: multiplication alone can turn two negative counters
+    into a falsely positive allocation budget.
+    """
+    try:
+        volume = os.fstatvfs(fd)
+        blocks, block_size = volume.f_bavail, volume.f_frsize
+    except (OSError, ValueError, OverflowError, AttributeError, TypeError) as exc:
+        raise LongContextSpoolError("spool volume telemetry unavailable") from exc
+    if (type(blocks) is not int or not 0 <= blocks <= 2**63 - 1
+            or type(block_size) is not int
+            or not 1 <= block_size <= 2**63 - 1):
+        raise LongContextSpoolError("invalid spool volume telemetry")
+    available = blocks * block_size
+    if available > 2**127 - 1:
+        raise LongContextSpoolError("invalid spool volume telemetry")
+    return available
+
+
 def _canonical(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("utf-8")
 
@@ -660,22 +682,7 @@ class LongContextSpool:
         lock_fd = self._publication_lock()
         try:
             used = self._spool_usage_locked()
-            try:
-                volume = os.fstatvfs(self._root_fd)
-                blocks = volume.f_bavail
-                block_size = volume.f_frsize
-            except (OSError, ValueError, OverflowError, AttributeError) as exc:
-                raise LongContextSpoolError("spool volume telemetry unavailable") from exc
-            # Validate each kernel counter independently. A negative block
-            # count multiplied by a negative block size would otherwise look
-            # like positive disk capacity and authorize an unsafe estimate.
-            if (type(blocks) is not int or not 0 <= blocks <= 2**63 - 1
-                    or type(block_size) is not int
-                    or not 1 <= block_size <= 2**63 - 1):
-                raise LongContextSpoolError("invalid spool volume telemetry")
-            available = blocks * block_size
-            if available > 2**127 - 1:
-                raise LongContextSpoolError("invalid spool volume telemetry")
+            available = _volume_available_bytes(self._root_fd)
             remaining_quota = self.max_spool_bytes - used
             disk_headroom = max(0, available - self.disk_reserve_bytes)
             publishable = min(remaining_quota, disk_headroom)
@@ -728,8 +735,7 @@ class LongContextSpool:
             used = self._spool_usage_locked()
             if len(raw) > self.max_spool_bytes - used:
                 raise LongContextSpoolError("spool byte quota prevents admission")
-            volume = os.fstatvfs(bucket_fd)
-            free = volume.f_bavail * volume.f_frsize
+            free = _volume_available_bytes(bucket_fd)
             if free < self.disk_reserve_bytes or free - self.disk_reserve_bytes < len(raw):
                 raise LongContextSpoolError("disk reserve prevents spool admission")
             temp = "." + digest + "." + os.urandom(8).hex() + ".tmp"

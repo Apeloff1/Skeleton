@@ -104,6 +104,11 @@ and free volume bytes after the configured disk reserve. `state=hold` is a
 conservative observation; `state=observed_available` is **not** a lease,
 permission grant, GPU qualification, or guarantee of a future write. Publication
 still independently revalidates quota and free space under the same lock.
+Both observation and actual POSIX publication reject negative, boolean,
+nonintegral, oversized or unavailable filesystem block counters *before*
+computing disk headroom; an apparently positive product of invalid negative
+counters never grants disk admission. A failed telemetry probe leaves no new
+immutable object or checkpoint receipt.
 Unreadable, untrusted, oversized inventory or unknown volume telemetry fails
 closed. The POSIX scanner is cooperative, not a defense against malicious
 same-UID filesystem mutation. The Windows fallback is deliberately unsupported

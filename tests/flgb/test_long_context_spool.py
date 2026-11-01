@@ -133,6 +133,43 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertNotIn("token_ids", output.getvalue())
         self.assertFalse(receipt["is_admission_lease"])
 
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative publication requires POSIX")
+    def test_actual_publication_denies_malformed_volume_telemetry(self):
+        """A positive-looking product of invalid counters must never admit writes."""
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        invalid = ((-2, -4096), (-1, 4096), (1, -4096),
+                   (True, 4096), (1, False), (2**64, 4096),
+                   (2**63 - 1, 2**63 - 1))
+        for blocks, block_size in invalid:
+            with self.subTest(blocks=blocks, block_size=block_size):
+                with patch("skeleton.ai.model_runtime.long_context_spool.os.fstatvfs",
+                           return_value=SimpleNamespace(
+                               f_bavail=blocks, f_frsize=block_size)):
+                    with self.assertRaisesRegex(
+                        LongContextSpoolError, "invalid spool volume telemetry"
+                    ):
+                        self.stage()
+                # Denied writes must not publish either a sequence or a receipt.
+                self.assertFalse(any(self.spool.objects.rglob("[0-9a-f]" * 64)))
+                self.assertFalse(any(self.spool.checkpoints.rglob("[0-9a-f]" * 64)))
+
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative publication requires POSIX")
+    def test_actual_publication_denies_missing_volume_telemetry(self):
+        from unittest.mock import patch
+
+        for error in (OSError("unavailable"), ValueError("unavailable"),
+                      OverflowError("unavailable"), TypeError("unavailable")):
+            with self.subTest(error=type(error).__name__):
+                with patch("skeleton.ai.model_runtime.long_context_spool.os.fstatvfs",
+                           side_effect=error):
+                    with self.assertRaisesRegex(
+                        LongContextSpoolError, "spool volume telemetry unavailable"
+                    ):
+                        self.stage()
+        self.assertFalse(any(self.spool.objects.rglob("[0-9a-f]" * 64)))
+
     def test_stage_and_resume_across_process_object(self):
         start = self.stage()
         restored = LongContextSpool(self.root, disk_reserve_bytes=0)
