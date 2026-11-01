@@ -111,7 +111,10 @@ class LongContextTelemetryFusion:
             reasons: set[str] = set()
             sources: dict[str, dict[str, str]] = {}
             state = "unavailable"
-            start = self._clock()
+            try:
+                start = self._clock()
+            except Exception:
+                start = None
             valid_start = type(start) is int and start >= 0
             for name, observer, root in (
                 ("host", observe_host_pressure, self._host_root),
@@ -125,10 +128,14 @@ class LongContextTelemetryFusion:
             try:
                 event_state, event_reasons, deltas = _event(self._events.sample())
                 reasons.update(event_reasons)
-            except (OSError, ValueError, OverflowError, TypeError, KeyError):
+            except Exception:
+                # Observer faults must degrade diagnostics, not leak a grant.
                 event_state, deltas = "baseline_required", None
                 reasons.add("event_observation_unavailable")
-            end = self._clock()
+            try:
+                end = self._clock()
+            except Exception:
+                end = None
             if (not valid_start or type(end) is not int or end <= start
                     or end - start > self._max_sample_ns
                     or (self._last_ns is not None and start <= self._last_ns)):

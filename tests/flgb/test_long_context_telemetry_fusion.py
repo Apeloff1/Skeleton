@@ -210,3 +210,30 @@ class TestTelemetryFusion(TestCase):
         self.assertFalse(hasattr(self.monitor, "spool"))
         self.assertEqual(self.monitor.sample()["sources"],
                          ("host_psi", "cgroup_v2", "cgroup_events"))
+
+    def test_clock_provider_exception_fails_closed(self):
+        for ticks in (iter(()), iter((100,))):
+            monitor = LongContextTelemetryFusion(clock=lambda: next(ticks))
+            with patch.object(monitor._events, "sample", return_value=event()):
+                result = monitor.sample()
+            self.assertEqual(result["state"], "unavailable")
+            self.assertEqual(result["signals"]["cpu"], "unknown")
+            self.assertIn("observation_clock_invalid", result["reasons"])
+            self.assertFalse(result["is_admission_grant"])
+
+    def test_unexpected_event_provider_exception_fails_closed(self):
+        with patch.object(self.monitor._events, "sample",
+                          side_effect=RuntimeError("provider crash")):
+            result = self.monitor.sample()
+        self.assertEqual(result["event_state"], "baseline_required")
+        self.assertEqual(result["state"], "baseline_required")
+        self.assertIn("event_observation_unavailable", result["reasons"])
+        self.assertFalse(result["is_execution_lease"])
+
+    def test_clock_provider_exception_preserves_high_watermark(self):
+        values = iter((100, 200, 150, 250, 300, 400))
+        monitor = LongContextTelemetryFusion(clock=lambda: next(values))
+        with patch.object(monitor._events, "sample", return_value=event()):
+            self.assertEqual(monitor.sample()["state"], "observed")
+            self.assertEqual(monitor.sample()["state"], "unavailable")
+            self.assertEqual(monitor.sample()["state"], "observed")
