@@ -6,7 +6,7 @@ generates testimony or grants NPC speech, hardware, or release authority.
 from __future__ import annotations
 
 from html import escape
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from .studio_ecosystem_npc_knowledge import (
     _canonical, _digest, _lease, compile_npc_knowledge, source_knowledge_facts,
@@ -28,14 +28,14 @@ def compile_npc_lineage(
     _lease(expected_source_digest, "lineage source")
     if expected_session_digest is not None:
         _lease(expected_session_digest, "lineage session")
-    compiled = compile_npc_knowledge(
+    compiled = cast(dict[str, Any], compile_npc_knowledge(
         documents, actions, authoring, authorized=True,
         expected_source_digest=expected_source_digest,
-        expected_session_digest=expected_session_digest)
-    facts = source_knowledge_facts(
+        expected_session_digest=expected_session_digest))
+    facts = cast(dict[str, Any], source_knowledge_facts(
         documents, actions, authorized=True,
         expected_source_digest=expected_source_digest,
-        expected_session_digest=compiled["session_digest"])
+        expected_session_digest=compiled["session_digest"]))
     if (facts["project_id"] != compiled["project_id"] or
             facts["source_digest"] != compiled["source_digest"] or
             facts["session_digest"] != compiled["session_digest"]):
@@ -45,7 +45,7 @@ def compile_npc_lineage(
         if fact["fact_id"] in sources:
             raise StudioQuestError("duplicate source NPC fact identity")
         sources[fact["fact_id"]] = fact
-    nodes: list[dict[str, object]] = []
+    nodes: list[dict[str, Any]] = []
     positions: dict[str, int] = {}
     for i, scene in enumerate(compiled["scenes"]):
         scene_id = scene["scene_id"]
@@ -57,7 +57,7 @@ def compile_npc_lineage(
             "quest_stage": scene["quest_stage"], "status": scene["status"],
             "incoming": 0, "outgoing": 0, "earned_incoming": 0,
         })
-    edges: list[dict[str, object]] = []
+    edges: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for reveal in compiled["reveals"]:
         source, target = reveal["source_scene_id"], reveal["recipient_scene_id"]
@@ -74,7 +74,7 @@ def compile_npc_lineage(
         if reveal["status"] not in ("pending", "earned_in_sandbox_replay"):
             raise StudioQuestError("unknown NPC lineage status")
         earned = reveal["status"] == "earned_in_sandbox_replay"
-        edge: dict[str, object] = {
+        edge: dict[str, Any] = {
             "fact_id": reveal["fact_id"], "source_scene_id": source,
             "recipient_scene_id": target,
             "source_ref": fact["source_ref"],
