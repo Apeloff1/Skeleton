@@ -59,3 +59,28 @@ def test_plugin_sdk_rejects_malformed_manifest_and_unbounded_payloads():
             h.call("e", "export", payload)
     with pytest.raises(m.ContractError, match="conformance cases"):
         m.conformance(h, "e", [({"n": 1}, lambda x: True)] * 129)
+
+
+def test_plugin_rejects_cyclic_and_oversized_nested_json_before_dispatch():
+    h = m.Host(frozenset())
+    h.register(m.Manifest("e", "exporter", (1, 0), ()), Exp())
+    cycle = []
+    cycle.append(cycle)
+    for payload in ({"n": cycle}, {"n": [0] * 5000}, {"n": {"x": 10**2000}}):
+        with pytest.raises(m.ContractError, match="bound|cyclic"):
+            h.call("e", "export", payload)
+
+
+def test_plugin_rejects_noncanonical_output_without_stringifying_objects():
+    class Poison:
+        def __str__(self):
+            raise AssertionError("unsafe repr executed")
+
+    class BadOutput:
+        def export(self, payload):
+            return {"out": Poison()}
+
+    h = m.Host(frozenset())
+    h.register(m.Manifest("bad", "exporter", (1, 0), ()), BadOutput())
+    with pytest.raises(m.ContractError, match="not canonical"):
+        h.call("bad", "export", {})

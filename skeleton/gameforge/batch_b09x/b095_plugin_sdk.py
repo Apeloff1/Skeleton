@@ -4,13 +4,63 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 import re
 from typing import Any, Callable, Mapping
 
-from ._helpers import ContractError, digest, require, require_str
+from ._helpers import ContractError, require, require_str
 
 SDK_API = (1, 0)
 KINDS = {"exporter": ("export",), "tool": ("run",), "model": ("infer",)}
+
+MAX_JSON_NODES = 4_096
+MAX_JSON_DEPTH = 16
+MAX_JSON_BYTES = 65_536
+
+
+def _bounded_json(value: Any) -> str:
+    """Validate plugin JSON before encoding, rejecting cycles and resource bombs."""
+    active: set[int] = set()
+    nodes = 0
+
+    def walk(node: Any, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        require(nodes <= MAX_JSON_NODES and depth <= MAX_JSON_DEPTH,
+                "plugin JSON traversal exceeds bound")
+        if type(node) in (dict, list, tuple):
+            identity = id(node)
+            require(identity not in active, "cyclic plugin JSON")
+            require(len(node) <= MAX_JSON_NODES, "plugin JSON collection exceeds bound")
+            active.add(identity)
+            try:
+                if type(node) is dict:
+                    for key, child in node.items():
+                        require(type(key) is str and 1 <= len(key) <= 128,
+                                "plugin JSON key exceeds bound")
+                        walk(child, depth + 1)
+                else:
+                    for child in node:
+                        walk(child, depth + 1)
+            finally:
+                active.remove(identity)
+        elif type(node) is str:
+            require(len(node) <= MAX_JSON_BYTES, "plugin JSON string exceeds bound")
+        elif type(node) is int:
+            require(node.bit_length() <= 4_096, "plugin JSON integer exceeds bound")
+        elif type(node) is float:
+            require(math.isfinite(node), "plugin JSON number must be finite")
+        else:
+            require(type(node) in (bool, type(None)), "plugin JSON value is not canonical")
+
+    walk(value, 0)
+    try:
+        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise ContractError("plugin JSON encoding rejected") from exc
+    require(len(encoded) <= MAX_JSON_BYTES, "plugin JSON exceeds byte bound")
+    return encoded
 
 
 @dataclass(frozen=True)
@@ -60,13 +110,10 @@ class Host:
                 "plugin payload exceeds entry bound")
         require(all(type(k) is str and 1 <= len(k) <= 128 for k in payload),
                 "plugin payload keys are invalid")
-        try:
-            encoded = json.dumps(dict(payload), sort_keys=True, separators=(",", ":"),
-                                 ensure_ascii=True, allow_nan=False)
-        except (TypeError, ValueError, RecursionError) as exc:
-            raise ContractError("plugin payload is not canonical JSON") from exc
-        require(len(encoded) <= 65_536, "plugin payload exceeds byte bound")
-        return getattr(impl, method)(json.loads(encoded))
+        encoded = _bounded_json(dict(payload))
+        result = getattr(impl, method)(json.loads(encoded))
+        _bounded_json(result)
+        return result
 
 
 def conformance(
@@ -80,5 +127,5 @@ def conformance(
     for payload, check in cases:
         a = host.call(name, method, payload)
         b = host.call(name, method, payload)
-        results.append(bool(check(a)) and digest(a) == digest(b))
+        results.append(bool(check(a)) and _bounded_json(a) == _bounded_json(b))
     return {"plugin": name, "passed": all(results), "cases": len(results)}
