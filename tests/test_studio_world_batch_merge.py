@@ -188,6 +188,7 @@ def test_cli_merge_persists_private_editor_and_recompiles(tmp_path, capsys):
     }
     path = tmp_path / "edited.json"
     path.write_text(json.dumps(export, sort_keys=True), encoding="utf-8")
+    path.chmod(0o600)
     assert load_world_batch_editor_export(
         path, authorized=True, expected_catalog_digest=catalog,
         expected_baseline_plan_digest=plan["plan_digest"],
