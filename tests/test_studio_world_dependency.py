@@ -242,3 +242,50 @@ def test_private_restore_rejects_duplicate_json_and_symlink(tmp_path, monkeypatc
     with pytest.raises(OSError):
         restore_dependency_execution(
             tmp_path, authorized=True, expected_catalog_digest="a" * 64)
+
+
+def test_offline_dependency_editor_import_and_lease(tmp_path, monkeypatch):
+    import skeleton.ai.game_builder.studio_world_dependency as mod
+    from skeleton.ai.game_builder.studio_world_dependency_editor import (
+        EXPORT_SCHEMA, render_dependency_editor, publish_dependency_editor,
+        load_dependency_editor_export,
+    )
+    monkeypatch.setattr(mod, "compile_world_batch_plan", lambda *a, **k: {
+        "catalog_digest": "a" * 64,
+        "provenance": {"projects": [{"project_id": "source", "source_digest": "b" * 64}]},
+        "plan_digest": "c" * 64,
+    })
+    proof = compile_dependency_world_batch(
+        _graph(), authorized=True, expected_catalog_digest="a" * 64)
+    html, attestation = render_dependency_editor(proof, authorized=True)
+    assert b"script-src 'sha256-" in html
+    assert b"connect-src 'none'" in html
+    assert attestation["baseline_proof_digest"] == proof["proof_digest"]
+    assert publish_dependency_editor(proof, tmp_path, authorized=True)["file_write_performed"]
+    with pytest.raises(FileExistsError):
+        publish_dependency_editor(proof, tmp_path, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA,
+        "catalog_digest": proof["catalog_digest"],
+        "baseline_proof_digest": proof["proof_digest"],
+        "baseline_graph_digest": proof["graph_digest"],
+        "graph": proof["graph"],
+    }
+    path = tmp_path / "studio_world_dependency_edit.json"
+    path.write_text(json.dumps(record))
+    path.chmod(0o600)
+    assert load_dependency_editor_export(
+        path, authorized=True, expected_catalog_digest="a" * 64,
+        baseline_proof=proof) == proof["graph"]
+    record["baseline_proof_digest"] = "0" * 64
+    path.write_text(json.dumps(record))
+    with pytest.raises(StudioQuestError, match="stale"):
+        load_dependency_editor_export(
+            path, authorized=True, expected_catalog_digest="a" * 64,
+            baseline_proof=proof)
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_dependency_editor_export(
+            path, authorized=True, expected_catalog_digest="a" * 64,
+            baseline_proof=proof)

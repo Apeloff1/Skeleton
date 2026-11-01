@@ -36,3 +36,15 @@ Run focused tests with
 Exact-head integration/security CI is still required. HTML5 quest receipts
 are available only when downstream reviewed tools actually produce them.
 No native runtime, rights, device, or release qualification is claimed.
+
+## Offline dependency editing
+
+Use `--editor-directory <existing-private-directory>` to publish the
+source-leased HTML editor. The editor changes both step requests and explicit
+predecessor edges, and exports `studio_world_dependency_edit.json`.
+Import with `--import-graph <file> --baseline-proof '<JSON>'` and the same
+`--expected-catalog`. Import checks private-file custody, rejects symlinks,
+duplicate JSON keys and nonfinite values, and replays the baseline source and
+catalog before compiling the edited graph. The original baseline digest is
+never treated as authorization for a changed source or graph. Recompiled
+outputs must pass the same source-bound execution and replay checks.

@@ -8,7 +8,9 @@ from pathlib import Path
 
 from scripts.studio_scene_schedule_cli import _strict
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
-from skeleton.ai.game_builder.studio_world_batch_editor import publish_world_batch_editor
+from skeleton.ai.game_builder.studio_world_dependency_editor import (
+    publish_dependency_editor, load_dependency_editor_export,
+)
 from skeleton.ai.game_builder.studio_world_dependency import (
     compile_dependency_world_batch, execute_dependency_world_batch,
     publish_dependency_execution, restore_dependency_execution,
@@ -22,10 +24,16 @@ def main(argv: list[str] | None = None) -> int:
     modes = ap.add_mutually_exclusive_group(required=True)
     modes.add_argument("--graph", help="Strict bounded typed dependency graph JSON")
     modes.add_argument("--restore", type=Path, help="Existing private execution directory")
+    modes.add_argument("--import-graph", type=Path, help="Private exported dependency graph")
+    ap.add_argument("--baseline-proof", help="Source-replayed original graph proof JSON")
     ap.add_argument("--publish", type=Path, help="Existing private output directory")
     ap.add_argument("--editor-directory", type=Path, help="Existing private editor directory")
     ap.add_argument("--html-sha256", action="store_true")
     args = ap.parse_args(argv)
+    if args.import_graph and not args.baseline_proof:
+        ap.error("dependency graph import requires baseline proof")
+    if args.baseline_proof and not args.import_graph:
+        ap.error("baseline proof is only valid for graph import")
     if args.restore and (args.publish or args.editor_directory):
         ap.error("restore is read-only; cannot combine with publication")
     try:
@@ -36,7 +44,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             proof = execution["dependency_proof"]
         else:
-            graph = _strict(args.graph, max_bytes=48 * 1024)
+            if args.import_graph:
+                graph = load_dependency_editor_export(
+                    args.import_graph, authorized=True,
+                    expected_catalog_digest=args.expected_catalog,
+                    baseline_proof=_strict(args.baseline_proof, max_bytes=768 * 1024),
+                )
+            else:
+                graph = _strict(args.graph, max_bytes=48 * 1024)
             proof = compile_dependency_world_batch(
                 graph, authorized=True,
                 expected_catalog_digest=args.expected_catalog,
@@ -50,8 +65,8 @@ def main(argv: list[str] | None = None) -> int:
             output["html_sha256"] = sha256(render_dependency_world_html(
                 proof, authorized=True)).hexdigest()
         if args.editor_directory:
-            output["editor"] = publish_world_batch_editor(
-                proof["plan"], args.editor_directory, authorized=True)
+            output["editor"] = publish_dependency_editor(
+                proof, args.editor_directory, authorized=True)
             output["file_write_performed"] = True
         if args.publish:
             output["publication"] = publish_dependency_execution(
