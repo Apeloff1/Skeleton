@@ -167,3 +167,14 @@ def test_nested_render_budget_is_cumulative_across_selects():
     message = "{s, select, a {" + "{name}" * 70 + "} other {safe}}"
     with pytest.raises(MessageError, match="output bound"):
         format_message(message, {"s": "a", "name": "x" * 1024}, "en")
+
+
+def test_untrusted_locale_tags_are_bounded_before_direction_and_plural_rules():
+    for bad in ("", "x" * 129, "en\nspoof", "en\x00US", True):
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            is_rtl(bad)
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            plural_category(bad, 1)
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            format_message("Hello {name}", {"name": "Ada"}, bad)
+    assert is_rtl("pa-Arab") and not is_rtl("az-Latn")

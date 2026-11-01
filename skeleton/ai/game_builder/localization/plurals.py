@@ -104,8 +104,16 @@ _RULES: dict[str, Callable[..., str]] = {
 }
 
 
+def _locale_parts(locale: str) -> list[str]:
+    """Bound untrusted locale tags before normalization or script inspection."""
+    if (type(locale) is not str or not 1 <= len(locale) <= 128
+            or any(ord(ch) < 33 or ord(ch) == 127 for ch in locale)):
+        raise ValueError("locale must be a bounded printable tag")
+    return locale.replace("_", "-").split("-")
+
+
 def _language(locale: str) -> str:
-    return locale.replace("_", "-").split("-", 1)[0].lower()
+    return _locale_parts(locale)[0].lower()
 
 
 def plural_category(locale: str, n: int | float | Decimal | str) -> str:
@@ -123,7 +131,7 @@ def categories_for(locale: str) -> frozenset[str]:
 
 
 def is_rtl(locale: str) -> bool:
-    parts = locale.replace("_", "-").split("-")
+    parts = _locale_parts(locale)
     if any(len(p) == 4 and p.title() in _RTL_SCRIPTS for p in parts[1:]):
         return True
     if any(len(p) == 4 and p.isalpha() for p in parts[1:]):
