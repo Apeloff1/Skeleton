@@ -56,3 +56,11 @@ def test_secret_audit_refuses_unbounded_timestamp_and_untyped_credential():
     with pytest.raises(m.ContractError, match="credential"):
         ledger.use(object(), "read", 1)
     assert not ledger.events
+
+
+def test_credential_name_cannot_embed_secret_or_log_delimiters():
+    for bad in ("password=supersecret123", "token: secretvalue",
+                "name with spaces", "x\\tfield", "=malformed"):
+        with pytest.raises(m.ContractError, match="credential name"):
+            m.Credential(bad, ("read",), 0, 60)
+    assert m.Credential("ci-runner:release_1", ("read",), 0, 60).name == "ci-runner:release_1"

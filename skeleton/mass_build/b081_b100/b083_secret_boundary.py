@@ -47,7 +47,8 @@ class Credential:
 
     def __post_init__(self) -> None:
         require_str(self.name, "name")
-        require(len(self.name) <= 128 and _safe_diagnostic(self.name),
+        require(len(self.name) <= 128 and _safe_diagnostic(self.name)
+                and bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", self.name)),
                 "credential name exceeds diagnostic bound")
         require(type(self.issued_at) is int and type(self.expires_at) is int
                 and 0 <= self.issued_at < self.expires_at <= MAX_AUDIT_TIMESTAMP,
