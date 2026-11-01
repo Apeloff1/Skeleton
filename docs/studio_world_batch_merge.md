@@ -37,3 +37,12 @@ Publication is an operator-requested write, never a merge-side effect.
 The editor and publication paths are opt-in. All execution and source leases
 are checked again on the final plan; the merge receipt itself is not a
 permission token, a gameplay certificate, or a release assertion.
+
+The typed Jeeves router also exposes
+`studio_original_world_batch_merge` through a reviewed static descriptor.
+Its arguments are `schema`, `expected_catalog_digest`, `baseline`,
+`left`, and `right`. It requires out-of-band operator authorization and
+returns a canonical merge plan without executing, writing, or asserting release
+readiness. The existing CLI is the separate explicit execution/publication
+boundary. This adapter is deliberately excluded from the recursive read-only
+world batch tool allowlist to prevent nested workflow execution.
