@@ -4,7 +4,9 @@ This Studio A vertical produces spoiler-bounded accessibility hints from the
 canonical quest DAG and an exact replayed quest session. Only stages currently
 **available** or already **completed** may appear. The deterministic prompt
 creates generic available-stage hints; authored text must remain bound to a
-stage that the session has actually unlocked. It cannot create choices,
+stage that the session has actually unlocked. Exact hidden stage and ending identifiers are blocked in visible hint text;
+freeform prose is not semantically spoiler-certified and requires editorial
+review. It cannot create choices,
 unlock stages, mint evidence, reveal locked ending predicates, or certify
 native gameplay.
 

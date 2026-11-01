@@ -75,6 +75,12 @@ def test_authoring_and_locked_stage_fail_closed():
         with pytest.raises(StudioQuestError):
             compile_quest_hint_deck(
                 docs, [], {"hints": [{
+                    "stage_id": first, "text": "Hidden " + locked,
+                    "audience": "available",
+                }]}, authorized=True, expected_source_digest=source)
+        with pytest.raises(StudioQuestError):
+            compile_quest_hint_deck(
+                docs, [], {"hints": [{
                     "stage_id": locked, "text": "Spoiler.", "audience": "available",
                 }]}, authorized=True, expected_source_digest=source)
     for bad in (

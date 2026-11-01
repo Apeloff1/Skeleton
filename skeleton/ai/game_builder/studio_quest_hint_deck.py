@@ -61,6 +61,13 @@ def compile_quest_hint_deck(
     completed = set(session.completed)
     available = set(available_stages(session, documents))
     by_id = {stage.key: stage for stage in program.stages}
+    # Exact hidden identifiers must never be embedded in an available hint.
+    # This is an identifier leak guard, not a semantic spoiler classifier.
+    hidden_ids = {
+        stage.key.casefold() for stage in program.stages
+        if stage.key not in completed and stage.key not in available
+    }
+    hidden_ids.update(ending_id.casefold() for ending_id, _ in program.endings)
     if (type(authoring) is not dict or set(authoring) != {"hints"}
             or type(authoring["hints"]) is not list
             or len(authoring["hints"]) > MAX_HINTS
@@ -84,8 +91,11 @@ def compile_quest_hint_deck(
             raise StudioQuestError("quest hint attempts to reveal locked or unearned stage")
         seen.add(key)
         stage = by_id[key]
+        hint_text = _text(item["text"])
+        if any(secret and secret in hint_text.casefold() for secret in hidden_ids):
+            raise StudioQuestError("quest hint reveals a hidden stage or ending identifier")
         card: dict[str, Any] = {
-            "stage_id": key, "audience": audience, "text": _text(item["text"]),
+            "stage_id": key, "audience": audience, "text": hint_text,
             "prerequisites": list(stage.prerequisites),
             "stage_source_digest": _digest({
                 "stage_id": key, "prerequisites": stage.prerequisites,
@@ -111,6 +121,7 @@ def compile_quest_hint_deck(
         "locked_stage_count": len(program.stages) - len(available) - len(completed),
         "source_replay_verified": True,
         "spoiler_visibility_bound_to_replay": True,
+        "semantic_spoiler_review_verified": False,
         "quest_unlock_performed": False, "file_write_performed": False,
         "native_genre_runtime_verified": False, "release_certified": False,
     }

@@ -36,6 +36,7 @@ VERIFIED_READ_ONLY_TOOLS = frozenset({
     "studio_ending_plan",
     "studio_original_npc_continuity",
     "studio_original_npc_continuity_merge",
+    "studio_original_quest_hints",
 })
 
 
