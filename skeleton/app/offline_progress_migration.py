@@ -94,8 +94,9 @@ def preflight_offline_game_migration(
 ) -> dict[str, object]:
     """Check independent pins and destination admission without publication.
 
-    Save-to-world binding is not asserted until the source has been installed
-    and the canonical replay reexecuted. Preflight is never a reservation.
+    The pinned archive's typed world reexecutes the private save before any
+    destination is reserved. Installation independently repeats the replay
+    and verifies the installed source. Preflight is never a reservation.
     """
     raw_save, inspected, compatible = _validate_migration_inputs(
         archive, destination,

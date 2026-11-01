@@ -136,9 +136,8 @@ def test_foreign_game_progress_rejected_without_new_save(tmp_path, capsys):
     )) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert not migrated.exists()
-    # A reserved destination can remain for explicit quarantine.
-    if destination.exists():
-        assert destination.is_dir()
+    # A foreign save is rejected by archive-bound preflight before mkdir.
+    assert not destination.exists()
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow custody")

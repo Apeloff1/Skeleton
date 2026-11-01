@@ -102,6 +102,33 @@ def test_unauthorized_and_tampered_save_rejected(tmp_path, capsys):
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow custody")
+def test_same_bytes_archive_in_place_replacement_is_not_accepted(
+    tmp_path, capsys, monkeypatch,
+):
+    archive, archive_pin, manifest_pin, save, save_pin, _ = _prepared(
+        tmp_path, capsys,
+    )
+    import skeleton.app.offline_progress_compatibility as module
+    original_read = module._read_private_archive
+    swapped = False
+
+    def replace_after_inventory(path):
+        nonlocal swapped
+        if not swapped:
+            replacement = tmp_path / "new-inode.zip"
+            replacement.write_bytes(archive.read_bytes())
+            replacement.chmod(0o600)
+            os.replace(replacement, archive)
+            swapped = True
+        return original_read(path)
+
+    monkeypatch.setattr(module, "_read_private_archive", replace_after_inventory)
+    with pytest.raises(OfflineArchiveSaveCompatibilityError):
+        _verify(archive, archive_pin, manifest_pin, save, save_pin)
+    assert swapped is True
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX nofollow custody")
 def test_symlinked_archive_rejected(tmp_path, capsys):
     archive, archive_pin, manifest_pin, save, save_pin, _ = _prepared(
         tmp_path, capsys,

@@ -72,6 +72,11 @@ If either the archive or its pin is provided alone, the command fails closed.
 The `--preflight-migration` mode accepts the same archive, source, private
 save and destination options as `--migrate-progress`. It checks independently
 pinned archive and save bytes, private-file custody and no-clobber destination
-admission without creating either output. It cannot prove save-to-world
-binding until the canonical world is installed and replayed, and it does not
-reserve paths. The mutating migration repeats the same checks.
+admission without creating either output. It also reconstructs the typed
+world from the independently pinned canonical ZIP and reexecutes the complete
+private action chain *before* any installation directory is reserved. A
+foreign save therefore fails without leaving a partial installation. The
+archive path and inode identity are checked across replay, and the mutating
+migration repeats all admission checks and independently verifies installed
+source and save before reporting success. Preflight does not reserve paths,
+execute Godot, qualify devices, certify content rights, or authorize release.

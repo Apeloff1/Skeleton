@@ -8,18 +8,21 @@ from __future__ import annotations
 from hashlib import sha256
 from io import BytesIO
 import hmac
+import os
+import stat
 from pathlib import Path
 import re
 from zipfile import ZipFile, BadZipFile, LargeZipFile
 
 from skeleton.ai.game_builder.dual_runtime_verify import (
-    _MAX_BYTES, _MAX_MANIFEST, _json, _world,
+    _MAX_BYTES, _MAX_MANIFEST, _assert_original_root, _json, _world,
 )
 from skeleton.ai.game_builder.playable_simulation import (
     MAX_SERIALIZED_REPLAY_BYTES, deserialize_replay,
 )
 from skeleton.app.offline_delivery_archive import (
-    _read_private_archive, inspect_offline_game_archive,
+    _parent as _archive_parent, _read_private_archive,
+    inspect_offline_game_archive,
 )
 
 SCHEMA = "skeleton.app.offline_archive_save_compatibility.v1"
@@ -36,6 +39,25 @@ def _pin(value: object, name: str) -> str:
             "independent " + name + " SHA-256 pin required"
         )
     return value
+
+
+def _archive_identity(path: str | Path) -> tuple[int, ...]:
+    """Pin path, owner, and inode metadata across the entire replay admission."""
+    target, parent_fd = _archive_parent(path)
+    try:
+        info = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_uid != os.geteuid() or info.st_mode & 0o077):
+            raise OfflineArchiveSaveCompatibilityError(
+                "archive path is not a private regular inode"
+            )
+        _assert_original_root(target.parent, parent_fd)
+        return (
+            info.st_dev, info.st_ino, info.st_size, info.st_mode,
+            info.st_nlink, info.st_uid, info.st_mtime_ns, info.st_ctime_ns,
+        )
+    finally:
+        os.close(parent_fd)
 
 
 def verify_archived_progress_binding(
@@ -63,6 +85,7 @@ def verify_archived_progress_binding(
         raise OfflineArchiveSaveCompatibilityError("invalid bounded save bytes")
     if not hmac.compare_digest(sha256(save_bytes).hexdigest(), save_pin):
         raise OfflineArchiveSaveCompatibilityError("save differs from independent pin")
+    identity_before = _archive_identity(archive)
     before = inspect_offline_game_archive(
         archive, expected_archive_sha256=archive_pin,
         expected_manifest_sha256=manifest_pin, authorized=True,
@@ -98,7 +121,9 @@ def verify_archived_progress_binding(
         archive, expected_archive_sha256=archive_pin,
         expected_manifest_sha256=manifest_pin, authorized=True,
     )
-    if before != after or after.get("archive_integrity_verified") is not True:
+    identity_after = _archive_identity(archive)
+    if (identity_before != identity_after or before != after
+            or after.get("archive_integrity_verified") is not True):
         raise OfflineArchiveSaveCompatibilityError(
             "source archive changed during compatibility replay"
         )
