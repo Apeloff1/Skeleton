@@ -146,11 +146,28 @@ def test_safety_hazard_source_and_ai_mirror_are_byte_identical() -> None:
     assert source.read_bytes() == mirror.read_bytes()
 
 
-def test_contract_init_source_and_ai_mirror_remain_byte_identical() -> None:
+def test_contract_init_source_and_ai_mirror_preserve_declared_facade() -> None:
+    """Only the governed execution-authority overlay may extend the mirror."""
+    import ast
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2]
-    source = root / "skeleton/contracts/__init__.py"
-    mirror = root / "skeleton/ai/runtime/contracts/__init__.py"
-
-    assert source.read_bytes() == mirror.read_bytes()
+    source = (root / "skeleton/contracts/__init__.py").read_bytes()
+    mirror = (root / "skeleton/ai/runtime/contracts/__init__.py").read_bytes()
+    assert mirror.startswith(source)
+    # The overlay must contain exactly an explicit relative import and a
+    # matching __all__ extension; arbitrary module-level code is forbidden.
+    suffix = mirror[len(source):].decode("utf-8")
+    nodes = ast.parse(suffix).body
+    assert len(nodes) == 2
+    imported, exported = nodes
+    assert isinstance(imported, ast.ImportFrom)
+    assert imported.module == "execution_authority" and imported.level == 1
+    names = tuple(alias.name for alias in imported.names)
+    assert len(names) == len(set(names))
+    assert all(alias.asname is None for alias in imported.names)
+    assert {"ExecutionAuthority", "ExecutionAuthorityError", "verify_authority_receipt_chain"} <= set(names)
+    assert isinstance(exported, ast.AugAssign)
+    assert isinstance(exported.target, ast.Name) and exported.target.id == "__all__"
+    assert isinstance(exported.op, ast.Add)
+    assert tuple(ast.literal_eval(exported.value)) == names
