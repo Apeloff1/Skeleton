@@ -25,9 +25,11 @@ def main(argv: list[str] | None = None) -> int:
     window = commands.add_parser("window", help="Read next bounded token window")
     window.add_argument("--checkpoint", required=True)
     window.add_argument("--max-tokens", type=int, required=True)
+    window.add_argument("--max-checkpoints", type=int, default=4096)
     advance = commands.add_parser("advance", help="Persist completed token progress")
     advance.add_argument("--checkpoint", required=True)
     advance.add_argument("--consumed-tokens", type=int, required=True)
+    advance.add_argument("--max-checkpoints", type=int, default=4096)
     args = parser.parse_args(argv)
     try:
         spool = LongContextSpool(args.root)
@@ -42,9 +44,10 @@ def main(argv: list[str] | None = None) -> int:
                       "checkpoint": spool.stage(sequence)}
         elif args.command == "advance":
             result = {"schema": "skeleton.ai.long-context-cli.v1",
-                      "checkpoint": spool.advance(args.checkpoint,
+                      "checkpoint": spool.audited_advance(args.checkpoint,
                           expected_tokenizer_digest=args.tokenizer_digest,
-                          consumed_tokens=args.consumed_tokens)}
+                          consumed_tokens=args.consumed_tokens,
+                          max_checkpoints=args.max_checkpoints)}
         elif args.command == "audit":
             result = spool.audit_history(
                 args.checkpoint, expected_tokenizer_digest=args.tokenizer_digest,
@@ -57,9 +60,10 @@ def main(argv: list[str] | None = None) -> int:
                       "checkpoint": asdict(checkpoint),
                       "total_tokens": len(sequence.token_ids)}
         else:
-            item = spool.next_window(args.checkpoint,
+            item = spool.audited_next_window(args.checkpoint,
                 expected_tokenizer_digest=args.tokenizer_digest,
-                max_tokens=args.max_tokens)
+                max_tokens=args.max_tokens,
+                max_checkpoints=args.max_checkpoints)
             result = {"schema": "skeleton.ai.long-context-cli.v1",
                       "window": None if item is None else {
                           "start": item.start, "stop": item.stop,

@@ -314,6 +314,87 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertEqual(invoke("window", "--checkpoint", child,
                                 "--max-tokens", "3")["window"]["token_ids"], [3, 4, 5])
 
+    def test_audited_window_rejects_missing_grandparent_before_tokens(self):
+        genesis = self.stage()
+        first = self.spool.advance(
+            genesis, expected_tokenizer_digest=TOKENIZER, consumed_tokens=2,
+        )
+        second = self.spool.advance(
+            first, expected_tokenizer_digest=TOKENIZER, consumed_tokens=3,
+        )
+        self.assertEqual(
+            self.spool.audited_next_window(
+                second, expected_tokenizer_digest=TOKENIZER,
+                max_tokens=2, max_checkpoints=3,
+            ).token_ids, (5, 6),
+        )
+        self.spool._path("checkpoint", genesis).unlink()
+        # Ordinary immediate-parent validation is insufficient to detect this.
+        self.assertEqual(
+            self.spool.next_window(
+                second, expected_tokenizer_digest=TOKENIZER, max_tokens=2,
+            ).token_ids, (5, 6),
+        )
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.audited_next_window(
+                second, expected_tokenizer_digest=TOKENIZER,
+                max_tokens=2, max_checkpoints=3,
+            )
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.audited_advance(
+                second, expected_tokenizer_digest=TOKENIZER,
+                consumed_tokens=1, max_checkpoints=3,
+            )
+
+    def test_audited_window_and_advance_require_complete_bounded_history(self):
+        genesis = self.stage()
+        first = self.spool.audited_advance(
+            genesis, expected_tokenizer_digest=TOKENIZER, consumed_tokens=2,
+        )
+        second = self.spool.audited_advance(
+            first, expected_tokenizer_digest=TOKENIZER, consumed_tokens=3,
+        )
+        with self.assertRaisesRegex(LongContextSpoolError, "audit bound"):
+            self.spool.audited_next_window(
+                second, expected_tokenizer_digest=TOKENIZER,
+                max_tokens=2, max_checkpoints=2,
+            )
+        with self.assertRaisesRegex(LongContextSpoolError, "audit bound"):
+            self.spool.audited_advance(
+                second, expected_tokenizer_digest=TOKENIZER,
+                consumed_tokens=1, max_checkpoints=2,
+            )
+        self.assertEqual(
+            self.spool.audited_next_window(
+                second, expected_tokenizer_digest=TOKENIZER,
+                max_tokens=2, max_checkpoints=3,
+            ).token_ids, (5, 6),
+        )
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.audited_next_window(
+                second, expected_tokenizer_digest=SOURCE,
+                max_tokens=2, max_checkpoints=3,
+            )
+
+    def test_cli_window_denies_corrupt_history_and_does_not_print_tokens(self):
+        genesis = self.stage()
+        first = self.spool.advance(
+            genesis, expected_tokenizer_digest=TOKENIZER, consumed_tokens=2,
+        )
+        second = self.spool.advance(
+            first, expected_tokenizer_digest=TOKENIZER, consumed_tokens=2,
+        )
+        self.spool._path("checkpoint", genesis).unlink()
+        output = StringIO()
+        with redirect_stdout(output):
+            with self.assertRaises(SystemExit) as failure:
+                cli_main([
+                    "--root", str(self.root), "--tokenizer-digest", TOKENIZER,
+                    "window", "--checkpoint", second, "--max-tokens", "2",
+                ])
+        self.assertEqual(failure.exception.code, 2)
+        self.assertEqual(output.getvalue(), "")
+
     def test_bounded_history_audit_survives_restart_and_rejects_missing_ancestor(self):
         start = self.stage()
         child = self.spool.advance(

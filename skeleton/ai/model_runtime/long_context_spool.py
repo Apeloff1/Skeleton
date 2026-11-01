@@ -824,6 +824,43 @@ class LongContextSpool:
             sequence.digest,
         )
 
+    def audited_next_window(
+        self, checkpoint_digest: str, *, expected_tokenizer_digest: str,
+        max_tokens: int, max_checkpoints: int = 4096,
+    ) -> TokenWindow | None:
+        """Require complete bounded ancestry proof before releasing token IDs.
+
+        Unlike next_window, this rejects a missing or corrupted *grandparent*
+        checkpoint. It does not authenticate a publisher or establish a global
+        replay fence. The operator must supply a trusted checkpoint digest.
+        """
+        self._require_owner_process()
+        _positive(max_tokens, "max_tokens", self.max_window_tokens)
+        self.audit_history(
+            checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
+            max_checkpoints=max_checkpoints,
+        )
+        return self.next_window(
+            checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
+            max_tokens=max_tokens,
+        )
+
+    def audited_advance(
+        self, checkpoint_digest: str, *, expected_tokenizer_digest: str,
+        consumed_tokens: int, max_checkpoints: int = 4096,
+    ) -> str:
+        """Reject broken ancestry before committing any new progress."""
+        self._require_owner_process()
+        _positive(consumed_tokens, "consumed_tokens", 2**31 - 1)
+        self.audit_history(
+            checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
+            max_checkpoints=max_checkpoints,
+        )
+        return self.advance(
+            checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
+            consumed_tokens=consumed_tokens,
+        )
+
     def advance(
         self, checkpoint_digest: str, *, expected_tokenizer_digest: str, consumed_tokens: int,
     ) -> str:
