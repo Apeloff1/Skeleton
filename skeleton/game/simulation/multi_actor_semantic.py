@@ -36,6 +36,7 @@ SHOVE_MM = 50
 MAX_ACTORS = 512
 MAX_STATICS = 4096
 MAX_TICKS = 10_000
+MAX_CONTACTS = 100_000
 MAX_INTENT_MM_S = 1_000_000_000
 
 
@@ -127,6 +128,10 @@ def step_actors(
         raise MultiActorError("1..512 actors required")
     if len(statics) > MAX_STATICS:
         raise MultiActorError("static collider count exceeds bound")
+    if len(intents) > len(actors):
+        raise MultiActorError("actor intent count exceeds bound")
+    if len(prev_contacts) > MAX_CONTACTS:
+        raise MultiActorError("previous contact count exceeds bound")
     if type(tick) is not int or not 0 <= tick <= MAX_TICKS:
         raise MultiActorError("simulation tick exceeds bound")
     if (type(prev_digest) is not str or len(prev_digest) != 64

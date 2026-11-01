@@ -99,3 +99,15 @@ def test_multi_actor_bounded_inputs_and_duplicate_static_ids(monkeypatch):
     monkeypatch.setattr(mod, "MAX_TICKS", 1)
     with pytest.raises(MultiActorError, match="tick count"):
         run_actors((a,), [{}, {}], step_ns=STEP)
+
+
+def test_semantic_physics_rejects_oversized_intent_and_contact_maps(monkeypatch):
+    from skeleton.game.simulation import multi_actor_semantic as mod
+
+    a = actor("a", 0)
+    with pytest.raises(MultiActorError, match="intent count"):
+        step_actors((a,), {"a": (0, 0), "ghost": (0, 0)}, tick=0, step_ns=STEP)
+    monkeypatch.setattr(mod, "MAX_CONTACTS", 1)
+    contacts = frozenset({("a", "b"), ("c", "d")})
+    with pytest.raises(MultiActorError, match="contact count"):
+        step_actors((a,), {}, tick=0, step_ns=STEP, prev_contacts=contacts)
