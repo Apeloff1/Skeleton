@@ -739,3 +739,38 @@ Use `--project <id> --dialogue-stage --dialogue-actions '[]' --dialogue-itinerar
 ## Source-verified NPC encounter codex
 
 Use `--project <id> --dialogue-stage --dialogue-npc-codex --dialogue-actions '[]' --dialogue-expected-digest <sha256>` to browse original authored NPC knowledge, relationships, scene cues, quest status and selected alternatives. Filter by `--dialogue-npc-id` and page with `--dialogue-npc-offset`, `--dialogue-npc-limit` and an exact `--dialogue-npc-expected-session` continuation lease. The typed Jeeves `studio_npc_encounter_codex` tool returns the same read-only source-bound cards. No output claims an NPC has spoken or a native engine interaction occurred.
+
+## Source-bound NPC continuity and scene causality
+
+The operator can audit the canonical authored NPC scene chronology and quest
+prerequisite order without inventing conversations, world time, or new scene
+state. This uses the same source-bound `compile_dialogue_staging` and
+`replay_quest` owners as NPC scene preview, authored itinerary, and save
+restoration. The chronology is the author's scene order, **not** a clock or
+proof that a character was present in a running native game.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --dialogue-stage --dialogue-continuity --dialogue-actions '[]'
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --dialogue-stage --dialogue-continuity --dialogue-continuity-npc-id <authored-id>
+```
+
+Each record contains the original NPC identity, site, source-text digests and
+references, source-bound scene card digest, quest prerequisites, selected
+alternative, and current replayed status. A deterministic causal audit
+reports prerequisites whose scenes appear later in the author's sequence.
+Strict mode (`--dialogue-continuity-strict`) rejects those forward references
+instead of silently presenting a coherent chronology. The optional NPC filter
+does not change the global causality verdict. Every result is leased to the
+source SHA-256 and optionally the exact quest session digest; a stale lease
+fails closed. Jeeves exposes the same read-only contract via
+`execute_npc_continuity_tool` with explicit operator authority.
+
+The CLI never writes a save in this mode. To persist an authored revision,
+use the existing private revision bundle and pass
+`--dialogue-revision-source`; to commit a quest choice, use the existing
+dialogue preview/commit flow. This proof does not certify spoken dialogue,
+native gameplay, external events or consumer release. Run canonical
+`tests/test_studio_ecosystem_npc_continuity.py`, architecture gates and
+exact-head CI before promoting a PR.

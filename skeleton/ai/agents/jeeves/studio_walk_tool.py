@@ -1549,3 +1549,70 @@ def execute_npc_codex_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+NPC_CONTINUITY_REQUEST_SCHEMA = "skeleton.jeeves.studio_npc_continuity_request.v1"
+NPC_CONTINUITY_RESULT_SCHEMA = "skeleton.jeeves.studio_npc_continuity_result.v1"
+
+
+def npc_continuity_tool_schema() -> dict[str, object]:
+    """Typed read-only NPC chronology and causal proof; authorization out of band."""
+    return {
+        "name": "studio_npc_scene_continuity",
+        "description": "Audit original NPC chronology and quest dependencies without playing scenes",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": NPC_CONTINUITY_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "npc_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "require_chronological_prerequisites": {"type": "boolean"},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_npc_continuity_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    """Bind a typed Jeeves request to the authoritative source and quest replay."""
+    if authorized is not True:
+        raise PermissionError("Jeeves NPC continuity requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    allowed = required | {
+        "expected_session_digest", "npc_id",
+        "require_chronological_prerequisites",
+    }
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - allowed
+            or request.get("schema") != NPC_CONTINUITY_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves NPC continuity request")
+    from skeleton.ai.game_builder.studio_ecosystem_npc_continuity import (
+        audit_npc_continuity,
+    )
+    detail = audit_npc_continuity(
+        read_blueprint(request["project_id"]), request["actions"],
+        authorized=True, expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request.get("expected_session_digest"),
+        npc_id=request.get("npc_id"),
+        require_chronological_prerequisites=request.get(
+            "require_chronological_prerequisites", False),
+    )
+    payload: dict[str, Any] = {
+        "schema": NPC_CONTINUITY_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
