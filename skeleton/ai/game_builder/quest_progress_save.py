@@ -62,12 +62,29 @@ def restore_quest_progress(plane: GameSavePlane, slot: str, world: DirectorWorld
                            verified_state: DirectorState | None = None,
                            campaign_receipt_sha256: str | None = None,
                            sequence: int | None = None) -> dict[str, QuestProgressState]:
+    # A save section is only a view. Require independently replayed Director
+    # state or a verified campaign receipt before accepting stored progress.
+    if verified_state is None and campaign_receipt_sha256 is None:
+        raise QuestProgressSaveError("quest restore requires verified Director state or campaign receipt")
+    if verified_state is not None and (
+        not isinstance(verified_state, DirectorState)
+        or verified_state.world_digest != world.digest
+    ):
+        raise QuestProgressSaveError("verified director state belongs to another world")
+    if campaign_receipt_sha256 is not None and (
+        type(campaign_receipt_sha256) is not str
+        or len(campaign_receipt_sha256) != 64
+        or any(c not in "0123456789abcdef" for c in campaign_receipt_sha256)
+    ):
+        raise QuestProgressSaveError("invalid campaign receipt digest")
     sections, _ = plane.restore(slot, sequence=sequence)
     section = sections.get(SECTION)
     if section is None:
         raise QuestProgressSaveError("save has no quest progress section")
     if section.get("schema") != SCHEMA:
         raise QuestProgressSaveError("unknown quest progress schema")
+    if section.get("project") != world.project_id:
+        raise QuestProgressSaveError("quest progress belongs to another project")
     if section.get("director_world_digest") != world.digest:
         raise QuestProgressSaveError("quest progress belongs to another world")
     if verified_state is not None and section.get("final_state_sha256") != verified_state.digest:
