@@ -9,7 +9,7 @@ from skeleton.ai.runtime.inference.kv.live_tier_controller import (
     KVLiveTierController,
 )
 from skeleton.ai.runtime.inference.kv.migration_journal import (
-    KVMigrationJournal, KVJournaledTierController,
+    KVMigrationAnchor, KVMigrationJournal, KVJournaledTierController,
 )
 from skeleton.ai.runtime.inference.kv.pressure_tiering import (
     TierApplyReceipt, TierPlan, TierPressurePolicy,
@@ -53,6 +53,7 @@ class OfflineKVPageTierService:
     def from_trusted_handles(
         cls, *, manager: KVCacheManager, connection: sqlite3.Connection,
         session_id: str, journal_key: bytes, storage_path: str,
+        anchor: KVMigrationAnchor,
         policy: TierPressurePolicy | None = None,
     ) -> "OfflineKVPageTierService":
         """Production bootstrap: canonical live OS probe, no injected sensors."""
@@ -61,8 +62,15 @@ class OfflineKVPageTierService:
         )
         journal = KVMigrationJournal(
             connection, session_id=session_id, journal_key=journal_key,
+            anchor=anchor,
         )
         return cls(controller, journal)
+
+    def bootstrap_new_journal_anchor(self) -> None:
+        """Explicit first-install action, never called automatically on restart."""
+        if self._simulated:
+            raise ValueError("simulated journal is not a production rollback anchor")
+        self._service._journal.bootstrap_anchor()
 
     def verified_journal_status(self) -> dict[str, int | str | bool]:
         """Read authenticated history; never treat a receipt as GPU evidence."""

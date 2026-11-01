@@ -230,3 +230,74 @@ def test_verified_history_rejects_forged_receipt_accounting():
     with pytest.raises(KVMigrationOutcomeUnknown, match="unverifiable"):
         journal.verified_inventory()
     assert storage.calls == 1
+
+
+class SimulatedMigrationCAS:
+    """Independent simulated anchor, NOT a production durable implementation."""
+
+    def __init__(self):
+        self.value = None
+        self.fail_advance = False
+
+    def initialize(self, *, generation, digest):
+        if self.value is not None:
+            raise ValueError("anchor already initialized")
+        self.value = (generation, digest)
+
+    def read(self):
+        if self.value is None:
+            raise ValueError("anchor missing")
+        return self.value
+
+    def advance(self, *, expected_generation, expected_digest, generation, digest):
+        if self.fail_advance or self.value != (expected_generation, expected_digest):
+            raise ValueError("external CAS refused")
+        self.value = (generation, digest)
+
+
+def test_independent_anchor_detects_sqlite_history_rollback():
+    connection = sqlite3.connect(":memory:")
+    anchor = SimulatedMigrationCAS()
+    service, journal, storage = setup(connection=connection)
+    journal._anchor = anchor  # test-only binding before first installation
+    journal.bootstrap_anchor()
+    plan, _ = service.plan_live()
+    service.apply_once(plan)
+    assert anchor.value[0] == 2  # RUNNING intent, then committed receipt
+    assert journal.verified_inventory()["committed"] == 1
+    connection.execute("DELETE FROM local_kv_migration_journal")
+    connection.commit()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="anchor unverifiable"):
+        journal.verified_inventory()
+    assert storage.calls == 1
+
+
+def test_external_anchor_cas_failure_quarantines_after_sqlite_commit():
+    connection = sqlite3.connect(":memory:")
+    anchor = SimulatedMigrationCAS()
+    service, journal, storage = setup(connection=connection)
+    journal._anchor = anchor
+    journal.bootstrap_anchor()
+    plan, _ = service.plan_live()
+    anchor.fail_advance = True
+    with pytest.raises(KVMigrationOutcomeUnknown, match="anchor uncertain"):
+        journal.begin(plan)
+    assert journal._quarantined
+    assert connection.execute(
+        "SELECT state FROM local_kv_migration_journal"
+    ).fetchone() == ("running",)
+    assert storage.calls == 0
+    with pytest.raises(KVMigrationOutcomeUnknown):
+        journal.begin(plan)
+
+
+def test_anchor_bootstrap_cannot_reset_existing_migration_history():
+    connection = sqlite3.connect(":memory:")
+    anchor = SimulatedMigrationCAS()
+    service, journal, storage = setup(connection=connection)
+    journal._anchor = anchor
+    journal.bootstrap_anchor()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="bootstrap"):
+        journal.bootstrap_anchor()
+    assert journal._quarantined
+    assert storage.calls == 0

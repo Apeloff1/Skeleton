@@ -12,6 +12,7 @@ import hmac
 import json
 import sqlite3
 from threading import RLock
+from typing import Protocol
 
 from .live_tier_controller import KVLiveTierController
 from .pressure_tiering import TierApplyReceipt, TierPlan
@@ -25,6 +26,17 @@ MAX_MOVES = 128
 
 class KVMigrationOutcomeUnknown(RuntimeError):
     """Physical migration may have partially completed; no automatic retry."""
+
+
+class KVMigrationAnchor(Protocol):
+    """Independent durable CAS, never another row in this SQLite database."""
+
+    def initialize(self, *, generation: int, digest: str) -> None: ...
+
+    def read(self) -> tuple[int, str]: ...
+
+    def advance(self, *, expected_generation: int, expected_digest: str,
+                generation: int, digest: str) -> None: ...
 
 
 def _hex(value: object, label: str) -> str:
@@ -102,12 +114,20 @@ class KVMigrationJournal:
     def __init__(
         self, connection: sqlite3.Connection, *,
         session_id: str, journal_key: bytes,
+        anchor: KVMigrationAnchor | None = None,
     ) -> None:
         if not isinstance(connection, sqlite3.Connection) or connection.in_transaction:
             raise ValueError("exclusive idle SQLite journal connection required")
         if type(journal_key) is not bytes or not 32 <= len(journal_key) <= 128:
             raise ValueError("independent migration journal key required")
+        if anchor is not None and not all(
+            callable(getattr(anchor, name, None))
+            for name in ("initialize", "read", "advance")
+        ):
+            raise ValueError("independent KV migration CAS anchor required")
         self.session_id = _hex(session_id, "session")
+        self._anchor = anchor
+        self._quarantined = False
         self._key = journal_key
         self._connection = connection
         self._lock = RLock()
@@ -132,6 +152,88 @@ class KVMigrationJournal:
         ):
             raise ValueError("untrusted KV migration journal schema")
 
+    def _journal_digest(self) -> str:
+        """Bounded canonical row digest, including RUNNING and committed rows."""
+        rows = self._connection.execute(
+            "SELECT plan_digest, session_id, inventory_digest,"
+            " plan_payload, plan_mac, state, receipt_payload, receipt_mac"
+            " FROM " + TABLE + " ORDER BY plan_digest"
+        ).fetchall()
+        if len(rows) > MAX_ROWS:
+            raise ValueError("unbounded migration history")
+        digest = sha256(b"skeleton.kv-migration-anchor.v1\\0")
+        for row in rows:
+            for value in row:
+                if value is None:
+                    digest.update(b"N")
+                elif type(value) is str:
+                    raw = value.encode("utf-8", errors="strict")
+                    digest.update(b"S" + len(raw).to_bytes(8, "big") + raw)
+                elif type(value) is bytes:
+                    if len(value) > MAX_RECEIPT_BYTES:
+                        raise ValueError("unbounded migration row")
+                    digest.update(b"B" + len(value).to_bytes(8, "big") + value)
+                else:
+                    raise ValueError("invalid migration row type")
+        return digest.hexdigest()
+
+    def bootstrap_anchor(self) -> None:
+        """One-time installation only; never reinitialize on process restart."""
+        with self._lock:
+            if self._anchor is None or self._quarantined:
+                raise KVMigrationOutcomeUnknown("trusted rollback anchor required")
+            try:
+                if self._connection.execute(
+                    "SELECT COUNT(*) FROM " + TABLE
+                ).fetchone()[0] != 0:
+                    raise ValueError("nonempty migration history cannot be bootstrapped")
+                self._anchor.initialize(generation=0, digest=self._journal_digest())
+            except BaseException as exc:
+                self._quarantined = True
+                raise KVMigrationOutcomeUnknown(
+                    "migration rollback anchor bootstrap requires reconciliation"
+                ) from exc
+
+    def _anchor_snapshot(self) -> tuple[int, str] | None:
+        if self._quarantined:
+            raise KVMigrationOutcomeUnknown("migration rollback custody quarantined")
+        if self._anchor is None:
+            return None
+        try:
+            generation, digest = self._anchor.read()
+            if (type(generation) is not int
+                    or not 0 <= generation < (1 << 63)
+                    or type(digest) is not str
+                    or not hmac.compare_digest(
+                        _hex(digest, "anchor digest"), self._journal_digest()
+                    )):
+                raise ValueError("independent migration rollback anchor mismatch")
+            return generation, digest
+        except BaseException as exc:
+            self._quarantined = True
+            raise KVMigrationOutcomeUnknown(
+                "migration rollback anchor unverifiable"
+            ) from exc
+
+    def _advance_anchor(self, previous: tuple[int, str] | None) -> None:
+        if previous is None:
+            return
+        try:
+            generation, digest = previous
+            if generation == (1 << 63) - 1:
+                raise ValueError("migration anchor generation exhausted")
+            self._anchor.advance(
+                expected_generation=generation, expected_digest=digest,
+                generation=generation + 1, digest=self._journal_digest(),
+            )
+        except BaseException as exc:
+            # SQLite may already have committed. Never undo it or retry the
+            # physical migration after an external CAS failure.
+            self._quarantined = True
+            raise KVMigrationOutcomeUnknown(
+                "migration committed but independent rollback anchor uncertain"
+            ) from exc
+
     def _begin(self) -> None:
         if self._connection.in_transaction:
             raise KVMigrationOutcomeUnknown("migration journal has active transaction")
@@ -147,6 +249,7 @@ class KVMigrationJournal:
         """
         with self._lock:
             try:
+                self._anchor_snapshot()
                 rows = self._connection.execute(
                     "SELECT plan_digest, session_id, inventory_digest,"
                     " plan_payload, plan_mac, state, receipt_payload, receipt_mac"
@@ -267,6 +370,7 @@ class KVMigrationJournal:
         with self._lock:
             self._begin()
             try:
+                previous_anchor = self._anchor_snapshot()
                 inventory = self.verified_inventory()
                 if inventory["running"]:
 
@@ -291,6 +395,7 @@ class KVMigrationJournal:
                     (plan.digest, self.session_id, plan.inventory_digest, payload, mac),
                 )
                 self._connection.commit()
+                self._advance_anchor(previous_anchor)
             except BaseException:
                 self._connection.rollback()
                 raise
@@ -304,6 +409,7 @@ class KVMigrationJournal:
         with self._lock:
             self._begin()
             try:
+                previous_anchor = self._anchor_snapshot()
                 row = self._connection.execute(
                     "SELECT session_id, inventory_digest, plan_payload,"
                     " plan_mac, state, receipt_payload, receipt_mac FROM "
@@ -332,6 +438,7 @@ class KVMigrationJournal:
                 if changed != 1:
                     raise KVMigrationOutcomeUnknown("migration journal CAS failed")
                 self._connection.commit()
+                self._advance_anchor(previous_anchor)
             except BaseException:
                 self._connection.rollback()
                 raise
@@ -340,6 +447,7 @@ class KVMigrationJournal:
         """Read only an authenticated receipt; NEVER replay physical movement."""
         expected_plan = _encode(_plan_body(plan, self.session_id))
         with self._lock:
+            self._anchor_snapshot()
             row = self._connection.execute(
                 "SELECT session_id, inventory_digest, plan_payload,"
                 " plan_mac, state, receipt_payload, receipt_mac FROM "
