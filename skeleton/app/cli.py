@@ -159,6 +159,10 @@ def _parser() -> argparse.ArgumentParser:
         help="reverify an ordered series of independently pinned game handoffs",
     )
     sub.add_parser(
+        "mixed-library-checkpoint-handoff", add_help=False,
+        help="publish or independently inspect a private checkpoint-chain replay receipt",
+    )
+    sub.add_parser(
         "audit-mixed-library-epoch-successor", add_help=False,
         help="verify a pinned original-game epoch handoff strictly extends another",
     )
@@ -483,6 +487,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "audit-mixed-library-epoch-receipts":
         from skeleton.app.offline_mixed_library_epoch_receipt_chain import main as receipt_chain_main
         return receipt_chain_main(arguments[1:])
+    if arguments and arguments[0] == "mixed-library-checkpoint-handoff":
+        from skeleton.app.offline_mixed_library_checkpoint_handoff import main as checkpoint_handoff_main
+        return checkpoint_handoff_main(arguments[1:])
     if arguments and arguments[0] == "audit-mixed-library-epoch-successor":
         from skeleton.app.offline_mixed_library_epoch_successor import main as successor_main
         return successor_main(arguments[1:])
