@@ -97,6 +97,13 @@ class RegistryS2SAuthGate(S2SAuthGate):
     ) -> None:
         if not isinstance(verifier, RegistryVerifier):
             raise TypeError("RegistryS2SAuthGate needs a RegistryVerifier")
+        # An authorization gate must never accept an opt-out of replay custody
+        # or a permissive registry, even if those configurations exist for
+        # standalone diagnostic/verifier use.
+        if verifier.nonce_store is None:
+            raise ValueError("registry s2s gate requires a replay nonce store")
+        if not verifier.registry.strict:
+            raise ValueError("registry s2s gate requires strict issuer registration")
         super().__init__(verifier, policies, matrix=matrix, admission=admission, hooks=hooks)
         self.registry: ServiceRegistry = verifier.registry
         self._local = threading.local()

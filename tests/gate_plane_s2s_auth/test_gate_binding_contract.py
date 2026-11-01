@@ -71,3 +71,32 @@ def test_open_probe_not_audited(ring, registry, nonces, clock):
     gate = _asm(ring, registry, nonces, clock, sink).gate
     assert gate.evaluate("GET", "/health/live", {}).http_status == 200
     assert len(sink) == 0
+
+
+def test_gate_rejects_replay_disabled_verifier(ring, registry, clock):
+    import pytest
+    from skeleton.gate_plane.s2s.authz import default_gate_plane_policies
+    from skeleton.gate_plane.s2s.bound_gate import RegistryS2SAuthGate
+    from skeleton.gate_plane.s2s.verifier import RegistryVerifier
+
+    verifier = RegistryVerifier(
+        "gate", ring, registry=registry, nonce_store=None,
+        clock=clock, require_nonce_store=False,
+    )
+    with pytest.raises(ValueError, match="requires a replay nonce store"):
+        RegistryS2SAuthGate(verifier, default_gate_plane_policies())
+
+
+def test_gate_rejects_permissive_registry(ring, clock, nonces):
+    import pytest
+    from skeleton.gate_plane.s2s.authz import default_gate_plane_policies
+    from skeleton.gate_plane.s2s.bound_gate import RegistryS2SAuthGate
+    from skeleton.gate_plane.s2s.registry import ServiceRegistry
+    from skeleton.gate_plane.s2s.verifier import RegistryVerifier
+
+    verifier = RegistryVerifier(
+        "gate", ring, registry=ServiceRegistry(strict=False), nonce_store=nonces,
+        clock=clock,
+    )
+    with pytest.raises(ValueError, match="requires strict issuer registration"):
+        RegistryS2SAuthGate(verifier, default_gate_plane_policies())
