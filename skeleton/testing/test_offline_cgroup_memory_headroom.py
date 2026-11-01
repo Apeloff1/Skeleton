@@ -9,7 +9,6 @@ import pytest
 from skeleton.app import offline_cgroup_memory_headroom as module
 from skeleton.ai.model_runtime import fair_stream_live_budget as budget_module
 from skeleton.app.offline_resources import LocalResourceSnapshot
-from skeleton.app.offline_resources import LocalResourceSnapshot
 
 
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux cgroup-v2 only")
@@ -179,3 +178,78 @@ def test_invalid_unlimited_observation_is_not_an_authority():
         module.CgroupMemoryHeadroom(1024, 100, 900, 0, True)
     with pytest.raises(ValueError):
         module.CgroupMemoryHeadroom(1024, 100, 924, 0, False)
+
+
+def test_nested_membership_uses_child_limit_not_host_root(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root, current="1048576", maximum="max", high="max")
+    child = root / "tenant"
+    fixture(child, current="125829120", maximum="134217728", high="max")
+    monkeypatch.setattr(module, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(module, "_read_self_cgroup_path", lambda: ("tenant",))
+    sample = module.probe_cgroup_memory_headroom()
+    assert sample.limit_bytes == 134217728
+    assert sample.headroom_bytes == 8388608
+    assert sample.hard_hold
+
+
+def test_ancestor_hold_overrides_apparently_free_child(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root, current="950000000", maximum="1000000000", high="max")
+    child = root / "tenant"
+    fixture(child, current="1000", maximum="500000000", high="max")
+    monkeypatch.setattr(module, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(module, "_read_self_cgroup_path", lambda: ("tenant",))
+    sample = module.probe_cgroup_memory_headroom()
+    assert sample.limit_bytes == 1000000000
+    assert sample.hard_hold
+
+
+def test_cgroup_membership_change_is_not_admission(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root)
+    fixture(root / "tenant")
+    monkeypatch.setattr(module, "_DEFAULT_CGROUP_ROOT", str(root))
+    paths = iter([("tenant",), ()])
+    monkeypatch.setattr(module, "_read_self_cgroup_path", lambda: next(paths))
+    with pytest.raises(module.CgroupMemoryUnavailable, match="membership changed"):
+        module.probe_cgroup_memory_headroom()
+
+
+def test_missing_child_or_parent_capacity_is_not_host_fallback(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root)
+    (root / "tenant").mkdir()
+    monkeypatch.setattr(module, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(module, "_read_self_cgroup_path", lambda: ("tenant",))
+    with pytest.raises(module.CgroupMemoryUnavailable, match="unmeasured"):
+        module.probe_cgroup_memory_headroom()
+
+
+def test_symlinked_membership_component_denied(tmp_path, monkeypatch):
+    root = tmp_path / "cg"
+    fixture(root)
+    outside = tmp_path / "outside"
+    fixture(outside)
+    (root / "tenant").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(module, "_DEFAULT_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(module, "_read_self_cgroup_path", lambda: ("tenant",))
+    with pytest.raises(module.CgroupMemoryUnavailable):
+        module.probe_cgroup_memory_headroom()
+
+
+def test_invalid_membership_from_proc_is_not_trusted(monkeypatch):
+    # This validates the parser without granting a fabricated cgroup path.
+    import os
+    original_open = module.os.open
+    original_read = module.os.read
+    original_close = module.os.close
+    original_fstat = module.os.fstat
+    def fake_open(path, flags, *args, **kwargs):
+        if path == "/proc/self/cgroup":
+            return original_open(os.devnull, flags)
+        return original_open(path, flags, *args, **kwargs)
+    monkeypatch.setattr(module.os, "open", fake_open)
+    monkeypatch.setattr(module.os, "read", lambda fd, n: b"0::/../escape\\n")
+    with pytest.raises(module.CgroupMemoryUnavailable, match="unsafe"):
+        module._read_self_cgroup_path()

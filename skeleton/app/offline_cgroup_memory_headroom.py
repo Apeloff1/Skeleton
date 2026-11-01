@@ -117,8 +117,8 @@ def _open_cgroup_directory(root: str) -> int:
         raise
 
 
-def probe_cgroup_memory_headroom(
-    root: str = "/sys/fs/cgroup",
+def _probe_single_cgroup_memory_headroom(
+    root: str,
 ) -> CgroupMemoryHeadroom | None:
     """Observe one Linux cgroup-v2 memory limit, never infer missing capacity.
 
@@ -186,6 +186,96 @@ def probe_cgroup_memory_headroom(
         raise CgroupMemoryUnavailable("incomplete cgroup memory observation") from exc
     finally:
         os.close(directory)
+
+
+
+# This is the conventional cgroup-v2 mount. A caller-selected fixture path is
+# deliberately probed as a single directory, never interpreted as /proc data.
+_DEFAULT_CGROUP_ROOT = "/sys/fs/cgroup"
+_MAX_CGROUP_DEPTH = 32
+_MAX_CGROUP_MEMBERSHIP_BYTES = 4096
+
+
+def _read_self_cgroup_path() -> tuple[str, ...]:
+    """Read bounded unified cgroup membership without trusting path traversal.
+
+    The process can be moved between cgroups; the public probe compares the
+    membership before and after sampling and callers re-probe before tokens.
+    """
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    try:
+        fd = os.open("/proc/self/cgroup", flags)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise CgroupMemoryUnavailable("cgroup membership is not regular")
+            raw = os.read(fd, _MAX_CGROUP_MEMBERSHIP_BYTES + 1)
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise CgroupMemoryUnavailable("cgroup membership unavailable") from exc
+    if not raw or len(raw) > _MAX_CGROUP_MEMBERSHIP_BYTES:
+        raise CgroupMemoryUnavailable("cgroup membership exceeds bound")
+    try:
+        lines = raw.decode("utf-8", errors="strict").splitlines()
+    except UnicodeError as exc:
+        raise CgroupMemoryUnavailable("invalid cgroup membership encoding") from exc
+    unified = [line[3:] for line in lines if line.startswith("0::")]
+    if len(unified) != 1 or not unified[0].startswith("/"):
+        raise CgroupMemoryUnavailable("unique unified cgroup membership required")
+    path = unified[0]
+    if (not path or "\x00" in path
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in path)):
+        raise CgroupMemoryUnavailable("invalid cgroup membership path")
+    if path == "/":
+        return ()
+    parts = path[1:].split("/")
+    if (len(parts) > _MAX_CGROUP_DEPTH
+            or any(not part or part in (".", "..") for part in parts)):
+        raise CgroupMemoryUnavailable("unsafe or overdeep cgroup membership")
+    return tuple(parts)
+
+
+def probe_cgroup_memory_headroom(
+    root: str | None = None,
+) -> CgroupMemoryHeadroom | None:
+    """Conservatively bound the CURRENT process by every cgroup ancestor.
+
+    A host-root-only sample can miss a container's much smaller child limit.
+    For the canonical mount, observe the current process membership and each
+    ancestor from root through leaf. The tightest finite headroom wins; any
+    ancestor hard hold wins over all apparent free RAM. Unknown or changing
+    membership fails closed. This is still an observation, not a reservation.
+    """
+    if root is None:
+        root = _DEFAULT_CGROUP_ROOT
+    if sys.platform != "linux":
+        return None
+    if root != _DEFAULT_CGROUP_ROOT:
+        return _probe_single_cgroup_memory_headroom(root)
+    parts = _read_self_cgroup_path()
+    samples: list[CgroupMemoryHeadroom] = []
+    for depth in range(len(parts) + 1):
+        path = os.path.join(root, *parts[:depth])
+        observation = _probe_single_cgroup_memory_headroom(path)
+        if observation is None:
+            raise CgroupMemoryUnavailable("unmeasured cgroup ancestor capacity")
+        samples.append(observation)
+    if _read_self_cgroup_path() != parts:
+        raise CgroupMemoryUnavailable("process cgroup membership changed")
+    finite = [item for item in samples if item.headroom_bytes is not None]
+    if not finite:
+        # Every ancestor explicitly reported max; never invent finite capacity.
+        return CgroupMemoryHeadroom(
+            None, max(item.used_bytes for item in samples), None, 0, False,
+        )
+    held = [item for item in finite if item.hard_hold]
+    if held:
+        # A large parent may be inside its own reserve even if the child is not.
+        # The live sampler will admit zero slots for this result.
+        return min(held, key=lambda item: item.headroom_bytes)
+    return min(finite, key=lambda item: item.headroom_bytes)
+
+
 
 
 __all__ = [
