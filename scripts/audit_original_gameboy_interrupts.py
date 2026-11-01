@@ -123,8 +123,11 @@ def _di_after_ei():
         return core.instruction() + core.instruction() + core.instruction()
 
     def check(core, cycles):
+        # _verify requires a literal bool. The pending IF bit is an int;
+        # without bool(), a successful final `and` operand is integer 1,
+        # which incorrectly fails the identity-based oracle.
         _verify(cycles == 12 and core.pc == 0x103 and core.ime is False
-                and core.ime_delay == 0 and core.memory[0xFF0F] & 1,
+                and core.ime_delay == 0 and bool(core.memory[0xFF0F] & 1),
                 "DI failed to cancel pending EI or incorrectly serviced IRQ")
 
     return _replay("di_cancels_pending_ei", m, op, check)
