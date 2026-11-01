@@ -45,9 +45,9 @@ def changes():
         {"op": "add_stage", "id": "archive", "value": {
             "id": "archive", "prerequisites": ["harbor"],
             "alternatives": ["rescue", "leave"], "reward": "archive_open",
-            "choice_effects": {"rescue": ["archivist_safe"]}}},
+            "choice_effects": {"rescue": ["choice:archive:safe"]}}},
         {"op": "add_ending", "id": "archive_saved", "value": {
-            "id": "archive_saved", "requires": ["archivist_safe"]}},
+            "id": "archive_saved", "requires": ["choice:archive:safe"]}},
     ]
 
 

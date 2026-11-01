@@ -27,12 +27,12 @@ def plan():
         "originality_attested": True,
         "stages": [
             {"id": "beacon", "prerequisites": [], "alternatives": ["light", "leave"],
-             "reward": "signal", "choice_effects": {"light": ["lit"]}},
+             "reward": "signal", "choice_effects": {"light": ["choice:beacon:lit"]}},
             {"id": "harbor", "prerequisites": ["beacon"], "alternatives": ["sail"],
              "reward": "arrival", "choice_effects": {}},
         ],
         "endings": [
-            {"id": "rescue", "requires": ["lit", "arrival"]},
+            {"id": "rescue", "requires": ["choice:beacon:lit", "arrival"]},
             {"id": "depart", "requires": ["arrival"]},
         ],
     }
