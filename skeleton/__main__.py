@@ -884,6 +884,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-campaign-author":
         from skeleton.game.gameplay.combat_campaign_author import cli as campaign_author_cli
         return campaign_author_cli(rest)
+    if cmd == "combat-supply":
+        from skeleton.game.gameplay.combat_campaign_supply import cli as supply_cli
+        return supply_cli(rest)
     if cmd == "combat-campaign":
         from skeleton.game.gameplay.combat_campaign import cli as campaign_cli
         return campaign_cli(rest)
