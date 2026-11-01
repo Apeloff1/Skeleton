@@ -168,3 +168,66 @@ def test_private_publication_restore_no_overwrite_or_symlink(source, tmp_path):
             expected_source_digest=DIGEST,
             expected_session_digest=receipt["prior_session_digest"],
         )
+
+
+def test_cli_and_jeeves_router_produce_same_playable_receipt(source, tmp_path,
+                                                              monkeypatch, capsys):
+    import scripts.studio_waypoint_handoff_cli as cli
+    import skeleton.ai.agents.jeeves.studio_waypoint_handoff_tool as adapter
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: source[0])
+    monkeypatch.setattr(adapter, "read_blueprint", lambda _: source[0])
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    assert cli.main([
+        "--project", "original", "--expected-source", DIGEST,
+        "--new-session", "--publish", str(private), "--html-sha256",
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+    receipt = output["handoff"]
+    assert output["file_write_performed"] is True
+    assert output["publication"]["file_write_performed"] is True
+    assert cli.main([
+        "--project", "original", "--expected-source", DIGEST,
+        "--expected-session", receipt["prior_session_digest"],
+        "--restore", str(private),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["handoff"] == receipt
+    request = {
+        "schema": adapter.REQUEST_SCHEMA, "project_id": "original",
+        "expected_source_digest": DIGEST,
+        "expected_session_digest": receipt["prior_session_digest"],
+        "session_receipt": receipt["prior_walk_receipt"],
+        "waypoints": [], "max_hazard_contacts": 0,
+    }
+    direct = adapter.execute_waypoint_handoff_tool(request, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_waypoint_handoff", "arguments": request},
+        authorized=True,
+    )
+    assert direct["detail"] == receipt
+    assert routed["result"] == direct
+    assert routed["file_write_performed"] is False
+
+
+def test_jeeves_tool_cannot_claim_operator_authority(source, monkeypatch):
+    import skeleton.ai.agents.jeeves.studio_waypoint_handoff_tool as adapter
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    monkeypatch.setattr(adapter, "read_blueprint", lambda _: source[0])
+    session = new_walk_receipt(source[0], authorized=True,
+                               expected_source_digest=DIGEST)
+    request = {
+        "schema": adapter.REQUEST_SCHEMA, "project_id": "original",
+        "expected_source_digest": DIGEST,
+        "expected_session_digest": session["session_digest"],
+        "session_receipt": session, "waypoints": [],
+        "max_hazard_contacts": 0,
+    }
+    with pytest.raises(PermissionError):
+        adapter.execute_waypoint_handoff_tool(request, authorized=False)
+    with pytest.raises(StudioQuestError, match="authority"):
+        route_world_tool(
+            {"tool": "studio_original_waypoint_handoff",
+             "arguments": {**request, "authorized": True}},
+            authorized=True,
+        )
