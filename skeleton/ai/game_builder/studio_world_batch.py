@@ -16,6 +16,10 @@ import stat
 from typing import Any
 
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_world_batch_provenance import (
+    compile_world_batch_provenance, replay_world_batch_provenance,
+    verify_world_batch_step,
+)
 from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import (
     _canonical, _digest, _lease, _open_directory, _write_all,
 )
@@ -185,7 +189,10 @@ def compile_world_batch_plan(
             "ordinal": index, "request": request,
             "request_digest": _digest(request),
         })
+    provenance = compile_world_batch_provenance(
+        requests, authorized=True)
     result: dict[str, Any] = {
+        "provenance": provenance,
         "schema": SCHEMA, "catalog_digest": actual_catalog_digest,
         "steps": steps, "step_count": len(steps),
         "operator_authorization_required": True,
@@ -234,12 +241,18 @@ def execute_world_batch(
         raise PermissionError("world batch execution requires authorization")
     verified = replay_world_batch_plan(plan, authorized=True)
     from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    requests = [step["request"] for step in verified["steps"]]
+    provenance = replay_world_batch_provenance(
+        verified["provenance"], requests, authorized=True)
     rows: list[dict[str, Any]] = []
     playable: list[dict[str, Any]] = []
     for step in verified["steps"]:
         # A failure aborts the entire batch; no subsequent tool is invoked.
         result = route_world_tool(step["request"], authorized=True,
                                   allow_authoring=False)
+        verify_world_batch_step(
+            step["request"], result,
+            provenance["step_bindings"][step["ordinal"]], authorized=True)
         if result.get("file_write_performed") is not False:
             raise StudioQuestError("world batch refused unverified read-only execution")
         detail = result.get("result")
@@ -269,6 +282,7 @@ def execute_world_batch(
         })
     output: dict[str, Any] = {
         "schema": EXECUTION_SCHEMA, "catalog_digest": verified["catalog_digest"],
+        "provenance": provenance,
         "plan_digest": verified["plan_digest"], "plan": verified,
         "results": rows, "completed_count": len(rows),
         "playable_handoffs": playable, "playable_handoff_count": len(playable),
@@ -305,6 +319,10 @@ def render_world_batch_html(receipt: object, *, authorized: bool) -> bytes:
         "<p>Source replay and typed tool outputs; no release or native runtime proof.</p>",
         "<ol>",
     ]
+    for source in verified["provenance"]["projects"]:
+        parts.append("<p>Source-leased world: " + escape(
+            source["project_id"], quote=True) +
+            " (canon SHA-256 " + escape(source["source_digest"]) + ")</p>")
     for row in verified["results"]:
         parts.append(
             "<li><strong>" + escape(row["tool"], quote=True) +
