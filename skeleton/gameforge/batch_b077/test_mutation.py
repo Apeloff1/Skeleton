@@ -74,3 +74,13 @@ def test_interpreter_rejects_unbounded_inputs_and_nonfinite_floats():
     for value in (10**100, float("nan"), float("inf"), "x" * 1025, object()):
         with pytest.raises(MutationUnsupportedError):
             _interpret(ast.Name(id="x", ctx=ast.Load()), {"x": value})
+
+
+def test_mutant_source_and_site_generation_budgets(monkeypatch):
+    from skeleton.gameforge.batch_b077 import mutation
+    monkeypatch.setattr(mutation, "MAX_MUTATION_SITES", 1)
+    with pytest.raises(mutation.MutationUnsupportedError, match="site count"):
+        mutation.generate_mutants(can_trade)
+    monkeypatch.setattr(mutation.inspect, "getsource", lambda fn: "def f(x):\n    return x + 1\n" + " " * 32769)
+    with pytest.raises(mutation.MutationUnsupportedError, match="byte bound"):
+        mutation.generate_mutants(can_trade)

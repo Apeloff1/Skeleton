@@ -60,3 +60,19 @@ def test_crash_is_reported():
 
 def test_shrink_list_minimal():
     assert shrink_list([1, 2, 3, 99, 4], lambda xs: 99 in xs) == [99]
+
+
+def test_fuzz_generation_and_execution_budgets_fail_closed():
+    import pytest
+
+    with pytest.raises(ValueError, match="text length"):
+        Gen.text(100_000)
+    with pytest.raises(ValueError, match="list length"):
+        Gen.ints().lists(100_000)
+    with pytest.raises(ValueError, match="case count"):
+        check_property(Gen.ints(), lambda x: True, cases=0)
+    with pytest.raises(ValueError, match="workload"):
+        fuzz_state_machine(Inventory, [("add", Gen.ints())], lambda s: True, (ValueError,),
+                           runs=10_000, steps=10_000)
+    with pytest.raises(ValueError, match="shrink input"):
+        shrink_list([0] * 10_001, lambda x: True)

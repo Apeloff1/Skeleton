@@ -38,6 +38,8 @@ class Gen:
 
     @staticmethod
     def text(max_len: int = 20) -> "Gen":
+        if type(max_len) is not int or not 0 <= max_len <= 1024:
+            raise ValueError("fuzz text length exceeds bound")
         alphabet = "abcXYZ019 _-{}[]:,\"\\\n"
         def g(r):
             if r.random() < 0.3:
@@ -50,6 +52,8 @@ class Gen:
         return Gen(lambda r: r.choice(list(options)))
 
     def lists(self, max_len: int = 10) -> "Gen":
+        if type(max_len) is not int or not 0 <= max_len <= 1024:
+            raise ValueError("fuzz list length exceeds bound")
         return Gen(lambda r: [self(r) for _ in range(r.randint(0, max_len))])
 
 
@@ -73,6 +77,8 @@ class FuzzResult:
 
 def shrink_list(value: list, fails: Callable[[list], bool]) -> list:
     """Greedy delta shrink: drop halves, then single items, while still failing."""
+    if len(value) > 10_000:
+        raise ValueError("fuzz shrink input exceeds bound")
     cur = list(value)
     n = 2
     while len(cur) >= 1:
@@ -98,6 +104,8 @@ def _fails(prop, v) -> Optional[str]:
 
 
 def check_property(gen: Gen, prop: Callable[[Any], bool], seed: int = 0, cases: int = 200) -> FuzzResult:
+    if type(cases) is not int or not 1 <= cases <= 10_000:
+        raise ValueError("property case count exceeds bound")
     rng = DeterministicRng(seed)
     for i in range(cases):
         v = gen(rng)
@@ -114,6 +122,10 @@ def fuzz_state_machine(factory: Callable[[], Any], actions: Sequence[Tuple[str, 
                        invariant: Callable[[Any], bool], rejects: Tuple[Type[BaseException], ...],
                        seed: int = 0, runs: int = 50, steps: int = 30) -> FuzzResult:
     """Apply random ``(method_name, arg)`` sequences; declared rejections are fine, others fail."""
+    if (type(runs) is not int or type(steps) is not int
+            or not 1 <= runs <= 10_000 or not 1 <= steps <= 10_000
+            or runs * steps > 100_000 or not 1 <= len(actions) <= 64):
+        raise ValueError("state-machine fuzz workload exceeds bound")
     rng = DeterministicRng(seed)
     for run in range(runs):
         sm = factory()

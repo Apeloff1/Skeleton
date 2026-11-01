@@ -24,6 +24,7 @@ _CMP_SWAP = {ast.Lt: ast.LtE, ast.LtE: ast.Lt, ast.Gt: ast.GtE, ast.GtE: ast.Gt,
              ast.Eq: ast.NotEq, ast.NotEq: ast.Eq}
 _BIN_SWAP = {ast.Add: ast.Sub, ast.Sub: ast.Add, ast.Mult: ast.FloorDiv}
 _BOOL_SWAP = {ast.And: ast.Or, ast.Or: ast.And}
+MAX_MUTATION_SITES = 128
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,14 @@ def _sites(tree: ast.AST):
 
 def generate_mutants(fn: Callable) -> List[Mutant]:
     src = textwrap.dedent(inspect.getsource(fn))
-    n_sites = sum(1 for _ in _sites(ast.parse(src)))
+    if len(src.encode("utf-8")) > 32768:
+        raise MutationUnsupportedError("mutation source exceeds byte bound")
+    parsed = ast.parse(src)
+    if len(list(ast.walk(parsed))) > 256:
+        raise MutationUnsupportedError("mutation source exceeds AST node bound")
+    n_sites = sum(1 for _ in _sites(parsed))
+    if n_sites > MAX_MUTATION_SITES:
+        raise MutationUnsupportedError("mutation site count exceeds bound")
     out: List[Mutant] = []
     for k in range(n_sites):
         tree = ast.parse(src)
