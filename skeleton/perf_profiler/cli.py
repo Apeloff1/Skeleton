@@ -6,7 +6,9 @@ Subcommands (exit 0 = pass, 1 = gate failed / invalid evidence, 2 = usage error)
   (percentiles from main's observability profiler) and fail if the hitch ratio
   exceeds ``--max-hitch-ratio``. Empty input fails closed.
 * ``alloc``   call ``module:function`` (no args) under the allocation tracker
-  and fail if net ``alloc_bytes`` or ``peak_bytes`` exceed the given limits.
+  and fail if net ``alloc_bytes`` or ``peak_bytes`` exceed limits. This runs
+  trusted local code only with ``SKELETON_PERF_TRUSTED_EXECUTION=1`` and
+  ``--allow-local-callable``; the profiler is not a sandbox.
 * ``verify``  check the sha256 seal of a load report written by ``LoadTimer``.
 """
 from __future__ import annotations
@@ -14,6 +16,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import sys
 from typing import Any, Callable, List, Optional, Sequence
 
@@ -66,6 +69,10 @@ def _cmd_frames(args: argparse.Namespace) -> int:
 
 
 def _cmd_alloc(args: argparse.Namespace) -> int:
+    # Calling a Python symbol is code execution, not passive measurement.
+    # Require two operator-controlled gates before importing the target.
+    if os.environ.get("SKELETON_PERF_TRUSTED_EXECUTION") != "1" or not args.allow_local_callable:
+        raise UsageError("alloc requires trusted local operator execution and --allow-local-callable")
     fn = _resolve(args.target)
     with AllocationTracker(top_n=args.top) as tracker:
         with tracker.scope(args.target) as result:
@@ -98,6 +105,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     alloc = sub.add_parser("alloc", help="allocation profile of module:function")
     alloc.add_argument("target")
+    alloc.add_argument("--allow-local-callable", action="store_true",
+                       help="explicitly run trusted local Python code (never expose to remote input)")
     alloc.add_argument("--max-alloc-bytes", type=int)
     alloc.add_argument("--max-peak-bytes", type=int)
     alloc.add_argument("--top", type=int, default=0)
