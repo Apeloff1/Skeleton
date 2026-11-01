@@ -121,7 +121,6 @@ def publish_verified_receipt(
         raise ReceiptPublicationError("unsafe receipt destination parent") from exc
     temporary = ".receipt-" + secrets.token_hex(16)
     temporary_identity: tuple[int, int] | None = None
-    published = False
     try:
         parent = os.fstat(parent_fd)
         if (not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022
@@ -149,7 +148,6 @@ def publish_verified_receipt(
             temporary, target.name, src_dir_fd=parent_fd,
             dst_dir_fd=parent_fd, follow_symlinks=False,
         )
-        published = True
         final = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
         if (not stat.S_ISREG(final.st_mode)
                 or (final.st_dev, final.st_ino) != temporary_identity
@@ -162,13 +160,12 @@ def publish_verified_receipt(
         os.fsync(parent_fd)
         return sha256(data).hexdigest()
     except BaseException as exc:
-        if published and temporary_identity is not None:
-            try:
-                final = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
-                if (final.st_dev, final.st_ino) == temporary_identity:
-                    os.unlink(target.name, dir_fd=parent_fd)
-            except OSError:
-                pass
+        # The hardlink is the publication linearization point. A later
+        # directory fsync, path-identity check or temporary cleanup failure
+        # makes durability uncertain, NOT publication safely reversible.
+        # Never unlink the published name: another process may already have
+        # observed it. Preserve it for owner-controlled quarantine/recovery;
+        # a retry must fail the existing-name no-clobber check.
         if isinstance(exc, (ReceiptPublicationError, PermissionError)):
             raise
         if isinstance(exc, DualRuntimeVerificationError):
