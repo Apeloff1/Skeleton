@@ -196,3 +196,29 @@ def test_secret_migration_rejects_unbounded_batch_parameters(stores):
             m.encrypt_plaintext(batch_size=bad)
         with pytest.raises(ValueError, match="max_batches"):
             m.encrypt_plaintext(max_batches=bad)
+
+
+def test_migrator_rejects_corrupt_or_cross_job_checkpoints_before_skipping(stores):
+    from core.core_v1.secret_migration import Checkpoint
+
+    store, cps = stores
+    _seed_plain(store, 1)
+    migrator = SecretMigrator(store, P1, cps, Clock())
+    for cp in (
+        Checkpoint("wrong-job", "", True, 1.0),
+        Checkpoint(JOB_ENCRYPT, "x" * 257, False, 1.0),
+        Checkpoint(JOB_ENCRYPT, "", True, float("nan")),
+        Checkpoint(JOB_ENCRYPT, "", 1, 1.0),
+    ):
+        cps.save(cp if cp.job == JOB_ENCRYPT else Checkpoint(JOB_ENCRYPT, "", False, 1.0))
+        if cp.job != JOB_ENCRYPT:
+            class WrongJobStore:
+                def get(self, job):
+                    return cp
+
+            check = SecretMigrator(store, P1, WrongJobStore(), Clock())
+        else:
+            check = migrator
+        with pytest.raises(ValueError, match="checkpoint"):
+            check.encrypt_plaintext()
+    assert store.count_by_key() == {"": 1}

@@ -13,6 +13,7 @@ finished job is a no-op; a crashed job resumes from its last checkpoint.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
@@ -85,6 +86,14 @@ class SecretMigrator:
         if max_batches is not None and (type(max_batches) is not int or not 1 <= max_batches <= 1000):
             raise ValueError("max_batches must be 1..1000 or None")
         cp = self.checkpoints.get(job)
+        if cp is not None and (
+            not isinstance(cp, Checkpoint) or cp.job != job
+            or type(cp.cursor) is not str or len(cp.cursor) > 256
+            or type(cp.done) is not bool
+            or type(cp.updated_at) not in (int, float)
+            or not math.isfinite(cp.updated_at)
+        ):
+            raise ValueError("invalid secret migration checkpoint")
         report = JobReport(job)
         if cp is not None and cp.done:
             report.done = True
