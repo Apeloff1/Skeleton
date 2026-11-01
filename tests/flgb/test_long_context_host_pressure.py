@@ -129,9 +129,15 @@ class TestLongContextHostPressure(unittest.TestCase):
             if not touched[0]:
                 touched[0] = True
                 # Preserve the inode and length while changing the signal.
-                (self.root / "cpu").write_bytes(
-                    b"some avg10=80.00 avg60=0.00 avg300=0.00 total=100\\n"
+                target = self.root / "cpu"
+                before = target.stat()
+                target.write_bytes(
+                    b"some avg10=9.00 avg60=0.00 avg300=0.00 total=100\n"
                 )
+                # Force distinct metadata even on coarse timestamp filesystems.
+                os.utime(target, ns=(
+                    before.st_atime_ns, before.st_mtime_ns + 2_000_000_000,
+                ))
             return raw
 
         with patch("skeleton.ai.model_runtime.long_context_host_pressure.os.read",
