@@ -179,3 +179,82 @@ def test_app_native_prompt_ram_status_is_payload_free():
     assert "hello" not in str(status)
     with pytest.raises(ValueError, match="canonical"):
         native_cpu_prompt_memory_status(object())
+
+
+def test_authenticated_native_submission_stages_exact_bound_owner(
+    private_files, monkeypatch,
+):
+    from skeleton.app.offline_native_fair_stream import (
+        submit_authenticated_native_cpu_prompt,
+    )
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    request = StreamRequest(
+        "native-auth-1", "alice", InferencePhase.PREFILL, 2, 16,
+    )
+    result = submit_authenticated_native_cpu_prompt(
+        service=service, vault=vault, runtime=runtime, registry=registry,
+        authenticated_tenant_id="alice", request=request,
+        prompt="hello", max_output_tokens=2,
+    )
+    assert result.pending_leases == 0
+    assert registry.budget_status()["staged_bytes"] == 5
+    assert service.execute_next(token_budget=2)["executed"] is True
+    assert registry.budget_status()["staged_bytes"] == 0
+
+
+def test_authenticated_native_submission_denies_wrong_tenant_before_staging(
+    private_files,
+):
+    from skeleton.app.offline_native_fair_stream import (
+        submit_authenticated_native_cpu_prompt,
+    )
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    request = StreamRequest(
+        "native-auth-2", "alice", InferencePhase.PREFILL, 2, 16,
+    )
+    with pytest.raises(ValueError, match="tenant"):
+        submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="bob", request=request,
+            prompt="hello", max_output_tokens=2,
+        )
+    assert registry.budget_status()["staged_bytes"] == 0
+
+
+def test_failed_native_submission_revokes_ephemeral_grant(
+    private_files, monkeypatch,
+):
+    from skeleton.app.offline_native_fair_stream import (
+        submit_authenticated_native_cpu_prompt,
+    )
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    request = StreamRequest(
+        "native-auth-3", "alice", InferencePhase.PREFILL, 2, 16,
+    )
+    def broken(_):
+        raise RuntimeError("simulated durable submit failure")
+    monkeypatch.setattr(service, "submit", broken)
+    with pytest.raises(RuntimeError, match="durable submit failure"):
+        submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice", request=request,
+            prompt="hello", max_output_tokens=2,
+        )
+    assert registry.budget_status()["staged_bytes"] == 0
+    assert registry.status()["consumed_or_revoked"] == 1

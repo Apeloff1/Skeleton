@@ -19,6 +19,7 @@ from skeleton.ai.model_runtime.native_fair_stream_backend import (
     NativeFairStreamBackend, NativePromptRegistry, pin_native_prompt,
 )
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+from skeleton.ai.model_runtime.fair_stream_queue import StreamRequest
 from skeleton.ai.model_runtime.fair_stream_session import DurableFairStreamSession
 from skeleton.app.offline_dispatch_bridge import OfflineAdaptiveDispatchService
 from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle
@@ -129,3 +130,54 @@ def native_cpu_prompt_memory_status(
     if type(registry) is not NativePromptRegistry:
         raise ValueError("canonical native prompt registry required")
     return registry.budget_status()
+
+
+def submit_authenticated_native_cpu_prompt(
+    *, service: OfflineAdaptiveDispatchService,
+    vault: SealedFairStreamResultVault,
+    runtime: NativeLLMRuntime, registry: NativePromptRegistry,
+    authenticated_tenant_id: str, request: StreamRequest,
+    prompt: str, max_output_tokens: int,
+):
+    """Stage and submit as one app operation, burning grants on submission error.
+
+    authenticated_tenant_id MUST originate from the app's verified principal,
+    never from a request body. This operation is not a replacement for the
+    durable journal's one-use request identity or the live OS pressure guard.
+    If durable submit succeeds but status retrieval fails, the grant is
+    revoked and the request is held for explicit operator reconciliation.
+    """
+    if (type(service) is not OfflineAdaptiveDispatchService
+            or type(vault) is not SealedFairStreamResultVault
+            or type(runtime) is not NativeLLMRuntime
+            or type(registry) is not NativePromptRegistry
+            or type(request) is not StreamRequest):
+        raise ValueError("canonical authenticated native CPU app components required")
+    if (type(authenticated_tenant_id) is not str
+            or request.tenant_id != authenticated_tenant_id):
+        raise ValueError("authenticated tenant does not own stream request")
+    if (type(max_output_tokens) is not int
+            or request.remaining_tokens > max_output_tokens):
+        raise ValueError("native output grant cannot cover requested stream")
+    # Reject an unrelated registry, runtime, vault or session BEFORE staging
+    # plaintext. A caller must use the exact owner bound during app startup.
+    owner = service._guard._owner
+    if (type(owner) is not JournaledExecutionOwner
+            or owner._backend is not vault
+            or type(vault._backend) is not NativeFairStreamBackend
+            or vault._backend.registry is not registry
+            or vault._backend.runtime is not runtime
+            or service._session.verify().get("session_id") != registry.session_id):
+        raise ValueError("native app ownership binding mismatch")
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id=request.request_id,
+        tenant_id=authenticated_tenant_id, prompt=prompt,
+        max_output_tokens=max_output_tokens,
+    )
+    try:
+        return service.submit(request)
+    except BaseException:
+        # Never retain plaintext admission after a failed or uncertain submit.
+        # Revocation burns this process-local identity; no automatic retry.
+        registry.revoke(request.request_id)
+        raise

@@ -24,3 +24,13 @@ Unknown hardware telemetry continues to hold admission conservatively.
 
 Focused regression command (not yet executed):
 `python -m pytest -q skeleton/testing/test_native_prompt_budget.py skeleton/testing/test_native_fair_stream_backend.py skeleton/testing/test_offline_native_fair_stream.py`
+
+## Authenticated app submission
+
+`submit_authenticated_native_cpu_prompt` accepts the app-verified tenant
+principal, canonical stream request and the exact bound service/vault/native
+runtime/registry. It rejects a mismatched tenant, output cap or owner chain
+before staging plaintext. On any durable submission exception it revokes the
+in-memory grant and burns the request ID; a potentially committed durable
+request is not replayed automatically. Only a successful canonical submit
+leaves a staged prompt for the one-use execution journal.
