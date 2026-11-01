@@ -111,3 +111,14 @@ def test_semantic_physics_rejects_oversized_intent_and_contact_maps(monkeypatch)
     contacts = frozenset({("a", "b"), ("c", "d")})
     with pytest.raises(MultiActorError, match="contact count"):
         step_actors((a,), {}, tick=0, step_ns=STEP, prev_contacts=contacts)
+
+
+def test_actor_body_rejects_noninteger_and_unbounded_vertical_velocity():
+    controller = CharacterController("vertical", (0, 500, 0), 5000, False)
+    for bad in (True, 1.5, "500", 10**1000, -(10**1000)):
+        with pytest.raises(MultiActorError, match="vertical velocity"):
+            ActorBody(controller, (300, 500, 300), 70000, vertical_velocity_mm_s=bad)
+    valid = ActorBody(controller, (300, 500, 300), 70000,
+                      vertical_velocity_mm_s=-10000)
+    receipt = step_actors((valid,), {}, tick=0, step_ns=STEP)
+    assert len(receipt.state_digest) == 64

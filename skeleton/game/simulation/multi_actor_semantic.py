@@ -58,6 +58,9 @@ class ActorBody:
             raise MultiActorError("half extents must be 3 positive ints")
         if type(self.mass_g) is not int or not 1 <= self.mass_g <= MAX_INTENT_MM_S:
             raise MultiActorError("mass must be positive grams")
+        if (type(self.vertical_velocity_mm_s) is not int
+                or abs(self.vertical_velocity_mm_s) > MAX_INTENT_MM_S):
+            raise MultiActorError("vertical velocity must be a bounded integer")
         if self.role not in ("player", "npc", "creature", "prop"):
             raise MultiActorError("unknown actor role")
 
