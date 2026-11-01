@@ -134,9 +134,17 @@ class Collector:
         self.events.append(ev)
         return ev
 
-    def ingest_many(self, rows: Iterable[tuple[str, str, Mapping[str, Any]]]) -> int:
+    def ingest_many(self, rows: Iterable[tuple[str, str, Mapping[str, Any]]],
+                    *, max_rows: int = 100_000) -> int:
+        """Ingest a bounded batch, including rejected and opted-out input rows."""
+        if type(max_rows) is not int or not 1 <= max_rows <= 1_000_000:
+            raise ValueError("analytics batch row budget must be in [1, 1000000]")
         n = 0
-        for p, s, ev in rows:
+        for index, row in enumerate(rows):
+            if index >= max_rows:
+                self.counts["rejected"] += 1
+                raise EventCapacityError("analytics batch row budget exhausted")
+            p, s, ev = row
             try:
                 n += self.ingest(p, s, ev) is not None
             except EventCapacityError:

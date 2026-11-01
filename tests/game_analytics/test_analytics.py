@@ -203,3 +203,20 @@ def test_maximum_bounded_player_and_session_id_are_accepted():
     ev = c.ingest("p" * 256, "s" * 256, {"seq": 0, "t": 0, "type": "session_start"})
     assert ev is not None and len(ev.session_id) == 21
     assert len(build_sessions(c.events)) == 1
+
+
+def test_ingest_many_budgets_even_opted_out_infinite_rows():
+    from itertools import repeat
+
+    from skeleton.ai.game_builder.analytics.privacy import EventCapacityError
+
+    c = collector(opt_out="drop")
+    c.opt_out("a")
+    row = ("a", "s", {"seq": 0, "t": 0, "type": "session_start"})
+    with pytest.raises(EventCapacityError, match="batch row budget"):
+        c.ingest_many(repeat(row), max_rows=3)
+    assert c.counts["opted_out_dropped"] == 3
+    assert c.counts["rejected"] == 1
+    assert not c.events
+    with pytest.raises(ValueError, match="batch row budget"):
+        c.ingest_many([], max_rows=0)
