@@ -199,3 +199,23 @@ def test_cli_rejects_unacknowledged_verification(signed, capsys):
     command.remove("--trusted-local-operator")
     assert run_app_cli(command) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+@pytest.mark.parametrize("kind", ["key", "signature"])
+def test_detached_material_must_have_correct_bounded_extension(signed, tmp_path, kind):
+    _, _, _, key, signature, _ = signed
+    original = key if kind == "key" else signature
+    wrong = tmp_path / ("key.json" if kind == "key" else "signature.json")
+    wrong.write_bytes(original.read_bytes())
+    wrong.chmod(0o600)
+    kwargs = {"public_key_file" if kind == "key" else "signature_file": wrong}
+    with pytest.raises(OfflineArchiveSignatureError):
+        _call(signed, **kwargs)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_world_writable_detached_material_is_rejected(signed):
+    key = signed[3]
+    key.chmod(0o666)
+    with pytest.raises(OfflineArchiveSignatureError):
+        _call(signed)

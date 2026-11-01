@@ -20,14 +20,14 @@ from typing import Sequence
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from skeleton.ai.game_builder.dual_runtime_verify import _assert_original_root
+from skeleton.ai.game_builder.dual_runtime_verify import _assert_original_root, _root_fd
 from skeleton.app.offline_delivery_archive import inspect_offline_game_archive
 from skeleton.app.offline_progress_compatibility import _archive_identity
-from skeleton.app.private_game_save import _parent
 
 SCHEMA = "skeleton.app.offline_source_archive_ed25519.v1"
 DOMAIN = b"Skeleton offline original source archive signature v1\x00"
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,122}\.(?:pub|sig)\Z")
 
 
 class OfflineArchiveSignatureError(ValueError):
@@ -58,9 +58,33 @@ def source_archive_signature_message(
     ).encode("ascii")
 
 
+def _detached_parent(path: str | Path, *, extension: str) -> tuple[Path, int]:
+    """Pin an owner-controlled parent; unlike save custody, accept .pub/.sig."""
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise OfflineArchiveSignatureError("descriptor-safe detached verification unavailable")
+    target = Path(path).expanduser().absolute()
+    if _NAME.fullmatch(target.name) is None or not target.name.endswith(extension):
+        raise OfflineArchiveSignatureError("invalid bounded detached material filename")
+    parent_fd = _root_fd(target.parent)
+    try:
+        info = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_mode & 0o022):
+            raise OfflineArchiveSignatureError("detached material parent is not owner-controlled")
+        _assert_original_root(target.parent, parent_fd)
+    except BaseException:
+        os.close(parent_fd)
+        raise
+    return target, parent_fd
+
+
 def _read_detached_file(path: str | Path, *, length: int) -> tuple[bytes, tuple[int, ...]]:
     """Read exact-length owner-controlled file with a descriptor/inode fence."""
-    target, parent_fd = _parent(path)
+    if length not in (32, 64):
+        raise OfflineArchiveSignatureError("unsupported detached material length")
+    target, parent_fd = _detached_parent(
+        path, extension=".pub" if length == 32 else ".sig",
+    )
     try:
         flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
         if hasattr(os, "O_CLOEXEC"):
