@@ -122,3 +122,23 @@ def test_actor_body_rejects_noninteger_and_unbounded_vertical_velocity():
                       vertical_velocity_mm_s=-10000)
     receipt = step_actors((valid,), {}, tick=0, step_ns=STEP)
     assert len(receipt.state_digest) == 64
+
+
+@pytest.mark.parametrize("invalid", [
+    frozenset({("a",)}),
+    frozenset({("a", 1)}),
+    frozenset({("b", "a")}),
+    frozenset({("a" * 257, "b")}),
+    frozenset({("a\\n", "b")}),
+    frozenset({("a", "a")}),
+])
+def test_semantic_physics_rejects_noncanonical_previous_contacts(invalid):
+    with pytest.raises(MultiActorError, match="previous contact pair"):
+        step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP,
+                    prev_contacts=invalid)
+
+
+def test_semantic_physics_rejects_wrong_previous_contact_container():
+    with pytest.raises(MultiActorError, match="contact count or type"):
+        step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP,
+                    prev_contacts=[("a", "b")])

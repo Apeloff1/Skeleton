@@ -133,8 +133,16 @@ def step_actors(
         raise MultiActorError("static collider count exceeds bound")
     if len(intents) > len(actors):
         raise MultiActorError("actor intent count exceeds bound")
-    if len(prev_contacts) > MAX_CONTACTS:
-        raise MultiActorError("previous contact count exceeds bound")
+    if type(prev_contacts) is not frozenset or len(prev_contacts) > MAX_CONTACTS:
+        raise MultiActorError("previous contact count or type exceeds bound")
+    for pair in prev_contacts:
+        if (type(pair) is not tuple or len(pair) != 2
+                or any(type(identity) is not str or not 1 <= len(identity) <= 256
+                       or identity != identity.strip()
+                       or any(ord(char) < 32 for char in identity)
+                       for identity in pair)
+                or pair[0] >= pair[1]):
+            raise MultiActorError("previous contact pair is not canonical")
     if type(tick) is not int or not 0 <= tick <= MAX_TICKS:
         raise MultiActorError("simulation tick exceeds bound")
     if (type(prev_digest) is not str or len(prev_digest) != 64
