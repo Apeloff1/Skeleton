@@ -69,7 +69,7 @@ def _edit(source: dict[str, Any], raw: Any) -> dict[str, Any]:
 
 
 def _seal(value: dict[str, Any]) -> dict[str, Any]:
-    value["digest"] = dig(value)
+    value["digest"] = dig({k: v for k, v in value.items() if k != "digest"})
     _bounded(value)
     return value
 

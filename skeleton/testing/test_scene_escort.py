@@ -1,14 +1,13 @@
 """Playable convoy delivery, earned supplies, replay and export contracts."""
 from __future__ import annotations
 
-import copy
 import json
 
 import pytest
 
 from skeleton.game.gameplay.scene_escort import (
-    _advance, cli, demo_actions, export_escort, import_escort,
-    new_escort, normalize_escort_source, original_escort, resume_escort,
+    cli, demo_actions, export_escort, import_escort,
+    normalize_escort_source, original_escort, resume_escort,
     simulate_escort, verify_escort,
 )
 from skeleton.game.gameplay.scene_travel import SceneTravelError

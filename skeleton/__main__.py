@@ -78,6 +78,7 @@ Commands:
     scene-mission-league-author  Transactionally edit and preview league scoring
     scene-escort  Play source-bound convoy deliveries, save/replay and export
     scene-escort-author  Transactionally edit and preview escort missions
+    scene-escort-solve  Find replay-proven safe convoy routes with bounded search
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -765,6 +766,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)
+    if cmd == "scene-escort-solve":
+        from skeleton.game.gameplay.scene_escort_solver import cli as escort_solver_cli
+        return escort_solver_cli(rest)
     if cmd == "scene-escort-author":
         from skeleton.game.gameplay.scene_escort_author import cli as escort_author_cli
         return escort_author_cli(rest)
