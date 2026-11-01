@@ -119,6 +119,56 @@ def test_undo_redo_with_history_rollback():
     assert [v.label for v in h.versions("p1")][-1] == "edit-3"
 
 
+def test_failed_history_save_does_not_publish_edit_or_advance_ledger():
+    h = FakeHistory()
+    s = EditSession(good_plan(), editor(grant=("none",)), history=h, project_id="p1")
+    base_version = s.version
+
+    def refuse_save(*args, **kwargs):
+        raise RuntimeError("durable save unavailable")
+
+    h.saver.save_files = refuse_save
+    with pytest.raises(RuntimeError, match="durable save unavailable"):
+        run(s.edit("set player hp to 120"))
+    assert s.plan == good_plan() and s.version == base_version and s._seq == 0
+    assert s.undo_stack == [] and s.redo_stack == [] and s.ledger.entries() == ()
+
+
+def test_failed_history_rollback_preserves_undo_redo_state():
+    h = FakeHistory()
+    s = EditSession(good_plan(), editor(grant=("none",)), history=h, project_id="p1")
+    run(s.edit("set player hp to 120"))
+    edited, version = dict(s.plan), s.version
+    undo, redo = list(s.undo_stack), list(s.redo_stack)
+
+    def refuse_rollback(*args, **kwargs):
+        raise RuntimeError("history rollback unavailable")
+
+    h.rollback = refuse_rollback
+    with pytest.raises(RuntimeError, match="history rollback unavailable"):
+        s.undo()
+    assert s.plan == edited and s.version == version
+    assert s.undo_stack == undo and s.redo_stack == redo
+
+
+def test_failed_redo_rollback_preserves_session_state():
+    h = FakeHistory()
+    s = EditSession(good_plan(), editor(grant=("none",)), history=h, project_id="p1")
+    run(s.edit("set player hp to 120"))
+    s.undo()
+    plan, version = dict(s.plan), s.version
+    undo, redo = list(s.undo_stack), list(s.redo_stack)
+
+    def refuse_rollback(*args, **kwargs):
+        raise RuntimeError("history rollback unavailable")
+
+    h.rollback = refuse_rollback
+    with pytest.raises(RuntimeError, match="history rollback unavailable"):
+        s.redo()
+    assert s.plan == plan and s.version == version
+    assert s.undo_stack == undo and s.redo_stack == redo
+
+
 def test_history_requires_project_id():
     with pytest.raises(ValueError):
         EditSession(good_plan(), editor(), history=FakeHistory())
