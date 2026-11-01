@@ -19,7 +19,7 @@ from skeleton.game.gameplay.flgb_gameplay_runtime import (
 from skeleton.game.gameplay.turn_combat import (
     CombatSessionError, _id, _integer, _object, _parse_json,
     normalize_scenario, new_session, original_demo, resume_session,
-    verify_session,
+    verify_session, _advance as advance_combat,
 )
 
 SCHEMA = "skeleton.combat_contract.v1"
@@ -163,7 +163,7 @@ def _advance(session: dict[str, Any], action: Any) -> dict[str, Any]:
     source, previous = session["source"], session["state"]
     if previous["phase"] != "active":
         raise CombatSessionError("contract is already terminal")
-    combat = resume_session(previous["combat"], [action])
+    # Only called with canonical sessions from new_contract or verified replay.\n    # Avoid quadratic nested verification on every internal simulation step.\n    combat = advance_combat(previous["combat"], action)
     progress = _progress(source, combat)
     combat_phase = combat["state"]["phase"]
     phase = "active"
