@@ -27,8 +27,8 @@ from skeleton.ai.game_builder.dual_runtime_verify import (
 SCHEMA = "skeleton.app.offline_game_source_archive.v1"
 INSPECTION_SCHEMA = "skeleton.app.offline_game_source_archive_inspection.v1"
 _ARCHIVE_MAX_BYTES = 2_500_000
-_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,126}\\.zip\\Z")
-_HEX = re.compile(r"[0-9a-f]{64}\\Z")
+_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,126}\.zip\Z")
+_HEX = re.compile(r"[0-9a-f]{64}\Z")
 _DATE = (1980, 1, 1, 0, 0, 0)
 
 
@@ -307,8 +307,11 @@ def inspect_offline_game_archive(
                     or manifest.get("godot_hardware_tested") is not False):
                 raise OfflineGameArchiveError("unsupported archived release authority")
             declared = manifest.get("files")
-            if (type(declared) is not dict or set(files) != set(declared) | {"release.json"}
-                    or not _REQUIRED <= set(files)):
+            if (type(declared) is not dict or not 1 <= len(declared) <= _MAX_FILES
+                    or "release.json" in declared
+                    or set(files) != set(declared) | {"release.json"}
+                    or not _REQUIRED <= set(files)
+                    or manifest.get("proof_status") != "python-simulated-winning-actions"):
                 raise OfflineGameArchiveError("archived source inventory mismatch")
             for name, expected_digest in declared.items():
                 if (type(expected_digest) is not str or not _HEX.fullmatch(expected_digest)
