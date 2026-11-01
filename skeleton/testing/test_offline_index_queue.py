@@ -288,6 +288,28 @@ def test_queue_admits_new_work_after_cancel_without_legacy_fixed_row_quota(
         assert queue.enqueue(source, library).job_id == replacement.job_id
 
 
+def test_queue_storage_pressure_fails_closed_without_losing_cancelled_history(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_index_queue as module
+    from skeleton.app.offline_resources import LocalResourcePressure
+
+    source = _root(tmp_path)
+    library = tmp_path / "knowledge.sqlite"
+    with OfflineIndexQueue(tmp_path / "queue.sqlite") as queue:
+        original = queue.enqueue(source, library)
+        queue.cancel(original.job_id)
+
+        def reject_write(*_args, **_kwargs):
+            raise LocalResourcePressure("insufficient measurable storage headroom")
+
+        monkeypatch.setattr(module, "admit_resident_document", reject_write)
+        with pytest.raises(OfflineQueueError, match="headroom"):
+            queue.enqueue(source, library)
+        assert len(queue.list_jobs()) == 1
+        assert queue.get(original.job_id).state == "cancelled"
+
+
 def test_normal_queue_read_rejects_forged_completed_receipt(
     tmp_path: Path,
 ) -> None:
