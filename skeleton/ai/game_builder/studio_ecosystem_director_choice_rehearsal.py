@@ -70,7 +70,9 @@ function state(){
     completed.add(stage.id);
     facts.add(stage.id);
     facts.add(stage.reward);
-    for(const token of (stage.choice_effects[pair[1]]||[]))facts.add(token);
+    const tokens=Object.prototype.hasOwnProperty.call(stage.choice_effects,pair[1])
+      ? stage.choice_effects[pair[1]] : [];
+    for(const token of tokens)facts.add(token);
   }
   return {completed,facts};
 }
