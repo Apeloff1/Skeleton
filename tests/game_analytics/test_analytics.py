@@ -170,3 +170,29 @@ def test_heatmap_suppresses_small_cells_and_ignores_unknown_ids():
     hm = difficulty_heatmap(c.events, PLAN, min_players=5)
     assert hm.suppressed == 1 and hm.cell("l2") is None and hm.cell("secret") is None
     assert difficulty_heatmap(c.events, min_players=1).cell("secret").attempts == 1
+
+
+def test_shared_raw_session_ids_cannot_link_distinct_players():
+    """Session pseudonyms must bind player identity, not only a reusable session id."""
+    c = collector()
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    first = c.ingest("player-one", "reused-session", event)
+    second = c.ingest("player-two", "reused-session", event)
+    assert first is not None and second is not None
+    assert first.session_id != second.session_id
+    assert first.player != second.player
+    assert len(build_sessions(c.events)) == 2
+    assert "reused-session" not in json.dumps([e.to_dict() for e in c.events])
+
+
+@pytest.mark.parametrize("bad", ["", "x" * 257, "name\nnewline", "name\x00nul", "name\x7fdel", None, 123])
+def test_analytics_raw_identity_boundaries_fail_closed(bad):
+    c = collector()
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    with pytest.raises(EventError):
+        c.ingest(bad, "s1", event)
+    with pytest.raises(EventError):
+        c.ingest("player", bad, event)
+    with pytest.raises(EventError):
+        c.opt_out(bad)
+    assert not c.events and not c.opted_out

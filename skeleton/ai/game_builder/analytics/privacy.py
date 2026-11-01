@@ -16,6 +16,15 @@ from typing import Any, Iterable, Mapping
 from .events import EventError, GameplayEvent
 
 ANON = "anon"
+MAX_RAW_ID_CHARS = 256
+
+
+def _raw_identity(value: str, label: str) -> str:
+    """Bound opaque identities before hashing; forbid ambiguous separators."""
+    if (type(value) is not str or not 1 <= len(value) <= MAX_RAW_ID_CHARS
+            or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value)):
+        raise EventError(f"{label} must be a bounded non-control string")
+    return value
 
 
 class EventCapacityError(EventError):
@@ -37,10 +46,14 @@ class PrivacyPolicy:
             raise ValueError("opt_out must be 'drop' or 'anonymise'")
 
     def pseudonym(self, kind: str, raw: str) -> str:
+        if kind not in ("player", "session", "anon_session"):
+            raise EventError("unsupported pseudonym domain")
+        raw = _raw_identity(raw, "raw identity")
         return kind[0] + hmac.new(self.salt, f"{kind}\x00{raw}".encode(), hashlib.sha256).hexdigest()[:20]
 
     def sampled(self, raw_player: str) -> bool:
         """Per-player (not per-event) so a sampled player's whole history is kept."""
+        raw_player = _raw_identity(raw_player, "player identity")
         if self.sample_rate >= 1.0:
             return True
         h = hmac.new(self.salt, f"sample\x00{raw_player}".encode(), hashlib.sha256).digest()
@@ -64,6 +77,7 @@ class Collector:
 
     def opt_out(self, raw_player: str) -> None:
         """Record opt-out and purge (or anonymise) what was already stored for the player."""
+        raw_player = _raw_identity(raw_player, "player identity")
         self.opted_out.add(raw_player)
         mine = self.policy.pseudonym("player", raw_player)
         kept: list[GameplayEvent] = []
@@ -80,6 +94,14 @@ class Collector:
 
     def ingest(self, raw_player: str, raw_session: str, event: Mapping[str, Any]) -> GameplayEvent | None:
         """Validate one event. ``event`` must not carry ids; they are passed separately."""
+        try:
+            raw_player = _raw_identity(raw_player, "player identity")
+            raw_session = _raw_identity(raw_session, "session identity")
+        except EventError:
+            self.counts["rejected"] += 1
+            raise
+        if not isinstance(event, Mapping):
+            raise EventError("analytics event must be a mapping")
         if "player" in event or "session_id" in event:
             raise EventError("pass raw ids as arguments, not inside the event")
         if raw_player in self.opted_out and self.policy.opt_out == "drop":
@@ -90,7 +112,8 @@ class Collector:
             return None
         try:
             ev = GameplayEvent.from_dict({**event, "player": self.policy.pseudonym("player", raw_player),
-                                          "session_id": self.policy.pseudonym("session", raw_session)})
+                                          "session_id": self.policy.pseudonym(
+                                              "session", f"{len(raw_player)}:{raw_player}{raw_session}")})
         except EventError:
             self.counts["rejected"] += 1
             raise
