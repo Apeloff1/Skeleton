@@ -160,3 +160,37 @@ def test_editor_export_session_is_enforced_even_without_cli_session(tmp_path):
             "--expected-visual", export["visual_digest"],
             "--editor-export", str(path),
         ])
+
+
+def test_cli_publishes_and_restores_imported_export(tmp_path, capsys):
+    _, export = fixture()
+    incoming = tmp_path / "incoming"
+    outgoing = tmp_path / "private"
+    incoming.mkdir()
+    outgoing.mkdir()
+    path = write_export(incoming, export)
+    args = [
+        "--project", PROJECT, "--expected-source", export["source_digest"],
+        "--expected-visual", export["visual_digest"],
+        "--editor-export", str(path),
+    ]
+    assert main(args + ["--publish-directory", str(outgoing)]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["publication"]["file_write_performed"] is True
+    assert result["manifest"]["release_certified"] is False
+    assert (outgoing / "studio_director_handoff.zip").is_file()
+    assert main(args + ["--verify-directory", str(outgoing)]) == 0
+    assert json.loads(capsys.readouterr().out) == result["manifest"]
+    with pytest.raises(SystemExit):
+        main(args + ["--publish-directory", str(outgoing)])
+
+
+def test_symlinked_parent_directory_rejected(tmp_path):
+    _, export = fixture()
+    real = tmp_path / "real"
+    real.mkdir()
+    write_export(real, export)
+    link = tmp_path / "alias"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(OSError):
+        import_export(link / FILENAME, export)
