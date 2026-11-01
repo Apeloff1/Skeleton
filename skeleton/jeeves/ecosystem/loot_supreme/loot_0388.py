@@ -1,0 +1,11 @@
+"""Loot supreme 0388.
+"""
+from __future__ import annotations
+
+ID = "loot_supreme_0388"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "loot", "index": 388}
+
+def activate(context: str = "") -> dict:
+    return {"ok": True, "id": ID, "context": context[:100], "active": True}

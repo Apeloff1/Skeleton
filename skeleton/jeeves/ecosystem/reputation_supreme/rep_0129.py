@@ -1,0 +1,11 @@
+"""Rep supreme 0129.
+"""
+from __future__ import annotations
+
+ID = "rep_supreme_0129"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "rep", "index": 129}
+
+def activate(context: str = "") -> dict:
+    return {"ok": True, "id": ID, "context": context[:100], "active": True}
