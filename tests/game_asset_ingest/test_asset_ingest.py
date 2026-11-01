@@ -480,3 +480,17 @@ def test_directory_rejects_sidecar_replacement_after_scan(tmp_path, monkeypatch)
     assert not report.ok
     assert any(issue.code == "missing_reference" and "changed after directory scan" in issue.detail
                for issue in report.issues)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="POSIX FIFO required")
+def test_descriptor_leaf_fifo_fails_closed_without_blocking(tmp_path):
+    """A hostile leaf must not block open() while waiting for a FIFO writer."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    fifo = tmp_path / "swapped.png"
+    os.mkfifo(fifo)
+    report = pipeline.import_files(tmp_path, ["swapped.png"])
+    assert not report.ok
+    assert not report.imported
+    assert any(issue.path == "swapped.png" and issue.code == "broken"
+               and "not a regular file" in issue.detail for issue in report.issues)

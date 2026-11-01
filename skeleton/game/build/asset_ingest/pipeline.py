@@ -25,10 +25,16 @@ MAX_IMPORT_TOTAL_BYTES = 512 * 1024 * 1024
 # A platform without dir_fd + O_NOFOLLOW must not silently downgrade to a
 # check-then-open path traversal. A native Windows handle backend is separate.
 _DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-_FILE_FLAGS = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+# O_NONBLOCK prevents a hostile FIFO leaf from hanging open() before fstat.
+# O_NOCTTY prevents a swapped terminal device from becoming the controller.
+_FILE_FLAGS = (
+    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOCTTY", 0)
+)
 _SECURE_OPEN = (
     hasattr(os, "O_DIRECTORY")
     and hasattr(os, "O_NOFOLLOW")
+    and hasattr(os, "O_NONBLOCK")
     and os.open in os.supports_dir_fd
 )
 
