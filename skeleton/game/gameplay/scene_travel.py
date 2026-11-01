@@ -336,7 +336,19 @@ def _json(text: str, label: str, *, max_bytes: int = MAX_JSON_BYTES) -> Any:
     try:
         if type(text) is not str or len(text.encode("utf-8")) > max_bytes:
             raise SceneTravelError(f"{label} exceeds input size budget")
-        return json.loads(text)
+        def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate JSON key")
+                result[key] = value
+            return result
+
+        def reject_constant(value: str) -> None:
+            raise ValueError("nonfinite JSON constant")
+
+        return json.loads(text, object_pairs_hook=unique_pairs,
+                          parse_constant=reject_constant)
     except (ValueError, UnicodeError, TypeError, RecursionError) as exc:
         if isinstance(exc, SceneTravelError):
             raise

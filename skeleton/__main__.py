@@ -792,6 +792,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-patrol":
         from skeleton.game.gameplay.scene_guard_patrol import cli as patrol_cli
         return patrol_cli(rest)
+    if cmd == "scene-weather":
+        from skeleton.game.gameplay.scene_weather import cli as weather_cli
+        return weather_cli(rest)
     if cmd == "scene-travel":
         from skeleton.game.gameplay.scene_travel import cli as scene_cli
         return scene_cli(rest)
