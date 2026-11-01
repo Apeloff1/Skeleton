@@ -28,15 +28,18 @@ def thermal():
     return (CPUThermalSensor("zone0", "cpu", 40.0, 90.0),)
 
 
-def controller(*, ticks=(10, 20, 40), capture_probe=snapshot):
+def controller(*, ticks=(10, 20, 40), capture_probe=snapshot,
+               guard_clock=None, quantum_duration_ns=5_000_000_000):
     policy = InFlightPressurePolicy(
         min_ram_bytes=1 << 20, min_disk_bytes=1 << 20,
         max_cpu_load_ppm=900_000, max_memory_pressure_ppm=900_000,
         max_generated_tokens=256, max_quantum_tokens=64,
+        max_quantum_duration_ns=quantum_duration_ns,
     )
     guard = InFlightCPUResourceGuard(
         policy, storage_path=".", simulated=True,
         resource_probe=snapshot, thermal_probe=thermal,
+        clock=guard_clock,
     )
     identity = ProfileIdentity(
         "a" * 64, "b" * 64, "c" * 64, "d" * 64,
@@ -151,3 +154,33 @@ def test_app_token_mismatch_quarantines_instead_of_publishing_false_tail():
     assert app.status().state == "aborted"
     with pytest.raises(InFlightLifecycleQuarantined):
         app.complete(output_tokens=5)
+
+
+def test_app_quarantines_on_expired_cpu_quantum_without_tail_completion():
+    app = controller(
+        guard_clock=iter((100, 200)).__next__,
+        quantum_duration_ns=50,
+    )
+    app.begin(request_id="q", prompt_tokens=3)
+    app.admit_quantum(requested_tokens=3)
+    with pytest.raises(InFlightLifecycleQuarantined, match="journal reconciliation"):
+        app.checkpoint(generated_tokens=3)
+    status = app.status()
+    assert status.state == "aborted"
+    assert status.telemetry_quarantined
+    assert not status.continue_execution
+    with pytest.raises(InFlightLifecycleQuarantined):
+        app.complete(output_tokens=3)
+
+
+def test_app_first_token_does_not_escape_expired_quantum():
+    app = controller(
+        guard_clock=iter((100, 200)).__next__,
+        quantum_duration_ns=50,
+    )
+    app.begin(request_id="q", prompt_tokens=3)
+    app.admit_quantum(requested_tokens=3)
+    with pytest.raises(InFlightLifecycleQuarantined, match="journal reconciliation"):
+        app.first_token()
+    assert app.status().telemetry_quarantined
+    assert app.status().state == "aborted"

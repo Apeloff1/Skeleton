@@ -22,3 +22,12 @@ RAM, swap, disk and measured thermal checks.
 
 Focused deterministic regression coverage is in
 `skeleton/testing/test_tail_inflight_guard.py`.
+
+## Application lifecycle fencing
+
+`OfflineTailInFlightSession` now treats a terminal CPU quantum deadline or
+clock failure as a cross-component uncertain outcome. It marks the app session
+quarantined and requires the independent execution journal to be reconciled
+before further work. A failed first-token or checkpoint boundary cannot
+silently publish a successful tail profile. Invalid requests that leave the
+guard healthy still raise their original admission errors.

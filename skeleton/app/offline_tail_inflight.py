@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from threading import RLock
+from typing import Callable
 
 from skeleton.ai.model_runtime.execution_telemetry import ExecutionTiming
 from skeleton.ai.model_runtime.tail_inflight_guard import (
@@ -60,6 +61,24 @@ class OfflineTailInFlightSession:
         if self._quarantined:
             raise InFlightLifecycleQuarantined("execution requires journal reconciliation")
 
+    def _checked_guard(
+        self, operation: Callable[[], InFlightPressureDecision],
+    ) -> InFlightPressureDecision:
+        """Fence a terminal pressure/clock failure across the app boundary."""
+        try:
+            return operation()
+        except InFlightPressureDenied as exc:
+            try:
+                terminal = self._guard.status().state == "aborted"
+            except BaseException:
+                terminal = True
+            if terminal:
+                self._quarantined = True
+                raise InFlightLifecycleQuarantined(
+                    "terminal CPU quantum requires execution journal reconciliation"
+                ) from exc
+            raise
+
     def _status(self, decision: InFlightPressureDecision) -> OfflineInFlightStatus:
         return OfflineInFlightStatus(
             schema="skeleton.app.offline-tail-inflight.v1",
@@ -100,7 +119,9 @@ class OfflineTailInFlightSession:
     def first_token(self) -> None:
         with self._lock:
             self._require_healthy()
-            if self._request_id is None or self._guard.status().state != "running":
+            if self._request_id is None or self._checked_guard(
+                self._guard.status,
+            ).state != "running":
                 raise InFlightPressureDenied("first token requires running request")
             try:
                 self._capture.first_token(self._request_id)
@@ -121,18 +142,18 @@ class OfflineTailInFlightSession:
             self._require_healthy()
             if self._request_id is None:
                 raise InFlightPressureDenied("no in-flight request")
-            return self._status(
-                self._guard.admit_quantum(requested_tokens=requested_tokens)
-            )
+            return self._status(self._checked_guard(
+                lambda: self._guard.admit_quantum(requested_tokens=requested_tokens)
+            ))
 
     def checkpoint(self, *, generated_tokens: int) -> OfflineInFlightStatus:
         with self._lock:
             self._require_healthy()
             if self._request_id is None:
                 raise InFlightPressureDenied("no in-flight request")
-            return self._status(
-                self._guard.checkpoint(generated_tokens=generated_tokens)
-            )
+            return self._status(self._checked_guard(
+                lambda: self._guard.checkpoint(generated_tokens=generated_tokens)
+            ))
 
     def resume(self) -> OfflineInFlightStatus:
         with self._lock:
@@ -148,7 +169,7 @@ class OfflineTailInFlightSession:
             self._require_healthy()
             if self._request_id is None:
                 raise InFlightPressureDenied("no in-flight request")
-            before = self._guard.status()
+            before = self._checked_guard(self._guard.status)
             if before.state != "running":
                 raise InFlightPressureDenied("completion requires running execution")
             if type(output_tokens) is not int or output_tokens != before.generated_tokens:
@@ -160,7 +181,7 @@ class OfflineTailInFlightSession:
                 raise InFlightLifecycleQuarantined(
                     "completion token accounting mismatch; journal reconciliation required"
                 )
-            decision = self._guard.complete()
+            decision = self._checked_guard(self._guard.complete)
             if decision.state != "completed":
                 raise InFlightPressureDenied("fresh pressure probe holds completion")
             try:
@@ -192,4 +213,4 @@ class OfflineTailInFlightSession:
 
     def status(self) -> OfflineInFlightStatus:
         with self._lock:
-            return self._status(self._guard.status())
+            return self._status(self._checked_guard(self._guard.status))
