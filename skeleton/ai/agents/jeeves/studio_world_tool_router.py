@@ -48,6 +48,7 @@ _TOOL_SYMBOLS = (
     ("ending_atlas_tool_schema", "execute_ending_atlas_tool"),
     ("choice_impact_tool_schema", "execute_choice_impact_tool"),
     ("objective_board_tool_schema", "execute_objective_board_tool"),
+    ("scene_schedule_tool_schema", "execute_scene_schedule_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",

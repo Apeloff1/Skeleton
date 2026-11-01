@@ -1985,3 +1985,9 @@ def execute_objective_board_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+# Source-reviewed scene scheduling adapter; only read-only typed dispatch.
+from .studio_scene_schedule_tool import (  # noqa: E402
+    scene_schedule_tool_schema, execute_scene_schedule_tool,
+)
