@@ -69,6 +69,7 @@ Commands:
     combat-expedition  Play original multi-arena campaigns with earned inventory
     combat-expedition-solve  Find replayable bounded expedition routes
     combat-expedition-audit  Audit earned rewards, spending and save branches
+    combat-checkpoints  Replay and fork portable expedition checkpoints
     combat-expedition-playbook  Build and verify portable playable victories
     arena-forge    Play earned salvage, equipment crafting and tactical arenas
     arena-forge-solve  Solve bounded equipment and combat routes
@@ -791,6 +792,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "arena-forge":
         from skeleton.game.gameplay.arena_forge_run import cli as forge_cli
         return forge_cli(rest)
+    if cmd == "combat-checkpoints":
+        from skeleton.game.gameplay.arena_checkpoint_timeline import cli as checkpoint_cli
+        return checkpoint_cli(rest)
     if cmd == "combat-expedition-playbook":
         from skeleton.game.gameplay.arena_expedition_playbook import cli as playbook_cli
         return playbook_cli(rest)
