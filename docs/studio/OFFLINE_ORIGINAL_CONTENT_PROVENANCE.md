@@ -24,3 +24,16 @@ as certified.
 
 Focused acceptance:
 `python -m pytest skeleton/testing/test_app_offline_original_content_provenance.py -q`.
+
+
+### Same-byte source replacement custody
+
+The read-only provenance inspector pins each claimed file's original device,
+inode, size, ownership, permissions and timestamps. It now rechecks these
+identities after the initial content read **and again after the final canonical
+playable-source replay**. A same-byte replacement of a claimed source file
+cannot be mistaken for uninterrupted source custody merely because the SHA-256
+and gameplay replay still match. Hostile inode replacement fails closed; it
+does not delete, quarantine, repair, sign, approve rights or certify release.
+This is point-in-time inspection, not a claim of exclusive filesystem locking
+or durable rollback protection against a privileged concurrent attacker.

@@ -166,3 +166,64 @@ def test_cli_provenance_acceptance_and_denial(provenance, capsys):
     result = json.loads(capsys.readouterr().out)
     assert result["claimed_source_hashes_verified"] is True
     assert result["rights_certified"] is False
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_same_byte_source_inode_replacement_during_replay_rejected(
+    provenance, tmp_path, monkeypatch,
+):
+    """Canonical replay returning identical bytes is not inode custody."""
+    import skeleton.app.offline_original_content_provenance as module
+
+    data, _ = provenance
+    source = data["installed_source"] / "index.html"
+    original_bytes = source.read_bytes()
+    original_mode = source.stat().st_mode & 0o777
+    original_verify = module.verify_exported_package
+    calls = 0
+
+    def replace_during_second_replay(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            replacement = tmp_path / "same-byte-source.html"
+            replacement.write_bytes(original_bytes)
+            replacement.chmod(original_mode)
+            os.replace(replacement, source)
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(module, "verify_exported_package", replace_during_second_replay)
+    with pytest.raises(OriginalContentProvenanceError, match="inode replaced"):
+        inspect_original_content_provenance(**data)
+    assert source.read_bytes() == original_bytes
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
+def test_same_byte_source_inode_replacement_during_first_read_rejected(
+    provenance, tmp_path, monkeypatch,
+):
+    """A read can see the right digest from a different inode."""
+    import skeleton.app.offline_original_content_provenance as module
+
+    data, _ = provenance
+    source = data["installed_source"] / "index.html"
+    original_bytes = source.read_bytes()
+    original_mode = source.stat().st_mode & 0o777
+    original_read = module._read
+    swapped = False
+
+    def swap_on_claimed_read(fd, path, limit, *, owner_controlled=False):
+        nonlocal swapped
+        if path == "index.html" and not swapped:
+            swapped = True
+            replacement = tmp_path / "same-byte-first-read.html"
+            replacement.write_bytes(original_bytes)
+            replacement.chmod(original_mode)
+            os.replace(replacement, source)
+        return original_read(fd, path, limit, owner_controlled=owner_controlled)
+
+    monkeypatch.setattr(module, "_read", swap_on_claimed_read)
+    with pytest.raises(OriginalContentProvenanceError, match="inode replaced"):
+        inspect_original_content_provenance(**data)
+    assert swapped is True
+    assert source.read_bytes() == original_bytes

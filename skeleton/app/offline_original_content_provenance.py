@@ -143,11 +143,19 @@ def inspect_original_content_provenance(
                 raise OriginalContentProvenanceError(
                     "claimed original source bytes differ or exceed budget"
                 )
+            # A digest alone does not prove that the pathname still names
+            # the inode whose bytes were inspected. Preserve that custody
+            # through the complete canonical replay, not just this read.
+            if _file_identity(root_fd, path) != identity:
+                raise OriginalContentProvenanceError(
+                    "claimed source inode replaced during first read"
+                )
             original_files.append((path, identity))
+        original_file_identities = dict(original_files)
         # Re-read every file, not only the JSON manifest. A same-byte inode
         # replacement must not pass just because its SHA-256 is unchanged.
         for path, expected, _ in claims:
-            if _file_identity(root_fd, path) != dict(original_files)[path]:
+            if _file_identity(root_fd, path) != original_file_identities[path]:
                 raise OriginalContentProvenanceError("claimed source inode replaced")
             if not hmac.compare_digest(
                 sha256(_read(root_fd, path, MAX_FILE_BYTES, owner_controlled=True)).hexdigest(),
@@ -159,6 +167,16 @@ def inspect_original_content_provenance(
         )
         claim_after, claim_after_identity = _read_policy(claim_file)
         _assert_original_root(root, root_fd)
+        # Canonical replay verifies bytes, but same-byte replacement of a
+        # claimed source inode can occur during that replay. Reopen every
+        # claimed path *after* replay, and refuse to report stable custody
+        # if any original inode was replaced. The claim manifest is checked
+        # independently and never grants permission to repair the source.
+        for path, identity in original_files:
+            if _file_identity(root_fd, path) != identity:
+                raise OriginalContentProvenanceError(
+                    "claimed source inode replaced during canonical replay"
+                )
         if (before != after or original_root != _identity(root_fd)
                 or raw != claim_after or claim_identity != claim_after_identity):
             raise OriginalContentProvenanceError(
