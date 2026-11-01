@@ -105,6 +105,19 @@ def assure_mixed_game_library_relocation(
 
     old_snapshot = _snapshot(before_unsigned, before_signed)
     new_snapshot = _snapshot(after_unsigned, after_signed)
+    # Path-distinct installations can still be the same directory inode
+    # through bind mounts or other aliases. Reject source inode reuse across
+    # every before/after custody class before claiming relocation.
+    source_inodes = [
+        (entry[0][0], entry[0][1])
+        for snapshot in (old_snapshot, new_snapshot)
+        for group in snapshot
+        for entry in group
+    ]
+    if len(set(source_inodes)) != 2 * expected_count:
+        raise OfflineMixedGameLibraryRelocationError(
+            "relocation requires independent source directory inodes"
+        )
     old = audit_mixed_game_library(
         before_unsigned, before_signed, authorized=True,
     )

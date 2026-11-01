@@ -110,6 +110,30 @@ def test_cross_mode_old_new_root_alias_rejected(relocated):
                replace(old_signed, installed_source=new_unsigned.installed_source)))
 
 
+def test_different_names_for_same_source_inode_are_not_relocation(
+    relocated, monkeypatch,
+):
+    import skeleton.app.offline_mixed_game_library_relocation as module
+    original = module._snapshot
+    first = original([relocated[0]], [relocated[2]])
+    calls = 0
+
+    def alias(*args):
+        nonlocal calls
+        calls += 1
+        snapshot = original(*args)
+        if calls == 2:
+            unsigned, signed = snapshot
+            aliased = list(unsigned[0])
+            aliased[0] = first[0][0][0]
+            return ((tuple(aliased),), signed)
+        return snapshot
+
+    monkeypatch.setattr(module, "_snapshot", alias)
+    with pytest.raises(OfflineMixedGameLibraryRelocationError, match="inodes"):
+        _call(relocated)
+
+
 def test_wrong_unsigned_save_pin_blocks_entire_relocation(relocated):
     old_unsigned, new_unsigned, old_signed, new_signed = relocated
     with pytest.raises((OSError, ValueError)):
