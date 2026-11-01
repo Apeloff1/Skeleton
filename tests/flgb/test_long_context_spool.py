@@ -470,6 +470,29 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertEqual(len(list(bucket.glob(".*.tmp"))), 2)
         self.assertTrue((bucket / ("." + start + "." + f"{1:016x}" + ".tmp")).exists())
 
+
+    def test_inherited_spool_descriptor_cannot_publish_or_resume(self):
+        if os.name != "posix":
+            self.skipTest("POSIX process ownership required")
+        from unittest.mock import patch
+        checkpoint = self.stage()
+        with patch(
+            "skeleton.ai.model_runtime.long_context_spool.os.getpid",
+            return_value=os.getpid() + 10000,
+        ):
+            with self.assertRaisesRegex(LongContextSpoolError, "forked spool"):
+                self.spool.stage(self.sequence)
+            with self.assertRaisesRegex(LongContextSpoolError, "forked spool"):
+                self.spool.load(checkpoint, expected_tokenizer_digest=TOKENIZER)
+            with self.assertRaisesRegex(LongContextSpoolError, "forked spool"):
+                self.spool.recover_abandoned_temps(
+                    kind="checkpoint", digest=checkpoint,
+                )
+        self.assertEqual(
+            self.spool.load(checkpoint, expected_tokenizer_digest=TOKENIZER)[0].cursor,
+            0,
+        )
+
     def test_posix_world_readable_root_is_rejected(self):
         if os.name != "posix":
             self.skipTest("POSIX ownership and mode contract")

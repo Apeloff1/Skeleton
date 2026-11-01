@@ -193,6 +193,7 @@ class LongContextSpool:
         if (isinstance(disk_reserve_bytes, bool) or not isinstance(disk_reserve_bytes, int)
                 or not 0 <= disk_reserve_bytes <= 2**63 - 1):
             raise LongContextSpoolError("invalid disk reserve")
+        self._owner_pid = os.getpid()
         self.root = Path(os.path.abspath(directory)) if os.name == "posix" else Path(directory)
         self.max_sequence_bytes = max_sequence_bytes
         self.max_window_tokens = max_window_tokens
@@ -246,6 +247,15 @@ class LongContextSpool:
         except OSError as exc:
             raise LongContextSpoolError("cannot initialize pinned spool directory") from exc
 
+    def _require_owner_process(self) -> None:
+        """An inherited directory descriptor is not a new process grant."""
+        try:
+            current = os.getpid()
+        except BaseException as exc:
+            raise LongContextSpoolError("spool process identity unavailable") from exc
+        if type(current) is not int or current != self._owner_pid:
+            raise LongContextSpoolError("forked spool requires new owner authorization")
+
     def close(self) -> None:
         fd = getattr(self, "_root_fd", None)
         self._root_fd = None
@@ -259,6 +269,7 @@ class LongContextSpool:
             pass
 
     def _open_bucket(self, kind: str, digest: str) -> int:
+        self._require_owner_process()
         if self._root_fd is None:
             raise LongContextSpoolError("secure spool root is closed")
         _digest(digest, "content digest")
@@ -326,6 +337,7 @@ class LongContextSpool:
         spending the same disk reserve. The trusted owner must still enforce
         per-tenant quotas and exclude malicious same-UID directory mutation.
         """
+        self._require_owner_process()
         if self._root_fd is None:
             raise LongContextSpoolError("secure spool root is closed")
         import fcntl
@@ -593,6 +605,7 @@ class LongContextSpool:
         return base / digest[:2] / digest
 
     def _read_exact(self, path: Path, *, limit: int) -> bytes:
+        self._require_owner_process()
         if os.name == "posix":
             return self._read_exact_fd(path, limit=limit)
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
@@ -613,6 +626,7 @@ class LongContextSpool:
         return raw
 
     def _publish(self, kind: str, digest: str, raw: bytes) -> None:
+        self._require_owner_process()
         if os.name == "posix":
             self._publish_fd(kind, digest, raw)
             return
@@ -675,6 +689,7 @@ class LongContextSpool:
         return checkpoint.digest
 
     def stage(self, sequence: TokenSequence) -> str:
+        self._require_owner_process()
         """Persist canonical token IDs and return a deterministic genesis receipt."""
         if not isinstance(sequence, TokenSequence):
             raise LongContextSpoolError("TokenSequence required")
@@ -711,6 +726,7 @@ class LongContextSpool:
         self, checkpoint_digest: str, *, expected_tokenizer_digest: str,
     ) -> tuple[SpoolCheckpoint, TokenSequence]:
         """Verify checkpoint and sequence before returning any token content."""
+        self._require_owner_process()
         _digest(expected_tokenizer_digest, "expected_tokenizer_digest")
         checkpoint = self._read_checkpoint(checkpoint_digest)
         if checkpoint.tokenizer_digest != expected_tokenizer_digest:
@@ -747,6 +763,7 @@ class LongContextSpool:
         A chain longer than the bound fails closed rather than claiming a
         complete audit. The caller must retain its trusted latest digest.
         """
+        self._require_owner_process()
         _digest(checkpoint_digest, "checkpoint_digest")
         _digest(expected_tokenizer_digest, "expected_tokenizer_digest")
         _positive(max_checkpoints, "max_checkpoints", 100_000)
@@ -794,6 +811,7 @@ class LongContextSpool:
         # Never materialize an unbounded token tuple in the application.
         # This per-instance limit is intentionally independent of the full
         # serialized context length and applies after process restart.
+        self._require_owner_process()
         _positive(max_tokens, "max_tokens", self.max_window_tokens)
         checkpoint, sequence = self.load(
             checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
@@ -810,6 +828,7 @@ class LongContextSpool:
         self, checkpoint_digest: str, *, expected_tokenizer_digest: str, consumed_tokens: int,
     ) -> str:
         """Commit actual progress as a new immutable child; never rewrite a cursor."""
+        self._require_owner_process()
         _positive(consumed_tokens, "consumed_tokens", 2**31 - 1)
         checkpoint, sequence = self.load(
             checkpoint_digest, expected_tokenizer_digest=expected_tokenizer_digest,
