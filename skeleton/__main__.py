@@ -777,6 +777,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-expedition":
         from skeleton.game.gameplay.expedition_quest import cli as quest_cli
         return quest_cli(rest)
+    if cmd == "quest-expedition-play":
+        from skeleton.game.gameplay.expedition_quest_interactive import cli as quest_play_cli
+        return quest_play_cli(rest)
     if cmd == "quest-campaign":
         from skeleton.game.gameplay.quest_chapter_campaign import cli as campaign_cli
         return campaign_cli(rest)
