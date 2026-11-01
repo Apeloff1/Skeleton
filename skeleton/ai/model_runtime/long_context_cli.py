@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .long_context_spool import LongContextSpool, LongContextSpoolError, read_selected_sequence
 from .long_context_progress import LongContextProgressHead
+from .long_context_fairness import LongContextFairPlanner, PressureSignals, StreamDemand
 from .tokenization import deserialize_token_sequence
 
 
@@ -70,12 +71,41 @@ def main(argv: list[str] | None = None) -> int:
     audit_heads.add_argument("--max-heads", type=int, default=64)
     audit_heads.add_argument("--max-checkpoints", type=int, default=4096)
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
+    plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
+    plan.add_argument("--candidate", action="append", required=True,
+                      help="stream-id:checkpoint:generation:weight:max-tokens")
+    for signal in ("cpu", "memory", "thermal", "energy"):
+        plan.add_argument("--" + signal + "-pressure",
+                          choices=("normal", "elevated", "critical", "unknown"),
+                          default="unknown")
+    plan.add_argument("--device-kind", choices=("cpu", "gpu", "m_chip"), default="cpu")
+    plan.add_argument("--total-token-budget", type=int, required=True)
+    plan.add_argument("--quantum-tokens", type=int, default=256)
+    plan.add_argument("--max-checkpoints", type=int, default=4096)
     args = parser.parse_args(argv)
     try:
         spool = LongContextSpool(args.root)
         if args.command.startswith("head-"):
             heads = LongContextProgressHead(spool)
-            if args.command == "head-init":
+            if args.command == "head-plan":
+                demands = []
+                for value in args.candidate:
+                    parts = value.split(":")
+                    if len(parts) != 5:
+                        raise LongContextSpoolError("invalid candidate")
+                    demands.append(StreamDemand(
+                        parts[0], parts[1], int(parts[2]), int(parts[4]),
+                        weight=int(parts[3])))
+                signals = PressureSignals(
+                    args.cpu_pressure, args.memory_pressure,
+                    args.thermal_pressure, args.energy_pressure,
+                    device_kind=args.device_kind)
+                result = LongContextFairPlanner(heads).plan(
+                    tuple(demands), expected_tokenizer_digest=args.tokenizer_digest,
+                    signals=signals, total_token_budget=args.total_token_budget,
+                    quantum_tokens=args.quantum_tokens,
+                    max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-init":
                 result = heads.initialize(args.stream_id, args.checkpoint,
                     expected_tokenizer_digest=args.tokenizer_digest,
                     max_checkpoints=args.max_checkpoints)
