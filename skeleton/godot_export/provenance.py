@@ -12,7 +12,7 @@ import hashlib
 import json
 import subprocess
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .binary import sha256_file
@@ -21,14 +21,41 @@ from .project import IGNORED_DIRS
 SCHEMA = "skeleton.godot_export.provenance/v1"
 
 
+def _safe_relative(path: object) -> PurePosixPath:
+    if type(path) is not str or not path or len(path) > 4096:
+        raise ValueError("unsafe artifact path")
+    if any(char in path for char in (chr(92), chr(0), ":")):
+        raise ValueError("unsafe artifact path")
+    parts = path.split("/")
+    if len(parts) > 32 or any(part in ("", ".", "..") for part in parts):
+        raise ValueError("unsafe artifact path")
+    rel = PurePosixPath(path)
+    if rel.is_absolute():
+        raise ValueError("unsafe artifact path")
+    return rel
+
+
+def _has_symlink(root: Path, rel: PurePosixPath) -> bool:
+    current = root
+    for part in rel.parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
 def tree_digest(root: Path) -> str:
     """Order-independent digest of project sources (path + content hash)."""
     h = hashlib.sha256()
+    if root.is_symlink():
+        raise ValueError("project source root is a symlink")
     for p in sorted(root.rglob("*")):
-        if not p.is_file():
-            continue
         rel = p.relative_to(root)
         if any(part in IGNORED_DIRS for part in rel.parts):
+            continue
+        if p.is_symlink():
+            raise ValueError("project source contains a symlink")
+        if not p.is_file():
             continue
         h.update(rel.as_posix().encode() + b"\0" + sha256_file(p).encode() + b"\n")
     return h.hexdigest()
@@ -81,21 +108,46 @@ def build(root: Path, engine: str, verdict: str, artifacts: dict[str, Path], bas
     base = base or root
     m = Manifest(root.name, tree_digest(root), engine, verdict, git_head(root))
     for preset, path in artifacts.items():
-        rel = path.resolve().relative_to(base.resolve()).as_posix()
-        m.artifacts.append(Artifact(preset, rel, sha256_file(path), path.stat().st_size))
+        if base.is_symlink() or path.is_symlink():
+            raise ValueError("artifact path contains a symlink")
+        rel = _safe_relative(path.resolve().relative_to(base.resolve()).as_posix())
+        if _has_symlink(base.resolve(), rel):
+            raise ValueError("artifact path contains a symlink")
+        m.artifacts.append(Artifact(preset, rel.as_posix(), sha256_file(path), path.stat().st_size))
     return m
 
 
 def verify(manifest: Manifest, base: Path, root: Path | None = None) -> list[str]:
-    problems = []
+    """Reject untrusted paths before reading artifact bytes."""
+    problems: list[str] = []
+    if base.is_symlink() or not base.is_dir():
+        return ["artifact base root is unsafe or missing"]
+    trusted_base = base.resolve()
     for a in manifest.artifacts:
-        p = base / a.path
+        try:
+            rel = _safe_relative(a.path)
+        except ValueError:
+            problems.append(f"{a.preset}: unsafe artifact path")
+            continue
+        if _has_symlink(trusted_base, rel):
+            problems.append(f"{a.preset}: symlink artifact path refused")
+            continue
+        p = trusted_base.joinpath(*rel.parts)
         if not p.is_file():
             problems.append(f"{a.preset}: missing {a.path}")
-        elif sha256_file(p) != a.sha256:
+            continue
+        if type(a.size) is not int or a.size < 0 or p.stat().st_size != a.size:
+            problems.append(f"{a.preset}: size mismatch for {a.path}")
+        if (type(a.sha256) is not str or len(a.sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in a.sha256)
+                or sha256_file(p) != a.sha256):
             problems.append(f"{a.preset}: sha256 mismatch for {a.path}")
-    if root is not None and tree_digest(root) != manifest.tree:
-        problems.append("project tree changed since manifest")
+    if root is not None:
+        try:
+            if tree_digest(root) != manifest.tree:
+                problems.append("project tree changed since manifest")
+        except (OSError, ValueError):
+            problems.append("project tree cannot be safely verified")
     if manifest.verdict != "SHIP":
         problems.append(f"manifest verdict is {manifest.verdict}")
     return problems
