@@ -82,3 +82,22 @@ def test_chapter_cannot_rebind_state_to_different_layout_digest() -> None:
     second = load_episode(CHAPTER_IDS[1])
     with pytest.raises(ExpeditionError, match="another source"):
         step(second, new_game(first), "east")
+
+def test_locked_objective_is_recoverable_after_source_key_is_found() -> None:
+    """A denied first pickup cannot destroy the only winning route."""
+    ep = load_episode(CHAPTER_IDS[0])
+    reach_objective_without_key = (
+        ("south",) + ("east",) * 6 + ("north",)
+    )
+    denied = run_episode(ep, reach_objective_without_key)
+    assert denied.status == "active"
+    assert not denied.objective and not denied.has_key
+    assert denied.events.count("objective_locked") == 1
+
+    recovered = run_episode(
+        ep, reach_objective_without_key + ("west",) * 4 + ("east",) * 4
+    )
+    assert recovered.has_key and recovered.objective
+    assert recovered.events.count("objective_recovered") == 1
+    assert recovered.score >= 25
+    assert restore(ep, snapshot(ep, recovered)) == recovered
