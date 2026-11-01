@@ -377,6 +377,70 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertEqual(self.spool.load(start, expected_tokenizer_digest=TOKENIZER)[0].cursor, 0)
 
 
+
+    def test_crash_recovery_reclaims_single_link_partial_temp(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor custody required")
+        start = self.stage()
+        bucket = self.spool._path("checkpoint", start).parent
+        orphan = bucket / ("." + start + "." + "a" * 16 + ".tmp")
+        orphan.write_bytes(b"interrupted")
+        orphan.chmod(0o600)
+        recovered = LongContextSpool(self.root, disk_reserve_bytes=0)
+        result = recovered.recover_abandoned_temps(kind="checkpoint", digest=start)
+        self.assertEqual(result["removed"], 1)
+        self.assertEqual(result["bytes_reclaimed"], len(b"interrupted"))
+        self.assertFalse(orphan.exists())
+        self.assertEqual(recovered.load(start, expected_tokenizer_digest=TOKENIZER)[0].cursor, 0)
+
+    def test_crash_recovery_removes_published_temp_link_only(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor custody required")
+        start = self.stage()
+        final = self.spool._path("checkpoint", start)
+        orphan = final.parent / ("." + start + "." + "b" * 16 + ".tmp")
+        os.link(final, orphan)
+        result = self.spool.recover_abandoned_temps(kind="checkpoint", digest=start)
+        self.assertEqual(result["removed"], 1)
+        self.assertEqual(result["bytes_reclaimed"], 0)
+        self.assertTrue(final.exists())
+        self.assertEqual(final.stat().st_nlink, 1)
+
+    def test_crash_recovery_rejects_external_hardlink_and_symlink(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor custody required")
+        start = self.stage()
+        bucket = self.spool._path("checkpoint", start).parent
+        outsider = bucket / "unrelated"
+        outsider.write_bytes(b"other")
+        outsider.chmod(0o600)
+        orphan = bucket / ("." + start + "." + "c" * 16 + ".tmp")
+        os.link(outsider, orphan)
+        with self.assertRaisesRegex(LongContextSpoolError, "hardlink"):
+            self.spool.recover_abandoned_temps(kind="checkpoint", digest=start)
+        orphan.unlink()
+        orphan.symlink_to(outsider)
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.recover_abandoned_temps(kind="checkpoint", digest=start)
+        self.assertEqual(outsider.read_bytes(), b"other")
+
+    def test_crash_recovery_denies_excess_entries_before_deletion(self):
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor custody required")
+        start = self.stage()
+        bucket = self.spool._path("checkpoint", start).parent
+        for i in range(3):
+            orphan = bucket / ("." + start + "." + f"{i:016x}" + ".tmp")
+            orphan.write_bytes(b"x")
+            orphan.chmod(0o600)
+        with self.assertRaisesRegex(LongContextSpoolError, "entry bound"):
+            self.spool.recover_abandoned_temps(
+                kind="checkpoint", digest=start, max_entries=2,
+            )
+        self.assertEqual(len(list(bucket.glob(".*.tmp"))), 3)
+        result = self.spool.recover_abandoned_temps(kind="checkpoint", digest=start)
+        self.assertEqual(result["removed"], 3)
+
     def test_posix_world_readable_root_is_rejected(self):
         if os.name != "posix":
             self.skipTest("POSIX ownership and mode contract")

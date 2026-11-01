@@ -30,6 +30,10 @@ _CHUNK = 1024 * 1024
 MAX_WINDOW_TOKENS = 65_536
 DEFAULT_WINDOW_TOKENS = 4_096
 _PUBLISH_LOCK_WAIT_NS = 2_000_000_000
+_RECOVERY_MAX_ENTRIES = 64
+_RECOVERY_MAX_SCAN = 4096
+_RECOVERY_MAX_BYTES = 128 * 1024 * 1024
+
 
 
 class LongContextSpoolError(TokenizerContractError):
@@ -370,10 +374,128 @@ class LongContextSpool:
         finally:
             os.close(lock_fd)
 
+
+    @staticmethod
+    def _reap_temp_locked(
+        bucket_fd: int, digest: str, *, max_entries: int, max_bytes: int,
+    ) -> dict[str, int | bool | str]:
+        """Recover only known-digest orphan temps under the publication lock.
+
+        A crashed writer can leave either a single-link partial temp or a
+        two-link temp already published at the final content address. Both
+        cases are verified by inode, owner, permissions and link count before
+        unlink. No arbitrary directory cleanup or wildcard deletion occurs.
+        """
+        _digest(digest, "content digest")
+        _positive(max_entries, "max_entries", _RECOVERY_MAX_ENTRIES)
+        _positive(max_bytes, "max_bytes", _RECOVERY_MAX_BYTES)
+        prefix = "." + digest + "."
+        suffix = ".tmp"
+        matches: list[str] = []
+        scanned = 0
+        try:
+            with os.scandir(bucket_fd) as entries:
+                for entry in entries:
+                    scanned += 1
+                    if scanned > _RECOVERY_MAX_SCAN:
+                        raise LongContextSpoolError("spool recovery scan bound exceeded")
+                    name = entry.name
+                    if (name.startswith(prefix) and name.endswith(suffix)
+                            and len(name) == len(prefix) + 16 + len(suffix)
+                            and all(ch in "0123456789abcdef"
+                                    for ch in name[len(prefix):-len(suffix)])):
+                        matches.append(name)
+                        if len(matches) > max_entries:
+                            raise LongContextSpoolError("spool recovery entry bound exceeded")
+        except OSError as exc:
+            raise LongContextSpoolError("spool recovery enumeration failed") from exc
+        reclaimed = 0
+        removed = 0
+        for name in sorted(matches):
+            flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+            try:
+                fd = os.open(name, flags, dir_fd=bucket_fd)
+                try:
+                    info = os.fstat(fd)
+                    if (not stat.S_ISREG(info.st_mode)
+                            or info.st_uid != os.geteuid()
+                            or stat.S_IMODE(info.st_mode) != 0o600
+                            or info.st_nlink not in (1, 2)
+                            or info.st_size < 0
+                            or info.st_size > MAX_SERIALIZED_SEQUENCE_BYTES + 4096):
+                        raise LongContextSpoolError("untrusted orphan spool object")
+                    if reclaimed + info.st_size > max_bytes:
+                        raise LongContextSpoolError("spool recovery byte bound exceeded")
+                    if info.st_nlink == 2:
+                        # A completed link() before a crash leaves a second
+                        # name for the *same* inode. Any other link is denied.
+                        final = os.stat(
+                            digest, dir_fd=bucket_fd, follow_symlinks=False,
+                        )
+                        if ((final.st_dev, final.st_ino) !=
+                                (info.st_dev, info.st_ino)):
+                            raise LongContextSpoolError("untrusted orphan hardlink")
+                    current = os.stat(
+                        name, dir_fd=bucket_fd, follow_symlinks=False,
+                    )
+                    if ((current.st_dev, current.st_ino, current.st_nlink) !=
+                            (info.st_dev, info.st_ino, info.st_nlink)):
+                        raise LongContextSpoolError("orphan spool inode changed")
+                    os.unlink(name, dir_fd=bucket_fd)
+                    reclaimed += info.st_size if info.st_nlink == 1 else 0
+                    removed += 1
+                finally:
+                    os.close(fd)
+            except OSError as exc:
+                raise LongContextSpoolError("orphan spool recovery denied") from exc
+        if removed:
+            try:
+                os.fsync(bucket_fd)
+            except OSError as exc:
+                raise LongContextSpoolError("orphan spool recovery fsync failed") from exc
+        return {
+            "schema": "skeleton.ai.long-context-temp-recovery.v1",
+            "removed": removed,
+            "bytes_reclaimed": reclaimed,
+            "complete": True,
+        }
+
+    def recover_abandoned_temps(
+        self, *, kind: str, digest: str,
+        max_entries: int = _RECOVERY_MAX_ENTRIES,
+        max_bytes: int = _RECOVERY_MAX_BYTES,
+    ) -> dict[str, int | bool | str]:
+        """Explicit, bounded crash recovery for a known content digest.
+
+        Requires the same cooperative publication lock as normal writers.
+        Does not recover arbitrary tenant files or certify trusted publishers.
+        """
+        if os.name != "posix":
+            raise LongContextSpoolError("POSIX orphan recovery not qualified")
+        lock_fd = self._publication_lock()
+        try:
+            bucket_fd = self._open_bucket(kind, digest)
+            try:
+                return self._reap_temp_locked(
+                    bucket_fd, digest,
+                    max_entries=max_entries, max_bytes=max_bytes,
+                )
+            finally:
+                os.close(bucket_fd)
+        finally:
+            os.close(lock_fd)
+
     def _publish_fd_locked(self, kind: str, digest: str, raw: bytes) -> None:
         """Caller holds the cross-process admission lock."""
         bucket_fd = self._open_bucket(kind, digest)
         try:
+            # A prior crash may leave a temp after link() but before unlink().
+            # Recover it under the same lock before checking final content.
+            self._reap_temp_locked(
+                bucket_fd, digest,
+                max_entries=_RECOVERY_MAX_ENTRIES,
+                max_bytes=_RECOVERY_MAX_BYTES,
+            )
             try:
                 existing = os.open(
                     digest, os.O_RDONLY | os.O_NOFOLLOW |
