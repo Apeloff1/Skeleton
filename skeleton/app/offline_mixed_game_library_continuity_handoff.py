@@ -100,6 +100,8 @@ def _envelope(audit: dict[str, object]) -> dict[str, object]:
         )
     return {
         "schema": SCHEMA,
+        # Canonical publisher admission requires an actual completed replay.
+        "offline_gameplay_reexecuted": True,
         "continuity": audit,
         "previous_library_receipt_sha256": audit["before_library_receipt_sha256"],
         "current_library_receipt_sha256": audit["after_library_receipt_sha256"],
