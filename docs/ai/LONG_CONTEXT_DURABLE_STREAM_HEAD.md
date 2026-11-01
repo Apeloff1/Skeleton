@@ -57,3 +57,21 @@ publisher identity, an external anti-rollback fence, or an exactly-once
 backend guarantee. A crash after irreversible model work but before the
 external execution journal's durable completion must remain UNCERTAIN.
 Do not infer successful consumption from a window digest alone.
+
+## Read-only whole-root recovery audit
+
+`head-audit --max-heads 64 --max-checkpoints 4096` checks every
+committed stream head in the private POSIX directory under the same
+cross-process custody lock, with a strict 262,144-checkpoint work ceiling.
+It verifies inventory type, owner, mode, link count, canonical head records,
+tokenizer identity and complete bounded ancestry before reporting success.
+If a head count exceeds the supplied limit, a checkpoint is missing, any
+entry is malformed, or the audit exceeds the work ceiling, it fails closed.
+It does not delete, repair, advance, replay or publish any state.
+
+Output contains only aggregate head count, bounded inventory bytes, orphan
+temporary count and canonical aggregate digest. No stream IDs, token IDs,
+plaintext prompts, keys, model weights or checkpoint payloads are returned.
+The digest is **not** a MAC, proof of trusted publisher identity, or an
+external rollback fence. Different tokenizer identities in one root are
+rejected; keep separate roots per tokenizer/operator trust domain.

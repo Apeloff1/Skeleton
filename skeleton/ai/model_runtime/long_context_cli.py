@@ -65,6 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     commit_window.add_argument("--max-tokens", type=int, required=True)
     commit_window.add_argument("--consumed-tokens", type=int, required=True)
     commit_window.add_argument("--max-checkpoints", type=int, default=4096)
+    audit_heads = commands.add_parser("head-audit",
+        help="Read-only bounded audit of all local committed heads")
+    audit_heads.add_argument("--max-heads", type=int, default=64)
+    audit_heads.add_argument("--max-checkpoints", type=int, default=4096)
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
     args = parser.parse_args(argv)
     try:
@@ -103,6 +107,10 @@ def main(argv: list[str] | None = None) -> int:
                     expected_window_digest=args.expected_window_digest,
                     max_tokens=args.max_tokens, consumed_tokens=args.consumed_tokens,
                     max_checkpoints=args.max_checkpoints)
+            elif args.command == "head-audit":
+                result = heads.audit_inventory(
+                    expected_tokenizer_digest=args.tokenizer_digest,
+                    max_heads=args.max_heads, max_checkpoints=args.max_checkpoints)
             else:
                 result = heads.recover_orphan_temps()
         elif args.command == "capacity":

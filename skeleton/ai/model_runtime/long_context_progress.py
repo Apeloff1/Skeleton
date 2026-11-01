@@ -388,6 +388,54 @@ class LongContextProgressHead:
             self._publish(directory, name, updated, creating=False)
             return {**updated, "is_execution_lease": False}
 
+
+    def audit_inventory(self, *, expected_tokenizer_digest: str,
+                        max_heads: int = 64, max_checkpoints: int = 4096) -> dict[str, object]:
+        """Bounded read-only restart audit of ALL committed local stream heads.
+
+        Returns only aggregate integrity evidence, never token IDs, stream
+        names or raw checkpoint content. A single corrupt head fails the
+        complete audit closed; it never reports partial success.
+        """
+        _digest(expected_tokenizer_digest, "tokenizer digest")
+        _positive(max_heads, "max_heads", _MAX_HEADS)
+        _positive(max_checkpoints, "max_checkpoints", 100_000)
+        if max_heads * max_checkpoints > 262_144:
+            raise LongContextSpoolError("head audit work bound exceeded")
+        with self._locked() as directory:
+            heads, used, temps = self._inventory(directory)
+            if heads > max_heads:
+                raise LongContextSpoolError("head audit count bound exceeded")
+            records: list[dict[str, object]] = []
+            try:
+                names = sorted(entry.name for entry in os.scandir(directory)
+                               if _HEX.fullmatch(entry.name))
+            except OSError as exc:
+                raise LongContextSpoolError("head audit inventory unavailable") from exc
+            if len(names) != heads:
+                raise LongContextSpoolError("head audit inventory changed")
+            for name in names:
+                record = self._read(directory, name)
+                if record is None or record["tokenizer_digest"] != expected_tokenizer_digest:
+                    raise LongContextSpoolError("head audit identity mismatch")
+                self.spool.audit_history(record["checkpoint_digest"],
+                    expected_tokenizer_digest=expected_tokenizer_digest,
+                    max_checkpoints=max_checkpoints)
+                if self._read(directory, name) != record:
+                    raise LongContextSpoolError("head changed during inventory audit")
+                records.append(record)
+            return {
+                "schema": "skeleton.ai.long-context-head-inventory.v1",
+                "heads_verified": heads,
+                "orphan_temps_observed": len(temps),
+                "inventory_bytes": used,
+                "inventory_digest": sha256(_canonical(records)).hexdigest(),
+                "complete": True,
+                "token_payloads_returned": False,
+                "trusted_publisher_attested": False,
+                "external_replay_fence_attested": False,
+            }
+
     def recover_orphan_temps(self) -> dict[str, object]:
         """Explicit bounded recovery; never delete unknown or committed heads."""
         with self._locked() as directory:
