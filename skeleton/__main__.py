@@ -76,6 +76,7 @@ Commands:
     arena-forge-author  Atomically edit and preview tactical crafting sources
     quest-factions  Play NPC faction reputation and earned quest consequences
     quest-factions-play  Interactively play and checkpoint offline faction quests
+    quest-factions-accept  Replay-verify full faction quest production acceptance
     quest-factions-author  Transactionally author and preview faction consequences
     quest-factions-route  Solve replayable faction-gated quest endings
     quest-expedition  Play authored NPC/choice/crafting quest over combat
@@ -778,6 +779,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
+    if cmd == "quest-factions-accept":
+        from skeleton.game.gameplay.quest_factions_acceptance import cli as faction_accept_cli
+        return faction_accept_cli(rest)
     if cmd == "quest-factions-play":
         from skeleton.game.gameplay.quest_factions_interactive import cli as faction_play_cli
         return faction_play_cli(rest)
