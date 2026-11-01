@@ -55,6 +55,7 @@ Commands:
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
+    scene-circuit-author  Atomically edit and preview playable circuit sources
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -766,6 +767,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-atlas":
         from skeleton.game.gameplay.scene_atlas import cli as atlas_cli
         return atlas_cli(rest)
+    if cmd == "scene-circuit-author":
+        from skeleton.game.gameplay.scene_circuit_author import cli as circuit_author_cli
+        return circuit_author_cli(rest)
     if cmd == "scene-circuit-solve":
         from skeleton.game.gameplay.scene_circuit_solver import cli as circuit_solver_cli
         return circuit_solver_cli(rest)
