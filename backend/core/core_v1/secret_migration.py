@@ -80,8 +80,10 @@ class SecretMigrator:
         self.store, self.provider, self.checkpoints, self.now = store, provider, checkpoints, now
 
     def _run(self, job: str, transform, batch_size: int, max_batches: int | None) -> JobReport:
-        if not 1 <= batch_size <= 1000:
+        if type(batch_size) is not int or not 1 <= batch_size <= 1000:
             raise ValueError("batch_size must be 1..1000")
+        if max_batches is not None and (type(max_batches) is not int or not 1 <= max_batches <= 1000):
+            raise ValueError("max_batches must be 1..1000 or None")
         cp = self.checkpoints.get(job)
         report = JobReport(job)
         if cp is not None and cp.done:
@@ -95,7 +97,10 @@ class SecretMigrator:
                 report.done = True
                 self.checkpoints.save(Checkpoint(job, cursor, True, self.now()))
                 break
+            blocked = False
             for row in rows:
+                if row.secret_id <= cursor:
+                    raise RuntimeError("secret scan cursor did not advance monotonically")
                 report.scanned += 1
                 aad = envelope.secret_aad(row.tenant_id, row.secret_id)
                 try:
@@ -103,17 +108,23 @@ class SecretMigrator:
                 except EnvelopeError as exc:
                     report.failed.append(row.secret_id)
                     log.error("secret job %s failed for %s: %s", job, row.secret_id, exc)
-                    continue
+                    blocked = True
+                    break
                 if new is None:
                     report.skipped += 1
-                    continue
-                if self.store.compare_and_set(row.secret_id, row.blob, new, envelope.key_id_of(new)):
+                elif self.store.compare_and_set(row.secret_id, row.blob, new, envelope.key_id_of(new)):
                     report.changed += 1
                 else:
                     report.conflicts += 1
-            cursor = rows[-1].secret_id
+                    blocked = True
+                    break
+                # Advance only after the row has been durably processed or
+                # safely skipped. A failed/conflicting row must be retried.
+                cursor = row.secret_id
             report.batches += 1
             self.checkpoints.save(Checkpoint(job, cursor, False, self.now()))
+            if blocked:
+                return report
         return report
 
     def encrypt_plaintext(self, batch_size: int = 200, max_batches: int | None = None,

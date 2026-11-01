@@ -109,7 +109,11 @@ def test_encrypt_reports_unknown_rows(stores):
     _seed_plain(store, 2)
     store.put("sec_bad", "t1", b"\x00garbage", 5.0)
     r = SecretMigrator(store, P1, cps, Clock()).encrypt_plaintext()
-    assert r.failed == ["sec_bad"] and r.changed == 2 and r.done
+    assert r.failed == ["sec_bad"] and r.changed == 2 and not r.done
+    assert cps.get(JOB_ENCRYPT).cursor == "sec_0001"
+    assert store.compare_and_set("sec_bad", b"\\x00garbage", b"whsec_fixed", "")
+    resumed = SecretMigrator(store, P1, cps, Clock()).encrypt_plaintext()
+    assert resumed.changed == 1 and resumed.done and not resumed.failed
 
 
 def test_cas_conflict_is_not_clobbered(stores):
@@ -182,3 +186,13 @@ def test_service_signs_with_decrypted_secret_and_retries_when_key_missing():
     svc.publish(ADMIN, "a.c", {"x": 2})
     rep = svc.dispatch_due()
     assert rep.retried == 1 and len(transport.calls) == 1
+
+
+def test_secret_migration_rejects_unbounded_batch_parameters(stores):
+    store, cps = stores
+    m = SecretMigrator(store, P1, cps, Clock())
+    for bad in (0, True, 1001, -1):
+        with pytest.raises(ValueError, match="batch_size"):
+            m.encrypt_plaintext(batch_size=bad)
+        with pytest.raises(ValueError, match="max_batches"):
+            m.encrypt_plaintext(max_batches=bad)
