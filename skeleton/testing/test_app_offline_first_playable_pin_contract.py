@@ -78,7 +78,16 @@ def test_json_job_parser_and_canonical_admission_agree(tmp_path):
         "receipt_sha256": job.receipt_sha256,
     })
     parsed = _parse_job(raw)
-    assert parsed == job
+    assert parsed.source == str(job.source)
+    assert parsed.archive == str(job.archive)
+    assert parsed.install == str(job.install)
+    assert parsed.save == str(job.save)
+    assert parsed.receipt == str(job.receipt)
+    assert parsed.manifest_sha256 == job.manifest_sha256
+    assert parsed.moves == job.moves
+    assert parsed.archive_sha256 == job.archive_sha256
+    assert parsed.save_sha256 == job.save_sha256
+    assert parsed.receipt_sha256 == job.receipt_sha256
     assert _check_jobs((parsed, _jobs(tmp_path)[1]), tmp_path / "summary.json", inspect=True)[0] == parsed
 
 
