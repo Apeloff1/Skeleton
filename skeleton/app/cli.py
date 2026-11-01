@@ -139,6 +139,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify installed game, archive and save custody (delivery-assurance --help)",
     )
     sub.add_parser(
+        "signed-delivery-assurance", add_help=False,
+        help="verify signed source archive, installed game and saved replay",
+    )
+    sub.add_parser(
         "verify-archive-signature", add_help=False,
         help="verify detached Ed25519 original source archive signature",
     )
@@ -282,6 +286,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "signed-delivery-assurance":
+        from skeleton.app.offline_signed_delivery import main as signed_delivery_main
+        return signed_delivery_main(arguments[1:])
     if arguments and arguments[0] == "verify-archive-signature":
         from skeleton.app.offline_archive_signature import main as signature_main
         return signature_main(arguments[1:])
