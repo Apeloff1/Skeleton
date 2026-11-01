@@ -65,6 +65,7 @@ Commands:
     scene-weather-package  Export, verify and resume portable weather saves\n    scene-weather-author  Edit weather gates with source-fenced playable previews\n    scene-weather-rescue  Play and replay storm-gated NPC shelter missions
     scene-weather-rescue-author  Edit and preview NPC rescue missions
     scene-weather-rescue-solve  Find replayable weather-safe NPC shelter routes
+    scene-rescue-epilogue  Replay verified NPC rescue endings and compare consequences
     scene-weather-rescue-play  Play accessible NPC rescue missions with safe saves
     scene-weather  Play deterministic weather-gated scene travel and replay
     scene-travel  Simulate, verify and resume original offline scene journeys
@@ -830,6 +831,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-weather":
         from skeleton.game.gameplay.scene_weather import cli as weather_cli
         return weather_cli(rest)
+    if cmd == "scene-rescue-epilogue":
+        from skeleton.game.gameplay.scene_weather_rescue_epilogue import cli as rescue_epilogue_cli
+        return rescue_epilogue_cli(rest)
     if cmd == "scene-weather-rescue":
         from skeleton.game.gameplay.scene_weather_rescue import cli as weather_rescue_cli
         return weather_rescue_cli(rest)
