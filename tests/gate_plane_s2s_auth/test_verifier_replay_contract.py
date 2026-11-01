@@ -102,3 +102,12 @@ def test_local_nonce_double_rejects_bad_clock_and_control_identifiers():
     assert store.check_and_record("s2s:svc", "n" * 257, 1000, 60) is False
     with pytest.raises(ValueError, match="max_entries"):
         LocalNonceStoreDouble(max_entries=1_000_001)
+
+
+def test_local_nonce_double_rejects_expired_and_future_retention_aliases():
+    store = LocalNonceStoreDouble(clock=lambda: 1000.0)
+    for ts, ttl in ((0, 1), (-1, 2000), (1e308, 1)):
+        assert store.check_and_record("s2s:svc", "nonce", ts, ttl) is False
+    assert len(store) == 0
+    assert store.check_and_record("s2s:svc", "nonce", 1000, 60) is True
+    assert store.check_and_record("s2s:svc", "nonce", 1000, 60) is False

@@ -100,6 +100,12 @@ class LocalNonceStoreDouble:
         now = self._clock()
         if not _finite_number(now):
             return False
+        expires_at = float(ts) + float(ttl_s)
+        # Match production nonce custody: stale or unbounded retention
+        # must not return a fresh admission, even in the test double.
+        if (ts < 0 or not math.isfinite(expires_at)
+                or not now < expires_at <= now + 1_000_000_000_000):
+            return False
         key = (scope, nonce)
         with self._lock:
             self.calls += 1
@@ -113,7 +119,7 @@ class LocalNonceStoreDouble:
                     self.full_rejections += 1
                     soonest = min(self._seen.values(), default=now)
                     raise NonceStoreFull(math.ceil(max(0.0, soonest - now)) or 1)
-            self._seen[key] = float(ts) + float(ttl_s)
+            self._seen[key] = expires_at
             return True
 
     def __len__(self) -> int:
