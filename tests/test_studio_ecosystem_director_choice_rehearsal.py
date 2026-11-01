@@ -22,7 +22,9 @@ from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
 from skeleton.ai.game_builder.studio_ecosystem_quest import (
     StudioQuestError, compile_quest_program, replay_quest,
 )
-from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import compile_scene_schedule
+from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import (
+    _digest, compile_scene_schedule,
+)
 
 PROJECT = "studio_arena_fighting_glacial_fjord"
 
@@ -145,6 +147,20 @@ def test_edited_schedule_receipt_is_not_authoritative():
     forged["timeline"] = [dict(row) for row in timing["timeline"]]
     forged["timeline"][0]["start_tick"] = 999
     with pytest.raises(StudioQuestError, match="schedule lease"):
+        render_choice_rehearsal(
+            documents, [], forged, authorized=True,
+            expected_source_digest=canon)
+
+
+def test_self_hashed_forgery_cannot_replace_canonical_schedule():
+    documents, canon, _, _, _, _, timing = source()
+    forged = dict(timing)
+    forged["timeline"] = [dict(row) for row in timing["timeline"]]
+    forged["timeline"][0]["start_tick"] += 3
+    forged["schedule_digest"] = _digest({
+        key: value for key, value in forged.items() if key != "schedule_digest"
+    })
+    with pytest.raises(StudioQuestError, match="canonical schedule proof"):
         render_choice_rehearsal(
             documents, [], forged, authorized=True,
             expected_source_digest=canon)
