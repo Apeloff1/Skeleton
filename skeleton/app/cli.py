@@ -155,6 +155,10 @@ def _parser() -> argparse.ArgumentParser:
         help="verify multi-generation original-game relocation without replay loss",
     )
     sub.add_parser(
+        "audit-mixed-library-epoch-receipts", add_help=False,
+        help="reverify an ordered series of independently pinned game handoffs",
+    )
+    sub.add_parser(
         "audit-mixed-library-epoch-successor", add_help=False,
         help="verify a pinned original-game epoch handoff strictly extends another",
     )
@@ -476,6 +480,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "inspect-uncertain-offline-receipt":
         from skeleton.app.offline_uncertain_receipt_inspection import main as uncertain_main
         return uncertain_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-epoch-receipts":
+        from skeleton.app.offline_mixed_library_epoch_receipt_chain import main as receipt_chain_main
+        return receipt_chain_main(arguments[1:])
     if arguments and arguments[0] == "audit-mixed-library-epoch-successor":
         from skeleton.app.offline_mixed_library_epoch_successor import main as successor_main
         return successor_main(arguments[1:])
