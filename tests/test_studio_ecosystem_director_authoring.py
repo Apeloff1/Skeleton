@@ -147,3 +147,16 @@ def test_cli_rejects_conflicting_inline_and_export(tmp_path):
             "--expected-visual", export["visual_digest"],
             "--editor-export", str(path), "--schedule", "{}",
         ])
+
+
+def test_editor_export_session_is_enforced_even_without_cli_session(tmp_path):
+    _, export = fixture()
+    stale = dict(export)
+    stale["session_digest"] = "0" * 64
+    path = write_export(tmp_path, stale)
+    with pytest.raises(SystemExit):
+        main([
+            "--project", PROJECT, "--expected-source", export["source_digest"],
+            "--expected-visual", export["visual_digest"],
+            "--editor-export", str(path),
+        ])

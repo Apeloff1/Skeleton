@@ -8,7 +8,7 @@ from pathlib import Path
 from skeleton.ai.game_builder.studio_ecosystem_director_authoring import load_director_authoring
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
-from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError, replay_quest
 from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
     compile_director_handoff, publish_director_handoff, verify_director_handoff,
 )
@@ -37,20 +37,28 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("provide --editor-export or both --schedule and --assignments")
     try:
         actions = _strict(args.actions, max_bytes=16384)
+        docs = read_blueprint(args.project)
+        # A browser export must always be bound to the *current* replay,
+        # including when the operator omits --expected-session. A stale
+        # exported session may never be silently reinterpreted as a new one.
+        session_lease = args.expected_session
         if args.editor_export is not None:
+            current_session = replay_quest(docs, actions, authorized=True).digest
+            if session_lease is not None and session_lease != current_session:
+                raise StudioQuestError("stale director editor replay session")
+            session_lease = current_session
             schedule, assignments = load_director_authoring(
                 args.editor_export, authorized=True,
                 expected_source_digest=args.expected_source,
                 expected_visual_digest=args.expected_visual,
-                expected_session_digest=args.expected_session)
+                expected_session_digest=session_lease)
         else:
             schedule = _strict(args.schedule, max_bytes=16384)
             assignments = _strict(args.assignments, max_bytes=32768)
-        docs = read_blueprint(args.project)
         kwargs = dict(
             authorized=True, expected_source_digest=args.expected_source,
             expected_visual_digest=args.expected_visual,
-            expected_session_digest=args.expected_session)
+            expected_session_digest=session_lease)
         if args.verify_directory:
             manifest = verify_director_handoff(
                 docs, actions, schedule, assignments, args.verify_directory, **kwargs)
