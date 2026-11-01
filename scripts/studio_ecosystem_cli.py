@@ -126,6 +126,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="Bounded JSON list of distinct authored faction decisions")
     ap.add_argument("--faction-expected-digest",
                     help="Optional exact source SHA-256 for faction replay continuation")
+    ap.add_argument("--choice-impact", action="store_true",
+                    help="Replay all authored alternatives of available quest stages")
+    ap.add_argument("--choice-impact-expected-source",
+                    help="Required canonical source SHA-256 for choice impact")
+    ap.add_argument("--choice-impact-expected-session",
+                    help="Optional exact quest session lease for choice impact")
+    ap.add_argument("--choice-impact-offset", type=int, default=0)
+    ap.add_argument("--choice-impact-limit", type=int, default=4)
     ap.add_argument("--ending-atlas", action="store_true",
                     help="Compare all source-bound authored ending routes and external holds")
     ap.add_argument("--ending-atlas-expected-source",
@@ -762,6 +770,53 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.faction_decisions is not None or args.faction_expected_digest is not None:
         ap.error("--faction-decisions and --faction-expected-digest require --faction-reputation")
+    if args.choice_impact:
+        if (not args.project or not args.choice_impact_expected_source
+                or args.ending_atlas or args.ending_plan or args.play_quest
+                or args.play_walk or args.dialogue_stage or args.author_revision
+                or args.author_npc or args.author_choice or args.merge_revisions
+                or args.revision_lineage or args.cherry_pick_revision
+                or args.revision_impact or args.audit_canon or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.faction_plan
+                or args.faction_reputation or args.search is not None
+                or args.deep_search or args.genre or args.biome
+                or args.output is not None or args.limit != 20
+                or args.max_artifact_bytes is not None or args.revision_source is not None):
+            ap.error("--choice-impact requires --project and source lease, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_choice_impact_matrix import (
+            page_choice_impacts,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("choice impact actions exceed byte budget")
+            def unique_impact_keys(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate choice impact JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique_impact_keys,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite choice impact action")))
+            result = page_choice_impacts(
+                read_blueprint(args.project), actions, authorized=True,
+                expected_source_digest=args.choice_impact_expected_source,
+                expected_session_digest=args.choice_impact_expected_session,
+                offset=args.choice_impact_offset, limit=args.choice_impact_limit)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError,
+                RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.choice_impact_expected_source is not None
+            or args.choice_impact_expected_session is not None
+            or args.choice_impact_offset != 0 or args.choice_impact_limit != 4):
+        ap.error("choice impact options require --choice-impact")
     if args.ending_atlas:
         if (not args.project or not args.ending_atlas_expected_source
                 or args.ending_plan or args.play_quest or args.play_walk

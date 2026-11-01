@@ -1863,3 +1863,63 @@ def execute_ending_atlas_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+CHOICE_IMPACT_REQUEST_SCHEMA = "skeleton.jeeves.studio_choice_impact_request.v1"
+CHOICE_IMPACT_RESULT_SCHEMA = "skeleton.jeeves.studio_choice_impact_result.v1"
+
+
+def choice_impact_tool_schema() -> dict[str, object]:
+    """Typed authored quest branch comparison without fabricated effects."""
+    return {
+        "name": "studio_authored_choice_impact",
+        "description": "Replay and compare all currently executable authored quest alternatives",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": CHOICE_IMPACT_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "offset": {"type": "integer", "minimum": 0},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 8},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_choice_impact_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves choice impact requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    allowed = required | {"expected_session_digest", "offset", "limit"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - allowed
+            or request.get("schema") != CHOICE_IMPACT_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves choice impact request")
+    from skeleton.ai.game_builder.studio_ecosystem_choice_impact_matrix import (
+        page_choice_impacts,
+    )
+    detail = page_choice_impacts(
+        read_blueprint(request["project_id"]), request["actions"],
+        authorized=True, expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request.get("expected_session_digest"),
+        offset=request.get("offset", 0), limit=request.get("limit", 4),
+    )
+    payload: dict[str, Any] = {
+        "schema": CHOICE_IMPACT_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request), "detail": detail,
+        "file_write_performed": False, "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
