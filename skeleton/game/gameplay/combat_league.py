@@ -65,6 +65,9 @@ def normalize_league(raw: Any) -> dict[str, Any]:
         raise CombatSessionError("unsupported league schema")
     world_id = _id(obj["world_id"], "world_id")
     league_id = _id(obj["league_id"], "league_id")
+    # Reserve suffix space for deterministic per-round tournament IDs.
+    if len(league_id) > 48:
+        raise CombatSessionError("league id too long for bracket identity")
     rounds = _integer(obj["rounds"], "rounds", 1, MAX_ROUNDS)
     turn_limit = _integer(obj["match_turn_limit"], "match_turn_limit", 1, 64)
     raw_entrants = obj["entrants"]
@@ -114,13 +117,23 @@ def new_league(source: Any) -> dict[str, Any]:
 
 
 def _pairings(source: dict[str, Any], round_index: int) -> list[dict[str, Any]]:
-    """Rotate eight entrants into two disjoint canonical four-person brackets."""
+    """Use distinct balanced partitions so entrants meet different opponents.
+
+    A pure cyclic rotation of odd/even indices repeats the same two groups
+    each round. Four independent partitions prevent that silent regression.
+    """
     if type(round_index) is not int or not 0 <= round_index < source["rounds"]:
         raise CombatSessionError("league round outside authored schedule")
     ordered = source["entrants"]
-    offset = (round_index * 3) % ENTRANTS
-    rotated = ordered[offset:] + ordered[:offset]
-    groups = (rotated[::2], rotated[1::2])
+    partitions = (
+        (0, 2, 4, 6),
+        (0, 1, 4, 5),
+        (0, 1, 2, 3),
+        (0, 3, 5, 6),
+    )
+    first = partitions[round_index]
+    second = tuple(i for i in range(ENTRANTS) if i not in first)
+    groups = ([ordered[i] for i in first], [ordered[i] for i in second])
     return [{
         "schema_version": TOURNAMENT_SCHEMA,
         "world_id": source["world_id"],

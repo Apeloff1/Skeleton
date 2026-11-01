@@ -3,7 +3,7 @@
 Entry point: python -m skeleton combat-league demo
 
 A complete original three-round Harbor League uses eight distinct combatants,
-two four-entrant canonical brackets per round, and deterministic rotations.
+two four-entrant canonical brackets per round, and distinct balanced round partitions.
 Each bracket runs the existing turn-combat tournament and its source-bound
 replay/save engine. Semifinal wins earn two points; final wins earn three
 additional points; finalists earn one additional point. The highest scoring

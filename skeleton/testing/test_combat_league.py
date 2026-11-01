@@ -36,6 +36,24 @@ class CombatLeagueTests(unittest.TestCase):
         self.assertEqual(table["ranking"],
                          sorted(table["ranking"], key=lambda r: (-r["points"], r["entrant_id"])))
 
+    def test_schedule_changes_opponent_groups_each_round(self):
+        spec = normalize_league(self.source)
+        partitions = []
+        for round_index in range(spec["rounds"]):
+            groups = _pairings(spec, round_index)
+            first = frozenset(e["id"] for e in groups[0]["entrants"])
+            second = frozenset(e["id"] for e in groups[1]["entrants"])
+            self.assertFalse(first & second)
+            self.assertEqual(len(first | second), 8)
+            partitions.append(frozenset((first, second)))
+        self.assertEqual(len(set(partitions)), spec["rounds"])
+
+    def test_derived_tournament_id_length_is_bounded(self):
+        changed = copy.deepcopy(self.source)
+        changed["league_id"] = "a" * 49
+        with self.assertRaisesRegex(CombatSessionError, "too long"):
+            normalize_league(changed)
+
     def test_resume_matches_one_pass_and_portable_export(self):
         initial = new_league(self.source)
         first = advance_league(initial)
