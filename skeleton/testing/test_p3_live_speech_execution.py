@@ -651,15 +651,16 @@ def test_verified_corpus_issuance_cannot_be_downgraded_to_opaque_envelope():
     frame(session)
     rid = session.frames[0].record_id
     issued = session.corpus.intake._assets[rid]
+    # Construct an actual opaque envelope with the current typed contract;
+    # it must not inherit the issued decoder evidence by positional accident.
     session.corpus.intake._assets[rid] = MultimodalAsset(
-        issued.asset_id,
-        issued.modality,
-        issued.mime_type,
-        issued.content_digest,
-        issued.size_bytes,
-        issued.sanitized_metadata,
-        issued.instruction_trusted,
-        issued.embedded_instruction_detected,
+        asset_id=issued.asset_id,
+        modality=issued.modality,
+        mime_type=issued.mime_type,
+        content_digest=issued.content_digest,
+        content_bytes=issued.content_bytes,
+        embedded_instruction_detected=issued.embedded_instruction_detected,
+        sanitized_metadata=issued.sanitized_metadata,
     )
     with pytest.raises(MultimodalFoundationError, match="validation evidence is missing"):
         session.corpus.get(rid)
