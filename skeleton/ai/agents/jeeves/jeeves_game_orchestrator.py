@@ -81,6 +81,12 @@ class JeevesGameOrchestrator:
         from .studio_walk_tool import execute_author_revision_tool
         return execute_author_revision_tool(request, authorized=authorized)
 
+    def authoritative_choice_rehearsal(self, request: Mapping[str, Any], *,
+                                       authorized: bool = False) -> dict[str, Any]:
+        """Replay typed original quest-choice edits with canonical source custody."""
+        from .studio_choice_rehearsal_tool import execute_choice_rehearsal_tool
+        return execute_choice_rehearsal_tool(request, authorized=authorized)
+
     def model_card(self) -> str:
         return (
             "Jeeves game orchestrator: one call produces unified brief, advanced systems, "
