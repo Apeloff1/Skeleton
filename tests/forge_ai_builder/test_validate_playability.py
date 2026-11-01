@@ -74,3 +74,27 @@ def test_deep_chain_no_recursion_error():
     p = good_plan()
     p["triggers"] = [{"id": f"t{i}", "on": f"e{i}", "emits": [f"e{i + 1}"]} for i in range(5000)]
     assert check_cycles(p) == []
+
+
+def test_nonfinite_and_zero_margin_fail_closed():
+    p = good_plan()
+    for bad in (0, -1, float("nan"), float("inf"), "2"):
+        assert "margin must be finite" in msgs(check_winnable(p, margin=bad), "ERROR")[0]
+    p["player"]["dps"] = float("nan")
+    assert "player stats missing" in msgs(check_winnable(p), "ERROR")[0]
+
+
+def test_trigger_graph_expansion_budget_rejected():
+    p = good_plan()
+    p["triggers"] = [
+        {"id": f"t{i}", "on": "tick", "emits": ["tick"]}
+        for i in range(300)
+    ]
+    errors = msgs(check_cycles(p), "ERROR")
+    assert errors == ["trigger edge budget exceeded"]
+
+
+def test_nonlist_trigger_emissions_are_rejected_without_traversal():
+    p = good_plan()
+    p["triggers"][0]["emits"] = {"not": "a list"}
+    assert msgs(check_cycles(p), "ERROR") == ["malformed trigger emissions"]

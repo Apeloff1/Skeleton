@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Any, Mapping
 
 from skeleton.forge.validator import Severity
@@ -24,8 +25,13 @@ class Thresholds:
     warning_penalty: float = 0.2
 
     def __post_init__(self) -> None:
+        fields = (self.accept, self.repair, self.error_penalty, self.warning_penalty)
+        if any(type(x) not in (int, float) or not math.isfinite(x) for x in fields):
+            raise ValueError("thresholds must be finite numbers")
         if not 0.0 <= self.repair <= self.accept <= 1.0:
             raise ValueError("need 0 <= repair <= accept <= 1")
+        if not 0.0 <= self.error_penalty <= 1.0 or not 0.0 <= self.warning_penalty <= 1.0:
+            raise ValueError("penalty fractions must be within [0, 1]")
 
 
 @dataclass(frozen=True)
@@ -47,7 +53,9 @@ class Verdict:
 
 def validate_plan(plan: Any) -> list:
     problems = check_schema(plan)
-    if not isinstance(plan, Mapping):
+    # A structurally invalid plan is never safe to traverse as a graph.
+    # Regenerate rather than evaluate malformed/unbounded references.
+    if not isinstance(plan, Mapping) or any(p.severity is Severity.ERROR for p in problems):
         return problems
     for check in (check_references, check_reachability, check_winnable, check_cycles):
         problems.extend(check(plan))

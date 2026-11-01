@@ -6,13 +6,20 @@ damage taken - not economy balance.
 from __future__ import annotations
 
 from collections import deque
+import math
 from typing import Any, Mapping
 
 from ._common import err, items, warn
 
 
 def _num(v: Any) -> float | None:
-    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    try:
+        n = float(v)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return n if math.isfinite(n) else None
 
 
 def check_reachability(plan: Mapping[str, Any]) -> list:
@@ -44,6 +51,10 @@ def check_winnable(plan: Mapping[str, Any], *, margin: float = 1.0) -> list:
     """A level is winnable if the player survives all of its encounters back to
     back on one health pool: sum(enemy_hp / player.dps * enemy_dps) < hp / margin."""
     rule = "winnable"
+    margin_value = _num(margin)
+    if margin_value is None or margin_value <= 0:
+        return [err(rule, "margin must be finite and strictly positive")]
+    margin = margin_value
     player = plan.get("player") if isinstance(plan.get("player"), Mapping) else {}
     hp, dps = _num(player.get("hp")), _num(player.get("dps"))
     if not hp or not dps or hp <= 0 or dps <= 0:
@@ -76,11 +87,26 @@ def check_cycles(plan: Mapping[str, Any]) -> list:
     Iterative DFS (no recursion limit)."""
     rule = "logic_loop"
     trig = [t for t in items(plan, "triggers") if isinstance(t.get("id"), str) and isinstance(t.get("on"), str)]
+    if len(trig) > 8192:
+        return [err(rule, "trigger node budget exceeded")]
     by_event: dict[str, list[Mapping[str, Any]]] = {}
     for t in trig:
         by_event.setdefault(t["on"], []).append(t)
     # trigger -> triggers it can fire
-    edges = {t["id"]: [n["id"] for ev in t.get("emits") or [] for n in by_event.get(ev, [])] for t in trig}
+    edges: dict[str, list[str]] = {}
+    edge_count = 0
+    for t in trig:
+        emits = t.get("emits") or []
+        if not isinstance(emits, list) or len(emits) > 256 or any(not isinstance(x, str) for x in emits):
+            return [err(rule, "malformed trigger emissions")]
+        links: list[str] = []
+        for ev in emits:
+            next_links = by_event.get(ev, [])
+            if len(next_links) > 50_000 - edge_count - len(links):
+                return [err(rule, "trigger edge budget exceeded")]
+            links.extend(x["id"] for x in next_links)
+        edge_count += len(links)
+        edges[t["id"]] = links
     once = {t["id"] for t in trig if t.get("once") is True}
     out, state, reported = [], {}, set()
     for root in edges:
