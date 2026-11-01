@@ -6,6 +6,12 @@ import hashlib
 import hmac
 import unicodedata
 
+from dataclasses import dataclass
+from typing import Callable
+
+from ._helpers import canonical, digest
+from .b095_plugin_sdk import SDK_API
+
 def _member_path_ok(path: object) -> bool:
     """Validate signed package member names without rewriting signed bytes."""
     if not isinstance(path, str) or not path or len(path) > 240:
@@ -17,12 +23,6 @@ def _member_path_ok(path: object) -> bool:
         return False
     return all(part not in ("", ".", "..") for part in normalized.split("/"))
 
-
-from dataclasses import dataclass
-from typing import Callable
-
-from ._helpers import canonical, digest
-from .b095_plugin_sdk import SDK_API
 
 MOD_PERMISSIONS = frozenset({"read_save", "add_content", "ui_overlay"})
 
