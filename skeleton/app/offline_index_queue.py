@@ -378,13 +378,16 @@ class OfflineIndexQueue:
     def drain(self, *, limit: int | None = None) -> tuple[IndexJob, ...]:
         # Default job batch follows available CPU and RAM at invocation.
         # An explicit operator-selected limit remains an upper bound.
-        if limit is None:
+        adaptive = limit is None
+        if adaptive:
             try:
                 limit = probe_local_resources(self.path).suggested_index_jobs
             except LocalResourcePressure as exc:
                 raise OfflineQueueError(str(exc)) from exc
         if type(limit) is not int or limit < 1:
             raise OfflineQueueError("offline drain limit must be positive")
+        if not adaptive and limit > MAX_RUN_BATCH:
+            raise OfflineQueueError("offline drain batch limit exceeds explicit safe bound")
         completed: list[IndexJob] = []
         for _ in range(limit):
             # Recheck between jobs; load or swap saturation may have

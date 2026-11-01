@@ -1,7 +1,7 @@
 """100x extreme adversarial tests."""
 import pytest
 from skeleton.simulation.game.driving_sim_starter import DrivingSimulator, DrivingSimError
-from skeleton.distributed.mesh.multiplayer_authority import SessionAuthority
+from skeleton.distributed.mesh.multiplayer_authority import MultiplayerError, SessionAuthority
 
 def test_driving_100x_full():
     sim = DrivingSimulator(power=700, mass=1500)
@@ -45,3 +45,26 @@ def test_multi_100x_predictive():
     assert len(g.interest_set) >= 0
     assert len(g.rollback_buffer) > 0
     assert len(g.distributed_rollback) > 0
+
+def test_multi_predictive_rejects_unsafe_velocity_without_mutating_tick():
+    auth = SessionAuthority("strict-predict")
+    grant = auth.issue_grant("p1")
+    initial_tick = auth.global_tick
+    with pytest.raises(MultiplayerError):
+        auth.predictive_distributed_sync("p1", "p2", (1.0, 2.0, 3.0), (float("nan"), 0.0, 0.0), 20)
+    assert auth.global_tick == initial_tick
+    assert grant.peers == {}
+    with pytest.raises(MultiplayerError):
+        auth.predictive_distributed_sync("p1", "p2", (1.0, 2.0, 3.0), (1.0, 0.0, 0.0), True)
+    assert grant.peers == {}
+
+
+def test_multi_predictive_velocity_is_bounded_and_rollback_preserved():
+    auth = SessionAuthority("predict-horizon")
+    grant = auth.issue_grant("p1")
+    auth.predictive_distributed_sync("p1", "p2", (20.0, 30.0, 0.0), (5.0, 2.0, 0.0), 30)
+    assert grant.peers["p2"].predicted == pytest.approx((20.15, 30.06, 0.0))
+    assert grant.rollback_buffer[-1]["tick"] == auth.global_tick
+    assert auth.verify_grant("p1", grant.digest)
+    with pytest.raises(MultiplayerError):
+        auth.predictive_distributed_sync("unknown", "p2", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1)
