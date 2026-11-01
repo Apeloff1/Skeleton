@@ -5,6 +5,8 @@ import argparse
 import json
 from pathlib import Path
 
+from skeleton.ai.game_builder.studio_ecosystem_director_authoring import load_director_authoring
+
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_director_handoff import (
@@ -20,16 +22,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expected-visual", required=True)
     ap.add_argument("--expected-session")
     ap.add_argument("--actions", default="[]")
-    ap.add_argument("--schedule", required=True)
-    ap.add_argument("--assignments", required=True)
+    ap.add_argument("--schedule", help="Strict inline schedule JSON (requires --assignments)")
+    ap.add_argument("--assignments", help="Strict inline assignments JSON (requires --schedule)")
+    ap.add_argument("--editor-export", type=Path,
+                    help="Import the single source-bound JSON exported by director_editor.html")
     modes = ap.add_mutually_exclusive_group()
     modes.add_argument("--publish-directory", type=Path)
     modes.add_argument("--verify-directory", type=Path)
     args = ap.parse_args(argv)
+    if args.editor_export is not None:
+        if args.schedule is not None or args.assignments is not None:
+            ap.error("--editor-export cannot be combined with inline authoring")
+    elif args.schedule is None or args.assignments is None:
+        ap.error("provide --editor-export or both --schedule and --assignments")
     try:
         actions = _strict(args.actions, max_bytes=16384)
-        schedule = _strict(args.schedule, max_bytes=16384)
-        assignments = _strict(args.assignments, max_bytes=32768)
+        if args.editor_export is not None:
+            schedule, assignments = load_director_authoring(
+                args.editor_export, authorized=True,
+                expected_source_digest=args.expected_source,
+                expected_visual_digest=args.expected_visual,
+                expected_session_digest=args.expected_session)
+        else:
+            schedule = _strict(args.schedule, max_bytes=16384)
+            assignments = _strict(args.assignments, max_bytes=32768)
         docs = read_blueprint(args.project)
         kwargs = dict(
             authorized=True, expected_source_digest=args.expected_source,

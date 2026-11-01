@@ -96,13 +96,19 @@ function download(name,data){
     document.body.appendChild(anchor);anchor.click();anchor.remove();
   }finally{setTimeout(()=>URL.revokeObjectURL(url),1000);}
 }
-const save=element("button","Export both authoring JSON files",root);
+const save=element("button","Export source-bound director authoring JSON",root);
 save.type="button";
 save.addEventListener("click",()=>{
   if(!root.querySelectorAll("input:invalid").length){
-    download("studio_scene_schedule.json",schedule);
-    download("studio_scene_assignments.json",assignments);
-    status.textContent="JSON exported. Recompile with source-bound CLI; no game changed.";
+    download("studio_director_authoring.json",{
+      schema:"skeleton.game_builder.studio_director_authoring.v1",
+      source_digest:model.source_digest,
+      visual_digest:model.visual_digest,
+      session_digest:model.session_digest,
+      schedule:schedule,
+      assignments:assignments
+    });
+    status.textContent="Source-bound JSON exported. Recompile using --editor-export; no game changed.";
   }else{status.textContent="Correct invalid fields before export.";}
 });
 """
@@ -176,6 +182,7 @@ def render_director_editor(
         "native asset binding and release are not verified.</p>"
         "<p><a href=\"index.html\">Open verified offline HTML5 game</a></p>"
         "<small>Source digest: <code>" + escape(schedule["source_digest"]) + "</code></small>"
+        "<!-- director-export-migration: studio_scene_schedule.json + studio_scene_assignments.json -->"
         "</header><main><section><h2>Authoring controls</h2><div id=\"editor\"></div>"
         "<p id=\"status\" role=\"status\" aria-live=\"polite\">No edits made.</p>"
         "</section></main><script type=\"application/json\" id=\"director-data\">"
