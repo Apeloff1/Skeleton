@@ -267,3 +267,82 @@ def test_conflicting_cli_merge_does_not_publish_anything(tmp_path):
             "--merge-plans", payload, "--publish", str(tmp_path),
         ])
     assert list(tmp_path.iterdir()) == []
+
+
+def _order_fixtures():
+    from skeleton.ai.agents.jeeves.studio_walk_tool import ending_plan_tool_schema
+    original, catalog = fixture()
+    baseline = plan([original], catalog)
+    first = deepcopy(original)
+    first["arguments"]["decisions"] = [
+        read_blueprint(original["arguments"]["project_id"])["cast"]["social_rules"][0]["decision"]
+    ]
+    descriptor = ending_plan_tool_schema()
+    second = {
+        "tool": descriptor["name"],
+        "arguments": {
+            "schema": descriptor["parameters"]["properties"]["schema"]["const"],
+            "project_id": original["arguments"]["project_id"],
+            "ending_id": "review_only_ending",
+            "actions": [],
+        },
+    }
+    return baseline, first, second, catalog
+
+
+def test_three_way_merge_refuses_opposite_order_of_shared_steps():
+    baseline, first, second, catalog = _order_fixtures()
+    left = plan([baseline["steps"][0]["request"], first, second], catalog)
+    right = plan([baseline["steps"][0]["request"], second, first], catalog)
+    with pytest.raises(StudioQuestError, match="conflicting concurrent step order"):
+        merge_world_batch_plans(baseline, left, right, authorized=True)
+
+
+def test_three_way_merge_preserves_right_fork_order_before_shared_step():
+    baseline, first, second, catalog = _order_fixtures()
+    root = baseline["steps"][0]["request"]
+    left = plan([root, first], catalog)
+    right = plan([root, second, first], catalog)
+    result = merge_world_batch_plans(baseline, left, right, authorized=True)
+    assert [row["request"] for row in result["plan"]["steps"]] == [
+        root, second, first,
+    ]
+    assert result["receipt"]["ordering_policy"] == (
+        "stable_topological_preserve_both_forks"
+    )
+    assert result["receipt"]["ordered_append_digest"] == sha256(
+        json.dumps([second, first], sort_keys=True, separators=(",", ":"),
+                   ensure_ascii=True, allow_nan=False).encode("ascii")
+    ).hexdigest()
+    assert replay_world_batch_merge(
+        result, baseline, left, right, authorized=True) == result
+
+
+def test_three_way_merge_order_conflict_cli_never_publishes(tmp_path):
+    from scripts.studio_world_batch_cli import main
+    baseline, first, second, catalog = _order_fixtures()
+    root = baseline["steps"][0]["request"]
+    left = plan([root, first, second], catalog)
+    right = plan([root, second, first], catalog)
+    payload = json.dumps({"baseline": baseline, "left": left, "right": right},
+                         sort_keys=True, separators=(",", ":"))
+    with pytest.raises(SystemExit):
+        main(["--expected-catalog", catalog, "--merge-plans", payload,
+              "--publish", str(tmp_path)])
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_three_way_merge_order_conflict_jeeves_never_claims_success():
+    from skeleton.ai.agents.jeeves.studio_world_batch_merge_tool import (
+        REQUEST_SCHEMA, execute_world_batch_merge_tool,
+    )
+    baseline, first, second, catalog = _order_fixtures()
+    root = baseline["steps"][0]["request"]
+    left = plan([root, first, second], catalog)
+    right = plan([root, second, first], catalog)
+    with pytest.raises(StudioQuestError, match="conflicting concurrent step order"):
+        execute_world_batch_merge_tool({
+            "schema": REQUEST_SCHEMA,
+            "expected_catalog_digest": catalog,
+            "baseline": baseline, "left": left, "right": right,
+        }, authorized=True)

@@ -30,6 +30,51 @@ def _identity(request: dict[str, Any]) -> tuple[str, str]:
     return (request["tool"], request["arguments"]["project_id"])
 
 
+def _merge_suffix_order(
+    left_suffix: list[dict[str, Any]], right_suffix: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Stable topological merge preserving *both* authored branch orders.
+
+    A common step may appear in both forks. Its position is a causal
+    constraint, not permission to move earlier or later steps around it.
+    A cycle is a genuine merge conflict; selecting a winner would silently
+    rewrite one operator's authored workflow.
+    """
+    by_digest: dict[str, dict[str, Any]] = {}
+    rank: dict[str, int] = {}
+    edges: dict[str, set[str]] = {}
+    indegree: dict[str, int] = {}
+    for suffix in (left_suffix, right_suffix):
+        for request in suffix:
+            digest = _digest(request)
+            if digest not in by_digest:
+                rank[digest] = len(rank)
+                by_digest[digest] = request
+                edges[digest] = set()
+                indegree[digest] = 0
+        sequence = [_digest(request) for request in suffix]
+        for earlier, later in zip(sequence, sequence[1:]):
+            if earlier == later:
+                raise StudioQuestError("three-way merge has repeated ordered steps")
+            if later not in edges[earlier]:
+                edges[earlier].add(later)
+                indegree[later] += 1
+
+    ready = [key for key in by_digest if indegree[key] == 0]
+    merged: list[dict[str, Any]] = []
+    while ready:
+        ready.sort(key=rank.__getitem__)
+        key = ready.pop(0)
+        merged.append(by_digest[key])
+        for following in sorted(edges[key], key=rank.__getitem__):
+            indegree[following] -= 1
+            if indegree[following] == 0:
+                ready.append(following)
+    if len(merged) != len(by_digest):
+        raise StudioQuestError("three-way merge has conflicting concurrent step order")
+    return merged
+
+
 def merge_world_batch_plans(
     baseline: object, left: object, right: object, *, authorized: bool,
 ) -> dict[str, Any]:
@@ -74,12 +119,7 @@ def merge_world_batch_plans(
         if left_slots[slot] != right_slots[slot]:
             raise StudioQuestError("three-way merge has conflicting concurrent authoring")
 
-    appended = list(left_suffix)
-    seen = {_digest(item) for item in appended}
-    for item in right_suffix:
-        if _digest(item) not in seen:
-            appended.append(item)
-            seen.add(_digest(item))
+    appended = _merge_suffix_order(left_suffix, right_suffix)
     requests = original + appended
     if len(requests) > MAX_STEPS:
         raise StudioQuestError("three-way merge exceeds bounded execution steps")
@@ -101,6 +141,8 @@ def merge_world_batch_plans(
         "unique_appended_count": len(appended),
         "merged_step_count": len(requests),
         "merge_policy": "append_only_same_canon_same_catalog_fail_closed",
+        "ordering_policy": "stable_topological_preserve_both_forks",
+        "ordered_append_digest": _digest(appended),
         "source_replay_verified": True,
         "file_write_performed": False,
         "native_runtime_verified": False,

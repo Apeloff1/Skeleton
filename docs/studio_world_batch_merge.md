@@ -1,48 +1,34 @@
-# Jeeves source-leased append-only three-way workflow merge
+# Studio A — canonical world workflow merge ordering
 
-The merge accepts one common typed world plan and two independently authored
-forks. All three plans must replay against the current canonical source,
-the same tool catalog and the same source project set. A fork can only append
-steps; deleting, rewriting or reordering ancestor steps is rejected.
+The three-way merge accepts only source-replayed, catalog-leased append-only
+world workflow plans. Shared appended steps have a **causal ordering**: their
+position relative to other appended steps in either fork must be preserved.
 
-Concurrent append operations are deduplicated by complete canonical request
-digest. Different requests addressing the same (tool, authored project)
-semantic slot are treated as a conflict rather than choosing a winner.
-Repeated appended steps and duplicate semantic slots fail closed. This
-intentionally conservative policy is suitable for reviewed read-only tool
-workflows, not arbitrary authoring or automatic conflict resolution.
+## Merge algorithm
 
-Run the CLI with `--expected-catalog <digest> --merge-plans '<json>'`,
-where JSON has exactly `baseline`, `left` and `right` plan objects.
-`--html-sha256` adds the digest of an offline script-free review page.
-The returned plan can be passed through the existing typed plan replay and
-execution path after operator review. The merge itself writes no files,
-executes no tools, and never certifies native gameplay, asset rights or release.
+1. Replay the ancestor and both forks from canonical authored sources.
+2. Reject ancestor edits, duplicate steps and conflicting semantic slots.
+3. Form a bounded dependency DAG from adjacent appended steps in each fork.
+4. Stable-topologically sort the DAG, preferring left-first encounter order
+   for steps that are otherwise independent.
+5. Reject cycles as explicit concurrent authoring conflicts. Never silently
+   pick a fork's order or drop a step to make the merge succeed.
+6. Compile and replay the resulting typed plan before execution or publication.
 
-Source custody: every merge recompiles all three plans, then recompiles the
-merged plan. A receipt is never accepted as proof by itself: use
-`replay_world_batch_merge` with all three source plans to verify it.
+For example, left `A → B` and right `B → A` are incompatible. Left `A`
+and right `B → A` merge to `B → A`, not `A → B`. Two forks appending the
+same request once still deduplicate the shared step, preserving both orders.
 
-Focused regression:
-`python -m pytest -q tests/test_studio_world_batch_merge.py`
+The receipt includes `ordering_policy` and `ordered_append_digest` for
+deterministic replay. It does **not** grant write authority, native runtime
+qualification, or release certification. CLI publication and offline editing
+remain separate operator-authorized actions; failures must occur before any
+publication side effect.
 
-The merge CLI also accepts `--editor-directory <private-dir>` to publish the
-existing CSP-hashed offline editor for the merged typed plan. Export from that
-editor and use `--import-plan <export> --baseline-plan <merged-plan>` to
-recompile and execute the edited workflow against current canonical source.
-`--publish <private-dir>` executes and verifies the merged typed plan before
-using the existing no-overwrite, fsynced, private receipt publication path.
-Publication is an operator-requested write, never a merge-side effect.
+## Regression fixtures
 
-The editor and publication paths are opt-in. All execution and source leases
-are checked again on the final plan; the merge receipt itself is not a
-permission token, a gameplay certificate, or a release assertion.
-
-The typed Jeeves router also exposes
-`studio_original_world_batch_merge` through a reviewed static descriptor.
-Its arguments are `schema`, `expected_catalog_digest`, `baseline`,
-`left`, and `right`. It requires out-of-band operator authorization and
-returns a canonical merge plan without executing, writing, or asserting release
-readiness. The existing CLI is the separate explicit execution/publication
-boundary. This adapter is deliberately excluded from the recursive read-only
-world batch tool allowlist to prevent nested workflow execution.
+`tests/test_studio_world_batch_merge.py` covers reversed common-step
+order, compatible right-before-shared order, exact replay digest, CLI
+publication refusal on conflict and typed Jeeves tool refusal on conflict.
+Run the focused tests on the exact branch head, then required exact-head CI.
+No test or release claim is implied merely by committing these fixtures.
