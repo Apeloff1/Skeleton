@@ -143,12 +143,39 @@ def _evidence(result: dict[str, object]) -> dict[str, object]:
             or result.get("native_device_qualified") is not False
             or result.get("package_signed") is not False):
         raise FirstPlayableDeliveryBatchError("canonical delivery evidence missing")
+    # The canonical single-game result is a trust boundary. Never publish a
+    # cohort receipt containing booleans as counts, untyped identities, or
+    # malformed hashes even if an upstream adapter returns them as "success".
+    for key in ("manifest_sha256", "archive_sha256", "save_sha256",
+                "independent_receipt_sha256"):
+        if type(result[key]) is not str or _PIN.fullmatch(result[key]) is None:
+            raise FirstPlayableDeliveryBatchError(
+                "canonical delivery evidence has a noncanonical SHA-256 pin"
+            )
+    for key in ("project_id", "world_digest", "replay_digest"):
+        if type(result[key]) is not str or not result[key]:
+            raise FirstPlayableDeliveryBatchError(
+                "canonical delivery evidence has an invalid identity"
+            )
+    if (type(result["action_count"]) is not int
+            or not 1 <= result["action_count"] <= MAX_ACTIONS):
+        raise FirstPlayableDeliveryBatchError(
+            "canonical delivery evidence has an invalid action count"
+        )
     return {key: result[key] for key in keys}
 
 
 def _record(result: dict[str, object], moves: tuple[str, ...]) -> dict[str, object]:
+    evidence = _evidence(result)
+    if (type(moves) is not tuple
+            or not 1 <= len(moves) <= MAX_ACTIONS
+            or any(type(move) is not str or move not in _ACTIONS for move in moves)
+            or evidence["action_count"] != len(moves)):
+        raise FirstPlayableDeliveryBatchError(
+            "canonical replay count does not match operator player actions"
+        )
     return {
-        **_evidence(result),
+        **evidence,
         "moves_sha256": sha256(_canonical_bytes(list(moves))).hexdigest(),
     }
 

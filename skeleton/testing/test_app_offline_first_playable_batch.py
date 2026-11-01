@@ -515,3 +515,65 @@ def test_cohort_stops_before_second_publication_when_first_receipt_changes(
     assert Path(jobs[0].archive).exists()
     assert not Path(jobs[1].archive).exists()
     assert not summary.exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("manifest_sha256", "F" * 64),
+        ("archive_sha256", "short"),
+        ("save_sha256", 0),
+        ("independent_receipt_sha256", None),
+        ("project_id", ""),
+        ("world_digest", None),
+        ("replay_digest", ""),
+        ("action_count", True),
+        ("action_count", 65),
+    ],
+)
+def test_cohort_record_rejects_untyped_canonical_delivery_contract(
+    field, bad_value,
+):
+    from skeleton.app.offline_first_playable_batch import _record
+
+    result = {
+        "project_id": "original-game",
+        "manifest_sha256": "a" * 64,
+        "archive_sha256": "b" * 64,
+        "save_sha256": "c" * 64,
+        "independent_receipt_sha256": "d" * 64,
+        "world_digest": "world-digest",
+        "replay_digest": "replay-digest",
+        "action_count": 2,
+        "offline_gameplay_reexecuted": True,
+        "release_certified": False,
+        "native_device_qualified": False,
+        "package_signed": False,
+    }
+    result[field] = bad_value
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        _record(result, ("up", "right"))
+
+
+def test_cohort_record_rejects_replay_count_mismatch_and_unsupported_moves():
+    from skeleton.app.offline_first_playable_batch import _record
+
+    result = {
+        "project_id": "original-game",
+        "manifest_sha256": "a" * 64,
+        "archive_sha256": "b" * 64,
+        "save_sha256": "c" * 64,
+        "independent_receipt_sha256": "d" * 64,
+        "world_digest": "world-digest",
+        "replay_digest": "replay-digest",
+        "action_count": 2,
+        "offline_gameplay_reexecuted": True,
+        "release_certified": False,
+        "native_device_qualified": False,
+        "package_signed": False,
+    }
+    assert _record(result, ("up", "right"))["action_count"] == 2
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        _record(result, ("up",))
+    with pytest.raises(FirstPlayableDeliveryBatchError):
+        _record(result, ("up", "teleport"))
