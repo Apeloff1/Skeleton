@@ -1803,3 +1803,63 @@ def execute_guided_walk_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+ENDING_ATLAS_REQUEST_SCHEMA = "skeleton.jeeves.studio_ending_atlas_request.v1"
+ENDING_ATLAS_RESULT_SCHEMA = "skeleton.jeeves.studio_ending_atlas_result.v1"
+
+
+def ending_atlas_tool_schema() -> dict[str, object]:
+    """Typed source-leased comparison of all original narrative endings."""
+    return {
+        "name": "studio_authored_ending_atlas",
+        "description": "Compare replayable original ending routes and external evidence holds",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": ENDING_ATLAS_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_ending_atlas_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves ending atlas requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    allowed = required | {"expected_session_digest"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - allowed
+            or request.get("schema") != ENDING_ATLAS_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves ending atlas request")
+    from skeleton.ai.game_builder.studio_ecosystem_ending_atlas import (
+        build_ending_atlas,
+    )
+    detail = build_ending_atlas(
+        read_blueprint(request["project_id"]), request["actions"],
+        authorized=True,
+        expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request.get("expected_session_digest"),
+    )
+    payload: dict[str, Any] = {
+        "schema": ENDING_ATLAS_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

@@ -126,6 +126,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="Bounded JSON list of distinct authored faction decisions")
     ap.add_argument("--faction-expected-digest",
                     help="Optional exact source SHA-256 for faction replay continuation")
+    ap.add_argument("--ending-atlas", action="store_true",
+                    help="Compare all source-bound authored ending routes and external holds")
+    ap.add_argument("--ending-atlas-expected-source",
+                    help="Required 64-hex canonical source lease for --ending-atlas")
+    ap.add_argument("--ending-atlas-expected-session",
+                    help="Optional exact quest session lease for --ending-atlas")
     ap.add_argument("--ending-plan", action="store_true",
                     help="Replay-verify a deterministic authored quest route toward one ending")
     ap.add_argument("--ending-id", help="Exact authored ending ID for --ending-plan")
@@ -756,6 +762,51 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.faction_decisions is not None or args.faction_expected_digest is not None:
         ap.error("--faction-decisions and --faction-expected-digest require --faction-reputation")
+    if args.ending_atlas:
+        if (not args.project or not args.ending_atlas_expected_source
+                or args.ending_plan or args.play_quest or args.play_walk
+                or args.dialogue_stage or args.author_revision or args.author_npc
+                or args.author_choice or args.merge_revisions or args.revision_lineage
+                or args.cherry_pick_revision or args.revision_impact
+                or args.audit_canon or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.faction_plan or args.faction_reputation
+                or args.search is not None or args.deep_search
+                or args.genre or args.biome or args.output is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None
+                or args.revision_source is not None):
+            ap.error("--ending-atlas requires --project and source lease, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_ending_atlas import (
+            build_ending_atlas,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("ending atlas actions exceed byte budget")
+            def unique_atlas_keys(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate ending atlas JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique_atlas_keys,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite ending atlas action")))
+            result = build_ending_atlas(
+                read_blueprint(args.project), actions, authorized=True,
+                expected_source_digest=args.ending_atlas_expected_source,
+                expected_session_digest=args.ending_atlas_expected_session)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError,
+                RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.ending_atlas_expected_source is not None
+            or args.ending_atlas_expected_session is not None):
+        ap.error("ending atlas leases require --ending-atlas")
     if args.ending_plan:
         if (not args.project or not args.ending_id or args.cherry_pick_revision
                 or args.play_quest
