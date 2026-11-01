@@ -14,6 +14,9 @@ from skeleton.ai.game_builder.studio_world_batch import (
     restore_world_batch_execution, publish_world_batch_execution,
     render_world_batch_html,
 )
+from skeleton.ai.game_builder.studio_world_batch_compare import (
+    compare_world_batch_plans, render_world_batch_comparison_html,
+)
 from skeleton.ai.game_builder.studio_world_batch_editor import (
     publish_world_batch_editor, load_world_batch_editor_export,
 )
@@ -27,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--plan")
     modes.add_argument("--import-plan", type=Path)
     modes.add_argument("--restore", type=Path)
+    modes.add_argument("--compare-plans")
     ap.add_argument("--requests")
     ap.add_argument("--baseline-plan")
     ap.add_argument("--editor-directory", type=Path)
@@ -38,6 +42,27 @@ def main(argv: list[str] | None = None) -> int:
     if args.import_plan and not args.baseline_plan:
         ap.error("editor import requires baseline plan")
     try:
+        if args.compare_plans:
+            if (args.requests or args.baseline_plan or args.publish
+                    or args.editor_directory):
+                ap.error("comparison cannot combine with authoring or publication")
+            record = _strict(args.compare_plans, max_bytes=98304)
+            if type(record) is not dict or set(record) != {"baseline", "candidate"}:
+                raise StudioQuestError("comparison requires baseline and candidate plans")
+            comparison = compare_world_batch_plans(
+                record["baseline"], record["candidate"], authorized=True)
+            if comparison["catalog_digest"] != args.expected_catalog:
+                raise StudioQuestError("stale world batch comparison catalog lease")
+            output: dict[str, object] = {
+                "comparison": comparison, "file_write_performed": False,
+            }
+            if args.html_sha256:
+                output["html_sha256"] = sha256(render_world_batch_comparison_html(
+                    comparison, record["baseline"], record["candidate"],
+                    authorized=True)).hexdigest()
+            print(json.dumps(output, sort_keys=True, separators=(",", ":"),
+                             allow_nan=False))
+            return 0
         if args.restore:
             if args.requests or args.baseline_plan:
                 ap.error("restore cannot combine with authoring")
