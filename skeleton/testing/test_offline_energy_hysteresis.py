@@ -183,11 +183,13 @@ class TestEnergyHysteresis(TestCase):
         gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0))
         healthy = candidate()
         gate.step(healthy, now_ns=10, sampled_ns=10)
-        with self.assertRaisesRegex(HysteresisError, "non-advancing source telemetry"):
-            gate.step(healthy, now_ns=11, sampled_ns=10)
+        replay = gate.step(healthy, now_ns=11, sampled_ns=10)
+        self.assertEqual(replay.reason, "replayed_source_telemetry")
         self.assertEqual(gate.workers, 0)
-        self.assertEqual(gate.healthy_streak, 1)
+        self.assertEqual(gate.healthy_streak, 0)
         gate.step(healthy, now_ns=12, sampled_ns=12)
+        self.assertEqual(gate.workers, 0)
+        gate.step(healthy, now_ns=13, sampled_ns=13)
         self.assertEqual(gate.workers, 1)
 
     def test_checkpoint_contains_source_sample_fence_and_rejects_forged_chronology(self):
@@ -204,3 +206,24 @@ class TestEnergyHysteresis(TestCase):
         malformed["digest"] = fake
         with self.assertRaisesRegex(HysteresisError, "invalid checkpoint chronology"):
             EnergyHysteresis.restart_from_checkpoint(malformed, expected_digest=fake)
+
+
+    def test_repeated_sample_sheds_existing_worker_grant(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0))
+        healthy = candidate()
+        gate.step(healthy, now_ns=10, sampled_ns=10)
+        gate.step(healthy, now_ns=20, sampled_ns=20)
+        self.assertEqual(gate.workers, 1)
+        replay = gate.step(healthy, now_ns=21, sampled_ns=20)
+        self.assertEqual(replay.admitted_workers, 0)
+        self.assertEqual(replay.reason, "replayed_source_telemetry")
+
+    def test_future_observation_denied_without_poisoning_source_sample_clock(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0))
+        future = gate.step(candidate(), now_ns=10, sampled_ns=999)
+        self.assertEqual(future.admitted_workers, 0)
+        self.assertIsNone(gate.last_sampled_ns)
+        gate.step(candidate(), now_ns=11, sampled_ns=11)
+        self.assertEqual(gate.workers, 0)
+        gate.step(candidate(), now_ns=12, sampled_ns=12)
+        self.assertEqual(gate.workers, 1)

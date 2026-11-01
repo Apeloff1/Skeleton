@@ -67,12 +67,14 @@ class EnergyHysteresis:
             raise HysteresisError("source-bound energy admission required")
         if any(type(value) is not int or value < 0 for value in (now_ns, sampled_ns)):
             raise HysteresisError("invalid monotonic timestamp")
-        if (self.last_sampled_ns is not None and sampled_ns <= self.last_sampled_ns):
-            # A source observation is usable at most once for recovery.
-            # A fresh monotonic clock tick cannot turn one sample into
-            # multiple independently confirmed healthy observations.
-            raise HysteresisError("non-advancing source telemetry sample")
-        if sampled_ns > now_ns or now_ns - sampled_ns > self.policy.max_sample_age_ns:
+        # A source observation may not be counted twice as an independently
+        # healthy sample, even when the invocation monotonic clock advances.
+        # Reject replay in the *decision*, shedding any previous worker grant.
+        replayed = self.last_sampled_ns is not None and sampled_ns <= self.last_sampled_ns
+        invalid_clock = sampled_ns > now_ns or now_ns - sampled_ns > self.policy.max_sample_age_ns
+        if replayed:
+            target, reason = 0, "replayed_source_telemetry"
+        elif invalid_clock:
             target, reason = 0, "stale_or_future_telemetry"
         else:
             target = candidate.allowed_workers
@@ -101,7 +103,8 @@ class EnergyHysteresis:
         else:
             self.healthy_streak = 0
         self.last_seen_ns = now_ns
-        self.last_sampled_ns = sampled_ns
+        if not replayed and not invalid_clock:
+            self.last_sampled_ns = sampled_ns
         body = {"schema": SCHEMA, "candidate_digest": candidate.digest,
                 "candidate_workers": target, "admitted_workers": self.workers,
                 "healthy_streak": self.healthy_streak, "reason": reason,
