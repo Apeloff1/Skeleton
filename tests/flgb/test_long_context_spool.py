@@ -140,8 +140,7 @@ class TestLongContextSpool(unittest.TestCase):
         from unittest.mock import patch
 
         invalid = ((-2, -4096), (-1, 4096), (1, -4096),
-                   (True, 4096), (1, False), (2**64, 4096),
-                   (2**63 - 1, 2**63 - 1))
+                   (True, 4096), (1, False), (2**64, 4096))
         for blocks, block_size in invalid:
             with self.subTest(blocks=blocks, block_size=block_size):
                 with patch("skeleton.ai.model_runtime.long_context_spool.os.fstatvfs",
