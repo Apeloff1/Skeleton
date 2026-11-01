@@ -345,7 +345,7 @@ class MultimodalIntake:
             )
         except MediaValidationError as exc:
             raise MultimodalSanitizationError(str(exc)) from exc
-        _verify_declared_media_metadata(raw_metadata, measurement)
+        _verify_declared_media_metadata({} if metadata is None else metadata, measurement)
         verified = VerifiedMultimodalAsset(
             asset_id=candidate.asset_id,
             modality=candidate.modality,

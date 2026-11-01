@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from skeleton.automation.swarm.mesh import Mesh
-from skeleton.automation.agents.mesh import AgentMesh
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from skeleton.automation.agents.mesh import AgentMesh
 from skeleton.automation.swarm.handoff import HandoffRegistry, TaskEnvelope
 
 
