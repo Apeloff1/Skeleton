@@ -99,3 +99,27 @@ original session and cannot be silently reused after choices change.
 The HTML5 geometry game remains independently playable and replay-verified;
 the quest-choice page is a source-bound rehearsal companion, not a claim
 that NPC speech, native timing, rights or consumer release are qualified.
+
+### One-step replay into the playable director compiler
+
+The existing director CLI now also accepts `--choice-export`. Supply the
+**original baseline** `--expected-session`, and a fresh `--schedule` plus
+`--assignments` (or a source/session-matched `--editor-export`). It
+independently verifies the browser export and replaces the action history
+with canonical replay results *before* scheduling, asset binding and HTML5
+compilation. Inline `--actions` cannot be mixed with `--choice-export`.
+
+```bash
+python -m scripts.studio_director_handoff_cli \
+  --project PROJECT --expected-source CANON_DIGEST \
+  --expected-visual VISUAL_DIGEST --expected-session BASELINE_SESSION_DIGEST \
+  --choice-export EXISTING_DIR/studio_choice_rehearsal.json \
+  --schedule SCHEDULE_JSON --assignments ASSIGNMENTS_JSON \
+  --publish-directory EXISTING_PRIVATE_DIR
+```
+
+The new director manifest carries the resulting quest-session digest; a
+stale browser editor export cannot be silently reused for a changed quest
+session. Publication still requires the same exclusive private destination
+and deterministic canonical playable proof. No browser output bypasses
+authorization or grants native/runtime/release evidence.
