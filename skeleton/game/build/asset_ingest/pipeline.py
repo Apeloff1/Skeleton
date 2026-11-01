@@ -131,18 +131,19 @@ def import_files(root: str | Path, paths: Iterable[str]) -> ImportReport:
         report.issues.append(ImportIssue(".", "unsafe", str(exc)))
         return report
     try:
-        seen: set[str] = set()
+        # Consume only a bounded prefix, then sort for deterministic manifests.
+        # Do not materialize an attacker-controlled unbounded path iterator.
+        from itertools import islice
+
+        requested = list(islice(paths, MAX_IMPORT_FILES + 1))
+        if len(requested) > MAX_IMPORT_FILES:
+            report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
+            requested = requested[:MAX_IMPORT_FILES]
         total = 0
-        for relative in paths:
+        for relative in sorted(set(str(item) for item in requested)):
             if not isinstance(relative, str):
                 report.issues.append(ImportIssue(str(relative), "unsafe", "non-text path"))
                 continue
-            if relative in seen:
-                continue
-            seen.add(relative)
-            if len(seen) > MAX_IMPORT_FILES:
-                report.issues.append(ImportIssue(relative, "broken", "file count exceeds bound"))
-                break
             try:
                 parts = _parts(relative)
                 if PurePosixPath(parts[-1]).suffix.lower() not in _EXT:
