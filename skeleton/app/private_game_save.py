@@ -127,7 +127,6 @@ def publish_private_game_save(
     target, fd = _parent(destination)
     temporary = ".private-save-" + secrets.token_hex(16)
     identity: tuple[int, int] | None = None
-    published = False
     try:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         if hasattr(os, "O_CLOEXEC"):
@@ -150,7 +149,6 @@ def publish_private_game_save(
             temporary, target.name, src_dir_fd=fd, dst_dir_fd=fd,
             follow_symlinks=False,
         )
-        published = True
         final = os.stat(target.name, dir_fd=fd, follow_symlinks=False)
         if (not stat.S_ISREG(final.st_mode) or final.st_nlink != 2
                 or (final.st_dev, final.st_ino) != identity
@@ -163,13 +161,12 @@ def publish_private_game_save(
         os.fsync(fd)
         return sha256(data).hexdigest()
     except BaseException as exc:
-        if published and identity is not None:
-            try:
-                final = os.stat(target.name, dir_fd=fd, follow_symlinks=False)
-                if (final.st_dev, final.st_ino) == identity:
-                    os.unlink(target.name, dir_fd=fd)
-            except OSError:
-                pass
+        # The final hardlink is the publication linearization point.
+        # Post-link fsync, verification or cleanup failures mean durability
+        # is uncertain. Never unlink a published name: another process may
+        # already have observed it, or an attacker may have replaced it.
+        # Preserve it for explicit owner-controlled quarantine; retries
+        # must fail the existing-name no-clobber preflight.
         if isinstance(exc, (PrivateGameSaveError, PermissionError)):
             raise
         if isinstance(exc, (DualRuntimeVerificationError, OSError)):
