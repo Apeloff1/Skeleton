@@ -159,6 +159,11 @@ def test_jeeves_router_and_cli(capsys):
     with pytest.raises(PermissionError):
         execute_original_asset_briefs_tool(request, authorized=False)
 
+    with pytest.raises(SystemExit):
+        main(["--project", PROJECT, "--expected-source", source,
+              "--expected-visual", visual, "--actions", "[]",
+              "--bindings", "[]", "--prompt"])
+
 
 def test_offline_editor_export_import(tmp_path, capsys):
     from scripts.studio_original_asset_briefs_cli import main

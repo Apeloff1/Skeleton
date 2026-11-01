@@ -54,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             actions = _strict(args.actions, max_bytes=16384)
             bindings = _strict(args.bindings, max_bytes=262144)
+            if type(actions) is not list or type(bindings) is not dict:
+                raise StudioQuestError("original asset brief inputs must be typed")
             if args.prompt:
                 detail = propose_original_asset_briefs(
                     docs, actions, bindings, PROMPT, authorized=True,
