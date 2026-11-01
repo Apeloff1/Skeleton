@@ -298,5 +298,37 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertEqual(self.spool.load(start, expected_tokenizer_digest=TOKENIZER)[0].cursor, 0)
 
 
+    def test_posix_world_readable_root_is_rejected(self):
+        if os.name != "posix":
+            self.skipTest("POSIX ownership and mode contract")
+        self.spool.close()
+        self.root.chmod(0o755)
+        with self.assertRaisesRegex(LongContextSpoolError, "root permissions"):
+            LongContextSpool(self.root, disk_reserve_bytes=0)
+
+    def test_posix_world_readable_bucket_is_rejected(self):
+        if os.name != "posix":
+            self.skipTest("POSIX ownership and mode contract")
+        start = self.stage()
+        bucket = self.spool._path("checkpoint", start).parent
+        bucket.chmod(0o755)
+        with self.assertRaisesRegex(LongContextSpoolError, "bucket"):
+            self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
+
+    def test_posix_world_readable_object_is_never_accepted(self):
+        if os.name != "posix":
+            self.skipTest("POSIX ownership and mode contract")
+        start = self.stage()
+        checkpoint, _ = self.spool.load(
+            start, expected_tokenizer_digest=TOKENIZER,
+        )
+        path = self.spool._path("object", checkpoint.object_digest)
+        path.chmod(0o644)
+        with self.assertRaisesRegex(LongContextSpoolError, "owner or mode"):
+            self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
+        with self.assertRaisesRegex(LongContextSpoolError, "owner or mode"):
+            self.spool.stage(self.sequence)
+
+
 if __name__ == "__main__":
     unittest.main()

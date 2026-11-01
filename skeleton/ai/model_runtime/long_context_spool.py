@@ -32,6 +32,15 @@ class LongContextSpoolError(TokenizerContractError):
     """A source, custody, disk-budget, or checkpoint contract failed."""
 
 
+def _require_private_spool_file(fd: int) -> None:
+    """Reject files that other local principals can read or replace."""
+    info = os.fstat(fd)
+    if (not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.geteuid()
+            or stat.S_IMODE(info.st_mode) != 0o600):
+        raise LongContextSpoolError("spool object owner or mode is untrusted")
+
+
 def _positive(value: int, name: str, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
         raise LongContextSpoolError(f"invalid {name}")
@@ -183,8 +192,10 @@ class LongContextSpool:
             if os.name == "posix":
                 root_fd = _open_directory_chain(self.root, create=True)
                 try:
-                    mode = os.fstat(root_fd).st_mode
-                    if not stat.S_ISDIR(mode) or mode & 0o022:
+                    info = os.fstat(root_fd)
+                    if (not stat.S_ISDIR(info.st_mode)
+                            or info.st_uid != os.geteuid()
+                            or stat.S_IMODE(info.st_mode) != 0o700):
                         raise LongContextSpoolError("insecure spool root permissions")
                     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
                     for name in ("objects", "checkpoints"):
@@ -194,8 +205,10 @@ class LongContextSpool:
                             pass
                         child_fd = os.open(name, flags, dir_fd=root_fd)
                         try:
-                            child_mode = os.fstat(child_fd).st_mode
-                            if not stat.S_ISDIR(child_mode) or child_mode & 0o022:
+                            info = os.fstat(child_fd)
+                            if (not stat.S_ISDIR(info.st_mode)
+                                    or info.st_uid != os.geteuid()
+                                    or stat.S_IMODE(info.st_mode) != 0o700):
                                 raise LongContextSpoolError("insecure spool component")
                         finally:
                             os.close(child_fd)
@@ -244,14 +257,18 @@ class LongContextSpool:
         try:
             base_fd = os.open(base_name, flags, dir_fd=self._root_fd)
             try:
-                if os.fstat(base_fd).st_mode & 0o022:
+                base_info = os.fstat(base_fd)
+                if (base_info.st_uid != os.geteuid()
+                        or stat.S_IMODE(base_info.st_mode) != 0o700):
                     raise LongContextSpoolError("insecure spool component")
                 try:
                     os.mkdir(digest[:2], 0o700, dir_fd=base_fd)
                 except FileExistsError:
                     pass
                 bucket_fd = os.open(digest[:2], flags, dir_fd=base_fd)
-                if os.fstat(bucket_fd).st_mode & 0o022:
+                bucket_info = os.fstat(bucket_fd)
+                if (bucket_info.st_uid != os.geteuid()
+                        or stat.S_IMODE(bucket_info.st_mode) != 0o700):
                     os.close(bucket_fd)
                     raise LongContextSpoolError("insecure spool bucket")
                 return bucket_fd
@@ -276,8 +293,7 @@ class LongContextSpool:
             flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
             fd = os.open(digest, flags, dir_fd=bucket_fd)
             try:
-                if not stat.S_ISREG(os.fstat(fd).st_mode):
-                    raise LongContextSpoolError("spool object is not a regular file")
+                _require_private_spool_file(fd)
                 with os.fdopen(fd, "rb", closefd=False) as stream:
                     raw = stream.read(limit + 1)
             finally:
@@ -302,8 +318,7 @@ class LongContextSpool:
                 existing = None
             if existing is not None:
                 try:
-                    if not stat.S_ISREG(os.fstat(existing).st_mode):
-                        raise LongContextSpoolError("existing object is not regular")
+                    _require_private_spool_file(existing)
                     with os.fdopen(existing, "rb", closefd=False) as stream:
                         observed = stream.read(len(raw) + 1)
                     if observed != raw:
@@ -336,8 +351,7 @@ class LongContextSpool:
                         getattr(os, "O_NONBLOCK", 0), dir_fd=bucket_fd,
                     )
                     try:
-                        if not stat.S_ISREG(os.fstat(existing).st_mode):
-                            raise LongContextSpoolError("concurrent object not regular")
+                        _require_private_spool_file(existing)
                         with os.fdopen(existing, "rb", closefd=False) as stream:
                             observed = stream.read(len(raw) + 1)
                         if observed != raw:

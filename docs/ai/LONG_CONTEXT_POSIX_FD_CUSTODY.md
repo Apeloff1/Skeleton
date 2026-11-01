@@ -19,3 +19,14 @@ handle-based hardening.
 The spool is not a secure key vault, multi-process lease manager, encrypted
 storage engine or KV-tensor persistence layer. Original source/tokenizer
 identities, bounded size and immutable checkpoint semantics remain intact.
+
+## POSIX private ownership is mandatory
+
+The pinned spool root, objects/checkpoints directories and digest buckets must
+be owned by the effective user with mode 0700. Stored immutable token objects
+and checkpoint files must be owned by that user with mode 0600, including when
+an identical digest already exists or another writer publishes concurrently.
+A world-readable file with matching content is not accepted as safe custody.
+These checks operate on opened file descriptors, not pathname-only checks.
+Windows remains explicitly unqualified for equivalent ACL and ancestor-race
+assurance. This does not authenticate a malicious same-user publisher.
