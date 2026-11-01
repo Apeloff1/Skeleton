@@ -40,8 +40,9 @@ class PrivacyPolicy:
     def __post_init__(self) -> None:
         if not isinstance(self.salt, bytes) or len(self.salt) < 16:
             raise ValueError("salt must be at least 16 bytes")
-        if not 0.0 <= self.sample_rate <= 1.0:
-            raise ValueError("sample_rate must be in [0, 1]")
+        if (type(self.sample_rate) not in (int, float)
+                or not 0.0 <= self.sample_rate <= 1.0):
+            raise ValueError("sample_rate must be a numeric value in [0, 1]")
         if self.opt_out not in ("drop", "anonymise"):
             raise ValueError("opt_out must be 'drop' or 'anonymise'")
 
@@ -144,6 +145,11 @@ class Collector:
             if index >= max_rows:
                 self.counts["rejected"] += 1
                 raise EventCapacityError("analytics batch row budget exhausted")
+            # Reject malformed rows as data, not uncaught unpacking errors;
+            # the admission budget still counts every attempted row.
+            if type(row) not in (tuple, list) or len(row) != 3:
+                self.counts["rejected"] += 1
+                continue
             p, s, ev = row
             try:
                 n += self.ingest(p, s, ev) is not None

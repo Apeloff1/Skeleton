@@ -220,3 +220,19 @@ def test_ingest_many_budgets_even_opted_out_infinite_rows():
     assert not c.events
     with pytest.raises(ValueError, match="batch row budget"):
         c.ingest_many([], max_rows=0)
+
+
+def test_privacy_sample_rate_rejects_boolean_and_nonnumeric_configuration():
+    for bad in (True, False, "0.5", None, float("nan")):
+        with pytest.raises(ValueError, match="sample_rate"):
+            PrivacyPolicy(SALT, sample_rate=bad)
+    assert PrivacyPolicy(SALT, sample_rate=1).sampled("p")
+
+
+def test_ingest_many_rejects_malformed_rows_without_losing_batch_budget():
+    c = collector()
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    rows = [("p1", "s1", event), ("missing", "session"), None,
+            ("p2", "s2", event)]
+    assert c.ingest_many(rows, max_rows=4) == 2
+    assert c.counts["rejected"] == 2 and len(c.events) == 2
