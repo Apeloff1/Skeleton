@@ -27,6 +27,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="Search authored narrative/quest/asset/audio sections as well")
     ap.add_argument("--limit", type=int, default=20,
                     help="Maximum deterministic search results, 1..100")
+    ap.add_argument("--author-npc", action="store_true",
+                    help="Edit original NPC prose and export verified private playable bundle")
+    ap.add_argument("--npc-author-id", help="Immutable original NPC ID to edit")
+    ap.add_argument("--npc-author-name", help="Optional original NPC display name revision")
+    ap.add_argument("--npc-author-knows", help="Optional original NPC knowledge revision")
+    ap.add_argument("--npc-author-relationship", help="Optional NPC relationship revision")
+    ap.add_argument("--npc-author-expected-digest",
+                    help="Required optimistic source SHA-256 for NPC authoring")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
     ap.add_argument("--dialogue-route-scene",
@@ -289,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("NPC itinerary requires --dialogue-stage")
     if args.dialogue_stage:
         if (not args.project or args.faction_plan or args.faction_reputation
-                or args.ending_plan or args.author_revision or args.cherry_pick_revision
+                or args.ending_plan or args.author_revision or args.author_npc or args.cherry_pick_revision
                 or args.merge_revisions or args.revision_impact or args.revision_lineage
                 or args.audit_canon or args.play_walk or args.play_quest
                 or args.compile_preview or args.materialize_batch
@@ -916,6 +924,50 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.revision_compare_source is not None:
         ap.error("--revision-compare-source requires --revision-impact")
+    if args.author_npc:
+        if (not args.project or not args.npc_author_id
+                or not args.npc_author_expected_digest or args.output is None
+                or args.author_revision or args.dialogue_stage
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.limit != 20 or args.max_artifact_bytes is not None
+                or args.revision_request is not None or args.quest_actions is not None):
+            ap.error("--author-npc requires --project, NPC ID, source digest and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_npc_persona_author import (
+            preview_npc_persona_revision,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        changes = {key: value for key, value in (
+            ("name", args.npc_author_name),
+            ("knows", args.npc_author_knows),
+            ("relationship", args.npc_author_relationship),
+        ) if value is not None}
+        try:
+            source = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None
+                      else read_blueprint(args.project))
+            revised, html, receipt, detail = preview_npc_persona_revision(
+                source, npc_id=args.npc_author_id, changes=changes,
+                expected_source_digest=args.npc_author_expected_digest,
+                authorized=True)
+            write_revision_bundle(args.output, revised, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"author": detail, "receipt": receipt,
+                          "output": str(args.output)},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.npc_author_id is not None or args.npc_author_name is not None
+            or args.npc_author_knows is not None
+            or args.npc_author_relationship is not None
+            or args.npc_author_expected_digest is not None):
+        ap.error("NPC persona edit arguments require --author-npc")
     if args.author_revision:
         if (not args.project or args.revision_request is None or args.output is None
                 or args.audit_canon or args.play_walk or args.play_quest

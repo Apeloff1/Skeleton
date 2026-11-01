@@ -1616,3 +1616,66 @@ def execute_npc_continuity_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+NPC_AUTHOR_REQUEST_SCHEMA = "skeleton.jeeves.studio_npc_author_request.v1"
+NPC_AUTHOR_RESULT_SCHEMA = "skeleton.jeeves.studio_npc_author_result.v1"
+
+
+def npc_author_tool_schema() -> dict[str, object]:
+    """Typed NPC prose authoring through the existing verified revision compiler."""
+    return {
+        "name": "studio_npc_persona_author",
+        "description": "Preview an original NPC prose edit and source-bound playable HTML",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": NPC_AUTHOR_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "npc_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "changes": {"type": "object", "minProperties": 1, "maxProperties": 3,
+                            "additionalProperties": False,
+                            "properties": {
+                                "name": {"type": "string", "minLength": 1, "maxLength": 512},
+                                "knows": {"type": "string", "minLength": 1, "maxLength": 512},
+                                "relationship": {"type": "string", "minLength": 1, "maxLength": 512},
+                            }},
+            },
+            "required": ["schema", "project_id", "npc_id",
+                         "expected_source_digest", "changes"],
+        },
+    }
+
+
+def execute_npc_author_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    """No filesystem write: operator chooses private persistence separately."""
+    if authorized is not True:
+        raise PermissionError("Jeeves NPC authoring requires operator authorization")
+    required = {"schema", "project_id", "npc_id",
+                "expected_source_digest", "changes"}
+    if (type(request) is not dict or set(request) != required
+            or request.get("schema") != NPC_AUTHOR_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 8192):
+        raise StudioQuestError("invalid typed Jeeves NPC authoring request")
+    from skeleton.ai.game_builder.studio_ecosystem_npc_persona_author import (
+        preview_npc_persona_revision,
+    )
+    _, _, _, detail = preview_npc_persona_revision(
+        read_blueprint(request["project_id"]),
+        npc_id=request["npc_id"], changes=request["changes"],
+        expected_source_digest=request["expected_source_digest"],
+        authorized=True)
+    payload: dict[str, Any] = {
+        "schema": NPC_AUTHOR_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

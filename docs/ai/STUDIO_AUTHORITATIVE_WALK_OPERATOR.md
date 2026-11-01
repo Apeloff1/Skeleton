@@ -774,3 +774,31 @@ dialogue preview/commit flow. This proof does not certify spoken dialogue,
 native gameplay, external events or consumer release. Run canonical
 `tests/test_studio_ecosystem_npc_continuity.py`, architecture gates and
 exact-head CI before promoting a PR.
+
+## Original NPC persona authoring, private persistence and playable export
+
+`--author-npc` is an operator-friendly authoring entrypoint for a registered
+original cast member. It maps an immutable NPC ID to existing, allowlisted
+`cast.support` prose paths (`name`, `knows`, `relationship`), then delegates
+all source validation, canon checks and HTML compilation to
+`preview_canon_revision`. NPC IDs, roles, faction membership, stage IDs,
+quest prerequisites and source ownership cannot be changed through this mode.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --author-npc --npc-author-id <original-npc-id> \
+  --npc-author-knows "The eastern quay holds a sealed archive passage." \
+  --npc-author-expected-digest <canonical-source-sha256> \
+  --output ./private-original-npc-revision
+```
+
+The new output directory is exclusive, private and contains `source.json`,
+`story.html` and `receipt.json`. The existing secure revision bundle
+writer rejects pre-existing directories and linked paths, writes with
+private permissions and verifies source/HTML/receipt identity. Use
+`--revision-source` to reopen a verified earlier bundle for another edit.
+The typed Jeeves `execute_npc_author_tool` exposes the same preview and
+receipt without performing any filesystem write; operator authorization is
+out-of-band. A source digest lease is mandatory and mismatched sources fail
+closed. This is a real editable authored HTML story handoff, not a claim of
+native engine rendering, original-content legal certification, or release.
