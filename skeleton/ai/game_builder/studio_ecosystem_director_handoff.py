@@ -130,7 +130,7 @@ def compile_director_handoff(
         files["audio_captions.html"] = audio_preview
         files["audio_editor.html"] = audio_editor
     if knowledge_plan is not None:
-        files["npc_knowledge.json"] = _canonical(knowledge_plan) + b"\\n"
+        files["npc_knowledge.json"] = _canonical(knowledge_plan) + b"\n"
         files["npc_knowledge.html"] = knowledge_html
     manifest: dict[str, object] = {
         "schema": SCHEMA, "project_id": timing["project_id"],
