@@ -16,6 +16,7 @@ from skeleton.app.offline_mixed_game_library_continuity_handoff import (
 from skeleton.testing.test_app_offline_mixed_game_library_continuity import (
     catalog, _advance,
 )
+from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX private custody")
 
