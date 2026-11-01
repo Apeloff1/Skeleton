@@ -241,7 +241,7 @@ def test_symlinked_membership_component_denied(tmp_path, monkeypatch):
 def test_invalid_membership_from_proc_is_not_trusted(tmp_path, monkeypatch):
     # The fixture is a real regular file, not /dev/null (a character device).
     bad = tmp_path / "cgroup"
-    bad.write_bytes(b"0::/../escape\\n")
+    bad.write_bytes(b"0::/../escape\n")
     original_open = module.os.open
 
     def fake_open(path, flags, *args, **kwargs):
@@ -256,7 +256,7 @@ def test_invalid_membership_from_proc_is_not_trusted(tmp_path, monkeypatch):
 
 def test_duplicate_unified_membership_is_denied(tmp_path, monkeypatch):
     bad = tmp_path / "cgroup"
-    bad.write_bytes(b"0::/one\\n0::/two\\n")
+    bad.write_bytes(b"0::/one\n0::/two\n")
     original_open = module.os.open
 
     def fake_open(path, flags, *args, **kwargs):
