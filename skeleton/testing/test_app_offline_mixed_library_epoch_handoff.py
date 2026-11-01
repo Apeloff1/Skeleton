@@ -129,3 +129,113 @@ def test_cli_rejects_missing_inspection_pin(capsys):
         "--trusted-local-operator",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_real_epoch_handoff_post_link_failure_is_recoverable(
+    catalog, tmp_path, monkeypatch,
+):
+    """An observable published receipt is never silently removed on EIO."""
+    import errno
+    import stat
+    from hashlib import sha256
+
+    from skeleton.ai.game_builder import offline_receipt_publication as publication
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    from skeleton.app.offline_mixed_library_epoch_chain import (
+        assure_mixed_library_epoch_chain,
+    )
+    from skeleton.app.offline_mixed_library_epoch_handoff import _envelope
+
+    unsigned, signed = catalog
+    u1 = _advance(unsigned, tmp_path / "uncertain-handoff-u1.json")
+    epochs = (_epoch(unsigned, signed), _epoch(u1, signed))
+    target = tmp_path / "uncertain-epoch-handoff.json"
+
+    # Compute the expected pin from a separately replayed source chain,
+    # not by trusting bytes discovered in the failed publication destination.
+    chain = assure_mixed_library_epoch_chain(epochs, authorized=True)
+    expected = sha256(_canonical_bytes(_envelope(chain))).hexdigest()
+    original_fsync = os.fsync
+    failures = 0
+
+    def fail_first_parent_fsync(fd):
+        nonlocal failures
+        if stat.S_ISDIR(os.fstat(fd).st_mode) and failures == 0:
+            failures += 1
+            raise OSError(errno.EIO, "simulated post-link durability uncertainty")
+        return original_fsync(fd)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(publication.os, "fsync", fail_first_parent_fsync)
+        with pytest.raises(publication.ReceiptPublicationError):
+            publish_mixed_library_epoch_handoff(epochs, target, authorized=True)
+
+    assert failures == 1
+    assert target.exists()
+    assert sha256(target.read_bytes()).hexdigest() == expected
+    assert target.stat().st_mode & 0o077 == 0
+    assert not list(tmp_path.glob(".receipt-*"))
+    # The independent verifier must reexecute the actual original game
+    # histories and signer policies, not merely accept the saved JSON.
+    verified = inspect_mixed_library_epoch_handoff(
+        epochs, target, expected_receipt_sha256=expected, authorized=True,
+    )
+    assert verified["receipt_integrity_verified"] is True
+    assert verified["all_transitions_reexecuted"] is True
+    assert verified["release_certified"] is False
+    with pytest.raises(ValueError):
+        publish_mixed_library_epoch_handoff(epochs, target, authorized=True)
+    assert sha256(target.read_bytes()).hexdigest() == expected
+
+
+def test_real_epoch_handoff_recovery_rejects_modified_game_after_uncertainty(
+    catalog, tmp_path, monkeypatch,
+):
+    """A published but uncertain receipt never grants authority after rollback."""
+    import errno
+    import stat
+    from hashlib import sha256
+
+    from skeleton.ai.game_builder import offline_receipt_publication as publication
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    from skeleton.app.offline_mixed_library_epoch_chain import (
+        assure_mixed_library_epoch_chain,
+    )
+    from skeleton.app.offline_mixed_library_epoch_handoff import _envelope
+
+    unsigned, signed = catalog
+    u1 = _advance(unsigned, tmp_path / "rollback-handoff-u1.json")
+    epochs = (_epoch(unsigned, signed), _epoch(u1, signed))
+    target = tmp_path / "rollback-handoff.json"
+    expected = sha256(_canonical_bytes(_envelope(
+        assure_mixed_library_epoch_chain(epochs, authorized=True),
+    ))).hexdigest()
+    original_fsync = os.fsync
+    failures = 0
+
+    def fail_parent_once(fd):
+        nonlocal failures
+        if stat.S_ISDIR(os.fstat(fd).st_mode) and failures == 0:
+            failures += 1
+            raise OSError(errno.EIO, "simulated post-publication EIO")
+        return original_fsync(fd)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(publication.os, "fsync", fail_parent_once)
+        with pytest.raises(publication.ReceiptPublicationError):
+            publish_mixed_library_epoch_handoff(epochs, target, authorized=True)
+    assert failures == 1
+    assert target.exists()
+
+    # Replacing the latest save with the old independently valid save is a
+    # rollback even though the receipt file itself remains unmodified.
+    reverted = (
+        epochs[0],
+        _epoch(unsigned, signed),
+    )
+    with pytest.raises(ValueError):
+        inspect_mixed_library_epoch_handoff(
+            reverted, target, expected_receipt_sha256=expected, authorized=True,
+        )
+    assert target.exists()
+    assert sha256(target.read_bytes()).hexdigest() == expected
