@@ -79,6 +79,7 @@ Commands:
     quest-expedition-route  Find replayable NPC crafting and combat ending routes
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
+    game-vertical-accept  Replay-verify complete playable quests and crafting games
     quest-campaign-author  Edit and preview replay-verified chapter campaigns
     quest-campaign-play  Interactively play and resume earned chapter campaigns\n    quest-campaign-route  Solve and replay authored multi-chapter campaign completion\n    game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
@@ -791,6 +792,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-campaign-route":
         from skeleton.game.gameplay.quest_chapter_campaign_route import cli as campaign_route_cli
         return campaign_route_cli(rest)
+    if cmd == "game-vertical-accept":
+        from skeleton.game.gameplay.game_vertical_acceptance import cli as vertical_accept_cli
+        return vertical_accept_cli(rest)
     if cmd == "quest-campaign":
         from skeleton.game.gameplay.quest_chapter_campaign import cli as campaign_cli
         return campaign_cli(rest)
