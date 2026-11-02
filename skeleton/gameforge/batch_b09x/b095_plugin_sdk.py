@@ -125,7 +125,7 @@ class Host:
 def conformance(
     host: Host, name: str, cases: list[tuple[dict, Callable[[Any], bool]]]
 ) -> dict[str, Any]:
-    require(type(cases) is list and len(cases) <= 128,
+    require(type(cases) is list and 1 <= len(cases) <= 128,
             "plugin conformance cases exceed bound")
     require(type(name) is str and name in host.plugins,
             "unknown conformance plugin")
@@ -133,10 +133,13 @@ def conformance(
                 and type(case[0]) is dict and callable(case[1])
                 for case in cases),
             "invalid plugin conformance case")
+    # Admission is atomic with respect to plugin dispatch: a malformed later
+    # case must not execute any earlier plugin call or certify an empty suite.
+    snapshots = [json.loads(_bounded_json(case[0])) for case in cases]
     m, _ = host.plugins[name]
     method = KINDS[m.kind][0]
     results = []
-    for payload, check in cases:
+    for (_, check), payload in zip(cases, snapshots):
         a = host.call(name, method, payload)
         b = host.call(name, method, payload)
         results.append(bool(check(a)) and _bounded_json(a) == _bounded_json(b))

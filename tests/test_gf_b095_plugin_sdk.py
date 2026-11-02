@@ -127,3 +127,28 @@ def test_conformance_validates_all_cases_before_any_plugin_dispatch():
     with pytest.raises(m.ContractError, match="invalid plugin conformance case"):
         m.conformance(host, "safe", [({}, lambda output: True), ({}, None)])
     assert plugin.calls == 0
+
+
+def test_conformance_refuses_empty_or_late_invalid_cases_without_dispatch():
+    class CountingPlugin:
+        calls = 0
+
+        def export(self, payload):
+            self.calls += 1
+            return payload
+
+    plugin = CountingPlugin()
+    host = m.Host(frozenset())
+    host.register(m.Manifest("bounded", "exporter", (1, 0), ()), plugin)
+    with pytest.raises(m.ContractError, match="conformance cases"):
+        m.conformance(host, "bounded", [])
+    with pytest.raises(m.ContractError, match="not canonical"):
+        m.conformance(host, "bounded", [
+            ({"n": 1}, lambda output: True),
+            ({"n": object()}, lambda output: True),
+        ])
+    assert plugin.calls == 0
+    assert m.conformance(host, "bounded", [({"n": 1}, lambda output: output["n"] == 1)])[
+        "passed"
+    ] is True
+    assert plugin.calls == 2
