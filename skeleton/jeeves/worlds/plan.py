@@ -35,6 +35,14 @@ def _sources(fd: int, store: WorldStore, world_id: str):
     return world, assets, timeline
 
 
+def _tid(prefix: str, source_id: str) -> str:
+    """Stable bounded task identifier, even for maximal valid source IDs."""
+    raw = prefix + source_id
+    if len(raw) <= 48:
+        return raw
+    return prefix + source_id[:16] + "_" + sha256(source_id.encode()).hexdigest()[:12]
+
+
 def _task(task_id: str, kind: str, source_id: str, dependencies: list[str],
           description: str) -> dict[str, Any]:
     return {"id": task_id, "kind": kind, "source_id": source_id,
@@ -118,29 +126,29 @@ def validate_plan(plan: Any, world: Any, assets: Any, timeline: Any) -> dict[str
 def propose_plan_unreviewed(world: Any, assets: Any, timeline: Any) -> list[dict[str, Any]]:
     """Deterministic inventory helper that never recursively calls validation."""
     tasks: list[dict[str, Any]] = []
-    scene_tasks = {s["id"]: "scene_" + s["id"] for s in world["scenes"]}
+    scene_tasks = {s["id"]: _tid("scene_", s["id"]) for s in world["scenes"]}
     for scene in sorted(world["scenes"], key=lambda x: x["id"]):
         tasks.append(_task(scene_tasks[scene["id"]], "scene_canon", scene["id"], [],
                            "Review authored scene continuity: " + scene["title"]))
     for choice in sorted(world["choices"], key=lambda x: x["id"]):
-        tasks.append(_task("choice_" + choice["id"], "choice_consequence",
+        tasks.append(_task(_tid("choice_", choice["id"]), "choice_consequence",
                            choice["id"], [scene_tasks[choice["from"]],
                                           scene_tasks[choice["to"]]],
                            "Verify earned choice consequences: " + choice["label"]))
     for ending in sorted(world["endings"], key=lambda x: x["scene"]):
-        incoming = ["choice_" + e["id"] for e in world["choices"]
+        incoming = [_tid("choice_", e["id"]) for e in world["choices"]
                     if e["to"] == ending["scene"]]
-        tasks.append(_task("ending_" + ending["scene"], "ending_witness",
+        tasks.append(_task(_tid("ending_", ending["scene"]), "ending_witness",
                            ending["scene"], [scene_tasks[ending["scene"]], *incoming],
                            "Verify reachable ending: " + ending["label"]))
     for asset in sorted(assets["assets"], key=lambda x: x["id"]):
-        tasks.append(_task("asset_" + asset["id"], "asset_rights",
+        tasks.append(_task(_tid("asset_", asset["id"]), "asset_rights",
                            asset["id"], [scene_tasks[asset["scene"]]],
                            "Review original asset descriptor: " + asset["description"][:200]))
     for event in sorted(timeline["events"], key=lambda x: x["id"]):
-        tasks.append(_task("event_" + event["id"], "temporal_event",
+        tasks.append(_task(_tid("event_", event["id"]), "temporal_event",
                            event["id"], [scene_tasks[event["scene"]]] +
-                           ["event_" + d for d in event["depends_on"]],
+                           [_tid("event_", d) for d in event["depends_on"]],
                            "Review temporal event: " + event["description"][:200]))
     tasks.append(_task("playable_compile", "playable_handoff", world["id"],
                        [t["id"] for t in tasks],

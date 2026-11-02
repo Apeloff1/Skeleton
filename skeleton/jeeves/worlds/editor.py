@@ -109,9 +109,10 @@ class WorldEditorStore:
             try:
                 os.close(lock_fd)
                 world = strict_json(self.worlds._read(fd, world_id + ".json"))
+                proof = prove(world)
                 if world["id"] != world_id:
                     raise CanonError("identity_mismatch")
-                if prove(world).source_digest != expected_digest:
+                if proof.source_digest != expected_digest:
                     raise CanonError("stale_source")
                 output = render_editor_html(world).encode("utf-8")
                 name = world_id + ".editor.html"
