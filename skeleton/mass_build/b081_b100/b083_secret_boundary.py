@@ -18,6 +18,7 @@ PATTERNS = (
 MAX_TTL_S = 3600
 MAX_ARTIFACTS = 256
 MAX_ARTIFACT_CHARS = 1_000_000
+MAX_TOTAL_ARTIFACT_CHARS = 4_000_000
 MAX_CREDENTIALS = 256
 MAX_AUDIT_EVENTS = 10_000
 MAX_AUDIT_TIMESTAMP = 1_000_000_000_000
@@ -86,6 +87,12 @@ def evaluate(artifacts: dict[str, str], creds: list[Credential]):
     require(all(type(path) is str and 1 <= len(path) <= 512
                 and _safe_diagnostic(path) for path in artifacts),
             "artifact path exceeds bound")
+    require(all(type(value) is str and len(value) <= MAX_ARTIFACT_CHARS
+                for value in artifacts.values()),
+            "artifact content exceeds per-file bound")
+    require(sum(len(value) for value in artifacts.values())
+            <= MAX_TOTAL_ARTIFACT_CHARS,
+            "aggregate artifact content exceeds bound")
     findings = []
     for path in sorted(artifacts):
         for h in scan(artifacts[path]):
