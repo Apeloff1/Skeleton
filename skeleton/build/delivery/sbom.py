@@ -10,6 +10,7 @@ from skeleton.build.delivery._util import DeliveryError, canonical_json, require
 
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 ECOSYSTEMS = frozenset({"pypi", "npm", "cargo", "generic"})
+MAX_SBOM_COMPONENTS = 8192
 
 
 @dataclass(frozen=True)
@@ -52,9 +53,15 @@ def parse_requirements(text: str) -> tuple[Component, ...]:
     """Parse pinned ``name==version`` lines; unpinned requirements are rejected."""
     out: list[Component] = []
     for lineno, raw in enumerate(text.splitlines(), 1):
+        if lineno > MAX_SBOM_COMPONENTS:
+            raise DeliveryError("requirements component count exceeds bound")
         line = raw.split("#", 1)[0].strip()
-        if not line or line.startswith("-"):
+        if not line:
             continue
+        # -r, -e, index overrides and direct URLs can pull dependencies not
+        # represented by the generated SBOM; never silently omit them.
+        if line.startswith("-"):
+            raise DeliveryError(f"line {lineno}: unsupported requirements directive")
         line = line.split(";", 1)[0].strip()
         if "==" not in line:
             raise DeliveryError(f"line {lineno}: requirement must be pinned with ==")
@@ -68,10 +75,14 @@ def parse_package_lock(data: Mapping[str, Any]) -> tuple[Component, ...]:
     packages = data.get("packages")
     if not isinstance(packages, Mapping):
         raise DeliveryError("package-lock must contain a packages object")
+    if len(packages) > MAX_SBOM_COMPONENTS:
+        raise DeliveryError("package-lock component count exceeds bound")
     out = []
     for key, meta in packages.items():
-        if not key or not isinstance(meta, Mapping) or "version" not in meta:
-            continue
+        if key == "":
+            continue  # root package is the SBOM subject, not a dependency
+        if not isinstance(key, str) or not isinstance(meta, Mapping) or "version" not in meta:
+            raise DeliveryError("package-lock dependency lacks version evidence")
         name = key.rsplit("node_modules/", 1)[-1]
         safe = name.replace("@", "").replace("/", ".")
         out.append(Component(safe, str(meta["version"]), "npm", str(meta.get("license", "NOASSERTION"))))
@@ -79,7 +90,14 @@ def parse_package_lock(data: Mapping[str, Any]) -> tuple[Component, ...]:
 
 
 def build_sbom(subject: str, version: str, components: Iterable[Component]) -> dict[str, Any]:
-    items = sorted({(c.purl, c) for c in components}, key=lambda pair: pair[0])
+    from itertools import islice
+
+    bounded = list(islice(components, MAX_SBOM_COMPONENTS + 1))
+    if len(bounded) > MAX_SBOM_COMPONENTS:
+        raise DeliveryError("SBOM component count exceeds bound")
+    if any(not isinstance(c, Component) for c in bounded):
+        raise DeliveryError("SBOM requires validated components")
+    items = sorted({(c.purl, c) for c in bounded}, key=lambda pair: pair[0])
     purls = [p for p, _ in items]
     if len(purls) != len(set(purls)):
         raise DeliveryError("duplicate components")
