@@ -562,3 +562,24 @@ def test_descriptor_import_rejects_unbounded_external_references_transactionally
         assert not report.imported
         assert any("external reference count exceeds bound" in issue.detail
                    for issue in report.issues)
+
+def test_directory_unsafe_scan_discards_partial_manifest(tmp_path):
+    """A rejected filename cannot leave other scanned assets publishable."""
+    (tmp_path / "a.png").write_bytes(png())
+    (tmp_path / "bad\nname.png").write_bytes(png(8, 4))
+    report = import_directory(tmp_path)
+    assert not report.ok
+    assert report.imported == [] and report.duplicates == []
+    assert report.manifest.entries == []
+    assert any(issue.code == "unsafe" for issue in report.issues)
+
+
+def test_directory_missing_sidecar_discards_partial_manifest(tmp_path):
+    """Unresolved external source evidence invalidates the directory snapshot."""
+    (tmp_path / "a.png").write_bytes(png())
+    (tmp_path / "mesh.obj").write_bytes(OBJ)
+    report = import_directory(tmp_path)
+    assert not report.ok
+    assert report.imported == [] and report.duplicates == []
+    assert report.manifest.entries == []
+    assert any(issue.code == "missing_reference" for issue in report.issues)

@@ -325,4 +325,12 @@ def import_directory(root: str | Path) -> ImportReport:
     finally:
         os.close(root_fd)
     report.issues.extend(issues)
+    # A hostile tree scan, changed scanned inode, or missing/rewritten sidecar
+    # invalidates the entire directory snapshot. Never expose earlier assets
+    # from that snapshot as a plausible partial import transaction.
+    if issues or any(
+        issue.code == "missing_reference" or "changed" in issue.detail
+        for issue in report.issues
+    ):
+        return ImportReport(AssetManifest(), issues=report.issues)
     return report
