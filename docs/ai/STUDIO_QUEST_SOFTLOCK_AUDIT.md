@@ -30,3 +30,13 @@ pruned without losing a possible later softlock.
 No native gameplay, audio, hardware, rights, release or physical-world
 verification is claimed. Source digest leases and replay checks detect
 accidental/hostile alteration; they are not cryptographic author signatures.
+
+## Offline HTML editing
+
+Pass `--render-editor <existing-private-directory>` with a compiled audit to
+publish a CSP-hashed, network-disabled HTML editor. It exports a JSON envelope
+containing exact baseline/source/session leases and a typed authoring plan.
+Pass `--editor-export-file <private-json> --baseline-audit-file <private-json>`
+to import it; the baseline must be the original canonical audit receipt.
+Import is never authority: the CLI recompiles the edited plan against the
+current source and exact initial-session digest before publication or handoff.

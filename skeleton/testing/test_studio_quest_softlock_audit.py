@@ -149,3 +149,58 @@ def test_private_publication_and_restore(tmp_path: Path):
         restore_quest_softlock_audit(
             d, tmp_path, authorized=True,
             expected_source_digest=kwargs(d)["expected_source_digest"])
+
+
+def test_editor_roundtrip_and_tamper_rejection(tmp_path: Path):
+    from skeleton.ai.game_builder.studio_quest_softlock_editor import (
+        EXPORT_SCHEMA, render_quest_softlock_editor,
+        publish_quest_softlock_editor, load_quest_softlock_editor_export,
+    )
+    d = docs()
+    baseline = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    html = render_quest_softlock_editor(d, baseline, authorized=True)
+    assert b"Content-Security-Policy" in html
+    assert b"sha256-" in html
+    assert b"unsafe-inline" not in html
+    assert b"Export typed plan" in html
+    publication = publish_quest_softlock_editor(
+        d, baseline, tmp_path, authorized=True)
+    assert publication["file_write_performed"] is True
+    export = tmp_path / "export.json"
+    envelope = {
+        "schema": EXPORT_SCHEMA, "baseline_digest": baseline["audit_digest"],
+        "source_digest": baseline["source_digest"],
+        "initial_session_digest": baseline["initial_session_digest"],
+        "authoring": plan([["opening", "rescue"]]),
+    }
+    export.write_text(json.dumps(envelope))
+    export.chmod(0o600)
+    edited = load_quest_softlock_editor_export(
+        d, baseline, export, **kwargs(d))
+    result = compile_quest_softlock_audit(
+        d, edited, **kwargs(d, [["opening", "rescue"]]))
+    assert result["status"] == "no_softlock_in_exhaustive_search"
+    envelope["baseline_digest"] = "0" * 64
+    export.write_text(json.dumps(envelope))
+    with pytest.raises(StudioQuestError):
+        load_quest_softlock_editor_export(d, baseline, export, **kwargs(d))
+    envelope["baseline_digest"] = baseline["audit_digest"]
+    export.write_text('{"schema":"x","schema":"y"}')
+    with pytest.raises(StudioQuestError):
+        load_quest_softlock_editor_export(d, baseline, export, **kwargs(d))
+
+
+def test_editor_symlink_export_rejected(tmp_path: Path):
+    from skeleton.ai.game_builder.studio_quest_softlock_editor import (
+        load_quest_softlock_editor_export,
+    )
+    d = docs()
+    baseline = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    target = tmp_path / "real.json"
+    target.write_text("{}")
+    target.chmod(0o600)
+    link = tmp_path / "link.json"
+    link.symlink_to(target)
+    with pytest.raises((OSError, StudioQuestError)):
+        load_quest_softlock_editor_export(
+            d, baseline, link, **kwargs(d))
