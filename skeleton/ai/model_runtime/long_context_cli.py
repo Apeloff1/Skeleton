@@ -16,6 +16,7 @@ from .long_context_telemetry_fusion import LongContextTelemetryFusion
 from .long_context_pressure_latch import LongContextPressureLatch
 from .long_context_live_plan import LongContextLivePlanner
 from .long_context_memory_envelope import observe_memory_envelope
+from .long_context_platform_fallback import LongContextPlatformFallback, PlatformFallbackRequest
 from .long_context_kv_compatibility import KvLayout, KvWindowRequest, LongContextKvCompatibility
 from .tokenization import deserialize_token_sequence
 
@@ -101,6 +102,12 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("head-observe-latched", help="One-shot recovery diagnostic; no grant")
     memory = commands.add_parser("head-observe-memory", help="Read-only bounded RAM/cgroup envelope; no grant")
     memory.add_argument("--request-bytes", type=int, default=0)
+    fallback = commands.add_parser("head-platform-fallback", help="CPU-only fallback observation; no grant")
+    fallback.add_argument("--principal", required=True)
+    fallback.add_argument("--stream-id", required=True)
+    fallback.add_argument("--requested-device", choices=("cpu", "gpu", "m_chip"), required=True)
+    fallback.add_argument("--max-tokens", type=int, required=True)
+    fallback.add_argument("--request-bytes", type=int, required=True)
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
     live_plan = commands.add_parser("head-plan-live", help="Fair proposal bound to live telemetry; no grant")
     for argument in (live_plan,):
@@ -123,6 +130,19 @@ def main(argv: list[str] | None = None) -> int:
     # Host observation never needs to open, create, or authorize a spool.
     # This keeps unsupported platforms conservatively observable rather
     # than mistaking POSIX spool unavailability for normal pressure.
+    if args.command == "head-platform-fallback":
+        try:
+            request = PlatformFallbackRequest(args.principal, args.stream_id,
+                args.requested_device, args.max_tokens, args.request_bytes)
+            monitor = LongContextPlatformFallback()
+            try:
+                result = monitor.sample(request)
+            finally:
+                monitor.close()
+        except (LongContextSpoolError, OSError, ValueError) as exc:
+            parser.exit(2, f"long-context-fallback: {exc}\n")
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
     if args.command in ("head-observe", "head-observe-cgroup", "head-observe-events", "head-observe-fused", "head-observe-latched", "head-observe-memory"):
         if args.command == "head-observe-memory":
             result = observe_memory_envelope(requested_bytes=args.request_bytes)

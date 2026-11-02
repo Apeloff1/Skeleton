@@ -11,6 +11,9 @@ from importlib import import_module
 # Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
     "LongContextSpool": ".long_context_spool",
+    "PlatformFallbackRequest": ".long_context_platform_fallback",
+    "PlatformFallbackPolicy": ".long_context_platform_fallback",
+    "LongContextPlatformFallback": ".long_context_platform_fallback",
     "CgroupEventMonitor": ".long_context_cgroup_events",
     "LongContextTelemetryFusion": ".long_context_telemetry_fusion",
     "observe_memory_envelope": ".long_context_memory_envelope",
@@ -262,6 +265,8 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".long_context_live_plan", __name__)
     if module_name == ".long_context_fairness":
         return import_module(".long_context_fairness", __name__)
+    if module_name == ".long_context_platform_fallback":
+        return import_module(".long_context_platform_fallback", __name__)
     if module_name == ".long_context_spool":
         return import_module(".long_context_spool", __name__)
     if module_name == ".iteration_scheduler":
@@ -321,6 +326,9 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "PlatformFallbackRequest",
+    "PlatformFallbackPolicy",
+    "LongContextPlatformFallback",
     "CpuCapacityLimits",
     "CpuCapacityRequest",
     "LongContextCpuCapacityGuard",
