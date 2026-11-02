@@ -27,6 +27,7 @@ def test_original_market_acceptance_full_vertical():
     assert result["ledger_credits_spent"] == 2
     assert len(result["ledger_checksum"]) == 64
     assert len(result["ledger_portable_checksum"]) == 64
+    assert len(result["checkpoint_reconciliation_checksum"]) == 64
     assert result["interactive_checkpoints"] >= 1
     assert len(result["portable_checksum"]) == 64
     assert len(result["editor_receipt_checksum"]) == 64

@@ -21,6 +21,7 @@ from skeleton.game.gameplay.scene_market import (
 from skeleton.game.gameplay.scene_market_ledger import (
     audit_market_ledger, export_market_ledger, import_market_ledger,
 )
+from skeleton.game.gameplay.scene_market_reconciliation import reconcile_market
 from skeleton.game.gameplay.scene_market_author import (
     edit_market, verify_market_edit,
 )
@@ -53,6 +54,10 @@ def audit_market(source: Any, actions: Any, *,
     split = len(actions) // 2
     partial = simulate_market(spec, actions[:split])
     resumed = resume_market(partial, actions[split:])
+    reconciliation = reconcile_market(partial, complete)
+    if (reconciliation["actions_applied"] != len(actions) - split
+            or reconciliation["to_state_digest"] != complete["state_digest"]):
+        raise SceneTravelError("market checkpoint reconciliation differs")
     if complete != resumed or verify_market(complete) != complete:
         raise SceneTravelError("market checkpoint replay differs from full play")
     bundle = export_market(complete)
@@ -136,6 +141,7 @@ def audit_market(source: Any, actions: Any, *,
         "delivered": complete["state"]["delivered"],
         "reputation": complete["state"]["reputation"],
         "checkpoint_state_digest": partial["state_digest"],
+        "checkpoint_reconciliation_checksum": reconciliation["checksum"],
         "portable_checksum": bundle["checksum"],
         "interactive_terminal_digest": terminal[0]["state_digest"],
         "interactive_checkpoints": len(checkpoints),
