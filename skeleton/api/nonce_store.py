@@ -97,6 +97,9 @@ class InMemoryNonceStore:
         self._clock = clock
         self._metrics = metrics
         self._entries: dict[tuple[str, str], float] = {}
+        # Cached earliest live expiry avoids O(max_entries) work for every
+        # attacker-triggered full-store rejection under a saturated TTL.
+        self._earliest_expiry: float | None = None
         self._lock = threading.Lock()
         self.nonce_store_full = 0
         self.reclaimed = 0
@@ -123,10 +126,13 @@ class InMemoryNonceStore:
             }
 
     def _purge(self, now: float) -> None:
+        if self._earliest_expiry is None or self._earliest_expiry >= now:
+            return
         dead = [k for k, exp in self._entries.items() if exp < now]
         for k in dead:
             del self._entries[k]
         self.reclaimed += len(dead)
+        self._earliest_expiry = min(self._entries.values(), default=None)
 
     def _full(self, scope: str, now: float) -> NonceStoreFull:
         self.nonce_store_full += 1
@@ -135,7 +141,7 @@ class InMemoryNonceStore:
                 self._metrics.increment(FULL_METRIC, 1.0, {"scope": scope})
             except Exception:  # noqa: BLE001, S110
                 pass  # metrics must never turn a rejection into an accept
-        soonest = min(self._entries.values(), default=now)
+        soonest = self._earliest_expiry if self._earliest_expiry is not None else now
         return NonceStoreFull(math.ceil(max(0.0, soonest - now)) or 1)
 
     def check_and_record(self, scope: str, nonce: str, ts: float, ttl_s: float) -> bool:
@@ -165,4 +171,11 @@ class InMemoryNonceStore:
                 if len(self._entries) >= self._max:
                     raise self._full(scope, now)
             self._entries[key] = expires_at
+            if exp is not None and exp == self._earliest_expiry:
+                # Replacing the oldest expired nonce may move the minimum.
+                # This scan occurs on an accepted overwrite, never on each
+                # full-store rejection.
+                self._earliest_expiry = min(self._entries.values(), default=None)
+            elif self._earliest_expiry is None or expires_at < self._earliest_expiry:
+                self._earliest_expiry = expires_at
             return True

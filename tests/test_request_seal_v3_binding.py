@@ -467,3 +467,38 @@ def test_nonce_store_length_snapshot_uses_same_lock_as_replay_updates():
     assert store.check_and_record("seal", "nonce", NOW, 60)
     assert len(store) == 1
     assert lock.entered >= 3
+
+
+def test_nonce_full_store_rejections_do_not_rescan_live_entries():
+    """Saturation cannot amplify each denied request into a full map scan."""
+    st = InMemoryNonceStore(max_entries=2, clock=lambda: 0.0)
+    assert st.check_and_record("seal", "a", 0, 100)
+    assert st.check_and_record("seal", "b", 0, 200)
+
+    class NoEnumeration(dict):
+        def items(self):
+            raise AssertionError("full live store must not be scanned")
+
+        def values(self):
+            raise AssertionError("full live store must not be scanned")
+
+    st._entries = NoEnumeration(st._entries)
+    for _ in range(3):
+        with pytest.raises(NonceStoreFull) as err:
+            st.check_and_record("seal", "attacker", 0, 100)
+        assert err.value.retry_after_s == 100
+    assert st.check_and_record("seal", "a", 0, 100) is False
+    assert len(st) == 2
+
+
+def test_nonce_overwriting_earliest_expired_key_recomputes_retry_hint():
+    now = [0.0]
+    st = InMemoryNonceStore(max_entries=2, clock=lambda: now[0])
+    assert st.check_and_record("seal", "early", 0, 5)
+    assert st.check_and_record("seal", "later", 0, 100)
+    now[0] = 6.0
+    assert st.check_and_record("seal", "early", 6, 200)
+    with pytest.raises(NonceStoreFull) as err:
+        st.check_and_record("seal", "new", 6, 200)
+    assert err.value.retry_after_s == 94
+    assert st.check_and_record("seal", "later", 6, 100) is False
