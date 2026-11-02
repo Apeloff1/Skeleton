@@ -21,7 +21,8 @@ from .studio_ecosystem_scene_schedule import (
     _canonical, _digest, _open_directory, _write_all,
 )
 from .studio_quest_consequence_diff import (
-    compile_quest_consequence_handoff, replay_quest_consequence_diff,
+    compile_quest_consequence_diff, compile_quest_consequence_handoff,
+    replay_quest_consequence_diff,
 )
 
 SCHEMA = "skeleton.game_builder.studio_quest_causal_trace.v1"
@@ -271,7 +272,7 @@ def publish_quest_causal_trace(
 
 
 def restore_quest_causal_trace(
-    documents: Mapping[str, Any], consequence_receipt: object,
+    documents: Mapping[str, Any], consequence_receipt: object | None,
     directory: Path, *, authorized: bool,
 ) -> dict[str, Any]:
     if authorized is not True:
@@ -314,5 +315,19 @@ def restore_quest_causal_trace(
                 StudioQuestError("nonfinite causal trace JSON")))
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise StudioQuestError("invalid causal trace JSON") from exc
+    if (type(parsed) is not dict or type(parsed.get("baseline")) is not dict
+            or type(parsed.get("candidate")) is not dict):
+        raise StudioQuestError("invalid causal trace bundle shape")
+    if consequence_receipt is None:
+        # Rebuild the canonical consequence receipt from the single durable
+        # causal bundle. Never trust its embedded session or release flags.
+        consequence_receipt = compile_quest_consequence_diff(
+            documents, {
+                "baseline_actions": parsed["baseline"].get("actions"),
+                "candidate_actions": parsed["candidate"].get("actions"),
+            }, authorized=True,
+            expected_source_digest=parsed.get("source_digest"),
+            expected_initial_session_digest=parsed.get("initial_session_digest"),
+        )
     return replay_quest_causal_trace(
         documents, consequence_receipt, parsed, authorized=True)

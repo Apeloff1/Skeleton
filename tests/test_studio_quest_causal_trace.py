@@ -200,3 +200,35 @@ def test_jeeves_adapter_and_router_registration(monkeypatch):
     with pytest.raises(StudioQuestError):
         tool.execute_quest_causal_trace_tool(
             dict(request, unexpected=True), authorized=True)
+
+
+def test_single_receipt_restores_without_second_consequence_file(tmp_path):
+    docs = source()
+    diff, trace = receipts(docs)
+    publish_quest_causal_trace(
+        docs, diff, trace, tmp_path, authorized=True)
+    assert [p.name for p in tmp_path.iterdir()] == [FILENAME]
+    assert restore_quest_causal_trace(
+        docs, None, tmp_path, authorized=True) == trace
+
+
+def test_cli_private_publish_then_self_contained_restore(tmp_path, monkeypatch, capsys):
+    from scripts import studio_quest_causal_trace_cli as cli
+    docs = source()
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: docs)
+    authored = tmp_path / "authoring.json"
+    authored.write_text(json.dumps(fork()))
+    os.chmod(authored, 0o600)
+    flags = [
+        "--project", "original",
+        "--expected-source", leases(docs)["expected_source_digest"],
+        "--expected-session", leases(docs)["expected_initial_session_digest"],
+    ]
+    assert cli.main(flags + ["--authoring-file", str(authored),
+                             "--publish", str(tmp_path)]) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["publication"]["file"] == FILENAME
+    assert cli.main(flags + ["--restore", str(tmp_path)]) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert second["trace"] == first["trace"]
+    assert second["file_write_performed"] is False

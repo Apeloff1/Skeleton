@@ -41,25 +41,28 @@ def main(argv: list[str] | None = None) -> int:
             "authorized": True, "expected_source_digest": args.expected_source,
             "expected_initial_session_digest": args.expected_session,
         }
-        if args.prompt:
-            consequence = propose_quest_consequence_diff(docs, PROMPT, **options)
-        else:
-            if args.restore:
-                authoring = _private_json(args.restore / "studio_quest_consequence_diff.json",
-                                          256 * 1024)
-                if authoring.get("source_digest") != args.expected_source or (
-                    authoring.get("initial_session_digest") != args.expected_session
-                ):
-                    raise StudioQuestError("stale causal restore source/session")
-                authoring = authoring["authoring"]
-            else:
-                authoring = _private_json(args.authoring_file, 32768)
-            consequence = compile_quest_consequence_diff(docs, authoring, **options)
         if args.restore:
             trace = restore_quest_causal_trace(
-                docs, consequence, args.restore, authorized=True)
+                docs, None, args.restore, authorized=True)
+            if (trace["source_digest"] != args.expected_source
+                    or trace["initial_session_digest"] != args.expected_session):
+                raise StudioQuestError("stale causal restore source/session")
+            authoring = {
+                "baseline_actions": trace["baseline"]["actions"],
+                "candidate_actions": trace["candidate"]["actions"],
+            }
+            consequence = compile_quest_consequence_diff(
+                docs, authoring, **options)
         else:
-            trace = compile_quest_causal_trace(docs, consequence, authorized=True)
+            if args.prompt:
+                consequence = propose_quest_consequence_diff(
+                    docs, PROMPT, **options)
+            else:
+                authoring = _private_json(args.authoring_file, 32768)
+                consequence = compile_quest_consequence_diff(
+                    docs, authoring, **options)
+            trace = compile_quest_causal_trace(
+                docs, consequence, authorized=True)
         replay_quest_causal_trace(docs, consequence, trace, authorized=True)
         if args.html_preview:
             print(render_quest_causal_html(
