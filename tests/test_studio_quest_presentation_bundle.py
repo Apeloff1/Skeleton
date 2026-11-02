@@ -105,3 +105,73 @@ def test_cli_requires_private_receipts_and_exact_leases(tmp_path, capsys):
         main(args + ["--handoff"])
     with pytest.raises(SystemExit):
         main(args[:-1] + ["0" * 64])
+
+
+def test_complete_reviewed_eligible_quest_produces_verified_playable_bundle():
+    """A minimal original quest proves the successful end-user handoff path."""
+    docs = {
+        "quest": {
+            "project_id": "original_copper_garden",
+            "release_certified": False,
+            "stages": [{
+                "id": "plant_seed", "alternatives": ["plant", "wait"],
+                "reward": "garden_bloom",
+                "choice_effects": {
+                    "plant": ["choice:plant_seed:grew_garden"],
+                    "wait": ["choice:plant_seed:rested"],
+                },
+            }],
+        },
+        "narrative": {
+            "project_id": "original_copper_garden",
+            "release_certified": False,
+            "endings": [{
+                "id": "garden_restored",
+                "requires": ["choice:plant_seed:grew_garden"],
+            }],
+        },
+    }
+    program = compile_quest_program(docs)
+    initial = start_quest(docs, authorized=True)
+    leases = {
+        "authorized": True,
+        "expected_source_digest": program.source_digest,
+        "expected_initial_session_digest": initial.digest,
+    }
+    actions = [["plant_seed", "plant"]]
+    locale_plan = propose_quest_localization(
+        docs, LOCALE_PROMPT, "nb-NO", actions, "garden_restored", **leases)
+    for row in locale_plan["rows"]:
+        row["reviewed"] = True
+        if row["source"] == "plant":
+            row["translation"] = "plante"
+    achievement_plan = propose_quest_achievements(
+        docs, AWARD_PROMPT, actions, target_ending="garden_restored", **leases)
+    achievement_plan["achievements"][0]["required_choice"] = "plant"
+    achievement_plan["achievements"][0]["required_effect"] = (
+        "choice:plant_seed:grew_garden")
+    locale = compile_quest_localization(docs, locale_plan, **leases)
+    awards = compile_quest_achievements(docs, achievement_plan, **leases)
+    bundle = compile_quest_presentation_bundle(
+        docs, locale, awards, authorized=True)
+    assert bundle["playable_handoff_allowed"] is True
+    handoff = compile_quest_presentation_handoff(
+        docs, locale, awards, authorized=True)
+    assert handoff["canonical_choices"] == actions
+    assert handoff["target_ending"] == "garden_restored"
+    assert handoff["unlocked_achievements"][0]["id"] == "stage_1"
+    assert handoff["sandbox_points"] == 10
+    assert any(row["display"] == "plante" and row["source"] == "plant"
+               for row in handoff["localized_display_rows"])
+    assert handoff["native_gameplay_verified"] is False
+    assert handoff["release_certified"] is False
+    html = render_quest_presentation_preview_html(
+        docs, locale, awards, authorized=True)
+    assert b"plante" in html
+    assert b"Handoff allowed: yes" in html
+    assert b"<script" not in html
+    tampered = copy.deepcopy(locale)
+    tampered["authoring"]["rows"][0]["translation"] = "forged"
+    with pytest.raises(StudioQuestError):
+        compile_quest_presentation_handoff(
+            docs, tampered, awards, authorized=True)
