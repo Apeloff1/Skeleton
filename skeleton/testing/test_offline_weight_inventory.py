@@ -75,7 +75,14 @@ def test_symlinked_store_directory_rejected(tmp_path: Path) -> None:
 
 def test_inventory_fails_closed_when_entry_budget_exhausted(tmp_path: Path) -> None:
     _, store = _stage(tmp_path)
+    _stage(tmp_path, payload=b"distinct offline weights")
     with pytest.raises(OfflineInventoryError, match="entry budget"):
+        inventory_offline_weights(store, max_entries=1)
+
+
+def test_inventory_rejects_invalid_entry_limit(tmp_path: Path) -> None:
+    _, store = _stage(tmp_path)
+    with pytest.raises(OfflineInventoryError, match="entry limit"):
         inventory_offline_weights(store, max_entries=0)
 
 
