@@ -39,3 +39,14 @@ Focused tests: python -m pytest
 skeleton/testing/test_jeeves_world_lore.py -q
 
 Required exact-head repository security and CI gates remain mandatory.
+
+## Offline browser editing
+
+Use world-lore editor --world-id marsh --expected-digest SHA to publish
+an offline CSP-hash-protected HTML editor. Select a fact, revise its subject
+or statement, and export a typed replace operation as JSON. Review the
+operation and pass it to world-lore edit --operation-json with the exact
+source digest. The CLI validates the complete canon graph, revokes approval
+and persists only under an optimistic lease. The browser itself has no
+filesystem write, network or model authority. Verify the published editor
+using world-lore verify-editor --world-id marsh; tampering fails closed.

@@ -230,3 +230,34 @@ def test_symlinked_lore_source_refused(tmp_path):
     leaf.symlink_to(tmp_path / "outside.json")
     with pytest.raises((CanonError, OSError)):
         store.read("marsh")
+
+
+def test_lore_browser_editor_escapes_authored_html():
+    from skeleton.jeeves.worlds.lore_editor import render_lore_editor
+    source = world()
+    data = lore(source)
+    data["facts"][0]["statement"] = "</script><img src=x onerror=alert(1)>"
+    page = render_lore_editor(source, data).decode("utf-8")
+    assert "</script><img" not in page
+    assert "\\u003c/script>" in page
+    assert "connect-src 'none'" in page
+    assert "script-src 'sha256-" in page
+    assert "role='status'" in page
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored POSIX custody")
+def test_lore_editor_cli_publish_verify_and_tamper(tmp_path, capsys):
+    root = tmp_path / "private"
+    WorldStore(root).publish(world(), create=True)
+    store = LoreStore(root)
+    revision = store.publish("marsh", lore(), create=True)
+    args = ["--store", str(root)]
+    assert run(args + ["editor", "--world-id", "marsh",
+                       "--expected-digest", revision]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["editor"]["lore_digest"] == revision
+    assert run(args + ["verify-editor", "--world-id", "marsh"]) == 0
+    assert json.loads(capsys.readouterr().out)["ok"] is True
+    (root / "marsh.lore.editor.html").write_text("tampered")
+    assert run(args + ["verify-editor", "--world-id", "marsh"]) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "lore_editor_artifact_mismatch"

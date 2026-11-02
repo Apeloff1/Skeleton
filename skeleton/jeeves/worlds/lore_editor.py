@@ -9,7 +9,7 @@ from typing import Any
 
 from .bundle import _artifact_read
 from .lore import LoreStore, validate_lore
-from .world_canon import CanonError, _id, canonical, digest, strict_json
+from .world_canon import CanonError, _id, canonical, digest
 
 EDITOR_SCHEMA = "jeeves.world.lore_editor.v1"
 

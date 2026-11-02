@@ -8,6 +8,7 @@ import sys
 from .lore import (
     LoreStore, approve_lore, edit_lore, propose_lore, reveal_lore,
 )
+from .lore_editor import LoreEditorStore
 from .session import SessionStore
 from .world_canon import CanonError, WorldStore, digest, strict_json
 
@@ -21,10 +22,11 @@ def run(argv: list[str]) -> int:
     proposal.add_argument("--prompt", required=True)
     proposal.add_argument("--subject", required=True)
     proposal.add_argument("--statement", required=True)
-    for action in ("inspect", "edit", "approve", "compile", "verify", "reveal"):
+    for action in ("inspect", "edit", "approve", "compile", "verify", "reveal",
+                   "editor", "verify-editor"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
-        if action in ("edit", "approve", "compile"):
+        if action in ("edit", "approve", "compile", "editor"):
             cmd.add_argument("--expected-digest", required=True)
         if action == "edit":
             cmd.add_argument("--operation-json", required=True)
@@ -35,7 +37,13 @@ def run(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     try:
         store = LoreStore(args.store)
-        if args.action == "verify":
+        if args.action == "verify-editor":
+            result = {"ok": True, "editor": LoreEditorStore(args.store).verify(
+                args.world_id)}
+        elif args.action == "editor":
+            result = {"ok": True, "editor": LoreEditorStore(args.store).render(
+                args.world_id, args.expected_digest)}
+        elif args.action == "verify":
             result = {"ok": True, "receipt": store.verify(args.world_id)}
         elif args.action == "compile":
             result = {"ok": True, "receipt": store.compile(
