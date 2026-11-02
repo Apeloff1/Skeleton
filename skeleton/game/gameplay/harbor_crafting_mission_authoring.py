@@ -134,7 +134,11 @@ def verify_mission_revision(revision: Any) -> dict[str, Any]:
     if revision["source_digest"] != digest(revision["source"]):
         raise HarborError("mission revision source digest mismatch")
     preview = revision["preview"]
-    preview_bundle = None if preview is None else preview["bundle"]
+    if preview is not None and not isinstance(preview, dict):
+        raise HarborError("invalid mission preview")
+    preview_bundle = None if preview is None else preview.get("bundle")
+    if preview is not None and preview_bundle is None:
+        raise HarborError("missing mission preview bundle")
     recreated = author_mission_revision(
         revision["parent"], revision["source"], revision["operations"],
         expected_board_digest=revision["parent_digest"],

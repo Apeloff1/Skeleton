@@ -35,3 +35,29 @@ python -m scripts.game.harbor_crafting solve-missions --choice signal --require-
 These portable JSON digests provide tamper evidence and replay consistency,
 not authenticated authorship or a signed distribution. No network, dynamic
 execution, paid assets, device qualification or release claim is involved.
+
+## Authored mission revisions and branching acceptance
+
+`author-missions --missions BOARD --source WORLD --mission-edits EDITS
+--expected-board-digest DIGEST` applies bounded, allowlisted optimistic edits
+to the authored mission board. An optional `--preview-bundle BUNDLE`
+generates a real replay-derived quest preview. The portable revision records
+the source, original board, operations, resulting board and verified preview.
+`verify-mission-author --mission-revision REVISION` replays the edit from
+its original source, rejecting stale leases, reordered prerequisites,
+duplicate edit targets, forged previews and altered final boards.
+
+`mission-checkpoint --bundle SAVE --tick N` reconstructs an actual historical
+gameplay checkpoint and derives the quest journal for that prefix.
+`mission-resume --bundle SAVE --actions ACTIONS
+--expected-terminal-digest DIGEST` uses the existing CAS-protected save
+continuation and then derives the complete new quest journal. Both can use
+`--require-all` to reject unearned completion.
+
+`mission-portfolio --bundle PORTFOLIO` accepts a canonical verified game
+branch portfolio, independently verifies every branch's save and derives
+separate mission completion and earned points for each ending.
+`verify-mission-portfolio --report REPORT` reconstructs all source,
+branch and mission results. A shelter ending cannot claim signal-only
+dispatch points. A scorecard is a deterministic gameplay consequence,
+not an authenticated leaderboard or financial reward.

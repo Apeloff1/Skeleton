@@ -13,6 +13,7 @@ from .harbor_crafting_authoring import author_revision, verify_revision
 from .harbor_crafting_planner import solve, verify_plan
 from .harbor_crafting_missions import mission_report, verify_mission_report, solve_missions
 from .harbor_crafting_mission_authoring import author_mission_revision, verify_mission_revision
+from .harbor_crafting_mission_branches import mission_branch_report, verify_mission_branch_report
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -41,7 +42,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -64,7 +65,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify-mission-author":
+        if args.command == "verify-mission-portfolio":
+            output = {"verified": True, "branches": verify_mission_branch_report(
+                _required_json(args.report, "report"))}
+        elif args.command == "mission-portfolio":
+            output = mission_branch_report(
+                _required_json(args.bundle, "bundle"), decode(_read(args.missions)))
+        elif args.command == "mission-checkpoint":
+            if args.tick is None:
+                raise HarborError("--tick is required for mission-checkpoint")
+            output = mission_report(
+                checkpoint(_required_json(args.bundle, "bundle"), args.tick),
+                decode(_read(args.missions)), require_all=args.require_all)
+        elif args.command == "mission-resume":
+            if not args.expected_terminal_digest:
+                raise HarborError("--expected-terminal-digest is required for mission-resume")
+            resumed = resume_bundle(
+                _required_json(args.bundle, "bundle"),
+                _required_json(args.actions, "actions"),
+                expected_terminal_digest=args.expected_terminal_digest,
+            )
+            output = mission_report(resumed, decode(_read(args.missions)), require_all=args.require_all)
+        elif args.command == "verify-mission-author":
             output = {"verified": True, "board": verify_mission_revision(
                 _required_json(args.mission_revision, "mission-revision"))}
         elif args.command == "author-missions":

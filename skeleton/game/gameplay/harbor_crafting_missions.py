@@ -60,9 +60,9 @@ def validate_board(board: Any, source: Any) -> dict[str, Any]:
         requires = mission["requires"]
         if not isinstance(requires, list) or len(requires) > MAX_MISSIONS:
             raise HarborError("invalid mission prerequisites")
-        if len(set(requires)) != len(requires) or any(
-            type(req) is not str or req not in known for req in requires
-        ):
+        if any(type(req) is not str for req in requires):
+            raise HarborError("invalid mission prerequisite type")
+        if len(set(requires)) != len(requires) or any(req not in known for req in requires):
             raise HarborError("mission prerequisites must precede their mission")
         _integer(mission["points"], 1, 100, "mission points")
         _integer(mission["deadline"], 1, world["max_ticks"], "mission deadline")
@@ -222,7 +222,7 @@ def verify_mission_report(report: Any, *, require_all: bool = False) -> dict[str
         raise HarborError("mission report digest mismatch")
     if report["board_digest"] != digest(report["board"]):
         raise HarborError("mission board digest mismatch")
-    if report["source_digest"] != report["bundle"]["source_digest"]:
+    if not isinstance(report["bundle"], dict) or report["source_digest"] != report["bundle"].get("source_digest"):
         raise HarborError("mission source digest mismatch")
     replayed = mission_report(report["bundle"], report["board"], require_all=require_all)
     if replayed != report:
