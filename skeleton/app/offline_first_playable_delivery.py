@@ -236,6 +236,17 @@ def publish_first_playable_delivery(
         authorized=True,
     )
     archive_pin = published["independent_archive_sha256"]
+    # ZIP publication is irreversible and can take time. A source swap during
+    # that step must stop BEFORE the fresh installer writes another artifact.
+    # Keep the published ZIP for explicit quarantine; never pathname rollback.
+    if (original_source_identity != _source_identity(source)
+            or source_verified != verify_exported_package(
+                source, expected_manifest_sha256=expected_manifest_sha256,
+                authorized=True,
+            )):
+        raise FirstPlayableDeliveryAcceptanceError(
+            "original source changed during archive publication; install blocked"
+        )
     admitted = preflight_offline_game_install(
         archive, install, expected_archive_sha256=archive_pin,
         expected_manifest_sha256=expected_manifest_sha256, authorized=True,

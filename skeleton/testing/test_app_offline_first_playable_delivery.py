@@ -369,3 +369,38 @@ def test_identical_byte_source_root_swap_during_preflight_fails_before_write(
     assert calls == swap_on
     assert all(not item.exists() for item in (archive, install, save, receipt))
     assert old.is_dir() and source.is_dir()
+
+
+def test_archive_publication_source_swap_blocks_install_and_preserves_zip(
+    original_source, tmp_path, monkeypatch,
+):
+    """A published archive stays quarantined; no new install follows a swap."""
+    import shutil
+    from skeleton.app import offline_first_playable_delivery as module
+
+    source = tmp_path / "original-copy"
+    replacement = tmp_path / "replacement"
+    shutil.copytree(original_source[0], source)
+    shutil.copytree(original_source[0], replacement)
+    archive, install, save, receipt = _destinations(tmp_path)
+    original_publisher = module.publish_offline_game_archive
+
+    def replace_after_archive(*args, **kwargs):
+        published = original_publisher(*args, **kwargs)
+        source.rename(tmp_path / "old-source")
+        replacement.rename(source)
+        return published
+
+    monkeypatch.setattr(
+        module, "publish_offline_game_archive", replace_after_archive,
+    )
+    with pytest.raises(
+        FirstPlayableDeliveryAcceptanceError, match="install blocked",
+    ):
+        publish_first_playable_delivery(
+            source, archive, install, save, receipt,
+            expected_manifest_sha256=original_source[1],
+            moves=("up",), authorized=True,
+        )
+    assert archive.is_file()
+    assert all(not item.exists() for item in (install, save, receipt))
