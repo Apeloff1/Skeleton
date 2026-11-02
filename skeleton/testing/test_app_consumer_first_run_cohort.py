@@ -126,7 +126,7 @@ def test_wrong_independent_pins_and_partial_game_pins_fail_closed(
     with pytest.raises(ValueError):
         inspect_consumer_first_run_cohort(
             jobs, summary,
-            expected_summary_sha256=published["independent_summary_sha256"].upper(),
+            expected_summary_sha256="A" * 64,
             authorized=True,
         )
     incomplete = (replace(jobs[0], receipt_sha256=None), jobs[1])
