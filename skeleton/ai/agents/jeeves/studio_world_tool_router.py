@@ -22,6 +22,7 @@ from skeleton.ai.agents.jeeves import studio_npc_knowledge_exchange_tool as exch
 from skeleton.ai.agents.jeeves import studio_npc_knowledge_relay_tool as relay
 from skeleton.ai.agents.jeeves import studio_npc_relay_impact_tool as relay_impact
 from skeleton.ai.agents.jeeves import studio_npc_dialogue_knowledge_gate_tool as knowledge_gate
+from skeleton.ai.agents.jeeves import studio_quest_causal_trace_tool as causal_trace
 from skeleton.ai.agents.jeeves import studio_npc_continuity_tool as continuity
 from skeleton.ai.agents.jeeves import studio_npc_continuity_merge_tool as continuity_merge
 from skeleton.ai.agents.jeeves import studio_world_batch_tool as batch
@@ -123,6 +124,7 @@ _TOOL_SYMBOLS = (
     ("npc_knowledge_relay_tool_schema", "execute_npc_knowledge_relay_tool"),
     ("npc_relay_impact_tool_schema", "execute_npc_relay_impact_tool"),
     ("npc_dialogue_knowledge_gate_tool_schema", "execute_npc_dialogue_knowledge_gate_tool"),
+    ("quest_causal_trace_tool_schema", "execute_quest_causal_trace_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -169,6 +171,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    relay if descriptor_name == "npc_knowledge_relay_tool_schema" else
                    relay_impact if descriptor_name == "npc_relay_impact_tool_schema" else
                    knowledge_gate if descriptor_name == "npc_dialogue_knowledge_gate_tool_schema" else
+                   causal_trace if descriptor_name == "quest_causal_trace_tool_schema" else
                    continuity if descriptor_name == "npc_continuity_tool_schema" else
                    continuity_merge if descriptor_name == "npc_continuity_merge_tool_schema" else
                    batch if descriptor_name == "world_batch_tool_schema" else
