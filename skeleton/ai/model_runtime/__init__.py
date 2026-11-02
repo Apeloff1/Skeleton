@@ -14,6 +14,9 @@ _LAZY_EXPORTS = {
     "CgroupEventMonitor": ".long_context_cgroup_events",
     "LongContextTelemetryFusion": ".long_context_telemetry_fusion",
     "observe_memory_envelope": ".long_context_memory_envelope",
+    "MemoryBudgetRequest": ".long_context_memory_budget",
+    "MemoryBudgetLimits": ".long_context_memory_budget",
+    "LongContextMemoryBudgetGuard": ".long_context_memory_budget",
     "LongContextPressureLatch": ".long_context_pressure_latch",
     "CpuCapacityLimits": ".long_context_cpu_guard",
     "CpuCapacityRequest": ".long_context_cpu_guard",
@@ -238,6 +241,8 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".long_context_cgroup", __name__)
     if module_name == ".long_context_cgroup_events":
         return import_module(".long_context_cgroup_events", __name__)
+    if module_name == ".long_context_memory_budget":
+        return import_module(".long_context_memory_budget", __name__)
     if module_name == ".long_context_memory_envelope":
         return import_module(".long_context_memory_envelope", __name__)
     if module_name == ".long_context_telemetry_fusion":
