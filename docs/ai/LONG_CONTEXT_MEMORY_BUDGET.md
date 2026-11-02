@@ -1,26 +1,29 @@
-# Cooperative Linux RAM budget guard
+# Atomic cooperative memory fair cycles (Studio C)
 
-`LongContextMemoryBudgetGuard` composes the read-only two-sample memory
-envelope with an independently trusted principal verifier. This is a
-**process-local reservation ledger**, not an allocator, backend authorization,
-device certification, cross-process lock, or inference lease.
+The `LongContextMemoryBudgetGuard.reserve_fair_cycle` operation reserves
+multiple distinct streams atomically **within one process**. Requests are
+validated as a bounded tuple (1–64), ordered deterministically by stream,
+verified against the caller-supplied principal verifier, and checked against
+aggregate and per-principal RAM limits before any reservation is published.
+The observer must return a structurally consistent, explicitly non-authorizing
+RAM/cgroup envelope; unknown telemetry revokes all outstanding reservations.
 
-States: absent → reserved → claimed → released, expired or revoked. The
-guard uses strict request types, a non-reentrant lock, a monotonic TTL,
-fork rejection, per-principal and global byte limits, and cryptographically
-random reservation identifiers. Each claim checks authorization again,
-reobserves headroom for **all outstanding bytes**, and rejects stale or
-forged non-authorizing telemetry. Sensor failures revoke the local ledger;
-restart never recovers reservations as active. No principal identities or
-raw model tokens are emitted in status.
+Every reservation carries an independent random identity, a bounded monotonic
+expiry, and a SHA-256 stream identifier in the receipt (no stream names, tokens,
+model weights, or prompts). Entropy errors, duplicate IDs, slow telemetry,
+clock regressions, quota exhaustion, duplicate streams, and closed/forked
+instances fail closed without partially publishing a fair cycle. The guard
+revalidates memory and principal identity when each reservation is claimed.
 
-The execution backend must still enforce authorization, CPU capacity,
-GPU/Metal device policy, tokenizer/KV compatibility, durable disk quota,
-thermal and energy pressure, and actual memory allocation. Kernel
-headroom can change immediately after observation. The guard cannot
-prevent another process from allocating RAM.
+A fair cycle is **not** a model-execution grant, hardware qualification,
+cross-process memory allocation, GPU/VRAM lease, durable reservation, or proof
+that RAM remained free after observation. Backend execution must separately
+validate model/tokenizer/KV identity, current pressure, actual allocations,
+and cross-process constraints. Restart and fork invalidate all local claims.
 
-Focused tests:
-`python -m unittest tests.flgb.test_long_context_memory_budget`
-and `python -m unittest tests.flgb.test_long_context_memory_envelope`.
-Exact-head CI and device qualification remain held.
+The close/reserve/claim/release/status paths now check the closed flag under
+the same mutex as publication. A fork PID check happens before waiting on a
+potentially inherited lock. Focused regression coverage includes fair-cycle
+atomicity, identity collision, slow observer, forged telemetry, expiry, and
+close-vs-observer concurrency. Exact-head CI and device qualification remain
+required before release.

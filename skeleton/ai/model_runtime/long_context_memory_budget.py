@@ -7,6 +7,7 @@ Every claim re-observes kernel memory; restart/fork loses all reservations.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import os
 from secrets import token_hex
 from threading import Lock
@@ -184,11 +185,86 @@ class LongContextMemoryBudgetGuard:
             "requires_live_backend_revalidation": True,
         }
 
+    def reserve_fair_cycle(
+        self, requests: tuple[MemoryBudgetRequest, ...],
+    ) -> dict[str, object]:
+        """Atomically reserve one bounded RAM quantum for each distinct stream.
+
+        This is cooperative process-local accounting, never backend admission.
+        No partial publication is permitted on failed identity, telemetry,
+        clock, quota, nonce generation, or collision checks. Concurrent callers
+        serialize through the same guard lock as single-stream reservations.
+        """
+        if type(requests) is not tuple or not 1 <= len(requests) <= 64:
+            raise LongContextSpoolError("invalid memory fair cycle")
+        if any(not isinstance(item, MemoryBudgetRequest) for item in requests):
+            raise LongContextSpoolError("invalid memory fair cycle request")
+        names = [item.stream_id for item in requests]
+        if len(set(names)) != len(names):
+            raise LongContextSpoolError("duplicate memory fair cycle stream")
+        self._pid_guard()  # Never wait on a potentially inherited fork lock.
+        with self._lock:
+            self._open()  # Must be checked under the same lock as close().
+            now = self._now()
+            ordered = tuple(sorted(requests, key=lambda item: item.stream_id))
+            if any(not self._authorized(item) for item in ordered):
+                return {**self._receipt("hold", "principal_unverified"),
+                        "reservations": []}
+            existing = {item.request.stream_id for item in self._entries.values()}
+            if any(item.stream_id in existing for item in ordered):
+                return {**self._receipt("hold", "duplicate_stream"),
+                        "reservations": []}
+            total, owners = self._totals()
+            incoming = sum(item.requested_bytes for item in ordered)
+            for item in ordered:
+                owners[item.principal] = owners.get(item.principal, 0) + item.requested_bytes
+            if (len(self._entries) + len(ordered) > self._limits.max_active
+                    or total + incoming > self._limits.max_bytes
+                    or any(value > self._limits.max_bytes_per_principal
+                           for value in owners.values())):
+                return {**self._receipt("hold", "memory_budget_exhausted"),
+                        "reservations": []}
+            if not self._headroom(total + incoming):
+                self._revoke_all()
+                return {**self._receipt("hold", "memory_telemetry_unverified"),
+                        "reservations": []}
+            after = self._now()
+            if (after - now >= self._limits.lifetime_ns
+                    or after > _MAX - self._limits.lifetime_ns):
+                return {**self._receipt("hold", "memory_observation_expired"),
+                        "reservations": []}
+            try:
+                keys = [token_hex(24) for _ in ordered]
+            except Exception:
+                return {**self._receipt("hold", "reservation_identity_unavailable"),
+                        "reservations": []}
+            if (len(set(keys)) != len(keys)
+                    or any(type(key) is not str or len(key) != 48
+                           or any(c not in "0123456789abcdef" for c in key)
+                           or key in self._entries for key in keys)):
+                return {**self._receipt("hold", "reservation_collision"),
+                        "reservations": []}
+            expires = after + self._limits.lifetime_ns
+            receipts = []
+            for item, key in zip(ordered, keys):
+                self._entries[key] = _Entry(item, expires)
+                receipts.append({
+                    "stream_digest": sha256(item.stream_id.encode("ascii")).hexdigest(),
+                    "reservation_id": key,
+                    "requested_bytes": item.requested_bytes,
+                    "expires_ns": expires,
+                })
+            return {**self._receipt("reserved", "cooperative_only"),
+                    "reservations": receipts,
+                    "cycle_atomic_within_process": True,
+                    "cross_process_exclusive": False}
+
     def reserve(self, request: MemoryBudgetRequest) -> dict[str, object]:
         if not isinstance(request, MemoryBudgetRequest):
             raise LongContextSpoolError("invalid memory request")
-        self._open()
+        self._pid_guard()
         with self._lock:
+            self._open()
             now = self._now()
             if not self._authorized(request):
                 return self._receipt("hold", "principal_unverified")
@@ -221,8 +297,9 @@ class LongContextMemoryBudgetGuard:
             c not in "0123456789abcdef" for c in key
         ) or not isinstance(request, MemoryBudgetRequest):
             raise LongContextSpoolError("invalid memory claim")
-        self._open()
+        self._pid_guard()
         with self._lock:
+            self._open()
             self._now()
             entry = self._entries.get(key)
             if entry is None or entry.state != "reserved" or entry.request != request:
@@ -243,14 +320,16 @@ class LongContextMemoryBudgetGuard:
     def release(self, key: str) -> bool:
         if type(key) is not str:
             raise LongContextSpoolError("invalid memory reservation id")
-        self._open()
+        self._pid_guard()
         with self._lock:
+            self._open()
             self._now()
             return self._entries.pop(key, None) is not None
 
     def status(self) -> dict[str, object]:
-        self._open()
+        self._pid_guard()
         with self._lock:
+            self._open()
             self._now()
             total, _ = self._totals()
             return {

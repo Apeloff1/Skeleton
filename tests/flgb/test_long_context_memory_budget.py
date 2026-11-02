@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from threading import Event, Thread
 from unittest.mock import Mock, patch
 
 from skeleton.ai.model_runtime.long_context_memory_budget import (
@@ -59,6 +60,80 @@ class MemoryBudgetGuardTests(unittest.TestCase):
         self.one = MemoryBudgetRequest("owner", "stream-a", 512)
         self.two = MemoryBudgetRequest("owner", "stream-b", 512)
         self.other = MemoryBudgetRequest("other", "stream-c", 512)
+
+    def test_fair_cycle_atomic_claim_and_release(self):
+        result = self.guard.reserve_fair_cycle((self.other, self.one))
+        self.assertEqual(result["state"], "reserved")
+        self.assertEqual(len(result["reservations"]), 2)
+        self.assertFalse(result["is_execution_lease"])
+        self.assertFalse(result["is_admission_grant"])
+        self.assertFalse(result["cross_process_exclusive"])
+        self.assertEqual(self.guard.status()["reserved_bytes"], 1024)
+        entries = {x["stream_digest"]: x for x in result["reservations"]}
+        from hashlib import sha256
+        key = entries[sha256(b"stream-a").hexdigest()]["reservation_id"]
+        self.assertEqual(self.guard.claim(key, self.one)["state"], "claimed")
+        for entry in result["reservations"]:
+            self.assertTrue(self.guard.release(entry["reservation_id"]))
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_fair_cycle_all_or_nothing_on_quota_and_identity(self):
+        self.assertEqual(self.guard.reserve_fair_cycle((self.one, self.two))["state"], "hold")
+        self.assertEqual(self.guard.status()["active"], 0)
+        with self.assertRaises(LongContextSpoolError):
+            self.guard.reserve_fair_cycle((self.one, self.one))
+        with patch("skeleton.ai.model_runtime.long_context_memory_budget.token_hex",
+                   return_value="a" * 48):
+            result = self.guard.reserve_fair_cycle((self.one, self.other))
+        self.assertEqual(result["reason"], "reservation_collision")
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_fair_cycle_forged_telemetry_revokes_existing(self):
+        self.guard.reserve(self.one)
+        self.observer.side_effect = lambda requested_bytes: envelope(
+            requested_bytes, is_execution_lease=True)
+        result = self.guard.reserve_fair_cycle((self.other,))
+        self.assertEqual(result["reason"], "memory_telemetry_unverified")
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_fair_cycle_slow_observer_and_nonce_failure_never_publish(self):
+        def slow(requested_bytes):
+            self.clock.value += 1100
+            return envelope(requested_bytes)
+        self.observer.side_effect = slow
+        result = self.guard.reserve_fair_cycle((self.one, self.other))
+        self.assertEqual(result["reason"], "memory_observation_expired")
+        self.assertEqual(self.guard.status()["active"], 0)
+        self.observer.side_effect = lambda requested_bytes: envelope(requested_bytes)
+        with patch("skeleton.ai.model_runtime.long_context_memory_budget.token_hex",
+                   side_effect=OSError("entropy unavailable")):
+            result = self.guard.reserve_fair_cycle((self.one, self.other))
+        self.assertEqual(result["reason"], "reservation_identity_unavailable")
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_close_serializes_with_inflight_observer(self):
+        entered, proceed = Event(), Event()
+        outcomes = []
+        def slow(requested_bytes):
+            entered.set()
+            if not proceed.wait(timeout=3):
+                raise OSError("timeout")
+            return envelope(requested_bytes)
+        self.observer.side_effect = slow
+        worker = Thread(target=lambda: outcomes.append(self.guard.reserve(self.one)))
+        worker.start()
+        self.assertTrue(entered.wait(timeout=3))
+        closer = Thread(target=self.guard.close)
+        closer.start()
+        proceed.set()
+        worker.join(timeout=3)
+        closer.join(timeout=3)
+        self.assertFalse(worker.is_alive())
+        self.assertFalse(closer.is_alive())
+        self.assertEqual(len(outcomes), 1)
+        self.assertEqual(self.guard._entries, {})
+        with self.assertRaises(LongContextSpoolError):
+            self.guard.reserve(self.other)
 
     def test_reserve_claim_release_is_not_execution(self):
         receipt = self.guard.reserve(self.one)
