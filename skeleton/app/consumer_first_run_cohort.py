@@ -1,0 +1,228 @@
+"""Read-only multi-game consumer first-run evidence from independently pinned jobs.
+
+This is a source-level acceptance boundary, not native-device, installer,
+marketplace, rights, signing, or guarded-local-model certification. It never
+publishes artifacts, repairs custody, or modifies a private save.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Sequence
+
+from skeleton.app.consumer_first_run_readiness import (
+    RELEASE_HOLDS, inspect_consumer_first_run,
+)
+from skeleton.app.offline_delivery_assurance import _save_identity
+from skeleton.app.offline_first_playable_batch import (
+    DeliveryJob, _check_jobs, _delivered_custody,
+    inspect_first_playable_delivery_batch,
+)
+from skeleton.app.offline_first_playable_jobfile import (
+    _pin, read_pinned_jobs,
+)
+
+SCHEMA = "skeleton.app.consumer_first_run_cohort.v1"
+
+
+class ConsumerFirstRunCohortError(ValueError):
+    """A pinned first-run cohort could not be independently reexecuted."""
+
+
+def inspect_consumer_first_run_cohort(
+    jobs: Sequence[DeliveryJob], summary: str | Path, *,
+    expected_summary_sha256: str, authorized: bool,
+) -> dict[str, object]:
+    """Replay all installed games and their cohort receipt across custody barriers.
+
+    All hashes must come from outside the artifacts being inspected. The
+    first and final cohort inspections independently reexecute each game;
+    each individual consumer inspection also performs two replay passes.
+    No filesystem lock, persistent anti-rollback claim, or device evidence
+    is produced by this function.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise ConsumerFirstRunCohortError("POSIX nofollow custody required")
+    pin = _pin(expected_summary_sha256)
+    checked = _check_jobs(jobs, summary, inspect=True)
+    before = _delivered_custody(checked)
+    summary_before = _save_identity(summary)
+    first = inspect_first_playable_delivery_batch(
+        checked, summary, expected_summary_sha256=pin, authorized=True,
+    )
+    if (type(first) is not dict
+            or first.get("all_live_games_reexecuted") is not True
+            or first.get("receipt_integrity_verified") is not True
+            or first.get("read_only") is not True
+            or first.get("release_certified") is not False
+            or first.get("native_device_qualified") is not False
+            or first.get("independent_summary_sha256") != pin
+            or type(first.get("games")) is not list
+            or len(first["games"]) != len(checked)):
+        raise ConsumerFirstRunCohortError("canonical cohort replay evidence invalid")
+    if (_delivered_custody(checked) != before
+            or _save_identity(summary) != summary_before):
+        raise ConsumerFirstRunCohortError("cohort custody changed after first replay")
+
+    games: list[dict[str, object]] = []
+    for index, (job, stored) in enumerate(zip(
+        checked, first["games"], strict=True,
+    )):
+        if type(stored) is not dict:
+            raise ConsumerFirstRunCohortError("canonical game record invalid")
+        observed = inspect_consumer_first_run(
+            job.install, job.archive, job.save, job.receipt,
+            expected_manifest_sha256=job.manifest_sha256,
+            expected_archive_sha256=job.archive_sha256,
+            expected_save_sha256=job.save_sha256,
+            expected_receipt_sha256=job.receipt_sha256,
+            authorized=True,
+        )
+        if (type(observed) is not dict
+                or observed.get("project_id") != stored.get("project_id")
+                or observed.get("world_digest") != stored.get("world_digest")
+                or observed.get("replay_digest") != stored.get("replay_digest")
+                or observed.get("action_count") != len(job.moves)
+                or observed.get("action_count") != stored.get("action_count")
+                or observed.get("manifest_sha256") != job.manifest_sha256
+                or observed.get("archive_sha256") != job.archive_sha256
+                or observed.get("save_sha256") != job.save_sha256
+                or observed.get("receipt_sha256") != job.receipt_sha256
+                or observed.get("source_level_replay_passes") != 2
+                or observed.get("read_only") is not True
+                or observed.get("release_certified") is not False
+                or observed.get("native_device_qualified") is not False
+                or observed.get("package_signed") is not False
+                or observed.get("rights_certified") is not False):
+            raise ConsumerFirstRunCohortError(
+                "consumer replay diverged from independently pinned cohort"
+            )
+        games.append({
+            "index": index,
+            "project_id": observed["project_id"],
+            "world_digest": observed["world_digest"],
+            "replay_digest": observed["replay_digest"],
+            "action_count": observed["action_count"],
+            "manifest_sha256": job.manifest_sha256,
+            "archive_sha256": job.archive_sha256,
+            "save_sha256": job.save_sha256,
+            "receipt_sha256": job.receipt_sha256,
+            "source_level_replay_passes": 2,
+            "release_certified": False,
+        })
+        if (_delivered_custody(checked) != before
+                or _save_identity(summary) != summary_before):
+            raise ConsumerFirstRunCohortError(
+                "another installed game or summary changed during replay"
+            )
+
+    # Reinspect the complete canonical cohort after the final consumer game;
+    # a later replay must not mask tampering with an earlier installed game.
+    second = inspect_first_playable_delivery_batch(
+        checked, summary, expected_summary_sha256=pin, authorized=True,
+    )
+    if (second != first
+            or _delivered_custody(checked) != before
+            or _save_identity(summary) != summary_before
+            or len({game["project_id"] for game in games}) != len(games)):
+        raise ConsumerFirstRunCohortError(
+            "cohort changed across final cross-game replay barrier"
+        )
+    return {
+        "schema": SCHEMA,
+        "status": "consumer_source_level_cohort_replayed_release_blocked",
+        "game_count": len(games),
+        "games": games,
+        "independent_summary_sha256": pin,
+        "source_level_replay_passes_per_game": 2,
+        "canonical_cohort_inspections": 2,
+        "all_installed_games_and_private_saves_reexecuted": True,
+        "cohort_and_job_inodes_stable": True,
+        "read_only": True,
+        "files_published": 0,
+        "native_device_qualified": False,
+        "native_godot_executed": False,
+        "windows_laptop_qualified": False,
+        "installer_qualified": False,
+        "guarded_local_ai_qualified": False,
+        "package_signed": False,
+        "rights_certified": False,
+        "persistent_rollback_protection": False,
+        "release_certified": False,
+        "release_holds": list(RELEASE_HOLDS),
+    }
+
+
+def inspect_pinned_consumer_cohort(
+    jobs_file: str | Path, *, expected_jobs_sha256: str,
+    summary: str | Path, expected_summary_sha256: str,
+    authorized: bool,
+) -> dict[str, object]:
+    """Bind the read-only acceptance run to a separately pinned private jobfile."""
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    jobs, identity = read_pinned_jobs(
+        jobs_file, expected_sha256=expected_jobs_sha256,
+        summary=summary, mode="inspect", authorized=True,
+    )
+    try:
+        result = inspect_consumer_first_run_cohort(
+            jobs, summary, expected_summary_sha256=expected_summary_sha256,
+            authorized=True,
+        )
+    finally:
+        again, final_identity = read_pinned_jobs(
+            jobs_file, expected_sha256=expected_jobs_sha256,
+            summary=summary, mode="inspect", authorized=True,
+        )
+        if jobs != again or identity != final_identity:
+            raise ConsumerFirstRunCohortError(
+                "private jobfile inode or bytes changed during consumer replay"
+            )
+    return {**result, "independent_jobs_sha256": _pin(expected_jobs_sha256)}
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m skeleton app consumer-first-run-cohort",
+        description="Read-only pinned 2-8 game first-run acceptance; release blocked",
+    )
+    parser.add_argument("--jobs-file", required=True)
+    parser.add_argument("--expected-jobs-sha256", required=True)
+    parser.add_argument("--summary", required=True)
+    parser.add_argument("--expected-summary-sha256", required=True)
+    parser.add_argument("--trusted-local-operator", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        result = inspect_pinned_consumer_cohort(
+            args.jobs_file, expected_jobs_sha256=args.expected_jobs_sha256,
+            summary=args.summary,
+            expected_summary_sha256=args.expected_summary_sha256,
+            authorized=args.trusted_local_operator,
+        )
+    except (PermissionError, OSError, ValueError, TypeError, KeyError) as exc:
+        print(json.dumps({
+            "schema": SCHEMA, "status": "blocked",
+            "error": type(exc).__name__,
+            "native_device_qualified": False, "release_certified": False,
+        }, sort_keys=True), file=sys.stderr)
+        return 2
+    print(json.dumps(result, sort_keys=True, separators=(",", ":"),
+                     allow_nan=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+__all__ = [
+    "SCHEMA", "ConsumerFirstRunCohortError",
+    "inspect_consumer_first_run_cohort", "inspect_pinned_consumer_cohort",
+    "main",
+]
