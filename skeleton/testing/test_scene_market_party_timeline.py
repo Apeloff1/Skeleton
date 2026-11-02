@@ -97,7 +97,7 @@ def test_fork_rejects_illegal_actor_and_oversized_turns(campaign):
 
 
 @pytest.mark.parametrize("field,value", [
-    ("checksum", "0" * 64),
+    ("fork_save_digest", "0" * 64),
     ("parent_state_digest", "0" * 64),
     ("fork_phase", "active"),
     ("fork_state_digest", "0" * 64),
@@ -108,8 +108,18 @@ def test_tampered_fork_fails_even_if_checksum_recomputed(campaign, field, value)
     report = fork_party(completed, 0, turns)
     forged = copy.deepcopy(report)
     forged[field] = value
+    assert forged != report  # prevent ineffective tamper cases
     forged["checksum"] = dig({k: v for k, v in forged.items()
                               if k != "checksum"})
+    with pytest.raises(SceneTravelError):
+        verify_party_fork(completed, forged)
+
+
+def test_invalid_fork_outer_checksum_is_rejected(campaign):
+    _, turns, completed = campaign
+    forged = fork_party(completed, 0, turns)
+    assert forged["checksum"] != "0" * 64
+    forged["checksum"] = "0" * 64
     with pytest.raises(SceneTravelError):
         verify_party_fork(completed, forged)
 

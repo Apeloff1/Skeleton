@@ -81,8 +81,8 @@ def test_invalid_hint_never_becomes_witness():
 
 
 @pytest.mark.parametrize("mutation", [
-    lambda r: r.update(status="proven_win"),
-    lambda r: r.update(checksum="0" * 64),
+    lambda r: r.update(status="inconclusive"),
+    lambda r: r.update(source_digest="0" * 64),
     lambda r: r.update(terminal_state_digest="0" * 64),
     lambda r: r.update(portable_checksum="0" * 64),
     lambda r: r.update(explored_states=999),
@@ -92,11 +92,25 @@ def test_forged_witness_rejected_even_with_recomputed_checksum(mutation):
     from skeleton.game.gameplay.flgb_gameplay_runtime import dig
     source, turns = original_party()
     first = new_party(source)
-    forged = copy.deepcopy(solve_party_route(first, hint_turns=turns))
+    original = solve_party_route(first, hint_turns=turns)
+    forged = copy.deepcopy(original)
     mutation(forged)
+    # Every parameter must change signed-over data, not only a digest
+    # that this test immediately recomputes.
+    assert forged != original
     forged["checksum"] = dig({k: v for k, v in forged.items() if k != "checksum"})
     with pytest.raises(SceneTravelError):
         verify_party_route(first, forged)
+
+
+def test_invalid_outer_checksum_is_rejected_without_recomputation():
+    source, turns = original_party()
+    initial = new_party(source)
+    forged = solve_party_route(initial, hint_turns=turns)
+    assert forged["checksum"] != "0" * 64
+    forged["checksum"] = "0" * 64
+    with pytest.raises(SceneTravelError):
+        verify_party_route(initial, forged)
 
 
 def test_cli_demo_and_main_dispatch(capsys):
