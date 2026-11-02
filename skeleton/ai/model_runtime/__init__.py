@@ -17,6 +17,9 @@ _LAZY_EXPORTS = {
     "MemoryBudgetRequest": ".long_context_memory_budget",
     "MemoryBudgetLimits": ".long_context_memory_budget",
     "LongContextMemoryBudgetGuard": ".long_context_memory_budget",
+    "KvLayout": ".long_context_kv_compatibility",
+    "KvWindowRequest": ".long_context_kv_compatibility",
+    "LongContextKvCompatibility": ".long_context_kv_compatibility",
     "LongContextPressureLatch": ".long_context_pressure_latch",
     "CpuCapacityLimits": ".long_context_cpu_guard",
     "CpuCapacityRequest": ".long_context_cpu_guard",
@@ -241,6 +244,8 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".long_context_cgroup", __name__)
     if module_name == ".long_context_cgroup_events":
         return import_module(".long_context_cgroup_events", __name__)
+    if module_name == ".long_context_kv_compatibility":
+        return import_module(".long_context_kv_compatibility", __name__)
     if module_name == ".long_context_memory_budget":
         return import_module(".long_context_memory_budget", __name__)
     if module_name == ".long_context_memory_envelope":

@@ -16,6 +16,7 @@ from .long_context_telemetry_fusion import LongContextTelemetryFusion
 from .long_context_pressure_latch import LongContextPressureLatch
 from .long_context_live_plan import LongContextLivePlanner
 from .long_context_memory_envelope import observe_memory_envelope
+from .long_context_kv_compatibility import KvLayout, KvWindowRequest, LongContextKvCompatibility
 from .tokenization import deserialize_token_sequence
 
 
@@ -77,6 +78,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Read-only bounded audit of all local committed heads")
     audit_heads.add_argument("--max-heads", type=int, default=64)
     audit_heads.add_argument("--max-checkpoints", type=int, default=4096)
+    kv = commands.add_parser("head-kv-observe", help="Generation-fenced CPU KV layout check; no grant")
+    kv.add_argument("--stream-id", required=True)
+    kv.add_argument("--checkpoint", required=True)
+    kv.add_argument("--expected-generation", type=int, required=True)
+    kv.add_argument("--model-digest", required=True)
+    kv.add_argument("--layers", type=int, required=True)
+    kv.add_argument("--heads", type=int, required=True)
+    kv.add_argument("--head-dim", type=int, required=True)
+    kv.add_argument("--context-tokens", type=int, required=True)
+    kv.add_argument("--vocab-size", type=int, required=True)
+    kv.add_argument("--bytes-per-element", type=int, default=2)
+    kv.add_argument("--device-kind", choices=("cpu", "gpu", "m_chip"), default="cpu")
+    kv.add_argument("--max-tokens", type=int, required=True)
+    kv.add_argument("--max-kv-bytes", type=int, required=True)
+    kv.add_argument("--max-checkpoints", type=int, default=4096)
     commands.add_parser("head-recover", help="Explicit bounded orphan cleanup")
     commands.add_parser("head-observe", help="Read conservative local PSI pressure; no grant")
     commands.add_parser("head-observe-cgroup", help="Read cgroup-v2 pressure; no grant")
@@ -128,7 +144,18 @@ def main(argv: list[str] | None = None) -> int:
         spool = LongContextSpool(args.root)
         if args.command.startswith("head-"):
             heads = LongContextProgressHead(spool)
-            if args.command in ("head-plan", "head-plan-live"):
+            if args.command == "head-kv-observe":
+                layout = KvLayout(
+                    args.model_digest, args.tokenizer_digest, args.layers,
+                    args.heads, args.head_dim, args.context_tokens,
+                    args.vocab_size, args.bytes_per_element, args.device_kind)
+                request = KvWindowRequest(
+                    args.stream_id, args.checkpoint, args.expected_generation,
+                    args.max_tokens, args.max_kv_bytes)
+                result = LongContextKvCompatibility(heads).observe(
+                    layout, request, expected_model_digest=args.model_digest,
+                    max_checkpoints=args.max_checkpoints)
+            elif args.command in ("head-plan", "head-plan-live"):
                 demands = []
                 for value in args.candidate:
                     parts = value.split(":")
