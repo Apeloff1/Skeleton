@@ -69,6 +69,35 @@ class QuestSaveTests(unittest.TestCase):
                 QuestFailure("q2", "turn_limit", "late")
             ] * 4097)
 
+    def test_quest_section_rejects_oversized_and_forged_failure_evidence(self):
+        for bad in (
+            QuestFailure("q2", "turn_limit", "x" * 513),
+            QuestFailure("q2", "not-a-failure-kind", "forged"),
+            QuestFailure("q2", "turn_limit", "unsafe\\u202ereason"),
+            QuestFailure("q" * 129, "turn_limit", "too long"),
+        ):
+            with self.assertRaisesRegex(QuestProgressSaveError, "failure evidence"):
+                quest_section(self.w, self.state, [self.prog], failures=[bad])
+        with self.assertRaisesRegex(QuestProgressSaveError, "duplicate quest failure"):
+            quest_section(self.w, self.state, [self.prog], failures=[
+                QuestFailure("q2", "turn_limit", "a"),
+                QuestFailure("q2", "turn_limit", "b"),
+            ])
+
+    def test_restore_rejects_unrecognized_or_corrupt_failure_evidence(self):
+        for idx, changes in enumerate((
+            {"failures": [{"quest": "q2", "kind": "flag", "reason": "ok", "extra": 1}]},
+            {"failures": [{"quest": "q2", "kind": "bad", "reason": "ok"}]},
+            {"failures": "not-a-list"},
+            {"extra": "untrusted"},
+        )):
+            forged = dict(self.section, **changes)
+            plane = GameSavePlane()
+            save_quest_progress(plane, f"bad-failure-{idx}", 1, forged)
+            with self.assertRaisesRegex(QuestProgressSaveError, "failure|section shape"):
+                restore_quest_progress(plane, f"bad-failure-{idx}", self.w,
+                                       verified_state=self.state)
+
     def test_restore_rejects_noncanonical_objective_indices(self):
         for index, key in enumerate(("00", "+0", "٠", "000001", "1" * 7)):
             plane = GameSavePlane()

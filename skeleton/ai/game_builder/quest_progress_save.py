@@ -9,6 +9,7 @@ the section is rejected unless the digests match.
 """
 from __future__ import annotations
 
+import unicodedata
 from typing import Any, Mapping, Sequence
 
 from skeleton.ai.game_builder.quest_fail_states import QuestFailure
@@ -18,10 +19,33 @@ from skeleton.kernel.game_save_plane import GameSavePlane
 
 SECTION = "quest_progress"
 SCHEMA = "skeleton.game_builder.quest_progress_section.v1"
+FAIL_KINDS = frozenset({"turn_limit", "flag", "escort_lost"})
 
 
 class QuestProgressSaveError(ValueError):
     pass
+
+
+def _safe_text(value: object, maximum: int) -> bool:
+    return (type(value) is str and 1 <= len(value) <= maximum
+            and not any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"}
+                        for ch in value))
+
+
+def _validate_failure_docs(failures: object) -> None:
+    if type(failures) is not list or len(failures) > 4096:
+        raise QuestProgressSaveError("invalid quest failure collection")
+    seen: set[tuple[str, str]] = set()
+    for failure in failures:
+        if (type(failure) is not dict or set(failure) != {"quest", "kind", "reason"}
+                or not _safe_text(failure["quest"], 128)
+                or failure["kind"] not in FAIL_KINDS
+                or not _safe_text(failure["reason"], 512)):
+            raise QuestProgressSaveError("invalid quest failure evidence")
+        identity = (failure["quest"], failure["kind"])
+        if identity in seen:
+            raise QuestProgressSaveError("duplicate quest failure evidence")
+        seen.add(identity)
 
 
 def _validate_campaign_receipt(value: str | None) -> None:
@@ -42,10 +66,19 @@ def quest_section(world: DirectorWorld, state: DirectorState,
     if len(quests) > 4096 or len(failures) > 4096:
         raise QuestProgressSaveError("quest section exceeds bounded collection size")
     quest_ids = [q.quest_id for q in quests]
-    if any(type(qid) is not str or not qid for qid in quest_ids):
+    if any(not _safe_text(qid, 128) for qid in quest_ids):
         raise QuestProgressSaveError("invalid quest identity")
     if len(set(quest_ids)) != len(quest_ids):
         raise QuestProgressSaveError("duplicate quest identity in section")
+    for quest in quests:
+        if not isinstance(quest, QuestProgressState):
+            raise QuestProgressSaveError("invalid quest progress object")
+        _progress(quest.as_dict())
+    if any(not isinstance(failure, QuestFailure) for failure in failures):
+        raise QuestProgressSaveError("invalid quest failure object")
+    failure_docs = [{"quest": f.quest, "kind": f.kind, "reason": f.reason}
+                    for f in failures]
+    _validate_failure_docs(failure_docs)
     return {
         "schema": SCHEMA,
         "project": world.project_id,
@@ -53,7 +86,7 @@ def quest_section(world: DirectorWorld, state: DirectorState,
         "final_state_sha256": state.digest,
         "campaign_receipt_sha256": campaign_receipt_sha256,
         "quests": {q.quest_id: q.as_dict() for q in sorted(quests, key=lambda q: q.quest_id)},
-        "failures": [{"quest": f.quest, "kind": f.kind, "reason": f.reason} for f in failures],
+        "failures": failure_docs,
     }
 
 
@@ -72,7 +105,7 @@ def _progress(raw: Mapping[str, Any]) -> QuestProgressState:
     if not isinstance(raw, Mapping) or set(raw) != {"quest_id", "status", "objectives_progress"}:
         raise QuestProgressSaveError("invalid quest progress shape")
     quest_id, status = raw["quest_id"], raw["status"]
-    if type(quest_id) is not str or not quest_id or status not in ("active", "completed", "failed"):
+    if not _safe_text(quest_id, 128) or status not in ("active", "completed", "failed"):
         raise QuestProgressSaveError("invalid quest progress identity or status")
     progress = raw["objectives_progress"]
     if not isinstance(progress, Mapping) or len(progress) > 1024:
@@ -113,8 +146,12 @@ def restore_quest_progress(plane: GameSavePlane, slot: str, world: DirectorWorld
     section = sections.get(SECTION)
     if section is None:
         raise QuestProgressSaveError("save has no quest progress section")
-    if not isinstance(section, Mapping) or len(section) > 16:
+    if not isinstance(section, Mapping) or set(section) != {
+        "schema", "project", "director_world_digest", "final_state_sha256",
+        "campaign_receipt_sha256", "quests", "failures",
+    }:
         raise QuestProgressSaveError("invalid quest progress section shape")
+    _validate_failure_docs(section["failures"])
     if section.get("schema") != SCHEMA:
         raise QuestProgressSaveError("unknown quest progress schema")
     if section.get("project") != world.project_id:
