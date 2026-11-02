@@ -71,6 +71,11 @@ def solve_contract(source: Any, *, max_nodes: int = MAX_NODES,
         if state["phase"] != "active" or len(actions) >= depth:
             continue
         for action in _choices(state["market"]):
+            # The node budget is also a hard frontier/memory budget. A
+            # saturated queue is inconclusive, never an impossibility proof.
+            # Check before allocating another nested replay session.
+            if len(queue) >= nodes:
+                return _result(spec, "inconclusive", count, None)
             try:
                 next_session = _advance(session, action)
             except SceneTravelError:

@@ -69,3 +69,13 @@ def test_route_cli_reachable_and_bounded(capsys):
     assert cli(["solve", "--source-json", json.dumps(source),
                 "--max-nodes", "0"]) == 2
     assert "error" in json.loads(capsys.readouterr().err)
+
+
+@pytest.mark.parametrize("budget", [1, 2, 4, 8])
+def test_frontier_budget_returns_inconclusive_without_claiming_impossibility(budget):
+    source, _ = original_contract()
+    report = solve_contract(source, max_nodes=budget, max_depth=32)
+    assert report["visited_nodes"] <= budget
+    assert report["status"] == "inconclusive"
+    assert report["actions"] is None
+    assert verify_contract_route(source, report) == report
