@@ -912,6 +912,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-campaign-board":
         from skeleton.game.gameplay.combat_campaign_decision_board import cli as campaign_board_cli
         return campaign_board_cli(rest)
+    if cmd == "combat-campaign-author":
+        from skeleton.game.gameplay.combat_campaign_author import cli as campaign_author_cli
+        return campaign_author_cli(rest)
     if cmd == "combat-campaign-solve":
         from skeleton.game.gameplay.combat_campaign_solver import cli as campaign_solve_cli
         return campaign_solve_cli(rest)
