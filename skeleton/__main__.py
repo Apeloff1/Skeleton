@@ -106,6 +106,7 @@ Commands:
     scene-market-party-league-author  Transactional scoring edits and playable preview
     scene-market-party-compare  Compare replay branches and select portable save
     scene-market-party-portfolio  Package replayed save, league and victory
+    scene-market-party-handoff  Fork a played campaign into a new ranked portable save
     scene-market-party-balance  Audit replayed cooperative role contributions
     scene-market-party-vault  Replay-verified offline save slots with CAS
     scene-market-party-vault-history  Replay vault revisions and leased recovery
@@ -979,6 +980,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-balance":
         from skeleton.game.gameplay.scene_market_party_balance import cli as party_balance_cli
         return party_balance_cli(rest)
+    if cmd == "scene-market-party-handoff":
+        from skeleton.game.gameplay.scene_market_party_handoff import cli as party_handoff_cli
+        return party_handoff_cli(rest)
     if cmd == "scene-market-party-portfolio":
         from skeleton.game.gameplay.scene_market_party_portfolio import cli as party_portfolio_cli
         return party_portfolio_cli(rest)
