@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from .studio_ecosystem_quest import (
     StudioQuestError, compile_quest_program, replay_quest, quest_progress,
+    step_quest,
 )
 
 SCHEMA="skeleton.game_builder.offline_story_choices.v1"
@@ -17,8 +18,8 @@ KEYS={"schema","project_id","source_digest","choices","external_evidence_verifie
       "native_genre_runtime_verified","release_certified"}
 
 
-def inspect_browser_story_receipt(raw: bytes, documents: Mapping[str, Any], *,
-                                  authorized: bool) -> dict[str, object]:
+def _replay_browser_story_receipt(raw: bytes, documents: Mapping[str, Any], *,
+                                  authorized: bool):
     if not authorized:
         raise PermissionError("browser history inspection requires operator authorization")
     if not isinstance(raw,bytes) or not 1<=len(raw)<=65536:
@@ -46,6 +47,12 @@ def inspect_browser_story_receipt(raw: bytes, documents: Mapping[str, Any], *,
                 "release_certified"))):
         raise StudioQuestError("unqualified or source-mismatched offline transcript")
     session=replay_quest(documents,payload["choices"],authorized=True)
+    return program, session
+
+
+def inspect_browser_story_receipt(raw: bytes, documents: Mapping[str, Any], *,
+                                  authorized: bool) -> dict[str, object]:
+    program, session = _replay_browser_story_receipt(raw, documents, authorized=authorized)
     progress=quest_progress(session,documents)
     return {"schema":"skeleton.game_builder.offline_story_replay_review.v1",
             "project_id":program.project_id,
@@ -56,3 +63,40 @@ def inspect_browser_story_receipt(raw: bytes, documents: Mapping[str, Any], *,
             "replayed_from_authoritative_source":True,
             "browser_transcript_independently_attested":False,
             "release_certified":False}
+
+
+def preview_browser_story_choice(raw: bytes, documents: Mapping[str, Any], *,
+                                 stage: str, alternative: str,
+                                 authorized: bool) -> dict[str, object]:
+    """Replay a browser checkpoint, then simulate one authored choice without committing.
+
+    This is an independently recomputed Python counterpart of the browser
+    preview. A browser receipt grants no rights or evidence and cannot
+    declare an ending earned outside the authored sandbox.
+    """
+    program, session = _replay_browser_story_receipt(raw, documents,
+                                                     authorized=authorized)
+    if type(stage) is not str or type(alternative) is not str:
+        raise StudioQuestError("invalid preview choice identity")
+    before = quest_progress(session, documents)
+    candidate = step_quest(session, documents, stage=stage,
+                           alternative=alternative, authorized=True)
+    after = quest_progress(candidate, documents)
+    newly = sorted(set(after["sandbox_endings_eligible"])
+                   - set(before["sandbox_endings_eligible"]))
+    return {
+        "schema": "skeleton.game_builder.offline_story_choice_preview.v1",
+        "project_id": program.project_id,
+        "source_digest": program.source_digest,
+        "base_session_digest": session.digest,
+        "candidate_session_digest": candidate.digest,
+        "stage_id": stage,
+        "alternative": alternative,
+        "newly_eligible_sandbox_endings": newly,
+        "unmet_ending_predicates": after["unmet_ending_predicates"],
+        "baseline_session_unchanged": True,
+        "replayed_from_authoritative_source": True,
+        "external_evidence_verified": False,
+        "native_genre_runtime_verified": False,
+        "release_certified": False,
+    }

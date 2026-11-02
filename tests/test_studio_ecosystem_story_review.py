@@ -3,7 +3,7 @@ from copy import deepcopy
 import pytest
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_story_html import story_source
-from skeleton.ai.game_builder.studio_ecosystem_story_review import inspect_browser_story_receipt
+from skeleton.ai.game_builder.studio_ecosystem_story_review import (inspect_browser_story_receipt, preview_browser_story_choice)
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 def _receipt(docs,actions):
@@ -36,3 +36,50 @@ def test_browser_cannot_forge_progress_or_source_and_duplicate_json_is_refused()
         inspect_browser_story_receipt(json.dumps(bad).encode(),docs,authorized=True)
     with pytest.raises(StudioQuestError):
         inspect_browser_story_receipt(b'{"schema":1,"schema":2}',docs,authorized=True)
+
+
+@pytest.mark.parametrize("pid", [
+    "studio_aerial_traversal_amber_highlands",
+    "studio_arena_fighting_glacial_fjord",
+])
+def test_choice_preview_is_canonical_noncommitting_and_replayable(pid):
+    from skeleton.ai.game_builder.studio_ecosystem_quest import (
+        replay_quest, step_quest, quest_progress,
+    )
+    docs = read_blueprint(pid)
+    stage = story_source(docs)["stages"][0]
+    raw = json.dumps(_receipt(docs, [])).encode()
+    choice = stage["alternatives"][0]
+    result = preview_browser_story_choice(
+        raw, docs, stage=stage["id"], alternative=choice, authorized=True)
+    base = replay_quest(docs, [], authorized=True)
+    candidate = step_quest(base, docs, stage=stage["id"],
+                           alternative=choice, authorized=True)
+    progress = quest_progress(candidate, docs)
+    assert result["base_session_digest"] == base.digest
+    assert result["candidate_session_digest"] == candidate.digest
+    assert result["unmet_ending_predicates"] == progress["unmet_ending_predicates"]
+    assert result["baseline_session_unchanged"] is True
+    assert result["release_certified"] is False
+    assert replay_quest(docs, [], authorized=True).digest == base.digest
+
+
+def test_choice_preview_rejects_invalid_action_stale_source_and_authority():
+    docs = read_blueprint("studio_arena_fighting_glacial_fjord")
+    raw = json.dumps(_receipt(docs, [])).encode()
+    stage = story_source(docs)["stages"][0]
+    with pytest.raises(StudioQuestError):
+        preview_browser_story_choice(raw, docs, stage=stage["id"],
+                                     alternative="unwritten-action", authorized=True)
+    with pytest.raises(StudioQuestError):
+        preview_browser_story_choice(raw, docs, stage=True,
+                                     alternative=stage["alternatives"][0], authorized=True)
+    with pytest.raises(PermissionError):
+        preview_browser_story_choice(raw, docs, stage=stage["id"],
+                                     alternative=stage["alternatives"][0], authorized=False)
+    forged = _receipt(docs, [])
+    forged["source_digest"] = "f" * 64
+    with pytest.raises(StudioQuestError):
+        preview_browser_story_choice(json.dumps(forged).encode(), docs,
+                                     stage=stage["id"],
+                                     alternative=stage["alternatives"][0], authorized=True)

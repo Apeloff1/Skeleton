@@ -34,13 +34,14 @@ const transcript=document.getElementById("transcript");
 const endings=document.getElementById("endings");
 const checkpoint=document.getElementById("checkpoint");
 const checkpointStatus=document.getElementById("checkpoint-status");
+const previewStatus=document.getElementById("choice-preview");
 function node(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;}
-function reset(){chosen.length=0;completed.clear();render();}
+function reset(){chosen.length=0;completed.clear();previewStatus.textContent="";render();}
 function act(id,option){
  const stage=byId.get(id);
  if(!stage||completed.has(id)||!stage.prerequisites.every(dep=>completed.has(dep))||
     !stage.alternatives.includes(option)){return;}
- chosen.push([id,option]);completed.add(id);render();
+ chosen.push([id,option]);completed.add(id);previewStatus.textContent="";render();
 }
 function parseCheckpoint(raw){
  if(typeof raw!=="string"||raw.length>16384){throw Error("checkpoint too large");}
@@ -82,11 +83,47 @@ function restoreCheckpoint(){
    chosen.splice(0,chosen.length,...actions);
    completed.clear();
    for(const [id] of actions){completed.add(id);}
+   previewStatus.textContent="";
    render();
    checkpointStatus.textContent="Source-matched sandbox checkpoint restored";
  }catch(error){
    checkpointStatus.textContent="Checkpoint rejected; current progress preserved";
  }
+}
+function earnedFacts(history){
+ const earned=new Set();
+ for(const [id,option] of history){
+   const stage=byId.get(id);
+   if(!stage){throw Error("unknown authored stage");}
+   earned.add(id);earned.add(stage.reward);
+   const effects=stage.choice_effects;
+   // JSON objects inherit names such as toString and constructor. An
+   // unlisted alternative must never execute inherited prototype values.
+   const tokens=Object.prototype.hasOwnProperty.call(effects,option)
+     ? effects[option] : [];
+   for(const token of tokens){earned.add(token);}
+ }
+ return earned;
+}
+function previewChoice(id,option){
+ const stage=byId.get(id);
+ if(!stage||completed.has(id)||!stage.prerequisites.every(dep=>completed.has(dep))||
+    !stage.alternatives.includes(option)){return;}
+ const before=earnedFacts(chosen);
+ const after=earnedFacts([...chosen,[id,option]]);
+ const newly=[];
+ const remaining=[];
+ for(const ending of source.endings){
+   const unmet=ending.requires.filter(required=>!after.has(required));
+   if(unmet.length===0 && ending.requires.some(required=>!before.has(required))){
+     newly.push(ending.id);
+   }
+   if(unmet.length){remaining.push(ending.id+": "+unmet.join(", "));}
+ }
+ previewStatus.textContent="Sandbox preview "+id+" / "+option+
+   "; newly eligible endings: "+(newly.join(", ")||"none")+
+   "; still unmet: "+(remaining.join("; ")||"none")+
+   ". This preview does not commit a choice or verify external consequences.";
 }
 function render(){
  host.replaceChildren();endings.replaceChildren();
@@ -105,16 +142,14 @@ function render(){
      for(const choice of stage.alternatives){
        const button=node("button",choice);button.type="button";
        button.addEventListener("click",()=>act(stage.id,choice));box.append(button);
+       const preview=node("button","Preview: "+choice);preview.type="button";
+       preview.addEventListener("click",()=>previewChoice(stage.id,choice));
+       box.append(preview);
      }
    }
    host.append(box);
  }
- const earned=new Set(completed);
- for(const stage of source.stages){if(completed.has(stage.id))earned.add(stage.reward);}
- for(const [id,option] of chosen){
-   const stage=byId.get(id);
-   if(stage){for(const token of (stage.choice_effects[option]||[])){earned.add(token);}}
- }
+ const earned=earnedFacts(chosen);
  for(const ending of source.endings){
    const missing=ending.requires.filter(required=>!earned.has(required));
    endings.append(node("li",ending.id+": "+(missing.length===0
@@ -200,7 +235,9 @@ def render_story_html(documents: Mapping[str, Any]) -> bytes:
         "<header><h1>Original interactive quest</h1><p>Project: "+project+"</p>"
         "<p>Sandbox choices, not native world interactions</p></header>"
         "<main><p id='premise'></p><p id='summary' role='status' aria-live='polite'></p>"
-        "<div id='stages'></div><section><h2>Ending requirements</h2>"
+        "<div id='stages'></div><section><h2>Noncommitting choice preview</h2>"
+        "<p id='choice-preview' role='status' aria-live='polite'></p></section>"
+        "<section><h2>Ending requirements</h2>"
         "<ul id='endings'></ul></section>"
         "<section><h2>Replay transcript</h2><button type='button' id='restart'>"
         "Restart simulation</button><pre id='transcript'></pre>"
