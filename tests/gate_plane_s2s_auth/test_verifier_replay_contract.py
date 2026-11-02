@@ -111,3 +111,19 @@ def test_local_nonce_double_rejects_expired_and_future_retention_aliases():
     assert len(store) == 0
     assert store.check_and_record("s2s:svc", "nonce", 1000, 60) is True
     assert store.check_and_record("s2s:svc", "nonce", 1000, 60) is False
+
+
+def test_s2s_nonce_scope_rejects_noncanonical_service_and_scope_aliases():
+    from skeleton.gate_plane.s2s.tokens import validate_scope, validate_service_name
+
+    for bad in ("", "svc\n", "svc\r", "svc\u202e", "svc:admin",
+                "UPPERCASE", "x" * 64, True, None):
+        with pytest.raises(ValueError):
+            validate_service_name(bad)
+        with pytest.raises(ValueError):
+            s2s_scope(bad)
+    for bad in ("forge:read\n", "forge:read\r", "forge:read\u202e", "FORGE:READ"):
+        with pytest.raises(ValueError):
+            validate_scope(bad)
+    assert s2s_scope("forge-worker") == "s2s:forge-worker"
+    assert validate_scope("forge:read") == "forge:read"
