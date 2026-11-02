@@ -35,6 +35,11 @@ MAX_SCHEMA_VERSION = 10_000
 MAX_PAYLOAD_NODES = 10_000
 MAX_PAYLOAD_DEPTH = 32
 MAX_MIGRATION_STEPS = 128
+MAX_GAMEPLAY_TICK = 2**63 - 1
+SECTION_KEYS = frozenset({
+    "schema", "world_id", "schema_version", "tick", "payload",
+    "canon_digest", "parent_save_digest", "state_digest",
+})
 
 Migration = Callable[[Dict[str, Any]], Dict[str, Any]]
 
@@ -109,8 +114,8 @@ class GameplayStateEnvelope:
     def __post_init__(self) -> None:
         req_id(self.world_id, "world_id")
         _version(self.schema_version, "schema_version")
-        if not _int(self.tick) or self.tick < 0:
-            raise GameplayMigrationError("invalid tick")
+        if not _int(self.tick) or not 0 <= self.tick <= MAX_GAMEPLAY_TICK:
+            raise GameplayMigrationError("invalid bounded tick")
         if not isinstance(self.payload, Mapping):
             raise GameplayMigrationError("payload must be a mapping")
         req_digest(self.canon_digest, "canon_digest")
@@ -143,6 +148,11 @@ class GameplayStateEnvelope:
     def from_section(cls, section: Mapping[str, Any]) -> "GameplayStateEnvelope":
         if not isinstance(section, Mapping) or section.get("schema") != ENVELOPE_SCHEMA:
             raise GameplayMigrationError("unknown gameplay save schema")
+        if set(section) != SECTION_KEYS:
+            missing = SECTION_KEYS - set(section)
+            if missing:
+                raise GameplayMigrationError("missing gameplay save field")
+            raise GameplayMigrationError("unknown gameplay save field")
         try:
             env = cls(section["world_id"], section["schema_version"], section["tick"],
                       section["payload"], section["canon_digest"], section.get("parent_save_digest"))

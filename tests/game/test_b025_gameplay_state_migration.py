@@ -147,3 +147,20 @@ def test_gameplay_save_rejects_oversized_integer_before_digest(bad):
 def test_gameplay_save_rejects_nonfinite_float_before_copy(bad):
     with pytest.raises(GameplayMigrationError, match="nonfinite"):
         GameplayStateEnvelope("w1", 1, 0, {"value": bad}, CANON)
+
+
+@pytest.mark.parametrize("tick", [True, -1, 2**63, 10**1000, 1.5, "42"])
+def test_gameplay_save_rejects_unbounded_tick_and_unrecognized_fields(tick):
+    with pytest.raises(GameplayMigrationError, match="bounded tick"):
+        GameplayStateEnvelope("w1", 1, tick, {"hp": 10}, CANON)
+
+
+def test_gameplay_section_rejects_unknown_fields_before_migration():
+    tampered = dict(V1_SECTION, unexpected={"future": "untrusted"})
+    with pytest.raises(GameplayMigrationError, match="unknown gameplay save field"):
+        GameplayStateEnvelope.from_section(tampered)
+    missing = dict(V1_SECTION)
+    missing.pop("parent_save_digest")
+    with pytest.raises(GameplayMigrationError, match="missing gameplay save field"):
+        GameplayStateEnvelope.from_section(missing)
+    assert GameplayStateEnvelope.from_section(V1_SECTION).tick == 42
