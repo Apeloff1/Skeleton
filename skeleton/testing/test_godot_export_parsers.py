@@ -328,3 +328,45 @@ def test_godot_rejects_symlinked_project_root_before_reference_or_scan(tmp_path)
     project = project_mod.GodotProject(link, configfile.loads("[application]\\n"))
     with pytest.raises(ValueError, match="symlinked Godot project root"):
         project.scripts()
+
+
+def test_godot_path_to_res_rejects_aliases_and_ancestor_symlinks(tmp_path):
+    from skeleton.godot_export.project import path_to_res, res_to_path
+
+    root = tmp_path / "project"
+    root.mkdir()
+    script = root / "script.gd"
+    script.write_text("extends Node")
+    assert path_to_res(root, script) == "res://script.gd"
+    with pytest.raises(ValueError, match="outside"):
+        path_to_res(root, tmp_path / "outside.gd")
+
+    alias = root / "script_alias.gd"
+    try:
+        alias.symlink_to(script)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlinked"):
+        path_to_res(root, alias)
+
+    parent = tmp_path / "real_parent"
+    parent.mkdir()
+    nested = parent / "nested"
+    nested.mkdir()
+    (nested / "scene.tscn").write_text("[gd_scene format=3]\n")
+    linked_parent = tmp_path / "linked_parent"
+    linked_parent.symlink_to(parent, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlinked"):
+        res_to_path(linked_parent / "nested", "res://scene.tscn")
+    with pytest.raises(ValueError, match="symlinked"):
+        path_to_res(linked_parent / "nested", linked_parent / "nested" / "scene.tscn")
+
+
+def test_godot_inventory_fails_closed_on_symlinked_entries(tmp_path):
+    from skeleton.godot_export.project import GodotProject
+
+    (tmp_path / "valid.gd").write_text("extends Node")
+    (tmp_path / "alias.gd").symlink_to(tmp_path / "valid.gd")
+    project = GodotProject(tmp_path, configfile.loads("[application]\n"))
+    with pytest.raises(ValueError, match="symlinked Godot inventory"):
+        project.scripts()

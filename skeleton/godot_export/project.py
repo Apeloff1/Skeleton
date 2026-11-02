@@ -13,9 +13,15 @@ IGNORED_DIRS = {".godot", ".import", ".git", "build", "export"}
 MAX_PROJECT_SCAN_ENTRIES = 20_000
 
 
+def _reject_symlink_chain(path: Path) -> None:
+    # This is a static source-reference check, not a descriptor-held read.
+    # Consumers opening hostile paths must still use openat/O_NOFOLLOW.
+    if any(component.is_symlink() for component in (path, *path.parents)):
+        raise ValueError("symlinked Godot path or ancestor is not trusted")
+
+
 def res_to_path(root: Path, res: str) -> Path:
-    if root.is_symlink():
-        raise ValueError("symlinked Godot project root is not trusted")
+    _reject_symlink_chain(root)
     if type(res) is not str or not res.startswith("res://") or len(res) > 4096:
         raise ValueError("not a bounded res:// path")
     rel = res[len("res://"):]
@@ -27,18 +33,24 @@ def res_to_path(root: Path, res: str) -> Path:
             unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} for char in rel):
         raise ValueError("unsafe res:// URI or control character")
     target = root.joinpath(*parts)
-    # Reject already-present symlink components. This is a conservative
-    # reference validator, not a substitute for descriptor-bound file reads.
-    for depth in range(1, len(parts) + 1):
-        if root.joinpath(*parts[:depth]).is_symlink():
-            raise ValueError("symlinked res:// path is not trusted")
+    # Refuse symlinked ancestors as well as the leaf. Never return a
+    # plausible res:// reference through a pre-existing alias.
+    _reject_symlink_chain(target)
     return target
 
 
 def path_to_res(root: Path, path: Path) -> str:
-    if root.is_symlink():
-        raise ValueError("symlinked Godot project root is not trusted")
-    return "res://" + path.resolve().relative_to(root.resolve()).as_posix()
+    _reject_symlink_chain(root)
+    _reject_symlink_chain(path)
+    try:
+        relative = path.absolute().relative_to(root.absolute())
+    except ValueError as exc:
+        raise ValueError("Godot resource lies outside the project") from exc
+    if not relative.parts or any(part in ("", ".", "..") for part in relative.parts):
+        raise ValueError("unsafe Godot resource relative path")
+    result = "res://" + relative.as_posix()
+    res_to_path(root, result)
+    return result
 
 
 @dataclass
@@ -49,8 +61,7 @@ class GodotProject:
     @classmethod
     def load(cls, root: str | Path) -> "GodotProject":
         r = Path(root)
-        if r.is_symlink():
-            raise ValueError("symlinked Godot project root is not trusted")
+        _reject_symlink_chain(r)
         return cls(r, configfile.load(r / "project.godot"))
 
     @property
@@ -110,15 +121,16 @@ class GodotProject:
             return False
 
     def iter_files(self, suffixes: tuple[str, ...]) -> list[Path]:
-        if self.root.is_symlink():
-            raise ValueError("symlinked Godot project root is not trusted")
+        _reject_symlink_chain(self.root)
         out = []
         visited = 0
         for p in self.root.rglob("*"):
             visited += 1
             if visited > MAX_PROJECT_SCAN_ENTRIES:
                 raise ValueError("project scan exceeds entry bound")
-            if p.is_symlink() or not p.is_file() or p.suffix not in suffixes:
+            if p.is_symlink():
+                raise ValueError("symlinked Godot inventory entry is not trusted")
+            if not p.is_file() or p.suffix not in suffixes:
                 continue
             if any(part in IGNORED_DIRS for part in p.relative_to(self.root).parts):
                 continue
