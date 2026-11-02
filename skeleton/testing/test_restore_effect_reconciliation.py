@@ -5,7 +5,14 @@ from skeleton.skills.tool_contract import ToolExecutionRequest
 from skeleton.skills.tool_effect_reconciliation import ReconciliableToolReceiptStore, ToolEffectReconciliationEvidence
 
 def request():
-    return ToolExecutionRequest(request_id="req-1", operation_id="op-1", execution_id="exec-1", turn_id="turn-1", call_id="call-1", tenant_id="tenant-1", tool_id="tool-1", idempotency_key="idem-1", arguments_digest="a"*64)
+    return ToolExecutionRequest(
+        request_id="00000000-0000-4000-8000-000000000001",
+        operation_id="00000000-0000-4000-8000-000000000002",
+        execution_id="exec-1", turn_id="turn-1", call_id="call-1",
+        tenant_id="tenant-1", tool_id="tool-1", idempotency_key="idem-1",
+        arguments={"input": "reconciliation"},
+        requested_at=datetime(2026, 10, 5, tzinfo=timezone.utc),
+    )
 
 class TestRestoreEffectReconciliation(unittest.TestCase):
     def setUp(self):
