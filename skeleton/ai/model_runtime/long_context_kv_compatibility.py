@@ -128,7 +128,9 @@ class LongContextKvCompatibility:
                 "tokenizer_digest": layout.tokenizer_digest,
                 "generation": request.generation,
             }
-            if (any(observed.get(key) != value for key, value in body.items())
+            if (any(type(observed.get(key)) is not type(value)
+                    or observed.get(key) != value for key, value in body.items())
+                    or type(observed.get("record_digest")) is not str
                     or observed.get("record_digest") != sha256(_canonical(body)).hexdigest()):
                 raise LongContextSpoolError("KV head identity mismatch")
             window = observed.get("window")

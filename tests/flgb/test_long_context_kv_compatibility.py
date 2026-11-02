@@ -76,6 +76,7 @@ class KvCompatibilityTests(unittest.TestCase):
     def test_stale_or_tampered_head_holds(self):
         for change in (
             {"generation": 4},
+            {"generation": True},
             {"is_execution_lease": True},
             {"record_digest": "0" * 64},
             {"tokenizer_digest": "0" * 64},
