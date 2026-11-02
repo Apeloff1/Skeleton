@@ -48,6 +48,10 @@ def parse_command(line: str) -> dict[str, str] | str:
         raise HarborError("empty terminal command")
     if parts == ["save"]:
         return "save"
+    if parts == ["undo"]:
+        return "undo"
+    if parts == ["redo"]:
+        return "redo"
     if parts == ["hint"]:
         return "hint"
     if parts == ["help"]:
@@ -79,8 +83,9 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
     world = validate_source(source)
     state = initial_state(world)
     actions: list[dict[str, str]] = []
+    redo_stack: list[dict[str, str]] = []
     max_commands = world["max_ticks"] * 4 + 16
-    output_stream.write("LANTERN QUAY | north south east west gather craft ID trade ID deliver signal shelter wait hint save quit\n")
+    output_stream.write("LANTERN QUAY | north south east west gather craft ID trade ID deliver signal shelter wait hint undo redo save quit\n")
     output_stream.write(render(world, state))
     for _ in range(max_commands):
         line = input_stream.readline(MAX_COMMAND_BYTES + 2)
@@ -90,6 +95,27 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
             return 2
         try:
             command = parse_command(line)
+            if command == "undo":
+                if not actions:
+                    raise HarborError("no action to undo")
+                redo_stack.append(actions.pop())
+                restored = export_bundle(world, actions)
+                state = verify_bundle(restored)
+                output_stream.write("UNDO " + restored["terminal_digest"] + "\n")
+                output_stream.write(render(world, state))
+                continue
+            if command == "redo":
+                if not redo_stack:
+                    raise HarborError("no action to redo")
+                candidate = redo_stack[-1]
+                restored = export_bundle(world, actions + [candidate])
+                updated = verify_bundle(restored)
+                actions.append(candidate)
+                redo_stack.pop()
+                state = updated
+                output_stream.write("REDO " + restored["terminal_digest"] + "\n")
+                output_stream.write(render(world, state))
+                continue
             if command == "hint":
                 available = legal_actions(world, state)
                 descriptions = []
@@ -103,7 +129,7 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
                 output_stream.write("LEGAL NOW " + ", ".join(descriptions) + "\n")
                 continue
             if command == "help":
-                output_stream.write("Move, gather, craft, trade, deliver and choose an ending. save exports a checkpoint.\n")
+                output_stream.write("Move, gather, craft, trade, deliver and choose an ending. hint lists legal actions; undo/redo replay verified history; save exports a checkpoint.\n")
                 continue
             if command == "save":
                 output_stream.write("CHECKPOINT " + canonical(export_bundle(world, actions)).decode("utf-8") + "\n")
@@ -117,6 +143,7 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
             output_stream.write("REJECTED " + str(exc) + "\n")
             continue
         actions.append(command)
+        redo_stack.clear()
         state = updated
         output_stream.write(render(world, state))
         if state["ending"] is not None:
