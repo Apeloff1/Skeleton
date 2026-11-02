@@ -83,4 +83,3 @@ explicit release holds. If any required pin, path custody, replay,
 summary, or source check fails, the CLI exits nonzero with a blocked
 receipt and does not attempt recovery. Preserve failed artifacts for
 explicit operator quarantine and investigation.
-
