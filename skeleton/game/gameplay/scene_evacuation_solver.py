@@ -60,6 +60,7 @@ def solve_evacuation(source: Any, *, max_nodes: int = MAX_SEARCH_NODES,
     ]
     seen = {initial["state_digest"]}
     expanded = 0
+    generated = 1
     while heap and expanded < max_nodes:
         _, _, actions, current = heapq.heappop(heap)
         expanded += 1
@@ -73,9 +74,10 @@ def solve_evacuation(source: Any, *, max_nodes: int = MAX_SEARCH_NODES,
             if next_session["state"]["phase"] != "active":
                 continue
             key = next_session["state_digest"]
-            if key in seen:
+            if key in seen or generated >= max_nodes:
                 continue
             seen.add(key)
+            generated += 1
             counter += 1
             state = next_session["state"]
             remaining = max(0, spec["required_rescues"] - len(state["passengers"]))
@@ -89,7 +91,8 @@ def solve_evacuation(source: Any, *, max_nodes: int = MAX_SEARCH_NODES,
     result = {
         "schema_version": "skeleton.scene_evacuation_route.v1",
         "status": "inconclusive", "source_digest": dig(spec),
-        "expanded": expanded, "max_nodes": max_nodes, "max_depth": max_depth,
+        "expanded": expanded, "generated": generated,
+        "max_nodes": max_nodes, "max_depth": max_depth,
         "reason": "bounded search exhausted without a verified winning route",
     }
     result["receipt"] = dig(result)

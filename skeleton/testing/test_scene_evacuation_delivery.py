@@ -125,3 +125,31 @@ def test_acceptance_rejects_partial_outcome_without_false_certification():
     actions = [action for action in demo_actions() if action["kind"] != "protect"]
     with pytest.raises(SceneTravelError, match="earned victory"):
         accept_evacuation(source, actions)
+
+
+def test_solver_caps_generated_states_as_well_as_expansions():
+    report = solve_evacuation(original_evacuation(), max_nodes=4, max_depth=8)
+    assert report["status"] == "inconclusive"
+    assert 1 <= report["generated"] <= 4
+    assert 1 <= report["expanded"] <= 4
+
+
+def test_live_player_input_uses_bounded_read_and_preserves_checkpoint(monkeypatch):
+    import io
+    from skeleton.game.gameplay.scene_evacuation_interactive import _live
+
+    reader = io.StringIO("quit\n")
+    monkeypatch.setattr("sys.stdin", reader)
+    checkpoint = _live(original_evacuation())
+    assert checkpoint["state"]["phase"] == "active"
+    assert checkpoint["state"]["tick"] == 0
+
+
+def test_live_player_rejects_oversized_line_before_json_parse(monkeypatch):
+    import io
+    from skeleton.game.gameplay.scene_evacuation import MAX_BYTES
+    from skeleton.game.gameplay.scene_evacuation_interactive import _live
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(" " * (MAX_BYTES + 2) + "\n"))
+    with pytest.raises(SceneTravelError, match="byte budget"):
+        _live(original_evacuation())

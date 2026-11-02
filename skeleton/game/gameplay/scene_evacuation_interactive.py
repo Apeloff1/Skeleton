@@ -60,12 +60,13 @@ def _live(source: Any, checkpoint: Any = None) -> dict[str, Any]:
         board = inspect_evacuation(saved)
         print(json.dumps({"board": board, "checkpoint": saved}, sort_keys=True),
               flush=True)
-        try:
-            raw = input()
-        except EOFError:
+        # Bounded read prevents an interactive client from exhausting memory
+        # before the strict JSON parser can enforce the byte limit.
+        raw = sys.stdin.readline(MAX_BYTES + 1)
+        if not raw or raw.strip() == "quit":
             break
-        if raw.strip() == "quit":
-            break
+        if len(raw.encode("utf-8")) > MAX_BYTES:
+            raise SceneTravelError("player action exceeds input byte budget")
         action = _strict_json(raw, "player action", max_bytes=MAX_BYTES)
         if action not in board["legal_actions"]:
             raise SceneTravelError("player action not legal at this checkpoint")
