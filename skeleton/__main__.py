@@ -72,6 +72,7 @@ Commands:
     scene-survival  Play source-bound tile hazards, earned food, shelter and replay
     scene-weather  Play authored climate, stamina and earned protection
     scene-weather-author  Transactionally edit climate and preview play
+    scene-weather-play  Interactively play weather with portable checkpoints
     scene-market-hours  Play authored merchant schedules with verified saves
     scene-market-hours-play  Interactively play merchants with portable checkpoints
     scene-market-hours-accept  Verify end-to-end merchant gameplay acceptance
@@ -943,6 +944,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-weather":
         from skeleton.game.gameplay.scene_weather import cli as weather_cli
         return weather_cli(rest)
+    if cmd == "scene-weather-play":
+        from skeleton.game.gameplay.scene_weather_interactive import cli as weather_play_cli
+        return weather_play_cli(rest)
     if cmd == "scene-weather-author":
         from skeleton.game.gameplay.scene_weather_author import cli as weather_author_cli
         return weather_author_cli(rest)

@@ -46,7 +46,7 @@ class WeatherProductionTests(unittest.TestCase):
             _advance(session, {
                 "kind": "survival",
                 "action": {"kind": "tile", "action": {
-                    "kind": "move", "direction": "north"}},
+                    "kind": "move", "direction": "west"}},
             })
         self.assertEqual(session["state"]["stamina"], self.source["max_stamina"])
         self.assertEqual(session["journal"], [])

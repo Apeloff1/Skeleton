@@ -27,3 +27,5 @@ collision. No wall clock, network, native renderer or nondeterministic RNG.
 A checkpoint cannot substitute for external authentication or consumer/device
 qualification. Regression tests cover movement, source provenance, rest,
 equipment, replay, save/export/import, editor CAS and forged receipts.
+
+For a stream-based user interface, run `python -m skeleton scene-weather-play play --source-json JSON`. Commands include `move east`, `collect find_key`, `equip stormcloak`, `rest` and JSON actions. The adapter emits replay-verified checkpoints at configurable intervals and on EOF or input exhaustion. No input is executed as code.
