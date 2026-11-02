@@ -129,6 +129,11 @@ def _regular(
             before = os.fstat(leaf)
             if not stat.S_ISREG(before.st_mode):
                 raise AssetImportError("asset is not a regular file")
+            # O_NOFOLLOW blocks symlinks, not hard links. A hostile package
+            # could otherwise alias a readable file outside its held root.
+            # Reject shared inodes for assets and their external sidecars.
+            if before.st_nlink != 1:
+                raise AssetImportError("asset is hard-linked outside its source boundary")
             if before.st_size > MAX_ASSET_BYTES:
                 raise AssetImportError("asset exceeds size limit")
             if observed is not None:
