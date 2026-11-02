@@ -112,3 +112,15 @@ def test_empty_mutation_set_cannot_certify_quality():
     assert generated.score == 0.0
     with pytest.raises(AssertionError, match="no executable mutants"):
         generated.gate()
+
+
+def test_incomparable_mutant_operands_cannot_count_as_killed():
+    import ast
+    from skeleton.gameforge.batch_b077.mutation import MutationUnsupportedError, _interpret
+
+    expr = ast.parse("left < right", mode="eval").body
+    for left, right in (("3", 3), (True, 1), (None, "x")):
+        with pytest.raises(MutationUnsupportedError):
+            _interpret(expr, {"left": left, "right": right})
+    assert _interpret(expr, {"left": 1, "right": 2.0}) is True
+    assert _interpret(expr, {"left": "a", "right": "b"}) is True

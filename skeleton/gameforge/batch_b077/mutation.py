@@ -179,6 +179,11 @@ def _interpret(node: ast.AST, variables: dict, depth: int = 0):
             if type(op) not in _COMPARISONS:
                 raise MutationUnsupportedError("unsupported mutant comparison")
             right = _interpret(comparator, variables, depth + 1)
+            if type(op) in (ast.Lt, ast.LtE, ast.Gt, ast.GtE):
+                numeric = type(left) in (int, float) and type(right) in (int, float)
+                textual = type(left) is str and type(right) is str
+                if not (numeric or textual):
+                    raise MutationUnsupportedError("incomparable mutant operands")
             if not _COMPARISONS[type(op)](left, right):
                 return False
             left = right
