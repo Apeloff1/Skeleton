@@ -90,6 +90,14 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.assertTrue(self.guard.release(key))
         self.assertFalse(self.guard.release(key))
 
+    def test_sampling_gap_revokes_inflight_capacity(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.clock.value += 3_000_000_000
+        self.assertEqual(self.guard.observe()["state"], "warming")
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+        self.assertEqual(self.guard.status()["active"], 0)
+
     def test_critical_pressure_revokes(self):
         self.warm()
         key = self.guard.reserve(self.request)["reservation_id"]
