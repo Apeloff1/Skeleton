@@ -19,6 +19,8 @@ from ..persistence.journal import EventJournal
 from ..orchestration.service import OfflineAIService
 from ..orchestration.custody.session import ProcessSessionFence
 from ..model.gguf.file_guard import open_trusted_root
+from ..deployment.boot.identity import PrincipalBinding, establish_binding
+from ..deployment.install.doctor import inspect_installed_model
 
 
 def main(argv:list[str]|None=None)->int:
@@ -43,25 +45,40 @@ def main(argv:list[str]|None=None)->int:
     if (args.message is None)==(not args.serve):
         p.error('specify exactly one of --message or --serve')
     if args.session and args.system:p.error('system can only be set on new session')
+    if args.serve:
+        candidate=os.environ.get('SKELETON_LOCAL_AI_BEARER','')
+        if not 32<=len(candidate)<=512 or any(ord(c)<33 or ord(c)>126 for c in candidate):
+            print(json.dumps({'status':'blocked','reason':'InvalidBearerSecret'}),file=sys.stderr)
+            return 2
     try:
         state=args.state_dir.absolute()
         if not state.is_dir() or state.is_symlink() or state.stat().st_mode&0o077:
             raise GGUFManifestError('private state directory must exist, non-symlink, mode 0700')
+        # Never serve a model staged outside the source-bound approved installer.
+        installed=inspect_installed_model(args.model_root)
+        manifest=load_approved_manifest(args.model_root,args.manifest)
+        key_material=load_key_file(args.memory_key_file)
+        if installed.model_sha256!=manifest.model_sha256:
+            raise GGUFManifestError('installed model receipt does not bind activated model')
+        # The chat store itself binds model/tokenizer, not tenant/user. Refuse
+        # any unbound legacy database instead of implicitly adopting it.
+        establish_binding(state,PrincipalBinding(args.tenant,args.user,
+                           manifest.model_sha256,manifest.model_sha256))
         root_fd=open_trusted_root(state)
         try:
-            os.mkdir('session_locks',mode=0o700,dir_fd=root_fd)
-        except FileExistsError:
-            pass
+            try:
+                os.mkdir('session_locks',0o700,dir_fd=root_fd)
+            except FileExistsError:
+                pass
         finally:
             os.close(root_fd)
-        manifest=load_approved_manifest(args.model_root,args.manifest)
         with ExitStack() as stack:
             backend=stack.enter_context(activate_model(args.model_root,manifest,
                 n_ctx=args.context_tokens,n_threads=args.threads,n_gpu_layers=args.gpu_layers))
             from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
             store=stack.enter_context(OfflineChatStore(state/'chat.sqlite'))
             memory=stack.enter_context(SealedMemoryStore(state/'memory.sqlite',
-                load_key_file(args.memory_key_file)))
+                key_material))
             journal=stack.enter_context(EventJournal(state/'audit.sqlite'))
             process_fence=stack.enter_context(ProcessSessionFence(state/'session_locks'))
             actor=Actor(args.tenant,args.user,backend.model_digest,backend.tokenizer_digest)
@@ -69,8 +86,7 @@ def main(argv:list[str]|None=None)->int:
                 context_tokens=args.context_tokens,output_tokens=args.max_new_tokens,
                 tool_calls=0,retrieval_hits=8,deadline_ms=120000)
             service=OfflineAIService(actor=actor,gateway=ModelGateway(backend),chat_store=store,
-                                      memory=memory,journal=journal,limits=limits,
-                                      process_fence=process_fence)
+                                      memory=memory,journal=journal,limits=limits,process_fence=process_fence)
             if args.serve:
                 from .http import LocalHTTPServer
                 from .dispatch import Dispatcher
@@ -86,7 +102,7 @@ def main(argv:list[str]|None=None)->int:
             print(json.dumps(result.to_record(),sort_keys=True,ensure_ascii=False))
         return 0
     except (GGUFManifestError,ValueError,RuntimeError,OSError) as exc:
-        print(json.dumps({'status':'blocked','error':str(exc)}),file=sys.stderr)
+        print(json.dumps({'status':'blocked','reason':type(exc).__name__}),file=sys.stderr)
         return 2
 
 if __name__=='__main__':raise SystemExit(main())

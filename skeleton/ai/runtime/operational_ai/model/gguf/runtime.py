@@ -75,8 +75,17 @@ class GGUFBackend:
             choices=result['choices']
             if not isinstance(choices,list) or len(choices)!=1:
                 raise KeyError('choices')
-            text=choices[0]['message']['content']
-            reason=choices[0].get('finish_reason') or 'stop'
+            choice=choices[0]
+            message=choice['message']
+            if (not isinstance(message,dict) or message.get('role','assistant')!='assistant'
+                    or message.get('tool_calls') or message.get('function_call')):
+                raise ValueError('native backend attempted unauthorized tool or role')
+            text=message['content']
+            reason=choice.get('finish_reason')
+            # A function/tool-call finish cannot be represented as a safe
+            # user-visible chat response, even if content is also present.
+            if reason not in ('stop','length'):
+                raise ValueError('unsupported native finish reason')
             usage=result['usage']
             prompt_tokens=usage['prompt_tokens']
             generated=usage['completion_tokens']
