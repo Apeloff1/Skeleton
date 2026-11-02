@@ -101,15 +101,20 @@ class LongContextCpuCapacityGuard:
         if os.getpid() != self._pid:
             raise LongContextSpoolError("inherited capacity lock after fork")
 
+    def _revoke_all(self) -> None:
+        """Account for every invalidated reservation, including claimed ones."""
+        self._revocations += len(self._reservations)
+        self._reservations.clear()
+
     def _now(self) -> int:
         try:
             now = self._clock()
         except Exception as exc:
-            self._reservations.clear()
+            self._revoke_all()
             raise LongContextSpoolError("capacity clock unavailable") from exc
         if (type(now) is not int or not 0 <= now <= _MAX_CLOCK
                 or (self._last_ns is not None and now <= self._last_ns)):
-            self._reservations.clear()
+            self._revoke_all()
             raise LongContextSpoolError("capacity clock regressed")
         self._last_ns = now
         expired = [key for key, item in self._reservations.items()
@@ -134,8 +139,7 @@ class LongContextCpuCapacityGuard:
         # Warming after a sampling gap is not a stable safe observation.
         # Revoke previously reserved capacity on every non-normal state.
         if state != "repeated_normal_observed":
-            self._revocations += len(self._reservations)
-            self._reservations.clear()
+            self._revoke_all()
         return state
 
     def _authorized(self, request: CpuCapacityRequest) -> bool:
@@ -395,7 +399,7 @@ class LongContextCpuCapacityGuard:
     def close(self) -> None:
         self._pid_guard()
         with self._lock:
-            self._reservations.clear()
+            self._revoke_all()
             self._closed = True
 
 

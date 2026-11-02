@@ -207,6 +207,8 @@ class CpuCapacityGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(LongContextSpoolError, "clock regressed"):
             self.guard.status()
         self.assertEqual(len(self.guard._reservations), 0)
+        self.clock.value = 2_000_000
+        self.assertEqual(self.guard.status()["revocations"], 1)
         with patch("skeleton.ai.model_runtime.long_context_cpu_guard.os.getpid",
                    return_value=-1):
             with self.assertRaisesRegex(LongContextSpoolError, "after fork"):
@@ -217,6 +219,7 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.guard.reserve(self.request)
         self.guard.close()
         self.assertEqual(self.guard.status()["active"], 0)
+        self.assertEqual(self.guard.status()["revocations"], 1)
         with self.assertRaisesRegex(LongContextSpoolError, "closed"):
             self.guard.reserve(self.request)
 
@@ -356,6 +359,18 @@ class CpuCapacityGuardTests(unittest.TestCase):
             receipts[1]["reservation_id"], self.request)["claimed"])
         self.assertEqual(self.guard.status()["active"], 1)
 
+
+    def test_clock_exception_accounts_for_revoked_claim(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.assertTrue(self.guard.claim(key, self.request)["claimed"])
+        self.guard._clock = MagicMock(side_effect=OSError("monotonic unavailable"))
+        with self.assertRaisesRegex(LongContextSpoolError, "clock unavailable"):
+            self.guard.status()
+        self.guard._clock = self.clock
+        self.assertEqual(self.guard.status()["active"], 0)
+        self.assertEqual(self.guard.status()["revocations"], 1)
+        self.assertFalse(self.guard.release(key))
 
 if __name__ == "__main__":
     unittest.main()
