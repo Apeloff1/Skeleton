@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import math
 
 from skeleton.build.delivery._util import DeliveryError
-from skeleton.build.delivery.health_check import HealthReport
+from skeleton.build.delivery.health_check import HealthReport, VERDICTS
 from skeleton.build.delivery.release_history import ReleaseHistory, ReleaseRecord
 
 TRIGGERS = frozenset({"health", "manual", "error-budget", "promotion-veto"})
@@ -37,6 +37,11 @@ def decide(
     error_budget: float = 0.01,
     tolerate_degraded: bool = True,
 ) -> RollbackDecision:
+    if (not isinstance(report, HealthReport)
+            or type(report.verdict) is not str or report.verdict not in VERDICTS
+            or type(report.failing_probes) is not tuple
+            or (report.verdict == "healthy" and bool(report.failing_probes))):
+        raise DeliveryError("invalid or contradictory health report evidence")
     if (type(error_rate) not in (int, float) or type(error_budget) not in (int, float)
             or not math.isfinite(error_rate) or not math.isfinite(error_budget)
             or not 0 <= error_rate <= 1 or not 0 < error_budget <= 1):
@@ -53,7 +58,7 @@ def decide(
 
 
 def plan_rollback(history: ReleaseHistory, *, trigger: str) -> RollbackPlan:
-    if trigger not in TRIGGERS:
+    if type(trigger) is not str or trigger not in TRIGGERS:
         raise DeliveryError(f"unknown rollback trigger {trigger!r}")
     current = history.current()
     if current is None:
