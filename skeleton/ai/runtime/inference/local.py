@@ -4124,9 +4124,8 @@ class LocalModelAdapter(ProviderAdapter):
                 )
                 async def invoke_verified() -> Any:
                     # An engine-owned durable reader must be activated for
-                    # this *exact* native digest inside the wait_for task, not
-                    # in the parent task where ContextVar inheritance could
-                    # accidentally confer the wrong execution identity.
+                    # this *exact* native digest inside the owning task, without spawning a child task where ContextVar
+                    # inheritance could accidentally confer the wrong execution identity.
                     reader = self.guarded_service.snapshots
                     binder = getattr(reader, "bind_execution", None)
                     if binder is None:
@@ -4151,9 +4150,8 @@ class LocalModelAdapter(ProviderAdapter):
                             **execution_options,
                         )
 
-                generation = await asyncio.wait_for(
-                    invoke_verified(), timeout=remaining,
-                )
+                async with asyncio.timeout(remaining):
+                    generation = await invoke_verified()
                 from .guarded_service import GuardedGeneration
                 from skeleton.context.pre_delivery_guard import PreDeliveryReceipt
                 if (not isinstance(generation, GuardedGeneration)

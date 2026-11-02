@@ -227,7 +227,7 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
                 LocalResourcePressure, "late Metal pressure"
             ):
                 backend.infer(
-                    LocalInferenceRequest(prompt="private local question"),
+                    LocalInferenceRequest(prompt="private local question", max_output_tokens=64),
                     threading.Event(),
                 )
         self.assertEqual(len(calls), 2)
