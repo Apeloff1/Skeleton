@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import shutil
+import os
 import json
 from pathlib import Path
 
@@ -19,6 +20,78 @@ from skeleton.app.offline_first_playable_batch_triage import (
 from skeleton.testing.test_app_offline_first_playable_batch import (
     original_games, jobs_for, pinned,
 )
+
+
+
+
+def _pinned_prefix_for_triage(original_games, tmp_path):
+    jobs = jobs_for(original_games, tmp_path)
+    first = jobs[0]
+    published = publish_first_playable_delivery(
+        first.source, first.archive, first.install, first.save, first.receipt,
+        expected_manifest_sha256=first.manifest_sha256,
+        moves=first.moves, authorized=True,
+    )
+    return (
+        replace(first, archive_sha256=published["archive_sha256"],
+                save_sha256=published["save_sha256"],
+                receipt_sha256=published["independent_receipt_sha256"]),
+        jobs[1],
+    )
+
+
+def test_resume_triage_rejects_late_same_byte_prefix_inode_swap(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_batch_triage as module
+
+    jobs = _pinned_prefix_for_triage(original_games, tmp_path)
+    original_preflight = module._preflight
+    swapped = False
+
+    def swap_after_suffix_preflight(*args, **kwargs):
+        nonlocal swapped
+        result = original_preflight(*args, **kwargs)
+        if not swapped:
+            target = Path(jobs[0].archive)
+            replacement = tmp_path / "same-bytes-replacement.zip"
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(0o600)
+            os.replace(replacement, target)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(module, "_preflight", swap_after_suffix_preflight)
+    result = module.triage_first_playable_delivery_batch(
+        jobs, tmp_path / "cohort.json", authorized=True,
+    )
+    assert swapped is True
+    assert result["resume_eligible_with_independent_pins"] is False
+    assert result["resume_source_preflight_verified"] is False
+    assert result["release_certified"] is False
+
+
+def test_resume_triage_rejects_suffix_output_created_after_preflight(
+    original_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import offline_first_playable_batch_triage as module
+
+    jobs = _pinned_prefix_for_triage(original_games, tmp_path)
+    original_preflight = module._preflight
+
+    def publish_untrusted_suffix_after_preflight(*args, **kwargs):
+        result = original_preflight(*args, **kwargs)
+        Path(jobs[1].archive).write_bytes(b"untrusted late artifact")
+        return result
+
+    monkeypatch.setattr(module, "_preflight", publish_untrusted_suffix_after_preflight)
+    result = module.triage_first_playable_delivery_batch(
+        jobs, tmp_path / "cohort.json", authorized=True,
+    )
+    assert result["resume_eligible_with_independent_pins"] is False
+    assert result["resume_source_preflight_verified"] is False
+    assert Path(jobs[1].archive).read_bytes() == b"untrusted late artifact"
+    assert result["release_certified"] is False
 
 
 def test_empty_cohort_is_pending_and_read_only(original_games, tmp_path):

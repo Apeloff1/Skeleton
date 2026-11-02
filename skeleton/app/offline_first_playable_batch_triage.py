@@ -21,6 +21,7 @@ from skeleton.app.offline_archive_install import _parent as install_parent
 from skeleton.app.offline_delivery_archive import _parent as archive_parent
 from skeleton.app.offline_first_playable_batch import (
     DeliveryJob, _check_jobs, _parse_job, _reverify_original_sources,
+    _delivered_custody, _inspect_jobs, _record,
     inspect_first_playable_delivery_batch,
 )
 from skeleton.app.offline_first_playable_delivery import (
@@ -183,6 +184,23 @@ def triage_first_playable_delivery_batch(
     source_preflight_verified = False
     if can_resume:
         try:
+            # The earlier status snapshot is not a durable reservation. Pin
+            # the entire published prefix before replaying the missing suffix;
+            # a same-byte inode swap must not produce a resume-safe verdict.
+            prefix = checked[:verified_prefix]
+            prefix_custody = _delivered_custody(prefix)
+            prefix_records = []
+            for job in prefix:
+                inspected = inspect_first_playable_delivery(
+                    job.install, job.archive, job.save, job.receipt,
+                    expected_manifest_sha256=job.manifest_sha256,
+                    expected_archive_sha256=job.archive_sha256,
+                    expected_save_sha256=job.save_sha256,
+                    expected_receipt_sha256=job.receipt_sha256,
+                    authorized=True,
+                )
+                prefix_records.append(_record(inspected, job.moves))
+            _inspect_jobs(prefix, prefix_records)
             admissions: list[dict[str, object]] = []
             identities: list[tuple[int, ...]] = []
             for index, job in enumerate(checked):
@@ -213,6 +231,18 @@ def triage_first_playable_delivery_batch(
                     "duplicate original project in resumable cohort"
                 )
             _reverify_original_sources(checked, admissions, identities)
+            # A suffix destination or summary may appear while the expensive
+            # source replay runs. Recheck every name and every pinned game
+            # after the last preflight before reporting resume eligibility.
+            _inspect_jobs(prefix, prefix_records)
+            if (_delivered_custody(prefix) != prefix_custody
+                    or _entry(summary_receipt, private_parent,
+                              directory=False) != "missing"
+                    or any(any(value != "missing" for value in _states(job).values())
+                           for job in checked[verified_prefix:])):
+                raise FirstPlayableBatchTriageError(
+                    "delivery artifacts changed during resume eligibility replay"
+                )
         except (OSError, ValueError, TypeError, KeyError):
             can_resume = False
         else:
