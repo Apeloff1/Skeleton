@@ -107,6 +107,8 @@ def inspect_consumer_first_run_cohort(
                 or observed.get("nested_asset_inode_snapshots_equal") is not True
                 or type(observed.get("installed_tree_snapshot_sha256")) is not str
                 or len(observed["installed_tree_snapshot_sha256"]) != 64
+                or any(char not in "0123456789abcdef"
+                       for char in observed["installed_tree_snapshot_sha256"])
                 or observed.get("read_only") is not True
                 or observed.get("release_certified") is not False
                 or observed.get("native_device_qualified") is not False
