@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import heapq
 import math
+import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -26,6 +27,29 @@ from skeleton.frontier_nav.route_grounding import (
 )
 
 CHANGE_KINDS = frozenset({"construction", "flood", "collapse", "tide", "terrain"})
+MAX_WORLD_CHANGE_WAYPOINTS = 4096
+MAX_WORLD_CHANGE_HOPS = 8192
+MAX_WORLD_CHANGES = 100_000
+
+
+def _valid_waypoint(value: object) -> bool:
+    return (type(value) is str and 1 <= len(value) <= 128
+            and value == value.strip()
+            and not any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"}
+                        for ch in value))
+
+
+def _valid_waypoint_set(values: object) -> bool:
+    return (type(values) is frozenset and len(values) <= MAX_WORLD_CHANGE_WAYPOINTS
+            and all(_valid_waypoint(value) for value in values))
+
+
+def _valid_hop_set(values: object) -> bool:
+    return (type(values) is frozenset and len(values) <= MAX_WORLD_CHANGE_HOPS
+            and all(type(pair) is tuple and len(pair) == 2
+                    and _valid_waypoint(pair[0]) and _valid_waypoint(pair[1])
+                    and pair[0] != pair[1] for pair in values))
+
 
 Point = tuple[float, float, float]
 
@@ -45,13 +69,23 @@ class WorldChange:
     reopen_hops: frozenset[tuple[str, str]] = frozenset()
 
     def __post_init__(self) -> None:
-        if self.kind not in CHANGE_KINDS:
+        if type(self.kind) is not str or self.kind not in CHANGE_KINDS:
             raise ValueError(f"unknown world change kind {self.kind!r}")
         if (type(self.change_id) is not str or not 1 <= len(self.change_id) <= 128
                 or any(ord(char) < 32 or ord(char) == 127 for char in self.change_id)):
             raise ValueError("change_id must be a bounded printable identifier")
         if type(self.frame) is not int or not 0 <= self.frame <= 2**63 - 1:
             raise ValueError("world change frame must be a bounded integer")
+        if (not _valid_waypoint_set(self.blocked_waypoints)
+                or not _valid_waypoint_set(self.reopen_waypoints)
+                or not _valid_hop_set(self.blocked_hops)
+                or not _valid_hop_set(self.reopen_hops)):
+            raise ValueError("world change topology evidence exceeds canonical bounds")
+        if self.blocked_waypoints & self.reopen_waypoints or any(
+            pair in self.reopen_hops or (pair[1], pair[0]) in self.reopen_hops
+            for pair in self.blocked_hops
+        ):
+            raise ValueError("world change cannot block and reopen the same topology")
 
 
 @dataclass
@@ -66,6 +100,8 @@ class Blockages:
     def apply(self, change: WorldChange) -> bool:
         if change.change_id in self.applied:
             return False
+        if len(self.applied) >= MAX_WORLD_CHANGES:
+            raise ValueError("world change history exceeds capacity")
         if change.frame < self.last_frame:
             raise ValueError(
                 f"change {change.change_id} at frame {change.frame} "

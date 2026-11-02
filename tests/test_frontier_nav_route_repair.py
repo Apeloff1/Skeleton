@@ -173,3 +173,33 @@ def test_route_monitor_rejects_invalid_deviation_frame_thresholds(bad):
     _, repairer = setup()
     with pytest.raises(ValueError, match="deviation_frames"):
         RouteMonitor(repairer, deviation_frames=bad)
+
+
+def test_world_change_topology_evidence_is_bounded_and_unambiguous(monkeypatch):
+    from skeleton.frontier_nav import route_repair as mod
+
+    bad = [
+        {"blocked_waypoints": {"A"}},
+        {"blocked_waypoints": frozenset({"bad\u202ename"})},
+        {"blocked_hops": frozenset({("A", "A")})},
+        {"blocked_hops": frozenset({("A", "bad\nnode")})},
+        {"blocked_hops": frozenset({("A",)})},
+        {"blocked_hops": frozenset({("A", "B")}),
+         "reopen_hops": frozenset({("B", "A")})},
+        {"blocked_waypoints": frozenset({"A"}),
+         "reopen_waypoints": frozenset({"A"})},
+    ]
+    for kwargs in bad:
+        with pytest.raises(ValueError, match="topology"):
+            WorldChange("bad", "flood", 1, **kwargs)
+
+    monkeypatch.setattr(mod, "MAX_WORLD_CHANGE_WAYPOINTS", 1)
+    with pytest.raises(ValueError, match="topology"):
+        WorldChange("many", "flood", 1, blocked_waypoints=frozenset({"A", "B"}))
+    monkeypatch.setattr(mod, "MAX_WORLD_CHANGES", 1)
+    blockages = Blockages()
+    assert blockages.apply(WorldChange("first", "flood", 1))
+    assert not blockages.apply(WorldChange("first", "flood", 1))
+    with pytest.raises(ValueError, match="history exceeds capacity"):
+        blockages.apply(WorldChange("second", "flood", 2))
+    assert blockages.last_frame == 1
