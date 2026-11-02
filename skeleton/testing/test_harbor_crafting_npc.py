@@ -57,3 +57,19 @@ def test_rehashed_forged_forecast_is_rejected(source):
     forged["forecast_digest"] = digest({k: v for k, v in forged.items() if k != "forecast_digest"})
     with pytest.raises(HarborError, match="replay"):
         verify_npc_forecast(forged)
+
+
+def test_trade_reachability_checks_stock_coins_and_capacity(source):
+    from skeleton.game.gameplay.harbor_crafting import MAX_INVENTORY, initial_state
+    from skeleton.game.gameplay.harbor_crafting_npc import _observe
+    state = initial_state(source)
+    state["pos"] = [4, 1]  # Adjacent to the initial merchant position.
+    assert _observe(state, source)["trade_reachable"] is True
+    state["coins"] = 0
+    assert _observe(state, source)["trade_reachable"] is False
+    state["coins"] = source["npc"]["price"]
+    state["npc_stock"] = {"food": 0}
+    assert _observe(state, source)["trade_reachable"] is False
+    state["npc_stock"] = {"food": 1}
+    state["inventory"] = {"wood": MAX_INVENTORY}
+    assert _observe(state, source)["trade_reachable"] is False

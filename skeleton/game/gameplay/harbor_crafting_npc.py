@@ -5,7 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from .harbor_crafting import (
-    HarborError, MAX_BUNDLE_BYTES, _keys, canonical, digest,
+    HarborError, MAX_BUNDLE_BYTES, MAX_INVENTORY, _keys, canonical, digest,
     initial_state, step, verify_bundle,
 )
 from .harbor_crafting_sessions import resume_bundle
@@ -18,12 +18,19 @@ MAX_FORECAST = 32
 
 def _observe(state: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
     distance = abs(state["pos"][0] - state["npc_pos"][0]) + abs(state["pos"][1] - state["npc_pos"][1])
+    can_trade = (
+        distance == 1
+        and state["ending"] is None
+        and state["coins"] >= source["npc"]["price"]
+        and sum(state["inventory"].values()) < MAX_INVENTORY
+        and any(quantity > 0 for quantity in state["npc_stock"].values())
+    )
     return {
         "tick": state["tick"],
         "player": list(state["pos"]),
         "npc": list(state["npc_pos"]),
         "distance": distance,
-        "trade_reachable": distance == 1 and state["ending"] is None,
+        "trade_reachable": can_trade,
         "stock": deepcopy(state["npc_stock"]),
         "coins": state["coins"],
         "merchant_price": source["npc"]["price"],
