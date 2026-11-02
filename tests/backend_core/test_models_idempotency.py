@@ -126,3 +126,21 @@ def _assert_idempotency_lease_fences_stale_owner(idem, clock):
 def test_memory_idempotency_lease_fences_stale_owner():
     idem, clock = _idem()
     _assert_idempotency_lease_fences_stale_owner(idem, clock)
+
+
+def test_idempotency_ttl_must_cover_inflight_lease_and_be_finite():
+    for ttl in (True, 0, 1, 59.99, float("nan"), float("inf"), -1, "86400", 10**100):
+        with pytest.raises(ValueError, match="cover the lease"):
+            Idempotency(MemoryIdempotencyStore(), FakeClock(), ttl_seconds=ttl)
+    Idempotency(MemoryIdempotencyStore(), FakeClock(), ttl_seconds=60)
+
+
+def test_idempotency_invalid_clock_never_executes_side_effect():
+    for instant in (float("nan"), float("inf"), -1, 10**13):
+        idem = Idempotency(MemoryIdempotencyStore(), FakeClock(start=instant))
+        invoked = []
+        with pytest.raises(CoreError) as err:
+            idem.run("key-clock-001", ("tenant", "actor", "route"), "fp",
+                     lambda: invoked.append(True) or StoredResponse(201, {}))
+        assert err.value.code == "CORE.IDEMPOTENCY.INVALID_CLOCK"
+        assert not invoked

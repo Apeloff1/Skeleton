@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import secrets
 from dataclasses import dataclass
@@ -64,7 +65,12 @@ def scope_key(tenant_id: str, actor_id: str, route: str, key: str) -> str:
 
 class Idempotency:
     def __init__(self, store: IdempotencyStore, clock: Clock, ttl_seconds: float = DEFAULT_TTL) -> None:
-        self.store, self.clock, self.ttl = store, clock, ttl_seconds
+        # TTL shorter than the 60-second in-flight lease permits two holders
+        # to execute the same side effect concurrently after early expiry.
+        if (type(ttl_seconds) not in (int, float) or not math.isfinite(ttl_seconds)
+                or not LOCK_SECONDS <= ttl_seconds <= 1_000_000_000):
+            raise ValueError("idempotency TTL must be finite and cover the lease")
+        self.store, self.clock, self.ttl = store, clock, float(ttl_seconds)
 
     def run(self, key: str | None, skey_parts: tuple[str, str, str], fp: str,
             action: Callable[[], StoredResponse]) -> tuple[StoredResponse, bool]:
@@ -75,6 +81,9 @@ class Idempotency:
             raise validation("CORE.IDEMPOTENCY.INVALID_KEY", "Idempotency-Key is malformed")
         skey = scope_key(*skey_parts, key)
         now = self.clock.now()
+        if (type(now) not in (int, float) or not math.isfinite(now)
+                or not 0 <= now <= 1_000_000_000_000):
+            raise validation("CORE.IDEMPOTENCY.INVALID_CLOCK", "idempotency clock is invalid")
         existing = self.store.get(skey)
         if existing and existing.expires_at > now:
             if existing.fingerprint != fp:
