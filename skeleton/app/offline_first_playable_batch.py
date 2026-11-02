@@ -533,6 +533,70 @@ def resume_first_playable_delivery_batch(
     }
 
 
+
+def _validated_stored_records(
+    stored: dict[str, object], jobs: tuple[DeliveryJob, ...],
+) -> list[dict[str, object]]:
+    """Validate an independently pinned summary before touching live games.
+
+    An operator-supplied SHA-256 pin authenticates bytes, not the JSON schema
+    or their authority. Reject malformed, reordered, duplicated or partially
+    forged records *before* the expensive live replay and without accepting
+    Python bool as an integer. All fields must match canonical publisher output.
+    """
+    raw_games = stored.get("games")
+    if type(raw_games) is not list or len(raw_games) != len(jobs):
+        raise FirstPlayableDeliveryBatchError("invalid bounded summary game list")
+    required = frozenset((
+        "project_id", "manifest_sha256", "archive_sha256", "save_sha256",
+        "independent_receipt_sha256", "world_digest", "replay_digest",
+        "action_count", "moves_sha256",
+    ))
+    records: list[dict[str, object]] = []
+    for index, (raw, job) in enumerate(zip(raw_games, jobs, strict=True)):
+        if type(raw) is not dict or raw.keys() != required:
+            raise FirstPlayableDeliveryBatchError(
+                "malformed canonical summary game record"
+            )
+        if (type(raw["project_id"]) is not str
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}",
+                                raw["project_id"]) is None):
+            raise FirstPlayableDeliveryBatchError(
+                "invalid original project identity in summary"
+            )
+        for field in (
+            "manifest_sha256", "archive_sha256", "save_sha256",
+            "independent_receipt_sha256", "world_digest",
+            "replay_digest", "moves_sha256",
+        ):
+            value = raw[field]
+            if type(value) is not str or _PIN.fullmatch(value) is None:
+                raise FirstPlayableDeliveryBatchError(
+                    "invalid SHA-256 identity in canonical summary"
+                )
+        expected = {
+            "manifest_sha256": job.manifest_sha256,
+            "archive_sha256": job.archive_sha256,
+            "save_sha256": job.save_sha256,
+            "independent_receipt_sha256": job.receipt_sha256,
+            "action_count": len(job.moves),
+            "moves_sha256": sha256(_canonical_bytes(list(job.moves))).hexdigest(),
+        }
+        if (type(raw["action_count"]) is not int
+                or any(raw[key] != value for key, value in expected.items())):
+            raise FirstPlayableDeliveryBatchError(
+                "summary record disagrees with independent game pins or actions"
+            )
+        records.append(dict(raw))
+    if (len({record["project_id"] for record in records}) != len(records)
+            or len({record["independent_receipt_sha256"] for record in records})
+               != len(records)):
+        raise FirstPlayableDeliveryBatchError(
+            "duplicate original game or receipt in canonical summary"
+        )
+    return records
+
+
 def inspect_first_playable_delivery_batch(
     jobs: Sequence[DeliveryJob], summary_receipt: str | Path, *,
     expected_summary_sha256: str, authorized: bool,
@@ -565,20 +629,7 @@ def inspect_first_playable_delivery_batch(
             or type(stored.get("games")) is not list
             or len(stored["games"]) != len(checked)):
         raise FirstPlayableDeliveryBatchError("invalid canonical cohort receipt")
-    records = [
-        {
-            "project_id": record["project_id"],
-            "manifest_sha256": job.manifest_sha256,
-            "archive_sha256": job.archive_sha256,
-            "save_sha256": job.save_sha256,
-            "independent_receipt_sha256": job.receipt_sha256,
-            "world_digest": record["world_digest"],
-            "replay_digest": record["replay_digest"],
-            "action_count": len(job.moves),
-            "moves_sha256": sha256(_canonical_bytes(list(job.moves))).hexdigest(),
-        }
-        for job, record in zip(checked, stored["games"], strict=True)
-    ]
+    records = _validated_stored_records(stored, checked)
     if stored != _summary(records):
         raise FirstPlayableDeliveryBatchError("cohort pins or release holds diverged")
     original_admissions: list[dict[str, object]] = []

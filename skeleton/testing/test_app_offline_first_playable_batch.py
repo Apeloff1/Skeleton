@@ -941,3 +941,98 @@ def test_second_cohort_replay_detects_late_in_place_installed_file_edit(
     assert calls >= 3
     assert target.read_bytes() != original
     assert published["release_certified"] is False
+
+
+def test_pinned_summary_record_schema_rejected_before_live_replay(
+    original_games, tmp_path,
+):
+    """Even an independently pinned JSON blob is not a typed game receipt."""
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    from skeleton.app.offline_first_playable_batch import _validated_stored_records
+
+    base_jobs = jobs_for(original_games, tmp_path)
+    jobs = tuple(
+        replace(
+            job, archive_sha256=f"{index + 1:064x}",
+            save_sha256=f"{index + 3:064x}",
+            receipt_sha256=f"{index + 5:064x}",
+        )
+        for index, job in enumerate(base_jobs)
+    )
+    records = [
+        {
+            "project_id": f"original-test-{index}",
+            "manifest_sha256": job.manifest_sha256,
+            "archive_sha256": job.archive_sha256,
+            "save_sha256": job.save_sha256,
+            "independent_receipt_sha256": job.receipt_sha256,
+            "world_digest": f"{index + 7:064x}",
+            "replay_digest": f"{index + 9:064x}",
+            "action_count": len(job.moves),
+            "moves_sha256": sha256(
+                _canonical_bytes(list(job.moves))
+            ).hexdigest(),
+        }
+        for index, job in enumerate(jobs)
+    ]
+    assert _validated_stored_records({"games": records}, jobs) == records
+    malformed = (
+        (0, "project_id", {"unexpected": "object"}),
+        (0, "project_id", "../foreign"),
+        (0, "world_digest", "0" * 63),
+        (0, "action_count", True),
+        (0, "action_count", len(jobs[0].moves) + 1),
+        (0, "manifest_sha256", "f" * 64),
+        (0, "moves_sha256", "f" * 64),
+        (1, "independent_receipt_sha256", records[0]["independent_receipt_sha256"]),
+    )
+    for index, key, value in malformed:
+        changed = [dict(record) for record in records]
+        changed[index][key] = value
+        with pytest.raises(FirstPlayableDeliveryBatchError):
+            _validated_stored_records({"games": changed}, jobs)
+    for variant in (
+        [dict(records[0])],
+        [dict(records[0]), "not a record"],
+        [dict(records[0]), {**records[1], "extra": 1}],
+        [dict(records[1]), dict(records[0])],
+    ):
+        with pytest.raises(FirstPlayableDeliveryBatchError):
+            _validated_stored_records({"games": variant}, jobs)
+
+
+def test_independently_pinned_malformed_summary_fails_before_game_replay(
+    original_games, tmp_path, monkeypatch,
+):
+    """A valid independent SHA cannot launder hostile summary JSON as evidence."""
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    from skeleton.app import offline_first_playable_batch as module
+    from skeleton.app.private_game_save import publish_private_game_save
+
+    jobs = jobs_for(original_games, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    stored = json.loads(summary.read_bytes())
+    stored["games"][0]["project_id"] = {"not": "a string"}
+    forged = tmp_path / "forged-summary.json"
+    forged_pin = publish_private_game_save(
+        _canonical_bytes(stored), forged,
+        protected_roots=tuple(
+            root for job in jobs for root in (job.source, job.install)
+        ),
+        authorized=True,
+    )
+    def must_not_replay(*args, **kwargs):
+        raise AssertionError("malformed summary reached live game replay")
+    monkeypatch.setattr(module, "inspect_first_playable_delivery", must_not_replay)
+    with pytest.raises(
+        FirstPlayableDeliveryBatchError, match="original project identity",
+    ):
+        inspect_first_playable_delivery_batch(
+            pinned(jobs, published), forged,
+            expected_summary_sha256=forged_pin, authorized=True,
+        )
+    assert forged.exists()
+    assert all(Path(job.save).exists() for job in jobs)
