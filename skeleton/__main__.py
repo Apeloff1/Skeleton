@@ -102,6 +102,7 @@ Commands:
     scene-market-party-route  Find bounded role-gated routes with replay witnesses
     scene-market-party-accept  Prove cooperative interactive restart and export
     scene-market-party-timeline  Replay journal pages, seek and fork portable saves
+    scene-market-party-vault  Replay-verified offline save slots with CAS
     scene-market  Play earned-currency trading, crafting and delivery quests
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-push  Play crate physics, pressure plates, author, solve and replay
@@ -969,6 +970,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-accept":
         from skeleton.game.gameplay.scene_market_party_acceptance import cli as party_accept_cli
         return party_accept_cli(rest)
+    if cmd == "scene-market-party-vault":
+        from skeleton.game.gameplay.scene_market_party_vault import cli as party_vault_cli
+        return party_vault_cli(rest)
     if cmd == "scene-market-party-timeline":
         from skeleton.game.gameplay.scene_market_party_timeline import cli as party_timeline_cli
         return party_timeline_cli(rest)
