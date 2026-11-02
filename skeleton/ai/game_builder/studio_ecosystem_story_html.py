@@ -45,6 +45,11 @@ function act(id,option){
 function parseCheckpoint(raw){
  if(typeof raw!=="string"||raw.length>16384){throw Error("checkpoint too large");}
  const data=JSON.parse(raw);
+ // Accept only the exact pretty-printed receipt emitted by this browser.
+ // JSON.parse alone silently collapses duplicate keys and ambiguous spellings.
+ if(raw.trim()!==JSON.stringify(data,null,2)){
+   throw Error("noncanonical or duplicate-key checkpoint");
+ }
  if(!data||Array.isArray(data)||typeof data!=="object"||
     Object.keys(data).sort().join(",")!==
     "choices,external_evidence_verified,native_genre_runtime_verified,project_id,release_certified,schema,source_digest"||
