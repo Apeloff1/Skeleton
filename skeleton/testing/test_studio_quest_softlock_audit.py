@@ -204,3 +204,83 @@ def test_editor_symlink_export_rejected(tmp_path: Path):
     with pytest.raises((OSError, StudioQuestError)):
         load_quest_softlock_editor_export(
             d, baseline, link, **kwargs(d))
+
+
+def test_exhaustive_safety_when_every_authored_choice_awards_same_stage_reward():
+    d = docs()
+    d["narrative"]["endings"][0]["requires"] = ["opening_complete"]
+    result = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    assert result["status"] == "no_softlock_in_exhaustive_search"
+    assert result["expanded_states"] == 3
+    assert result["search_exhaustive"] is True
+    assert result["terminal_softlock_witness"] is None
+    assert compile_quest_softlock_handoff(
+        d, result, authorized=True)["canonical_quest_replay_verified"] is True
+
+
+def test_depth_truncation_cannot_be_reported_safe():
+    d = docs()
+    result = compile_quest_softlock_audit(
+        d, plan(depth=1), **kwargs(d))
+    assert result["status"] == "softlock_proven"
+    d["quest"]["stage_graph"].append({
+        "id": "second", "prerequisites": ["opening"],
+        "alternatives": ["wait"], "reward": "second_complete",
+    })
+    result = compile_quest_softlock_audit(
+        d, plan(depth=1), **kwargs(d))
+    # The good choice is a verified eligible ending; the bad choice has
+    # unresolved authored successors at the depth fence, not a proved lock.
+    assert result["status"] == "inconclusive"
+    assert result["playable_handoff_allowed"] is False
+
+
+def test_edited_prefix_rejected_if_quest_action_is_illegal():
+    d = docs()
+    bad = plan([["missing_stage", "rescue"]])
+    with pytest.raises(StudioQuestError):
+        compile_quest_softlock_audit(d, bad, **kwargs(d))
+
+
+def test_private_restore_rejects_symlink_and_world_writable_file(tmp_path: Path):
+    d = docs()
+    result = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    other = tmp_path / "other"
+    other.mkdir()
+    publish_quest_softlock_audit(d, result, other, authorized=True)
+    link = tmp_path / "studio_quest_softlock_audit.json"
+    link.symlink_to(other / "studio_quest_softlock_audit.json")
+    with pytest.raises((OSError, StudioQuestError)):
+        restore_quest_softlock_audit(
+            d, tmp_path, authorized=True,
+            expected_source_digest=kwargs(d)["expected_source_digest"])
+    link.unlink()
+    published = other / "studio_quest_softlock_audit.json"
+    published.chmod(0o666)
+    with pytest.raises(StudioQuestError):
+        restore_quest_softlock_audit(
+            d, other, authorized=True,
+            expected_source_digest=kwargs(d)["expected_source_digest"])
+
+
+def test_jeeves_tool_descriptor_and_authorization_contract(monkeypatch):
+    from skeleton.ai.agents.jeeves import studio_quest_softlock_audit_tool as adapter
+    d = docs()
+    monkeypatch.setattr(adapter, "read_blueprint", lambda project_id: d)
+    descriptor = adapter.quest_softlock_audit_tool_schema()
+    assert descriptor["name"] == "studio_original_quest_softlock_audit"
+    request = {
+        "schema": adapter.REQUEST_SCHEMA,
+        "project_id": "demo",
+        "authoring": plan(),
+        "expected_source_digest": kwargs(d)["expected_source_digest"],
+        "expected_initial_session_digest": kwargs(d)["expected_initial_session_digest"],
+    }
+    with pytest.raises(PermissionError):
+        adapter.execute_quest_softlock_audit_tool(request, authorized=False)
+    result = adapter.execute_quest_softlock_audit_tool(request, authorized=True)
+    assert result["detail"]["status"] == "softlock_proven"
+    assert result["file_write_performed"] is False
+    with pytest.raises(StudioQuestError):
+        adapter.execute_quest_softlock_audit_tool(
+            {**request, "authorized": True}, authorized=True)
