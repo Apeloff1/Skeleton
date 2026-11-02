@@ -102,6 +102,11 @@ Commands:
     scene-market-party-route  Find bounded role-gated routes with replay witnesses
     scene-market-party-accept  Prove cooperative interactive restart and export
     scene-market-party-timeline  Replay journal pages, seek and fork portable saves
+    scene-market-party-league  Rank earned cooperative market victories offline
+    scene-market-party-league-author  Transactional scoring edits and playable preview
+    scene-market-party-compare  Compare replay branches and select portable save
+    scene-market-party-portfolio  Package replayed save, league and victory
+    scene-market-party-balance  Audit replayed cooperative role contributions
     scene-market-party-vault  Replay-verified offline save slots with CAS
     scene-market-party-vault-history  Replay vault revisions and leased recovery
     scene-market  Play earned-currency trading, crafting and delivery quests
@@ -971,6 +976,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-accept":
         from skeleton.game.gameplay.scene_market_party_acceptance import cli as party_accept_cli
         return party_accept_cli(rest)
+    if cmd == "scene-market-party-balance":
+        from skeleton.game.gameplay.scene_market_party_balance import cli as party_balance_cli
+        return party_balance_cli(rest)
+    if cmd == "scene-market-party-portfolio":
+        from skeleton.game.gameplay.scene_market_party_portfolio import cli as party_portfolio_cli
+        return party_portfolio_cli(rest)
+    if cmd == "scene-market-party-compare":
+        from skeleton.game.gameplay.scene_market_party_compare import cli as party_compare_cli
+        return party_compare_cli(rest)
+    if cmd == "scene-market-party-league-author":
+        from skeleton.game.gameplay.scene_market_party_league_author import cli as party_league_author_cli
+        return party_league_author_cli(rest)
+    if cmd == "scene-market-party-league":
+        from skeleton.game.gameplay.scene_market_party_league import cli as party_league_cli
+        return party_league_cli(rest)
     if cmd == "scene-market-party-vault":
         from skeleton.game.gameplay.scene_market_party_vault import cli as party_vault_cli
         return party_vault_cli(rest)
