@@ -1,0 +1,290 @@
+"""Fail-closed cooperative CPU token-capacity reservations.
+
+This module only reserves bounded in-process resources. A reservation is
+neither backend authorization nor a model-execution lease. Restart/fork
+invalidates every reservation; hardware and disk claims remain observational.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+import os
+from secrets import token_hex
+from threading import Lock
+from time import monotonic_ns
+from typing import Callable
+
+from .long_context_fairness import _bounded
+from .long_context_pressure_latch import LongContextPressureLatch
+from .long_context_progress import LongContextProgressHead, _name
+from .long_context_spool import LongContextSpoolError, _digest
+from .long_context_telemetry_fusion import LongContextTelemetryFusion
+
+_MAX_CLOCK = 2**63 - 1
+
+
+@dataclass(frozen=True, slots=True)
+class CpuCapacityRequest:
+    principal: str
+    stream_id: str
+    checkpoint_digest: str
+    tokenizer_digest: str
+    generation: int
+    max_tokens: int
+    requested_bytes: int = 0
+
+    def __post_init__(self) -> None:
+        if (type(self.principal) is not str or not 1 <= len(self.principal) <= 96
+                or not all(c.isascii() and (c.isalnum() or c in "_-.")
+                           for c in self.principal)):
+            raise LongContextSpoolError("invalid principal")
+        _name(self.stream_id)
+        _digest(self.checkpoint_digest, "checkpoint")
+        _digest(self.tokenizer_digest, "tokenizer")
+        _bounded(self.generation, "generation", 0, _MAX_CLOCK)
+        _bounded(self.max_tokens, "max_tokens", 1, 4096)
+        _bounded(self.requested_bytes, "requested_bytes", 0, 64 * 1024**2)
+
+
+@dataclass(frozen=True, slots=True)
+class CpuCapacityLimits:
+    max_active: int = 8
+    max_tokens: int = 8192
+    max_bytes: int = 64 * 1024**2
+    lifetime_ns: int = 1_000_000_000
+
+    def __post_init__(self) -> None:
+        _bounded(self.max_active, "max_active", 1, 64)
+        _bounded(self.max_tokens, "max_tokens", 1, 65536)
+        _bounded(self.max_bytes, "max_bytes", 1, 1024**3)
+        _bounded(self.lifetime_ns, "lifetime_ns", 1, 5_000_000_000)
+
+
+@dataclass(slots=True)
+class _Reservation:
+    request: CpuCapacityRequest
+    window_digest: str
+    expires_ns: int
+    state: str = "reserved"
+
+
+class LongContextCpuCapacityGuard:
+    """Cooperative absent -> reserved -> claimed -> released state machine.
+
+    Caller supplies an independently trusted, non-reentrant principal verifier.
+    All calls are serialized within this process. This is NOT cross-process
+    admission and never grants model execution.
+    """
+
+    def __init__(self, heads: LongContextProgressHead,
+                 monitor: LongContextTelemetryFusion,
+                 verifier: Callable[[CpuCapacityRequest], bool], *,
+                 limits: CpuCapacityLimits = CpuCapacityLimits(),
+                 clock: Callable[[], int] = monotonic_ns) -> None:
+        if not isinstance(heads, LongContextProgressHead):
+            raise LongContextSpoolError("invalid progress coordinator")
+        if not isinstance(monitor, LongContextTelemetryFusion):
+            raise LongContextSpoolError("invalid monitor")
+        if not callable(verifier) or not callable(clock):
+            raise LongContextSpoolError("invalid verifier or clock")
+        if not isinstance(limits, CpuCapacityLimits):
+            raise LongContextSpoolError("invalid limits")
+        self._heads, self._verifier, self._clock = heads, verifier, clock
+        self._limits = limits
+        self._latch = LongContextPressureLatch(monitor, clock=clock)
+        self._pid, self._lock = os.getpid(), Lock()
+        self._last_ns: int | None = None
+        self._reservations: dict[str, _Reservation] = {}
+        self._closed = False
+        self._revocations = 0
+
+    def _pid_guard(self) -> None:
+        if os.getpid() != self._pid:
+            raise LongContextSpoolError("inherited capacity lock after fork")
+
+    def _now(self) -> int:
+        try:
+            now = self._clock()
+        except Exception as exc:
+            self._reservations.clear()
+            raise LongContextSpoolError("capacity clock unavailable") from exc
+        if (type(now) is not int or not 0 <= now <= _MAX_CLOCK
+                or (self._last_ns is not None and now <= self._last_ns)):
+            self._reservations.clear()
+            raise LongContextSpoolError("capacity clock regressed")
+        self._last_ns = now
+        expired = [key for key, item in self._reservations.items()
+                   if item.expires_ns <= now]
+        for key in expired:
+            del self._reservations[key]
+        self._revocations += len(expired)
+        return now
+
+    def _pressure(self) -> str:
+        try:
+            result = self._latch.sample()
+            state = result["state"]
+            if (result.get("is_execution_lease") is not False
+                    or result.get("is_admission_grant") is not False
+                    or result.get("device_qualified") is not False
+                    or result.get("requires_live_backend_revalidation") is not True
+                    or state not in ("hold", "warming", "repeated_normal_observed")):
+                state = "hold"
+        except Exception:
+            state = "hold"
+        if state == "hold":
+            self._revocations += len(self._reservations)
+            self._reservations.clear()
+        return state
+
+    def _authorized(self, request: CpuCapacityRequest) -> bool:
+        try:
+            return self._verifier(request) is True
+        except Exception:
+            return False
+
+    def _window(self, request: CpuCapacityRequest) -> str:
+        result = self._heads.compare_window(
+            request.stream_id,
+            expected_checkpoint_digest=request.checkpoint_digest,
+            expected_generation=request.generation,
+            expected_tokenizer_digest=request.tokenizer_digest,
+            max_tokens=request.max_tokens,
+        )
+        if (type(result) is not dict
+                or result.get("is_execution_lease") is not False
+                or result.get("checkpoint_digest") != request.checkpoint_digest
+                or result.get("tokenizer_digest") != request.tokenizer_digest
+                or result.get("generation") != request.generation):
+            raise LongContextSpoolError("stale capacity head")
+        window = result.get("window")
+        if (type(window) is not dict
+                or type(window.get("start")) is not int
+                or type(window.get("stop")) is not int
+                or not 0 <= window["start"] < window["stop"]
+                or window["stop"] - window["start"] > request.max_tokens):
+            raise LongContextSpoolError("invalid capacity window")
+        return _digest(window.get("digest"), "window")
+
+    def _snapshot(self, state: str) -> dict[str, object]:
+        items = tuple(self._reservations.values())
+        return {
+            "schema": "skeleton.ai.cpu-capacity-guard.v1",
+            "state": state,
+            "active": len(items),
+            "reserved_tokens": sum(x.request.max_tokens for x in items),
+            "reserved_bytes": sum(x.request.requested_bytes for x in items),
+            "revocations": self._revocations,
+            "device": "cpu", "device_qualified": False,
+            "cross_process_exclusive": False,
+            "is_execution_lease": False, "is_admission_grant": False,
+            "requires_live_backend_revalidation": True,
+        }
+
+    def observe(self) -> dict[str, object]:
+        self._pid_guard()
+        with self._lock:
+            self._now()
+            return self._snapshot(self._pressure())
+
+    def reserve(self, request: CpuCapacityRequest) -> dict[str, object]:
+        if not isinstance(request, CpuCapacityRequest):
+            raise LongContextSpoolError("invalid capacity request")
+        self._pid_guard()
+        with self._lock:
+            if self._closed:
+                raise LongContextSpoolError("capacity guard closed")
+            now = self._now()
+            state = self._pressure()
+            if state != "repeated_normal_observed":
+                return {**self._snapshot(state), "reservation_id": None}
+            if not self._authorized(request):
+                return {**self._snapshot("hold"), "reservation_id": None,
+                        "reason": "principal_unverified"}
+            if any(x.request.stream_id == request.stream_id
+                   for x in self._reservations.values()):
+                return {**self._snapshot("hold"), "reservation_id": None,
+                        "reason": "duplicate_stream"}
+            status = self._snapshot(state)
+            if (status["active"] >= self._limits.max_active
+                    or status["reserved_tokens"] + request.max_tokens > self._limits.max_tokens
+                    or status["reserved_bytes"] + request.requested_bytes > self._limits.max_bytes):
+                return {**status, "state": "hold", "reservation_id": None,
+                        "reason": "budget_exhausted"}
+            try:
+                digest = self._window(request)
+                capacity = self._heads.spool.capacity_snapshot(
+                    requested_bytes=request.requested_bytes)
+                if (type(capacity) is not dict
+                        or capacity.get("request_observed_sufficient") is not True
+                        or type(capacity.get("observed_publishable_bytes")) is not int
+                        or capacity["observed_publishable_bytes"] <= 0):
+                    raise LongContextSpoolError("disk capacity hold")
+            except (LongContextSpoolError, OSError, ValueError, TypeError):
+                return {**self._snapshot("hold"), "reservation_id": None,
+                        "reason": "custody_or_disk_unverified"}
+            if now > _MAX_CLOCK - self._limits.lifetime_ns:
+                raise LongContextSpoolError("capacity clock overflow")
+            key = token_hex(32)
+            if key in self._reservations:
+                raise LongContextSpoolError("capacity identity collision")
+            self._reservations[key] = _Reservation(
+                request, digest, now + self._limits.lifetime_ns)
+            return {**self._snapshot("reserved"), "reservation_id": key,
+                    "window_digest": digest, "expires_ns": now + self._limits.lifetime_ns}
+
+    def claim(self, reservation_id: str, request: CpuCapacityRequest) -> dict[str, object]:
+        self._validate_key(reservation_id)
+        if not isinstance(request, CpuCapacityRequest):
+            raise LongContextSpoolError("invalid claim request")
+        self._pid_guard()
+        with self._lock:
+            if self._closed:
+                raise LongContextSpoolError("capacity guard closed")
+            self._now()
+            state = self._pressure()
+            item = self._reservations.get(reservation_id)
+            if (state != "repeated_normal_observed" or item is None
+                    or item.state != "reserved" or item.request != request):
+                return {**self._snapshot("hold"), "claimed": False}
+            if not self._authorized(request):
+                self._reservations.pop(reservation_id, None)
+                self._revocations += 1
+                return {**self._snapshot("hold"), "claimed": False}
+            try:
+                if self._window(request) != item.window_digest:
+                    raise LongContextSpoolError("window changed before claim")
+            except (LongContextSpoolError, OSError, ValueError, TypeError):
+                self._reservations.pop(reservation_id, None)
+                self._revocations += 1
+                return {**self._snapshot("hold"), "claimed": False}
+            item.state = "claimed"
+            return {**self._snapshot("claimed"), "claimed": True,
+                    "window_digest": item.window_digest}
+
+    @staticmethod
+    def _validate_key(key: str) -> None:
+        if (type(key) is not str or len(key) != 64
+                or any(c not in "0123456789abcdef" for c in key)):
+            raise LongContextSpoolError("invalid reservation identity")
+
+    def release(self, reservation_id: str) -> bool:
+        self._validate_key(reservation_id)
+        self._pid_guard()
+        with self._lock:
+            self._now()
+            return self._reservations.pop(reservation_id, None) is not None
+
+    def status(self) -> dict[str, object]:
+        self._pid_guard()
+        with self._lock:
+            self._now()
+            return self._snapshot("closed" if self._closed else "diagnostic")
+
+    def close(self) -> None:
+        self._pid_guard()
+        with self._lock:
+            self._reservations.clear()
+            self._closed = True
+
+
+__all__ = ["CpuCapacityLimits", "CpuCapacityRequest", "LongContextCpuCapacityGuard"]

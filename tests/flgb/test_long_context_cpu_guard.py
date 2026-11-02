@@ -1,0 +1,178 @@
+"""CPU capacity guard: conservative simulated state-machine regression."""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+import unittest
+from unittest.mock import MagicMock, patch
+
+from skeleton.ai.model_runtime.long_context_cpu_guard import (
+    CpuCapacityLimits, CpuCapacityRequest, LongContextCpuCapacityGuard,
+)
+from skeleton.ai.model_runtime.long_context_spool import LongContextSpoolError
+from skeleton.ai.model_runtime.long_context_telemetry_fusion import LongContextTelemetryFusion
+
+
+class Tick:
+    def __init__(self):
+        self.value = 1_000_000
+
+    def __call__(self):
+        self.value += 1000
+        return self.value
+
+
+def envelope(level="normal", event=0):
+    obj = {
+        "schema": "skeleton.ai.long-context-telemetry-fusion.v1",
+        "state": "observed",
+        "signals": {k: level for k in ("cpu", "memory", "thermal", "energy")},
+        "reasons": [], "event_state": "observed",
+        "event_deltas": {"oom": event, "oom_kill": 0, "nr_throttled": 0},
+        "sources": ("host_psi", "cgroup_v2", "cgroup_events"),
+        "cross_source_snapshot_atomic": False,
+        "scope_membership_attested": False,
+        "pressure_signals_attested": False,
+        "device_qualified": False,
+        "is_admission_grant": False,
+        "is_execution_lease": False,
+        "requires_live_backend_revalidation": True,
+    }
+    obj["observation_digest"] = sha256(json.dumps(
+        obj, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return obj
+
+
+class CpuCapacityGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.clock = Tick()
+        self.monitor = LongContextTelemetryFusion()
+        self.monitor.sample = MagicMock(return_value=envelope())
+        self.heads = MagicMock()
+        self.heads.compare_window.return_value = {
+            "checkpoint_digest": "a" * 64, "tokenizer_digest": "b" * 64,
+            "generation": 4, "is_execution_lease": False,
+            "window": {"start": 0, "stop": 8, "digest": "c" * 64},
+        }
+        self.heads.spool.capacity_snapshot.return_value = {
+            "request_observed_sufficient": True,
+            "observed_publishable_bytes": 4096,
+        }
+        self.authorized = True
+        self.verifier = MagicMock(side_effect=lambda _: self.authorized)
+        self.request = CpuCapacityRequest("owner", "stream", "a" * 64,
+                                          "b" * 64, 4, 8, 64)
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            self.guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier, clock=self.clock)
+
+    def warm(self):
+        for _ in range(3):
+            self.guard.observe()
+
+    def test_warming_then_reservation_is_not_authority(self):
+        self.assertIsNone(self.guard.reserve(self.request)["reservation_id"])
+        self.warm()
+        result = self.guard.reserve(self.request)
+        self.assertEqual(result["state"], "reserved")
+        self.assertEqual(len(result["reservation_id"]), 64)
+        self.assertFalse(result["is_execution_lease"])
+        self.assertFalse(result["is_admission_grant"])
+        self.assertFalse(result["device_qualified"])
+        self.assertFalse(result["cross_process_exclusive"])
+
+    def test_one_shot_claim_and_release(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.assertTrue(self.guard.claim(key, self.request)["claimed"])
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+        self.assertTrue(self.guard.release(key))
+        self.assertFalse(self.guard.release(key))
+
+    def test_critical_pressure_revokes(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.monitor.sample.return_value = envelope("critical")
+        self.assertEqual(self.guard.observe()["state"], "hold")
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+
+    def test_event_pressure_revokes(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.monitor.sample.return_value = envelope(event=1)
+        self.guard.observe()
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+
+    def test_stale_head_and_disk_hold(self):
+        self.warm()
+        self.heads.compare_window.return_value["generation"] = 5
+        self.assertEqual(self.guard.reserve(self.request)["reason"],
+                         "custody_or_disk_unverified")
+        self.heads.compare_window.return_value["generation"] = 4
+        self.heads.spool.capacity_snapshot.return_value[
+            "request_observed_sufficient"] = False
+        self.assertIsNone(self.guard.reserve(self.request)["reservation_id"])
+
+    def test_claim_revalidates_head(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.heads.compare_window.return_value["window"]["digest"] = "d" * 64
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+        self.assertFalse(self.guard.release(key))
+
+    def test_principal_revalidated(self):
+        self.warm()
+        self.authorized = False
+        self.assertEqual(self.guard.reserve(self.request)["reason"],
+                         "principal_unverified")
+        self.authorized = True
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.authorized = False
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+
+    def test_duplicate_stream_and_bounded_budget(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.assertEqual(self.guard.reserve(self.request)["reason"],
+                         "duplicate_stream")
+        self.assertTrue(self.guard.release(key))
+
+    def test_clock_regression_and_fork(self):
+        self.warm()
+        self.guard.reserve(self.request)
+        self.clock.value = 0
+        with self.assertRaisesRegex(LongContextSpoolError, "clock regressed"):
+            self.guard.status()
+        self.assertEqual(self.guard.status()["active"], 0)
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.os.getpid",
+                   return_value=-1):
+            with self.assertRaisesRegex(LongContextSpoolError, "after fork"):
+                self.guard.observe()
+
+    def test_close_invalidates(self):
+        self.warm()
+        self.guard.reserve(self.request)
+        self.guard.close()
+        self.assertEqual(self.guard.status()["active"], 0)
+        with self.assertRaisesRegex(LongContextSpoolError, "closed"):
+            self.guard.reserve(self.request)
+
+    def test_invalid_envelope_and_monitor_exception(self):
+        self.monitor.sample.return_value = {**envelope(), "is_execution_lease": True}
+        self.assertEqual(self.guard.observe()["state"], "hold")
+        self.monitor.sample.side_effect = OSError("sensor")
+        self.assertEqual(self.guard.observe()["state"], "hold")
+
+    def test_strict_request_and_limits(self):
+        for bad in (True, -1, 0, 4097):
+            with self.subTest(bad=bad), self.assertRaises(LongContextSpoolError):
+                CpuCapacityRequest("owner", "stream", "a" * 64, "b" * 64, 4, bad)
+        with self.assertRaises(LongContextSpoolError):
+            CpuCapacityRequest("../owner", "stream", "a" * 64, "b" * 64, 4, 8)
+        with self.assertRaises(LongContextSpoolError):
+            CpuCapacityLimits(max_active=True)
+
+
+if __name__ == "__main__":
+    unittest.main()

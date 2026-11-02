@@ -14,6 +14,9 @@ _LAZY_EXPORTS = {
     "CgroupEventMonitor": ".long_context_cgroup_events",
     "LongContextTelemetryFusion": ".long_context_telemetry_fusion",
     "LongContextPressureLatch": ".long_context_pressure_latch",
+    "CpuCapacityLimits": ".long_context_cpu_guard",
+    "CpuCapacityRequest": ".long_context_cpu_guard",
+    "LongContextCpuCapacityGuard": ".long_context_cpu_guard",
     "LongContextLivePlanner": ".long_context_live_plan",
     "observe_cgroup_pressure": ".long_context_cgroup",
     "LongContextFairPlanner": ".long_context_fairness",
@@ -238,6 +241,8 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".long_context_telemetry_fusion", __name__)
     if module_name == ".long_context_pressure_latch":
         return import_module(".long_context_pressure_latch", __name__)
+    if module_name == ".long_context_cpu_guard":
+        return import_module(".long_context_cpu_guard", __name__)
     if module_name == ".long_context_live_plan":
         return import_module(".long_context_live_plan", __name__)
     if module_name == ".long_context_fairness":
@@ -301,6 +306,9 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "CpuCapacityLimits",
+    "CpuCapacityRequest",
+    "LongContextCpuCapacityGuard",
     "LongContextLivePlanner",
     "LongContextPressureLatch",
     "CgroupEventMonitor",
