@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+from hashlib import sha256
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
@@ -14,7 +15,7 @@ from skeleton.ai.model_runtime.long_context_spool import LongContextSpoolError
 
 
 def healthy():
-    return {
+    value = {
         "schema": "skeleton.ai.long-context-telemetry-fusion.v1",
         "state": "observed", "event_state": "observed",
         "sources": ("host_psi", "cgroup_v2", "cgroup_events"),
@@ -26,6 +27,14 @@ def healthy():
         "is_execution_lease": False,
         "requires_live_backend_revalidation": True,
     }
+    return rehash(value)
+
+
+def rehash(value):
+    value = {k: v for k, v in value.items() if k != "observation_digest"}
+    value["observation_digest"] = sha256(json.dumps(
+        value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return value
 
 
 class Clock:
@@ -74,8 +83,8 @@ class FallbackTests(unittest.TestCase):
     def test_pressure_revokes_and_rewarms(self):
         self.monitor.sample(self.request)
         self.assertEqual(self.monitor.sample(self.request)["state"], "cpu_candidate")
-        self.observer.value = {**healthy(), "signals": {
-            **healthy()["signals"], "memory": "critical"}}
+        self.observer.value = rehash({**healthy(), "signals": {
+            **healthy()["signals"], "memory": "critical"}})
         result = self.monitor.sample(self.request)
         self.assertEqual(result["state"], "hold")
         self.assertEqual(result["revocations"], 1)
@@ -97,9 +106,17 @@ class FallbackTests(unittest.TestCase):
             {"event_deltas": {"oom": 1, "oom_kill": 0, "nr_throttled": 0}},
         ):
             with self.subTest(bad=bad):
-                self.observer.value = {**healthy(), **bad}
+                self.observer.value = rehash({**healthy(), **bad})
                 self.assertEqual(self.monitor.sample(self.request)["state"], "hold")
                 self.assertEqual(self.monitor.sample(self.request)["normal_samples"], 0)
+        self.observer.value = healthy()
+        self.assertEqual(self.monitor.sample(self.request)["state"], "warming")
+
+    def test_forged_checksum_is_not_accepted_as_normal(self):
+        damaged = healthy()
+        damaged["observation_digest"] = "0" * 64
+        self.observer.value = damaged
+        self.assertEqual(self.monitor.sample(self.request)["state"], "hold")
         self.observer.value = healthy()
         self.assertEqual(self.monitor.sample(self.request)["state"], "warming")
 

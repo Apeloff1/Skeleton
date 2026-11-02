@@ -14,12 +14,11 @@ from threading import Lock
 from time import monotonic_ns
 from typing import Callable
 
+from .long_context_pressure_latch import _inspect
 from .long_context_spool import LongContextSpoolError
 from .long_context_telemetry_fusion import LongContextTelemetryFusion
 
 _SCHEMA = "skeleton.ai.long-context-platform-fallback.v1"
-_SIGNALS = frozenset(("cpu", "memory", "thermal", "energy"))
-_EVENTS = frozenset(("oom", "oom_kill", "nr_throttled"))
 _MAX = 2**63 - 1
 
 
@@ -105,24 +104,11 @@ class LongContextPlatformFallback:
 
     @staticmethod
     def _safe(value: object) -> bool:
-        if type(value) is not dict:
-            return False
-        if (value.get("schema") != "skeleton.ai.long-context-telemetry-fusion.v1"
-                or value.get("state") != "observed"
-                or value.get("event_state") != "observed"
-                or value.get("sources") != ("host_psi", "cgroup_v2", "cgroup_events")
-                or value.get("reasons") != []
-                or any(value.get(key) is not False for key in (
-                    "cross_source_snapshot_atomic", "scope_membership_attested",
-                    "pressure_signals_attested", "device_qualified",
-                    "is_admission_grant", "is_execution_lease"))
-                or value.get("requires_live_backend_revalidation") is not True):
-            return False
-        signals, events = value.get("signals"), value.get("event_deltas")
-        return (type(signals) is dict and set(signals) == _SIGNALS
-                and all(type(v) is str and v == "normal" for v in signals.values())
-                and type(events) is dict and set(events) == _EVENTS
-                and all(type(v) is int and v == 0 for v in events.values()))
+        # Share the canonical bounded, exact-field and checksum-verified
+        # telemetry contract with the live planner and pressure latch.
+        # The checksum detects corruption, never authenticates sensors.
+        status, _signals, digest = _inspect(value)
+        return status == "normal_observed" and digest is not None
 
     def _receipt(self, request: PlatformFallbackRequest,
                  state: str, reason: str) -> dict[str, object]:
