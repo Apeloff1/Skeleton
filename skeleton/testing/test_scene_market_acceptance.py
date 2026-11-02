@@ -22,6 +22,11 @@ def test_original_market_acceptance_full_vertical():
     assert result["delivered"] == ["sanctuary_seal"]
     assert result["reputation"] == 5
     assert result["tampered_bundle_rejected"] is True
+    assert result["ledger_tamper_rejected"] is True
+    assert result["ledger_credits_earned"] == 3
+    assert result["ledger_credits_spent"] == 2
+    assert len(result["ledger_checksum"]) == 64
+    assert len(result["ledger_portable_checksum"]) == 64
     assert result["interactive_checkpoints"] >= 1
     assert len(result["portable_checksum"]) == 64
     assert len(result["editor_receipt_checksum"]) == 64
@@ -69,3 +74,14 @@ def test_main_cli_demo_and_audit(capsys):
     assert cli(["audit", "--source-json", '{"x":1,"x":2}',
                 "--actions-json", "[]"]) == 2
     assert "error" in json.loads(capsys.readouterr().err)
+
+def test_market_acceptance_proves_economy_for_prefix_and_loss():
+    source, actions = original_market()
+    missing = [action for action in actions
+               if action.get("kind") != "deliver"]
+    report = audit_market(source, missing, require_victory=False)
+    assert report["phase"] == "lost"
+    assert report["ledger_tamper_rejected"] is True
+    assert report["ledger_credits_earned"] == 3
+    assert report["ledger_credits_spent"] == 2
+    assert report["reputation"] == 0

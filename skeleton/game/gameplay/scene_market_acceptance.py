@@ -18,6 +18,9 @@ from skeleton.game.gameplay.scene_market import (
     _json, export_market, import_market, normalize_market, original_market,
     resume_market, simulate_market, verify_market,
 )
+from skeleton.game.gameplay.scene_market_ledger import (
+    audit_market_ledger, export_market_ledger, import_market_ledger,
+)
 from skeleton.game.gameplay.scene_market_author import (
     edit_market, verify_market_edit,
 )
@@ -56,6 +59,14 @@ def audit_market(source: Any, actions: Any, *,
     imported = import_market(bundle)
     if imported != complete:
         raise SceneTravelError("market portable import differs from game")
+    ledger = audit_market_ledger(complete)
+    ledger_bundle = export_market_ledger(complete)
+    if (import_market_ledger(ledger_bundle) != complete
+            or ledger["credits_remaining"] != complete["state"]["credits"]
+            or ledger["reputation_earned"] != complete["state"]["reputation"]
+            or ledger["goods_remaining"] != complete["state"]["goods"]
+            or ledger["journal_length"] != len(actions)):
+        raise SceneTravelError("market economic provenance differs from play")
     stream = io.StringIO()
     interactive = play_market(
         spec, input_stream=io.StringIO(_commands(actions)),
@@ -95,6 +106,24 @@ def audit_market(source: Any, actions: Any, *,
         tamper_rejected = False
     if not tamper_rejected:
         raise SceneTravelError("market bundle tampering accepted")
+    forged_ledger = copy.deepcopy(ledger_bundle)
+    forged_ledger["ledger"]["credits_earned"] += 1
+    # A plain checksum is not a trust anchor. Recompute both digests to
+    # demonstrate the source/journal replay still rejects fabricated credit.
+    forged_ledger["ledger"]["checksum"] = dig({
+        k: v for k, v in forged_ledger["ledger"].items() if k != "checksum"
+    })
+    forged_ledger["checksum"] = dig({
+        k: v for k, v in forged_ledger.items() if k != "checksum"
+    })
+    try:
+        import_market_ledger(forged_ledger)
+    except SceneTravelError:
+        ledger_tamper_rejected = True
+    else:
+        ledger_tamper_rejected = False
+    if not ledger_tamper_rejected:
+        raise SceneTravelError("forged market economic witness accepted")
     report = {
         "schema_version": SCHEMA, "ok": True,
         "source_digest": complete["source_digest"],
@@ -111,6 +140,11 @@ def audit_market(source: Any, actions: Any, *,
         "interactive_terminal_digest": terminal[0]["state_digest"],
         "interactive_checkpoints": len(checkpoints),
         "tampered_bundle_rejected": tamper_rejected,
+        "ledger_checksum": ledger["checksum"],
+        "ledger_portable_checksum": ledger_bundle["checksum"],
+        "ledger_credits_earned": ledger["credits_earned"],
+        "ledger_credits_spent": ledger["credits_spent"],
+        "ledger_tamper_rejected": ledger_tamper_rejected,
         "editor_receipt_checksum": (
             editor_receipt["checksum"] if editor_receipt is not None else None
         ),
