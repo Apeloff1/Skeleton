@@ -129,8 +129,11 @@ def bundle_path(base_dir: str | Path, tenant_id: str, project_id: str, namespace
     """
     ns = namespace(tenant_id, purpose="game_project_bundles")
     m = _NS.fullmatch(ns)
-    if not m:
-        raise BundleError("unexpected tenant namespace shape")
+    # The injected namespace is an identity boundary, not a free-form path.
+    # An alternate purpose (including "..") must never alias another tenant
+    # or storage class, even if the caller later uses this lexical path.
+    if not m or m.group(2) != "game_project_bundles":
+        raise BundleError("unexpected tenant namespace shape or purpose")
     base = os.fspath(base_dir)
     if not isinstance(base, str) or not base or "\x00" in base or ".." in Path(base).parts:
         raise BundleError("unsafe bundle storage base")

@@ -210,3 +210,11 @@ def test_bundle_codec_faults_fail_closed_without_publishing(saver):
         with pytest.raises(BundleError, match="bundle envelope failed integrity check"):
             bio.import_bundle("{}", codec, saver)
     assert saver.next_sequence("hero") == 1
+
+
+def test_bundle_path_refuses_namespace_purpose_aliases(tmp_path):
+    for purpose in ("..", ".", "other_data", "game_project_bundles:.."): 
+        forged = lambda tenant, *, purpose: "tenant:" + "a" * 24 + ":" + forged_purpose
+        forged_purpose = purpose
+        with pytest.raises(BundleError, match="namespace shape or purpose"):
+            bio.bundle_path(tmp_path, "tenant-one", "hero", forged)
