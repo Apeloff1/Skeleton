@@ -1,0 +1,51 @@
+"""Regression against escaped literal newlines in Python import/CLI seams."""
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+
+@pytest.mark.parametrize("path", [
+    "skeleton/__main__.py",
+    "skeleton/jeeves/worlds/route.py",
+    "skeleton/jeeves/worlds/cast.py",
+    "skeleton/jeeves/worlds/quest.py",
+    "skeleton/jeeves/worlds/counterfactual.py",
+    "skeleton/jeeves/worlds/counterfactual_cli.py",
+    "skeleton/jeeves/worlds/lore.py",
+    "skeleton/jeeves/worlds/lore_cli.py",
+    "skeleton/jeeves/worlds/lore_editor.py",
+])
+def test_python_world_modules_parse(path: str):
+    source = (ROOT / path).read_text(encoding="utf-8")
+    ast.parse(source, filename=path)
+
+
+def test_main_cli_dispatch_has_real_statements():
+    source = (ROOT / "skeleton/__main__.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    commands = {
+        node.comparators[0].value for node in ast.walk(tree)
+        if isinstance(node, ast.Compare)
+        and len(node.ops) == 1
+        and isinstance(node.ops[0], ast.Eq)
+        and len(node.comparators) == 1
+        and isinstance(node.comparators[0], ast.Constant)
+        and isinstance(node.comparators[0].value, str)
+        and isinstance(node.left, ast.Name)
+        and node.left.id == "cmd"
+    }
+    assert {
+        "world-route", "world-cast", "world-quest",
+        "world-counterfactual", "world-lore",
+    } <= commands
+
+
+def test_repaired_world_modules_import_without_syntax_error():
+    from skeleton.jeeves.worlds import cast, quest, route
+    from skeleton.jeeves.worlds import counterfactual, lore, lore_editor
+    assert route.SCHEMA and cast.SCHEMA and quest.SCHEMA
+    assert counterfactual.SCHEMA and lore.SCHEMA and lore_editor.EDITOR_SCHEMA

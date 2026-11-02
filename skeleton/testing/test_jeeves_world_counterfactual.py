@@ -256,10 +256,17 @@ def test_custody_rejects_symlinked_review_leaf(tmp_path):
         store.read("marsh", "save")
 
 
-def test_wrong_slot_cannot_relabel_replayed_review():
-    source, state = world(), session()
-    data = review(source, state)
-    data["session_slot"] = "another"
-    assert validate_review(data, source, state) is data
-    # Store binding must reject the wrong slot even when session digests match.
-    assert data["session_slot"] != "save"
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored POSIX custody")
+def test_wrong_slot_cannot_relabel_replayed_review(tmp_path):
+    root = tmp_path / "private"
+    source = world()
+    WorldStore(root).publish(source, create=True)
+    sessions = SessionStore(root)
+    sessions.create("marsh", "save")
+    sessions.create("marsh", "other")
+    state = sessions.read("marsh", "save")
+    data = propose_review(source, state, slot="other", prompt="Wrong slot")
+    # The saves have identical state digests, but distinct custody identities.
+    assert digest(sessions.read("marsh", "other")) == digest(state)
+    with pytest.raises(CanonError, match="counterfactual_slot_mismatch"):
+        CounterfactualStore(root).publish("marsh", "save", data, create=True)
