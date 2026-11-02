@@ -127,6 +127,12 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(self.monitor.sample(other)["state"], "cpu_candidate")
         self.assertEqual(self.monitor.sample(self.request)["state"], "warming")
 
+    def test_long_sampling_gap_resets_recovery_streak(self):
+        self.assertEqual(self.monitor.sample(self.request)["state"], "warming")
+        self.clock.value += 3_000_000_000
+        self.assertEqual(self.monitor.sample(self.request)["state"], "warming")
+        self.assertEqual(self.monitor.sample(self.request)["state"], "cpu_candidate")
+
     def test_fork_close_clock_and_policy_fail_closed(self):
         with patch("skeleton.ai.model_runtime.long_context_platform_fallback.os.getpid",
                    return_value=-1):
@@ -140,6 +146,8 @@ class FallbackTests(unittest.TestCase):
             self.monitor.sample(self.request)
         with self.assertRaises(LongContextSpoolError):
             PlatformFallbackPolicy(required_normal_samples=1)
+        with self.assertRaises(LongContextSpoolError):
+            PlatformFallbackPolicy(max_gap_ns=0)
         with self.assertRaises(LongContextSpoolError):
             PlatformFallbackRequest("owner", "stream", "cuda", 32, 4096)
         with self.assertRaises(LongContextSpoolError):

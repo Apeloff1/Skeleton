@@ -59,12 +59,14 @@ class PlatformFallbackPolicy:
     required_normal_samples: int = 3
     cooldown_ns: int = 500_000_000
     max_sample_ns: int = 2_000_000_000
+    max_gap_ns: int = 2_000_000_000
     allow_cpu_fallback: bool = True
 
     def __post_init__(self) -> None:
         _integer(self.required_normal_samples, "normal sample count", 2, 16)
         _integer(self.cooldown_ns, "fallback cooldown", 1, 10_000_000_000)
         _integer(self.max_sample_ns, "fallback observation duration", 1, 10_000_000_000)
+        _integer(self.max_gap_ns, "fallback observation gap", 1, 10_000_000_000)
         if type(self.allow_cpu_fallback) is not bool:
             raise LongContextSpoolError("invalid CPU fallback policy")
 
@@ -107,8 +109,11 @@ class LongContextPlatformFallback:
         # Share the canonical bounded, exact-field and checksum-verified
         # telemetry contract with the live planner and pressure latch.
         # The checksum detects corruption, never authenticates sensors.
-        status, _signals, digest = _inspect(value)
-        return status == "normal_observed" and digest is not None
+        try:
+            status, _signals, digest = _inspect(value)
+            return status == "normal_observed" and digest is not None
+        except Exception:
+            return False
 
     def _receipt(self, request: PlatformFallbackRequest,
                  state: str, reason: str) -> dict[str, object]:
@@ -157,6 +162,11 @@ class LongContextPlatformFallback:
                     or (self._last_ns is not None and start <= self._last_ns)):
                 self._hold(None)
                 return self._receipt(request, "hold", "clock_unverified")
+            # A long gap invalidates prior recovery samples even if the
+            # next individual observation is healthy.
+            if (self._last_ns is not None
+                    and start - self._last_ns > self._policy.max_gap_ns):
+                self._normal = 0
             try:
                 observation = self._fusion.sample()
             except Exception:
