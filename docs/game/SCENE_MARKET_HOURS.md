@@ -24,3 +24,23 @@ checks, not signatures or authorization proofs. Source digests must be
 pinned by trusted consumers when provenance matters. Replay, deterministic
 exports and CLI acceptance do not certify device installation or online
 multiplayer security.
+
+
+## Interactive merchant hours and acceptance
+
+`python -m skeleton scene-market-hours-play demo` plays the original
+merchant quest through the same canonical market actions as batch simulation.
+`play --source-json JSON` begins a source-bound game; `play --session-json
+JSON --source-digest HEX` resumes a checkpoint with an optional trusted source
+pin. Input accepts `move north`, `collect find_key`, `buy copper_badge`,
+`craft seal_press`, `deliver sanctuary_seal` or one JSON action per line.
+Each accepted action is replay-verified; rejected commands leave the previous
+checkpoint intact. EOF and repeated invalid commands emit a portable
+checkpoint rather than inventing an outcome.
+
+`python -m skeleton scene-market-hours-accept audit --session-json JSON`
+cross-checks canonical market economic provenance, merchant availability,
+portable export/import, the read-only board and transactional source editing.
+`verify --session-json JSON --report-json JSON` recomputes the entire
+acceptance witness. A completed demo is one deterministic offline playable
+fixture, not hardware qualification or online trust.

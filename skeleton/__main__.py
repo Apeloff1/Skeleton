@@ -70,7 +70,10 @@ Commands:
     scene-survival-author  Transactionally edit survival sources and preview play
     scene-survival-route  Find replay-proven bounded survival routes
     scene-survival  Play source-bound tile hazards, earned food, shelter and replay
-    scene-market-hours  Play authored merchant schedules with verified saves\n    scene-market-route-accept  Audit route, interactive play, editor and portable delivery
+    scene-market-hours  Play authored merchant schedules with verified saves
+    scene-market-hours-play  Interactively play merchants with portable checkpoints
+    scene-market-hours-accept  Verify end-to-end merchant gameplay acceptance
+    scene-market-route-accept  Audit route, interactive play, editor and portable delivery
     scene-market-route  Find replay-proven earned market routes with bounded search
     scene-market-board  Inspect earned inventory, deliveries and verified hints
     scene-market-accept  Verify game-to-export market acceptance evidence
@@ -890,6 +893,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-survival":
         from skeleton.game.gameplay.scene_tile_survival import cli as scene_survival_cli
         return scene_survival_cli(rest)
+    if cmd == "scene-market-hours-play":
+        from skeleton.game.gameplay.scene_market_hours_interactive import cli as hours_play_cli
+        return hours_play_cli(rest)
+    if cmd == "scene-market-hours-accept":
+        from skeleton.game.gameplay.scene_market_hours_acceptance import cli as hours_accept_cli
+        return hours_accept_cli(rest)
     if cmd == "scene-market-hours":
         from skeleton.game.gameplay.scene_market_hours import cli as hours_cli
         return hours_cli(rest)
