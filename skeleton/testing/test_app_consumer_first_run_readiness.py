@@ -164,3 +164,37 @@ def test_forged_release_claim_from_canonical_adapter_rejected(
     monkeypatch.setattr(module, "inspect_first_playable_delivery", forged)
     with pytest.raises(ConsumerFirstRunReadinessError, match="contracts"):
         inspect_consumer_first_run(*paths, **pins)
+
+
+def test_same_byte_nested_asset_swap_during_consumer_replay_fails_closed(
+    delivered_first_run, tmp_path, monkeypatch,
+):
+    import shutil
+    from skeleton.app import consumer_first_run_readiness as module
+
+    paths, pins = delivered_first_run
+    original_install, archive, save, receipt = paths
+    isolated_install = tmp_path / "installed"
+    shutil.copytree(original_install, isolated_install)
+    target = isolated_install / "godot" / "scripts" / "main.gd"
+    original = module.inspect_first_playable_delivery
+    changed = False
+
+    def swap_nested_asset(*args, **kwargs):
+        nonlocal changed
+        result = original(*args, **kwargs)
+        if not changed:
+            changed = True
+            replacement = tmp_path / "replacement.gd"
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            os.replace(replacement, target)
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_first_playable_delivery", swap_nested_asset,
+    )
+    with pytest.raises(ConsumerFirstRunReadinessError, match="changed"):
+        inspect_consumer_first_run(
+            isolated_install, archive, save, receipt, **pins,
+        )
