@@ -15,7 +15,7 @@ from typing import Any
 from .evidence import EvidenceStore
 from .factions import FactionStore
 from .world_canon import (
-    CanonError, WorldStore, _id, canonical, digest, strict_json,
+    CanonError, MAX_SOURCE_BYTES, WorldStore, _id, canonical, digest, strict_json,
 )
 
 EDITOR_SCHEMA = "jeeves.world.review_editor.v1"
@@ -77,7 +77,10 @@ def _html(manifest: dict[str, Any]) -> bytes:
         '</main><script id="review-data" type="application/json">'
         f"{payload}</script><script>{_SCRIPT}</script></body></html>\n"
     )
-    return page.encode("utf-8")
+    output = page.encode("utf-8")
+    if len(output) > MAX_SOURCE_BYTES:
+        raise CanonError("review_editor_too_large")
+    return output
 
 
 class ReviewEditorStore:

@@ -325,6 +325,8 @@ class EvidenceStore:
         contents = [compile_overlay_html(
             world, evidence=data).encode("utf-8"),
             canonical(handoff)]
+        if any(len(content) > 524288 for content in contents):
+            raise CanonError("evidence_output_too_large")
         receipt = {
             "schema": RECEIPT_SCHEMA, "world_id": world["id"],
             "world_digest": digest(world), "evidence_digest": digest(data),

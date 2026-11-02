@@ -83,3 +83,11 @@ def test_unreviewed_and_stale_sources_fail_closed():
 def test_empty_overlay_refused():
     with pytest.raises(CanonError, match="empty_world_overlay"):
         compile_overlay_html(world())
+
+
+def test_browser_output_budget_fails_closed(monkeypatch):
+    from skeleton.jeeves.worlds import overlay as module
+    source = world()
+    monkeypatch.setattr(module, "_SCRIPT", "x" * 524288)
+    with pytest.raises(CanonError, match="overlay_too_large"):
+        compile_overlay_html(source, factions=factions(source))

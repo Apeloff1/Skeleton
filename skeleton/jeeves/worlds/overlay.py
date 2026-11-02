@@ -11,7 +11,7 @@ from hashlib import sha256
 import html
 from typing import Any
 
-from .world_canon import CanonError, canonical, digest, prove
+from .world_canon import CanonError, MAX_SOURCE_BYTES, canonical, digest, prove
 
 _SCRIPT = r"""
 "use strict";
@@ -74,7 +74,7 @@ function render() {
   } else {
     const options = world.choices.filter(c => c.from === scene &&
       c.requires.every(flag => flags.has(flag)))
-      .sort((a, b) => a.id.localeCompare(b.id));
+      .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     for (const choice of options) {
       const button = element("button", choice.label);
       button.type = "button";
@@ -127,7 +127,7 @@ def compile_overlay_html(world: Any, *, factions: Any = None,
     embedded = canonical(manifest).decode("utf-8").replace("<", "\\u003c")
     script_hash = base64.b64encode(sha256(_SCRIPT.encode()).digest()).decode()
     title = html.escape(world["id"], quote=True)
-    return (
+    page = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
@@ -139,3 +139,6 @@ def compile_overlay_html(world: Any, *, factions: Any = None,
         '<script id="world-data" type="application/json">'
         f"{embedded}</script><script>{_SCRIPT}</script></body></html>\n"
     )
+    if len(page.encode("utf-8")) > MAX_SOURCE_BYTES:
+        raise CanonError("overlay_too_large")
+    return page
