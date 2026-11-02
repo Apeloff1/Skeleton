@@ -227,6 +227,148 @@ class LongContextAdmissionBundle:
                     except Exception:
                         pass
 
+    def reserve_fair_cycle(
+        self, requests: tuple[AdmissionBundleRequest, ...], *,
+        quantum_tokens: int = 256,
+    ) -> dict[str, object]:
+        """Atomic process-local reservation across KV, RAM, and CPU streams.
+
+        The two underlying guards must support their own atomic fair-cycle
+        operations. A failed/forged receipt never publishes a partial bundle;
+        all recognizable reservation identities are released independently.
+        Claims remain per-stream and require fresh backend revalidation.
+        """
+        if type(requests) is not tuple or not 1 <= len(requests) <= _MAX_ACTIVE:
+            raise LongContextSpoolError("invalid admission fair cycle")
+        if (type(quantum_tokens) is not int or not 1 <= quantum_tokens <= 4096
+                or any(not isinstance(r, AdmissionBundleRequest) for r in requests)):
+            raise LongContextSpoolError("invalid admission fair cycle request")
+        names = [r.cpu.stream_id for r in requests]
+        if len(set(names)) != len(names):
+            raise LongContextSpoolError("duplicate admission fair cycle stream")
+        self._pid_guard()
+        with self._lock:
+            self._open()
+            ordered = tuple(sorted(requests, key=lambda r: r.cpu.stream_id))
+            if (len(self._entries) + len(ordered) > self._max_active
+                    or any(r.cpu.max_tokens > quantum_tokens for r in ordered)
+                    or any(r.cpu.stream_id in (
+                        entry.request.cpu.stream_id for entry in self._entries.values())
+                        for r in ordered)):
+                return {**self._receipt("hold", "fair_cycle_capacity_or_duplicate"),
+                        "reservations": []}
+            digests = [self._kv_window(r) for r in ordered]
+            if any(digest is None for digest in digests):
+                return {**self._receipt("hold", "fair_cycle_kv_unverified"),
+                        "reservations": []}
+            memory_keys: list[str] = []
+            cpu_keys: list[str] = []
+            published = False
+            try:
+                memory = self._memory.reserve_fair_cycle(
+                    tuple(r.memory for r in ordered))
+                if type(memory) is dict and type(memory.get("reservations")) is list:
+                    memory_keys = [entry["reservation_id"] for entry in memory["reservations"]
+                                   if type(entry) is dict
+                                   and self._key(entry.get("reservation_id"), 48)]
+                if (type(memory) is not dict
+                        or memory.get("schema") != "skeleton.ai.long-context-memory-budget.v1"
+                        or memory.get("state") != "reserved"
+                        or memory.get("cycle_atomic_within_process") is not True
+                        or memory.get("cross_process_exclusive") is not False
+                        or any(memory.get(k) is not False for k in (
+                            "is_execution_lease", "is_admission_grant",
+                            "is_memory_allocation"))
+                        or memory.get("requires_live_backend_revalidation") is not True
+                        or type(memory.get("reservations")) is not list
+                        or len(memory["reservations"]) != len(ordered)):
+                    return {**self._receipt("hold", "fair_cycle_memory_unverified"),
+                            "reservations": []}
+                memory_map = {}
+                from hashlib import sha256
+                for entry in memory["reservations"]:
+                    if type(entry) is not dict or not self._key(entry.get("reservation_id"), 48):
+                        raise LongContextSpoolError("invalid fair-cycle RAM identity")
+                    key = entry.get("stream_digest")
+                    if (type(key) is not str or key in memory_map
+                            or type(entry.get("requested_bytes")) is not int):
+                        raise LongContextSpoolError("invalid fair-cycle RAM receipt")
+                    memory_map[key] = entry
+                for request in ordered:
+                    digest = sha256(request.memory.stream_id.encode("ascii")).hexdigest()
+                    if (digest not in memory_map
+                            or memory_map[digest]["requested_bytes"] !=
+                            request.memory.requested_bytes):
+                        raise LongContextSpoolError("fair-cycle RAM stream mismatch")
+                cpu = self._cpu.reserve_fair_cycle(
+                    tuple(r.cpu for r in ordered), quantum_tokens=quantum_tokens)
+                if type(cpu) is dict and type(cpu.get("reservations")) is list:
+                    cpu_keys = [entry["reservation_id"] for entry in cpu["reservations"]
+                                if type(entry) is dict
+                                and self._key(entry.get("reservation_id"), 64)]
+                if (type(cpu) is not dict
+                        or cpu.get("schema") != "skeleton.ai.cpu-capacity-guard.v1"
+                        or cpu.get("state") != "reserved"
+                        or cpu.get("device") != "cpu"
+                        or cpu.get("device_qualified") is not False
+                        or cpu.get("is_execution_lease") is not False
+                        or cpu.get("is_admission_grant") is not False
+                        or cpu.get("cycle_atomic_within_process") is not True
+                        or cpu.get("cross_process_exclusive") is not False
+                        or cpu.get("requires_live_backend_revalidation") is not True
+                        or type(cpu.get("reservations")) is not list
+                        or len(cpu["reservations"]) != len(ordered)):
+                    return {**self._receipt("hold", "fair_cycle_cpu_unverified"),
+                            "reservations": []}
+                cpu_map = {}
+                from .long_context_progress import _name
+                for entry in cpu["reservations"]:
+                    if type(entry) is not dict or not self._key(entry.get("reservation_id"), 64):
+                        raise LongContextSpoolError("invalid fair-cycle CPU identity")
+                    key = entry.get("stream_digest")
+                    if type(key) is not str or key in cpu_map:
+                        raise LongContextSpoolError("duplicate fair-cycle CPU stream")
+                    cpu_map[key] = entry
+                for request, digest in zip(ordered, digests):
+                    entry = cpu_map.get(_name(request.cpu.stream_id))
+                    if (entry is None or entry.get("window_digest") != digest
+                            or type(entry.get("max_tokens")) is not int
+                            or entry["max_tokens"] != request.cpu.max_tokens):
+                        raise LongContextSpoolError("fair-cycle CPU stream mismatch")
+                bundle_keys = [self._nonce(32) for _ in ordered]
+                if (any(not self._key(key, 64) or key in self._entries
+                        for key in bundle_keys)
+                        or len(set(bundle_keys)) != len(bundle_keys)):
+                    raise LongContextSpoolError("fair-cycle bundle identity collision")
+                receipts = []
+                for request, digest, key in zip(ordered, digests, bundle_keys):
+                    self._entries[key] = _Bundle(
+                        request,
+                        memory_map[sha256(request.memory.stream_id.encode("ascii")).hexdigest()]["reservation_id"],
+                        cpu_map[_name(request.cpu.stream_id)]["reservation_id"],
+                        digest)
+                    receipts.append({
+                        "stream_digest": _name(request.cpu.stream_id),
+                        "bundle_id": key, "window_digest": digest,
+                    })
+                published = True
+                return {**self._receipt("reserved", "cooperative_only"),
+                        "reservations": receipts,
+                        "cycle_atomic_within_process": True,
+                        "cross_process_exclusive": False}
+            except Exception:
+                return {**self._receipt("hold", "fair_cycle_dependency_unavailable"),
+                        "reservations": []}
+            finally:
+                if not published:
+                    for guard, keys in ((self._cpu, cpu_keys),
+                                        (self._memory, memory_keys)):
+                        for key in set(keys):
+                            try:
+                                guard.release(key)
+                            except Exception:
+                                pass
+
     def claim(self, bundle_id: str, request: AdmissionBundleRequest) -> dict[str, object]:
         if not self._key(bundle_id, 64) or not isinstance(request, AdmissionBundleRequest):
             raise LongContextSpoolError("invalid admission bundle claim")

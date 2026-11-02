@@ -27,3 +27,14 @@ independent principal verifiers. No CLI path fabricates authorization.
 
 Focused test: `python -m pytest -q tests/flgb/test_long_context_admission_bundle.py`.
 Full exact-head CI and security validation remain release prerequisites.
+
+## Multi-stream fair-cycle reservation
+
+`reserve_fair_cycle` checks all candidate KV identities before invoking
+atomic RAM and CPU fair-cycle guards. It verifies exact stream-digest mapping,
+quantum accounting, per-stream window digests, independent reservation IDs,
+all non-authorizing receipt flags, and unique bundle identities before any
+bundle becomes visible. Any failed/forged/missing dependency receipt or nonce
+collision rolls back every recognizable CPU and RAM reservation. It does not
+claim fairness across independent processes or make a multi-stream *claim*
+atomic; each claim separately revalidates live backend constraints.

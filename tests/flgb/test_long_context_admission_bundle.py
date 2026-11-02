@@ -77,6 +77,47 @@ class GuardStub:
         return self.reserved.pop(key, None) is not None
 
 
+class FairGuardStub(GuardStub):
+    def reserve_fair_cycle(self, requests, *, quantum_tokens=256):
+        from skeleton.ai.model_runtime.long_context_progress import _name
+        receipts = []
+        for request in requests:
+            key = sha256((self.kind + ":" + request.stream_id).encode()).hexdigest()
+            if self.kind == "memory":
+                key = key[:48]
+            self.reserved[key] = "reserved"
+            if self.kind == "cpu":
+                receipts.append({
+                    "stream_digest": _name(request.stream_id),
+                    "reservation_id": key, "window_digest": self.digest,
+                    "max_tokens": request.max_tokens,
+                })
+            else:
+                receipts.append({
+                    "stream_digest": sha256(request.stream_id.encode()).hexdigest(),
+                    "reservation_id": key, "requested_bytes": request.requested_bytes,
+                })
+        if self.kind == "cpu":
+            return {
+                "schema": "skeleton.ai.cpu-capacity-guard.v1",
+                "state": "reserved", "device": "cpu", "device_qualified": False,
+                "is_execution_lease": False, "is_admission_grant": False,
+                "cycle_atomic_within_process": True,
+                "cross_process_exclusive": False,
+                "requires_live_backend_revalidation": True,
+                "reservations": receipts,
+            }
+        return {
+            "schema": "skeleton.ai.long-context-memory-budget.v1",
+            "state": "reserved", "is_execution_lease": False,
+            "is_admission_grant": False, "is_memory_allocation": False,
+            "cycle_atomic_within_process": True,
+            "cross_process_exclusive": False,
+            "requires_live_backend_revalidation": True,
+            "reservations": receipts,
+        }
+
+
 class KvStub:
     def __init__(self, digest):
         self.digest = digest
@@ -115,6 +156,70 @@ class AdmissionBundleTests(unittest.TestCase):
             KvWindowRequest("stream", "a" * 64, 3, 8, 2048),
             "d" * 64,
         )
+
+    def fair_setup(self):
+        self.cpu = FairGuardStub("cpu", self.digest)
+        self.memory = FairGuardStub("memory", self.digest)
+        self.bundle = LongContextAdmissionBundle(
+            self.cpu, self.memory, self.kv,
+            nonce=lambda _: "c" * 64)
+        other = AdmissionBundleRequest(
+            CpuCapacityRequest("other", "second", "a" * 64, "b" * 64, 3, 8, 32),
+            MemoryBudgetRequest("other", "second", 2048),
+            self.request.kv_layout,
+            KvWindowRequest("second", "a" * 64, 3, 8, 2048),
+            "d" * 64,
+        )
+        return other
+
+    def test_fair_cycle_atomic_reservation_then_individual_claim(self):
+        other = self.fair_setup()
+        # nonce is called with a byte-count; adapter ignores the argument.
+        self.bundle._nonce = lambda n, seq=iter(("c" * 64, "e" * 64)): next(seq)
+        result = self.bundle.reserve_fair_cycle((self.request, other),
+                                                quantum_tokens=8)
+        self.assertEqual(result["state"], "reserved")
+        self.assertEqual(len(result["reservations"]), 2)
+        self.assertFalse(result["is_execution_lease"])
+        self.assertFalse(result["cross_process_exclusive"])
+        self.assertEqual(self.bundle.status()["active"], 2)
+        for receipt, request in zip(result["reservations"], (other, self.request)):
+            self.assertEqual(self.bundle.claim(receipt["bundle_id"], request)["state"],
+                             "claimed")
+            self.assertTrue(self.bundle.release(receipt["bundle_id"]))
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_fair_cycle_nonce_collision_rolls_back_both_guards(self):
+        other = self.fair_setup()
+        result = self.bundle.reserve_fair_cycle((self.request, other),
+                                                quantum_tokens=8)
+        self.assertEqual(result["state"], "hold")
+        self.assertEqual(result["reservations"], [])
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_fair_cycle_cpu_dependency_failure_rolls_back_ram(self):
+        other = self.fair_setup()
+        self.cpu.reserve_fair_cycle = Mock(side_effect=OSError("CPU offline"))
+        result = self.bundle.reserve_fair_cycle((self.request, other),
+                                                quantum_tokens=8)
+        self.assertEqual(result["state"], "hold")
+        self.assertEqual(result["reservations"], [])
+        self.assertFalse(self.memory.reserved)
+        self.assertEqual(self.bundle.status()["active"], 0)
+
+    def test_fair_cycle_input_validation_and_budget(self):
+        other = self.fair_setup()
+        with self.assertRaises(LongContextSpoolError):
+            self.bundle.reserve_fair_cycle((self.request, self.request))
+        with self.assertRaises(LongContextSpoolError):
+            self.bundle.reserve_fair_cycle([self.request])
+        self.assertEqual(self.bundle.reserve_fair_cycle(
+            (self.request, other), quantum_tokens=4)["state"], "hold")
+        self.assertFalse(self.memory.reserved)
 
     def test_reserve_claim_release_never_grants_execution(self):
         first = self.bundle.reserve(self.request)
