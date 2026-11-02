@@ -93,6 +93,38 @@ def test_batch_preflight_rejects_untyped_paths_before_publication(
     assert not Path(jobs[1].archive).exists()
 
 
+
+
+def test_cohort_rejects_untyped_canonical_game_digests_and_project_ids():
+    from skeleton.app.offline_first_playable_batch import _evidence
+
+    valid = {
+        "project_id": "original-game-01",
+        "manifest_sha256": "a" * 64,
+        "archive_sha256": "b" * 64,
+        "save_sha256": "c" * 64,
+        "independent_receipt_sha256": "d" * 64,
+        "world_digest": "e" * 64,
+        "replay_digest": "f" * 64,
+        "action_count": 2,
+        "offline_gameplay_reexecuted": True,
+        "release_certified": False,
+        "native_device_qualified": False,
+        "package_signed": False,
+    }
+    assert _evidence(valid)["world_digest"] == "e" * 64
+    for key, forged in (
+        ("world_digest", "not-a-digest"),
+        ("replay_digest", "A" * 64),
+        ("world_digest", True),
+        ("project_id", "../foreign-game"),
+        ("project_id", "game\\ncontrol"),
+        ("project_id", "x" * 129),
+    ):
+        with pytest.raises(FirstPlayableDeliveryBatchError):
+            _evidence({**valid, key: forged})
+
+
 def test_two_original_games_publish_restore_and_independently_reverify(
     original_games, tmp_path,
 ):

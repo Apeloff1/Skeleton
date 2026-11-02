@@ -161,11 +161,20 @@ def _evidence(result: dict[str, object]) -> dict[str, object]:
             raise FirstPlayableDeliveryBatchError(
                 "canonical delivery evidence has a noncanonical SHA-256 pin"
             )
-    for key in ("project_id", "world_digest", "replay_digest"):
-        if type(result[key]) is not str or not result[key]:
+    # World and replay identities are SHA-256 content digests, not free-form
+    # strings. A compromised adapter must not launder unpinned content into
+    # an apparently verified cohort summary.
+    for key in ("world_digest", "replay_digest"):
+        if type(result[key]) is not str or _PIN.fullmatch(result[key]) is None:
             raise FirstPlayableDeliveryBatchError(
-                "canonical delivery evidence has an invalid identity"
+                "canonical delivery evidence has a noncanonical game digest"
             )
+    if (type(result["project_id"]) is not str
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}",
+                            result["project_id"]) is None):
+        raise FirstPlayableDeliveryBatchError(
+            "canonical delivery evidence has an invalid project identity"
+        )
     if (type(result["action_count"]) is not int
             or not 1 <= result["action_count"] <= MAX_ACTIONS):
         raise FirstPlayableDeliveryBatchError(
