@@ -99,12 +99,25 @@ def test_cli_pinned_private_jobfile_and_explicit_release_holds(
     assert report["native_device_qualified"] is False
     assert report["release_certified"] is False
     assert report["files_published"] == 0
+    assert report["original_sources_reverified"] is False
+    assert run_app_cli(base + [
+        "--trusted-local-operator", "--verify-original-sources",
+    ]) == 0
+    source_bound = json.loads(capsys.readouterr().out)
+    assert source_bound["original_sources_reverified"] is True
+    assert source_bound["release_certified"] is False
 
 
 def test_wrong_independent_pins_and_partial_game_pins_fail_closed(
     delivered_games, tmp_path,
 ):
     jobs, summary, published = delivered_games
+    with pytest.raises(ConsumerFirstRunCohortError):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True, verify_original_sources="yes",
+        )
     with pytest.raises(ValueError):
         inspect_consumer_first_run_cohort(
             jobs, summary, expected_summary_sha256="0" * 64,
