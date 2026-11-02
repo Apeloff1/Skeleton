@@ -52,7 +52,8 @@ UpstreamProfiler = _upstream.Profiler
 def percentile_summary(name: str, durations_ms: Iterable[float]) -> Dict[str, Any]:
     """Return main's ``Profiler.stats`` dict for ``durations_ms``."""
     if (type(name) is not str or not 1 <= len(name) <= 128
-            or any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} for ch in name)):
+            or name != name.strip()
+            or any(unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"} for ch in name)):
         raise ValueError("percentile name must be bounded and printable")
     values = list(islice(durations_ms, MAX_SUMMARY_SAMPLES + 1))
     if len(values) > MAX_SUMMARY_SAMPLES:

@@ -48,7 +48,13 @@ def test_percentile_summary_rejects_aggregate_overflow_and_unsafe_metric_names()
 
 
 def test_percentile_summary_rejects_unicode_bidi_spoofed_metric_names():
-    for bad_name in ("render\\u202ereverse", "render\\u2066isolated",
-                     "render\\u2028line", "render\\u2029paragraph"):
+    for bad_name in ("render\u202ereverse", "render\u2066isolated",
+                     "render\u2028line", "render\u2029paragraph"):
         with pytest.raises(ValueError, match="bounded and printable"):
             _stats.percentile_summary(bad_name, [1.0])
+
+
+def test_metric_names_reject_surrogates_and_whitespace_aliases():
+    for name in (" frame", "frame ", "frame\ud800hidden"):
+        with pytest.raises(ValueError, match="bounded and printable"):
+            _stats.percentile_summary(name, [1.0])
