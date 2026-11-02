@@ -108,3 +108,13 @@ assets. A late same-byte substitution of an earlier game's original source
 cannot be accepted merely because canonical content digests still match.
 Without this option no original source directory is required or scanned.
 These checks are observational, not proof of rights or continuous custody.
+
+## Evidence parent-directory continuity
+
+The single-game readiness reader captures both the evidence-file inode and
+its owner-controlled **parent directory inode** for the installed root,
+ZIP, private save, and receipt. Replacing a parent directory while moving
+the same underlying file inode into the new directory is rejected at the
+next replay boundary, even when the file digest remains identical. This
+closes a path-custody gap not addressed by file-only inode comparisons.
+No persistent lock or device qualification is implied.

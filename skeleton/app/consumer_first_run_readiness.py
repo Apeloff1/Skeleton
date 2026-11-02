@@ -46,10 +46,21 @@ def _custody(
     save: str | Path, receipt: str | Path,
 ) -> tuple[tuple[int, ...], ...]:
     """Snapshot every installed source, ZIP, private save and receipt inode."""
+    # File identity alone is insufficient: an attacker can move the same
+    # inode into a replacement parent directory. Capture each parent as a
+    # separate owner-controlled directory inode before and after replay.
+    # This is still observational, not a filesystem lock.
+    def parent_identity(path: str | Path) -> tuple[int, ...]:
+        return _source_identity(Path(path).expanduser().absolute().parent)
+
     return (
+        parent_identity(installed),
         _source_identity(installed),
+        parent_identity(archive),
         _archive_identity(archive),
+        parent_identity(save),
         _save_identity(save),
+        parent_identity(receipt),
         _save_identity(receipt),
     )
 

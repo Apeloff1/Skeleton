@@ -198,3 +198,44 @@ def test_same_byte_nested_asset_swap_during_consumer_replay_fails_closed(
         inspect_consumer_first_run(
             isolated_install, archive, save, receipt, **pins,
         )
+
+
+def test_same_inode_receipt_parent_directory_swap_rejected(
+    delivered_first_run, tmp_path, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_readiness as module
+
+    paths, pins = delivered_first_run
+    install, archive, save, original_receipt = paths
+    parent = tmp_path / "private-receipt"
+    parent.mkdir(mode=0o700)
+    receipt = parent / "receipt.json"
+    receipt.write_bytes(original_receipt.read_bytes())
+    receipt.chmod(0o600)
+    before = receipt.stat()
+    original = module.inspect_first_playable_delivery
+    swapped = False
+
+    def replace_parent_after_first_replay(*args, **kwargs):
+        nonlocal swapped
+        result = original(*args, **kwargs)
+        if not swapped:
+            swapped = True
+            old_parent = tmp_path / "retired-receipt-parent"
+            os.rename(parent, old_parent)
+            parent.mkdir(mode=0o700)
+            os.rename(old_parent / receipt.name, receipt)
+            # Same bytes and SAME file inode, but a different directory
+            # inode now controls the evidence pathname.
+            assert receipt.stat().st_ino == before.st_ino
+            assert receipt.read_bytes() == original_receipt.read_bytes()
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_first_playable_delivery",
+        replace_parent_after_first_replay,
+    )
+    with pytest.raises(ConsumerFirstRunReadinessError, match="changed"):
+        inspect_consumer_first_run(
+            install, archive, save, receipt, **pins,
+        )
