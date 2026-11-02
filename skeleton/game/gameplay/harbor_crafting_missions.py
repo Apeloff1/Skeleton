@@ -256,7 +256,7 @@ def solve_missions(source: Any, board: Any, *, choice: str = "signal") -> dict[s
                 elif kind == "craft":
                     recipe = next(r for r in world["recipes"] if r["id"] == objective["recipe"])
                     for item, quantity in sorted(recipe["inputs"].items()):
-                        planner.ensure(item, planner.state["inventory"].get(item, 0) + quantity)
+                        planner.ensure(item, quantity)
                     planner.emit({"op": "craft", "recipe": recipe["id"]})
                 elif kind == "trade":
                     planner.navigate(
@@ -264,14 +264,14 @@ def solve_missions(source: Any, board: Any, *, choice: str = "signal") -> dict[s
                     )
                     planner.emit({"op": "trade", "item": objective["item"]})
                 elif kind == "visit":
-                    planner.navigate(
-                        lambda state, at=objective["at"]: state["pos"] == at
-                    )
-                    # A visit is credited only by an actual movement transition.
-                    # If already on the tile, leave and re-enter or fail closed.
-                    if planner.actions and planner.actions[-1]["op"] == "move":
-                        pass
+                    already_at_target = planner.state["pos"] == objective["at"]
+                    if not already_at_target:
+                        planner.navigate(
+                            lambda state, at=objective["at"]: state["pos"] == at
+                        )
                     else:
+                        # An objective needs an actual move INTO its destination;
+                        # standing on it from a prior mission does not count.
                         from .harbor_crafting_planner import MOVES
                         returned = False
                         for action in MOVES:

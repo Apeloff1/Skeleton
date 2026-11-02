@@ -130,3 +130,32 @@ def test_mission_board_enforces_global_objective_budget():
     ]
     with pytest.raises(HarborError, match="budget"):
         validate_board(authored, source())
+
+
+def test_solver_gathers_quest_stock_before_crafting_and_uses_real_transitions():
+    result = solve_missions(source(), board())
+    actions = [event["action"] for event in result["bundle"]["events"]]
+    wood_gathers = [
+        index for index, event in enumerate(result["bundle"]["events"])
+        if event["action"]["op"] == "gather"
+        and event["after"] != event["before"]
+    ]
+    first_craft = next(i for i, action in enumerate(actions) if action["op"] == "craft")
+    assert len(wood_gathers) >= 3
+    assert first_craft > 2
+    assert result["bundle"]["state"]["delivered"]
+    assert result["journal"][-1]["points"] == 60
+
+
+def test_solver_rejects_unobtainable_repeat_objective_instead_of_claiming_win():
+    authored = board()
+    authored["missions"][0]["objectives"][0]["count"] = 3
+    with pytest.raises(HarborError):
+        solve_missions(source(), authored)
+
+
+def test_malformed_prerequisite_types_fail_closed_with_domain_error():
+    authored = board()
+    authored["missions"][1]["requires"] = [["salvage"]]
+    with pytest.raises(HarborError, match="prerequisite"):
+        validate_board(authored, source())

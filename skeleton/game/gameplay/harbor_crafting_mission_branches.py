@@ -74,7 +74,7 @@ def verify_mission_branch_report(report: Any) -> list[dict[str, Any]]:
         raise HarborError("mission portfolio custody mismatch")
     if report["board_digest"] != digest(report["board"]):
         raise HarborError("mission portfolio board mismatch")
-    if report["source_digest"] != portfolio["root"]["source_digest"]:
+    if not isinstance(portfolio.get("root"), dict) or report["source_digest"] != portfolio["root"].get("source_digest"):
         raise HarborError("mission portfolio source mismatch")
     rebuilt = mission_branch_report(portfolio, report["board"])
     if rebuilt != report:

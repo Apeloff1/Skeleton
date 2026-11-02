@@ -117,3 +117,42 @@ def test_cli_rejects_forged_report_without_success_receipt(tmp_path):
     )
     assert result.returncode == 2
     assert "mission portfolio replay mismatch" in result.stderr
+
+
+def test_checkpoint_and_resume_cli_preserve_earned_mission_history(tmp_path):
+    source_path = ROOT / "harbor_lantern_quay.json"
+    board_path = ROOT / "harbor_lantern_quay_missions.json"
+    actions = demo_actions()
+    root = export_bundle(source(), actions[:10])
+    root_path = tmp_path / "checkpoint.json"
+    root_path.write_bytes(canonical(root))
+    suffix_path = tmp_path / "suffix.json"
+    suffix_path.write_bytes(canonical(actions[10:]))
+    base = [sys.executable, "-m", "scripts.game.harbor_crafting"]
+    checkpoint = subprocess.run(
+        base + ["mission-checkpoint", "--bundle", str(root_path), "--tick", "5",
+                "--missions", str(board_path), "--source", str(source_path)],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert checkpoint.returncode == 0, checkpoint.stderr
+    assert json.loads(checkpoint.stdout)["completed"] == ["salvage"]
+    resumed = subprocess.run(
+        base + ["mission-resume", "--bundle", str(root_path),
+                "--actions", str(suffix_path),
+                "--expected-terminal-digest", root["terminal_digest"],
+                "--missions", str(board_path), "--source", str(source_path),
+                "--require-all"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert resumed.returncode == 0, resumed.stderr
+    result = json.loads(resumed.stdout)
+    assert result["points"] == 60
+    assert result["bundle"]["state"]["ending"] == "beacon"
+    denied = subprocess.run(
+        base + ["mission-resume", "--bundle", str(root_path),
+                "--actions", str(suffix_path), "--expected-terminal-digest", "0" * 64,
+                "--missions", str(board_path), "--source", str(source_path)],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert denied.returncode == 2
+    assert "stale checkpoint" in denied.stderr
