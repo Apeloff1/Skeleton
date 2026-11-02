@@ -8,6 +8,9 @@ from typing import Iterable, Mapping, Sequence
 from skeleton.build.delivery._util import DeliveryError, require_id
 
 METHODS = frozenset({"GET", "HEAD", "OPTIONS"})  # smoke tests must be read-only
+MAX_SMOKE_CASES = 256
+MAX_SMOKE_OUTCOMES = 1024
+MAX_SMOKE_JSON_KEYS = 128
 
 
 @dataclass(frozen=True)
@@ -22,8 +25,14 @@ class SmokeCase:
         require_id(self.case_id, field="case_id")
         if self.method not in METHODS:
             raise DeliveryError(f"smoke case {self.case_id} must use a read-only method")
-        if not self.path.startswith("/"):
+        if not isinstance(self.path, str) or not self.path.startswith("/"):
             raise DeliveryError("smoke path must start with /")
+        if type(self.expect_status) is not int or not 100 <= self.expect_status <= 599:
+            raise DeliveryError("smoke expected status must be a valid HTTP integer")
+        if (not isinstance(self.expect_json_keys, tuple)
+                or len(self.expect_json_keys) > MAX_SMOKE_JSON_KEYS
+                or any(type(k) is not str or not k for k in self.expect_json_keys)):
+            raise DeliveryError("smoke expected JSON keys invalid")
 
 
 @dataclass(frozen=True)
@@ -44,13 +53,19 @@ class SmokeReport:
 
 
 def load_suite(items: Sequence[Mapping]) -> tuple[SmokeCase, ...]:
-    cases = tuple(
-        SmokeCase(
-            i["id"], i.get("method", "GET"), i["path"],
-            int(i.get("expect_status", 200)), tuple(i.get("expect_json_keys", ())),
-        )
-        for i in items
-    )
+    if not isinstance(items, Sequence) or len(items) > MAX_SMOKE_CASES:
+        raise DeliveryError("smoke suite count exceeds bound")
+    cases: list[SmokeCase] = []
+    for item in items:
+        if not isinstance(item, Mapping):
+            raise DeliveryError("smoke case must be an object")
+        keys = item.get("expect_json_keys", ())
+        if not isinstance(keys, (tuple, list)) or len(keys) > MAX_SMOKE_JSON_KEYS:
+            raise DeliveryError("smoke expected JSON keys invalid")
+        cases.append(SmokeCase(
+            item["id"], item.get("method", "GET"), item["path"],
+            item.get("expect_status", 200), tuple(keys),
+        ))
     ids = [c.case_id for c in cases]
     if len(ids) != len(set(ids)):
         raise DeliveryError("duplicate smoke case ids")
@@ -58,7 +73,25 @@ def load_suite(items: Sequence[Mapping]) -> tuple[SmokeCase, ...]:
 
 
 def evaluate(cases: Sequence[SmokeCase], outcomes: Iterable[SmokeOutcome]) -> SmokeReport:
-    by_id = {o.case_id: o for o in outcomes}
+    if not cases or len(cases) > MAX_SMOKE_CASES:
+        raise DeliveryError("smoke case count must be bounded and nonzero")
+    ids = [case.case_id for case in cases]
+    if len(set(ids)) != len(ids):
+        raise DeliveryError("duplicate smoke case ids")
+    by_id: dict[str, SmokeOutcome] = {}
+    for count, outcome in enumerate(outcomes, 1):
+        if count > MAX_SMOKE_OUTCOMES:
+            raise DeliveryError("smoke outcome count exceeds bound")
+        if not isinstance(outcome, SmokeOutcome) or outcome.case_id not in ids:
+            raise DeliveryError("unknown or malformed smoke outcome")
+        if outcome.case_id in by_id:
+            raise DeliveryError("duplicate smoke outcome identity")
+        if (type(outcome.status) is not int or not 100 <= outcome.status <= 599
+                or not isinstance(outcome.json_keys, tuple)
+                or len(outcome.json_keys) > MAX_SMOKE_JSON_KEYS
+                or any(type(k) is not str for k in outcome.json_keys)):
+            raise DeliveryError("invalid smoke outcome evidence")
+        by_id[outcome.case_id] = outcome
     passed: list[str] = []
     failed: list[tuple[str, str]] = []
     for case in cases:
