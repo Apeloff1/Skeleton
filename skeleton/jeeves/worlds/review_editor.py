@@ -102,6 +102,8 @@ class ReviewEditorStore:
             data = EvidenceStore(self.worlds.root).read(world_id)
         else:
             raise CanonError("invalid_review_kind")
+        if data["world_digest"] != digest(world):
+            raise CanonError("review_editor_world_race")
         return world, data
 
     def _outputs(self, world_id: str, kind: str):

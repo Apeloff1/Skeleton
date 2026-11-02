@@ -108,4 +108,47 @@ def test_untrusted_original_text_cannot_escape_json_script(tmp_path):
     page = (root / "marsh.factions.editor.html").read_text()
     assert "</script><img" not in page
     assert "<img src=x" not in page
-    assert "\\u003c/img" in page
+    assert "\\u003c/script" in page
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-anchored custody")
+@pytest.mark.parametrize("kind", ["factions", "evidence"])
+def test_cli_editor_export_import_replay(tmp_path, capsys, kind):
+    from skeleton.jeeves.worlds.factions_cli import run as factions_cli
+    from skeleton.jeeves.worlds.evidence_cli import run as evidence_cli
+    root = tmp_path / "private"
+    faction_digest, evidence_digest = prepare(root)
+    current_digest = faction_digest if kind == "factions" else evidence_digest
+    cli = factions_cli if kind == "factions" else evidence_cli
+    args = ["--store", str(root)]
+    assert cli(args + ["editor", "--world-id", "marsh",
+                       "--expected-digest", current_digest]) == 0
+    capsys.readouterr()
+    assert cli(args + ["verify-editor", "--world-id", "marsh"]) == 0
+    assert json.loads(capsys.readouterr().out)["ok"]
+    if kind == "factions":
+        operation = {"action": "replace_rule", "value": {
+            "id": "first_effect", "choice_id": "pursue_goal",
+            "faction_id": "couriers", "delta": 5, "reason": "Revised."}}
+    else:
+        operation = {"action": "replace", "value": {
+            "id": "letter", "title": "Revised letter",
+            "detail": "The revised truth.", "unlock_choice": "pursue_goal",
+            "depends_on": [], "required": True}}
+    path = tmp_path / "operation.json"
+    path.write_text(json.dumps(operation))
+    assert cli(args + ["edit", "--world-id", "marsh",
+                       "--expected-digest", current_digest,
+                       "--operation-file", str(path)]) == 0
+    new_digest = json.loads(capsys.readouterr().out)[
+        "factions_digest" if kind == "factions" else "evidence_digest"]
+    assert new_digest != current_digest
+    assert cli(args + ["verify-editor", "--world-id", "marsh"]) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == (
+        "review_editor_receipt_mismatch")
+    path.unlink()
+    path.symlink_to(root / "marsh.json")
+    assert cli(args + ["edit", "--world-id", "marsh",
+                       "--expected-digest", new_digest,
+                       "--operation-file", str(path)]) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "io_error"

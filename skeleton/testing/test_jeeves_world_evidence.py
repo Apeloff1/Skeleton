@@ -113,10 +113,24 @@ def test_edit_batch_atomic_revokes_approval():
         edit_evidence(data, world(), {"action": "exec", "value": {}})
 
 
-def test_required_unreachable_evidence_refuses_compile():
+def test_mutually_exclusive_clue_branches_fail_closed():
+    source = world()
+    source["choices"].append({
+        "id": "exit", "from": "opening", "to": "resolution",
+        "label": "Leave without searching", "requires": [], "grants": [],
+    })
+    prove(source)
     data = evidence()
-    data["clues"][0]["unlock_choice"] = "open"
-    assert solve_evidence(data, world()) == ("search", "open")
+    data["world_digest"] = digest(source)
+    data["clues"].append({
+        "id": "other_path", "title": "Exit mark", "detail": "Seen on exit.",
+        "unlock_choice": "exit", "depends_on": [], "required": True,
+    })
+    assert validate_evidence(data, source) is data
+    with pytest.raises(CanonError, match="evidence_unreachable"):
+        solve_evidence(data, source)
+    with pytest.raises(CanonError, match="evidence_unreachable"):
+        compile_evidence(approve_evidence(data, source, "Reviewed."), source)
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-anchored custody")
