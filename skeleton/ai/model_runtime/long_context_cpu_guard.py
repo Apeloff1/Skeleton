@@ -48,12 +48,15 @@ class CpuCapacityRequest:
 @dataclass(frozen=True, slots=True)
 class CpuCapacityLimits:
     max_active: int = 8
+    max_active_per_principal: int = 4
     max_tokens: int = 8192
     max_bytes: int = 64 * 1024**2
     lifetime_ns: int = 1_000_000_000
 
     def __post_init__(self) -> None:
         _bounded(self.max_active, "max_active", 1, 64)
+        _bounded(self.max_active_per_principal,
+                 "max_active_per_principal", 1, 64)
         _bounded(self.max_tokens, "max_tokens", 1, 65536)
         _bounded(self.max_bytes, "max_bytes", 1, 1024**3)
         _bounded(self.lifetime_ns, "lifetime_ns", 1, 5_000_000_000)
@@ -205,6 +208,20 @@ class LongContextCpuCapacityGuard:
         return (publishable > 0 if requested_bytes == 0
                 else publishable >= requested_bytes)
 
+    def _principal_room(self, requests: tuple[CpuCapacityRequest, ...]) -> bool:
+        """Prevent a verified principal monopolizing in-process capacity."""
+        counts: dict[str, int] = {}
+        for item in self._reservations.values():
+            principal = item.request.principal
+            counts[principal] = counts.get(principal, 0) + 1
+        limit = min(self._limits.max_active, self._limits.max_active_per_principal)
+        for request in requests:
+            principal = request.principal
+            counts[principal] = counts.get(principal, 0) + 1
+            if counts[principal] > limit:
+                return False
+        return True
+
     def _snapshot(self, state: str) -> dict[str, object]:
         items = tuple(self._reservations.values())
         return {
@@ -214,6 +231,7 @@ class LongContextCpuCapacityGuard:
             "reserved_tokens": sum(x.request.max_tokens for x in items),
             "reserved_bytes": sum(x.request.requested_bytes for x in items),
             "revocations": self._revocations,
+            "max_active_per_principal": self._limits.max_active_per_principal,
             "device": "cpu", "device_qualified": False,
             "cross_process_exclusive": False,
             "is_execution_lease": False, "is_admission_grant": False,
@@ -240,6 +258,9 @@ class LongContextCpuCapacityGuard:
             if not self._authorized(request):
                 return {**self._snapshot("hold"), "reservation_id": None,
                         "reason": "principal_unverified"}
+            if not self._principal_room((request,)):
+                return {**self._snapshot("hold"), "reservation_id": None,
+                        "reason": "principal_capacity_exhausted"}
             if any(x.request.stream_id == request.stream_id
                    for x in self._reservations.values()):
                 return {**self._snapshot("hold"), "reservation_id": None,
@@ -315,6 +336,9 @@ class LongContextCpuCapacityGuard:
             if not all(self._authorized(r) for r in ordered):
                 return {**active, "state": "hold", "reservations": [],
                         "reason": "principal_unverified"}
+            if not self._principal_room(tuple(ordered)):
+                return {**active, "state": "hold", "reservations": [],
+                        "reason": "fair_cycle_principal_capacity"}
             try:
                 windows = [(r, self._window(r)) for r in ordered]
                 if not self._disk_observed_sufficient(requested_bytes):

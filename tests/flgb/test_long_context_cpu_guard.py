@@ -372,5 +372,42 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.assertEqual(self.guard.status()["revocations"], 1)
         self.assertFalse(self.guard.release(key))
 
+    def test_principal_quota_preserves_capacity_for_other_verified_owner(self):
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier,
+                limits=CpuCapacityLimits(max_active=8, max_active_per_principal=2),
+                clock=self.clock)
+        for _ in range(3):
+            guard.observe()
+        one = self.request
+        two = CpuCapacityRequest("owner", "stream2", "a" * 64, "b" * 64, 4, 8, 64)
+        three = CpuCapacityRequest("owner", "stream3", "a" * 64, "b" * 64, 4, 8, 64)
+        other = CpuCapacityRequest("other", "stream4", "a" * 64, "b" * 64, 4, 8, 64)
+        self.assertIsNotNone(guard.reserve(one)["reservation_id"])
+        self.assertIsNotNone(guard.reserve(two)["reservation_id"])
+        self.assertEqual(guard.reserve(three)["reason"],
+                         "principal_capacity_exhausted")
+        self.assertIsNotNone(guard.reserve(other)["reservation_id"])
+        self.assertEqual(guard.status()["active"], 3)
+
+    def test_fair_cycle_principal_quota_is_atomic(self):
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier,
+                limits=CpuCapacityLimits(max_active=8, max_active_per_principal=2),
+                clock=self.clock)
+        for _ in range(3):
+            guard.observe()
+        requests = tuple(CpuCapacityRequest(
+            "owner", f"stream{i}", "a" * 64, "b" * 64, 4, 8, 64)
+            for i in range(3))
+        result = guard.reserve_fair_cycle(requests, quantum_tokens=8)
+        self.assertEqual(result["reason"], "fair_cycle_principal_capacity")
+        self.assertEqual(result["reservations"], [])
+        self.assertEqual(guard.status()["active"], 0)
+
 if __name__ == "__main__":
     unittest.main()
