@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for gloamforge."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('gloamforge_arrival', (), (), ('arrival_record',)), Quest('gloamforge_source', ('gloamforge_arrival',), ('arrival_record',), ('source_proof',)), Quest('gloamforge_witness', ('gloamforge_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('gloamforge_reconcile', ('gloamforge_source', 'gloamforge_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('gloamforge_crossing', ('gloamforge_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('gloamforge_conclusion', ('gloamforge_crossing',), ('crossing_pass',), ('ending_unlocked',)))
