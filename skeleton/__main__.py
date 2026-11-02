@@ -77,6 +77,7 @@ Commands:
     world-experience Unified reviewed world, cast and route offline playable
     world-session Source-verified offline play, save, resume and checkpoint replay
     world-quest  Original objective authoring, earned consequences and quest proof
+    world-counterfactual Reviewed alternate endings from actual player choices
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -801,6 +802,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-quest":
         from skeleton.jeeves.worlds.quest_cli import run as world_quest_cli
         return world_quest_cli(rest)
+    if cmd == "world-counterfactual":
+        from skeleton.jeeves.worlds.counterfactual_cli import run as world_counterfactual_cli
+        return world_counterfactual_cli(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
