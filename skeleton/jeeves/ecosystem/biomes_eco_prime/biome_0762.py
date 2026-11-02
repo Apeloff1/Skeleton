@@ -1,0 +1,13 @@
+"""Biome eco_prime 0762.
+"""
+from __future__ import annotations
+
+ID = "biome_eco_prime_0762"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "biome", "index": 762, "tier": 762 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 762 % 59 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}
