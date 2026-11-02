@@ -8,10 +8,12 @@ from dataclasses import dataclass
 from ._core import ContractError, require, require_str, verdict
 
 PATTERNS = (
-    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"(?:AKIA|ASIA)[0-9A-Z]{16}"),
     re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"(?i)(?:password|secret|token)\s*[:=]\s*\S{8,}"),
+    # GitHub fine-grained PATs use a different prefix from legacy gh[pousr]_.
+    re.compile(r"github_pat_[A-Za-z0-9_]{40,}"),
 )
 MAX_TTL_S = 3600
 MAX_ARTIFACTS = 256

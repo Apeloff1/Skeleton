@@ -64,3 +64,14 @@ def test_credential_name_cannot_embed_secret_or_log_delimiters():
         with pytest.raises(m.ContractError, match="credential name"):
             m.Credential(bad, ("read",), 0, 60)
     assert m.Credential("ci-runner:release_1", ("read",), 0, 60).name == "ci-runner:release_1"
+
+
+def test_secret_scan_detects_temporary_aws_and_fine_grained_github_tokens():
+    # Synthetic fixtures: never embed actual credentials in the repository.
+    aws_temporary = "ASIA" + "A" * 16
+    github_fine_grained = "github_pat_" + "A" * 48
+    assert "pattern0" in m.scan("temporary " + aws_temporary)
+    assert "pattern4" in m.scan("token=" + github_fine_grained)
+    report = m.evaluate({"artifact.txt": "prefix " + github_fine_grained}, [])
+    assert not report.passed
+    assert "secret:artifact.txt:pattern4" in report.findings
