@@ -298,3 +298,12 @@ def test_seal_replay_cache_recomputes_expiry_after_replacing_oldest():
     with pytest.raises(hs.ReplayCacheFull):
         cache.check_and_store("new", NOW + 200, NOW + 6)
     assert cache.check_and_store("later", NOW + 100, NOW + 6) is False
+
+
+def test_enforced_legacy_seals_refuse_unbounded_future_lifetime():
+    for principal in (None, "user1"):
+        token = hs.mint_seal("svc", 86400, secret=SECRET, principal=principal, now=NOW)
+        with pytest.raises(AuthError):
+            _v(token, domain="projects")
+        # Direct compatibility helper is deliberately not the enforced gate.
+        assert hs.verify_seal(token, secret=SECRET, now=NOW) == "svc"

@@ -419,7 +419,9 @@ def verify_seal(
             return None
         if len(sig) != 64 or any(c not in "0123456789abcdef" for c in sig):
             return None
-        if ts > expiry:
+        # Legacy signatures are replayable. Enforced routes must never
+        # accept credentials minted with effectively unbounded lifetimes.
+        if ts > expiry or (enforce_domain and expiry > ts + MAX_V2_TTL_SECS + REPLAY_SKEW_SECS):
             raise AuthError(_OPAQUE)
         for key in ring.values():
             try:
@@ -446,7 +448,9 @@ def verify_seal(
             return None
         if len(sig) != 64 or any(c not in "0123456789abcdef" for c in sig):
             return None
-        if ts > expiry:
+        # Legacy signatures are replayable. Enforced routes must never
+        # accept credentials minted with effectively unbounded lifetimes.
+        if ts > expiry or (enforce_domain and expiry > ts + MAX_V2_TTL_SECS + REPLAY_SKEW_SECS):
             raise AuthError(_OPAQUE)
         for key in ring.values():
             expected = _sign_principal(principal, attester, expiry, key)
