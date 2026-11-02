@@ -280,6 +280,8 @@ def _parser() -> argparse.ArgumentParser:
                    help="exercise original source, fresh install, interactive save and pinned delivery acceptance")
     sub.add_parser("consumer-first-run-readiness", add_help=False,
                    help="read-only two-pass installed playable evidence with explicit release holds")
+    sub.add_parser("consumer-first-run-cohort", add_help=False,
+                   help="read-only pinned 2-8 game consumer first-run replay; release blocked")
     sub.add_parser("studio-journey", add_help=False,
                    help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
@@ -542,6 +544,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "consumer-first-run-readiness":
         from skeleton.app.consumer_first_run_readiness import main as readiness_main
         return readiness_main(arguments[1:])
+    if arguments and arguments[0] == "consumer-first-run-cohort":
+        from skeleton.app.consumer_first_run_cohort import main as cohort_readiness_main
+        return cohort_readiness_main(arguments[1:])
     if arguments and arguments[0] == "studio-journey":
         from skeleton.app.studio_journey import main as journey_main
         return journey_main(arguments[1:])
