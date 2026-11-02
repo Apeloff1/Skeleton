@@ -203,3 +203,16 @@ def test_world_change_topology_evidence_is_bounded_and_unambiguous(monkeypatch):
     with pytest.raises(ValueError, match="history exceeds capacity"):
         blockages.apply(WorldChange("second", "flood", 2))
     assert blockages.last_frame == 1
+
+
+def test_reused_world_change_identity_cannot_silently_drop_new_blockage():
+    blockages = Blockages()
+    original = WorldChange("same-id", "flood", 10, blocked_waypoints=frozenset({"B"}))
+    assert blockages.apply(original)
+    assert not blockages.apply(original)
+    with pytest.raises(ValueError, match="conflicting world change identity"):
+        blockages.apply(WorldChange("same-id", "flood", 10,
+                                   blocked_waypoints=frozenset({"C"})))
+    assert blockages.hop_blocked("A", "B")
+    assert not blockages.hop_blocked("A", "C")
+    assert blockages.last_frame == 10

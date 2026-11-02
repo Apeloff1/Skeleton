@@ -95,10 +95,13 @@ class Blockages:
     waypoints: set[str] = field(default_factory=set)
     hops: set[tuple[str, str]] = field(default_factory=set)
     applied: dict[str, int] = field(default_factory=dict)
+    applied_events: dict[str, WorldChange] = field(default_factory=dict)
     last_frame: int = -1
 
     def apply(self, change: WorldChange) -> bool:
         if change.change_id in self.applied:
+            if self.applied_events.get(change.change_id) != change:
+                raise ValueError("conflicting world change identity")
             return False
         if len(self.applied) >= MAX_WORLD_CHANGES:
             raise ValueError("world change history exceeds capacity")
@@ -115,6 +118,7 @@ class Blockages:
         for a, b in change.blocked_hops:
             self.hops |= {(a, b), (b, a)}
         self.applied[change.change_id] = change.frame
+        self.applied_events[change.change_id] = change
         self.last_frame = change.frame
         return True
 
