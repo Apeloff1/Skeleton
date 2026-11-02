@@ -200,12 +200,14 @@ class GameplayMigrations:
         if fn is None:
             raise GameplayMigrationError(f"missing migration step {v}->{v + 1}")
         a = fn(copy.deepcopy(payload))
-        b = fn(copy.deepcopy(payload))
-        if not isinstance(a, dict) or not isinstance(b, dict):
+        if not isinstance(a, dict):
             raise GameplayMigrationError(f"non-deterministic migration {v}->{v + 1}")
-        # Callback output is untrusted until bounded; never hash a cyclic or
-        # oversized migration result before validating its full shape.
+        # Reject a malformed first result BEFORE invoking the callback again.
+        # No second side effect is permitted after an already failed boundary.
         _bounded_payload(a)
+        b = fn(copy.deepcopy(payload))
+        if not isinstance(b, dict):
+            raise GameplayMigrationError(f"non-deterministic migration {v}->{v + 1}")
         _bounded_payload(b)
         if dig(a) != dig(b):
             raise GameplayMigrationError(f"non-deterministic migration {v}->{v + 1}")

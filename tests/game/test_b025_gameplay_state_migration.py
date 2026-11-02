@@ -164,3 +164,17 @@ def test_gameplay_section_rejects_unknown_fields_before_migration():
     with pytest.raises(GameplayMigrationError, match="missing gameplay save field"):
         GameplayStateEnvelope.from_section(missing)
     assert GameplayStateEnvelope.from_section(V1_SECTION).tick == 42
+
+
+def test_migration_invalid_first_result_does_not_invoke_callback_twice():
+    calls = []
+
+    def invalid_first(payload):
+        calls.append(1)
+        return {"too_many": [0] * 10_001}
+
+    registry = GameplayMigrations(2)
+    registry.register(1, invalid_first)
+    with pytest.raises(GameplayMigrationError, match="collection exceeds bound"):
+        registry.load_section(V1_SECTION)
+    assert calls == [1]
