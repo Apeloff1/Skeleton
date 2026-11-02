@@ -14,6 +14,7 @@ from .harbor_crafting_planner import solve, verify_plan
 from .harbor_crafting_missions import mission_report, verify_mission_report, solve_missions
 from .harbor_crafting_mission_authoring import author_mission_revision, verify_mission_revision
 from .harbor_crafting_mission_branches import mission_branch_report, verify_mission_branch_report
+from .harbor_crafting_mission_compare import compare_mission_revision, verify_mission_comparison
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -42,7 +43,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -60,12 +61,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mission-edits", help="Transactional mission edit JSON")
     parser.add_argument("--expected-board-digest", help="Optimistic board revision lease")
     parser.add_argument("--mission-revision", help="Portable mission revision JSON")
+    parser.add_argument("--comparison", help="Portable replay-derived mission revision comparison")
     parser.add_argument("--preview-bundle", help="Optional canonical gameplay bundle for edited mission preview")
     parser.add_argument("--require-all", action="store_true", help="Require every authored mission to be earned")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify-mission-portfolio":
+        if args.command == "verify-mission-comparison":
+            output = {"verified": True, **verify_mission_comparison(
+                _required_json(args.comparison, "comparison"))}
+        elif args.command == "compare-mission-revision":
+            output = compare_mission_revision(
+                _required_json(args.mission_revision, "mission-revision"),
+                _required_json(args.bundle, "bundle"))
+        elif args.command == "verify-mission-portfolio":
             output = {"verified": True, "branches": verify_mission_branch_report(
                 _required_json(args.report, "report"))}
         elif args.command == "mission-portfolio":

@@ -61,3 +61,18 @@ separate mission completion and earned points for each ending.
 branch and mission results. A shelter ending cannot claim signal-only
 dispatch points. A scorecard is a deterministic gameplay consequence,
 not an authenticated leaderboard or financial reward.
+
+## Deterministic edit consequences
+
+`compare-mission-revision --mission-revision REVISION --bundle BUNDLE`
+evaluates the original and edited mission boards against the *same*
+verified gameplay save. It exports two independently replayable quest journals,
+the exact change in earned points, and mission IDs newly gained or lost.
+`verify-mission-comparison --comparison COMPARISON` replays both sides
+and rejects fabricated scores, tampered rules, mismatched source worlds,
+altered save events, and forged before/after consequences.
+
+This is a production authoring preview, not a claim that changing a
+mission board rewrites the original gameplay save. A mission may be
+lost after an edit even though the underlying player's earned game
+ending remains unchanged.
