@@ -205,7 +205,8 @@ def compile_review(data: Any, world: Any, session: Any) -> dict[str, Any]:
 def render_report(report: Any) -> bytes:
     if type(report) is not dict or report.get("schema") != REPORT_SCHEMA:
         raise CanonError("counterfactual_report_schema")
-    esc = lambda value: html.escape(str(value), quote=True)
+    def esc(value: Any) -> str:
+        return html.escape(str(value), quote=True)
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; ",
@@ -256,10 +257,13 @@ class CounterfactualStore:
         return world, session
 
     def _read(self, fd: int, world_id: str, slot: str, world: Any, session: Any):
-        return validate_review(
+        review = validate_review(
             strict_json(self.worlds._read(fd, self._name(world_id, slot))),
             world, session,
         )
+        if review["session_slot"] != slot:
+            raise CanonError("counterfactual_slot_mismatch")
+        return review
 
     def _lock(self, fd: int, world_id: str) -> int:
         try:

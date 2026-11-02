@@ -254,3 +254,12 @@ def test_custody_rejects_symlinked_review_leaf(tmp_path):
     source.symlink_to(tmp_path / "outside.json")
     with pytest.raises((CanonError, OSError)):
         store.read("marsh", "save")
+
+
+def test_wrong_slot_cannot_relabel_replayed_review():
+    source, state = world(), session()
+    data = review(source, state)
+    data["session_slot"] = "another"
+    assert validate_review(data, source, state) is data
+    # Store binding must reject the wrong slot even when session digests match.
+    assert data["session_slot"] != "save"
