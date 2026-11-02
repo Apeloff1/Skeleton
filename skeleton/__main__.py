@@ -921,7 +921,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-hours-accept":
         from skeleton.game.gameplay.scene_market_hours_acceptance import cli as hours_accept_cli
         return hours_accept_cli(rest)
-    if cmd == "scene-market-party":\n        from skeleton.game.gameplay.scene_market_party import cli as party_cli\n        return party_cli(rest)\n    if cmd == "scene-market-party-author":\n        from skeleton.game.gameplay.scene_market_party_author import cli as party_author_cli\n        return party_author_cli(rest)\n    if cmd == "scene-market-party-board":\n        from skeleton.game.gameplay.scene_market_party_board import cli as party_board_cli\n        return party_board_cli(rest)\n    if cmd == "scene-market-party-play":\n        from skeleton.game.gameplay.scene_market_party_interactive import cli as party_play_cli\n        return party_play_cli(rest)\n    if cmd == "scene-market-hours":
+    if cmd == "scene-market-party":
+        from skeleton.game.gameplay.scene_market_party import cli as party_cli
+        return party_cli(rest)
+    if cmd == "scene-market-party-author":
+        from skeleton.game.gameplay.scene_market_party_author import cli as party_author_cli
+        return party_author_cli(rest)
+    if cmd == "scene-market-party-board":
+        from skeleton.game.gameplay.scene_market_party_board import cli as party_board_cli
+        return party_board_cli(rest)
+    if cmd == "scene-market-party-play":
+        from skeleton.game.gameplay.scene_market_party_interactive import cli as party_play_cli
+        return party_play_cli(rest)
+    if cmd == "scene-market-hours":
         from skeleton.game.gameplay.scene_market_hours import cli as hours_cli
         return hours_cli(rest)
     if cmd == "scene-market-contract-play":
