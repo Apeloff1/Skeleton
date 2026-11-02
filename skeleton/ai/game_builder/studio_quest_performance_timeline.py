@@ -5,6 +5,8 @@ speech synthesis, observed playback, native audio timing or device evidence.
 """
 from __future__ import annotations
 
+from base64 import b64encode
+from hashlib import sha256
 from html import escape
 import os
 from pathlib import Path
@@ -268,6 +270,88 @@ def restore_performance_timeline(
         documents, *parts, voice_receipt=voice_receipt,
         chronology_receipt=chronology_receipt,
         receipt=stored, authorized=True)
+
+
+_SCRIPT = """(() => {
+  'use strict';
+  const byId = id => document.getElementById(id);
+  byId('export').addEventListener('click', () => {
+    try {
+      const plan = JSON.parse(byId('plan').textContent);
+      plan.rows = plan.rows.map((row, i) => ({
+        ...row,
+        buffer_ms: Number(byId('buffer-' + i).value),
+        reviewed: byId('review-' + i).checked
+      }));
+      const raw = JSON.stringify(plan);
+      if (new TextEncoder().encode(raw).length > 131072) throw Error('oversize');
+      const url = URL.createObjectURL(new Blob([raw], {type: 'application/json'}));
+      const link = document.createElement('a');
+      link.href = url; link.download = 'original-quest-performance-plan.json';
+      link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      byId('status').textContent = 'Exported; canonical replay and compile required.';
+    } catch (_) { byId('status').textContent = 'Invalid edit; no export.'; }
+  });
+})();"""
+
+
+def render_performance_timeline_editor(
+    documents: Mapping[str, Any], *parts: object,
+    voice_receipt: object, chronology_receipt: object,
+    plan: object, authorized: bool,
+) -> bytes:
+    if authorized is not True:
+        raise PermissionError("performance editor requires authorization")
+    base, voice, chrono = _components(
+        documents, parts, voice_receipt, chronology_receipt)
+    if (type(plan) is not dict or set(plan) != {
+            "schema", "source_digest", "session_digest",
+            "voice_direction_digest", "chronology_digest", "rows"}
+            or plan["schema"] != PLAN_SCHEMA
+            or len(_canonical(plan)) > MAX_PLAN
+            or plan["source_digest"] != base["source_digest"]
+            or plan["session_digest"] != base["session_digest"]
+            or plan["voice_direction_digest"] != voice["voice_direction_digest"]
+            or plan["chronology_digest"] != chrono["chronology_digest"]
+            or type(plan["rows"]) is not list
+            or len(plan["rows"]) != len(base["events"])):
+        raise StudioQuestError("invalid source-bound performance editor plan")
+    rows = []
+    for i, (event, row) in enumerate(zip(base["events"], plan["rows"])):
+        if (type(row) is not dict or set(row) != {
+                "stage_id", "choice", "buffer_ms", "reviewed"}
+                or row["stage_id"] != event["stage_id"]
+                or row["choice"] != event["choice"]
+                or type(row["buffer_ms"]) is not int
+                or not 0 <= row["buffer_ms"] <= 30000
+                or type(row["reviewed"]) is not bool):
+            raise StudioQuestError("invalid typed performance editor row")
+        rows.append(
+            '<fieldset><legend>' +
+            escape(row["stage_id"] + " / " + row["choice"]) +
+            '</legend><label>Review buffer milliseconds'
+            '<input type="number" min="0" max="30000" step="1" id="buffer-' +
+            str(i) + '" value="' + str(row["buffer_ms"]) +
+            '"></label><label>Reviewed<input type="checkbox" id="review-' +
+            str(i) + '"' + (" checked" if row["reviewed"] else "") +
+            '></label></fieldset>')
+    plan_json = _canonical(plan).decode("ascii").replace("<", "\\u003c")
+    script_hash = b64encode(sha256(_SCRIPT.encode("utf-8")).digest()).decode("ascii")
+    csp = ("default-src 'none'; script-src 'sha256-" + script_hash +
+           "'; connect-src 'none'; img-src 'none'; style-src 'none'; "
+           "base-uri 'none'; form-action 'none'; object-src 'none'")
+    html = ('<!doctype html><html lang="' + escape(base["locale"], quote=True) +
+            '"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" '
+            'content="' + csp + '"><title>Original quest performance editor</title>'
+            '</head><body><main><h1>Review performance time buffers</h1>' +
+            ''.join(rows) + '<script id="plan" type="application/json">' +
+            plan_json + '</script><button id="export" type="button">'
+            'Export edited performance plan</button>'
+            '<p id="status" role="status" aria-live="polite"></p>'
+            '</main><script>' + _SCRIPT + '</script></body></html>').encode("utf-8")
+    if len(html) > MAX_HTML:
+        raise StudioQuestError("performance editor exceeds byte budget")
+    return html
 
 
 def render_performance_timeline_html(

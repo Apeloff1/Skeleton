@@ -11,7 +11,7 @@ from skeleton.ai.game_builder.studio_quest_private_io import read_studio_private
 from skeleton.ai.game_builder.studio_quest_performance_timeline import (
     PROMPT, propose_performance_timeline, compile_performance_timeline,
     publish_performance_timeline, restore_performance_timeline,
-    render_performance_timeline_html,
+    render_performance_timeline_html, render_performance_timeline_editor,
 )
 
 
@@ -26,11 +26,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--chronology-file", type=Path, required=True)
     parser.add_argument("--plan-file", type=Path)
     parser.add_argument("--preview-html", action="store_true")
+    parser.add_argument("--editor-html", action="store_true")
     parser.add_argument("--publish", type=Path)
     parser.add_argument("--restore", type=Path)
     args = parser.parse_args(argv)
     if args.publish and args.restore:
         parser.error("cannot publish and restore together")
+    if args.editor_html and (args.publish or args.restore or args.preview_html):
+        parser.error("editor is read-only")
     if args.preview_html and (args.publish or args.restore):
         parser.error("preview is read-only")
     try:
@@ -56,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
                     expected_voice_digest=voice["voice_direction_digest"],
                     expected_chronology_digest=chronology["chronology_digest"],
                     authorized=True, **kwargs)
+            if args.editor_html:
+                print(render_performance_timeline_editor(
+                    documents, *parts, plan=plan, authorized=True,
+                    **kwargs).decode("utf-8"))
+                return 0
+            if not args.plan_file:
                 if args.publish or args.preview_html:
                     parser.error("reviewed --plan-file required")
                 print(json.dumps({"schema": "skeleton.cli.quest_performance_plan.v1",

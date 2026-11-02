@@ -23,6 +23,7 @@ from skeleton.ai.game_builder.studio_quest_performance_timeline import (
     PROMPT, FILENAME, propose_performance_timeline, compile_performance_timeline,
     replay_performance_timeline, publish_performance_timeline,
     restore_performance_timeline, render_performance_timeline_html,
+    render_performance_timeline_editor,
 )
 from tests.test_studio_quest_character_locale import fixture
 
@@ -86,6 +87,10 @@ def test_cross_vertical_verified_handoff_and_preview():
         parts[0], *parts[1:], receipt=result, authorized=True, **kwargs)
     assert b"Content-Security-Policy" in html
     assert b"no observed speech" in html
+    editor = render_performance_timeline_editor(
+        parts[0], *parts[1:], plan=plan, authorized=True, **kwargs)
+    assert b"Export edited performance plan" in editor
+    assert b"connect-src 'none'" in editor
 
 
 def test_reject_stale_source_wrong_session_and_forged_cues():
@@ -176,6 +181,8 @@ def test_cli_plan_compile_publish_and_restore(tmp_path, monkeypatch, capsys):
     assert cli.main(args) == 0
     proposed = json.loads(capsys.readouterr().out)["plan"]
     assert proposed["rows"][0]["reviewed"] is False
+    assert cli.main(args + ["--editor-html"]) == 0
+    assert "Export edited performance plan" in capsys.readouterr().out
     plan_file = tmp_path / "plan.json"
     plan_file.write_text(json.dumps(plan))
     os.chmod(plan_file, 0o600)
