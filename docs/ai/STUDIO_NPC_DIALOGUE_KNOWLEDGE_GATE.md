@@ -28,3 +28,11 @@ read-only tool is operator-gated and bounded. A playable manifest is
 available only when every gate is allowed and the underlying relay qualifies
 for canonical HTML5 handoff. Native NPC memory, spoken dialogue, physical
 interaction and release qualification remain explicitly unverified.
+
+An offline, source-leased HTML editor is available with `--render-editor
+PRIVATE_DIRECTORY`. Its embedded script is CSP-hash pinned and only exports
+a typed JSON edit, never commits gameplay itself. Recompile that export with
+`--editor-export-file PRIVATE_JSON --baseline-gate-file PRIVATE_BASELINE_GATE
+--relay-file PRIVATE_RELAY`. The importer checks private file custody,
+unique JSON keys, project/source/session/relay identity, baseline gate digest,
+and bounded authoring before replaying the revised gate. No overwrite occurs.

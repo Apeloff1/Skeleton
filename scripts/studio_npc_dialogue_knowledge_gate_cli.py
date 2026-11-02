@@ -14,6 +14,9 @@ from skeleton.ai.game_builder.studio_npc_dialogue_knowledge_gate import (
     restore_npc_dialogue_knowledge_gate,
 )
 from scripts.studio_npc_knowledge_relay_cli import _private_json
+from skeleton.ai.game_builder.studio_npc_dialogue_knowledge_gate_editor import (
+    load_npc_dialogue_gate_editor_export, publish_npc_dialogue_gate_editor,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,14 +27,20 @@ def main(argv: list[str] | None = None) -> int:
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument("--prompt", action="store_true")
     mode.add_argument("--authoring-file", type=Path)
+    mode.add_argument("--editor-export-file", type=Path)
     mode.add_argument("--restore", type=Path)
     ap.add_argument("--publish", type=Path)
+    ap.add_argument("--baseline-gate-file", type=Path)
+    ap.add_argument("--render-editor", type=Path)
     ap.add_argument("--playable", action="store_true")
     args = ap.parse_args(argv)
-    if args.restore is not None and (args.relay_file or args.publish):
+    if args.restore is not None and (args.relay_file or args.publish or
+                                     args.baseline_gate_file):
         ap.error("restore excludes new relay or publication")
     if args.restore is None and args.relay_file is None:
         ap.error("gate authoring requires a private relay receipt")
+    if (args.editor_export_file is not None) != (args.baseline_gate_file is not None):
+        ap.error("editor import requires a matching private baseline gate receipt")
     try:
         docs = read_blueprint(args.project)
         if args.restore is not None:
@@ -42,11 +51,28 @@ def main(argv: list[str] | None = None) -> int:
             relay = _private_json(args.relay_file, MAX_BYTES)
             kwargs = {"authorized": True,
                       "expected_source_digest": args.expected_source}
-            result = (propose_npc_dialogue_knowledge_gate(
-                docs, relay, PROMPT, **kwargs) if args.prompt
-                else compile_npc_dialogue_knowledge_gate(
+            if args.editor_export_file is not None:
+                baseline = _private_json(args.baseline_gate_file, MAX_BYTES)
+                replay_npc_dialogue_knowledge_gate(docs, baseline, authorized=True)
+                if (baseline["relay_digest"] != relay["relay_digest"]
+                        or baseline["source_digest"] != args.expected_source):
+                    raise StudioQuestError("editor baseline differs from relay source")
+                authoring = load_npc_dialogue_gate_editor_export(
+                    args.editor_export_file, authorized=True,
+                    expected_project_id=args.project,
+                    expected_source_digest=args.expected_source,
+                    expected_session_digest=baseline["session_digest"],
+                    expected_relay_digest=baseline["relay_digest"],
+                    expected_baseline_digest=baseline["gate_digest"])
+                result = compile_npc_dialogue_knowledge_gate(
+                    docs, relay, authoring, **kwargs)
+            elif args.prompt:
+                result = propose_npc_dialogue_knowledge_gate(
+                    docs, relay, PROMPT, **kwargs)
+            else:
+                result = compile_npc_dialogue_knowledge_gate(
                     docs, relay, _private_json(args.authoring_file, 32768),
-                    **kwargs))
+                    **kwargs)
             replay_npc_dialogue_knowledge_gate(docs, result, authorized=True)
         output = {
             "schema": "skeleton.cli.studio_npc_dialogue_knowledge_gate.v1",
@@ -56,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.playable:
             output["playable_handoff"] = compile_npc_dialogue_gate_playable(
                 docs, result, authorized=True)
+        if args.render_editor is not None:
+            output["editor"] = publish_npc_dialogue_gate_editor(
+                docs, result, args.render_editor, authorized=True)
+            output["file_write_performed"] = True
         if args.publish is not None:
             output["publication"] = publish_npc_dialogue_knowledge_gate(
                 docs, result, args.publish, authorized=True)

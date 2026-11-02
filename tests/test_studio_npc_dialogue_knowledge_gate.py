@@ -19,6 +19,11 @@ from skeleton.ai.agents.jeeves.studio_world_tool_router import (
     route_world_tool, world_tool_catalog,
 )
 from tests.test_studio_npc_relay_impact import fixture, PROJECT
+from skeleton.ai.game_builder.studio_npc_dialogue_knowledge_gate_editor import (
+    EXPORT_SCHEMA, FILENAME as EDITOR_FILENAME,
+    render_npc_dialogue_gate_editor, publish_npc_dialogue_gate_editor,
+    load_npc_dialogue_gate_editor_export,
+)
 
 
 def test_prompt_to_typed_dialogue_gate_and_exact_replay():
@@ -130,3 +135,50 @@ def test_jeeves_static_tool_and_bounded_router():
     with pytest.raises(StudioQuestError):
         execute_npc_dialogue_knowledge_gate_tool(
             {**request, "authorized": True}, authorized=True)
+
+def test_offline_csp_editor_export_replay_and_stale_lease(tmp_path):
+    import json
+    docs, source, _, relay = fixture()
+    baseline = propose_npc_dialogue_knowledge_gate(
+        docs, relay, PROMPT, authorized=True, expected_source_digest=source)
+    html, proof = render_npc_dialogue_gate_editor(
+        docs, baseline, authorized=True)
+    assert b"Content-Security-Policy" in html
+    assert b"script-src 'sha256-" in html
+    assert proof["baseline_gate_digest"] == baseline["gate_digest"]
+    directory = tmp_path / "private"
+    directory.mkdir(mode=0o700)
+    publication = publish_npc_dialogue_gate_editor(
+        docs, baseline, directory, authorized=True)
+    assert publication["file_write_performed"] is True
+    assert (directory / EDITOR_FILENAME).read_bytes() == html
+    with pytest.raises(FileExistsError):
+        publish_npc_dialogue_gate_editor(
+            docs, baseline, directory, authorized=True)
+    record = {
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "source_digest": source, "session_digest": baseline["session_digest"],
+        "relay_digest": baseline["relay_digest"],
+        "baseline_gate_digest": baseline["gate_digest"],
+        "authoring": baseline["authoring"],
+    }
+    path = directory / "edit.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    path.chmod(0o600)
+    kwargs = {
+        "authorized": True, "expected_project_id": PROJECT,
+        "expected_source_digest": source,
+        "expected_session_digest": baseline["session_digest"],
+        "expected_relay_digest": baseline["relay_digest"],
+        "expected_baseline_digest": baseline["gate_digest"],
+    }
+    assert load_npc_dialogue_gate_editor_export(path, **kwargs) == baseline["authoring"]
+    assert compile_npc_dialogue_knowledge_gate(
+        docs, relay, load_npc_dialogue_gate_editor_export(path, **kwargs),
+        authorized=True, expected_source_digest=source) == baseline
+    with pytest.raises(StudioQuestError):
+        load_npc_dialogue_gate_editor_export(
+            path, **{**kwargs, "expected_baseline_digest": "0" * 64})
+    path.write_text('{"schema":"a","schema":"b"}', encoding="utf-8")
+    with pytest.raises(StudioQuestError):
+        load_npc_dialogue_gate_editor_export(path, **kwargs)
