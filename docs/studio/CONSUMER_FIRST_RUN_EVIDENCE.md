@@ -5,7 +5,10 @@ installed original game, its ZIP, private replay save and private delivery
 receipt. The operator must supply four independently retained lowercase
 SHA-256 pins and `--trusted-local-operator`. The command runs the canonical
 installed-game/replay/receipt assurance **twice**, with descriptor-backed
-inode custody snapshots before, between and after both passes.
+inode custody snapshots before, between and after both passes. This
+tracks the installed root and evidence-file inodes, **not** every nested
+asset inode. Canonical ZIP/installed-content verification is separate from
+inode-inventory attestation; the latter remains an explicit release hold.
 
 This command never installs, signs, repairs, rolls back, overwrites, starts
 services, invokes Jeeves, or executes a native Godot binary. A successful
