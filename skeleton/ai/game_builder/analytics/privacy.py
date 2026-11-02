@@ -109,8 +109,10 @@ class Collector:
             self.counts["rejected"] += 1
             raise
         if not isinstance(event, Mapping):
+            self.counts["rejected"] += 1
             raise EventError("analytics event must be a mapping")
         if "player" in event or "session_id" in event:
+            self.counts["rejected"] += 1
             raise EventError("pass raw ids as arguments, not inside the event")
         if raw_player in self.opted_out and self.policy.opt_out == "drop":
             self.counts["opted_out_dropped"] += 1

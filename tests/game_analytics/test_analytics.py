@@ -243,3 +243,18 @@ def test_privacy_hmac_key_custody_rejects_unbounded_or_mutable_salts():
         with pytest.raises(ValueError, match="salt must be"):
             PrivacyPolicy(bad)
     assert PrivacyPolicy(b"x" * 4096).pseudonym("player", "p")
+
+
+def test_analytics_rejected_counter_covers_pre_schema_boundary():
+    """Malformed events and embedded raw identities must be auditable rejects."""
+    c = collector()
+    valid = {"seq": 0, "t": 0, "type": "session_start"}
+    for malformed in (None, [], "not-an-event", {**valid, "player": "raw"},
+                      {**valid, "session_id": "raw"}):
+        with pytest.raises(EventError):
+            c.ingest("player", "session", malformed)
+    assert c.counts["rejected"] == 5
+    assert not c.events
+    assert c.ingest("player", "session", valid) is not None
+    assert c.counts["rejected"] == 5
+    assert c.counts["kept"] == 1
