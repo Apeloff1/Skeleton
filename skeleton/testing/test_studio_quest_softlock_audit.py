@@ -1,0 +1,151 @@
+"""Deterministic, adversarial regression tests for quest softlock auditing."""
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+
+import pytest
+
+from skeleton.ai.game_builder.studio_ecosystem_quest import (
+    StudioQuestError, compile_quest_program, replay_quest,
+)
+from skeleton.ai.game_builder.studio_quest_softlock_audit import (
+    PROMPT, compile_quest_softlock_audit, propose_quest_softlock_audit,
+    replay_quest_softlock_audit, compile_quest_softlock_handoff,
+    publish_quest_softlock_audit, restore_quest_softlock_audit,
+    render_quest_softlock_html,
+)
+
+
+def docs():
+    return {
+        "quest": {"project_id": "demo", "release_certified": False,
+                  "stage_graph": [{
+                      "id": "opening", "prerequisites": [],
+                      "alternatives": ["rescue", "abandon"],
+                      "reward": "opening_complete",
+                      "choice_effects": {"rescue": ["choice:opening:rescue"],
+                                         "abandon": ["choice:opening:abandon"]},
+                  }]},
+        "narrative": {"project_id": "demo", "release_certified": False,
+                      "endings": [{"id": "saved", "requires": ["choice:opening:rescue"]}]},
+    }
+
+
+def kwargs(source=None, actions=None):
+    d = docs() if source is None else source
+    a = [] if actions is None else actions
+    return {"authorized": True,
+            "expected_source_digest": compile_quest_program(d).source_digest,
+            "expected_initial_session_digest":
+                replay_quest(d, a, authorized=True).digest}
+
+
+def plan(actions=None, states=64, depth=4):
+    return {"initial_actions": [] if actions is None else actions,
+            "target_endings": ["saved"], "max_states": states, "max_depth": depth}
+
+
+def test_proven_softlock_has_replayable_terminal_witness():
+    d = docs()
+    result = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    assert result["status"] == "softlock_proven"
+    assert result["terminal_softlock_witness"]["actions"] == [["opening", "abandon"]]
+    assert result["safe_ending_witness"]["actions"] == [["opening", "rescue"]]
+    assert result["playable_handoff_allowed"] is False
+    assert replay_quest_softlock_audit(d, result, authorized=True) == result
+    assert b"softlock_proven" in render_quest_softlock_html(d, result, authorized=True)
+    with pytest.raises(StudioQuestError):
+        compile_quest_softlock_handoff(d, result, authorized=True)
+
+
+def test_safe_prefix_is_exhaustive_and_handoff_is_source_bound():
+    d = docs()
+    actions = [["opening", "rescue"]]
+    result = compile_quest_softlock_audit(d, plan(actions), **kwargs(d, actions))
+    assert result["status"] == "no_softlock_in_exhaustive_search"
+    assert result["search_exhaustive"] is True
+    assert result["playable_handoff_allowed"] is True
+    handoff = compile_quest_softlock_handoff(d, result, authorized=True)
+    assert handoff["canonical_quest_replay_verified"] is True
+    assert handoff["native_gameplay_verified"] is False
+
+
+def test_budget_exhaustion_is_not_a_safety_proof():
+    d = docs()
+    result = compile_quest_softlock_audit(d, plan(states=1), **kwargs(d))
+    assert result["status"] == "inconclusive"
+    assert result["playable_handoff_allowed"] is False
+    with pytest.raises(StudioQuestError):
+        compile_quest_softlock_handoff(d, result, authorized=True)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda x: x.update({"audit_digest": "0" * 64}),
+    lambda x: x.update({"status": "no_softlock_in_exhaustive_search"}),
+    lambda x: x.update({"playable_handoff_allowed": True}),
+    lambda x: x["terminal_softlock_witness"]["actions"].append(["opening", "rescue"]),
+])
+def test_forged_receipt_rejected(mutate):
+    d = docs()
+    result = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    forged = copy.deepcopy(result)
+    mutate(forged)
+    with pytest.raises(StudioQuestError):
+        replay_quest_softlock_audit(d, forged, authorized=True)
+
+
+@pytest.mark.parametrize("invalid", [
+    {"initial_actions": [], "target_endings": ["saved"], "max_states": True, "max_depth": 4},
+    {"initial_actions": [], "target_endings": ["saved", "saved"], "max_states": 8, "max_depth": 4},
+    {"initial_actions": [], "target_endings": ["unknown"], "max_states": 8, "max_depth": 4},
+    {"initial_actions": [], "target_endings": ["saved"], "max_states": 8, "max_depth": False},
+    {"initial_actions": [["opening", "rescue"]], "target_endings": ["saved"], "max_states": 8, "max_depth": 0},
+])
+def test_malformed_authoring_rejected(invalid):
+    with pytest.raises(StudioQuestError):
+        compile_quest_softlock_audit(docs(), invalid, **kwargs())
+
+
+def test_prompt_and_stale_source_session_rejected():
+    d = docs()
+    result = propose_quest_softlock_audit(d, PROMPT, **kwargs(d))
+    assert result["status"] == "softlock_proven"
+    with pytest.raises(StudioQuestError):
+        propose_quest_softlock_audit(d, "make up an ending", **kwargs(d))
+    with pytest.raises(StudioQuestError):
+        compile_quest_softlock_audit(
+            d, plan(), authorized=True,
+            expected_source_digest="0" * 64,
+            expected_initial_session_digest=kwargs(d)["expected_initial_session_digest"])
+    with pytest.raises(StudioQuestError):
+        compile_quest_softlock_audit(
+            d, plan(), authorized=True,
+            expected_source_digest=kwargs(d)["expected_source_digest"],
+            expected_initial_session_digest="0" * 64)
+    with pytest.raises(PermissionError):
+        compile_quest_softlock_audit(
+            d, plan(), authorized=False,
+            expected_source_digest=kwargs(d)["expected_source_digest"],
+            expected_initial_session_digest=kwargs(d)["expected_initial_session_digest"])
+
+
+def test_private_publication_and_restore(tmp_path: Path):
+    d = docs()
+    result = compile_quest_softlock_audit(d, plan(), **kwargs(d))
+    publication = publish_quest_softlock_audit(d, result, tmp_path, authorized=True)
+    assert publication["file_write_performed"] is True
+    assert restore_quest_softlock_audit(
+        d, tmp_path, authorized=True,
+        expected_source_digest=kwargs(d)["expected_source_digest"]) == result
+    with pytest.raises((FileExistsError, StudioQuestError)):
+        publish_quest_softlock_audit(d, result, tmp_path, authorized=True)
+    file = tmp_path / "studio_quest_softlock_audit.json"
+    file.unlink()
+    file.write_text(json.dumps({**result, "status": "forged"}))
+    file.chmod(0o600)
+    with pytest.raises(StudioQuestError):
+        restore_quest_softlock_audit(
+            d, tmp_path, authorized=True,
+            expected_source_digest=kwargs(d)["expected_source_digest"])
