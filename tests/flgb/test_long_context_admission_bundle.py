@@ -111,6 +111,7 @@ class FairGuardStub(GuardStub):
             "schema": "skeleton.ai.long-context-memory-budget.v1",
             "state": "reserved", "is_execution_lease": False,
             "is_admission_grant": False, "is_memory_allocation": False,
+            "device_qualified": False,
             "cycle_atomic_within_process": True,
             "cross_process_exclusive": False,
             "requires_live_backend_revalidation": True,
