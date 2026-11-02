@@ -94,3 +94,20 @@ class PersistenceTests(unittest.TestCase):
         state, receipt = store.choose('play', 'step', 'visit_commons', expected_revision=0)
         self.assertEqual(state.scene, 'commons')
         self.assertEqual(store.load('play').revision, 1)
+
+class IdempotentGameRetryTests(unittest.TestCase):
+
+    def test_exact_retry_reuses_prior_receipt(self):
+        from skeleton.ai.runtime.production_fabric.persistence.journal import Journal
+        from skeleton.ai.runtime.production_fabric.persistence.game_store import GameStore
+        from skeleton.ai.runtime.production_fabric.contracts.spec import parse_world
+        from skeleton.ai.runtime.production_fabric.product.content.worlds.cloudbreak_signal import WORLD
+        j = Journal()
+        try:
+            store = GameStore(j, parse_world(WORLD))
+            store.choose('session', 'token', 'visit_commons', expected_revision=0)
+            state, receipt = store.choose('session', 'token', 'visit_commons', expected_revision=0)
+            self.assertEqual(state.revision, 1)
+            self.assertTrue(receipt['duplicate'])
+        finally:
+            j.close()

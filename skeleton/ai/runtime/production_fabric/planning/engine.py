@@ -1,7 +1,6 @@
 """One offline authoritative engine: typed worlds, durable choices, no model fallback."""
 from ..contracts.canonical import digest
 from ..contracts.spec import parse_world, World, to_data
-from ..contracts.state import initial
 from ..persistence.journal import Journal
 from ..persistence.game_store import GameStore
 from ..persistence.recovery import audit
@@ -12,6 +11,7 @@ from .worlds import validate_playable
 class ProductionEngine:
 
     def __init__(self, world_data: dict, journal: Journal | None=None):
+        self._owns_journal = journal is None
         self.world: World = parse_world(world_data)
         validate_playable(self.world)
         self.journal = journal or Journal()
@@ -32,3 +32,14 @@ class ProductionEngine:
 
     def qualify(self) -> dict:
         return discover(self.world)
+
+    def close(self) -> None:
+        """Close only the journal this engine created, not operator-owned storage."""
+        if self._owns_journal:
+            self.journal.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception, traceback):
+        self.close()

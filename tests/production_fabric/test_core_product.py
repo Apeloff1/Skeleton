@@ -14,6 +14,9 @@ class ProductTests(unittest.TestCase):
     def setUp(self):
         self.engine = ProductionEngine(WORLD)
 
+    def tearDown(self):
+        self.engine.close()
+
     def test_json_api_inspect(self):
         result = loads(LocalAPI(self.engine).json(b'{"method":"inspect","session":"a"}'))
         self.assertTrue(result['ok'])

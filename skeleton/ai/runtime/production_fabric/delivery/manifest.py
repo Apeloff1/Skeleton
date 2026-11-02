@@ -12,6 +12,9 @@ def make(entries: list[dict], *, source_ref: str) -> dict:
         if set(item) != {'path', 'sha256', 'size', 'wave'}:
             raise ContractError('invalid source entry')
         path = relative_path(item['path'])
+        seal = item['sha256']
+        if not isinstance(seal, str) or len(seal) != 64 or any((ch not in '0123456789abcdef' for ch in seal)):
+            raise ContractError('entry SHA-256 must be lowercase hex')
         if path in keys:
             raise ContractError('duplicate inventory path')
         keys.add(path)

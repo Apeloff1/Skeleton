@@ -1,6 +1,5 @@
 """Explicit branching by deterministic replay; no mutation of original session."""
 from ..contracts.errors import ContractError
-from ..persistence.journal import Journal
 from ..persistence.game_store import GameStore
 
 def fork(store: GameStore, source: str, destination: str, *, upto_revision: int) -> GameStore:

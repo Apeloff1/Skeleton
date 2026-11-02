@@ -1,5 +1,4 @@
 """Local preflight reports hold conditions without fabricating CI or hardware passes."""
-from ..contracts.errors import ContractError
 from ..evaluation.quality import qualify
 
 def preflight(*, evidence: dict, files: list[dict]) -> dict:

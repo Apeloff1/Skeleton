@@ -22,6 +22,10 @@ class DeliveryTests(unittest.TestCase):
         with self.assertRaises(ContractError):
             make([entry, entry], source_ref='head')
 
+    def test_invalid_entry_digest_fails_closed(self):
+        with self.assertRaises(ContractError):
+            make([{'path': 'world/a', 'sha256': 'invalid', 'size': 1, 'wave': 'MBW-05'}], source_ref='head')
+
     def test_promotion_hold(self):
         result = preflight(evidence={'structural': True}, files=[])
         self.assertEqual(result['status'], 'hold')

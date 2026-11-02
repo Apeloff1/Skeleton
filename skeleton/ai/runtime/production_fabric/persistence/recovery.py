@@ -1,7 +1,6 @@
 """Read-only recovery audit: verify every event and projection before admitting use."""
 from ..contracts.canonical import digest
 from ..contracts.errors import IntegrityError
-from .journal import Journal
 from .game_store import GameStore
 
 def audit(store: GameStore, stream: str) -> dict:

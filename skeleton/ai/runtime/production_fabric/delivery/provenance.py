@@ -1,5 +1,4 @@
 """Originality and provenance inventory must be explicit before artifact publication."""
-from ..contracts.errors import ContractError
 
 def attest_entries(entries: list[dict]) -> dict:
     missing = []

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
-from ..contracts.canonical import loads, dumps
+from ..contracts.canonical import loads
 from ..contracts.errors import FabricError
 from ..persistence.journal import Journal
 from ..planning.engine import ProductionEngine

@@ -1,6 +1,5 @@
 """Bounded evidence projection; untrusted text is explicitly quoted as data."""
-from ..contracts.errors import ContractError, BudgetError
-from .documents import Document
+from ..contracts.errors import ContractError
 from .index import EvidenceIndex
 from .tokenization import rough_tokens
 

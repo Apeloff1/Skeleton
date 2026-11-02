@@ -1,6 +1,6 @@
 """Mission objective progression with no skipped prerequisites."""
 from ..contracts.graph import topological
-from ..contracts.errors import ContractError, ConflictError
+from ..contracts.errors import ConflictError
 
 def progress(graph: dict[str, list[str]], done: set[str], objective: str) -> set[str]:
     order = topological(graph)
