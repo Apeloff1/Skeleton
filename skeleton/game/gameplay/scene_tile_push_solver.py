@@ -21,10 +21,24 @@ MAX_DEPTH = 64
 
 
 def _signature(session: dict[str, Any]) -> str:
+    """Canonical action-relevant position for shortest-path dominance.
+
+    This puzzle has no timed obstacles: reaching the same configuration
+    earlier always leaves at least as many turns as a later arrival.
+    Replay ticks, visited-history and save digests are *not* transition
+    inputs. Keeping them in the search key made harmless loops consume
+    the entire state budget before a valid solution could be reached.
+    """
     state = session["state"]
+    tile = state["tile"]["state"]
+    scene = tile["scene"]["state"]
     return json.dumps({
-        "tick": state["tick"], "tile": state["tile"]["state"],
-        "crates": state["crates"], "phase": state["phase"],
+        "scene_id": scene["scene_id"],
+        "position": tile["position"],
+        "inventory": scene["inventory"],
+        "collected": scene["collected"],
+        "crates": state["crates"],
+        "phase": state["phase"],
     }, sort_keys=True, separators=(",", ":"))
 
 

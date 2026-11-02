@@ -94,6 +94,11 @@ _COMMANDS = [
     "scene-market-hours",
     "scene-market-hours-play",
     "scene-market-hours-accept",
+    "scene-market-contract-play",
+    "scene-market-contract-accept",
+    "scene-market-contract",
+    "scene-market-contract-author",
+    "scene-market-contract-route",
     "scene-market-route-accept",
     "scene-market-route",
     "scene-market-board",
@@ -166,11 +171,6 @@ _COMMANDS = [
     "status",
     "config",
     "help",
-    "scene-market-contract-play",
-    "scene-market-contract-accept",
-    "scene-market-contract",
-    "scene-market-contract-author",
-    "scene-market-contract-route",
 ]
 
 
