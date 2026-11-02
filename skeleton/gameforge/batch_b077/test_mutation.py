@@ -93,3 +93,22 @@ def test_mutation_gate_rejects_invalid_thresholds_without_false_pass(bad):
     report = MutationReport("weak")
     with pytest.raises(ValueError, match="finite fraction"):
         report.gate(bad)
+
+
+def test_empty_mutation_set_cannot_certify_quality():
+    """A 100% score requires at least one executed mutation witness."""
+    from skeleton.gameforge.batch_b077.mutation import MutationReport
+
+    report = MutationReport("no_mutation_sites")
+    assert report.score == 0.0
+    for threshold in (0.0, 0.5, 1.0):
+        with pytest.raises(AssertionError, match="no executable mutants"):
+            report.gate(threshold)
+
+    def identity(x):
+        return x
+
+    generated = run_mutation(identity, lambda fn: fn(5) == 5)
+    assert generated.score == 0.0
+    with pytest.raises(AssertionError, match="no executable mutants"):
+        generated.gate()

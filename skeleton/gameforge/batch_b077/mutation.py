@@ -43,12 +43,15 @@ class MutationReport:
     @property
     def score(self) -> float:
         total = len(self.killed) + len(self.survived)
-        return len(self.killed) / total if total else 1.0
+        # No mutation sites means no assurance evidence, not 100% coverage.
+        return len(self.killed) / total if total else 0.0
 
     def gate(self, threshold: float = 1.0) -> None:
         if (type(threshold) not in (int, float) or not math.isfinite(threshold)
                 or not 0.0 <= threshold <= 1.0):
             raise ValueError("mutation gate threshold must be a finite fraction")
+        if not self.killed and not self.survived:
+            raise AssertionError("mutation assurance has no executable mutants")
         if self.score < threshold:
             names = "; ".join(m.description for m in self.survived)
             raise AssertionError(f"mutation score {self.score:.2f} < {threshold}: survivors: {names}")
