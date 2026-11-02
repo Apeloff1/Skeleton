@@ -30,6 +30,7 @@ RELEASE_HOLDS = (
     "SIGNED_PACKAGE_CHAIN_UNATTESTED",
     "ORIGINAL_CONTENT_RIGHTS_UNCERTIFIED",
     "GUARDED_LOCAL_AI_END_TO_END_UNQUALIFIED",
+    "NESTED_ASSET_INODE_INVENTORY_UNATTESTED",
 )
 
 
@@ -154,7 +155,13 @@ def inspect_consumer_first_run(
         },
         "source_level_replay_passes": 2,
         "installed_game_and_private_save_reexecuted": True,
-        "all_input_inodes_stable_during_inspection": True,
+        # The canonical installer compares all asset bytes to the pinned ZIP,
+        # but _source_identity snapshots the installed ROOT inode, not every
+        # nested asset inode. Never turn content integrity into a false claim
+        # that all nested file identities were continuously pinned.
+        "all_input_inodes_stable_during_inspection": False,
+        "root_and_evidence_inodes_stable_during_inspection": True,
+        "nested_asset_inode_inventory_attested": False,
         "read_only": True,
         "files_published": 0,
         "native_device_qualified": False,
