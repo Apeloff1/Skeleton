@@ -8,6 +8,9 @@ from pathlib import Path
 from scripts.studio_npc_knowledge_relay_cli import _private_json
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_quest_revision_migration_editor import (
+    render_quest_migration_editor, import_quest_migration_editor_export,
+)
 from skeleton.ai.game_builder.studio_quest_revision_migration import (
     compile_quest_revision_migration, replay_quest_revision_migration,
     compile_quest_migration_handoff, publish_quest_revision_migration,
@@ -24,11 +27,18 @@ def main(argv: list[str] | None = None) -> int:
     modes = ap.add_mutually_exclusive_group(required=True)
     modes.add_argument("--plan-file", type=Path)
     modes.add_argument("--restore", type=Path)
+    modes.add_argument("--editor-export", type=Path)
+    ap.add_argument("--baseline", type=Path)
+    ap.add_argument("--editor-preview", action="store_true")
     ap.add_argument("--publish", type=Path)
     ap.add_argument("--handoff", action="store_true")
     args = ap.parse_args(argv)
     if args.restore and args.publish:
         ap.error("restore cannot publish")
+    if args.editor_export and not args.baseline:
+        ap.error("editor export requires --baseline")
+    if args.editor_preview and (args.publish or args.handoff):
+        ap.error("editor preview cannot publish or handoff")
     try:
         docs = read_blueprint(args.project)
         if args.restore:
@@ -37,12 +47,25 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_digest=args.expected_source)
             if report["initial_session_digest"] != args.expected_session:
                 raise StudioQuestError("stale migration initial session")
+        elif args.editor_export:
+            baseline = restore_quest_revision_migration(
+                docs, args.baseline, authorized=True,
+                expected_source_digest=args.expected_source)
+            report = import_quest_migration_editor_export(
+                docs, baseline, args.editor_export, authorized=True,
+                expected_source_digest=args.expected_source,
+                expected_initial_session_digest=args.expected_session)
         else:
             report = compile_quest_revision_migration(
                 docs, _private_json(args.plan_file, 32768), authorized=True,
                 expected_source_digest=args.expected_source,
                 expected_initial_session_digest=args.expected_session)
         replay_quest_revision_migration(docs, report, authorized=True)
+        if args.editor_preview:
+            html, _ = render_quest_migration_editor(
+                docs, report, authorized=True)
+            print(html.decode("utf-8"))
+            return 0
         result: dict[str, object] = {
             "schema": "skeleton.cli.studio_quest_revision_migration.v1",
             "migration": report, "file_write_performed": False,

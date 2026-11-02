@@ -28,3 +28,13 @@ native game qualification or release gate is bypassed.
 
 Focused regression:
 `pytest -q tests/test_studio_quest_revision_migration.py`.
+
+## Accessible offline migration editor
+
+`--editor-preview` renders a CSP-hashed, network-disabled HTML editor for
+explicit remaps and the reviewed source revision. The browser exports typed
+JSON only. Publish a baseline first, then pass `--editor-export PRIVATE_JSON
+--baseline DIRECTORY` with the exact old quest-source and initial-session
+leases. The CLI rejects stale baselines, duplicate JSON keys, symlinks,
+world-readable files and oversized exports; it recompiles both canonical
+replays before allowing any playable handoff. The HTML never grants authority.

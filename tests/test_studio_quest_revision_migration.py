@@ -158,3 +158,66 @@ def test_jeeves_router_requires_explicit_authoring_authority():
         route_world_tool({"tool": name, "arguments": {
             "schema": REQUEST_SCHEMA, "authorized": True}},
             authorized=True, allow_authoring=True)
+
+def test_offline_migration_editor_csp_and_explicit_recompile(tmp_path):
+    from skeleton.ai.game_builder.studio_quest_revision_migration_editor import (
+        EXPORT_SCHEMA, render_quest_migration_editor,
+        import_quest_migration_editor_export,
+    )
+    docs, plan, leases, new_choice = fixture()
+    baseline = compile_quest_revision_migration(docs, plan, **leases)
+    html, proof = render_quest_migration_editor(
+        docs, baseline, authorized=True)
+    assert b"script-src 'sha256-" in html
+    assert b"connect-src 'none'" in html
+    assert proof["authoring_export_only"] is True
+    assert proof["release_certified"] is False
+    updated = copy.deepcopy(plan)
+    updated["remaps"] = [{
+        "stage_id": plan["actions"][0][0],
+        "from_choice": plan["actions"][0][1],
+        "to_choice": new_choice,
+    }]
+    payload = {
+        "schema": EXPORT_SCHEMA, "project_id": PROJECT,
+        "old_quest_source_digest": baseline["old_quest_source_digest"],
+        "initial_session_digest": baseline["initial_session_digest"],
+        "baseline_migration_digest": baseline["migration_digest"],
+        "authoring": updated,
+    }
+    path = tmp_path / "migration_edit.json"
+    path.write_text(json.dumps(payload))
+    os.chmod(path, 0o600)
+    result = import_quest_migration_editor_export(
+        docs, baseline, path, **leases)
+    assert result["migrated_actions"][0][1] == new_choice
+    assert len(result["migrated_actions"]) == len(updated["actions"])
+    payload["baseline_migration_digest"] = "0" * 64
+    path.write_text(json.dumps(payload))
+    with pytest.raises(StudioQuestError):
+        import_quest_migration_editor_export(
+            docs, baseline, path, **leases)
+
+
+def test_offline_migration_editor_rejects_symlink_and_duplicate_json(tmp_path):
+    from skeleton.ai.game_builder.studio_quest_revision_migration_editor import (
+        import_quest_migration_editor_export,
+    )
+    docs, plan, leases, _ = fixture()
+    baseline = compile_quest_revision_migration(docs, plan, **leases)
+    path = tmp_path / "migration_edit.json"
+    path.write_text('{"schema":"a","schema":"b"}')
+    os.chmod(path, 0o600)
+    with pytest.raises(StudioQuestError):
+        import_quest_migration_editor_export(
+            docs, baseline, path, **leases)
+    target = tmp_path / "target"
+    target.write_text("{}")
+    link = tmp_path / "linked.json"
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unsupported")
+    with pytest.raises(OSError):
+        import_quest_migration_editor_export(
+            docs, baseline, link, **leases)
