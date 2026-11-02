@@ -65,7 +65,7 @@ def test_terminal_checkpoint_only_accepts_earned_ending():
     ("final_state_digest", "0" * 64),
     ("portable_checksum", "0" * 64),
     ("explored", 999),
-    ("max_states", 1),
+    ("max_states", 2),
     ("actions", []),
 ])
 def test_forged_route_receipt_rejected(field, value):
