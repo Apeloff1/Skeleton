@@ -30,6 +30,9 @@ from .harbor_crafting_journal import (
     MAX_JOURNAL_BYTES, append_journal, create_journal, journal_at, journal_audit,
     journal_head, rewind_journal, verify_journal,
 )
+from .harbor_crafting_journal_transfer import (
+    MAX_TRANSFER_BYTES, export_journal_package_play, verify_journal_package_play,
+)
 from .harbor_crafting_guidance import (
     MAX_REPORT_BYTES as MAX_GUIDANCE_BYTES,
     legal_action_report, verify_legal_action_report,
@@ -62,7 +65,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -93,7 +96,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "legal-actions":
+        if args.command == "journal-package-play":
+            output = export_journal_package_play(
+                _required_json(args.journal, "journal", MAX_JOURNAL_BYTES),
+                _required_json(args.package, "package"),
+                require_all=args.require_all,
+            )
+        elif args.command == "journal-verify-package-play":
+            output = {"verified": True, **verify_journal_package_play(
+                _required_json(args.play, "play", MAX_TRANSFER_BYTES),
+                require_all=args.require_all,
+            )}
+        elif args.command == "legal-actions":
             output = legal_action_report(_required_json(args.bundle, "bundle"))
         elif args.command == "verify-legal-actions":
             output = {"verified": True, "legal_actions": verify_legal_action_report(
