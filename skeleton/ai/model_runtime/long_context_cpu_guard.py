@@ -48,10 +48,11 @@ class CpuCapacityRequest:
 @dataclass(frozen=True, slots=True)
 class CpuCapacityLimits:
     max_active: int = 8
-    max_active_per_principal: int = 4
     max_tokens: int = 8192
     max_bytes: int = 64 * 1024**2
     lifetime_ns: int = 1_000_000_000
+    # Keep legacy positional constructor arguments stable.
+    max_active_per_principal: int = 4
 
     def __post_init__(self) -> None:
         _bounded(self.max_active, "max_active", 1, 64)
