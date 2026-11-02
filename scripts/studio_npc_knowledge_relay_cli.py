@@ -14,6 +14,9 @@ from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_relay import (
     replay_npc_knowledge_relay, compile_npc_relay_playable,
     publish_npc_knowledge_relay, restore_npc_knowledge_relay,
 )
+from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_relay_editor import (
+    publish_npc_relay_editor, load_npc_relay_editor_export,
+)
 
 
 def _private_json(path: Path, limit: int) -> dict[str, object]:
@@ -61,17 +64,26 @@ def main(argv: list[str] | None = None) -> int:
                       help="Deterministically propose source-supported relay routes")
     mode.add_argument("--authoring-file", type=Path,
                       help="Private edited typed JSON authoring file")
+    mode.add_argument("--editor-export-file", type=Path,
+                      help="Source-bound JSON exported from offline HTML editor")
     mode.add_argument("--restore", type=Path,
                       help="Restore private canonical relay receipt from directory")
     ap.add_argument("--publish", type=Path, help="Publish immutable private relay receipt")
+    ap.add_argument("--baseline-relay-file", type=Path,
+                    help="Private canonical baseline receipt for editor import")
+    ap.add_argument("--render-editor", type=Path,
+                    help="Write immutable CSP-protected offline editor to directory")
     ap.add_argument("--playable", action="store_true",
                     help="Require a verified playable handoff manifest")
     args = ap.parse_args(argv)
     if args.restore is not None and (args.publish is not None or
-                                     args.exchange_file is not None):
+                                     args.exchange_file is not None or
+                                     args.baseline_relay_file is not None):
         ap.error("restore cannot accept a new exchange or publication")
     if args.restore is None and args.exchange_file is None:
         ap.error("new relay requires --exchange-file")
+    if (args.editor_export_file is not None) != (args.baseline_relay_file is not None):
+        ap.error("editor import requires matching --baseline-relay-file")
     try:
         docs = read_blueprint(args.project)
         if args.restore is not None:
@@ -85,7 +97,21 @@ def main(argv: list[str] | None = None) -> int:
                     docs, exchange, PROMPT, authorized=True,
                     expected_source_digest=args.expected_source)
             else:
-                authoring = _private_json(args.authoring_file, 32768)
+                if args.editor_export_file is not None:
+                    baseline = _private_json(args.baseline_relay_file, MAX_BYTES)
+                    replay_npc_knowledge_relay(docs, baseline, authorized=True)
+                    if (baseline["exchange_digest"] != exchange["exchange_digest"]
+                            or baseline["source_digest"] != args.expected_source):
+                        raise StudioQuestError("editor baseline differs from exchange source")
+                    authoring = load_npc_relay_editor_export(
+                        args.editor_export_file, authorized=True,
+                        expected_project_id=args.project,
+                        expected_source_digest=args.expected_source,
+                        expected_session_digest=baseline["session_digest"],
+                        expected_exchange_digest=baseline["exchange_digest"],
+                        expected_baseline_digest=baseline["relay_digest"])
+                else:
+                    authoring = _private_json(args.authoring_file, 32768)
                 relay = compile_npc_knowledge_relay(
                     docs, exchange, authoring, authorized=True,
                     expected_source_digest=args.expected_source)
@@ -98,6 +124,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.playable:
             result["playable_handoff"] = compile_npc_relay_playable(
                 docs, relay, authorized=True)
+        if args.render_editor is not None:
+            result["editor"] = publish_npc_relay_editor(
+                docs, relay, args.render_editor, authorized=True)
+            result["file_write_performed"] = True
         if args.publish is not None:
             result["publication"] = publish_npc_knowledge_relay(
                 docs, relay, args.publish, authorized=True)

@@ -201,3 +201,62 @@ def test_typed_jeeves_router_and_private_cli(tmp_path, capsys):
               "--authoring-file", str(authored)])
     with pytest.raises(PermissionError):
         execute_npc_knowledge_relay_tool(request, authorized=False)
+
+
+def test_offline_csp_editor_export_import_recompiles_source(tmp_path, capsys):
+    from hashlib import sha256
+    from scripts.studio_npc_knowledge_relay_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_relay_editor import (
+        EXPORT_SCHEMA, render_npc_relay_editor, publish_npc_relay_editor,
+        load_npc_relay_editor_export,
+    )
+    docs, source, exchange = fixture()
+    relay = compile_npc_knowledge_relay(
+        docs, exchange, {"routes": []}, authorized=True,
+        expected_source_digest=source)
+    html, proof = render_npc_relay_editor(docs, relay, authorized=True)
+    assert sha256(html).hexdigest() == proof["html_sha256"]
+    assert b"Content-Security-Policy" in html
+    assert b"connect-src 'none'" in html
+    assert publish_npc_relay_editor(
+        docs, relay, tmp_path, authorized=True)["file_write_performed"]
+    with pytest.raises(FileExistsError):
+        publish_npc_relay_editor(docs, relay, tmp_path, authorized=True)
+    export = {
+        "schema": EXPORT_SCHEMA, "project_id": relay["project_id"],
+        "source_digest": source, "session_digest": relay["session_digest"],
+        "exchange_digest": relay["exchange_digest"],
+        "baseline_relay_digest": relay["relay_digest"],
+        "authoring": relay["authoring"],
+    }
+    edit = tmp_path / "npc_relay_edit.json"
+    edit.write_text(json.dumps(export))
+    edit.chmod(0o600)
+    kwargs = {
+        "authorized": True, "expected_project_id": PROJECT,
+        "expected_source_digest": source,
+        "expected_session_digest": relay["session_digest"],
+        "expected_exchange_digest": relay["exchange_digest"],
+        "expected_baseline_digest": relay["relay_digest"],
+    }
+    assert load_npc_relay_editor_export(edit, **kwargs) == {"routes": []}
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(relay))
+    baseline.chmod(0o600)
+    exchange_file = tmp_path / "exchange.json"
+    exchange_file.write_text(json.dumps(exchange))
+    exchange_file.chmod(0o600)
+    assert main([
+        "--project", PROJECT, "--expected-source", source,
+        "--exchange-file", str(exchange_file),
+        "--editor-export-file", str(edit),
+        "--baseline-relay-file", str(baseline),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["relay"] == relay
+    edit.write_text(json.dumps({**export, "baseline_relay_digest": "0" * 64}))
+    with pytest.raises(StudioQuestError):
+        load_npc_relay_editor_export(edit, **kwargs)
+    edit.unlink()
+    edit.symlink_to(tmp_path / "missing")
+    with pytest.raises(OSError):
+        load_npc_relay_editor_export(edit, **kwargs)

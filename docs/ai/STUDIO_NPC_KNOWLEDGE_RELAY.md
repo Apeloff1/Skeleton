@@ -31,3 +31,11 @@ The resulting bundle is the existing canonical HTML5 quest proof, **not**
 native NPC dialogue. Run
 `pytest -q tests/test_studio_ecosystem_npc_knowledge_relay.py
 tests/test_studio_world_tool_router.py` on the exact branch head.
+
+The optional `--render-editor <existing-private-directory>` writes a
+CSP-hashed, script-restricted offline HTML editor with a typed JSON download.
+The exported record is leased to the exact source, session, exchange and
+baseline relay digest. Recompile it with `--editor-export-file <private-path>`,
+`--baseline-relay-file <private-baseline-receipt>` and
+`--exchange-file <private-exchange-receipt>`. Import never grants authority
+from JSON, and a changed baseline fails closed rather than overwriting work.
