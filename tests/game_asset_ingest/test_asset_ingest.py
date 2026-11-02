@@ -759,3 +759,39 @@ def test_deeply_nested_gltf_json_fails_closed_without_partial_manifest(tmp_path,
     assert report.imported == [] and report.duplicates == []
     assert any(issue.path == "hostile" + extension and issue.code == "broken"
                for issue in report.issues)
+
+
+def test_manifest_rejects_duplicate_json_keys_at_all_levels():
+    """A signed-looking digest must not hide ambiguous last-wins JSON keys."""
+    manifest = AssetManifest()
+    manifest.add(import_bytes("hero.png", png()))
+    canonical = manifest.to_json()
+    assert AssetManifest.from_json(canonical).to_json() == canonical
+    root_duplicate = canonical.replace('"schema":', '"schema":"forged","schema":', 1)
+    nested_duplicate = canonical.replace('"metadata":{', '"metadata":{"shadow":1,"shadow":2,', 1)
+    for hostile in (root_duplicate, nested_duplicate):
+        with pytest.raises(AssetImportError, match="duplicate JSON key"):
+            AssetManifest.from_json(hostile)
+
+
+def test_manifest_rejects_nonfinite_json_and_invalid_unicode():
+    manifest = AssetManifest()
+    manifest.add(import_bytes("hero.png", png()))
+    canonical = manifest.to_json()
+    for token in ("NaN", "Infinity", "-Infinity"):
+        hostile = canonical.replace('"paths":1', '"paths":' + token, 1)
+        assert hostile != canonical
+        with pytest.raises(AssetImportError, match="nonfinite JSON"):
+            AssetManifest.from_json(hostile)
+    with pytest.raises(AssetImportError, match="utf-8"):
+        AssetManifest.from_json('"' + chr(0xD800) + '"')
+
+
+def test_manifest_rejects_excessive_json_nesting_and_nodes(monkeypatch):
+    from skeleton.game.build.asset_ingest import manifest as manifest_module
+    deep = '{"nested":' * 70 + '0' + '}' * 70
+    with pytest.raises(AssetImportError, match="structure exceeds bound"):
+        AssetManifest.from_json(deep)
+    monkeypatch.setattr(manifest_module, "MAX_MANIFEST_JSON_NODES", 4)
+    with pytest.raises(AssetImportError, match="structure exceeds bound"):
+        AssetManifest.from_json('{"schema":"skeleton.game.asset_manifest.v1","entries":[1,2,3]}')

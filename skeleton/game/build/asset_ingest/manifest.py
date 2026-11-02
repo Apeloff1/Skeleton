@@ -44,6 +44,38 @@ MAX_MANIFEST_ENTRIES = 8192
 MAX_MANIFEST_JSON_BYTES = 32 * 1024 * 1024
 MAX_MANIFEST_TOTAL_BYTES = 512 * 1024 * 1024
 
+MAX_MANIFEST_JSON_DEPTH = 64
+MAX_MANIFEST_JSON_NODES = 131072
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise AssetImportError("manifest duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite_json(token: str) -> Any:
+    raise AssetImportError(f"manifest nonfinite JSON number: {token}")
+
+
+def _bound_json_structure(root: Any) -> None:
+    """Bound attacker-controlled nesting and node count before hashing."""
+    pending = [(root, 0)]
+    seen = 0
+    while pending:
+        node, depth = pending.pop()
+        seen += 1
+        if depth > MAX_MANIFEST_JSON_DEPTH or seen > MAX_MANIFEST_JSON_NODES:
+            raise AssetImportError("manifest JSON structure exceeds bound")
+        if type(node) is dict:
+            pending.extend((value, depth + 1) for value in node.values())
+        elif type(node) is list:
+            pending.extend((value, depth + 1) for value in node)
+
+
 
 def _valid_path(path: object) -> bool:
     if type(path) is not str or not path or len(path) > 4096:
@@ -121,12 +153,22 @@ class AssetManifest:
     @classmethod
     def from_json(cls, raw: str) -> AssetManifest:
         """Restore only canonical, bounded, collision-free manifest evidence."""
-        if type(raw) is not str or len(raw.encode("utf-8")) > MAX_MANIFEST_JSON_BYTES:
+        if type(raw) is not str:
+            raise AssetImportError("manifest input must be text")
+        try:
+            size = len(raw.encode("utf-8"))
+        except UnicodeError as exc:
+            raise AssetImportError("manifest is not utf-8") from exc
+        if size > MAX_MANIFEST_JSON_BYTES:
             raise AssetImportError("manifest exceeds input bound")
         try:
-            doc = json.loads(raw)
-        except ValueError as exc:
-            raise AssetImportError("manifest is not json") from exc
+            doc = json.loads(raw, object_pairs_hook=_unique_json_object,
+                             parse_constant=_reject_nonfinite_json)
+        except AssetImportError:
+            raise
+        except (ValueError, RecursionError) as exc:
+            raise AssetImportError("manifest is not strict json") from exc
+        _bound_json_structure(doc)
         if type(doc) is not dict or doc.get("schema") != MANIFEST_SCHEMA:
             raise AssetImportError("unsupported manifest schema")
         entries = doc.get("entries")
