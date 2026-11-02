@@ -27,3 +27,12 @@ canonical quest outcome and HTML bytes. Browser parity is a projection proof,
 not a browser runtime test, native game/device qualification, rights review or
 release approval. Run the focused pytest module and exact-head security/CI
 before promoting any source branch.
+
+The playable HTML now includes a no-network, copy/paste checkpoint editor.
+The user explicitly copies the displayed JSON into their own storage. Restore
+validates the exact receipt fields, source and project digests, false external
+and release claims, bounded action count, unique stage completion, legal
+authored alternatives, and topological prerequisite order **before** changing
+the current UI session. Invalid or stale checkpoints preserve the current
+progress. The Python CLI remains the authoritative private-disk publication
+path; browser copy/paste is an untrusted local convenience, not signed custody.

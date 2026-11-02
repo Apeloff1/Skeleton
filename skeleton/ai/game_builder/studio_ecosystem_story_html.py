@@ -16,6 +16,10 @@ button{font:inherit;border:2px solid #9ec8dc;border-radius:8px;padding:10px 14px
 margin:6px;background:#21465f;color:#fff;cursor:pointer}
 button:focus-visible{outline:3px solid #f3cc6f;outline-offset:3px}
 button:hover{background:#306583}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+textarea{display:block;width:100%;box-sizing:border-box;min-height:9em;
+ background:#0d1723;color:#f0f5fb;border:2px solid #9ec8dc;border-radius:8px;
+ padding:10px;font:14px ui-monospace,monospace;overflow-wrap:anywhere}
+textarea:focus-visible{outline:3px solid #f3cc6f;outline-offset:3px}
 """
 _JS = """
 "use strict";
@@ -28,6 +32,8 @@ const summary=document.getElementById("summary");
 const premise=document.getElementById("premise");
 const transcript=document.getElementById("transcript");
 const endings=document.getElementById("endings");
+const checkpoint=document.getElementById("checkpoint");
+const checkpointStatus=document.getElementById("checkpoint-status");
 function node(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;}
 function reset(){chosen.length=0;completed.clear();render();}
 function act(id,option){
@@ -35,6 +41,47 @@ function act(id,option){
  if(!stage||completed.has(id)||!stage.prerequisites.every(dep=>completed.has(dep))||
     !stage.alternatives.includes(option)){return;}
  chosen.push([id,option]);completed.add(id);render();
+}
+function parseCheckpoint(raw){
+ if(typeof raw!=="string"||raw.length>16384){throw Error("checkpoint too large");}
+ const data=JSON.parse(raw);
+ if(!data||Array.isArray(data)||typeof data!=="object"||
+    Object.keys(data).sort().join(",")!==
+    "choices,external_evidence_verified,native_genre_runtime_verified,project_id,release_certified,schema,source_digest"||
+    data.schema!=="skeleton.game_builder.offline_story_choices.v1"||
+    data.project_id!==source.project_id||data.source_digest!==source.source_digest||
+    data.external_evidence_verified!==false||
+    data.native_genre_runtime_verified!==false||data.release_certified!==false||
+    !Array.isArray(data.choices)||data.choices.length>source.stages.length){
+   throw Error("checkpoint source or schema mismatch");
+ }
+ const done=new Set();
+ const validated=[];
+ for(const pair of data.choices){
+   if(!Array.isArray(pair)||pair.length!==2||
+      typeof pair[0]!=="string"||typeof pair[1]!=="string"){
+     throw Error("invalid checkpoint action");
+   }
+   const stage=byId.get(pair[0]);
+   if(!stage||done.has(pair[0])||!stage.alternatives.includes(pair[1])||
+      !stage.prerequisites.every(dep=>done.has(dep))){
+     throw Error("illegal checkpoint quest history");
+   }
+   done.add(pair[0]);validated.push(pair.slice());
+ }
+ return validated;
+}
+function restoreCheckpoint(){
+ try{
+   const actions=parseCheckpoint(checkpoint.value);
+   chosen.splice(0,chosen.length,...actions);
+   completed.clear();
+   for(const [id] of actions){completed.add(id);}
+   render();
+   checkpointStatus.textContent="Source-matched sandbox checkpoint restored";
+ }catch(error){
+   checkpointStatus.textContent="Checkpoint rejected; current progress preserved";
+ }
 }
 function render(){
  host.replaceChildren();endings.replaceChildren();
@@ -75,6 +122,11 @@ function render(){
  transcript.textContent=JSON.stringify(receipt,null,2);
 }
 document.getElementById("restart").addEventListener("click",reset);
+document.getElementById("checkpoint-copy").addEventListener("click",()=>{
+ checkpoint.value=transcript.textContent;
+ checkpointStatus.textContent="Copy this checkpoint to save it privately";
+});
+document.getElementById("checkpoint-restore").addEventListener("click",restoreCheckpoint);
 render();
 """
 
@@ -146,7 +198,15 @@ def render_story_html(documents: Mapping[str, Any]) -> bytes:
         "<div id='stages'></div><section><h2>Ending requirements</h2>"
         "<ul id='endings'></ul></section>"
         "<section><h2>Replay transcript</h2><button type='button' id='restart'>"
-        "Restart simulation</button><pre id='transcript'></pre></section></main>"
+        "Restart simulation</button><pre id='transcript'></pre>"
+        "<h3>Private copy/paste checkpoint</h3>"
+        "<p>Save the text yourself; restoring verifies source and legal quest order.</p>"
+        "<button type='button' id='checkpoint-copy'>Copy current receipt into editor</button>"
+        "<label for='checkpoint'>Checkpoint JSON</label>"
+        "<textarea id='checkpoint' rows='8' maxlength='16384' spellcheck='false'></textarea>"
+        "<button type='button' id='checkpoint-restore'>Restore pasted checkpoint</button>"
+        "<p id='checkpoint-status' role='status' aria-live='polite'></p>"
+        "</section></main>"
         "<script type='application/json' id='studio-source'>"+payload+"</script>"
         "<script>"+_JS+"</script></body></html>"
     )

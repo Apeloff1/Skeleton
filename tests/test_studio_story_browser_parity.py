@@ -58,6 +58,9 @@ def test_choice_effects_unlock_authored_browser_endings():
     assert source["stages"][0]["choice_effects"][actions[0][1]]
     html = render_story_html(docs)
     assert b"stage.choice_effects[option]" in html
+    assert b"checkpoint-restore" in html
+    assert b"parseCheckpoint" in html
+    assert b"current progress preserved" in html
     assert b"browser_parity_ending" in html
     assert replay_story_browser_parity(docs, receipt, authorized=True) == receipt
     manifest, handoff = compile_story_browser_handoff(
