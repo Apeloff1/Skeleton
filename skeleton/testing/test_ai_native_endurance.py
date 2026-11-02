@@ -131,9 +131,34 @@ class EnduranceTests(unittest.TestCase):
             private=Path(path)/'private';private.mkdir(mode=0o700)
             report=measure(FixtureOnlyBackend(),self.new_policy(),clock=self.clock())
             info=publish_private(private,'run1.json',report)
-            self.assertEqual(info['status'],'private-report-created-no-clobber')
+            self.assertEqual(info['status'],'private-report-atomically-created-no-clobber')
             self.assertNotIn('Synthetic fixture reply',(private/'run1.json').read_text())
             with self.assertRaises(FileExistsError):publish_private(private,'run1.json',report)
+
+    def test_report_publication_never_accepts_arbitrary_prompt_or_response(self):
+        with tempfile.TemporaryDirectory() as path:
+            root=Path(path)/'private';root.mkdir(mode=0o700)
+            report=measure(FixtureOnlyBackend(),self.new_policy(),clock=self.clock())
+            report['private_prompt']='operator secret'
+            with self.assertRaises(QualificationHeld):publish_private(root,'clean.json',report)
+            self.assertFalse((root/'clean.json').exists())
+
+    def test_atomic_publisher_refuses_partial_named_reports(self):
+        with tempfile.TemporaryDirectory() as path:
+            root=Path(path)/'private';root.mkdir(mode=0o700)
+            report=measure(FixtureOnlyBackend(),self.new_policy(),clock=self.clock())
+            with patch('skeleton.ai.runtime.operational_ai.model.qualification.storage.os.link',
+                       side_effect=OSError('simulated publication failure')):
+                with self.assertRaises(OSError):publish_private(root,'never.json',report)
+            self.assertEqual(list(root.iterdir()),[])
+
+    def test_publish_cannot_overwrite_operator_symlink(self):
+        with tempfile.TemporaryDirectory() as path:
+            root=Path(path)/'private';root.mkdir(mode=0o700)
+            (root/'link.json').symlink_to(root/'target')
+            report=measure(FixtureOnlyBackend(),self.new_policy(),clock=self.clock())
+            with self.assertRaises(FileExistsError):publish_private(root,'link.json',report)
+            self.assertFalse((root/'target').exists())
 
     def test_report_rejects_directory_traversal(self):
         with tempfile.TemporaryDirectory() as path:

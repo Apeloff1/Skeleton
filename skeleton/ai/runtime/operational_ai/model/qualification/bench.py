@@ -57,7 +57,7 @@ def measure(backend, policy:BurnInPolicy,*,clock=time.monotonic_ns) -> dict:
     if summary['p99_ns']>policy.maximum_p99_ms*1_000_000:
         raise QualificationHeld('observed p99 native response latency exceeded operator ceiling')
     return {'schema':'skeleton.native-gguf-endurance.v1',
-            'status':'real-model-observed-not-release-certified',
+            'status':'backend-receipts-observed-not-release-certified',
             'model_sha256':model,'tokenizer_sha256':tokenizer,
             'policy':policy.record(), 'summary':summary,
             'trials':results,
