@@ -55,7 +55,10 @@ def test_real_two_game_install_play_save_restore_and_consumer_readiness(
     assert result["source_level_replay_passes_per_game"] == 2
     assert result["cohort_and_job_inodes_stable"] is False
     assert result["root_and_evidence_inodes_stable"] is True
-    assert result["nested_asset_inode_inventory_attested"] is False
+    assert result["nested_asset_inode_inventory_attested"] is True
+    assert result["nested_asset_inode_snapshots_equal"] is True
+    assert all(len(game["installed_tree_snapshot_sha256"]) == 64
+               for game in result["games"])
     assert result["private_jobfile_inode_attested"] is False
     assert result["read_only"] is True
     assert result["files_published"] == 0
