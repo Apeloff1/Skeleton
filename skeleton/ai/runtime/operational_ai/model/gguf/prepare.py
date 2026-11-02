@@ -83,10 +83,20 @@ def prepare_gguf(input_path:str|Path,output_dir:str|Path,*,model_id:str,
         manifest_bytes=json.dumps(manifest.to_record(),sort_keys=True,indent=2).encode()+b'\n'
         (staging/'model.manifest.json').write_bytes(manifest_bytes)
         # This ledger feeds the existing 1.9 GB ordered package builder.
-        ledger={'schema_version':1,'artifacts':[{'file':s.path,
-            'destination':f'models/{s.path}', 'wave':'MBW-02','bytes':s.bytes,
-            'sha256':s.sha256,'license':license,'source':source,
-            'rights_approved':rights_approved} for s in shards]}
+        # The package builder uses `file` relative to the payload root and
+        # `destination` relative to `bundle/stages/MBW-02/payload`. Preserve the
+        # model ID namespace and include the manifest itself: without this the
+        # bundle cannot be converted back into a bootable GGUF deployment.
+        artifacts = [{'file': s.path,
+            'destination': f'models/{model_id}/{s.path}', 'wave': 'MBW-02',
+            'bytes': s.bytes, 'sha256': s.sha256, 'license': license,
+            'source': source, 'rights_approved': rights_approved} for s in shards]
+        artifacts.append({'file': 'model.manifest.json',
+            'destination': f'models/{model_id}/model.manifest.json',
+            'wave': 'MBW-02', 'bytes': len(manifest_bytes),
+            'sha256': sha256(manifest_bytes).hexdigest(), 'license': license,
+            'source': source, 'rights_approved': rights_approved})
+        ledger = {'schema_version': 1, 'artifacts': artifacts}
         (staging/'approved_artifacts.json').write_text(json.dumps(ledger,indent=2,sort_keys=True)+'\n')
         for name in ('model.manifest.json','approved_artifacts.json'):
             os.chmod(staging/name,0o400)

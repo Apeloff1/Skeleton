@@ -6,6 +6,7 @@ receipts. A model never gets implicit tool or storage write privileges.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from contextlib import ExitStack
 import time
 import secrets
 from typing import Any,TYPE_CHECKING
@@ -22,6 +23,7 @@ from ..persistence.journal import EventJournal
 from ..tools.catalog import ToolCatalog
 from ..tools.executor import ToolExecutor,ToolReceipt
 from .session_locks import SessionLocks
+from .custody.session import ProcessSessionFence
 
 if TYPE_CHECKING:
     from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
@@ -61,7 +63,7 @@ class OfflineAIService:
 
     def __init__(self,*,actor:Actor,gateway:ModelGateway,chat_store:"OfflineChatStore",
                  memory:MemoryStore,journal:EventJournal,catalog:ToolCatalog|None=None,
-                 limits:Limits|None=None):
+                 limits:Limits|None=None,process_fence:ProcessSessionFence|None=None):
         if (actor.model_digest!=gateway.backend.model_digest or
             actor.tokenizer_digest!=gateway.backend.tokenizer_digest):
             raise ContractViolation("service identity does not bind active model")
@@ -74,6 +76,7 @@ class OfflineAIService:
         self.tools=ToolExecutor(self.catalog,self.journal)
         self.limits=limits or Limits()
         self.session_locks=SessionLocks()
+        self.process_fence=process_fence
 
     def create(self,*,system:str|None=None)->str:
         if system is not None:
@@ -116,7 +119,10 @@ class OfflineAIService:
     def turn(self,*,session:str,request_id:str,question:str,seed:int=0,
              temperature:float=1.0)->AIReceipt:
         """Serialize same-process turns before reading durable replay state."""
-        with self.session_locks.reserve(session,deadline_ms=self.limits.deadline_ms):
+        with ExitStack() as stack:
+            stack.enter_context(self.session_locks.reserve(session,deadline_ms=self.limits.deadline_ms))
+            if self.process_fence is not None:
+                stack.enter_context(self.process_fence.reserve(session,deadline_ms=self.limits.deadline_ms))
             return self._turn_locked(session=session,request_id=request_id,
                                      question=question,seed=seed,temperature=temperature)
 
@@ -160,12 +166,27 @@ class OfflineAIService:
                                  name=name,args=args,grant=grant,ledger=ledger)
 
     def status(self,session:str)->dict[str,Any]:
+        """Report verified recovery state, not just a count of audit events."""
+        require_id(session,field="conversation")
+        # In production the OfflineChatStore exposes read_snapshot and SQL
+        # custody. Lightweight contract fixtures can use count-only status;
+        # that does NOT claim verified or release-ready operation.
+        if hasattr(self.store,"read_snapshot"):
+            from .recovery import inspect
+            try:
+                proof=inspect(self,session)
+            except Exception as exc:
+                return {"status":"audit-failed","reason":type(exc).__name__,"session":session}
+            return {"status":"recoverable" if proof.status=="verified" else "audit-incomplete",
+                    "session":session,"revision":proof.turns,"journal_head":proof.audit_head,
+                    "missing_audits":proof.missing_audits,
+                    "model_digest":self.actor.model_digest}
         saved=self.history(session)
         try:
             events=self.journal.replay(session)
             head=self.journal.head(session)
         except Exception as exc:
-            return {"status":"audit-failed","error":str(exc),"session":session}
+            return {"status":"audit-failed","reason":type(exc).__name__,"session":session}
         commits=sum(e.kind=="ai.turn.committed" for e in events)
         if commits!=saved["revision"]:
             return {"status":"audit-incomplete","session":session,"revision":saved["revision"],

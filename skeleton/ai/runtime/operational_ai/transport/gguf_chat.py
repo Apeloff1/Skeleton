@@ -17,6 +17,8 @@ from ..context.sealed_memory.keys import load_key_file
 from ..context.sealed_memory.store import SealedMemoryStore
 from ..persistence.journal import EventJournal
 from ..orchestration.service import OfflineAIService
+from ..orchestration.custody.session import ProcessSessionFence
+from ..model.gguf.file_guard import open_trusted_root
 
 
 def main(argv:list[str]|None=None)->int:
@@ -45,6 +47,13 @@ def main(argv:list[str]|None=None)->int:
         state=args.state_dir.absolute()
         if not state.is_dir() or state.is_symlink() or state.stat().st_mode&0o077:
             raise GGUFManifestError('private state directory must exist, non-symlink, mode 0700')
+        root_fd=open_trusted_root(state)
+        try:
+            os.mkdir('session_locks',mode=0o700,dir_fd=root_fd)
+        except FileExistsError:
+            pass
+        finally:
+            os.close(root_fd)
         manifest=load_approved_manifest(args.model_root,args.manifest)
         with ExitStack() as stack:
             backend=stack.enter_context(activate_model(args.model_root,manifest,
@@ -54,12 +63,14 @@ def main(argv:list[str]|None=None)->int:
             memory=stack.enter_context(SealedMemoryStore(state/'memory.sqlite',
                 load_key_file(args.memory_key_file)))
             journal=stack.enter_context(EventJournal(state/'audit.sqlite'))
+            process_fence=stack.enter_context(ProcessSessionFence(state/'session_locks'))
             actor=Actor(args.tenant,args.user,backend.model_digest,backend.tokenizer_digest)
             limits=Limits(input_bytes=32768,output_bytes=262144,
                 context_tokens=args.context_tokens,output_tokens=args.max_new_tokens,
                 tool_calls=0,retrieval_hits=8,deadline_ms=120000)
             service=OfflineAIService(actor=actor,gateway=ModelGateway(backend),chat_store=store,
-                                      memory=memory,journal=journal,limits=limits)
+                                      memory=memory,journal=journal,limits=limits,
+                                      process_fence=process_fence)
             if args.serve:
                 from .http import LocalHTTPServer
                 from .dispatch import Dispatcher
