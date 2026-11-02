@@ -65,6 +65,7 @@ class GuardStub:
             receipt = {
                 "schema": "skeleton.ai.long-context-memory-budget.v1",
                 "state": "claimed", "device_qualified": False,
+                "reservation_id": key,
                 "is_execution_lease": False, "is_admission_grant": False,
                 "is_memory_allocation": False,
                 "requires_live_backend_revalidation": True,
@@ -421,6 +422,80 @@ class AdmissionBundleTests(unittest.TestCase):
             self.cpu, self.memory, self.kv,
             nonce=Mock(side_effect=OSError("entropy unavailable")))
         self.assertEqual(broken.reserve(self.request)["state"], "hold")
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+
+    def test_single_reservation_rechecks_kv_after_slow_cpu_guard(self):
+        original = self.cpu.reserve
+        def racing_cpu(request):
+            receipt = original(request)
+            self.kv.digest = "e" * 64
+            return receipt
+        self.cpu.reserve = racing_cpu
+        result = self.bundle.reserve(self.request)
+        self.assertEqual(result["reason"], "kv_changed_during_reservation")
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_fair_cycle_rechecks_all_kv_windows_before_publication(self):
+        other = self.fair_setup()
+        original = self.cpu.reserve_fair_cycle
+        def racing_cpu(requests, *, quantum_tokens=256):
+            receipt = original(requests, quantum_tokens=quantum_tokens)
+            self.kv.digest = "e" * 64
+            return receipt
+        self.cpu.reserve_fair_cycle = racing_cpu
+        result = self.bundle.reserve_fair_cycle((self.request, other),
+                                                quantum_tokens=8)
+        self.assertEqual(result["state"], "hold")
+        self.assertEqual(result["reservations"], [])
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_claim_rechecks_kv_after_memory_callback(self):
+        key = self.bundle.reserve(self.request)["bundle_id"]
+        original = self.memory.claim
+        def racing_memory(reservation_id, request):
+            receipt = original(reservation_id, request)
+            self.kv.digest = "e" * 64
+            return receipt
+        self.memory.claim = racing_memory
+        result = self.bundle.claim(key, self.request)
+        self.assertEqual(result["reason"], "kv_changed_during_claim")
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_forged_memory_claim_identity_revokes_both_guards(self):
+        key = self.bundle.reserve(self.request)["bundle_id"]
+        self.memory.forge = {"reservation_id": "e" * 48}
+        result = self.bundle.claim(key, self.request)
+        self.assertEqual(result["reason"], "claim_revalidation_failed")
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_slow_final_kv_check_expires_claim(self):
+        clock = Clock()
+        bundle = LongContextAdmissionBundle(
+            self.cpu, self.memory, self.kv,
+            nonce=lambda _: "c" * 64, clock=clock, lifetime_ns=1000)
+        key = bundle.reserve(self.request)["bundle_id"]
+        original = self.kv.observe
+        calls = [0]
+        def delayed_observe(*args, **kwargs):
+            calls[0] += 1
+            result = original(*args, **kwargs)
+            if calls[0] >= 4:
+                clock.value += 2000
+            return result
+        self.kv.observe = delayed_observe
+        result = bundle.claim(key, self.request)
+        self.assertEqual(result["state"], "hold")
+        self.assertEqual(bundle.status()["active"], 0)
         self.assertFalse(self.cpu.reserved)
         self.assertFalse(self.memory.reserved)
 

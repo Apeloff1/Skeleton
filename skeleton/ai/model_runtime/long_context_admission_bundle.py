@@ -234,6 +234,14 @@ class LongContextAdmissionBundle:
                 after = self._now()
                 if after >= now + self._lifetime_ns:
                     return self._receipt("hold", "bundle_observation_expired")
+                # CPU/RAM reservation callbacks can block while another
+                # process advances the durable token head. The earlier KV
+                # digest is not a lease: re-observe immediately before
+                # publishing the cooperative reservation.
+                if self._kv_window(request) != digest:
+                    return self._receipt("hold", "kv_changed_during_reservation")
+                if self._now() >= now + self._lifetime_ns:
+                    return self._receipt("hold", "bundle_observation_expired")
                 bundle_id = self._nonce(32)
                 if (not self._key(bundle_id, 64)
                         or bundle_id in self._entries):
@@ -383,6 +391,14 @@ class LongContextAdmissionBundle:
                 after = self._now()
                 if after >= now + self._lifetime_ns:
                     raise LongContextSpoolError("fair-cycle observation expired")
+                # Every stream must still point to its original KV window
+                # after both underlying fair-cycle guards have returned.
+                # One changed stream invalidates the entire batch.
+                if any(self._kv_window(request) != digest
+                       for request, digest in zip(ordered, digests)):
+                    raise LongContextSpoolError("fair-cycle KV changed")
+                if self._now() >= now + self._lifetime_ns:
+                    raise LongContextSpoolError("fair-cycle observation expired")
                 bundle_keys = [self._nonce(32) for _ in ordered]
                 if (any(not self._key(key, 64) or key in self._entries
                         for key in bundle_keys)
@@ -453,6 +469,7 @@ class LongContextAdmissionBundle:
                 memory = self._memory.claim(entry.memory_id, request.memory)
                 if (type(memory) is not dict or memory.get("state") != "claimed"
                     or memory.get("schema") != "skeleton.ai.long-context-memory-budget.v1"
+                    or memory.get("reservation_id") != entry.memory_id
                     or memory.get("is_execution_lease") is not False
                     or memory.get("is_admission_grant") is not False
                     or memory.get("is_memory_allocation") is not False
@@ -464,6 +481,14 @@ class LongContextAdmissionBundle:
                 return self._receipt("hold", "claim_revalidation_failed")
             # CPU and RAM claims may block; an expired bundle cannot be
             # published as claimed even if both inner guards returned success.
+            self._now()
+            if self._entries.get(bundle_id) is not entry:
+                return self._receipt("hold", "bundle_expired_during_claim")
+            # Both claim callbacks can race an external checkpoint advance.
+            # Never report a claimed cooperative bundle for a stale window.
+            if self._kv_window(request) != digest:
+                self._revoke(bundle_id)
+                return self._receipt("hold", "kv_changed_during_claim")
             self._now()
             if self._entries.get(bundle_id) is not entry:
                 return self._receipt("hold", "bundle_expired_during_claim")
