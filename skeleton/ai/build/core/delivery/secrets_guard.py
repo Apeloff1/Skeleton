@@ -14,6 +14,11 @@ from typing import Any, Iterable, Mapping
 
 SECRET_REF_RE = re.compile(r"^secret://[a-z0-9][a-z0-9._/-]{0,127}$")
 SENSITIVE_KEY_RE = re.compile(r"(pass(word)?|secret|token|api[_-]?key|private[_-]?key|credential|auth)", re.I)
+# A prefix-only ${ check can conceal appended literal credentials.
+_ENV_PLACEHOLDER_RE = re.compile(r"\$\{[A-Z_][A-Z0-9_]{0,127}\}\Z")
+MAX_SCAN_DEPTH = 32
+MAX_SCAN_NODES = 8192
+MAX_SCAN_VALUE_CHARS = 8192
 _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("aws-access-key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b")),
@@ -50,10 +55,12 @@ def scan_value(location: str, key: str, value: Any) -> list[SecretFinding]:
     findings: list[SecretFinding] = []
     if not isinstance(value, str) or is_secret_ref(value):
         return findings
+    if len(value) > MAX_SCAN_VALUE_CHARS:
+        return [SecretFinding(location, "oversized-secret-scan-value")]
     for rule, pattern in _PATTERNS:
         if pattern.search(value):
             findings.append(SecretFinding(location, rule))
-    if SENSITIVE_KEY_RE.search(key) and value and not value.startswith("${"):
+    if SENSITIVE_KEY_RE.search(key) and value and not _ENV_PLACEHOLDER_RE.fullmatch(value):
         findings.append(SecretFinding(location, "sensitive-key-literal"))
     token = value.strip()
     if (
@@ -67,19 +74,38 @@ def scan_value(location: str, key: str, value: Any) -> list[SecretFinding]:
 
 
 def scan_mapping(data: Mapping[str, Any], *, root: str = "$") -> tuple[SecretFinding, ...]:
-    out: list[SecretFinding] = []
+    """Scan hostile nested configuration without unbounded recursion or cycles."""
+    from skeleton.build.delivery._util import DeliveryError
 
-    def walk(node: Any, path: str, key: str) -> None:
-        if isinstance(node, Mapping):
-            for k in sorted(node, key=str):
-                walk(node[k], f"{path}.{k}", str(k))
-        elif isinstance(node, (list, tuple)):
-            for i, item in enumerate(node):
-                walk(item, f"{path}[{i}]", key)
+    if not isinstance(data, Mapping):
+        raise DeliveryError("secret scan input must be a mapping")
+    out: list[SecretFinding] = []
+    active: set[int] = set()
+    nodes = 0
+
+    def walk(node: Any, path: str, key: str, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > MAX_SCAN_NODES or depth > MAX_SCAN_DEPTH:
+            raise DeliveryError("secret scan structure exceeds bound")
+        if isinstance(node, (Mapping, list, tuple)):
+            identity = id(node)
+            if identity in active:
+                raise DeliveryError("cyclic secret scan structure")
+            active.add(identity)
+            try:
+                if isinstance(node, Mapping):
+                    for k in sorted(node, key=str):
+                        walk(node[k], f"{path}.{k}", str(k), depth + 1)
+                else:
+                    for i, item in enumerate(node):
+                        walk(item, f"{path}[{i}]", key, depth + 1)
+            finally:
+                active.remove(identity)
         else:
             out.extend(scan_value(path, key, node))
 
-    walk(data, root, "")
+    walk(data, root, "", 0)
     return tuple(sorted(set(out), key=lambda f: (f.location, f.rule)))
 
 

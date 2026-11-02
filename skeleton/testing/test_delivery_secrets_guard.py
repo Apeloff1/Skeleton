@@ -36,3 +36,34 @@ def test_scan_text_and_assert_clean():
     with pytest.raises(DeliveryError):
         assert_clean(findings)
     assert_clean(())
+
+def test_sensitive_placeholder_must_match_entire_value():
+    assert scan_mapping({"password": "${PASSWORD}"}) == ()
+    for bad in ("${PASSWORD}literal", "${bad-name}", "${PASSWORD", "${PASSWORD} "):
+        assert "sensitive-key-literal" in {
+            finding.rule for finding in scan_mapping({"password": bad})
+        }
+
+
+def test_secret_scanner_rejects_cycles_and_unbounded_structures():
+    from skeleton.ai.build.core.delivery import secrets_guard as mirrored
+
+    for module in (None, mirrored):
+        scan = scan_mapping if module is None else module.scan_mapping
+        cyclic = {}
+        cyclic["self"] = cyclic
+        with pytest.raises(DeliveryError, match="cyclic"):
+            scan(cyclic)
+        deep = {}
+        current = deep
+        for _ in range(40):
+            next_node = {}
+            current["child"] = next_node
+            current = next_node
+        with pytest.raises(DeliveryError, match="bound"):
+            scan(deep)
+        with pytest.raises(DeliveryError, match="bound"):
+            scan({"items": list(range(9000))})
+        assert "oversized-secret-scan-value" in {
+            finding.rule for finding in scan({"token": "x" * 9000})
+        }
