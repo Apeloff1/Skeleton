@@ -101,3 +101,10 @@ Focused acceptance: `python -m pytest -q
 skeleton/testing/test_app_consumer_first_run_cohort.py`. Adversarial
 coverage includes first-pass, late cross-game, final-pass same-byte inode
 substitution, and forged well-formed nested inventory digests.
+
+With `--verify-original-sources`, the same bounded cohort-wide inode
+barriers also cover each original authoring source tree, including nested
+assets. A late same-byte substitution of an earlier game's original source
+cannot be accepted merely because canonical content digests still match.
+Without this option no original source directory is required or scanned.
+These checks are observational, not proof of rights or continuous custody.

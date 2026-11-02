@@ -107,11 +107,14 @@ def test_cli_pinned_private_jobfile_and_explicit_release_holds(
     assert report["release_certified"] is False
     assert report["files_published"] == 0
     assert report["original_sources_reverified"] is False
+    assert report["original_source_nested_inode_inventory_attested"] is False
     assert run_app_cli(base + [
         "--trusted-local-operator", "--verify-original-sources",
     ]) == 0
     source_bound = json.loads(capsys.readouterr().out)
     assert source_bound["original_sources_reverified"] is True
+    assert source_bound["original_source_nested_inode_inventory_attested"] is True
+    assert source_bound["original_source_nested_inode_snapshots_equal"] is True
     assert source_bound["release_certified"] is False
 
 
@@ -358,4 +361,40 @@ def test_final_cohort_replay_nested_inode_swap_rejected(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
+        )
+
+
+def test_late_original_source_nested_swap_rejected_when_requested(
+    delivered_games, tmp_path, monkeypatch,
+):
+    import shutil
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = _isolated_installs(delivered_games, tmp_path)
+    isolated = []
+    for index, job in enumerate(jobs):
+        source = tmp_path / f"isolated-source-{index}"
+        shutil.copytree(job.source, source)
+        isolated.append(replace(job, source=source))
+    jobs = tuple(isolated)
+    original = module.inspect_consumer_first_run
+    calls = 0
+
+    def swap_earlier_source_after_later_game(*args, **kwargs):
+        nonlocal calls
+        result = original(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            _replace_nested_asset_with_identical_bytes(tmp_path, jobs[0].source)
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_consumer_first_run",
+        swap_earlier_source_after_later_game,
+    )
+    with pytest.raises(ConsumerFirstRunCohortError, match="original source"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True, verify_original_sources=True,
         )

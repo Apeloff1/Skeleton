@@ -35,22 +35,28 @@ class ConsumerFirstRunCohortError(ValueError):
     """A pinned first-run cohort could not be independently reexecuted."""
 
 
-def _nested_snapshots(jobs: tuple[DeliveryJob, ...]) -> tuple[tuple, ...]:
+def _nested_snapshots(
+    jobs: tuple[DeliveryJob, ...], *, original_sources: bool = False,
+) -> tuple[tuple, ...]:
     """Capture all 2-8 installed trees, including nested directory/file inodes.
 
     The canonical delivery custody check covers roots and evidence files,
     not every installed asset. Keep a bounded inventory for the *entire*
     cohort across each game's replay and the final cohort verification.
     """
-    return tuple(snapshot_installed_tree(job.install) for job in jobs)
+    return tuple(snapshot_installed_tree(
+        job.source if original_sources else job.install
+    ) for job in jobs)
 
 
 def _require_nested_custody(
-    jobs: tuple[DeliveryJob, ...], expected: tuple[tuple, ...],
+    jobs: tuple[DeliveryJob, ...], expected: tuple[tuple, ...], *,
+    original_sources: bool = False,
 ) -> None:
-    if _nested_snapshots(jobs) != expected:
+    if _nested_snapshots(jobs, original_sources=original_sources) != expected:
+        label = "original source" if original_sources else "installed game"
         raise ConsumerFirstRunCohortError(
-            "nested installed game inode changed during cross-game replay"
+            "nested " + label + " inode changed during cross-game replay"
         )
 
 
@@ -83,6 +89,20 @@ def inspect_consumer_first_run_cohort(
     nested_digests = tuple(
         installed_tree_snapshot_digest(snapshot) for snapshot in nested_before
     )
+    # Source trees are optional: an installed game must remain inspectable
+    # after its authoring source is intentionally retired. When explicitly
+    # requested, bind every original asset inode across the whole cohort.
+    source_nested_before = (
+        _nested_snapshots(checked, original_sources=True)
+        if verify_original_sources else None
+    )
+
+    def require_all_nested_custody() -> None:
+        _require_nested_custody(checked, nested_before)
+        if source_nested_before is not None:
+            _require_nested_custody(
+                checked, source_nested_before, original_sources=True,
+            )
     first = inspect_first_playable_delivery_batch(
         checked, summary, expected_summary_sha256=pin, authorized=True,
         verify_original_sources=verify_original_sources,
@@ -101,7 +121,7 @@ def inspect_consumer_first_run_cohort(
     if (_delivered_custody(checked) != before
             or _save_identity(summary) != summary_before):
         raise ConsumerFirstRunCohortError("cohort custody changed after first replay")
-    _require_nested_custody(checked, nested_before)
+    require_all_nested_custody()
 
     games: list[dict[str, object]] = []
     for index, (job, stored) in enumerate(zip(
@@ -162,7 +182,7 @@ def inspect_consumer_first_run_cohort(
             raise ConsumerFirstRunCohortError(
                 "another installed game or summary changed during replay"
             )
-        _require_nested_custody(checked, nested_before)
+        require_all_nested_custody()
 
     # Reinspect the complete canonical cohort after the final consumer game;
     # a later replay must not mask tampering with an earlier installed game.
@@ -177,7 +197,7 @@ def inspect_consumer_first_run_cohort(
         raise ConsumerFirstRunCohortError(
             "cohort changed across final cross-game replay barrier"
         )
-    _require_nested_custody(checked, nested_before)
+    require_all_nested_custody()
     return {
         "schema": SCHEMA,
         "status": "consumer_source_level_cohort_replayed_release_blocked",
@@ -195,6 +215,8 @@ def inspect_consumer_first_run_cohort(
         "nested_asset_inode_inventory_attested": True,
         "nested_asset_inode_snapshots_equal": True,
         "all_games_nested_inodes_checked_after_each_replay": True,
+        "original_source_nested_inode_inventory_attested": verify_original_sources,
+        "original_source_nested_inode_snapshots_equal": verify_original_sources,
         "private_jobfile_inode_attested": False,
         "read_only": True,
         "files_published": 0,
