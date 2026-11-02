@@ -10,6 +10,7 @@ from .harbor_crafting import (
     export_bundle, load_source, verify_bundle,
 )
 from .harbor_crafting_authoring import author_revision, verify_revision
+from .harbor_crafting_planner import solve, verify_plan
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
 )
@@ -36,7 +37,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -47,10 +48,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--edits", help="JSON list of transactional source edits")
     parser.add_argument("--revision", help="JSON source revision for verification")
     parser.add_argument("--expected-source-digest", help="CAS lease for source editing")
+    parser.add_argument("--choice", choices=("signal", "shelter"), default="signal")
+    parser.add_argument("--plan", help="JSON solver plan for verification")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify-author":
+        if args.command == "verify-plan":
+            state = verify_plan(_required_json(args.plan, "plan"))
+            output = {"verified": True, "state": state}
+        elif args.command == "solve":
+            output = solve(load_source(Path(args.source)), choice=args.choice)
+        elif args.command == "verify-author":
             source = verify_revision(_required_json(args.revision, "revision"))
             output = {"verified": True, "source": source}
         elif args.command == "author":
