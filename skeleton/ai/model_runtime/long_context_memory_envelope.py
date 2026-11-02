@@ -14,7 +14,7 @@ import sys
 from time import monotonic_ns
 from typing import Callable
 
-from .long_context_spool import LongContextSpoolError, _canonical
+from .long_context_spool import LongContextSpoolError, _canonical, _open_directory_chain
 
 _MAX_COUNTER = 2**63 - 1
 _MAX_SAMPLE_NS = 2_000_000_000
@@ -44,7 +44,7 @@ def _kernel_read(root: Path, name: str) -> str:
     if name not in {"meminfo", "memory.current", "memory.max", "memory.high"}:
         raise LongContextSpoolError("invalid kernel memory source")
     flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    directory = os.open(root, flags | os.O_DIRECTORY)
+    directory = _open_directory_chain(root, create=False)
     try:
         directory_before = os.fstat(directory)
         if not stat.S_ISDIR(directory_before.st_mode):
@@ -64,9 +64,14 @@ def _kernel_read(root: Path, name: str) -> str:
         finally:
             os.close(fd)
         visible = os.stat(root, follow_symlinks=False)
-        if (_identity(directory_before) != _identity(os.fstat(directory))
-                or _identity(directory_before) != _identity(visible)):
-            raise LongContextSpoolError("memory source root replaced")
+        again = _open_directory_chain(root, create=False)
+        try:
+            if (_identity(directory_before) != _identity(os.fstat(directory))
+                    or _identity(directory_before) != _identity(visible)
+                    or _identity(directory_before) != _identity(os.fstat(again))):
+                raise LongContextSpoolError("memory source root replaced")
+        finally:
+            os.close(again)
         try:
             return raw.decode("ascii", errors="strict")
         except UnicodeDecodeError as exc:

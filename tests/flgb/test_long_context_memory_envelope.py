@@ -173,6 +173,17 @@ class MemoryEnvelopeTests(unittest.TestCase):
                 _kernel_read(root, "meminfo")
 
     @unittest.skipUnless(os.name == "posix", "POSIX descriptor fence")
+    def test_kernel_read_rejects_symlinked_ancestor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "real"
+            root.mkdir()
+            (root / "meminfo").write_text("MemTotal: 1 kB\\n")
+            alias = Path(directory) / "alias"
+            alias.symlink_to(root, target_is_directory=True)
+            with self.assertRaises((OSError, LongContextSpoolError)):
+                _kernel_read(alias, "meminfo")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX descriptor fence")
     def test_kernel_read_rejects_replaced_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "source"

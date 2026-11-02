@@ -158,7 +158,7 @@ class MemoryBudgetGuardTests(unittest.TestCase):
     def test_close_and_fork_fail_closed(self):
         self.guard.reserve(self.one)
         self.guard.close()
-        self.assertEqual(self.guard.status if False else self.guard._revocations, 1)
+        self.assertEqual(self.guard._revocations, 1)
         with self.assertRaises(LongContextSpoolError):
             self.guard.reserve(self.one)
         fresh = LongContextMemoryBudgetGuard(
