@@ -156,8 +156,7 @@ def test_pipeline_reports_missing_broken_unsafe(tmp_path):
     codes = {(i.path, i.code) for i in r.issues}
     assert codes == {("bad.wav", "broken"), ("gone.ogg", "missing"), ("../x.png", "unsafe"),
                      ("notes.txt", "unsupported"), ("cube.obj", "missing_reference")}
-    assert r.imported == ["cube.obj", "tex/a.png"] and r.duplicates == ["tex/b.png"]
-    assert not r.ok
+    # A mixed trusted/invalid package must never expose a partial manifest.\n    # Rejected batches preserve diagnostic issues but discard all imported state.\n    assert not r.ok\n    assert r.imported == [] and r.duplicates == []\n    assert r.manifest.entries == []\n    assert r.manifest.to_dict()["paths"] == 0
 
 
 def test_import_directory_resolves_sidecars_and_skips_symlinks(tmp_path):
