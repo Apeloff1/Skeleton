@@ -22,6 +22,10 @@ from .harbor_crafting_market import MAX_BYTES as MAX_MARKET_BYTES
 from .harbor_crafting_market_balance import balance_market, verify_market_balance, MAX_BYTES as MAX_BALANCE_BYTES
 from .harbor_crafting_market_distribution import build_market_distribution, verify_market_distribution, play_market_distribution, verify_market_distribution_play, MAX_BYTES as MAX_DISTRIBUTION_BYTES
 from .harbor_crafting_npc import npc_observations, verify_npc_observations, npc_forecast, verify_npc_forecast, MAX_BYTES as MAX_NPC_BYTES
+from .harbor_crafting_journal_merge import (
+    MAX_COMPARISON_BYTES, compare_journals, fast_forward_journal,
+    verify_journal_comparison,
+)
 from .harbor_crafting_journal import (
     MAX_JOURNAL_BYTES, append_journal, create_journal, journal_at, journal_audit,
     journal_head, rewind_journal, verify_journal,
@@ -54,7 +58,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -79,12 +83,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preview-bundle", help="Optional canonical gameplay bundle for edited mission preview")
     parser.add_argument("--require-all", action="store_true", help="Require every authored mission to be earned")
     parser.add_argument("--journal", help="Portable replay journal JSON")
+    parser.add_argument("--other-journal", help="Candidate journal for reconciliation")
     parser.add_argument("--expected-journal-digest", help="CAS journal lease")
     parser.add_argument("--revision-index", type=int, help="Historical journal revision")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "journal-init":
+        if args.command == "journal-compare":
+            output = compare_journals(
+                _required_json(args.journal, "journal", MAX_JOURNAL_BYTES),
+                _required_json(args.other_journal, "other-journal", MAX_JOURNAL_BYTES),
+            )
+        elif args.command == "journal-verify-comparison":
+            output = {"verified": True, **verify_journal_comparison(
+                _required_json(args.comparison, "comparison", MAX_COMPARISON_BYTES))}
+        elif args.command == "journal-fast-forward":
+            if not args.expected_journal_digest:
+                raise HarborError("--expected-journal-digest is required")
+            output = fast_forward_journal(
+                _required_json(args.journal, "journal", MAX_JOURNAL_BYTES),
+                _required_json(args.other_journal, "other-journal", MAX_JOURNAL_BYTES),
+                expected_journal_digest=args.expected_journal_digest,
+            )
+        elif args.command == "journal-init":
             output = create_journal(_required_json(args.bundle, "bundle"))
         elif args.command == "journal-verify":
             output = {"verified": True, **verify_journal(

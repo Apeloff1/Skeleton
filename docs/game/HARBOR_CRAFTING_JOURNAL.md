@@ -35,3 +35,21 @@ revision order, forged terminal states and oversized input. Hashes provide
 integrity against accidental or untrusted changes only when the expected
 digest comes from an independently trusted source; they do not provide
 authenticity against an adversary who can replace all bytes and expectations.
+
+## Cross-device journal reconciliation
+
+Two complete, replay-verified Lantern Quay journals may be compared and
+fast-forwarded without treating a matching hash as an authority to merge.
+The journals must have the exact same verified root bundle. Revision records
+must match byte-for-byte along their shared prefix. Divergent gameplay
+choices, including different earned endings, remain separate.
+
+    python -m scripts.game.harbor_crafting journal-compare --journal local.json --other-journal remote.json > comparison.json
+    python -m scripts.game.harbor_crafting journal-verify-comparison --comparison comparison.json
+    python -m scripts.game.harbor_crafting journal-fast-forward --journal local.json --other-journal remote.json --expected-journal-digest LOCAL_DIGEST > advanced.json
+
+The fast-forward command rejects stale leases, reverse ancestry, different
+world roots and divergent revisions. A storage service must independently
+enforce atomic CAS when publishing the returned bytes. No file is silently
+overwritten by the CLI. Comparison reports are portable audit artifacts, not
+authentication or automatic conflict resolution.
