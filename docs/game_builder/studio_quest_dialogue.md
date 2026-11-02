@@ -36,3 +36,13 @@ The plan is bounded to 128 lines, 64 canonical actions, four lines per
 action, 192 KiB typed plan, and 256 KiB receipt. A strict CSP-hashed offline
 editor escapes text and does not contact the network. Duplicate, skipped,
 out-of-order, forged-speaker, stale-session and unreviewed inputs are rejected.
+
+## Jeeves typed capability integration
+
+The trusted app assembler may opt into
+`register_quest_dialogue_tools(registry, trusted_documents, verified_npc_receipt)`.
+The `studio_quest_dialogue_propose`, `studio_quest_dialogue_compile`, and
+`studio_quest_dialogue_handoff` adapters are read-only, source-leased, and
+require explicit registry authorization and non-dry-run execution. They cannot
+write a file, create NPC facts, or bypass the canonical quest/relationship
+replay. The NPC receipt and source are pinned at registration.
