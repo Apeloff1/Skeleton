@@ -7,6 +7,9 @@ from pathlib import Path
 from scripts.studio_npc_knowledge_relay_cli import _private_json
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_quest_readiness_editor import (
+    import_quest_readiness_editor_export,
+)
 from skeleton.ai.game_builder.studio_quest_readiness import (
     PROMPT, compile_quest_readiness, propose_quest_readiness,
     restore_quest_readiness,
@@ -27,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--prompt", action="store_true")
     modes.add_argument("--budget-file", type=Path)
     modes.add_argument("--restore-proof", type=Path)
+    modes.add_argument("--editor-export", type=Path)
     output = parser.add_mutually_exclusive_group()
     output.add_argument("--publish", type=Path)
     output.add_argument("--verify", type=Path)
@@ -44,6 +48,9 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_digest=args.expected_source)
             if readiness["initial_session_digest"] != args.expected_session:
                 raise StudioQuestError("stale restored readiness session")
+        elif args.editor_export:
+            readiness = import_quest_readiness_editor_export(
+                docs, args.editor_export, **leases)
         elif args.prompt:
             readiness = propose_quest_readiness(docs, PROMPT, **leases)
         else:
