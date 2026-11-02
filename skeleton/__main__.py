@@ -98,6 +98,7 @@ Commands:
     game-vertical-accept  Replay-verify complete playable quests and crafting games
     quest-campaign-author  Edit and preview replay-verified chapter campaigns
     quest-campaign-play  Interactively play and resume earned chapter campaigns\n    quest-campaign-route  Solve and replay authored multi-chapter campaign completion\n    game        Build a playable Godot project from a natural-language brief
+    quest-campaign-accept  Verify edited campaign, earned victory and portable replay
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
     forge       Blueprint compilation and materialization
@@ -848,6 +849,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-campaign-play":
         from skeleton.game.gameplay.quest_chapter_campaign_interactive import cli as campaign_play_cli
         return campaign_play_cli(rest)
+    if cmd == "quest-campaign-accept":
+        from skeleton.game.gameplay.quest_chapter_campaign_accept import cli as campaign_accept_cli
+        return campaign_accept_cli(rest)
     if cmd == "quest-campaign-route":
         from skeleton.game.gameplay.quest_chapter_campaign_route import cli as campaign_route_cli
         return campaign_route_cli(rest)
