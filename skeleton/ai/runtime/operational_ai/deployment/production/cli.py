@@ -19,12 +19,19 @@ def main(argv:list[str]|None=None)->int:
                    help='Run the real GGUF backend in a killable private subprocess')
     p.add_argument('--context',type=int,default=2048)
     p.add_argument('--max-new-tokens',type=int,default=256)
+    p.add_argument('--capacity-root',type=Path)
+    p.add_argument('--capacity-slots',type=int,default=1)
+    p.add_argument('--capacity-budget-bytes',type=int,default=8_000_000_000)
     args=p.parse_args(argv)
     try:
+        from ...model.admission.paths import create_default_root
         stack,worker=activate(model_root=args.model_root,state_dir=args.state_dir,
             tenant=args.tenant,subject=args.subject,n_ctx=args.context,
             max_new_tokens=args.max_new_tokens,n_threads=args.threads,
-            isolated=args.isolate_native)
+            isolated=args.isolate_native,
+            capacity_root=args.capacity_root if args.capacity_root is not None else create_default_root(),
+            capacity_slots=args.capacity_slots,
+            capacity_budget_bytes=args.capacity_budget_bytes)
         with stack:
             session=args.session or 's_'+secrets.token_hex(16)
             if not args.session:worker.spine.create(session)

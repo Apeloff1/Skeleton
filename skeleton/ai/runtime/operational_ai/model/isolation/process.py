@@ -27,16 +27,23 @@ def sanitized_environment() -> dict[str, str]:
 
 
 class OwnedWorker:
-    def __init__(self) -> None:
+    def __init__(self, *, retained_fds:tuple[int,...]=()) -> None:
         if os.name != 'posix':
             raise IsolationUnavailable('native process isolation requires POSIX')
+        if (type(retained_fds) is not tuple or len(retained_fds)>1
+                or any(type(fd) is not int or fd<3 for fd in retained_fds)):
+            raise IsolationUnavailable('invalid native capacity descriptors')
+        for fd in retained_fds:
+            try:os.fstat(fd)
+            except OSError as exc:
+                raise IsolationUnavailable('native capacity descriptor not open') from exc
         command = [sys.executable, '-u', '-m',
             'skeleton.ai.runtime.operational_ai.model.isolation.worker']
         try:
             self.process = subprocess.Popen(command, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 cwd='/', env=sanitized_environment(), close_fds=True,
-                start_new_session=True, bufsize=0)
+                pass_fds=retained_fds, start_new_session=True, bufsize=0)
         except OSError as exc:
             raise IsolationUnavailable('unable to launch native worker') from exc
         self._closed = False

@@ -22,6 +22,7 @@ class IsolatedGGUFBackend:
     def __init__(self, model_root: Path | str, manifest: GGUFModelManifest, *,
                  n_ctx: int = 2048, n_threads: int = 4, n_gpu_layers: int = 0,
                  startup_ms: int = 180000, inference_ms: int = 120000,
+                 capacity_lease=None,
                  ) -> None:
         if not isinstance(manifest, GGUFModelManifest):
             raise IsolationProtocolError('approved GGUF manifest is required')
@@ -32,6 +33,13 @@ class IsolatedGGUFBackend:
         root = Path(model_root)
         if not root.is_absolute():
             raise IsolationProtocolError('model root must be absolute')
+        if capacity_lease is not None:
+            from ..admission.broker import ModelCapacityLease
+            if (not isinstance(capacity_lease,ModelCapacityLease)
+                    or not capacity_lease.active
+                    or capacity_lease._entry['reservation']['model_sha256']!=manifest.model_sha256):
+                raise IsolationProtocolError('native child cannot inherit unbound capacity')
+            capacity_lease.assert_live()
         self._lock = threading.RLock()
         # A generation owns the IPC stream; shutdown must NOT wait for it.
         self._turn_lock = threading.Lock()
@@ -41,7 +49,8 @@ class IsolatedGGUFBackend:
         self._minimum_memory_reserve = 128 * 1024 * 1024
         self._requests_completed = 0
         self._request_failures = 0
-        self._worker = OwnedWorker()
+        self._worker = (OwnedWorker(retained_fds=(capacity_lease.fd,))
+                        if capacity_lease is not None else OwnedWorker())
         try:
             until = time.monotonic_ns() + startup_ms * 1_000_000
             boot = {'version': 1, 'type': 'boot', 'model_root': str(root),

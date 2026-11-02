@@ -24,6 +24,10 @@ def main(argv:list[str]|None=None)->int:
     p.add_argument('--gpu-layers',type=int,default=0)
     p.add_argument('--isolate-native',action='store_true',
                    help='Execute all GGUF inference inside a killable local worker process')
+    p.add_argument('--capacity-root',type=Path,
+                   help='Private global native-model capacity root')
+    p.add_argument('--capacity-slots',type=int,default=1)
+    p.add_argument('--capacity-budget-bytes',type=int,default=8_000_000_000)
     p.add_argument('--poll-ms',type=int,default=200)
     p.add_argument('--shutdown-grace-ms',type=int,default=120000)
     args=p.parse_args(argv)
@@ -31,12 +35,16 @@ def main(argv:list[str]|None=None)->int:
         # The bearer is read from an independently provisioned private file,
         # never copied into shell argv, a public environment variable or logs.
         from .credential import read_bearer
+        from ...model.admission.paths import create_default_root
         token=read_bearer(args.bearer_file)
         with activate_flight(model_root=args.model_root,state_dir=args.state_dir,
               tenant=args.tenant,subject=args.subject,worker_id=args.worker,
               n_ctx=args.context,max_new_tokens=args.max_new_tokens,
               n_threads=args.threads,gpu_layers=args.gpu_layers,
-              isolate_native=args.isolate_native) as app:
+              isolate_native=args.isolate_native,
+              capacity_root=args.capacity_root if args.capacity_root is not None else create_default_root(),
+              capacity_slots=args.capacity_slots,
+              capacity_budget_bytes=args.capacity_budget_bytes) as app:
             knowledge=KnowledgePlane(app.spine.db,app.spine.identity,initialize=False)
             policy=DaemonPolicy(poll_ms=args.poll_ms,
                                 shutdown_grace_ms=args.shutdown_grace_ms)
