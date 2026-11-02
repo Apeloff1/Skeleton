@@ -11,6 +11,7 @@ from typing import Any
 from .evidence import EvidenceStore, propose_evidence
 from .factions import FactionStore, propose_factions
 from .promises import PromiseStore, propose_promises, prove_promises
+from .context_journal import ContextStore
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
 )
@@ -20,6 +21,7 @@ RESULT_SCHEMA = "jeeves.world.tool_result.v1"
 
 TOOLS = {
     "world.proof": (),
+    "context.status": (),
     "promises.propose_preview": (
         "prompt", "promise_id", "title", "setup", "payoff",
         "trigger_choice", "resolve_choice", "required",
@@ -65,6 +67,8 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     world = WorldStore(root).read(req["world_id"])
     if name == "world.proof":
         payload = prove(world).as_dict()
+    elif name == "context.status":
+        payload = ContextStore(root).status(req["world_id"])
     elif name == "promises.propose_preview":
         payload = propose_promises(world, **args)
     elif name == "promises.inspect":
