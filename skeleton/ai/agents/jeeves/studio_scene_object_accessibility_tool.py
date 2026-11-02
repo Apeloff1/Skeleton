@@ -81,6 +81,7 @@ def execute_scene_object_accessibility_tool(
         "content_sha256": sha256(content.encode()).hexdigest(),
         "accessibility_digest": receipt["accessibility_digest"],
         "scene_id": receipt["scene_id"], "object_count": receipt["object_count"],
+        "scene_catalog_digest": receipt["scene_catalog_digest"],
         "source_object_coverage_complete": True,
         "sandbox_playable_html_sha256": receipt["sandbox_playable_html_sha256"],
         "file_write_performed": False,

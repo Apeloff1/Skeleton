@@ -68,6 +68,7 @@ def compile_scene_object_accessibility(
         raise StudioQuestError("stale scene accessibility source lease")
     authored = _request(request)
     scenes = scene_catalog(documents)
+    scene_catalog_digest = _digest(scenes)
     scene = next((row for row in scenes
                   if row["scene_id"] == authored["scene_id"]), None)
     if scene is None:
@@ -93,6 +94,7 @@ def compile_scene_object_accessibility(
         "schema": SCHEMA, "project_id": program.project_id,
         "source_digest": expected_source_digest,
         "scene_id": scene["scene_id"], "quest_stage": scene["quest_stage"],
+        "scene_catalog_digest": scene_catalog_digest,
         "object_count": len(rows), "objects": rows,
         "sandbox_playable_html_sha256": playable_sha256,
         "sandbox_playable_html_compiled": True,

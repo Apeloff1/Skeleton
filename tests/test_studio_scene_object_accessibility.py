@@ -52,11 +52,25 @@ def test_exact_canonical_scene_object_coverage_and_playable_compiler():
     assert receipt["sandbox_playable_html_compiled"] is True
     assert receipt["sandbox_playable_html_sha256"] == sha256(render_story_html(docs)).hexdigest()
     assert receipt["source_object_coverage_complete"] is True
+    assert len(receipt["scene_catalog_digest"]) == 64
     assert receipt["asset_rendered"] is False
     assert receipt["accessibility_device_verified"] is False
     assert receipt["release_certified"] is False
     assert replay_scene_object_accessibility(
         docs, receipt, authorized=True, expected_source_digest=source) == receipt
+
+
+
+def test_scene_catalog_drift_invalidates_saved_labels_even_if_quest_unchanged():
+    docs, source, scene, labels = fixture()
+    receipt = compile_labels(docs, source, scene, labels)
+    changed = copy.deepcopy(docs)
+    first = changed["scene"]["episode_plan"][0]
+    object_field = "objects" if "objects" in first else "interactive_objects"
+    first[object_field].append("new_unreviewed_object")
+    with pytest.raises(StudioQuestError):
+        replay_scene_object_accessibility(
+            changed, receipt, authorized=True, expected_source_digest=source)
 
 
 def test_missing_extra_and_forged_scene_object_labels_fail_closed():
