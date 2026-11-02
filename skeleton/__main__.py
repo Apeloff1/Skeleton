@@ -84,6 +84,11 @@ Commands:
     scene-market-hours  Play authored merchant schedules with verified saves
     scene-market-hours-play  Interactively play merchants with portable checkpoints
     scene-market-hours-accept  Verify end-to-end merchant gameplay acceptance
+    scene-market-contract-play  Play source-bound market contracts interactively
+    scene-market-contract-accept  Verify contract play, replay and portable export
+    scene-market-contract  Play authored earned market contracts offline
+    scene-market-contract-author  Edit and preview authored market contracts
+    scene-market-contract-route  Find bounded replay-proven contract routes
     scene-market-route-accept  Audit route, interactive play, editor and portable delivery
     scene-market-route  Find replay-proven earned market routes with bounded search
     scene-market-board  Inspect earned inventory, deliveries and verified hints

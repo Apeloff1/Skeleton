@@ -6,21 +6,28 @@ market party engine's focused tests.
 """
 from __future__ import annotations
 
-import importlib
-
 import pytest
 
 from skeleton.__main__ import main
+from skeleton.game.gameplay import (
+    scene_market_party,
+    scene_market_party_author,
+    scene_market_party_board,
+    scene_market_party_interactive,
+)
 
 
-@pytest.mark.parametrize(("command", "module_name"), [
-    ("scene-market-party", "scene_market_party"),
-    ("scene-market-party-author", "scene_market_party_author"),
-    ("scene-market-party-board", "scene_market_party_board"),
-    ("scene-market-party-play", "scene_market_party_interactive"),
-])
-def test_cooperative_market_commands_dispatch_to_real_cli(monkeypatch, command, module_name):
-    module = importlib.import_module("skeleton.game.gameplay." + module_name)
+_COMMAND_MODULES = {
+    "scene-market-party": scene_market_party,
+    "scene-market-party-author": scene_market_party_author,
+    "scene-market-party-board": scene_market_party_board,
+    "scene-market-party-play": scene_market_party_interactive,
+}
+
+
+@pytest.mark.parametrize("command", tuple(_COMMAND_MODULES))
+def test_cooperative_market_commands_dispatch_to_real_cli(monkeypatch, command):
+    module = _COMMAND_MODULES[command]
     received = []
 
     def cli(args):
