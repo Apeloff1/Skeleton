@@ -63,9 +63,6 @@ def test_rehydration_rejects_semantically_invalid_but_rehashed_records():
 
 
 def test_release_history_import_is_bounded_before_materializing():
-    from itertools import repeat
-    from skeleton.build.delivery.release_history import MAX_RELEASE_RECORDS
-
     from skeleton.build.delivery import release_history as module
     original = module.MAX_RELEASE_RECORDS
     module.MAX_RELEASE_RECORDS = 1
