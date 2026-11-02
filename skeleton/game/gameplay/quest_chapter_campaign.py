@@ -266,7 +266,7 @@ def import_campaign(payload: Any) -> dict[str, Any]:
     session = verify_campaign(obj["session"])
     if (session["source_digest"] != obj["source_digest"]
             or session["state_digest"] != obj["state_digest"]):
-        raise CombatSessionError("campaign bundle source/state mismatch")
+        raise CombatSessionError("campaign bundle source/state identity mismatch")
     return session
 
 

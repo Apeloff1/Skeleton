@@ -120,6 +120,13 @@ def test_bundle_rejects_corruption_and_wrong_source():
     ).dig({k: v for k, v in bad.items() if k != "checksum"})
     with pytest.raises(CombatSessionError, match="identity"):
         import_campaign(bad)
+    bad = copy.deepcopy(bundle)
+    bad["state_digest"] = "0" * 64
+    bad["checksum"] = __import__(
+        "skeleton.game.gameplay.flgb_gameplay_runtime", fromlist=["dig"]
+    ).dig({k: v for k, v in bad.items() if k != "checksum"})
+    with pytest.raises(CombatSessionError, match="identity"):
+        import_campaign(bad)
 
 
 def test_bounded_actions_and_terminal_replay():
