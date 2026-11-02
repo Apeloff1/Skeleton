@@ -50,8 +50,10 @@ def test_real_installed_game_and_private_save_replayed_without_release_claim(
     assert result["installed_game_and_private_save_reexecuted"] is True
     assert result["all_input_inodes_stable_during_inspection"] is False
     assert result["root_and_evidence_inodes_stable_during_inspection"] is True
-    assert result["nested_asset_inode_inventory_attested"] is False
-    assert "NESTED_ASSET_INODE_INVENTORY_UNATTESTED" in result["release_holds"]
+    assert result["nested_asset_inode_inventory_attested"] is True
+    assert result["nested_asset_inode_snapshots_equal"] is True
+    assert len(result["installed_tree_snapshot_sha256"]) == 64
+    assert "PERSISTENT_NESTED_ASSET_CUSTODY_UNQUALIFIED" in result["release_holds"]
     assert result["read_only"] is True
     assert result["files_published"] == 0
     assert result["action_count"] == 3
