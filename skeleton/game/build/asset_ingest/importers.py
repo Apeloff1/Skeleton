@@ -237,32 +237,69 @@ def _obj(data: bytes) -> dict[str, Any]:
                                      if ln.startswith("mtllib ") and len(ln.split()) > 1})}
 
 
-def _gltf_doc(doc: Any) -> dict[str, Any]:
-    if not isinstance(doc, dict) or not str(doc.get("asset", {}).get("version", "")).startswith("2"):
-        raise AssetImportError("gltf missing asset.version 2.x")
-    meshes = doc.get("meshes", [])
-    accessors = doc.get("accessors", [])
-    prims = 0
-    for m in meshes:
-        for p in m.get("primitives", []):
-            prims += 1
-            for ref in [*p.get("attributes", {}).values(), p.get("indices")]:
-                if ref is not None and not (isinstance(ref, int) and 0 <= ref < len(accessors)):
-                    raise AssetImportError(f"gltf accessor reference {ref!r} out of range")
-    uris = sorted({b["uri"] for b in doc.get("buffers", []) + doc.get("images", [])
-                   if isinstance(b, dict) and isinstance(b.get("uri"), str) and not b["uri"].startswith("data:")})
-    return {"meshes": len(meshes), "primitives": prims, "materials": len(doc.get("materials", [])),
-            "nodes": len(doc.get("nodes", [])), "animations": len(doc.get("animations", [])),
-            "external_refs": uris}
+def _strict_gltf_json(data: bytes) -> Any:
+    """Reject ambiguous JSON keys, nonfinite numbers and recursive input."""
+    def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise AssetImportError("gltf duplicate JSON key")
+            result[key] = value
+        return result
 
+    def reject_constant(value: str) -> None:
+        raise AssetImportError(f"gltf nonfinite JSON number: {value}")
 
-def _gltf(data: bytes) -> dict[str, Any]:
     try:
-        return _gltf_doc(json.loads(data))
-    except (ValueError, AttributeError, TypeError) as exc:
+        return json.loads(data, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+    except (ValueError, UnicodeDecodeError, RecursionError) as exc:
         if isinstance(exc, AssetImportError):
             raise
         raise AssetImportError("gltf is not valid json") from exc
+
+
+def _gltf_doc(doc: Any) -> dict[str, Any]:
+    if (type(doc) is not dict or type(doc.get("asset")) is not dict
+            or doc["asset"].get("version") != "2.0"):
+        raise AssetImportError("gltf missing asset.version 2.0")
+    collections = ("meshes", "accessors", "buffers", "images", "materials", "nodes", "animations")
+    for key in collections:
+        value = doc.get(key, [])
+        if type(value) is not list or len(value) > 8192:
+            raise AssetImportError(f"gltf {key} collection invalid or oversized")
+    meshes = doc.get("meshes", [])
+    accessors = doc.get("accessors", [])
+    prims = 0
+    for mesh in meshes:
+        if type(mesh) is not dict or type(mesh.get("primitives")) is not list:
+            raise AssetImportError("gltf mesh primitives invalid")
+        for primitive in mesh["primitives"]:
+            prims += 1
+            if prims > 8192 or type(primitive) is not dict:
+                raise AssetImportError("gltf primitive count or shape invalid")
+            attributes = primitive.get("attributes", {})
+            if type(attributes) is not dict or len(attributes) > 256:
+                raise AssetImportError("gltf primitive attributes invalid")
+            for ref in (*attributes.values(), primitive.get("indices")):
+                if ref is not None and not (type(ref) is int and 0 <= ref < len(accessors)):
+                    raise AssetImportError(f"gltf accessor reference {ref!r} out of range")
+    uris: set[str] = set()
+    for entry in (*doc.get("buffers", []), *doc.get("images", [])):
+        if type(entry) is not dict:
+            raise AssetImportError("gltf external resource shape invalid")
+        uri = entry.get("uri")
+        if uri is not None:
+            if type(uri) is not str or len(uri) > 4096:
+                raise AssetImportError("gltf external resource URI invalid")
+            if not uri.startswith("data:"):
+                uris.add(uri)
+    return {"meshes": len(meshes), "primitives": prims, "materials": len(doc.get("materials", [])),
+            "nodes": len(doc.get("nodes", [])), "animations": len(doc.get("animations", [])),
+            "external_refs": sorted(uris)}
+
+
+def _gltf(data: bytes) -> dict[str, Any]:
+    return _gltf_doc(_strict_gltf_json(data))
 
 
 def _glb(data: bytes) -> dict[str, Any]:
@@ -273,14 +310,17 @@ def _glb(data: bytes) -> dict[str, Any]:
     if length != len(data):
         raise AssetImportError("glb length mismatch (truncated)")
     clen, ctype = struct.unpack("<I4s", data[12:20])
-    if ctype != b"JSON" or 20 + clen > len(data):
-        raise AssetImportError("glb missing JSON chunk")
-    try:
-        return _gltf_doc(json.loads(data[20:20 + clen]))
-    except (ValueError, AttributeError, TypeError) as exc:
-        if isinstance(exc, AssetImportError):
-            raise
-        raise AssetImportError("glb JSON chunk invalid") from exc
+    if ctype != b"JSON" or clen % 4 or 20 + clen > len(data):
+        raise AssetImportError("glb missing or malformed JSON chunk")
+    offset = 20 + clen
+    if offset < len(data):
+        if len(data) - offset < 8:
+            raise AssetImportError("glb trailing unframed chunk")
+        binary_len, binary_type = struct.unpack("<I4s", data[offset:offset + 8])
+        if (binary_type != b"BIN\x00" or binary_len % 4
+                or offset + 8 + binary_len != len(data)):
+            raise AssetImportError("glb invalid trailing binary chunk")
+    return _gltf_doc(_strict_gltf_json(data[20:20 + clen]))
 
 
 def _wav(data: bytes) -> dict[str, Any]:

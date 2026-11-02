@@ -679,3 +679,31 @@ def test_obj_rejects_nonfinite_coordinates_before_manifest_publication(tmp_path,
     assert not report.ok and not report.imported
     assert not report.manifest.entries
     assert any(issue.code == "broken" for issue in report.issues)
+
+
+@pytest.mark.parametrize("payload", [
+    b'{"asset":{"version":"2.0","version":"2.0"}}',
+    b'{"asset":{"version":"2.0"},"materials":[NaN]}',
+    b'{"asset":{"version":"2.0"},"meshes":"not-an-array"}',
+    b'{"asset":{"version":"2.0"},"meshes":[{"primitives":[{"attributes":{"POSITION":true}}]}],"accessors":[{},{}]}',
+    b'{"asset":{"version":"2.0"},"meshes":[{"primitives":[7]}]}',
+])
+def test_gltf_rejects_ambiguous_or_invalid_source_transactionally(tmp_path, payload):
+    with pytest.raises(AssetImportError):
+        import_bytes("bad.gltf", payload)
+    (tmp_path / "good.gltf").write_bytes(GLTF)
+    (tmp_path / "bad.gltf").write_bytes(payload)
+    report = import_files(tmp_path, ["good.gltf", "bad.gltf"])
+    assert not report.ok
+    assert not report.imported and not report.manifest.entries
+
+
+def test_glb_rejects_unframed_and_unknown_trailing_chunks():
+    good = glb(GLTF)
+    assert import_bytes("good.glb", good).metadata["primitives"] == 1
+    for tail in (b"JUNK", struct.pack("<I4s", 4, b"EVIL") + b"data",
+                 struct.pack("<I4s", 8, b"BIN\x00") + b"data"):
+        forged = good + tail
+        forged = forged[:8] + struct.pack("<I", len(forged)) + forged[12:]
+        with pytest.raises(AssetImportError, match="chunk"):
+            import_bytes("forged.glb", forged)
