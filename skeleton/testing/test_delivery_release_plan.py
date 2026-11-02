@@ -25,3 +25,22 @@ def test_no_changes():
     with pytest.raises(DeliveryError):
         prepare(**kw)
     assert prepare(**kw, allow_empty=True).version == "1.0.0"
+
+def test_release_commit_provenance_is_unique_and_bounded(monkeypatch):
+    from skeleton.build.delivery import release_plan as module
+
+    kw = dict(product="s", current_version="1.0.0", source_commit="e" * 40,
+              artifacts=ART, date="2026-10-31")
+    for bad in (
+        [("not-a-sha", "feat: invalid")],
+        [("1" * 40, "feat: one"), ("1" * 40, "fix: duplicate")],
+        [("1" * 40, 42)],
+        [("1" * 40, "x" * (module.MAX_COMMIT_MESSAGE_CHARS + 1))],
+        [("1" * 40,)],
+    ):
+        with pytest.raises(DeliveryError):
+            prepare(**kw, commits=bad)
+    monkeypatch.setattr(module, "MAX_RELEASE_COMMITS", 1)
+    with pytest.raises(DeliveryError, match="inventory exceeds"):
+        prepare(**kw, commits=[("1" * 40, "feat: one"),
+                               ("2" * 40, "fix: two")])

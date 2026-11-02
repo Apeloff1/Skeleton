@@ -9,6 +9,9 @@ from skeleton.build.delivery._util import DeliveryError, require_sha1
 from skeleton.build.delivery.artifact_manifest import ArtifactEntry, ArtifactManifest, build_manifest
 from skeleton.build.delivery.changelog import Change, next_version, parse_commit, render
 
+MAX_RELEASE_COMMITS = 8192
+MAX_COMMIT_MESSAGE_CHARS = 10000
+
 
 @dataclass(frozen=True)
 class ReleaseCandidate:
@@ -34,7 +37,26 @@ def prepare(
     allow_empty: bool = False,
 ) -> ReleaseCandidate:
     require_sha1(source_commit, field="source_commit")
-    changes = tuple(c for c in (parse_commit(sha, msg) for sha, msg in commits) if c is not None)
+    # Commit evidence is not an arbitrary stream: bound it and reject
+    # duplicate or malformed identities before generating release provenance.
+    parsed: list[Change] = []
+    seen: set[str] = set()
+    for count, item in enumerate(commits, 1):
+        if count > MAX_RELEASE_COMMITS:
+            raise DeliveryError("release commit inventory exceeds bound")
+        if not isinstance(item, (tuple, list)) or len(item) != 2:
+            raise DeliveryError("release commit entry must contain sha and message")
+        sha, msg = item
+        require_sha1(sha, field="release commit sha")
+        if sha in seen:
+            raise DeliveryError("duplicate release commit identity")
+        seen.add(sha)
+        if type(msg) is not str or len(msg) > MAX_COMMIT_MESSAGE_CHARS:
+            raise DeliveryError("release commit message exceeds bound")
+        change = parse_commit(sha, msg)
+        if change is not None:
+            parsed.append(change)
+    changes = tuple(parsed)
     version = next_version(current_version, changes)
     if str(version) == current_version and not allow_empty:
         raise DeliveryError("no releasable changes since current version")
