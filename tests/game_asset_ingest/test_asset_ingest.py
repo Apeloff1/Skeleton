@@ -667,3 +667,25 @@ def test_duplicate_mesh_alias_reference_budget_is_global(tmp_path, monkeypatch):
     assert report.imported == []
     assert any("external reference count exceeds bound" in issue.detail
                for issue in report.issues)
+
+
+def test_explicit_batch_missing_sidecar_never_publishes_valid_asset(tmp_path):
+    """A missing dependency must invalidate even previously imported assets."""
+    (tmp_path / "a.png").write_bytes(png())
+    (tmp_path / "mesh.obj").write_bytes(OBJ)
+    report = import_files(tmp_path, ["a.png", "mesh.obj"])
+    assert not report.ok
+    assert any(issue.code == "missing_reference" for issue in report.issues)
+    assert report.manifest.entries == []
+    assert report.imported == [] and report.duplicates == []
+
+
+def test_explicit_batch_invalid_or_missing_path_is_transactional(tmp_path):
+    """Reject mixed batches rather than returning a publishable partial manifest."""
+    (tmp_path / "a.png").write_bytes(png())
+    for invalid in ("../outside.png", "missing.png", "notes.txt"):
+        report = import_files(tmp_path, ["a.png", invalid])
+        assert not report.ok
+        assert report.issues
+        assert report.manifest.entries == []
+        assert report.imported == [] and report.duplicates == []

@@ -242,6 +242,11 @@ def _import_from_fd(
             report.issues.append(ImportIssue(relative, _issue_code(exc), str(exc)))
     if not _check_references(root_fd, report, observed=observed):
         return ImportReport(AssetManifest(), issues=report.issues)
+    # A rejected input, including an unresolved sidecar, invalidates the
+    # entire explicit file batch. Consumers must never be able to publish a
+    # valid-looking partial manifest by overlooking report.ok.
+    if report.issues:
+        return ImportReport(AssetManifest(), issues=report.issues)
     return report
 
 
