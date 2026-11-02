@@ -1,0 +1,134 @@
+"""Human-readable terminal play for Lantern Quay with recoverable checkpoints.
+
+This interface calls the canonical gameplay step function; it never awards a
+victory from textual commands without a replay-proven dock delivery and choice.
+"""
+from __future__ import annotations
+
+from typing import Any, TextIO
+
+from .harbor_crafting import (
+    HarborError, canonical, demo_actions, export_bundle, initial_state,
+    normalize_action, step, validate_source, verify_bundle,
+)
+
+MAX_COMMAND_BYTES = 128
+
+
+def render(source: dict[str, Any], state: dict[str, Any]) -> str:
+    world = validate_source(source)
+    rows = [list(row) for row in world["map"]]
+    for resource in world["resources"]:
+        if state["stock"][resource["id"]] > 0:
+            x, y = resource["at"]
+            rows[y][x] = resource["id"][0].upper()
+    x, y = world["dock"]
+    rows[y][x] = "D"
+    x, y = state["npc_pos"]
+    rows[y][x] = "M"
+    x, y = state["pos"]
+    rows[y][x] = "@"
+    inventory = ",".join(
+        f"{item}:{qty}" for item, qty in sorted(state["inventory"].items())
+    ) or "empty"
+    return "\n".join("".join(row) for row in rows) + (
+        f"\ntick={state['tick']}/{world['max_ticks']}"
+        f" coins={state['coins']} reputation={state['reputation']}"
+        f" inventory={inventory} delivered={str(state['delivered']).lower()}"
+        f" ending={state['ending'] or 'none'}\n"
+    )
+
+
+def parse_command(line: str) -> dict[str, str] | str:
+    if not isinstance(line, str) or len(line.encode("utf-8")) > MAX_COMMAND_BYTES:
+        raise HarborError("terminal command exceeds byte limit")
+    parts = line.strip().lower().split()
+    if not parts:
+        raise HarborError("empty terminal command")
+    if parts == ["save"]:
+        return "save"
+    if parts == ["help"]:
+        return "help"
+    if parts == ["quit"]:
+        return "quit"
+    if len(parts) == 1:
+        simple = {
+            "north": {"op": "move", "direction": "north"},
+            "south": {"op": "move", "direction": "south"},
+            "east": {"op": "move", "direction": "east"},
+            "west": {"op": "move", "direction": "west"},
+            "gather": {"op": "gather"},
+            "deliver": {"op": "deliver"},
+            "wait": {"op": "wait"},
+            "signal": {"op": "choose", "choice": "signal"},
+            "shelter": {"op": "choose", "choice": "shelter"},
+        }
+        if parts[0] in simple:
+            return simple[parts[0]]
+    if len(parts) == 2 and parts[0] in ("craft", "trade"):
+        return normalize_action({
+            "op": parts[0], "recipe" if parts[0] == "craft" else "item": parts[1]
+        })
+    raise HarborError("unsupported terminal command")
+
+
+def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextIO) -> int:
+    world = validate_source(source)
+    state = initial_state(world)
+    actions: list[dict[str, str]] = []
+    max_commands = world["max_ticks"] * 4 + 16
+    output_stream.write("LANTERN QUAY | north south east west gather craft ID trade ID deliver signal shelter wait save quit\n")
+    output_stream.write(render(world, state))
+    for _ in range(max_commands):
+        line = input_stream.readline(MAX_COMMAND_BYTES + 2)
+        if line == "":
+            output_stream.write("EOF: no victory; replay-verifiable checkpoint follows\n")
+            output_stream.write("CHECKPOINT " + canonical(export_bundle(world, actions)).decode("utf-8") + "\n")
+            return 2
+        try:
+            command = parse_command(line)
+            if command == "help":
+                output_stream.write("Move, gather, craft, trade, deliver and choose an ending. save exports a checkpoint.\n")
+                continue
+            if command == "save":
+                output_stream.write("CHECKPOINT " + canonical(export_bundle(world, actions)).decode("utf-8") + "\n")
+                continue
+            if command == "quit":
+                output_stream.write("QUIT: no victory; replay-verifiable checkpoint follows\n")
+                output_stream.write("CHECKPOINT " + canonical(export_bundle(world, actions)).decode("utf-8") + "\n")
+                return 2
+            updated = step(world, state, command)
+        except HarborError as exc:
+            output_stream.write("REJECTED " + str(exc) + "\n")
+            continue
+        actions.append(command)
+        state = updated
+        output_stream.write(render(world, state))
+        if state["ending"] is not None:
+            bundle = export_bundle(world, actions, require_win=True)
+            if verify_bundle(bundle, require_win=True) != state:
+                raise HarborError("interactive replay divergence")
+            output_stream.write("VICTORY " + state["ending"] + " " + bundle["terminal_digest"] + "\n")
+            output_stream.write("CHECKPOINT " + canonical(bundle).decode("utf-8") + "\n")
+            return 0
+    output_stream.write("COMMAND_BUDGET_EXHAUSTED: no victory; checkpoint follows\n")
+    output_stream.write("CHECKPOINT " + canonical(export_bundle(world, actions)).decode("utf-8") + "\n")
+    return 2
+
+
+def scripted_demo_commands() -> str:
+    """Human input equivalent of the original deterministic victory fixture."""
+    lines: list[str] = []
+    for action in demo_actions():
+        op = action["op"]
+        if op == "move":
+            lines.append(action["direction"])
+        elif op == "craft":
+            lines.append("craft " + action["recipe"])
+        elif op == "trade":
+            lines.append("trade " + action["item"])
+        elif op == "choose":
+            lines.append(action["choice"])
+        else:
+            lines.append(op)
+    return "\n".join(lines) + "\n"

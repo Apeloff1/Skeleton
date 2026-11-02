@@ -11,6 +11,7 @@ from .harbor_crafting import (
 )
 from .harbor_crafting_authoring import author_revision, verify_revision
 from .harbor_crafting_planner import solve, verify_plan
+from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
 )
@@ -37,7 +38,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -53,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
+        if args.command == "play-live":
+            return play_live(load_source(Path(args.source)), sys.stdin, sys.stdout)
         if args.command == "verify-plan":
             state = verify_plan(_required_json(args.plan, "plan"))
             output = {"verified": True, "state": state}
