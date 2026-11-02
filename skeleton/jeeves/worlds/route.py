@@ -11,7 +11,7 @@ import html
 import os
 from typing import Any
 
-from .world_canon import (
+from .bundle import _artifact_read\nfrom .world_canon import (
     CanonError, MAX_STATES, WorldStore, _id, _keys, _list, _text,
     canonical, compile_html, digest, prove, strict_json,
 )
@@ -359,7 +359,7 @@ class RouteStore:
                 if receipt != expected:
                     raise CanonError("route_receipt_mismatch")
                 for name, payload in zip(names[:3], artifacts):
-                    actual = self.worlds._read(fd, name)
+                    actual = _artifact_read(fd, name)
                     if actual != payload:
                         raise CanonError("route_artifact_mismatch", name)
                 return expected

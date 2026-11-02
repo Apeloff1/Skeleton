@@ -12,7 +12,7 @@ import html
 import os
 from typing import Any
 
-from .timeline import _reachable_flags
+from .bundle import _artifact_read\nfrom .timeline import _reachable_flags
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _list, _text,
     canonical, digest, prove, strict_json,
@@ -59,7 +59,7 @@ def validate_cast(data: Any, world: Any) -> dict[str, Any]:
             raise CanonError("duplicate_actor", actor_id)
         actors[actor_id] = actor
         _text(actor["name"], "actor.name", 200)
-        if actor["role"] not in ROLES:
+        if type(actor["role"]) is not str or actor["role"] not in ROLES:
             raise CanonError("invalid_actor_role", actor_id)
         presence = _ordered_ids(actor["scenes"], "actor.scenes", 128)
         if not presence or not set(presence) <= scenes:
@@ -387,7 +387,7 @@ class CastStore:
                 if receipt != expected:
                     raise CanonError("cast_receipt_mismatch")
                 for name, content in zip(names[:2], contents):
-                    if self.worlds._read(fd, name) != content:
+                    if _artifact_read(fd, name) != content:
                         raise CanonError("cast_artifact_mismatch", name)
                 return expected
             finally:

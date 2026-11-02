@@ -239,3 +239,15 @@ def test_cli_end_to_end_reviewed_route(tmp_path, capsys):
     assert receipt["world_id"] == "lantern"
     assert run(args + ["verify", "--world-id", "lantern"]) == 0
     assert json.loads(capsys.readouterr().out)["receipt"] == receipt
+
+def test_large_compiled_artifact_reader_is_bounded_separately_from_source(tmp_path):
+    from skeleton.jeeves.worlds.bundle import _artifact_read
+    import os
+    name = "large.route.playable.html"
+    payload = b"x" * 600000
+    (tmp_path / name).write_bytes(payload)
+    fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        assert _artifact_read(fd, name) == payload
+    finally:
+        os.close(fd)

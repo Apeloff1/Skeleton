@@ -237,3 +237,10 @@ def test_cli_author_edit_review_compile_verify(tmp_path, capsys):
     receipt = json.loads(capsys.readouterr().out)["receipt"]
     assert run(args + ["verify", "--world-id", "cinder"]) == 0
     assert json.loads(capsys.readouterr().out)["receipt"] == receipt
+
+def test_malformed_actor_role_list_is_a_typed_failure():
+    source = world()
+    data = cast()
+    data["characters"][0]["role"] = ["npc"]
+    with pytest.raises(CanonError, match="invalid_actor_role"):
+        validate_cast(data, source)
