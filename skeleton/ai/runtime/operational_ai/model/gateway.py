@@ -56,14 +56,17 @@ class ModelGateway:
             with self.admission.slot(deadline_ns=started+limits.deadline_ms*1_000_000,cancel=cancel):
                 result=self.backend.generate(messages,max_output_tokens=limits.output_tokens,
                                              seed=seed,temperature=float(temperature))
-            # Invalid native receipts, time-budget violations and identity
-            # changes are backend failures too: the breaker must observe them.
+            # Native output is untrusted until every receipt constraint passes.
+            # A mismatched digest, budget overrun or failed deadline is a model
+            # failure and MUST count toward the breaker, not a silent success.
             ledger.deadline()
             if not isinstance(result,Generated):
                 raise ContractViolation("model backend supplied no verifiable generation receipt")
             if (result.model_digest!=self.backend.model_digest or
                 result.tokenizer_digest!=self.backend.tokenizer_digest):
                 raise ContractViolation("model/tokenizer identity mismatch after inference")
+            if result.output_digest!=sha256(result.text.encode("utf-8")):
+                raise ContractViolation("native output digest does not match generated text")
             if result.generated_tokens>limits.output_tokens:
                 raise ContractViolation("model output token budget exceeded")
             ledger.charge(output_bytes=len(result.text.encode("utf-8")),
@@ -71,7 +74,7 @@ class ModelGateway:
             if result.prompt_tokens+result.generated_tokens>limits.context_tokens:
                 raise ContractViolation("native context-token overrun")
             ledger.charge(context_tokens=result.prompt_tokens+result.generated_tokens)
-        except BaseException:
+        except Exception:
             self.circuit.failure()
             raise
         self.circuit.success()

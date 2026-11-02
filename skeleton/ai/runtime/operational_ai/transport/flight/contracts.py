@@ -9,6 +9,10 @@ PROTOCOL={
   'schema':SCHEMA,
   'transport':'loopback-bearer-only',
   'required_model':'approved-local-native-GGUF',
+  'event_stream':{'method':'GET','route':'/v2/jobs/{job_id}/events',
+                  'authentication':'private-bearer-and-hmac-job-cursor',
+                  'max_events':32,'max_wait_ms':2000,
+                  'delivery':'finite-resumable-SSE-verified-status-only'},
   'operations':{
     'create':['session_id'],
     'submit':['job_id','session_id','request_id','question'],
