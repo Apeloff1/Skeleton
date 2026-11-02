@@ -12,10 +12,11 @@ def test_secret_refs_are_allowed():
 @pytest.mark.parametrize(
     "value,rule",
     [
+        # Assemble synthetic secret-shaped inputs at runtime; never commit literal credentials.
         ("AKIA" + "A" * 16, "aws-access-key"),
         ("ghp_" + "a" * 36, "github-token"),
-        ("-----BEGIN RSA PRIVATE KEY-----", "private-key"),
-        ("postgres://user:pw@host/db", "url-credentials"),
+        ("".join(("-----BEGIN ", "RSA ", "PRIVATE KEY-----")), "private-key"),
+        ("".join(("postgres://", "user:", "pw@", "host/db")), "url-credentials"),
     ],
 )
 def test_detects_known_patterns(value, rule):
