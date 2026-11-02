@@ -146,6 +146,48 @@ class CpuCapacityGuardTests(unittest.TestCase):
                          "duplicate_stream")
         self.assertTrue(self.guard.release(key))
 
+    def test_fair_cycle_is_all_or_nothing(self):
+        self.warm()
+        other = CpuCapacityRequest("owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
+        result = self.guard.reserve_fair_cycle((self.request, other),
+                                               quantum_tokens=8)
+        self.assertEqual(result["state"], "reserved")
+        self.assertEqual(len(result["reservations"]), 2)
+        self.assertEqual(result["reserved_tokens"], 16)
+        self.assertFalse(result["is_execution_lease"])
+        for receipt in result["reservations"]:
+            self.assertTrue(self.guard.release(receipt["reservation_id"]))
+
+    def test_fair_cycle_rejects_partial_capacity(self):
+        self.warm()
+        other = CpuCapacityRequest("owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
+        held = self.guard.reserve_fair_cycle((self.request, other),
+                                             quantum_tokens=4)
+        self.assertEqual(held["reason"], "fair_cycle_budget_or_duplicate")
+        self.assertEqual(held["reservations"], [])
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_fair_cycle_rolls_back_on_stale_head(self):
+        self.warm()
+        other = CpuCapacityRequest("owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
+        self.heads.compare_window.side_effect = [
+            self.heads.compare_window.return_value,
+            LongContextSpoolError("stale head"),
+        ]
+        result = self.guard.reserve_fair_cycle((self.request, other),
+                                               quantum_tokens=8)
+        self.assertEqual(result["reason"], "fair_cycle_custody_unverified")
+        self.assertEqual(result["reservations"], [])
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_fair_cycle_rejects_duplicate_and_wrong_type(self):
+        with self.assertRaisesRegex(LongContextSpoolError, "duplicate fair"):
+            self.guard.reserve_fair_cycle((self.request, self.request))
+        with self.assertRaises(LongContextSpoolError):
+            self.guard.reserve_fair_cycle([self.request])
+        with self.assertRaises(LongContextSpoolError):
+            self.guard.reserve_fair_cycle((self.request, object()))
+
     def test_clock_regression_and_fork(self):
         self.warm()
         self.guard.reserve(self.request)
