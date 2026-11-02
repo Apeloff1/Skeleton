@@ -76,6 +76,7 @@ def execute_story_reading_bookmark_tool(
         "bookmark_digest": receipt["bookmark_digest"],
         "stage_index": receipt["stage_index"],
         "stage_count": receipt["stage_count"],
+        "sandbox_playable_html_sha256": receipt["sandbox_playable_html_sha256"],
         "reading_position_only": True, "quest_action_committed": False,
         "file_write_performed": False, "release_certified": False,
     }

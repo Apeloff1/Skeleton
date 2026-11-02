@@ -15,7 +15,7 @@ from typing import Any, Mapping
 from .studio_ecosystem_quest import StudioQuestError, compile_quest_program
 from .studio_ecosystem_scene_schedule import _canonical, _digest, _lease
 from .studio_ecosystem_story_accessibility import compile_story_accessibility
-from .studio_ecosystem_story_html import story_source
+from .studio_ecosystem_story_html import story_source, render_story_html
 
 SCHEMA = "skeleton.game_builder.story_reading_bookmark.v1"
 REQUEST_SCHEMA = "skeleton.game_builder.story_reading_bookmark_request.v1"
@@ -76,6 +76,8 @@ def compile_story_reading_bookmark(
             or story["project_id"] != program.project_id
             or accessible["project_id"] != program.project_id):
         raise StudioQuestError("reading bookmark source owners diverged")
+    # Compile the actual offline playable browser story, not a synthetic link.
+    playable_sha256 = sha256(render_story_html(documents)).hexdigest()
     stages = story["stages"]
     if type(stages) is not list or not 1 <= len(stages) <= _MAX_STAGES:
         raise StudioQuestError("reading bookmark stage count exceeds bound")
@@ -100,6 +102,8 @@ def compile_story_reading_bookmark(
         "schema": SCHEMA, "project_id": program.project_id,
         "source_digest": expected_source_digest,
         "accessibility_manifest_digest": accessible["manifest_digest"],
+        "sandbox_playable_html_sha256": playable_sha256,
+        "sandbox_playable_html_compiled": True,
         "stage_count": len(stages), "stage_index": index,
         "reader_note": fields["reader_note"], "stage": excerpt,
         "previous_stage_id": before, "next_stage_id": after,

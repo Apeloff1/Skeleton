@@ -10,6 +10,7 @@ import pytest
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_ecosystem_story_html import render_story_html
 from skeleton.ai.game_builder.studio_ecosystem_story_accessibility import (
     compile_story_accessibility,
 )
@@ -44,6 +45,8 @@ def test_timing_edits_preserve_all_canonical_words_and_replay():
     assert first == second
     assert first["caption_count"] == original["caption_count"]
     assert first["canonical_webvtt_sha256"] == original["webvtt_sha256"]
+    assert first["sandbox_playable_html_compiled"] is True
+    assert first["sandbox_playable_html_sha256"] == sha256(render_story_html(docs)).hexdigest()
     assert first["source_digest"] == original["source_digest"]
     assert first["canonical_words_preserved"] is True
     assert first["audio_sync_verified"] is False

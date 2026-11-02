@@ -77,6 +77,7 @@ def execute_caption_timing_tool(
         "content_sha256": sha256(content.encode("utf-8")).hexdigest(),
         "edit_digest": receipt["edit_digest"],
         "canonical_manifest_digest": receipt["canonical_manifest_digest"],
+        "sandbox_playable_html_sha256": receipt["sandbox_playable_html_sha256"],
         "operator_changed_count": receipt["operator_changed_count"],
         "caption_count": receipt["caption_count"],
         "synthetic_duration_ms": receipt["synthetic_duration_ms"],

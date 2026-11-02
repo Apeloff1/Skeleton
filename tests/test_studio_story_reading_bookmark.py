@@ -9,7 +9,8 @@ import pytest
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
-from skeleton.ai.game_builder.studio_ecosystem_story_html import story_source
+from skeleton.ai.game_builder.studio_ecosystem_story_html import story_source, render_story_html
+from hashlib import sha256
 from skeleton.ai.game_builder.studio_story_reading_bookmark import (
     REQUEST_SCHEMA as BOOKMARK_REQUEST_SCHEMA,
     compile_story_reading_bookmark, replay_story_reading_bookmark,
@@ -47,6 +48,8 @@ def test_reader_bookmark_replays_canonical_stage_without_committing_quest():
     first = compile_bookmark(docs, story)
     assert first == compile_bookmark(docs, story)
     assert first["stage_count"] == len(story["stages"])
+    assert first["sandbox_playable_html_compiled"] is True
+    assert first["sandbox_playable_html_sha256"] == sha256(render_story_html(docs)).hexdigest()
     assert first["stage_index"] == 0
     assert first["previous_stage_id"] is None
     assert first["stage"]["authored_goal"] == story["stages"][0]["authored_goal"]

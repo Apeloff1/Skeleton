@@ -17,6 +17,7 @@ from .studio_ecosystem_scene_schedule import _canonical, _digest, _lease
 from .studio_ecosystem_story_accessibility import (
     MAX_OUTPUT_BYTES, compile_story_accessibility,
 )
+from .studio_ecosystem_story_html import render_story_html
 
 SCHEMA = "skeleton.game_builder.caption_timing_edit.v1"
 MAX_EDITS = 64
@@ -117,6 +118,8 @@ def compile_caption_timing_edit(
             or original["project_id"] != program.project_id):
         raise StudioQuestError("caption accessibility source lease diverged")
     cues = _canonical_cues(original["webvtt"], original["caption_count"])
+    # Bind caption edits to the real canonical offline playable story artifact.
+    playable_sha256 = sha256(render_story_html(documents)).hexdigest()
     timings = _validated_edits(edits, len(cues))
     cursor = 0
     rows: list[dict[str, object]] = []
@@ -151,6 +154,8 @@ def compile_caption_timing_edit(
         "source_digest": expected_source_digest,
         "canonical_manifest_digest": original["manifest_digest"],
         "canonical_webvtt_sha256": original["webvtt_sha256"],
+        "sandbox_playable_html_sha256": playable_sha256,
+        "sandbox_playable_html_compiled": True,
         "edits_ms": timings, "operator_changed_count": changed,
         "caption_count": len(cues), "synthetic_duration_ms": cursor,
         "timeline": rows, "webvtt": webvtt,
