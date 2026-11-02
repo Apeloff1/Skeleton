@@ -1,0 +1,11 @@
+"""Econ eco_prime 0766.
+"""
+from __future__ import annotations
+
+ID = "econ_eco_prime_0766"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "econ", "index": 766}
+
+def activate(context: str = "") -> dict:
+    return {"ok": True, "id": ID, "context": context[:100], "active": True}
