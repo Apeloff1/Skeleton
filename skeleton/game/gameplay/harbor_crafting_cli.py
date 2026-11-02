@@ -16,6 +16,7 @@ from .harbor_crafting_mission_authoring import author_mission_revision, verify_m
 from .harbor_crafting_mission_branches import mission_branch_report, verify_mission_branch_report
 from .harbor_crafting_mission_compare import compare_mission_revision, verify_mission_comparison
 from .harbor_crafting_package import build_package, verify_package, play_package, verify_package_play
+from .harbor_crafting_market import market_report, verify_market_report, market_checkpoint, market_resume, market_futures, verify_market_futures
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -44,7 +45,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -70,7 +71,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "package-verify-play":
+        if args.command == "verify-market-futures":
+            output = {"verified": True, "branches": verify_market_futures(
+                _required_json(args.report, "report"))}
+        elif args.command == "market-futures":
+            output = market_futures(_required_json(args.bundle, "bundle"))
+        elif args.command == "market-checkpoint":
+            if args.tick is None:
+                raise HarborError("--tick is required for market-checkpoint")
+            output = market_checkpoint(_required_json(args.report, "report"), args.tick)
+        elif args.command == "market-resume":
+            if not args.expected_terminal_digest:
+                raise HarborError("--expected-terminal-digest is required for market-resume")
+            output = market_resume(
+                _required_json(args.report, "report"), _required_json(args.actions, "actions"),
+                expected_terminal_digest=args.expected_terminal_digest, require_win=args.require_win)
+        elif args.command == "verify-market":
+            output = {"verified": True, "totals": verify_market_report(
+                _required_json(args.report, "report"))}
+        elif args.command == "market-report":
+            output = market_report(_required_json(args.bundle, "bundle"))
+        elif args.command == "package-verify-play":
             output = {"verified": True, **verify_package_play(
                 _required_json(args.play, "play"), require_all=args.require_all)}
         elif args.command == "package-play":
@@ -136,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "play-live":
             return play_live(load_source(Path(args.source)), sys.stdin, sys.stdout)
-        if args.command == "verify-plan":
+        elif args.command == "verify-plan":
             state = verify_plan(_required_json(args.plan, "plan"))
             output = {"verified": True, "state": state}
         elif args.command == "solve":
