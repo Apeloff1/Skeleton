@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+import unicodedata
 from typing import Any, Mapping, Union
 
 from .plurals import PLURAL_CATEGORIES, categories_for, is_rtl, plural_category, wrap_bidi
@@ -201,17 +202,23 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
     """Render ``text`` for ``locale``. ``isolate`` wraps values in bidi isolates."""
     rtl = is_rtl(locale)
 
-    def val(v: Any) -> str:
+    def safe_arg(v: Any) -> str:
         if type(v) not in (str, int, float, bool):
             raise MessageError("unsupported message argument type")
         if type(v) is int and abs(v) > 10**12:
             raise MessageError("message numeric argument exceeds bound")
-        if type(v) is float and not math.isfinite(v):
-            raise MessageError("message numeric argument must be finite")
-        s = str(v)
-        if len(s) > MAX_ARG_CHARS:
+        if type(v) is float and (not math.isfinite(v) or abs(v) > 10**12):
+            raise MessageError("message numeric argument must be bounded and finite")
+        value = str(v)
+        if len(value) > MAX_ARG_CHARS:
             raise MessageError("message argument exceeds text bound")
-        return wrap_bidi(s) if isolate or (rtl and s.isascii() and s.strip()) else s
+        if any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} for ch in value):
+            raise MessageError("message argument contains unsafe control characters")
+        return value
+
+    def val(v: Any) -> str:
+        value = safe_arg(v)
+        return wrap_bidi(value) if isolate or (rtl and value.isascii() and value.strip()) else value
 
     def render(nodes, number=None) -> str:
         out: list[str] = []
@@ -245,7 +252,7 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
                     key = exact if exact in n.options else plural_category(locale, v)
                     append_bounded(render(n.options.get(key, n.options["other"]), v))
                 else:
-                    append_bounded(render(n.options.get(str(v), n.options["other"]), number))
+                    append_bounded(render(n.options.get(safe_arg(v), n.options["other"]), number))
         return "".join(out)
 
     return render(parse_message(text))

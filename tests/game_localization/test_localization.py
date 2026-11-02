@@ -189,3 +189,22 @@ def test_locale_tags_reject_noncanonical_separators_and_unicode_controls():
             plural_category(bad, 1)
     assert is_rtl("pa-Arab")
     assert not is_rtl("en_US")
+
+
+def test_untrusted_message_arguments_cannot_inject_controls_or_selectors():
+    """Interpolated text and select keys must share the same bounded contract."""
+    for value in ("trusted\x1b[31m", "abc\u202ereversed", "abc\u2066isolated",
+                  "line\nforged", "x" * 1025):
+        with pytest.raises(MessageError, match="unsafe control|text bound"):
+            format_message("Hello {name}", {"name": value}, "en")
+        with pytest.raises(MessageError, match="unsafe control|text bound"):
+            format_message("{name, select, other {ok}}", {"name": value}, "en")
+
+    class UntrustedSelector:
+        def __str__(self):
+            raise AssertionError("must not invoke arbitrary selector conversion")
+
+    with pytest.raises(MessageError, match="unsupported"):
+        format_message("{name, select, other {ok}}", {"name": UntrustedSelector()}, "en")
+    assert format_message("{name, select, safe {yes} other {no}}",
+                          {"name": "safe"}, "en") == "yes"
