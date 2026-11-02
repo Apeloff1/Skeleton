@@ -184,3 +184,26 @@ def test_cli_source_to_private_bundle_and_verify(monkeypatch, tmp_path, capsys):
     result = json.loads(capsys.readouterr().out)
     assert result["verified_existing_bundle"] is True
     assert result["file_write_performed"] is False
+
+def test_playable_publication_rolls_back_on_directory_fsync_failure(
+    monkeypatch, tmp_path,
+):
+    import stat
+    docs = source()
+    catalog(monkeypatch, docs)
+    report = ready(docs)
+    manifest, bundle = playable.compile_quest_readiness_playable(
+        docs, report, authorized=True)
+    original = playable.os.fsync
+
+    def fail_directory(fd):
+        if stat.S_ISDIR(playable.os.fstat(fd).st_mode):
+            raise OSError("simulated directory durability failure")
+        return original(fd)
+
+    monkeypatch.setattr(playable.os, "fsync", fail_directory)
+    with pytest.raises(OSError, match="durability failure"):
+        playable.publish_quest_readiness_playable(
+            docs, report, manifest, bundle, tmp_path, authorized=True)
+    assert not (tmp_path / playable.FILENAME).exists()
+    assert not list(tmp_path.iterdir())

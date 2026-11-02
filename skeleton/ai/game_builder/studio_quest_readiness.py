@@ -243,7 +243,11 @@ def publish_quest_readiness(
             os.close(out)
         os.link(temporary, FILENAME, src_dir_fd=fd, dst_dir_fd=fd,
                 follow_symlinks=False)
-        os.fsync(fd)
+        try:
+            os.fsync(fd)
+        except OSError:
+            os.unlink(FILENAME, dir_fd=fd)
+            raise
     finally:
         try:
             if created:

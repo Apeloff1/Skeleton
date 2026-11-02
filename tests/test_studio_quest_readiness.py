@@ -178,3 +178,23 @@ def test_private_restore_rejects_duplicate_keys_and_world_readable(tmp_path):
         restore_quest_readiness(
             docs, tmp_path, authorized=True,
             expected_source_digest=leases(docs)["expected_source_digest"])
+
+def test_publication_rolls_back_final_link_on_directory_fsync_failure(
+    tmp_path, monkeypatch,
+):
+    import stat
+    from skeleton.ai.game_builder import studio_quest_readiness as owner
+    docs = source()
+    report = compile_quest_readiness(docs, budget(), **leases(docs))
+    original = owner.os.fsync
+
+    def fail_directory(fd):
+        if stat.S_ISDIR(owner.os.fstat(fd).st_mode):
+            raise OSError("simulated directory durability failure")
+        return original(fd)
+
+    monkeypatch.setattr(owner.os, "fsync", fail_directory)
+    with pytest.raises(OSError, match="durability failure"):
+        publish_quest_readiness(docs, report, tmp_path, authorized=True)
+    assert not (tmp_path / FILENAME).exists()
+    assert not list(tmp_path.iterdir())
