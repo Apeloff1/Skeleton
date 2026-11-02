@@ -221,3 +221,47 @@ def test_offline_migration_editor_rejects_symlink_and_duplicate_json(tmp_path):
     with pytest.raises(OSError):
         import_quest_migration_editor_export(
             docs, baseline, link, **leases)
+
+def test_real_catalog_migration_cli_persistence_roundtrip(tmp_path, capsys):
+    from scripts.studio_quest_revision_migration_cli import main
+    docs, plan, leases, _ = fixture()
+    request = tmp_path / "migration-plan.json"
+    request.write_text(json.dumps(plan))
+    os.chmod(request, 0o600)
+    base = ["--project", PROJECT, "--expected-source",
+            leases["expected_source_digest"], "--expected-session",
+            leases["expected_initial_session_digest"]]
+    assert main(base + ["--plan-file", str(request),
+                        "--publish", str(tmp_path)]) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["file_write_performed"] is True
+    assert first["migration"]["status"] == "requires_explicit_remap"
+    assert first["migration"]["release_certified"] is False
+    assert main(base + ["--restore", str(tmp_path)]) == 0
+    restored = json.loads(capsys.readouterr().out)
+    assert restored["migration"] == first["migration"]
+    assert restored["file_write_performed"] is False
+
+
+def test_migration_editor_oversize_hardlink_and_wrong_lease(tmp_path):
+    from skeleton.ai.game_builder.studio_quest_revision_migration_editor import (
+        import_quest_migration_editor_export,
+    )
+    docs, plan, leases, _ = fixture()
+    baseline = compile_quest_revision_migration(docs, plan, **leases)
+    path = tmp_path / "oversize.json"
+    path.write_bytes(b"{" + b"x" * 32768 + b"}")
+    os.chmod(path, 0o600)
+    with pytest.raises(StudioQuestError):
+        import_quest_migration_editor_export(
+            docs, baseline, path, **leases)
+    path.write_text("{}")
+    other = tmp_path / "hardlink.json"
+    os.link(path, other)
+    with pytest.raises(StudioQuestError):
+        import_quest_migration_editor_export(
+            docs, baseline, path, **leases)
+    with pytest.raises(StudioQuestError):
+        import_quest_migration_editor_export(
+            docs, baseline, path,
+            **{**leases, "expected_source_digest": "0" * 64})

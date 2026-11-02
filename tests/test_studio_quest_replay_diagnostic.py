@@ -272,3 +272,59 @@ def test_offline_editor_import_rejects_duplicate_and_symlink(tmp_path):
     with pytest.raises(OSError):
         import_replay_diagnostic_editor_export(
             docs, baseline, link, **leases(docs))
+
+def test_real_catalog_cli_and_jeeves_end_to_end(capsys):
+    from scripts.studio_quest_replay_diagnostic_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
+    from skeleton.ai.agents.jeeves.studio_quest_replay_diagnostic_tool import (
+        execute_quest_replay_diagnostic_tool,
+    )
+    project = "studio_puzzle_expedition_copper_mesa"
+    docs = read_blueprint(project)
+    leases = {
+        "expected_source_digest": compile_quest_program(docs).source_digest,
+        "expected_initial_session_digest": start_quest(
+            docs, authorized=True).digest,
+    }
+    assert main(["--project", project, "--expected-source",
+                 leases["expected_source_digest"], "--expected-session",
+                 leases["expected_initial_session_digest"], "--prompt"]) == 0
+    cli = json.loads(capsys.readouterr().out)
+    assert cli["diagnostic"]["source_digest"] == leases["expected_source_digest"]
+    assert cli["diagnostic"]["canonical_quest_replay_verified"] is True
+    assert cli["release_certified"] is False
+    authoring = plan([], target=compile_quest_program(docs).endings[0][0])
+    request = {
+        "schema": REQUEST_SCHEMA, "project_id": project,
+        "authoring": authoring, **leases,
+    }
+    direct = execute_quest_replay_diagnostic_tool(request, authorized=True)
+    routed = route_world_tool(
+        {"tool": "studio_original_quest_replay_diagnostic",
+         "arguments": request}, authorized=True)
+    assert direct == routed["result"]
+    assert routed["result"]["detail"]["diagnostic_digest"]
+    assert routed["file_write_performed"] is False
+
+
+def test_editor_import_oversize_hardlink_and_control_character(tmp_path):
+    from skeleton.ai.game_builder.studio_quest_replay_diagnostic_editor import (
+        import_replay_diagnostic_editor_export,
+    )
+    docs = source()
+    baseline = compile_replay_diagnostic(docs, plan([]), **leases(docs))
+    path = tmp_path / "oversize.json"
+    path.write_bytes(b"{" + b"x" * 32768 + b"}")
+    os.chmod(path, 0o600)
+    with pytest.raises(StudioQuestError):
+        import_replay_diagnostic_editor_export(
+            docs, baseline, path, **leases(docs))
+    path.write_text("{}")
+    other = tmp_path / "hardlink.json"
+    os.link(path, other)
+    with pytest.raises(StudioQuestError):
+        import_replay_diagnostic_editor_export(
+            docs, baseline, path, **leases(docs))
+    with pytest.raises(StudioQuestError):
+        compile_replay_diagnostic(
+            docs, plan([["arrival", "bad\nchoice"]]), **leases(docs))
