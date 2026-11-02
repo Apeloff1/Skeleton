@@ -85,7 +85,11 @@ def _response_payload(result: Any) -> Any:
     if response is None:
         return None
     structured = getattr(response, "structured", None)
-    return dict(structured) if structured else getattr(response, "text", None)
+    if structured:
+        if not isinstance(structured, Mapping) or len(structured) > 64:
+            raise PlanParseError("structured model response exceeds bounded shape")
+        return dict(structured)
+    return getattr(response, "text", None)
 
 
 class ModelPlanner:
@@ -137,9 +141,12 @@ class ModelPlanner:
             return fallback(receipt, f"route:{receipt.status}")
         try:
             proposal = parse_model_plan(_response_payload(call.result))
-        except PlanParseError as exc:
-            return fallback(receipt, f"parse:{exc}")
-        spec, violations = guard_proposal(compiled, proposal)
+            spec, violations = guard_proposal(compiled, proposal)
+        except Exception as exc:
+            # Provider-controlled structured accessors and guard inputs can
+            # raise arbitrary ordinary exceptions. Never leak their payload
+            # through a receipt or let them abort the deterministic fallback.
+            return fallback(receipt, f"parse:{type(exc).__name__}")
         if spec["spec_id"] == compiled["spec_id"]:
             return fallback(receipt, "no_change", violations)
         return PlanOutcome(text, compiled, spec, "model", receipt, violations)

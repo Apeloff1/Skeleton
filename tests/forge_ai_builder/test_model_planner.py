@@ -127,3 +127,45 @@ def test_provider_grant_rejects_scalar_string_and_unbounded_subject():
     for subject in ("", "../admin", "forge\\nforged", "x" * 129, None):
         with pytest.raises(ValueError, match="subject"):
             grant_providers(issuer, ["alpha"], subject=subject)
+
+
+def test_malformed_structured_provider_result_falls_back_without_leaking():
+    from types import SimpleNamespace
+    from skeleton.frontier.runtime.model_router_contract import RoutedCall
+
+    class PoisonResponse:
+        @property
+        def structured(self):
+            raise RuntimeError("private provider payload must not leak")
+
+    class HostileRouter(FakeRouter):
+        async def execute(self, *args, **kwargs):
+            original = await super().execute(*args, **kwargs)
+            return RoutedCall(original.receipt, SimpleNamespace(response=PoisonResponse()))
+
+    gate, issuer = gate_and_issuer()
+    out = run(ModelPlanner(
+        HostileRouter(), gate=gate, cap=grant_providers(issuer, ["alpha"]),
+    ).plan(BRIEF))
+    assert out.source == "compiler"
+    assert out.fallback_reason == "parse:RuntimeError"
+    assert "private" not in out.fallback_reason
+    assert out.spec == out.compiled
+
+
+def test_oversized_structured_provider_shape_falls_back_before_copy():
+    from types import SimpleNamespace
+    from skeleton.frontier.runtime.model_router_contract import RoutedCall
+
+    class OversizedRouter(FakeRouter):
+        async def execute(self, *args, **kwargs):
+            original = await super().execute(*args, **kwargs)
+            response = SimpleNamespace(structured={str(i): i for i in range(65)})
+            return RoutedCall(original.receipt, SimpleNamespace(response=response))
+
+    gate, issuer = gate_and_issuer()
+    out = run(ModelPlanner(
+        OversizedRouter(), gate=gate, cap=grant_providers(issuer, ["alpha"]),
+    ).plan(BRIEF))
+    assert out.source == "compiler"
+    assert out.fallback_reason == "parse:PlanParseError"
