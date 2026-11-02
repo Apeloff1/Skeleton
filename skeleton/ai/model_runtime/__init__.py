@@ -17,6 +17,8 @@ _LAZY_EXPORTS = {
     "MemoryBudgetRequest": ".long_context_memory_budget",
     "MemoryBudgetLimits": ".long_context_memory_budget",
     "LongContextMemoryBudgetGuard": ".long_context_memory_budget",
+    "AdmissionBundleRequest": ".long_context_admission_bundle",
+    "LongContextAdmissionBundle": ".long_context_admission_bundle",
     "KvLayout": ".long_context_kv_compatibility",
     "KvWindowRequest": ".long_context_kv_compatibility",
     "LongContextKvCompatibility": ".long_context_kv_compatibility",
