@@ -15,6 +15,7 @@ from .long_context_cgroup_events import CgroupEventMonitor
 from .long_context_telemetry_fusion import LongContextTelemetryFusion
 from .long_context_pressure_latch import LongContextPressureLatch
 from .long_context_live_plan import LongContextLivePlanner
+from .long_context_memory_envelope import observe_memory_envelope
 from .tokenization import deserialize_token_sequence
 
 
@@ -82,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("head-observe-events", help="Untrusted cgroup event baseline; no grant")
     commands.add_parser("head-observe-fused", help="Conservative combined local telemetry; no grant")
     commands.add_parser("head-observe-latched", help="One-shot recovery diagnostic; no grant")
+    memory = commands.add_parser("head-observe-memory", help="Read-only bounded RAM/cgroup envelope; no grant")
+    memory.add_argument("--request-bytes", type=int, default=0)
     plan = commands.add_parser("head-plan", help="Read-only non-authorizing fair proposal")
     live_plan = commands.add_parser("head-plan-live", help="Fair proposal bound to live telemetry; no grant")
     for argument in (live_plan,):
@@ -104,8 +107,10 @@ def main(argv: list[str] | None = None) -> int:
     # Host observation never needs to open, create, or authorize a spool.
     # This keeps unsupported platforms conservatively observable rather
     # than mistaking POSIX spool unavailability for normal pressure.
-    if args.command in ("head-observe", "head-observe-cgroup", "head-observe-events", "head-observe-fused", "head-observe-latched"):
-        if args.command == "head-observe":
+    if args.command in ("head-observe", "head-observe-cgroup", "head-observe-events", "head-observe-fused", "head-observe-latched", "head-observe-memory"):
+        if args.command == "head-observe-memory":
+            result = observe_memory_envelope(requested_bytes=args.request_bytes)
+        elif args.command == "head-observe":
             result = observe_host_pressure()
         elif args.command == "head-observe-cgroup":
             result = observe_cgroup_pressure()
