@@ -28,6 +28,7 @@ from skeleton.ai.agents.jeeves import studio_story_merge_tool as story_merge
 from skeleton.ai.agents.jeeves import studio_story_accessibility_tool as story_accessibility
 from skeleton.ai.agents.jeeves import studio_caption_timing_tool as caption_timing
 from skeleton.ai.agents.jeeves import studio_story_reading_bookmark_tool as story_bookmark
+from skeleton.ai.agents.jeeves import studio_scene_object_accessibility_tool as scene_labels
 from skeleton.ai.agents.jeeves import studio_npc_continuity_tool as continuity
 from skeleton.ai.agents.jeeves import studio_npc_continuity_merge_tool as continuity_merge
 from skeleton.ai.agents.jeeves import studio_world_batch_tool as batch
@@ -135,6 +136,7 @@ _TOOL_SYMBOLS = (
     ("story_accessibility_tool_schema", "execute_story_accessibility_tool"),
     ("caption_timing_tool_schema", "execute_caption_timing_tool"),
     ("story_reading_bookmark_tool_schema", "execute_story_reading_bookmark_tool"),
+    ("scene_object_accessibility_tool_schema", "execute_scene_object_accessibility_tool"),
 )
 _AUTHORING_SYMBOLS = frozenset({
     "author_revision_tool_schema",
@@ -153,6 +155,7 @@ _AUTHORING_SYMBOLS = frozenset({
     "story_merge_tool_schema",
     "caption_timing_tool_schema",
     "story_reading_bookmark_tool_schema",
+    "scene_object_accessibility_tool_schema",
 })
 
 
@@ -190,6 +193,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    story_accessibility if descriptor_name == "story_accessibility_tool_schema" else
                    caption_timing if descriptor_name == "caption_timing_tool_schema" else
                    story_bookmark if descriptor_name == "story_reading_bookmark_tool_schema" else
+                   scene_labels if descriptor_name == "scene_object_accessibility_tool_schema" else
                    continuity if descriptor_name == "npc_continuity_tool_schema" else
                    continuity_merge if descriptor_name == "npc_continuity_merge_tool_schema" else
                    batch if descriptor_name == "world_batch_tool_schema" else
