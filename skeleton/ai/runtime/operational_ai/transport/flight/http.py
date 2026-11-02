@@ -17,6 +17,21 @@ class FlightRequestHandler(LegacyRequestHandler):
     """Same bearer, Host, Origin and request-framing checks as the hardened v1."""
     def do_GET(self)->None:
         if not self._authorize():return
+        if self.path=='/v2/health':
+            supervisor=getattr(self.server,'supervisor',None)
+            if supervisor is None:
+                self._write(404,'bad-request',{'reason':'supervisor-unavailable'});return
+            from ...orchestration.flight_control.daemon.health import public_health
+            try:
+                state=public_health(supervisor)
+            except Exception:
+                # Runtime state or SQLite custody could be corrupt; never
+                # report an unauthenticated or misleading green response.
+                self._write(503,'error',{'reason':'readiness-integrity-held'})
+                return
+            self._write(200 if state['admission']['serving'] else 503,
+                        'ok' if state['admission']['serving'] else 'error',state)
+            return
         if self.path!='/v2/protocol':
             self._write(404,'bad-request',{'reason':'unknown-route'});return
         self._write(200,'ok',PROTOCOL)
@@ -53,7 +68,10 @@ class FlightRequestHandler(LegacyRequestHandler):
 
 class FlightHTTPServer(LocalHTTPServer):
     def __init__(self,address,dispatcher,token,*,max_connections:int=8,
-                 io_timeout_seconds:float=15.0):
+                 io_timeout_seconds:float=15.0,supervisor=None):
+        if supervisor is not None and not hasattr(supervisor,'snapshot'):
+            raise ContractViolation('invalid supervisor health provider')
+        self.supervisor=supervisor
         super().__init__(address,dispatcher,token,max_connections=max_connections,
                          io_timeout_seconds=io_timeout_seconds)
         self.RequestHandlerClass=FlightRequestHandler

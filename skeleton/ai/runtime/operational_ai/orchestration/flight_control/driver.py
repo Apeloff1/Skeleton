@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from threading import Event,Thread,RLock
 import time
-from .contracts import FlightConflict,FlightError,Ticket
+from .contracts import FlightConflict,FlightError,FlightBusy,Ticket
 
 
 @dataclass(frozen=True,slots=True)
@@ -77,6 +77,11 @@ class NativeFlightWorker:
             # An expired fence is left for operator reconciliation.
             try:self.ledger.fail(ticket,type(exc).__name__[:64])
             except FlightError:pass
+            if isinstance(exc,FlightBusy):
+                # Once the claim has been acquired, capacity conflicts are
+                # not merely idle polling. This ticket may now be held and
+                # must stop automatic dispatch until operator review.
+                raise FlightConflict('claimed task failed before native execution') from exc
             raise
 
     def drain(self,*,maximum:int=32)->tuple[WorkerResult,...]:

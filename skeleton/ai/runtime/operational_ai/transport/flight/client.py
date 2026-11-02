@@ -57,3 +57,35 @@ class FlightClient:
             raise FlightClientError('local native AI service unavailable') from exc
         finally:
             conn.close()
+
+    def wait(self,job_id:str,*,max_wait_ms:int=1000)->dict:
+        """Bounded long polling; no claim of push streaming or network events."""
+        return self.request('wait',{'job_id':job_id,'max_wait_ms':max_wait_ms})
+
+    def cancel(self,job_id:str)->dict:
+        """Request cancellation; started native GPU kernels may not interrupt."""
+        return self.request('cancel',{'job_id':job_id})
+
+    def health(self)->dict:
+        """Bearer-scoped local readiness, observational not model qualification."""
+        conn=http.client.HTTPConnection('127.0.0.1',self.port,timeout=self.timeout)
+        try:
+            conn.request('GET','/v2/health',headers={
+                'Host':f'127.0.0.1:{self.port}',
+                'Authorization':'Bearer '+self.token,'Connection':'close'})
+            resp=conn.getresponse()
+            if resp.status!=200:
+                raise FlightClientError('native inference supervisor is not running')
+            raw=resp.read(262145)
+            if len(raw)>262144:raise FlightClientError('health response exceeded size limit')
+            from ...authority.canonical import load_json
+            obj=load_json(raw,ceiling=262144)
+            if type(obj)is not dict or obj.get('status')!='ok' or type(obj.get('result'))is not dict:
+                raise FlightClientError('invalid supervisor health envelope')
+            if (set(obj['result'])!={'supervisor','admission'} or
+                obj['result']['admission'].get('serving') is not True):
+                raise FlightClientError('native inference readiness contract mismatch')
+            return obj['result']
+        except (OSError,http.client.HTTPException) as exc:
+            raise FlightClientError('native inference health unavailable') from exc
+        finally:conn.close()

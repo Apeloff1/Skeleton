@@ -13,6 +13,8 @@ PROTOCOL={
     'create':['session_id'],
     'submit':['job_id','session_id','request_id','question'],
     'work_one':[],
+    'cancel':['job_id'],
+    'wait':['job_id'],
     'job':['job_id'],
     'queue':[],
     'history':['session_id'],
@@ -27,6 +29,7 @@ OPTIONAL={
     'submit':('priority','seed','temperature'),
     'replay':('seed','temperature'),
     'knowledge_search':('limit',),
+    'wait':('max_wait_ms',),
 }
 
 
