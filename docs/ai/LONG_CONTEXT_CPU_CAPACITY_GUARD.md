@@ -16,3 +16,9 @@ lease. Unknown pressure, disk capacity, or checkpoint custody still holds.
 
 Regression fixtures cover competing principals, atomic over-capacity
 cycles, and preservation of unallocated slots for another verified owner.
+
+Principal isolation also bounds aggregate reserved token windows and requested
+memory bytes (defaults: 4,096 tokens and 32 MiB per verified principal),
+not merely active slot count. This prevents a tenant from exhausting the
+global token or byte budget with fewer than its allotted slots. Limits remain
+in-process and observational; backend enforcement is still mandatory.

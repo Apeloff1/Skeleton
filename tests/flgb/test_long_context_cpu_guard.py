@@ -470,5 +470,41 @@ class CpuCapacityGuardTests(unittest.TestCase):
                 self.assertEqual(result["state"], "hold")
                 self.assertEqual(self.guard.status()["active"], 0)
 
+    def test_principal_token_budget_prevents_single_owner_monopoly(self):
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier,
+                limits=CpuCapacityLimits(max_tokens=64,
+                                         max_tokens_per_principal=8),
+                clock=self.clock)
+        for _ in range(3):
+            guard.observe()
+        self.assertIsNotNone(guard.reserve(self.request)["reservation_id"])
+        same = CpuCapacityRequest("owner", "otherstream", "a" * 64,
+                                  "b" * 64, 4, 8, 64)
+        self.assertEqual(guard.reserve(same)["reason"],
+                         "principal_capacity_exhausted")
+        different = CpuCapacityRequest("other", "another", "a" * 64,
+                                       "b" * 64, 4, 8, 64)
+        self.assertIsNotNone(guard.reserve(different)["reservation_id"])
+
+    def test_principal_byte_budget_blocks_atomic_fair_cycle(self):
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier,
+                limits=CpuCapacityLimits(max_bytes=4096,
+                                         max_bytes_per_principal=64),
+                clock=self.clock)
+        for _ in range(3):
+            guard.observe()
+        other = CpuCapacityRequest("owner", "another", "a" * 64,
+                                   "b" * 64, 4, 8, 64)
+        result = guard.reserve_fair_cycle(
+            (self.request, other), quantum_tokens=8)
+        self.assertEqual(result["reason"], "fair_cycle_principal_capacity")
+        self.assertEqual(guard.status()["active"], 0)
+
 if __name__ == "__main__":
     unittest.main()

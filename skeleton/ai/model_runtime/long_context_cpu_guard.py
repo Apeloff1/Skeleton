@@ -53,11 +53,17 @@ class CpuCapacityLimits:
     lifetime_ns: int = 1_000_000_000
     # Keep legacy positional constructor arguments stable.
     max_active_per_principal: int = 4
+    max_tokens_per_principal: int = 4096
+    max_bytes_per_principal: int = 32 * 1024**2
 
     def __post_init__(self) -> None:
         _bounded(self.max_active, "max_active", 1, 64)
         _bounded(self.max_active_per_principal,
                  "max_active_per_principal", 1, 64)
+        _bounded(self.max_tokens_per_principal,
+                 "max_tokens_per_principal", 1, 65536)
+        _bounded(self.max_bytes_per_principal,
+                 "max_bytes_per_principal", 0, 1024**3)
         _bounded(self.max_tokens, "max_tokens", 1, 65536)
         _bounded(self.max_bytes, "max_bytes", 1, 1024**3)
         _bounded(self.lifetime_ns, "lifetime_ns", 1, 5_000_000_000)
@@ -230,16 +236,26 @@ class LongContextCpuCapacityGuard:
                 else publishable >= requested_bytes)
 
     def _principal_room(self, requests: tuple[CpuCapacityRequest, ...]) -> bool:
-        """Prevent a verified principal monopolizing in-process capacity."""
-        counts: dict[str, int] = {}
-        for item in self._reservations.values():
-            principal = item.request.principal
-            counts[principal] = counts.get(principal, 0) + 1
-        limit = min(self._limits.max_active, self._limits.max_active_per_principal)
+        """Bound verified-principal slots, token windows, and memory bytes."""
+        totals: dict[str, list[int]] = {}
+        slot_limit = min(self._limits.max_active,
+                         self._limits.max_active_per_principal)
+        token_limit = min(self._limits.max_tokens,
+                          self._limits.max_tokens_per_principal)
+        byte_limit = min(self._limits.max_bytes,
+                         self._limits.max_bytes_per_principal)
+        for request in (item.request for item in self._reservations.values()):
+            usage = totals.setdefault(request.principal, [0, 0, 0])
+            usage[0] += 1
+            usage[1] += request.max_tokens
+            usage[2] += request.requested_bytes
         for request in requests:
-            principal = request.principal
-            counts[principal] = counts.get(principal, 0) + 1
-            if counts[principal] > limit:
+            usage = totals.setdefault(request.principal, [0, 0, 0])
+            usage[0] += 1
+            usage[1] += request.max_tokens
+            usage[2] += request.requested_bytes
+            if (usage[0] > slot_limit or usage[1] > token_limit
+                    or usage[2] > byte_limit):
                 return False
         return True
 
@@ -253,6 +269,8 @@ class LongContextCpuCapacityGuard:
             "reserved_bytes": sum(x.request.requested_bytes for x in items),
             "revocations": self._revocations,
             "max_active_per_principal": self._limits.max_active_per_principal,
+            "max_tokens_per_principal": self._limits.max_tokens_per_principal,
+            "max_bytes_per_principal": self._limits.max_bytes_per_principal,
             "device": "cpu", "device_qualified": False,
             "cross_process_exclusive": False,
             "is_execution_lease": False, "is_admission_grant": False,
