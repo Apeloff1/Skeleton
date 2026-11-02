@@ -231,12 +231,99 @@ def verify_mission_report(report: Any, *, require_all: bool = False) -> dict[str
 
 
 def solve_missions(source: Any, board: Any, *, choice: str = "signal") -> dict[str, Any]:
-    """Use the real canonical victory solver; fail if its route misses quests."""
-    from .harbor_crafting_planner import solve
+    """Plan authored quests in dependency order using real gameplay transitions.
+
+    The mission solver deliberately does not invent events or use mission progress
+    as an authority. Every action is executed by the same movement, economy,
+    collision, crafting and ending rules as a human player's session.
+    """
+    from .harbor_crafting import export_bundle
+    from .harbor_crafting_planner import _CampaignPlanner, _distance
     world = validate_source(source)
     authored = validate_board(board, world)
-    plan = solve(world, choice=choice)
-    report = mission_report(plan["bundle"], authored, require_all=True)
+    if type(choice) is not str or choice not in ("signal", "shelter"):
+        raise HarborError("invalid mission ending choice")
+    planner = _CampaignPlanner(world)
+    for mission in authored["missions"]:
+        for objective in mission["objectives"]:
+            kind = objective["kind"]
+            count = _target(objective)
+            for _ in range(count):
+                if kind == "gather":
+                    resource = next(r for r in world["resources"] if r["id"] == objective["item"])
+                    planner.navigate(lambda state, at=resource["at"]: state["pos"] == at)
+                    planner.emit({"op": "gather"})
+                elif kind == "craft":
+                    recipe = next(r for r in world["recipes"] if r["id"] == objective["recipe"])
+                    for item, quantity in sorted(recipe["inputs"].items()):
+                        planner.ensure(item, planner.state["inventory"].get(item, 0) + quantity)
+                    planner.emit({"op": "craft", "recipe": recipe["id"]})
+                elif kind == "trade":
+                    planner.navigate(
+                        lambda state: _distance(state["pos"], state["npc_pos"]) == 1
+                    )
+                    planner.emit({"op": "trade", "item": objective["item"]})
+                elif kind == "visit":
+                    planner.navigate(
+                        lambda state, at=objective["at"]: state["pos"] == at
+                    )
+                    # A visit is credited only by an actual movement transition.
+                    # If already on the tile, leave and re-enter or fail closed.
+                    if planner.actions and planner.actions[-1]["op"] == "move":
+                        pass
+                    else:
+                        from .harbor_crafting_planner import MOVES
+                        returned = False
+                        for action in MOVES:
+                            if action["op"] != "move":
+                                continue
+                            try:
+                                after = step(world, planner.state, action)
+                            except HarborError:
+                                continue
+                            if after["pos"] == objective["at"]:
+                                continue
+                            planner.emit(action)
+                            planner.navigate(
+                                lambda state, at=objective["at"]: state["pos"] == at
+                            )
+                            returned = True
+                            break
+                        if not returned:
+                            raise HarborError("visit requires a reachable movement transition")
+                elif kind == "inventory":
+                    planner.ensure(objective["item"], objective["quantity"])
+                elif kind == "deliver":
+                    for item, quantity in sorted(world["delivery"].items()):
+                        planner.ensure(item, quantity)
+                    planner.navigate(
+                        lambda state: _distance(state["pos"], world["dock"]) == 1
+                    )
+                    planner.emit({"op": "deliver"})
+                elif kind == "choose":
+                    if objective["choice"] != choice:
+                        raise HarborError("mission choice conflicts with requested ending")
+                    planner.navigate(
+                        lambda state: _distance(state["pos"], world["dock"]) == 1
+                    )
+                    planner.emit({"op": "choose", "choice": choice})
+                elif kind == "reputation":
+                    if planner.state["reputation"] < objective["minimum"]:
+                        raise HarborError("reputation requires prior earned delivery or choice")
+                else:
+                    raise HarborError("mission solver does not support objective")
+        if planner.state["tick"] > mission["deadline"]:
+            raise HarborError("mission solver missed authored deadline")
+    if planner.state["ending"] is None:
+        for item, quantity in sorted(world["delivery"].items()):
+            planner.ensure(item, quantity)
+        if not planner.state["delivered"]:
+            planner.navigate(lambda state: _distance(state["pos"], world["dock"]) == 1)
+            planner.emit({"op": "deliver"})
+        planner.navigate(lambda state: _distance(state["pos"], world["dock"]) == 1)
+        planner.emit({"op": "choose", "choice": choice})
+    bundle = export_bundle(world, planner.actions, require_win=True)
+    report = mission_report(bundle, authored, require_all=True)
     if verify_mission_report(report, require_all=True)["points"] != report["points"]:
         raise HarborError("mission solver replay mismatch")
     return report

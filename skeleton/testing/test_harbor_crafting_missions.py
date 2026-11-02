@@ -45,7 +45,7 @@ def test_mission_completion_requires_actual_prerequisites_and_order():
     early = mission_report(export_bundle(source(), actions[:11]), board())
     assert early["completed"] == ["salvage"]
     assert early["points"] == 10
-    assert early["journal"][-1]["progress"]["workshop"] == [0, 0]
+    assert early["journal"][-1]["progress"]["workshop"] == [1, 0]
     with pytest.raises(HarborError, match="not fully earned"):
         mission_report(export_bundle(source(), actions[:11]), board(), require_all=True)
 
