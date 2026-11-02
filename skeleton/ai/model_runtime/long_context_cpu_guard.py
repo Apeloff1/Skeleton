@@ -281,6 +281,14 @@ class LongContextCpuCapacityGuard:
                         "reason": "custody_or_disk_unverified"}
             if now > _MAX_CLOCK - self._limits.lifetime_ns:
                 raise LongContextSpoolError("capacity clock overflow")
+            # Verifier, checkpoint and volume probes may block. A normal
+            # pressure sample at entry is not enough to publish capacity.
+            if self._pressure() != "repeated_normal_observed":
+                return {**self._snapshot("hold"), "reservation_id": None,
+                        "reason": "pressure_changed_during_reservation"}
+            if self._now() >= now + self._limits.lifetime_ns:
+                return {**self._snapshot("hold"), "reservation_id": None,
+                        "reason": "reservation_expired_during_validation"}
             key = token_hex(32)
             if key in self._reservations:
                 raise LongContextSpoolError("capacity identity collision")
@@ -349,6 +357,12 @@ class LongContextCpuCapacityGuard:
                         "reason": "fair_cycle_custody_unverified"}
             if now > _MAX_CLOCK - self._limits.lifetime_ns:
                 raise LongContextSpoolError("capacity clock overflow")
+            if self._pressure() != "repeated_normal_observed":
+                return {**self._snapshot("hold"), "reservations": [],
+                        "reason": "fair_cycle_pressure_changed"}
+            if self._now() >= now + self._limits.lifetime_ns:
+                return {**self._snapshot("hold"), "reservations": [],
+                        "reason": "fair_cycle_expired_during_validation"}
             keys = [token_hex(32) for _ in windows]
             if len(set(keys)) != len(keys) or any(
                 key in self._reservations for key in keys
@@ -394,6 +408,10 @@ class LongContextCpuCapacityGuard:
                 # another process may have consumed the available quota.
                 if not self._disk_observed_sufficient(request.requested_bytes):
                     raise LongContextSpoolError("disk capacity changed before claim")
+                if (self._pressure() != "repeated_normal_observed"
+                        or self._now() >= item.expires_ns
+                        or self._reservations.get(reservation_id) is not item):
+                    raise LongContextSpoolError("claim fence changed")
             except (LongContextSpoolError, OSError, ValueError, TypeError):
                 self._reservations.pop(reservation_id, None)
                 self._revocations += 1

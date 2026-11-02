@@ -409,5 +409,42 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.assertEqual(result["reservations"], [])
         self.assertEqual(guard.status()["active"], 0)
 
+    def test_slow_volume_probe_cannot_publish_expired_reservation(self):
+        self.warm()
+        def slow_capacity(requested_bytes):
+            self.clock.value += 3_000_000_000
+            return self._capacity(requested_bytes)
+        self.heads.spool.capacity_snapshot.side_effect = slow_capacity
+        result = self.guard.reserve(self.request)
+        self.assertIsNone(result["reservation_id"])
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_pressure_transition_during_reservation_fails_closed(self):
+        self.warm()
+        observations = iter((envelope(), envelope("critical")))
+        self.monitor.sample.side_effect = lambda: next(observations)
+        result = self.guard.reserve(self.request)
+        self.assertEqual(result["reason"], "pressure_changed_during_reservation")
+        self.assertIsNone(result["reservation_id"])
+
+    def test_slow_claim_revalidation_revokes_before_claim(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.assertIsNotNone(key)
+        def slow_capacity(requested_bytes):
+            self.clock.value += 3_000_000_000
+            return self._capacity(requested_bytes)
+        self.heads.spool.capacity_snapshot.side_effect = slow_capacity
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+        self.assertFalse(self.guard.release(key))
+
+    def test_legacy_positional_capacity_limits_remain_stable(self):
+        limits = CpuCapacityLimits(2, 16, 4096, 100000)
+        self.assertEqual(limits.max_active, 2)
+        self.assertEqual(limits.max_tokens, 16)
+        self.assertEqual(limits.max_bytes, 4096)
+        self.assertEqual(limits.lifetime_ns, 100000)
+        self.assertEqual(limits.max_active_per_principal, 4)
+
 if __name__ == "__main__":
     unittest.main()
