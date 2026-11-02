@@ -1,0 +1,55 @@
+"""Exact-model startup path, no remote provider or synthetic model fallback."""
+from __future__ import annotations
+from pathlib import Path
+from contextlib import ExitStack
+import os
+from ...model.gguf.service import load_approved_manifest,activate_model
+from ...orchestration.execution_spine.contracts import Identity,SpineLimits,SpineError
+from ...orchestration.execution_spine.database import SpineDatabase
+from ...orchestration.execution_spine.lease import SessionGate
+from ...orchestration.execution_spine.coordinator import ExecutionSpine
+from ...orchestration.execution_spine.supervisor import SupervisedAI
+from ...orchestration.execution_spine.path_policy import open_private_root
+from ..boot.identity import PrincipalBinding,establish_binding
+
+def activate(*,model_root:str|Path,state_dir:str|Path,tenant:str,subject:str,
+             n_ctx:int=2048,max_new_tokens:int=256,n_threads:int=4,
+             gpu_layers:int=0):
+    """Return an ExitStack and working supervised execution spine.
+
+    Caller must close stack on failure and after serving. This does not claim
+    a model qualified unless real llama.cpp successfully activates.
+    """
+    stack=ExitStack()
+    try:
+        root_fd=open_private_root(state_dir)
+        try:
+            try:os.mkdir('execution_gates',0o700,dir_fd=root_fd)
+            except FileExistsError:pass
+        finally:os.close(root_fd)
+        manifest=load_approved_manifest(model_root)
+        model=stack.enter_context(activate_model(model_root,manifest,
+            n_ctx=n_ctx,n_threads=n_threads,n_gpu_layers=gpu_layers))
+        identity=Identity(tenant,subject,model.model_digest,model.tokenizer_digest)
+        # A preexisting unbound spine database must never be adopted by a new
+        # tenant identity, even if older state-binder versions do not know it.
+        state_fd=open_private_root(state_dir)
+        try:
+            try:os.stat('state.identity.json',dir_fd=state_fd,follow_symlinks=False)
+            except FileNotFoundError:
+                for name in ('ai-spine.sqlite','ai-spine.sqlite-wal','ai-spine.sqlite-shm',
+                             'ai-spine.sqlite-journal'):
+                    try:os.stat(name,dir_fd=state_fd,follow_symlinks=False)
+                    except FileNotFoundError:continue
+                    raise SpineError('unbound previous AI spine requires explicit migration')
+        finally:os.close(state_fd)
+        establish_binding(state_dir,PrincipalBinding(identity.tenant,identity.subject,
+            identity.model_sha256,identity.tokenizer_sha256))
+        db=stack.enter_context(SpineDatabase(state_dir))
+        gate=stack.enter_context(SessionGate(Path(state_dir)/'execution_gates'))
+        limits=SpineLimits(context_tokens=n_ctx,max_output_tokens=max_new_tokens)
+        runtime=ExecutionSpine(db=db,session_gate=gate,backend=model,
+                               identity=identity,limits=limits)
+        return stack, SupervisedAI(runtime)
+    except BaseException:
+        stack.close();raise
