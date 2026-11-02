@@ -62,6 +62,7 @@ Commands:
     tournament-author  Edit and preview replay-verifiable tournament brackets
     combat-league-author  Transactionally edit and preview offline league
     combat-league  Play source-bound offline eight-entrant combat league
+    combat-career-roadmap  Replay bounded multi-season training and portable career saves
     combat-career-advice  Compare bounded replayed training choices
     combat-career-author  Transactionally edit and preview coaching careers
     combat-career  Play, train, save and replay a multi-season coaching career
@@ -887,6 +888,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-league-author":
         from skeleton.game.gameplay.combat_league_author import cli as league_author_cli
         return league_author_cli(rest)
+    if cmd == "combat-career-roadmap":
+        from skeleton.game.gameplay.combat_league_career_roadmap import cli as roadmap_cli
+        return roadmap_cli(rest)
     if cmd == "combat-career-advice":
         from skeleton.game.gameplay.combat_league_career_advice import cli as career_advice_cli
         return career_advice_cli(rest)
