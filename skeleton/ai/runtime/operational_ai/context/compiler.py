@@ -11,6 +11,7 @@ from typing import Any,Iterable
 from ..authority.canonical import ContractViolation,require_small_text,digest
 from ..authority.budgets import Limits
 from .lexical import Hit
+from .redaction import redact
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +52,9 @@ def compile_context(question:str,hits:Iterable[Hit],limits:Limits,
         citation={"id":hit.source_id,"sha256":hit.sha256,"origin":hit.origin,
                   "trust":hit.trust,"rights":hit.rights,"start":hit.start,"end":hit.end}
         fence=f"\n<source id={hit.source_id!r} sha256={hit.sha256} trust={hit.trust!r}>\n"
-        chunk=fence+escape(hit.body,quote=True)+"\n</source>\n"
+        masking=redact(hit.body)
+        chunk=fence+escape(masking.text,quote=True)+"\n</source>\n"
+        citation["redaction_count"]=masking.mask_count
         budget=len(chunk.encode("utf-8"))
         if budget>reserved:
             continue

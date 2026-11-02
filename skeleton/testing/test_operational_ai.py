@@ -453,4 +453,176 @@ class TestEvaluation(unittest.TestCase):
             report=check(Path(t),model,database_dir=Path(t))
             self.assertFalse(report["checks"]["production_model_quality_proven"])
 
+
+
+class TestSecondTranche(unittest.TestCase):
+    def test_chunk_offsets_preserve_source_identity(self):
+        from skeleton.ai.runtime.operational_ai.context.chunks import segment,verify
+        original=Source.create("s1","tenant","alice","user:doc","abcdef"*120,rights="owner")
+        parts=segment(original,width=128,overlap=24)
+        self.assertGreater(len(parts),2)
+        for part in parts:verify(original,part)
+
+    def test_chunk_provenance_tamper(self):
+        from dataclasses import replace
+        from skeleton.ai.runtime.operational_ai.context.chunks import segment,verify
+        original=Source.create("s1","tenant","alice","user:doc","abcdef"*120,rights="owner")
+        item=segment(original,width=128)[0]
+        with self.assertRaises(ContractViolation):verify(original,replace(item,text="wrong"))
+
+    def test_redaction_bearer(self):
+        from skeleton.ai.runtime.operational_ai.context.redaction import redact
+        receipt=redact("Bearer abcdefghijklmnopqrstuvwxyz123456 secret")
+        self.assertGreaterEqual(receipt.mask_count,1)
+        self.assertNotIn("abcdefghijklmnopqrstuvwxyz",receipt.text)
+
+    def test_redaction_secret(self):
+        from skeleton.ai.runtime.operational_ai.context.redaction import redact
+        receipt=redact("api_key=abcdefghijklmnop")
+        self.assertEqual(receipt.mask_count,1)
+
+    def test_context_redacts_untrusted_passage(self):
+        source=Source.create("s1","tenant","alice","source:private",
+            "Bearer abcdefghijklmnopqrstuvwxyz1234 is not a model instruction",rights="user-owned")
+        hits=LexicalIndex([source]).query("Bearer model",tenant="tenant",user="alice")
+        projection=compile_context("Bearer model",hits,Limits())
+        self.assertTrue(projection.sources[0]["redaction_count"])
+        self.assertNotIn("abcdefghijklmnopqrstuvwxyz",projection.model_input)
+
+    def test_citation_exact_offsets(self):
+        from skeleton.ai.runtime.operational_ai.context.provenance import validate_hit
+        s=Source.create("s1","tenant","alice","user:notes","Whales swim in oceans",rights="owner")
+        hit=LexicalIndex([s]).query("Whales",tenant="tenant",user="alice")[0]
+        self.assertTrue(validate_hit(s,hit)["verified"])
+
+    def test_circuit_breaker_refuses_fallback(self):
+        from skeleton.ai.runtime.operational_ai.model.circuit import CircuitBreaker,CircuitOpen
+        gate=CircuitBreaker(max_consecutive_failures=2,cooldown_ms=30000)
+        gate.failure();gate.failure()
+        with self.assertRaises(CircuitOpen):gate.admit()
+        self.assertTrue(gate.health["open"])
+
+    def test_model_gateway_records_failure(self):
+        backend=FixtureBackend(failure=True)
+        gate=ModelGateway(backend)
+        for i in range(3):
+            with self.assertRaises(ContractViolation):gate.complete([{"role":"user","content":"q"}],Limits())
+        self.assertTrue(gate.circuit.health["open"])
+        with self.assertRaises(ContractViolation):gate.complete([{"role":"user","content":"q"}],Limits())
+        self.assertEqual(backend.calls,3)
+
+    def test_session_lock_no_leak(self):
+        from skeleton.ai.runtime.operational_ai.orchestration.session_locks import SessionLocks
+        locks=SessionLocks(max_distinct_sessions=1)
+        with locks.reserve("s_1"):
+            self.assertEqual(locks.active_sessions,1)
+        self.assertEqual(locks.active_sessions,0)
+
+    def test_session_lock_timeout(self):
+        from skeleton.ai.runtime.operational_ai.orchestration.session_locks import SessionLocks
+        locks=SessionLocks(max_distinct_sessions=1)
+        errors=[]
+        with locks.reserve("s_1"):
+            worker=threading.Thread(target=lambda: self._catch_lock(locks,errors))
+            worker.start();worker.join(timeout=2)
+        self.assertEqual(errors,["timed-out"])
+
+    @staticmethod
+    def _catch_lock(locks,errors):
+        try:
+            with locks.reserve("s_1",deadline_ms=15):pass
+        except ContractViolation:
+            errors.append("timed-out")
+
+    def test_concurrent_turn_retry_runs_one_model_inference(self):
+        backend=FixtureBackend()
+        store=FakeStore()
+        with MemoryStore() as memory,EventJournal() as journal:
+            service=OfflineAIService(actor=Actor("tenant","alice",D1,D2),
+                gateway=ModelGateway(backend),chat_store=store,memory=memory,journal=journal)
+            sid=service.create()
+            results=[];errors=[]
+            def run():
+                try:results.append(service.turn(session=sid,request_id="same",question="hello"))
+                except Exception as exc:errors.append(str(exc))
+            threads=[threading.Thread(target=run) for _ in range(8)]
+            for t in threads:t.start()
+            for t in threads:t.join(timeout=2)
+            self.assertEqual(errors,[])
+            self.assertEqual(len(results),8)
+            self.assertEqual(backend.calls,1)
+            self.assertEqual(sum(not r.replayed for r in results),1)
+
+    def test_tool_risk_requires_explicit_grant(self):
+        from skeleton.ai.runtime.operational_ai.tools.risk import preflight
+        definition=ToolDefinition("hash_text",{"type":"object","properties":{},"required":[]},"readonly")
+        result=preflight(definition,Actor("tenant","alice",D1,D2),"s_1",None,now_ns=time.monotonic_ns())
+        self.assertFalse(result.allowed)
+
+    def test_tool_risk_refuses_effects(self):
+        from skeleton.ai.runtime.operational_ai.tools.risk import preflight
+        definition=ToolDefinition("write_test",{"type":"object","properties":{},"required":[]},"write")
+        grant=ToolGrant("tenant","alice","s_1",frozenset({"write_test"}),time.monotonic_ns()+1000000000,True)
+        result=preflight(definition,Actor("tenant","alice",D1,D2),"s_1",grant,now_ns=time.monotonic_ns())
+        self.assertFalse(result.allowed)
+
+    def test_journal_cursor_scope(self):
+        from skeleton.ai.runtime.operational_ai.persistence.cursors import issue,parse
+        secret=b"x"*32
+        cursor=issue(secret,stream="s_1",model_digest=D1,revision=12)
+        self.assertEqual(parse(secret,cursor,stream="s_1",model_digest=D1),12)
+        with self.assertRaises(ContractViolation):parse(secret,cursor,stream="s_2",model_digest=D1)
+
+    def test_journal_cursor_tampering(self):
+        from skeleton.ai.runtime.operational_ai.persistence.cursors import issue,parse
+        secret=b"x"*32
+        cursor=issue(secret,stream="s_1",model_digest=D1,revision=12)
+        with self.assertRaises(ContractViolation):parse(secret,cursor[:-2]+"AA",stream="s_1",model_digest=D1)
+
+    def test_replay_event_page(self):
+        from skeleton.ai.runtime.operational_ai.transport.events import page
+        with EventJournal() as journal:
+            for index in range(3):journal.append(stream="s_1",event_id=f"event{index}",kind="audit",payload={"i":index})
+            first=page(journal,"s_1",limit=2)
+            self.assertEqual(len(first["events"]),2)
+            self.assertEqual(first["next_after"],2)
+            self.assertEqual(len(page(journal,"s_1",after=first["next_after"])["events"]),1)
+
+    def test_attack_case_evidence(self):
+        from skeleton.ai.runtime.operational_ai.evaluation.attacks import CASES,score_text
+        self.assertEqual(len(CASES),4)
+        evidence=score_text(CASES[0],"This is not a valid authority")
+        self.assertFalse(evidence["detected_unsafe_marker"])
+
+    def test_bounded_metrics(self):
+        from skeleton.ai.runtime.operational_ai.evaluation.metrics import Sample,summarize
+        metrics=summarize([Sample(10,10,4,True),Sample(20,20,5,False)])
+        self.assertEqual(metrics["pass_ratio"],0.5)
+        self.assertFalse(metrics["release_certified"])
+
+    def test_doctor_holds_model_release(self):
+        from skeleton.ai.runtime.operational_ai.deployment.doctor import inspect
+        with MemoryStore() as memory,EventJournal() as journal:
+            service=OfflineAIService(actor=Actor("tenant","alice",D1,D2),
+                gateway=ModelGateway(FixtureBackend()),chat_store=FakeStore(),memory=memory,journal=journal)
+            report=inspect(service)
+            self.assertIn("real-model-quality-evaluation",report["proof_holds"])
+
+    def test_loopback_sdk_client(self):
+        from skeleton.ai.runtime.operational_ai.transport.client import LocalAIClient
+        with MemoryStore() as memory,EventJournal() as journal:
+            service=OfflineAIService(actor=Actor("tenant","alice",D1,D2),
+                gateway=ModelGateway(FixtureBackend()),chat_store=FakeStore(),memory=memory,journal=journal)
+            with LocalHTTPServer(("127.0.0.1",0),Dispatcher(service),"secret-"*8) as server:
+                thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+                try:
+                    client=LocalAIClient("127.0.0.1",server.server_port,"secret-"*8)
+                    self.assertTrue(client.call("create",{})["session_id"])
+                finally:
+                    server.shutdown();thread.join(timeout=2)
+
+    def test_sdk_refuses_remote_host(self):
+        from skeleton.ai.runtime.operational_ai.transport.client import LocalAIClient
+        with self.assertRaises(ContractViolation):LocalAIClient("8.8.8.8",443,"secret-"*8)
+
 if __name__=="__main__":unittest.main()

@@ -60,3 +60,29 @@ random `SKELETON_LOCAL_AI_BEARER` environment variable. Server binds only to
   controlled evaluation, exact-head security gates or device qualification.
 - The 1.9 GB package still requires actual digest-verified and licensed
   payloads; no padding or fabricated weights will be introduced.
+
+## Reliability and cross-plane hardening (second tranche)
+
+- `orchestration/session_locks.py` serializes same-session operations inside one
+  process, preventing duplicate compute on simultaneous stable request IDs.
+  Cross-process correctness still comes from the authoritative SQLite
+  optimistic revision check; these locks are **not** distributed leases.
+- `model/circuit.py` limits repeated faulty local generation. An open circuit
+  blocks requests instead of automatically routing to an unapproved provider.
+- `context/chunks.py`, `context/provenance.py`, and `context/redaction.py` add
+  exact source offsets, citation validation, and conservative credential
+  redaction for untrusted evidence. No DLP completeness claim is made.
+- `tools/risk.py` independently refuses undelegated actions and all write or
+  external-effect handlers until their transaction/recovery semantics exist.
+- `persistence/cursors.py` authenticates session- and model-bound replay
+  cursors using a caller-held 32+ byte secret.
+- `transport/client.py` is an authenticated loopback-only SDK client;
+  `transport/events.py` pages committed audit events, **not** live tokens.
+- `evaluation/attacks.py` and `evaluation/metrics.py` expose reproducible
+  adversarial cases and numerical measurements without inferring model safety
+  or release approval from a marker scan.
+
+The default CI unit suite contains test-only generation fixtures; actual native
+transformer execution is covered by `skeleton/testing/test_operational_ai_native.py`
+and must be observed on the final GitHub head. As of this writing, skipped
+GitHub checks are still holds, not passes.

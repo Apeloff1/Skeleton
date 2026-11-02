@@ -8,6 +8,7 @@ from ..authority.budgets import Limits,BudgetLedger
 from ..authority.canonical import ContractViolation,sha256
 from .native import Generated
 from .admission import InferenceAdmission
+from .circuit import CircuitBreaker
 
 
 class Backend(Protocol):
@@ -28,12 +29,14 @@ class Completion:
 
 
 class ModelGateway:
-    def __init__(self,backend:Backend,admission:InferenceAdmission|None=None):
+    def __init__(self,backend:Backend,admission:InferenceAdmission|None=None,
+                 circuit:CircuitBreaker|None=None):
         if (not isinstance(getattr(backend,"model_digest",None),str)
                 or not isinstance(getattr(backend,"tokenizer_digest",None),str)):
             raise ContractViolation("explicit model and tokenizer identity required")
         self.backend=backend
         self.admission=admission or InferenceAdmission()
+        self.circuit=circuit or CircuitBreaker()
 
     def complete(self,messages:list[dict[str,str]],limits:Limits,*,seed:int=0,
                  temperature:float=1.0,cancel:threading.Event|None=None)->Completion:
@@ -48,9 +51,14 @@ class ModelGateway:
         raw=canonical_bytes(messages,ceiling=2_097_152)
         ledger.charge(input_bytes=len(raw))
         started=time.monotonic_ns()
-        with self.admission.slot(deadline_ns=started+limits.deadline_ms*1_000_000,cancel=cancel):
-            result=self.backend.generate(messages,max_output_tokens=limits.output_tokens,
-                                         seed=seed,temperature=float(temperature))
+        self.circuit.admit()
+        try:
+            with self.admission.slot(deadline_ns=started+limits.deadline_ms*1_000_000,cancel=cancel):
+                result=self.backend.generate(messages,max_output_tokens=limits.output_tokens,
+                                             seed=seed,temperature=float(temperature))
+        except Exception:
+            self.circuit.failure()
+            raise
         ledger.deadline()
         if not isinstance(result,Generated):
             raise ContractViolation("model backend supplied no verifiable generation receipt")
@@ -66,5 +74,6 @@ class ModelGateway:
         if result.prompt_tokens+result.generated_tokens>limits.context_tokens:
             raise ContractViolation("native context-token overrun")
         ledger.charge(context_tokens=result.prompt_tokens+result.generated_tokens)
+        self.circuit.success()
         return Completion(result,time.monotonic_ns()-started,sha256(raw),
             {key:ledger.remaining(key) for key in ledger.spent})

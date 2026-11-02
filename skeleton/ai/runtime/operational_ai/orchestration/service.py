@@ -21,6 +21,7 @@ from ..model.native import Generated
 from ..persistence.journal import EventJournal
 from ..tools.catalog import ToolCatalog
 from ..tools.executor import ToolExecutor,ToolReceipt
+from .session_locks import SessionLocks
 
 if TYPE_CHECKING:
     from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
@@ -72,6 +73,7 @@ class OfflineAIService:
         self.catalog=catalog or ToolCatalog()
         self.tools=ToolExecutor(self.catalog,self.journal)
         self.limits=limits or Limits()
+        self.session_locks=SessionLocks()
 
     def create(self,*,system:str|None=None)->str:
         if system is not None:
@@ -113,6 +115,13 @@ class OfflineAIService:
 
     def turn(self,*,session:str,request_id:str,question:str,seed:int=0,
              temperature:float=1.0)->AIReceipt:
+        """Serialize same-process turns before reading durable replay state."""
+        with self.session_locks.reserve(session,deadline_ms=self.limits.deadline_ms):
+            return self._turn_locked(session=session,request_id=request_id,
+                                     question=question,seed=seed,temperature=temperature)
+
+    def _turn_locked(self,*,session:str,request_id:str,question:str,seed:int=0,
+                     temperature:float=1.0)->AIReceipt:
         require_id(session,field="conversation")
         require_id(request_id,field="request ID")
         if any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in (session+request_id)):

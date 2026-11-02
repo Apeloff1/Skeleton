@@ -10,6 +10,7 @@ from ..persistence.journal import EventJournal
 from ..persistence.intent import IntentLedger
 from .catalog import ToolCatalog
 from .schemas import validate
+from .risk import preflight
 
 
 @dataclass(frozen=True,slots=True)
@@ -34,9 +35,10 @@ class ToolExecutor:
         require_id(invocation,field="invocation")
         definition,impl=self.catalog.resolve(name)
         validate(args,definition.argument_schema)
-        grant.check(tenant=actor.tenant,user=actor.user,session=session,tool=name,
-                    now_monotonic_ns=time.monotonic_ns(),
-                    write=definition.risk!="readonly")
+        decision=preflight(definition,actor,session,grant,
+                           now_ns=time.monotonic_ns(),allow_effects=False)
+        if not decision.allowed:
+            raise ContractViolation(f"tool risk admission denied: {decision.reason}")
         signature=digest({"tool":name,"version":definition.version,"args":args,
                           "actor":actor.to_record(),"session":session})
         event_id=f"tool_{invocation}"
