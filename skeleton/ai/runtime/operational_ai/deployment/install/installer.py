@@ -462,6 +462,12 @@ def install_approved_model(archive: Path | str, destination_root: Path | str, *,
                 archive_bytes, len(observed), len(model_candidates),
                 sum(s for s, _ in model_candidates.values()),
                 str(Path(destination_root).absolute() / install_id))
+        # Permanently bind the model directory to its verified archive and
+        # canonical model manifest before publishing. The receipt is data,
+        # not an approval signature, and is never inferred from model output.
+        receipt_raw = (json.dumps(receipt.to_record(), sort_keys=True,
+                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+        _write_staged(stage_fd, "install.receipt.json", io.BytesIO(receipt_raw), len(receipt_raw))
         os.fsync(stage_fd)
         _publish_no_replace(root_fd, stage_name, install_id)
         published = True

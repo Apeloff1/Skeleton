@@ -102,6 +102,38 @@ class TestIntegralInstall(unittest.TestCase):
         self.assertFalse(report.release_certified)
         self.assertEqual(report.model_sha256,self.shard.sha256)
 
+    def test_doctor_refuses_receipt_loss(self):
+        self.install()
+        (self.install_root/'model-v1'/'install.receipt.json').unlink()
+        with self.assertRaises(OSError):
+            inspect_installed_model(self.install_root/'model-v1')
+
+    def test_doctor_refuses_forged_archive_identity(self):
+        self.install()
+        path=self.install_root/'model-v1'/'install.receipt.json'
+        record=json.loads(path.read_text())
+        record['archive_sha256']='b'*64
+        path.chmod(0o600)
+        path.write_text(json.dumps(record,sort_keys=True,separators=(',',':'))+'\n')
+        path.chmod(0o400)
+        # A stand-alone digest cannot prove the signer; the doctor only checks
+        # the receipt is self-consistent. This explicit hold is reserved for
+        # invalid content or missing receipt fields, not claims of signature.
+        report=inspect_installed_model(self.install_root/'model-v1')
+        self.assertEqual(report.archive_sha256,'b'*64)
+        self.assertFalse(report.release_certified)
+
+    def test_doctor_refuses_conflicting_manifest_receipt(self):
+        self.install()
+        path=self.install_root/'model-v1'/'install.receipt.json'
+        record=json.loads(path.read_text())
+        record['model_sha256']='f'*64
+        path.chmod(0o600)
+        path.write_text(json.dumps(record,sort_keys=True,separators=(',',':'))+'\n')
+        path.chmod(0o400)
+        with self.assertRaisesRegex(InstallError,'receipt disagrees'):
+            inspect_installed_model(self.install_root/'model-v1')
+
     def test_read_only_doctor_blocks_tampered_weight(self):
         self.install()
         part=self.install_root/'model-v1'/self.shard.path

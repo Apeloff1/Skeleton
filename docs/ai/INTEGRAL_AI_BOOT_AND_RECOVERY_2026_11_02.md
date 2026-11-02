@@ -67,8 +67,14 @@ python -m skeleton.ai.runtime.operational_ai.deployment.install.cli install \
 python -m skeleton.ai.runtime.operational_ai.deployment.install.cli doctor \
   --model-root /private/models/original-v1
 
-# 5. Run real local inference, with a pre-existing private AI state directory
-#    and a separately provisioned private encryption key file.
+# 5. Provision private state and a local OS-CSPRNG 256-bit key exactly once.
+#    These parent directories must already exist with mode 0700; this is
+#    explicit operator action and the key is never printed or overwritten.
+python -m skeleton.ai.runtime.operational_ai.deployment.bootstrap.cli \
+  --state-parent /private --state-name ai-state \
+  --key-parent /private/keys --key-name memory.key
+
+# 6. Run real local inference with the private state and key.
 python -m skeleton.ai.runtime.operational_ai.transport.gguf_chat \
   --model-root /private/models/original-v1 \
   --state-dir /private/ai-state \
@@ -84,6 +90,14 @@ The archive includes `models/<model_id>/model.manifest.json` and
 `models/<model_id>/weights/...`, the exact structure accepted by the installer.
 If your model or other approved assets cannot meet the genuine size floor,
 packaging correctly fails; never add padding or forged model bytes.
+
+Successful model installation writes a private, canonical `install.receipt.json`
+next to the installed model. The read-only doctor validates installed model
+bytes, manifest digest, receipt structure and declared destination, and
+preserves the source commit and archive digest from the completed installation.
+It **does not independently rehash the original archive** (which may no longer
+be available), cryptographically authenticate the signer, or validate rights.
+Missing or internally conflicting receipts mean **HOLD**.
 
 ## Audit split-commit failure and recovery
 
