@@ -137,21 +137,43 @@ def _png(data: bytes) -> dict[str, Any]:
 
 
 def _jpeg(data: bytes) -> dict[str, Any]:
+    """Read a framed SOF marker, never scan through a malformed segment."""
     _need(data, 4, "jpeg")
     if data[:2] != b"\xff\xd8":
         raise AssetImportError("bad jpeg signature")
     i = 2
-    while i + 9 < len(data):
+    while i < len(data):
         if data[i] != 0xFF:
             raise AssetImportError("corrupt jpeg marker stream")
-        marker = data[i + 1]
-        seg = struct.unpack(">H", data[i + 2:i + 4])[0]
+        # JPEG permits fill FF bytes between markers, but not arbitrary
+        # stuffed data before the first start-of-frame segment.
+        while i < len(data) and data[i] == 0xFF:
+            i += 1
+        if i >= len(data):
+            raise AssetImportError("truncated jpeg marker")
+        marker = data[i]
+        i += 1
+        if marker in (0x00, 0x01, 0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
+            raise AssetImportError("unexpected jpeg marker before frame")
+        if i + 2 > len(data):
+            raise AssetImportError("truncated jpeg segment")
+        seg = struct.unpack_from(">H", data, i)[0]
+        if seg < 2 or i + seg > len(data):
+            raise AssetImportError("invalid jpeg segment length")
         if marker in (0xC0, 0xC1, 0xC2):
-            h, w = struct.unpack(">HH", data[i + 5:i + 9])
+            if seg < 8:
+                raise AssetImportError("truncated jpeg frame header")
+            precision = data[i + 2]
+            h, w = struct.unpack_from(">HH", data, i + 3)
+            channels = data[i + 7]
+            if precision not in (8, 12) or not 1 <= channels <= 4 or seg != 8 + 3 * channels:
+                raise AssetImportError("invalid jpeg frame layout")
             _texture_dims(w, h, "jpeg")
-            return {"width": w, "height": h, "channels": data[i + 9] if i + 9 < len(data) else 0,
+            return {"width": w, "height": h, "channels": channels,
                     "has_alpha": False, "power_of_two": _pot(w) and _pot(h)}
-        i += 2 + seg
+        if marker == 0xDA:
+            raise AssetImportError("jpeg scan precedes frame header")
+        i += seg
     raise AssetImportError("jpeg has no frame header")
 
 
