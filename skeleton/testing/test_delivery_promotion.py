@@ -32,3 +32,16 @@ def test_reasons():
 def test_cannot_skip_tiers_or_promote_unknown_release():
     v = evaluate(_req(source_tier="dev"), histories=_histories())
     assert "skip:dev->production" in v.reasons and "not-live-in-source" in v.reasons
+
+def test_promotion_rejects_duplicate_and_invalid_caller_evidence():
+    duplicated = _req(checks=(("smoke", "failure"), ("smoke", "success")))
+    result = evaluate(duplicated, histories=_histories(), required_checks=["smoke"])
+    assert not result.allowed and "duplicate-check-evidence" in result.reasons
+
+    invalid = _req(approvals=("reviewer", None), checks=(("smoke", "success"),))
+    result = evaluate(invalid, histories=_histories(), required_checks=["smoke"])
+    assert not result.allowed and "invalid-approval-evidence" in result.reasons
+
+    invalid_checks = _req(checks=(("smoke", "success"), ("invalid",)))
+    result = evaluate(invalid_checks, histories=_histories(), required_checks=["smoke"])
+    assert not result.allowed and "invalid-check-evidence" in result.reasons

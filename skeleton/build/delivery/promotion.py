@@ -55,10 +55,29 @@ def evaluate(
         reasons.append("manifest-mismatch")
     if request.target_tier == "production" and Version.parse(request.version).is_prerelease:
         reasons.append("prerelease-to-production")
-    approvers = set(request.approvals)
+    # These are caller-supplied identities, not GitHub review attestations.
+    # At minimum, malformed entries must never count as distinct approvals.
+    if (not isinstance(request.approvals, (tuple, list))
+            or len(request.approvals) > 256
+            or any(type(a) is not str or not a or len(a) > 128 for a in request.approvals)):
+        reasons.append("invalid-approval-evidence")
+        approvers: set[str] = set()
+    else:
+        approvers = set(request.approvals)
     if len(approvers) < required_approvals(request.target_tier):
         reasons.append(f"approvals:{len(approvers)}<{required_approvals(request.target_tier)}")
-    checks = dict(request.checks)
+    # dict(...) would let a trailing forged success override a prior failure.
+    if (not isinstance(request.checks, (tuple, list)) or len(request.checks) > 256
+            or any(not isinstance(item, (tuple, list)) or len(item) != 2
+                   or type(item[0]) is not str or not item[0]
+                   or type(item[1]) is not str for item in request.checks)):
+        reasons.append("invalid-check-evidence")
+        checks: dict[str, str] = {}
+    else:
+        names = [name for name, _ in request.checks]
+        if len(names) != len(set(names)):
+            reasons.append("duplicate-check-evidence")
+        checks = dict(request.checks)
     for name in required_checks:
         status = checks.get(name)
         if status != "success":
