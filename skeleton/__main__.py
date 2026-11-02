@@ -56,6 +56,7 @@ Commands:
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
     scene-circuit-author  Atomically edit and preview playable circuit sources
+    scene-circuit-accept  Verify editor, legal victory, checkpoint and portable export
     scene-patrol-solve  Find bounded legal routes through timed guards
     scene-patrol-author  Transactionally edit and preview timed patrols
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
@@ -878,6 +879,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-atlas":
         from skeleton.game.gameplay.scene_atlas import cli as atlas_cli
         return atlas_cli(rest)
+    if cmd == "scene-circuit-accept":
+        from skeleton.game.gameplay.scene_circuit_accept import cli as circuit_accept_cli
+        return circuit_accept_cli(rest)
     if cmd == "scene-circuit-author":
         from skeleton.game.gameplay.scene_circuit_author import cli as circuit_author_cli
         return circuit_author_cli(rest)
