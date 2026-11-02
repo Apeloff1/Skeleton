@@ -19,7 +19,7 @@ from .studio_ecosystem_story_html import story_source
 SCHEMA = "skeleton.game_builder.story_accessibility_script.v1"
 MAX_OUTPUT_BYTES = 65536
 MAX_CUES = 256
-MAX_TEXT = 2048
+MAX_TEXT = 8192
 
 
 def _safe(value: object, label: str) -> str:
@@ -29,6 +29,12 @@ def _safe(value: object, label: str) -> str:
         raise StudioQuestError("invalid accessibility " + label)
     return value
 
+
+def _md(value: str) -> str:
+    """Escape Markdown syntax as well as raw HTML in authored prose."""
+    special = "\\\`*_{}[]()#+-.!|>"
+    return "".join("\\" + char if char in special else char
+                   for char in escape(value))
 
 def _stamp(milliseconds: int) -> str:
     if type(milliseconds) is not int or not 0 <= milliseconds <= 35999999:
@@ -63,10 +69,10 @@ def compile_story_accessibility(
     lines = [
         "# Original interactive story — accessible reading edition",
         "",
-        "Project: " + escape(program.project_id),
+        "Project: " + _md(program.project_id),
         "Source digest: " + program.source_digest,
-        "Authored premise: " + escape(premise),
-        "Protagonist: " + escape(protagonist),
+        "Authored premise: " + _md(premise),
+        "Protagonist: " + _md(protagonist),
         "",
         "This is a sandbox reading edition, not generated audio, native gameplay, "
         "external evidence, rights verification, or release certification.",
@@ -86,18 +92,18 @@ def compile_story_accessibility(
             raise StudioQuestError("invalid accessibility authored alternatives")
         choices = [_safe(choice, "alternative") for choice in choices]
         lines.extend([
-            "## " + escape(stage_id) + " — " + escape(scene_id),
+            "## " + _md(stage_id) + " — " + _md(scene_id),
             "",
-            "Goal: " + escape(goal),
-            "Decision: " + escape(decision),
+            "Goal: " + _md(goal),
+            "Decision: " + _md(decision),
             "Available authored choices:",
         ])
-        lines.extend(f"{index}. {escape(choice)}"
+        lines.extend(f"{index}. {_md(choice)}"
                      for index, choice in enumerate(choices, 1))
         lines.extend([
-            "Prerequisites: " + (", ".join(escape(_safe(dep, "prerequisite"))
+            "Prerequisites: " + (", ".join(_md(_safe(dep, "prerequisite"))
                                           for dep in stage["prerequisites"]) or "none"),
-            "Sandbox reward: " + escape(_safe(stage["reward"], "reward")),
+            "Sandbox reward: " + _md(_safe(stage["reward"], "reward")),
             "",
         ])
         captions.append(("Stage " + stage_id, goal))
@@ -108,7 +114,7 @@ def compile_story_accessibility(
         ident = _safe(ending["id"], "ending ID")
         required = [_safe(value, "ending predicate") for value in ending["requires"]]
         text = ident + ": " + (", ".join(required) or "none")
-        lines.append("- " + escape(text))
+        lines.append("- " + _md(text))
         captions.append(("Ending " + ident, text))
     if not 1 <= len(captions) <= MAX_CUES:
         raise StudioQuestError("accessibility caption count exceeds budget")

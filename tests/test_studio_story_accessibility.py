@@ -53,6 +53,9 @@ def test_accessibility_escapes_untrusted_authored_text_and_fails_closed():
     assert "<script>" not in compiled["markdown"]
     assert "&lt;script&gt;" in compiled["markdown"]
     assert "<script>" not in compiled["webvtt"]
+    docs["narrative"]["premise"] = "[click](javascript:alert(1))"
+    compiled = compile_story_accessibility(docs, authorized=True)
+    assert "\\[click\\]\\(javascript:alert\\(1\\)\\)" in compiled["markdown"]
     docs["narrative"]["premise"] = "unsafe\ncue"
     with pytest.raises(StudioQuestError):
         compile_story_accessibility(docs, authorized=True)
