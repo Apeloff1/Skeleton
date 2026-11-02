@@ -131,7 +131,9 @@ class LongContextCpuCapacityGuard:
                 state = "hold"
         except Exception:
             state = "hold"
-        if state == "hold":
+        # Warming after a sampling gap is not a stable safe observation.
+        # Revoke previously reserved capacity on every non-normal state.
+        if state != "repeated_normal_observed":
             self._revocations += len(self._reservations)
             self._reservations.clear()
         return state
