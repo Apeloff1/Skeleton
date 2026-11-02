@@ -38,3 +38,14 @@ within [-100,100] without clamping. The offline HTML editor has CSP hash
 pinning and no network access; its exported JSON is never accepted without
 canonical CLI compilation. Review cannot create game-world facts or attest
 native gameplay.
+
+## Jeeves typed execution
+
+The trusted app assembler may call
+`register_quest_npc_relationship_tools(registry, trusted_documents)` to
+install `studio_quest_npc_propose`, `studio_quest_npc_compile`, and
+`studio_quest_npc_handoff` on the existing least-privilege
+`CapabilityRegistry`. All three are read-only and require explicit
+`authorized=True, dry_run=False` at the registry boundary. Each checks the
+registered immutable source lease before replay. This registration is opt-in;
+no untrusted model input can grant itself filesystem or publication authority.

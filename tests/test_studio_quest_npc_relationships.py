@@ -106,8 +106,18 @@ def test_duplicate_effect_and_overflow_rejected():
     })
     receipt = compile_plan(docs, program, initial, plan)
     assert receipt["final_trust"][0]["trust"] == 100
-    plan["effects"][0]["delta"] = 26
-    with pytest.raises(StudioQuestError):
+    docs["quest"]["stage_graph"].append({
+        "id": "after", "prerequisites": ["harbor"],
+        "alternatives": ["finish"], "reward": "after_pass",
+    })
+    program = compile_quest_program(docs)
+    initial = start_quest(docs, authorized=True)
+    plan["actions"].append(["after", "finish"])
+    plan["effects"].append({
+        "stage_id": "after", "choice": "finish", "actor_id": "captain",
+        "delta": 25, "reason": "Third bounded earned effect", "reviewed": True,
+    })
+    with pytest.raises(StudioQuestError, match="overflow"):
         compile_plan(docs, program, initial, plan)
 
 
@@ -123,8 +133,7 @@ def test_tamper_source_drift_and_authorization():
     with pytest.raises(StudioQuestError):
         replay_quest_npc_relationships(changed, receipt, authorized=True)
     with pytest.raises(PermissionError):
-        compile_plan(docs, program, initial, plan) if False else replay_quest_npc_relationships(
-            docs, receipt, authorized=False)
+        replay_quest_npc_relationships(docs, receipt, authorized=False)
 
 
 def test_private_publish_restore_and_symlink(tmp_path):
