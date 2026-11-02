@@ -33,8 +33,11 @@ def test_editor_changes_are_proven_in_playable_preview():
     source, _ = original_circuit()
     edits = [{"kind": "set_initial", "switch_id": "quay_lantern",
               "initial_on": True}]
+    original = copy.deepcopy(source)
     report = accept_circuit(source, edits)
-    assert report["source"]["switches"][0]["initial_on"] is True
+    assert source == original
+    assert next(s for s in report["terminal"]["source"]["switches"]
+                if s["id"] == "quay_lantern")["initial_on"] is True
     assert report["terminal"]["state"]["scene"]["state"]["phase"] == "won"
     assert len(report["plan"]["actions"]) == 3
     assert verify_acceptance(report) == report
@@ -46,9 +49,8 @@ def test_unreachable_and_budget_exhaustion_never_certified():
         accept_circuit(source, max_states=1)
     with pytest.raises(SceneTravelError, match="inconclusive"):
         accept_circuit(source, max_depth=1)
-    source["world"]["scenes"][0]["exits"] = [
-        e for e in source["world"]["scenes"][0]["exits"] if e["id"] != "north"
-    ]
+    next(s for s in source["world"]["scenes"]
+         if s["id"] == "gate")["exits"][0]["to"] = "sinkhole"
     with pytest.raises(SceneTravelError, match="unreachable"):
         accept_circuit(source)
 
