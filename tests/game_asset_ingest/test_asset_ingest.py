@@ -736,3 +736,26 @@ def test_jpeg_rejects_forged_frame_inside_malformed_segment():
     for forged in invalid:
         with pytest.raises(AssetImportError):
             import_bytes("forged.jpg", forged)
+
+
+@pytest.mark.parametrize("extension", [".gltf", ".glb"])
+def test_deeply_nested_gltf_json_fails_closed_without_partial_manifest(tmp_path, extension):
+    """Hostile JSON nesting must become a reported asset error, not a crash."""
+    nested = b"[" * 2048 + b"0" + b"]" * 2048
+    if extension == ".glb":
+        payload = (b"glTF" + struct.pack("<II", 2, 20 + len(nested))
+                   + struct.pack("<I4s", len(nested), b"JSON") + nested)
+    else:
+        payload = nested
+
+    with pytest.raises(AssetImportError):
+        import_bytes("hostile" + extension, payload)
+
+    (tmp_path / ("hostile" + extension)).write_bytes(payload)
+    (tmp_path / "valid.png").write_bytes(png())
+    report = import_files(tmp_path, ["valid.png", "hostile" + extension])
+    assert not report.ok
+    assert report.manifest.entries == []
+    assert report.imported == [] and report.duplicates == []
+    assert any(issue.path == "hostile" + extension and issue.code == "broken"
+               for issue in report.issues)

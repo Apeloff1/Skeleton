@@ -277,7 +277,7 @@ def _gltf_doc(doc: Any) -> dict[str, Any]:
 def _gltf(data: bytes) -> dict[str, Any]:
     try:
         return _gltf_doc(json.loads(data))
-    except (ValueError, AttributeError, TypeError) as exc:
+    except (ValueError, AttributeError, TypeError, RecursionError) as exc:
         if isinstance(exc, AssetImportError):
             raise
         raise AssetImportError("gltf is not valid json") from exc
@@ -295,7 +295,7 @@ def _glb(data: bytes) -> dict[str, Any]:
         raise AssetImportError("glb missing JSON chunk")
     try:
         return _gltf_doc(json.loads(data[20:20 + clen]))
-    except (ValueError, AttributeError, TypeError) as exc:
+    except (ValueError, AttributeError, TypeError, RecursionError) as exc:
         if isinstance(exc, AssetImportError):
             raise
         raise AssetImportError("glb JSON chunk invalid") from exc
