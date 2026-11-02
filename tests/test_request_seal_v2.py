@@ -266,3 +266,35 @@ def test_verifier_rejects_control_bytes_even_in_signed_legacy_identity():
         signed = hs.mint_seal(attester, 60, secret=SECRET, now=NOW)
         with pytest.raises(AuthError):
             hs.verify_seal(signed, secret=SECRET, now=NOW)
+
+
+def test_seal_replay_cache_full_rejections_do_not_scan_live_map():
+    """A saturated replay cache must reject in bounded constant time."""
+    cache = hs.InMemoryReplayCache(max_entries=2)
+    assert cache.check_and_store("a", NOW + 100, NOW)
+    assert cache.check_and_store("b", NOW + 200, NOW)
+
+    class NoEnumeration(dict):
+        def items(self):
+            raise AssertionError("live replay entries must not be rescanned")
+
+        def values(self):
+            raise AssertionError("live replay entries must not be rescanned")
+
+    cache._seen = NoEnumeration(cache._seen)
+    for _ in range(3):
+        with pytest.raises(hs.ReplayCacheFull):
+            cache.check_and_store("attacker", NOW + 100, NOW)
+    assert cache.check_and_store("a", NOW + 100, NOW) is False
+    assert len(cache) == 2
+
+
+def test_seal_replay_cache_recomputes_expiry_after_replacing_oldest():
+    cache = hs.InMemoryReplayCache(max_entries=2)
+    assert cache.check_and_store("early", NOW + 5, NOW)
+    assert cache.check_and_store("later", NOW + 100, NOW)
+    assert cache.check_and_store("early", NOW + 200, NOW + 6)
+    assert cache._earliest_expiry == NOW + 100
+    with pytest.raises(hs.ReplayCacheFull):
+        cache.check_and_store("new", NOW + 200, NOW + 6)
+    assert cache.check_and_store("later", NOW + 100, NOW + 6) is False

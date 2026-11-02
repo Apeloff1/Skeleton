@@ -236,15 +236,20 @@ class InMemoryReplayCache:
             raise ValueError("max_entries must be a positive integer")
         self._max = max_entries
         self._seen: Dict[str, int] = {}
+        # Avoid scanning a full, unexpired replay map for each denied token.
+        self._earliest_expiry: int | None = None
         self._lock = threading.Lock()
 
     def __len__(self) -> int:
         return len(self._seen)
 
     def _purge(self, now: int) -> None:
+        if self._earliest_expiry is None or self._earliest_expiry >= now:
+            return
         dead = [k for k, exp in self._seen.items() if exp < now]
         for k in dead:
             del self._seen[k]
+        self._earliest_expiry = min(self._seen.values(), default=None)
 
     def check_and_store(self, key: str, expires_at: int, now: int) -> bool:
         with self._lock:
@@ -256,6 +261,12 @@ class InMemoryReplayCache:
                 if len(self._seen) >= self._max:
                     raise ReplayCacheFull("replay cache full")
             self._seen[key] = expires_at
+            if exp is not None and exp == self._earliest_expiry:
+                # Recompute only on accepted expiry replacement, not every
+                # saturated denial; never evict live replay evidence.
+                self._earliest_expiry = min(self._seen.values(), default=None)
+            elif self._earliest_expiry is None or expires_at < self._earliest_expiry:
+                self._earliest_expiry = expires_at
             return True
 
 
