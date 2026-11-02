@@ -131,14 +131,15 @@ class StateFixture(unittest.TestCase):
             attempt=requests.reserve(conn,req,self.limits,lease_ns=1)
         time.sleep(.002)
         with self.db.transaction() as conn:
-            replacement=requests.reserve(conn,req,self.limits,lease_ns=1_000_000_000)
-        self.assertGreater(replacement['token'],attempt['token'])
+            with self.assertRaisesRegex(Busy,'operator recovery'):
+                requests.reserve(conn,req,self.limits,lease_ns=1_000_000_000)
         generation=GenerationReceipt('fixture',MODEL,TOK,5,3,'stop')
         with self.db.transaction() as conn:
             with self.assertRaises(Conflict):receipts.commit(conn,req,self.limits,generation,
                 attempt['token'],context_sha256='c'*64)
         with self.db.snapshot() as conn:
             self.assertEqual(conn.execute('SELECT COUNT(*) FROM turns').fetchone()[0],0)
+            self.assertEqual(conn.execute('SELECT state FROM requests').fetchone()[0],'pending')
 
     def test_transaction_rolls_back_partial_state(self):
         try:

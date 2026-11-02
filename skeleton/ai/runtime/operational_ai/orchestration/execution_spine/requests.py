@@ -18,12 +18,11 @@ def reserve(conn,req:InferenceRequest,limits:SpineLimits,*,lease_ns:int=60_000_0
         if state=='committed':return {'state':'committed','token':token,'nonce':nonce}
         if state in ('cancelled','held'):raise Conflict(f'request held terminal state {state}')
         if deadline is None or now<deadline:raise Busy('request is already in flight')
-        # An expired holder may still compute; its token is fenced at commit.
-        token=token+1
-        conn.execute("UPDATE requests SET owner_token=?,lease_deadline_ns=?,updated_ns=? WHERE session=? AND request_id=? AND state='pending'",
-            (token,now+lease_ns,now,req.session,req.request_id))
-        append(conn,req.session,'request_reclaimed',{'request_id':req.request_id,'token':token})
-        return {'state':'reserved','token':token,'nonce':nonce}
+        # Expiry is not proof that the native model stopped running. Never
+        # reclaim and regenerate an ambiguous pending inference. An independent
+        # recovery action may hold the request after its deadline, but cannot
+        # silently re-execute the same request ID.
+        raise Busy('expired inference requires explicit operator recovery hold')
     competing=conn.execute("SELECT request_id FROM requests WHERE session=? AND state='pending' LIMIT 1",(req.session,)).fetchone()
     if competing:raise Busy('another session operation has pending custody')
     count=conn.execute("SELECT COUNT(*) FROM requests WHERE state='pending'").fetchone()[0]
