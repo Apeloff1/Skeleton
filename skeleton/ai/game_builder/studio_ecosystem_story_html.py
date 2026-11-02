@@ -36,6 +36,8 @@ const checkpoint=document.getElementById("checkpoint");
 const checkpointStatus=document.getElementById("checkpoint-status");
 const previewStatus=document.getElementById("choice-preview");
 const compareStatus=document.getElementById("checkpoint-compare-status");
+const mergeStatus=document.getElementById("checkpoint-merge-status");
+const ancestorInput=document.getElementById("checkpoint-ancestor");
 function node(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;}
 function reset(){chosen.length=0;completed.clear();previewStatus.textContent="";compareStatus.textContent="";render();}
 function act(id,option){
@@ -158,6 +160,59 @@ function compareCheckpoint(){
    compareStatus.textContent="Checkpoint comparison rejected; current progress preserved";
  }
 }
+function mergeCheckpoint(){
+ // Browser-side reconciliation is a convenience preview only. The canonical
+ // Python merge CLI must independently replay and save the proposed result.
+ try{
+   const ancestor=parseCheckpoint(ancestorInput.value);
+   const candidate=parseCheckpoint(checkpoint.value);
+   const current=chosen.map(pair=>pair.slice());
+   const prefix=(base,history)=>base.length<=history.length&&
+     base.every((pair,index)=>pair[0]===history[index][0]&&pair[1]===history[index][1]);
+   if(!prefix(ancestor,current)||!prefix(ancestor,candidate)){
+     throw Error("fork does not extend the shared ancestor");
+   }
+   const mergedMap=new Map(ancestor);
+   for(const [id,choice] of [...current.slice(ancestor.length),
+                              ...candidate.slice(ancestor.length)]){
+     if(mergedMap.has(id)&&mergedMap.get(id)!==choice){
+       throw Error("conflicting authored choice");
+     }
+     mergedMap.set(id,choice);
+   }
+   const ancestorIds=new Set(ancestor.map(pair=>pair[0]));
+   const merged=[...ancestor.map(pair=>pair.slice())];
+   for(const stage of source.stages){
+     if(mergedMap.has(stage.id)&&!ancestorIds.has(stage.id)){
+       merged.push([stage.id,mergedMap.get(stage.id)]);
+     }
+   }
+   const subsequence=(history)=>{
+     let cursor=0;
+     for(const pair of merged){
+       if(cursor<history.length&&history[cursor][0]===pair[0]&&
+          history[cursor][1]===pair[1]){cursor++;}
+     }
+     return cursor===history.length;
+   };
+   if(!subsequence(current)||!subsequence(candidate)){
+     throw Error("incompatible fork ordering");
+   }
+   // Validate the merged history using the same source-leased replay as restore.
+   const receipt={schema:"skeleton.game_builder.offline_story_choices.v1",
+     project_id:source.project_id,source_digest:source.source_digest,
+     choices:merged,external_evidence_verified:false,
+     native_genre_runtime_verified:false,release_certified:false};
+   const proposed=JSON.stringify(receipt,null,2);
+   parseCheckpoint(proposed);
+   checkpoint.value=proposed;
+   mergeStatus.textContent="Proposed "+merged.length+"-action checkpoint is in the editor. "+
+     "Current progress was not changed. Save using the operator CLI for canonical replay "+
+     "and exclusive private publication; no external evidence is verified.";
+ }catch(error){
+   mergeStatus.textContent="Fork merge rejected; current progress and pasted candidate preserved.";
+ }
+}
 function render(){
  host.replaceChildren();endings.replaceChildren();
  summary.textContent=completed.size+" of "+source.stages.length+" authored stages complete";
@@ -198,6 +253,7 @@ function render(){
 document.getElementById("restart").addEventListener("click",reset);
 document.getElementById("undo").addEventListener("click",undoChoice);
 document.getElementById("checkpoint-compare").addEventListener("click",compareCheckpoint);
+document.getElementById("checkpoint-merge").addEventListener("click",mergeCheckpoint);
 document.getElementById("checkpoint-copy").addEventListener("click",()=>{
  checkpoint.value=transcript.textContent;
  checkpointStatus.textContent="Copy this checkpoint to save it privately";
@@ -287,6 +343,13 @@ def render_story_html(documents: Mapping[str, Any]) -> bytes:
         "<button type='button' id='checkpoint-compare'>Compare pasted checkpoint</button>"
         "<p id='checkpoint-compare-status' role='status' aria-live='polite'></p>"
         "<p id='checkpoint-status' role='status' aria-live='polite'></p>"
+        "<h3>Reconcile offline story forks</h3>"
+        "<p>Paste the common ancestor here and a second fork in the checkpoint editor. "
+        "Preview is noncommitting; the operator CLI must verify and privately save it.</p>"
+        "<label for='checkpoint-ancestor'>Shared ancestor checkpoint JSON</label>"
+        "<textarea id='checkpoint-ancestor' rows='8' maxlength='16384' spellcheck='false'></textarea>"
+        "<button type='button' id='checkpoint-merge'>Preview three-way fork merge</button>"
+        "<p id='checkpoint-merge-status' role='status' aria-live='polite'></p>"
         "</section></main>"
         "<script type='application/json' id='studio-source'>"+payload+"</script>"
         "<script>"+_JS+"</script></body></html>"
