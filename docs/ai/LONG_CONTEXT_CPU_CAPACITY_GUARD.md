@@ -22,3 +22,14 @@ This guard cannot be used as an interprocess lock or release certificate.
 
 Focused regression: python -m unittest tests.flgb.test_long_context_cpu_guard
 Follow with canonical spool/progress/telemetry suites and exact-head CI.
+
+## All-or-nothing fair cycles
+
+reserve_fair_cycle accepts a tuple of independent stream requests and a
+bounded quantum. It verifies every principal, head observation and aggregate
+spool capacity before publishing any in-process reservation. A single stale
+head, duplicate stream, insufficient token/byte budget, oversized quantum,
+or unverified disk observation rejects the entire cycle without reserving
+capacity for early streams. Each stream receives at most one quantum.
+This is fairness within a single cooperative cycle only; the backend must
+still enforce cross-process coordination and independent execution authority.
