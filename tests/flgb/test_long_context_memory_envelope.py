@@ -119,13 +119,34 @@ class MemoryEnvelopeTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(LongContextSpoolError):
                 self.observe(requested_bytes=bad)
         with self.assertRaises(LongContextSpoolError):
-            self.observe(reserve_bytes=-1)
+            with patch("skeleton.ai.model_runtime.long_context_memory_envelope.sys.platform", "linux"):
+                observe_memory_envelope(reserve_bytes=-1, reader=self.read, clock=self.clock)
 
     def test_unsupported_platform_never_claims_memory(self):
         with patch("skeleton.ai.model_runtime.long_context_memory_envelope.sys.platform", "win32"):
             result = observe_memory_envelope(reader=self.read, clock=self.clock)
         self.assertEqual(result["reason"], "unsupported_platform")
         self.assertFalse(result["is_admission_grant"])
+
+    def test_cli_read_only_memory_observation(self):
+        import contextlib
+        from io import StringIO
+        from unittest.mock import MagicMock
+        from skeleton.ai.model_runtime.long_context_cli import main
+        output = StringIO()
+        receipt = self.observe(requested_bytes=512)
+        with patch(
+            "skeleton.ai.model_runtime.long_context_cli.observe_memory_envelope",
+            return_value=receipt
+        ) as sampler, patch(
+            "skeleton.ai.model_runtime.long_context_cli.LongContextSpool",
+            side_effect=AssertionError("must not open spool")
+        ), contextlib.redirect_stdout(output):
+            code = main(["--root", "/unused", "--tokenizer-digest", "a" * 64,
+                         "head-observe-memory", "--request-bytes", "512"])
+        self.assertEqual(code, 0)
+        sampler.assert_called_once_with(requested_bytes=512)
+        self.assertIn('"state":"observed_headroom"', output.getvalue())
 
     def test_parser_strictness(self):
         for bad in ("", "MemTotal: 1 kB\n", "MemTotal: 1 kB\nMemAvailable: 2 kB",
