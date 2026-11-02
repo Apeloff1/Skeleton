@@ -73,6 +73,8 @@ Commands:
     scene-weather  Play authored climate, stamina and earned protection
     scene-weather-author  Transactionally edit climate and preview play
     scene-weather-play  Interactively play weather with portable checkpoints
+    scene-weather-board  Inspect legal weather actions, earned gear and forecast
+    scene-weather-route  Find replay-proven weather routes within explicit budgets
     scene-market-hours  Play authored merchant schedules with verified saves
     scene-market-hours-play  Interactively play merchants with portable checkpoints
     scene-market-hours-accept  Verify end-to-end merchant gameplay acceptance
@@ -941,6 +943,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market":
         from skeleton.game.gameplay.scene_market import cli as market_cli
         return market_cli(rest)
+    if cmd == "scene-weather-board":
+        from skeleton.game.gameplay.scene_weather_board import cli as weather_board_cli
+        return weather_board_cli(rest)
+    if cmd == "scene-weather-route":
+        from skeleton.game.gameplay.scene_weather_route import cli as weather_route_cli
+        return weather_route_cli(rest)
     if cmd == "scene-weather":
         from skeleton.game.gameplay.scene_weather import cli as weather_cli
         return weather_cli(rest)
