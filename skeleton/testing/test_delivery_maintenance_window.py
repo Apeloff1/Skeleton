@@ -28,3 +28,20 @@ def test_parse_errors():
             Window.parse(bad)
     with pytest.raises(DeliveryError):
         Freeze(5, 5, "x")
+
+def test_window_parser_rejects_invalid_clock_normalization():
+    for bad in ("tue 08:60-10:00", "tue 24:00-24:00",
+                "tue 08:00-24:01", "tue 99:00-10:00",
+                "tue 08:00-10:60", "tue 8:00-10:00",
+                "tue 08:00-10:00 trailing"):
+        with pytest.raises(DeliveryError):
+            Window.parse(bad)
+    assert Window.parse("tue 23:30-24:00") == Window("tue", 1410, 1440)
+
+
+def test_freeze_rejects_invalid_timestamp_and_reason_evidence():
+    for start, end, reason in ((True, 100, "x"), (1.0, 100, "x"),
+                               (-1, 100, "x"), (1, 2.0, "x"),
+                               (1, 2, ""), (1, 2, "forged\\nreason")):
+        with pytest.raises(DeliveryError):
+            Freeze(start, end, reason)

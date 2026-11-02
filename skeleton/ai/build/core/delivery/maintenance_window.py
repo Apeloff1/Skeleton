@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -25,14 +26,22 @@ class Window:
 
     @classmethod
     def parse(cls, text: str) -> "Window":
-        try:
-            day, span = text.strip().lower().split(" ", 1)
-            start, end = span.split("-")
-            sh, sm = (int(x) for x in start.split(":"))
-            eh, em = (int(x) for x in end.split(":"))
-        except ValueError as exc:
-            raise DeliveryError(f"window must look like 'tue 09:00-17:00': {text!r}") from exc
-        return cls(day, sh * 60 + sm, eh * 60 + em)
+        # Arithmetic normalization must not turn 08:60 or 24:01 into a
+        # different, valid deploy window. Parse the clock fields strictly.
+        match = re.fullmatch(
+            r"([a-z]{3}) ([0-9]{2}):([0-9]{2})-([0-9]{2}):([0-9]{2})",
+            text.strip().lower() if isinstance(text, str) else "",
+        )
+        if match is None:
+            raise DeliveryError("window must look like 'tue 09:00-17:00'")
+        day, sh, sm, eh, em = match.groups()
+        start_hour, start_minute = int(sh), int(sm)
+        end_hour, end_minute = int(eh), int(em)
+        if (start_hour > 23 or start_minute > 59 or end_minute > 59
+                or end_hour > 24 or (end_hour == 24 and end_minute != 0)):
+            raise DeliveryError("window clock fields out of range")
+        return cls(day, start_hour * 60 + start_minute,
+                   end_hour * 60 + end_minute)
 
 
 @dataclass(frozen=True)
@@ -42,8 +51,13 @@ class Freeze:
     reason: str
 
     def __post_init__(self) -> None:
-        if self.end <= self.start:
-            raise DeliveryError("freeze end must follow start")
+        if (type(self.start) is not int or type(self.end) is not int
+                or self.start < 0 or self.end <= self.start):
+            raise DeliveryError("freeze timestamps must be increasing nonnegative integers")
+        if (type(self.reason) is not str or not self.reason.strip()
+                or len(self.reason) > 256
+                or any(ord(char) < 32 or ord(char) == 127 for char in self.reason)):
+            raise DeliveryError("freeze reason must be bounded printable text")
 
 
 def in_window(ts: int, windows: Iterable[Window]) -> bool:
