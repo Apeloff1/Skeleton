@@ -174,7 +174,7 @@ def test_router_requires_explicit_authoring_permission(monkeypatch):
 
 def test_cli_plan_editor_publish_restore(tmp_path, capsys):
     from scripts.studio_quest_pacing_cli import main
-    docs, plan, leases, _ = fixture()
+    _, plan, leases, _ = fixture()
     path = tmp_path / "plan.json"
     path.write_text(json.dumps(plan))
     os.chmod(path, 0o600)

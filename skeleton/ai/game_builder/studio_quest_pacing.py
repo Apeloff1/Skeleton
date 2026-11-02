@@ -9,7 +9,6 @@ from html import escape
 import json
 import os
 from pathlib import Path
-import re
 import secrets
 from typing import Any, Mapping
 

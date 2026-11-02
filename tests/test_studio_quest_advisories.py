@@ -185,7 +185,7 @@ def test_router_requires_operator_authoring(monkeypatch):
 
 def test_cli_edit_consent_publish_restore(tmp_path, capsys):
     from scripts.studio_quest_advisories_cli import main
-    docs, plan, leases = fixture()
+    _, plan, leases = fixture()
     path = tmp_path / "plan.json"
     path.write_text(json.dumps(plan))
     os.chmod(path, 0o600)

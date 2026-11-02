@@ -162,9 +162,6 @@ def compile_quest_advisories(
     plan = _plan(authoring, program)
     session = replay_quest(documents, plan["actions"], authorized=True)
     progress = quest_progress(session, documents)
-    rows = {row["stage_id"]: row for row in plan["advisories"]}
-    played = [dict(rows[stage]) for stage in session.completed]
-    next_rows = [dict(rows[stage]) for stage in progress["available"]]
     all_reviewed = all(row["reviewed"] for row in plan["advisories"])
     target_ready = plan["target_ending"] in progress["sandbox_endings_eligible"]
     if _canonical(documents) != before:
