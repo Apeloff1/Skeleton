@@ -77,3 +77,26 @@ def test_latency_and_status_evidence_must_be_bounded_integers():
     for status in (True, 200.0, "200", 600):
         report = evaluate([LIVE], [O("liveness", "r1", status, 1)], replicas=("r1",))
         assert report.verdict == "unhealthy"
+
+def test_health_observation_and_inventory_limits_fail_closed():
+    from itertools import repeat
+    from skeleton.build.delivery.health_check import (
+        MAX_HEALTH_OBSERVATIONS, MAX_HEALTH_PROBES, MAX_HEALTH_REPLICAS,
+        MAX_OBSERVATION_BODY_CHARS,
+    )
+
+    with pytest.raises(DeliveryError, match="observation count exceeds"):
+        evaluate([LIVE], repeat(O("liveness", "r1", 200, 1),
+                                MAX_HEALTH_OBSERVATIONS + 1), replicas=("r1",))
+    with pytest.raises(DeliveryError, match="invalid health observation"):
+        evaluate([LIVE], [object()], replicas=("r1",))
+    with pytest.raises(DeliveryError, match="body exceeds bound"):
+        evaluate([LIVE], [O("liveness", "r1", 200, 1,
+                            body="x" * (MAX_OBSERVATION_BODY_CHARS + 1))],
+                 replicas=("r1",))
+    with pytest.raises(DeliveryError, match="probe count exceeds"):
+        evaluate([ProbeSpec(f"p{i}", "/health") for i in range(MAX_HEALTH_PROBES + 1)],
+                 [], replicas=("r1",))
+    with pytest.raises(DeliveryError, match="replica count exceeds"):
+        evaluate([LIVE], [], replicas=tuple(
+            f"r{i}" for i in range(MAX_HEALTH_REPLICAS + 1)))

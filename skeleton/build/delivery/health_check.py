@@ -15,6 +15,10 @@ from typing import Iterable, Mapping, Sequence
 from skeleton.build.delivery._util import DeliveryError, require_id
 
 VERDICTS = ("healthy", "degraded", "unhealthy")
+MAX_HEALTH_PROBES = 256
+MAX_HEALTH_REPLICAS = 1024
+MAX_HEALTH_OBSERVATIONS = 8192
+MAX_OBSERVATION_BODY_CHARS = 65536
 
 
 @dataclass(frozen=True)
@@ -93,8 +97,12 @@ def evaluate(
 ) -> HealthReport:
     if not specs:
         raise DeliveryError("at least one probe is required")
+    if len(specs) > MAX_HEALTH_PROBES:
+        raise DeliveryError("health probe count exceeds bound")
     if not replicas:
         raise DeliveryError("at least one replica is required")
+    if len(replicas) > MAX_HEALTH_REPLICAS:
+        raise DeliveryError("health replica count exceeds bound")
     if (type(quorum) not in (int, float) or not math.isfinite(quorum)
             or not 0 < quorum <= 1):
         raise DeliveryError("quorum must be a finite fraction in (0, 1]")
@@ -106,7 +114,13 @@ def evaluate(
         raise DeliveryError("duplicate probe ids")
     spec_map = {s.probe_id: s for s in specs}
     latest: dict[tuple[str, str], ProbeObservation] = {}
-    for obs in observations:
+    for count, obs in enumerate(observations, 1):
+        if count > MAX_HEALTH_OBSERVATIONS:
+            raise DeliveryError("health observation count exceeds bound")
+        if not isinstance(obs, ProbeObservation):
+            raise DeliveryError("invalid health observation")
+        if type(obs.body) is not str or len(obs.body) > MAX_OBSERVATION_BODY_CHARS:
+            raise DeliveryError("health observation body exceeds bound")
         if obs.probe_id not in spec_map:
             raise DeliveryError(f"unknown probe {obs.probe_id!r}")
         if obs.replica in replicas:
