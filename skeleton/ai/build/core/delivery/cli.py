@@ -85,8 +85,9 @@ def _read_tree(root: Path) -> dict[str, bytes]:
                         leaf_fd = os.open(entry.name, file_flags, dir_fd=directory_fd)
                         try:
                             before = os.fstat(leaf_fd)
-                            identity = lambda s: (s.st_dev, s.st_ino, s.st_size,
-                                                  s.st_mtime_ns, s.st_ctime_ns)
+                            def identity(s):
+                                return (s.st_dev, s.st_ino, s.st_size,
+                                        s.st_mtime_ns, s.st_ctime_ns)
                             if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
                                     or identity(before) != identity(observed)):
                                 raise DeliveryError("delivery file changed or aliases external inode")
