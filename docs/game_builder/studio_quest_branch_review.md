@@ -37,3 +37,16 @@ input, symlinked private input, existing output, and unauthorized requests
 are rejected. Branch comparison is bounded to 64 actions per branch and the
 canonical authored DAG limit. The HTML editor uses a pinned CSP script hash,
 escapes authored content, and cannot access the network.
+
+## Jeeves integration
+
+A trusted app assembly can explicitly register read-only typed adapters with
+`register_quest_branch_review_tools(CapabilityRegistry(), trusted_documents)`.
+The three capability IDs are `studio_quest_branch_propose`,
+`studio_quest_branch_compile`, and `studio_quest_branch_handoff`.
+The registry rejects unauthorized execution and defaults to dry-run; a trusted
+caller must set `authorized=True, dry_run=False` to obtain results. No adapter
+writes files or grants an external model, user prompt, or player approval.
+The branch compiler independently cross-checks the canonical consequence-diff
+receipt and rejects identical histories, preventing duplicated or fabricated
+branch comparison evidence.

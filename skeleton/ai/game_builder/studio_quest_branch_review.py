@@ -20,6 +20,7 @@ from .studio_ecosystem_scene_schedule import (
     _canonical, _digest, _lease, _open_directory, _write_all,
 )
 from .studio_quest_private_io import read_studio_private_json
+from .studio_quest_consequence_diff import compile_quest_consequence_diff
 
 SCHEMA = "skeleton.game_builder.studio_quest_branch_review.v1"
 PLAN_SCHEMA = "skeleton.game_builder.studio_quest_branch_plan.v1"
@@ -128,6 +129,8 @@ def compile_quest_branch_review(
     if initial.digest != expected_initial_session_digest:
         raise StudioQuestError("stale branch initial session lease")
     checked = _validate_plan(plan, program)
+    if checked["left_actions"] == checked["right_actions"]:
+        raise StudioQuestError("branch comparison requires distinct authored histories")
     left = replay_quest(documents, checked["left_actions"], authorized=True)
     right = replay_quest(documents, checked["right_actions"], authorized=True)
     left_progress = quest_progress(left, documents)
@@ -142,6 +145,15 @@ def compile_quest_branch_review(
         common += 1
     left_ending = left_progress["sandbox_endings_eligible"]
     right_ending = right_progress["sandbox_endings_eligible"]
+    counterfactual = compile_quest_consequence_diff(
+        documents, {"baseline_actions": checked["left_actions"],
+                    "candidate_actions": checked["right_actions"]},
+        authorized=True, expected_source_digest=program.source_digest,
+        expected_initial_session_digest=initial.digest)
+    if (counterfactual["first_divergence_index"] != common
+            or counterfactual["ending_delta"]["lost"] != sorted(set(left_ending) - set(right_ending))
+            or counterfactual["ending_delta"]["gained"] != sorted(set(right_ending) - set(left_ending))):
+        raise StudioQuestError("independent counterfactual proof diverged")
     target = checked["target_ending"]
     if _canonical(documents) != before:
         raise StudioQuestError("branch source mutated during compilation")
@@ -152,6 +164,7 @@ def compile_quest_branch_review(
         "authoring": checked, "left_session_digest": left.digest,
         "right_session_digest": right.digest,
         "selected_session_digest": chosen.digest,
+        "canonical_counterfactual_digest": counterfactual["receipt_digest"],
         "common_prefix_actions": common,
         "left_unique_actions": [list(x) for x in left.choices[common:]],
         "right_unique_actions": [list(x) for x in right.choices[common:]],
