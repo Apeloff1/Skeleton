@@ -77,7 +77,10 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
             raise FirstPlayableDeliveryBatchError(
                 "independent source manifest requires lowercase SHA-256"
             )
-        if any(type(value) not in (str, Path) for value in (
+        # pathlib.Path() returns PosixPath/WindowsPath, not an object whose
+        # exact type is Path. Reject arbitrary path-like objects, but admit
+        # real concrete Path instances used by the canonical game builder.
+        if any(not (type(value) is str or isinstance(value, Path)) for value in (
             job.source, job.archive, job.install, job.save, job.receipt,
         )):
             raise FirstPlayableDeliveryBatchError(
@@ -105,6 +108,10 @@ def _check_jobs(jobs: Sequence[DeliveryJob], summary: str | Path, *,
         paths.append(tuple(map(canonical, (
             job.source, job.archive, job.install, job.save, job.receipt,
         ))))
+    if not (type(summary) is str or isinstance(summary, Path)):
+        raise FirstPlayableDeliveryBatchError(
+            "cohort summary destination must be a string or pathlib Path"
+        )
     summary_path = canonical(summary)
     sources = [entry[0] for entry in paths]
     installs = [entry[2] for entry in paths]

@@ -64,6 +64,35 @@ def pinned(jobs, published):
     )
 
 
+
+
+def test_batch_preflight_accepts_concrete_pathlib_paths(original_games, tmp_path):
+    # Path() creates a PosixPath/WindowsPath, never an exact Path instance.
+    # A type(value) in (str, Path) check would reject every real game job.
+    from skeleton.app.offline_first_playable_batch import _check_jobs
+
+    jobs = jobs_for(original_games, tmp_path)
+    assert all(isinstance(job.source, Path) for job in jobs)
+    assert _check_jobs(jobs, tmp_path / "cohort.json", inspect=False) == jobs
+    mixed = (replace(jobs[0], source=str(jobs[0].source)), jobs[1])
+    assert _check_jobs(mixed, str(tmp_path / "cohort.json"), inspect=False) == mixed
+
+
+def test_batch_preflight_rejects_untyped_paths_before_publication(
+    original_games, tmp_path,
+):
+    from skeleton.app.offline_first_playable_batch import _check_jobs
+
+    jobs = jobs_for(original_games, tmp_path)
+    malformed = (jobs[0], replace(jobs[1], source=object()))
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="strings or pathlib Paths"):
+        _check_jobs(malformed, tmp_path / "cohort.json", inspect=False)
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="summary destination"):
+        _check_jobs(jobs, object(), inspect=False)
+    assert not Path(jobs[0].archive).exists()
+    assert not Path(jobs[1].archive).exists()
+
+
 def test_two_original_games_publish_restore_and_independently_reverify(
     original_games, tmp_path,
 ):
