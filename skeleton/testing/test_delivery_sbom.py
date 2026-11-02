@@ -38,7 +38,7 @@ def test_component_validation():
 def test_sbom_intake_rejects_silent_dependency_omission():
     for directive in ("-r other.txt", "-e git+ssh://example/mod", "--extra-index-url https://index"):
         with pytest.raises(DeliveryError, match="unsupported requirements directive"):
-            parse_requirements("safe==1.0.0\\n" + directive)
+            parse_requirements("safe==1.0.0\n" + directive)
     for invalid in (
         {"packages": {"node_modules/react": {}}},
         {"packages": {"node_modules/react": "18.0.0"}},
