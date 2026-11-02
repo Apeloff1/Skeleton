@@ -16,7 +16,7 @@ from typing import Any
 from .studio_ecosystem_quest import StudioQuestError
 from .studio_ecosystem_scene_schedule import _open_directory
 
-MAX_PRIVATE_JSON_BYTES = 65536
+MAX_PRIVATE_JSON_BYTES = 384 * 1024  # Per-call limits remain mandatory and smaller by default.
 
 
 def _identity(info: os.stat_result) -> tuple[int, ...]:

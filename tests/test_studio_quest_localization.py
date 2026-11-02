@@ -180,3 +180,21 @@ def test_cli_plan_preview_publish_restore(tmp_path, capsys):
                  leases["expected_initial_session_digest"], "--restore",
                  str(tmp_path)]) == 0
     assert json.loads(capsys.readouterr().out)["localization"]["row_count"] > 0
+
+
+def test_large_bounded_private_localization_json(tmp_path):
+    """Large authored locales need a bounded, descriptor-checked input reader."""
+    from skeleton.ai.game_builder.studio_quest_private_io import read_studio_private_json
+    path = tmp_path / "locale.json"
+    payload = {"locale": "nb-NO", "notes": "a" * 70000}
+    path.write_text(json.dumps(payload))
+    os.chmod(path, 0o600)
+    assert read_studio_private_json(path, 256 * 1024) == payload
+    with pytest.raises(StudioQuestError):
+        read_studio_private_json(path, 65536)
+    with pytest.raises(StudioQuestError):
+        read_studio_private_json(path, 512 * 1024)
+    path.unlink()
+    path.symlink_to(tmp_path / "missing")
+    with pytest.raises((StudioQuestError, OSError)):
+        read_studio_private_json(path, 256 * 1024)
