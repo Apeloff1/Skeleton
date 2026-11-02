@@ -44,6 +44,16 @@ class InferenceDaemon:
             if self.status.snapshot()['phase']!='running':return False
             self._loop.notify();return True
 
+    def accepting(self)->bool:
+        """Observe only worker availability, never manufacture approval.
+
+        Submission is forbidden once the worker has faulted, stopped, is
+        draining, or has exceeded the observational stall threshold. The
+        persistent operator paused mode still permits bounded queueing.
+        """
+        status=self.snapshot()
+        return status['phase']=='running' and not status['stall_observed']
+
     def snapshot(self)->dict:
         result=self.status.snapshot(stall_ms=self.policy.health_stall_ms)
         # No model health or benchmark claim is inferred from scheduler state.

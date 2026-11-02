@@ -71,6 +71,15 @@ release readiness.
   thread is non-daemon, so backend and database custody are not released while
   noninterruptible model generation is still executing. A bounded stop may
   report busy; it is not permission to force-close model memory.
+- The production dispatcher now **refuses new admissions** when the worker
+  is held, draining, stopped or observably stalled. The operator-paused queue
+  may still accept bounded work for later explicit resumption. This prevents
+  silently growing a backlog behind a failed native backend.
+- `GET /v2/protocol` advertises only actually available production operations:
+  manually triggered `work_one` is omitted when the automatic daemon owns the
+  backend. Existing explicit manual-mode callers retain their prior contract.
+- Operator latency percentiles use nearest-rank semantics; two observations
+  cannot be falsely reported with the minimum as p95.
 - `wait` and `GET /v2/health` are read-only and cannot execute a model.
   Canceling a running call cannot promise a native GPU interrupt; its durable
   state may still resolve to completed after the request.

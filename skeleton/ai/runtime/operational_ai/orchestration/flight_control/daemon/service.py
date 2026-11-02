@@ -17,7 +17,8 @@ def SupervisedFlightHTTP(application,knowledge,token,*,port:int=8766,
     from ....transport.flight.http import FlightHTTPServer
     with InferenceDaemon(application,policy=policy) as daemon:
         dispatcher=FlightDispatcher(application,knowledge_plane=knowledge,
-                                    on_submit=daemon.notify,allow_manual_work=False)
+                                    on_submit=daemon.notify,allow_manual_work=False,
+                                    accepting=daemon.accepting)
         with FlightHTTPServer(('127.0.0.1',port),dispatcher,token,
                               supervisor=daemon) as server:
             yield server,daemon

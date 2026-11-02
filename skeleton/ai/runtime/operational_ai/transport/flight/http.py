@@ -34,7 +34,11 @@ class FlightRequestHandler(LegacyRequestHandler):
             return
         if self.path!='/v2/protocol':
             self._write(404,'bad-request',{'reason':'unknown-route'});return
-        self._write(200,'ok',PROTOCOL)
+        advertised=dict(PROTOCOL)
+        if not self.server.dispatcher.allow_manual_work:
+            advertised['operations']={name:args for name,args in PROTOCOL['operations'].items()
+                                      if name!='work_one'}
+        self._write(200,'ok',advertised)
 
     def do_POST(self)->None:
         if not self._authorize():return

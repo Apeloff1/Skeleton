@@ -12,15 +12,18 @@ from .contracts import validate_payload
 
 
 class FlightDispatcher:
-    def __init__(self,application,*,knowledge_plane=None,on_submit=None,allow_manual_work:bool=True):
+    def __init__(self,application,*,knowledge_plane=None,on_submit=None,allow_manual_work:bool=True,accepting=None):
         self.app=application
         self.knowledge=knowledge_plane
         if on_submit is not None and not callable(on_submit):
             raise ContractViolation('submission wake callback must be callable')
         if type(allow_manual_work) is not bool:
             raise ContractViolation('explicit manual worker mode required')
+        if accepting is not None and not callable(accepting):
+            raise ContractViolation('submission guard must be callable')
         self.on_submit=on_submit
         self.allow_manual_work=allow_manual_work
+        self.accepting=accepting
         if application.spine.identity!=application.ledger.identity:
             raise ContractViolation('flight dispatcher owner/model mismatch')
         if application.worker.ledger is not application.ledger:
@@ -33,6 +36,9 @@ class FlightDispatcher:
             session=identifier(payload['session_id'],'session')
             return {'session_id':app.spine.create(session),'created':True}
         if operation=='submit':
+            if self.accepting is not None and self.accepting() is not True:
+                from ...orchestration.flight_control.contracts import FlightBusy
+                raise FlightBusy('automatic native worker is not accepting new work')
             record=app.ledger.submit(FlightSpec(
                 app.spine.identity,
                 identifier(payload['job_id'],'job'),

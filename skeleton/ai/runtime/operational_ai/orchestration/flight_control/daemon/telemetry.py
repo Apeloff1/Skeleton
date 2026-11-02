@@ -4,12 +4,13 @@ No prompts, model outputs or identifying job/session IDs are exported.
 """
 from __future__ import annotations
 from collections import Counter
+from math import ceil
 from .contracts import DaemonError
 
 def _percentile(samples:list[int],quantile:int)->int|None:
     if not samples:return None
     samples.sort()
-    return samples[((len(samples)-1)*quantile)//100]
+    return samples[max(0,ceil((len(samples)*quantile)/100)-1)]
 
 def snapshot(ledger,*,maximum:int=2048)->dict:
     if type(maximum)is not int or not 1<=maximum<=4096:

@@ -129,4 +129,62 @@ class NativeDaemonOperatorTests(unittest.TestCase):
                 con.close()
             finally:server.shutdown();t.join(timeout=5)
 
+    def test_native_protocol_advertises_only_actual_operations_in_daemon_mode(self):
+        f=self.fixture
+        with SupervisedFlightHTTP(f.app,f.knowledge,TOKEN,port=0,policy=f.policy) as (server,daemon):
+            t=threading.Thread(target=server.serve_forever,daemon=True);t.start()
+            try:
+                con=http.client.HTTPConnection('127.0.0.1',server.server_port,timeout=3)
+                con.request('GET','/v2/protocol',headers={'Host':f'127.0.0.1:{server.server_port}',
+                    'Authorization':'Bearer '+TOKEN,'Connection':'close'})
+                res=con.getresponse();self.assertEqual(res.status,200)
+                features=json.loads(res.read())['result']['operations'];con.close()
+                self.assertNotIn('work_one',features)
+                self.assertIn('submit',features)
+                self.assertIn('wait',features)
+                self.assertIn('cancel',features)
+            finally:server.shutdown();t.join(timeout=5)
+
+    def test_failed_worker_rejects_new_http_submission_before_queue_write(self):
+        f=self.fixture;f.spine.create('sess1');f.backend.fail=True
+        with SupervisedFlightHTTP(f.app,f.knowledge,TOKEN,port=0,policy=f.policy) as (server,daemon):
+            t=threading.Thread(target=server.serve_forever,daemon=True);t.start()
+            try:
+                client=FlightClient(port=server.server_port,token=TOKEN,timeout=3)
+                client.request('submit',{'job_id':'job1','session_id':'sess1','request_id':'req1','question':'first'})
+                f.wait_state(state='held')
+                self.assertEqual(daemon.snapshot()['phase'],'held')
+                with self.assertRaises(FlightClientError):
+                    client.request('submit',{'job_id':'job2','session_id':'sess1','request_id':'req2','question':'second'})
+                self.assertEqual(f.ledger.state_count()['held'],1)
+                self.assertEqual(f.backend.calls,1)
+            finally:server.shutdown();t.join(timeout=5)
+
+    def test_draining_worker_rejects_new_submission(self):
+        f=self.fixture;f.spine.create('sess1')
+        with SupervisedFlightHTTP(f.app,f.knowledge,TOKEN,port=0,policy=f.policy) as (server,daemon):
+            t=threading.Thread(target=server.serve_forever,daemon=True);t.start()
+            try:
+                daemon.stop(timeout_ms=500)
+                client=FlightClient(port=server.server_port,token=TOKEN,timeout=3)
+                with self.assertRaises(FlightClientError):
+                    client.request('submit',{'job_id':'job2','session_id':'sess1','request_id':'req2','question':'after stop'})
+                self.assertEqual(f.backend.calls,0)
+            finally:server.shutdown();t.join(timeout=5)
+
+    def test_native_supervisor_does_not_accept_work_during_stall(self):
+        f=self.fixture;f.backend.block=True;f.add()
+        daemon=f.daemon();daemon.start()
+        self.assertTrue(f.backend.entered.wait(2))
+        time.sleep(1.1)
+        self.assertFalse(daemon.accepting())
+        f.backend.release.set();f.wait_state()
+        self.assertTrue(daemon.accepting())
+
+    def test_tail_latency_uses_nearest_rank_not_lower_minimum(self):
+        from skeleton.ai.runtime.operational_ai.orchestration.flight_control.daemon.telemetry import _percentile
+        self.assertEqual(_percentile([3,100],95),100)
+        self.assertEqual(_percentile([3,100],50),3)
+        self.assertEqual(_percentile([3],95),3)
+
 if __name__=='__main__':unittest.main()
