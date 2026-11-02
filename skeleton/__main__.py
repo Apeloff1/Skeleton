@@ -906,6 +906,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-tournament":
         from skeleton.game.gameplay.combat_tournament import cli as tournament_cli
         return tournament_cli(rest)
+    if cmd == "combat-campaign-board":
+        from skeleton.game.gameplay.combat_campaign_decision_board import cli as campaign_board_cli
+        return campaign_board_cli(rest)
     if cmd == "combat-campaign-player":
         from skeleton.game.gameplay.combat_campaign_player import cli as campaign_player_cli
         return campaign_player_cli(rest)
