@@ -36,6 +36,7 @@ def _read_private_checkpoint(filename: str) -> str:
         try:
             before = os.fstat(fd)
             if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                    or before.st_uid != os.geteuid()
                     or before.st_mode & 0o077
                     or not 1 <= before.st_size <= MAX_CHECKPOINT_BYTES):
                 raise StudioQuestError("checkpoint must be a bounded owner-private regular file")

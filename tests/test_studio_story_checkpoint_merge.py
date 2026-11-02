@@ -182,3 +182,29 @@ def test_operator_cli_rejects_symlinks_world_readable_and_bad_directory(
     tmp_path.chmod(0o755)
     assert main(args) == 2
     assert not (tmp_path / "merged.json").exists()
+
+def test_world_router_requires_separate_authoring_authority():
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import (
+        route_world_tool,
+    )
+    _, source = _sources()
+    empty = _receipt(source, []).decode("utf-8")
+    request = {
+        "tool": "studio_original_story_checkpoint_merge",
+        "arguments": {
+            "schema": REQUEST_SCHEMA,
+            "project_id": PROJECT,
+            "expected_quest_source_digest": source["source_digest"],
+            "ancestor_checkpoint": empty,
+            "current_checkpoint": empty,
+            "candidate_checkpoint": empty,
+        },
+    }
+    with pytest.raises(PermissionError):
+        route_world_tool(request, authorized=False, allow_authoring=True)
+    with pytest.raises(PermissionError):
+        route_world_tool(request, authorized=True, allow_authoring=False)
+    receipt = route_world_tool(request, authorized=True, allow_authoring=True)
+    assert receipt["result"]["canonical_replay"]["merged_action_count"] == 0
+    assert receipt["file_write_performed"] is False
+    assert receipt["release_certified"] is False

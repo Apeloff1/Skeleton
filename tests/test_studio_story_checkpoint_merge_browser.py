@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from base64 import b64encode
 from hashlib import sha256
-import re
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_story_html import (

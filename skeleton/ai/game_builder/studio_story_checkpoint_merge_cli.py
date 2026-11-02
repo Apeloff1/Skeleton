@@ -63,7 +63,13 @@ def _publish_private(name: str, payload: str) -> None:
         # replace()/rename() to overwrite a checkpoint from another fork.
         os.link(temporary, name, src_dir_fd=directory, dst_dir_fd=directory,
                 follow_symlinks=False)
-        os.fsync(directory)
+        try:
+            os.fsync(directory)
+        except OSError:
+            # A failed directory durability barrier cannot leave an apparently
+            # published but unacknowledged checkpoint behind.
+            os.unlink(name, dir_fd=directory)
+            raise
     finally:
         if created:
             os.unlink(temporary, dir_fd=directory)
