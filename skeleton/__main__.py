@@ -89,7 +89,17 @@ Commands:
     scene-market-accept  Verify game-to-export market acceptance evidence
     scene-market-play  Play offline market quests with durable checkpoints
     scene-market-author  Edit and preview source-bound trading quests
-    scene-market-party  Play cooperative role-gated market turns and export\n    scene-market-party-author  Edit party roles with replayable previews\n    scene-market-party-play  Play cooperative turns with durable checkpoints\n    scene-market-party-board  Inspect replay-verified legal cooperative actions\n    scene-market  Play earned-currency trading, crafting and delivery quests
+    scene-evacuation  Play timed NPC rescue with earned mission endings
+    scene-evacuation-board  Inspect replay-verified legal rescue actions
+    scene-evacuation-author  Transactionally edit NPC rescue windows
+    scene-evacuation-accept  Prove end-to-end rescue, replay and export
+    scene-evacuation-solve  Find bounded replay-proven rescue routes
+    scene-evacuation-play  Play rescue interactively with checkpoints
+    scene-market-party  Play cooperative role-gated market turns and export
+    scene-market-party-author  Edit party roles with replayable previews
+    scene-market-party-play  Play cooperative turns with durable checkpoints
+    scene-market-party-board  Inspect replay-verified legal cooperative actions
+    scene-market  Play earned-currency trading, crafting and delivery quests
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
@@ -103,7 +113,9 @@ Commands:
     scene-mission-board  Inspect replay-derived mission objectives and legal actions
     scene-mission-author  Transactionally edit authored missions and preview play
     scene-mission-route  Solve replayable authored mission ending paths
-    scene-mission-assist  Offer replay-proven non-mutating mission hints\n    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
+    scene-mission-assist  Offer replay-proven non-mutating mission hints
+    scene-mission-liveness  Find replayable authored mission softlocks
+    scene-mission-accept  Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
     scene-mission-league  Rank completed source-bound mission replays offline
     scene-mission-league-author  Transactionally edit and preview league scoring
@@ -921,6 +933,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-hours-accept":
         from skeleton.game.gameplay.scene_market_hours_acceptance import cli as hours_accept_cli
         return hours_accept_cli(rest)
+    if cmd == "scene-evacuation":
+        from skeleton.game.gameplay.scene_evacuation import cli as evacuation_cli
+        return evacuation_cli(rest)
+    if cmd == "scene-evacuation-board":
+        from skeleton.game.gameplay.scene_evacuation_board import cli as evacuation_board_cli
+        return evacuation_board_cli(rest)
+    if cmd == "scene-evacuation-author":
+        from skeleton.game.gameplay.scene_evacuation_author import cli as evacuation_author_cli
+        return evacuation_author_cli(rest)
+    if cmd == "scene-evacuation-accept":
+        from skeleton.game.gameplay.scene_evacuation_acceptance import cli as evacuation_accept_cli
+        return evacuation_accept_cli(rest)
+    if cmd == "scene-evacuation-solve":
+        from skeleton.game.gameplay.scene_evacuation_solver import cli as evacuation_solve_cli
+        return evacuation_solve_cli(rest)
+    if cmd == "scene-evacuation-play":
+        from skeleton.game.gameplay.scene_evacuation_interactive import cli as evacuation_play_cli
+        return evacuation_play_cli(rest)
     if cmd == "scene-market-party":
         from skeleton.game.gameplay.scene_market_party import cli as party_cli
         return party_cli(rest)
