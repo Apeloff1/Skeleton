@@ -151,6 +151,9 @@ Commands:
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
+    combat-campaign-solve   Bounded source-bound human campaign victory search
+    combat-campaign-author  Transactional authored combat campaign editing
+    combat-campaign-production-accept  Verify authored game play/replay/export
     help        Show this help message
 """
 

@@ -39,14 +39,12 @@ class CampaignProductionAcceptanceTests(unittest.TestCase):
     def test_tampered_source_reward_and_export_fail_closed(self) -> None:
         original = accept_production(demo_author())
         for mutate in (
-            lambda x: x["earned_currency"].__class__,
+            lambda x: x.update(earned_currency=999),
             lambda x: x["author_report"]["after"]["encounters"][0].update(reward=999),
             lambda x: x["portable_bundle"]["session"]["state"].update(currency=999),
             lambda x: x["player_actions"][0].update(kind="rest"),
         ):
             forged = copy.deepcopy(original)
-            if mutate.__code__.co_consts == (None,):
-                continue
             mutate(forged)
             forged["receipt"] = dig({k: v for k, v in forged.items()
                                      if k != "receipt"})
