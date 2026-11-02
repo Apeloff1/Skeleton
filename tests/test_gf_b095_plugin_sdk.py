@@ -152,3 +152,17 @@ def test_conformance_refuses_empty_or_late_invalid_cases_without_dispatch():
         "passed"
     ] is True
     assert plugin.calls == 2
+
+
+def test_plugin_exception_diagnostics_do_not_escape_host_boundary():
+    class Exploding:
+        def export(self, payload):
+            raise RuntimeError("secret-token-should-not-escape")
+
+    host = m.Host(frozenset())
+    host.register(m.Manifest("exploding", "exporter", (1, 0), ()), Exploding())
+    with pytest.raises(m.ContractError, match="plugin execution failed") as exc:
+        host.call("exploding", "export", {})
+    assert "secret-token" not in str(exc.value)
+    with pytest.raises(m.ContractError, match="unknown plugin"):
+        host.call([], "export", {})

@@ -107,7 +107,7 @@ class Host:
         self.plugins[m.name] = (m, impl)
 
     def call(self, name: str, method: str, payload: Mapping[str, Any]) -> Any:
-        if name not in self.plugins:
+        if type(name) is not str or name not in self.plugins:
             raise ContractError(f"unknown plugin {name}")
         m, impl = self.plugins[name]
         require(method in KINDS[m.kind], f"{method} not in {m.kind} contract")
@@ -116,7 +116,12 @@ class Host:
         require(all(type(k) is str and 1 <= len(k) <= 128 for k in payload),
                 "plugin payload keys are invalid")
         encoded = _bounded_json(dict(payload))
-        result = getattr(impl, method)(json.loads(encoded))
+        try:
+            result = getattr(impl, method)(json.loads(encoded))
+        except Exception:
+            # Plugin code is an external execution boundary. Never return
+            # private exception text or traceback as a host API diagnostic.
+            raise ContractError("plugin execution failed") from None
         # Return the validated JSON snapshot, never plugin-owned mutable data.
         # Otherwise the plugin could mutate its result after conformance.
         return json.loads(_bounded_json(result))
