@@ -92,7 +92,7 @@
       "kind": "fastapi",
       "entrypoint": "server:app",
       "public_url": "http://localhost:8001",
-      "health_path": "/api/health",
+      "health_path": "/api/health/ready",
       "container_port": 8001,
       "depends_on": [
         "mongo",

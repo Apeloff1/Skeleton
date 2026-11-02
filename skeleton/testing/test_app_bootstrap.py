@@ -15,7 +15,7 @@ def test_public_bootstrap_is_dependency_closed_and_sanitized():
 
     services = {item["name"]: item for item in payload["services"]}
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(services)
-    assert services["backend"]["health_path"] == "/api/health"
+    assert services["backend"]["health_path"] == "/api/health/ready"
     assert services["backend"]["ingress_prefix"] == "/api"
     assert services["skeleton"]["health_path"] == "/api/v1/health/live"
     assert services["skeleton"]["ingress_prefix"] == "/api/v1"
