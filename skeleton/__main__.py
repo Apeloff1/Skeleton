@@ -70,6 +70,7 @@ Commands:
     scene-survival-author  Transactionally edit survival sources and preview play
     scene-survival-route  Find replay-proven bounded survival routes
     scene-survival  Play source-bound tile hazards, earned food, shelter and replay
+    scene-market-route-accept  Audit route, interactive play, editor and portable delivery
     scene-market-route  Find replay-proven earned market routes with bounded search
     scene-market-board  Inspect earned inventory, deliveries and verified hints
     scene-market-accept  Verify game-to-export market acceptance evidence
@@ -889,6 +890,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-survival":
         from skeleton.game.gameplay.scene_tile_survival import cli as scene_survival_cli
         return scene_survival_cli(rest)
+    if cmd == "scene-market-route-accept":
+        from skeleton.game.gameplay.scene_market_route_acceptance import cli as route_accept_cli
+        return route_accept_cli(rest)
     if cmd == "scene-market-route":
         from skeleton.game.gameplay.scene_market_route import cli as market_route_cli
         return market_route_cli(rest)
