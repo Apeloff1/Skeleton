@@ -75,3 +75,11 @@ def test_secret_scan_detects_temporary_aws_and_fine_grained_github_tokens():
     report = m.evaluate({"artifact.txt": "prefix " + github_fine_grained}, [])
     assert not report.passed
     assert "secret:artifact.txt:pattern4" in report.findings
+
+
+def test_secret_evidence_bounds_aggregate_content_and_reject_non_text(monkeypatch):
+    monkeypatch.setattr(m, "MAX_TOTAL_ARTIFACT_CHARS", 3)
+    with pytest.raises(m.ContractError, match="aggregate artifact content"):
+        m.evaluate({"a.txt": "ab", "b.txt": "cd"}, [])
+    with pytest.raises(m.ContractError, match="per-file bound"):
+        m.evaluate({"a.txt": object()}, [])
