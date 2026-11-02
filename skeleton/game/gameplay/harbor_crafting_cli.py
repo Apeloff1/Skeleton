@@ -15,7 +15,7 @@ from .harbor_crafting_missions import mission_report, verify_mission_report, sol
 from .harbor_crafting_mission_authoring import author_mission_revision, verify_mission_revision
 from .harbor_crafting_mission_branches import mission_branch_report, verify_mission_branch_report
 from .harbor_crafting_mission_compare import compare_mission_revision, verify_mission_comparison
-from .harbor_crafting_package import build_package, verify_package, play_package, verify_package_play
+from .harbor_crafting_package import MAX_PACKAGE_BYTES, build_package, verify_package, play_package, verify_package_play
 from .harbor_crafting_market import market_report, verify_market_report, market_checkpoint, market_resume, market_futures, verify_market_futures
 from .harbor_crafting_market_preview import preview_market, verify_market_preview, apply_market_preview, MAX_BYTES as MAX_PREVIEW_BYTES
 from .harbor_crafting_market import MAX_BYTES as MAX_MARKET_BYTES
@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "journal-package-play":
             output = export_journal_package_play(
                 _required_json(args.journal, "journal", MAX_JOURNAL_BYTES),
-                _required_json(args.package, "package"),
+                _required_json(args.package, "package", MAX_PACKAGE_BYTES),
                 require_all=args.require_all,
             )
         elif args.command == "journal-verify-package-play":
