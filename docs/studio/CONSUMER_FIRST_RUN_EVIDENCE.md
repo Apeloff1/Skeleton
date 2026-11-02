@@ -124,3 +124,8 @@ game's installed root, archive, private save, and receipt before replay,
 and rechecks all of them at each cross-game barrier. A later game cannot
 launder a replacement evidence parent for an earlier game merely by moving
 the original file inode into the new directory.
+
+The cohort summary's parent directory is independently fenced as well:
+moving an unchanged summary file inode into a replacement parent is
+rejected after any later game replay. The receipt remains observational;
+all device, signing, rights and release holds stay in force.

@@ -17,7 +17,7 @@ from skeleton.app.consumer_first_run_readiness import (
     RELEASE_HOLDS, _custody as _consumer_input_custody,
     inspect_consumer_first_run,
 )
-from skeleton.app.offline_delivery_assurance import _save_identity
+from skeleton.app.offline_delivery_assurance import _save_identity, _source_identity
 from skeleton.app.installed_tree_custody import (
     installed_tree_snapshot_digest, snapshot_installed_tree,
 )
@@ -86,6 +86,7 @@ def inspect_consumer_first_run_cohort(
     checked = _check_jobs(jobs, summary, inspect=True)
     before = _delivered_custody(checked)
     summary_before = _save_identity(summary)
+    summary_parent_before = _source_identity(Path(summary).expanduser().absolute().parent)
     nested_before = _nested_snapshots(checked)
     nested_digests = tuple(
         installed_tree_snapshot_digest(snapshot) for snapshot in nested_before
@@ -107,6 +108,12 @@ def inspect_consumer_first_run_cohort(
     )
 
     def require_all_nested_custody() -> None:
+        if _source_identity(
+            Path(summary).expanduser().absolute().parent
+        ) != summary_parent_before:
+            raise ConsumerFirstRunCohortError(
+                "cohort summary parent inode changed during cross-game replay"
+            )
         if tuple(
             _consumer_input_custody(
                 job.install, job.archive, job.save, job.receipt,
@@ -120,6 +127,7 @@ def inspect_consumer_first_run_cohort(
             _require_nested_custody(
                 checked, source_nested_before, original_sources=True,
             )
+
     first = inspect_first_playable_delivery_batch(
         checked, summary, expected_summary_sha256=pin, authorized=True,
         verify_original_sources=verify_original_sources,
@@ -233,6 +241,7 @@ def inspect_consumer_first_run_cohort(
         "nested_asset_inode_snapshots_equal": True,
         "all_games_nested_inodes_checked_after_each_replay": True,
         "all_game_evidence_parent_inodes_checked_after_each_replay": True,
+        "summary_parent_inode_checked_after_each_replay": True,
         "original_source_nested_inode_inventory_attested": verify_original_sources,
         "original_source_nested_inode_snapshots_equal": verify_original_sources,
         "private_jobfile_inode_attested": False,
