@@ -109,8 +109,13 @@ def test_source_bound_impact_deterministic_replay_and_no_speech_claim():
     assert result["npc_speech_verified"] is False
     assert result["native_npc_memory_verified"] is False
     assert result["release_certified"] is False
-    assert all(row["source_text_exposed"] is False for row in result["changes"])
+    assert all(row["source_text_in_impact_row"] is False for row in result["changes"])
     assert result["changed_route_count"] == len(result["changes"])
+    if candidate["routes"]:
+        assert result["changed_route_count"] == len(candidate["routes"])
+        assert set(result["affected_scene_ids"]) == {
+            row["target_scene_id"] for row in candidate["routes"]
+        }
     with pytest.raises(StudioQuestError):
         compile_npc_relay_impact_playable(docs, result, authorized=True)
 
@@ -183,8 +188,13 @@ def test_jeeves_typed_router_and_fail_closed_handoff():
     assert "studio_original_npc_relay_impact" in names
     envelope = {"tool": "studio_original_npc_relay_impact",
                 "arguments": request}
-    routed = route_world_tool(envelope, authorized=True)
-    assert routed["result"]["detail"] == direct["detail"]
+    from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _canonical
+    if len(_canonical(envelope)) <= 64 * 1024:
+        routed = route_world_tool(envelope, authorized=True)
+        assert routed["result"]["detail"] == direct["detail"]
+    else:
+        with pytest.raises(StudioQuestError):
+            route_world_tool(envelope, authorized=True)
     with pytest.raises(PermissionError):
         route_world_tool(envelope, authorized=False)
     with pytest.raises(StudioQuestError):

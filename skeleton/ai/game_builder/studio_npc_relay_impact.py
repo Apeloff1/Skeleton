@@ -92,7 +92,7 @@ def compile_npc_relay_impact(
             "baseline_delivered": before_delivered,
             "candidate_delivered": after_delivered,
             "delivery_regressed": before_delivered and not after_delivered,
-            "source_text_exposed": False,
+            "source_text_in_impact_row": False,
         })
     result: dict[str, Any] = {
         "schema": SCHEMA, "project_id": original["project_id"],
