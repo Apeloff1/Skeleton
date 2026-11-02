@@ -54,3 +54,18 @@ def test_farm_reproducible_entry():
 def test_farm_rejections(items):
     with pytest.raises(DeliveryError):
         entry_from_reproducible(items, path="a", kind="wheel", size=1)
+
+def test_remote_bridge_rejects_conflicting_receipts_and_unbounded_evidence():
+    from dataclasses import replace
+    from itertools import repeat
+    from skeleton.build.delivery.remote_bridge import MAX_REMOTE_RECEIPTS
+
+    original = _receipt()
+    with pytest.raises(DeliveryError, match="conflicting remote receipts"):
+        entries_from_receipts([original, replace(original, runner_id="other")])
+    with pytest.raises(DeliveryError, match="remote receipt count exceeds"):
+        entries_from_receipts(repeat(original, MAX_REMOTE_RECEIPTS + 1))
+    with pytest.raises(DeliveryError, match="remote receipt digest"):
+        entries_from_receipts([replace(original, receipt_digest="bad")])
+    with pytest.raises(DeliveryError, match="artifact reference"):
+        entries_from_receipts([replace(original, output_artifacts=(object(),))])

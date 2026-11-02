@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from typing import Iterable, Mapping
 
-from skeleton.build.delivery._util import DeliveryError
+from skeleton.build.delivery._util import DeliveryError, require_id, require_sha256
 from skeleton.build.delivery.artifact_manifest import ARTIFACT_KINDS, ArtifactEntry
-from skeleton.build.remote_build import VerifiedRemoteReceipt
+from skeleton.build.remote_build import RemoteArtifactRef, VerifiedRemoteReceipt
+
+MAX_REMOTE_RECEIPTS = 2048
+MAX_REMOTE_OUTPUTS = 2048
 
 
 def _kind_for(artifact_id: str) -> str:
@@ -33,12 +36,29 @@ def entries_from_receipts(
     default the artifact id is used as the path.
     """
     out: dict[str, ArtifactEntry] = {}
-    for receipt in receipts:
+    seen_jobs: dict[str, VerifiedRemoteReceipt] = {}
+    output_count = 0
+    for count, receipt in enumerate(receipts, 1):
+        if count > MAX_REMOTE_RECEIPTS:
+            raise DeliveryError("remote receipt count exceeds bound")
         if not isinstance(receipt, VerifiedRemoteReceipt):
             raise DeliveryError("verified remote receipts required")
+        require_id(receipt.job_id, field="remote job id")
+        require_id(receipt.runner_id, field="remote runner id")
+        require_sha256(receipt.receipt_digest, field="remote receipt digest")
+        require_sha256(receipt.log_digest, field="remote log digest")
         if receipt.status != "success":
             raise DeliveryError(f"job {receipt.job_id} did not succeed ({receipt.status})")
+        previous = seen_jobs.get(receipt.job_id)
+        if previous is not None and previous != receipt:
+            raise DeliveryError(f"conflicting remote receipts for job {receipt.job_id}")
+        seen_jobs[receipt.job_id] = receipt
+        if len(receipt.output_artifacts) > MAX_REMOTE_OUTPUTS - output_count:
+            raise DeliveryError("remote output inventory exceeds bound")
+        output_count += len(receipt.output_artifacts)
         for ref in receipt.output_artifacts:
+            if not isinstance(ref, RemoteArtifactRef):
+                raise DeliveryError("remote artifact reference must be verified")
             path = (paths or {}).get(ref.artifact_id, ref.artifact_id)
             kind = _kind_for(path)
             assert kind in ARTIFACT_KINDS
