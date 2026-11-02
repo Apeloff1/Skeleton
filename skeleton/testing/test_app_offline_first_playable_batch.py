@@ -837,3 +837,46 @@ def test_publish_rejects_source_root_swap_inside_first_preflight(
     assert calls == 1
     assert all(not Path(job.archive).exists() for job in jobs)
     assert not (tmp_path / "cohort.json").exists()
+
+
+def test_second_cohort_replay_detects_late_in_place_installed_file_edit(
+    original_games, tmp_path, monkeypatch,
+):
+    """A root-inode snapshot alone cannot detect edits to an existing file."""
+    from skeleton.app import offline_first_playable_batch as module
+
+    jobs = jobs_for(original_games, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    original_inspector = module.inspect_first_playable_delivery
+    target = Path(jobs[0].install) / "index.html"
+    original = target.read_bytes()
+    assert len(original) > 1
+    before_root = module._source_identity(jobs[0].install)
+    calls = 0
+
+    def mutate_first_game_after_second_game_replay(*args, **kwargs):
+        nonlocal calls
+        result = original_inspector(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            target.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+            # Editing a preexisting file does not change the parent directory.
+            assert module._source_identity(jobs[0].install) == before_root
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_first_playable_delivery",
+        mutate_first_game_after_second_game_replay,
+    )
+    with pytest.raises((OSError, ValueError)):
+        inspect_first_playable_delivery_batch(
+            pinned(jobs, published), summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+    assert calls >= 3
+    assert target.read_bytes() != original
+    assert published["release_certified"] is False

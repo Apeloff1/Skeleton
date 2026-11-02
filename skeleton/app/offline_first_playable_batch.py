@@ -229,20 +229,29 @@ def _inspect_jobs(jobs: tuple[DeliveryJob, ...],
         raise FirstPlayableDeliveryBatchError("delivery cohort length mismatch")
     before = _delivered_custody(jobs)
     try:
-        for job, record in zip(jobs, records, strict=True):
-            inspected = inspect_first_playable_delivery(
-                job.install, job.archive, job.save, job.receipt,
-                expected_manifest_sha256=job.manifest_sha256,
-                expected_archive_sha256=record["archive_sha256"],
-                expected_save_sha256=record["save_sha256"],
-                expected_receipt_sha256=record["independent_receipt_sha256"],
-                authorized=True,
-            )
-            if (_record(inspected, job.moves) != record
-                    or inspected.get("live_source_and_private_replay_reexecuted") is not True
-                    or inspected.get("read_only") is not True):
+        # One pass can miss a same-inode content edit to game 1 made while
+        # game 2 is replayed: the install directory inode remains unchanged.
+        # Replay the entire bounded cohort twice, with an identity barrier
+        # between passes, before publishing or accepting an inspection.
+        for _pass in range(2):
+            for job, record in zip(jobs, records, strict=True):
+                inspected = inspect_first_playable_delivery(
+                    job.install, job.archive, job.save, job.receipt,
+                    expected_manifest_sha256=job.manifest_sha256,
+                    expected_archive_sha256=record["archive_sha256"],
+                    expected_save_sha256=record["save_sha256"],
+                    expected_receipt_sha256=record["independent_receipt_sha256"],
+                    authorized=True,
+                )
+                if (_record(inspected, job.moves) != record
+                        or inspected.get("live_source_and_private_replay_reexecuted") is not True
+                        or inspected.get("read_only") is not True):
+                    raise FirstPlayableDeliveryBatchError(
+                        "live delivery no longer matches its independently pinned record"
+                    )
+            if _delivered_custody(jobs) != before:
                 raise FirstPlayableDeliveryBatchError(
-                    "live delivery no longer matches its independently pinned record"
+                    "delivered cohort custody changed during cross-game replay"
                 )
     finally:
         # Also check on a failed replay; a later error must never hide an
