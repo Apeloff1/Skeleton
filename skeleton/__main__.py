@@ -890,6 +890,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-survival":
         from skeleton.game.gameplay.scene_tile_survival import cli as scene_survival_cli
         return scene_survival_cli(rest)
+    if cmd == "scene-market-contract-play":
+        from skeleton.game.gameplay.scene_market_contract_interactive import cli as contract_play_cli
+        return contract_play_cli(rest)
+    if cmd == "scene-market-contract-accept":
+        from skeleton.game.gameplay.scene_market_contract_acceptance import cli as contract_accept_cli
+        return contract_accept_cli(rest)
     if cmd == "scene-market-contract":
         from skeleton.game.gameplay.scene_market_contract import cli as contract_cli
         return contract_cli(rest)
