@@ -583,3 +583,27 @@ def test_directory_missing_sidecar_discards_partial_manifest(tmp_path):
     assert report.imported == [] and report.duplicates == []
     assert report.manifest.entries == []
     assert any(issue.code == "missing_reference" for issue in report.issues)
+
+def test_directory_symlink_swap_discards_all_scanned_assets(tmp_path, monkeypatch):
+    """A leaf replaced after enumeration cannot publish unrelated assets."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    root = tmp_path / "assets"
+    root.mkdir()
+    (root / "a.png").write_bytes(png())
+    leaf = root / "hero.png"
+    leaf.write_bytes(png(8, 4))
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(png())
+    original_import = pipeline._import_from_fd
+
+    def replace_after_scan(fd, paths, **kwargs):
+        leaf.unlink()
+        leaf.symlink_to(outside)
+        return original_import(fd, paths, **kwargs)
+
+    monkeypatch.setattr(pipeline, "_import_from_fd", replace_after_scan)
+    report = pipeline.import_directory(root)
+    assert not report.ok
+    assert report.imported == [] and report.manifest.entries == []
+    assert any(issue.code == "unsafe" for issue in report.issues)

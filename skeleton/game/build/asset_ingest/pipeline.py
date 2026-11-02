@@ -329,7 +329,7 @@ def import_directory(root: str | Path) -> ImportReport:
     # invalidates the entire directory snapshot. Never expose earlier assets
     # from that snapshot as a plausible partial import transaction.
     if issues or any(
-        issue.code == "missing_reference" or "changed" in issue.detail
+        issue.code in {"unsafe", "missing_reference"} or "changed" in issue.detail
         for issue in report.issues
     ):
         return ImportReport(AssetManifest(), issues=report.issues)
