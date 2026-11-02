@@ -17,6 +17,9 @@ from skeleton.app.consumer_first_run_readiness import (
     RELEASE_HOLDS, inspect_consumer_first_run,
 )
 from skeleton.app.offline_delivery_assurance import _save_identity
+from skeleton.app.installed_tree_custody import (
+    installed_tree_snapshot_digest, snapshot_installed_tree,
+)
 from skeleton.app.offline_first_playable_batch import (
     DeliveryJob, _check_jobs, _delivered_custody,
     inspect_first_playable_delivery_batch,
@@ -30,6 +33,25 @@ SCHEMA = "skeleton.app.consumer_first_run_cohort.v1"
 
 class ConsumerFirstRunCohortError(ValueError):
     """A pinned first-run cohort could not be independently reexecuted."""
+
+
+def _nested_snapshots(jobs: tuple[DeliveryJob, ...]) -> tuple[tuple, ...]:
+    """Capture all 2-8 installed trees, including nested directory/file inodes.
+
+    The canonical delivery custody check covers roots and evidence files,
+    not every installed asset. Keep a bounded inventory for the *entire*
+    cohort across each game's replay and the final cohort verification.
+    """
+    return tuple(snapshot_installed_tree(job.install) for job in jobs)
+
+
+def _require_nested_custody(
+    jobs: tuple[DeliveryJob, ...], expected: tuple[tuple, ...],
+) -> None:
+    if _nested_snapshots(jobs) != expected:
+        raise ConsumerFirstRunCohortError(
+            "nested installed game inode changed during cross-game replay"
+        )
 
 
 def inspect_consumer_first_run_cohort(
@@ -57,6 +79,10 @@ def inspect_consumer_first_run_cohort(
     checked = _check_jobs(jobs, summary, inspect=True)
     before = _delivered_custody(checked)
     summary_before = _save_identity(summary)
+    nested_before = _nested_snapshots(checked)
+    nested_digests = tuple(
+        installed_tree_snapshot_digest(snapshot) for snapshot in nested_before
+    )
     first = inspect_first_playable_delivery_batch(
         checked, summary, expected_summary_sha256=pin, authorized=True,
         verify_original_sources=verify_original_sources,
@@ -75,6 +101,7 @@ def inspect_consumer_first_run_cohort(
     if (_delivered_custody(checked) != before
             or _save_identity(summary) != summary_before):
         raise ConsumerFirstRunCohortError("cohort custody changed after first replay")
+    _require_nested_custody(checked, nested_before)
 
     games: list[dict[str, object]] = []
     for index, (job, stored) in enumerate(zip(
@@ -107,8 +134,7 @@ def inspect_consumer_first_run_cohort(
                 or observed.get("nested_asset_inode_snapshots_equal") is not True
                 or type(observed.get("installed_tree_snapshot_sha256")) is not str
                 or len(observed["installed_tree_snapshot_sha256"]) != 64
-                or any(char not in "0123456789abcdef"
-                       for char in observed["installed_tree_snapshot_sha256"])
+                or observed["installed_tree_snapshot_sha256"] != nested_digests[index]
                 or observed.get("read_only") is not True
                 or observed.get("release_certified") is not False
                 or observed.get("native_device_qualified") is not False
@@ -128,7 +154,7 @@ def inspect_consumer_first_run_cohort(
             "save_sha256": job.save_sha256,
             "receipt_sha256": job.receipt_sha256,
             "source_level_replay_passes": 2,
-            "installed_tree_snapshot_sha256": observed["installed_tree_snapshot_sha256"],
+            "installed_tree_snapshot_sha256": nested_digests[index],
             "release_certified": False,
         })
         if (_delivered_custody(checked) != before
@@ -136,6 +162,7 @@ def inspect_consumer_first_run_cohort(
             raise ConsumerFirstRunCohortError(
                 "another installed game or summary changed during replay"
             )
+        _require_nested_custody(checked, nested_before)
 
     # Reinspect the complete canonical cohort after the final consumer game;
     # a later replay must not mask tampering with an earlier installed game.
@@ -150,6 +177,7 @@ def inspect_consumer_first_run_cohort(
         raise ConsumerFirstRunCohortError(
             "cohort changed across final cross-game replay barrier"
         )
+    _require_nested_custody(checked, nested_before)
     return {
         "schema": SCHEMA,
         "status": "consumer_source_level_cohort_replayed_release_blocked",
@@ -166,6 +194,7 @@ def inspect_consumer_first_run_cohort(
         "root_and_evidence_inodes_stable": True,
         "nested_asset_inode_inventory_attested": True,
         "nested_asset_inode_snapshots_equal": True,
+        "all_games_nested_inodes_checked_after_each_replay": True,
         "private_jobfile_inode_attested": False,
         "read_only": True,
         "files_published": 0,

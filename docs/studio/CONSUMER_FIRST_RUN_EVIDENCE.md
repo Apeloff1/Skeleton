@@ -83,3 +83,21 @@ explicit release holds. If any required pin, path custody, replay,
 summary, or source check fails, the CLI exits nonzero with a blocked
 receipt and does not attempt recovery. Preserve failed artifacts for
 explicit operator quarantine and investigation.
+
+## Cross-game nested inode custody
+
+The cohort inspector also takes a bounded, descriptor-anchored snapshot of
+**every installed game** before the first canonical replay, after that replay,
+after each individual game's two-pass replay, and after the final canonical
+cohort replay. A late same-byte replacement of an earlier game's nested
+asset is rejected even if its root inode and independently pinned hashes
+still match. Every consumer game's reported snapshot digest must equal the
+corresponding cohort baseline; a merely well-formed digest is insufficient.
+The JSON field `all_games_nested_inodes_checked_after_each_replay` records
+these observational checkpoints. This does not lock the filesystem, prove
+continuous custody between snapshots, or qualify a native consumer device.
+
+Focused acceptance: `python -m pytest -q
+skeleton/testing/test_app_consumer_first_run_cohort.py`. Adversarial
+coverage includes first-pass, late cross-game, final-pass same-byte inode
+substitution, and forged well-formed nested inventory digests.

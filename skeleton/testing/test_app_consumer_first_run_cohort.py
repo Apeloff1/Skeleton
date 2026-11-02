@@ -232,3 +232,130 @@ def test_forged_nested_inode_inventory_digest_is_rejected(
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
         )
+
+
+def _isolated_installs(delivered_games, tmp_path):
+    """Copy valid installed game trees without changing the shared fixture."""
+    import shutil
+
+    jobs, summary, published = delivered_games
+    copies = []
+    for index, job in enumerate(jobs):
+        install = tmp_path / f"isolated-installed-{index}"
+        shutil.copytree(job.install, install)
+        copies.append(replace(job, install=install))
+    return tuple(copies), summary, published
+
+
+def _replace_nested_asset_with_identical_bytes(tmp_path, installed):
+    """Same-byte replacement must still invalidate the inode inventory."""
+    target = Path(installed) / "godot" / "scripts" / "main.gd"
+    replacement = tmp_path / "new-main.gd"
+    replacement.write_bytes(target.read_bytes())
+    replacement.chmod(target.stat().st_mode & 0o777)
+    os.replace(replacement, target)
+
+
+def test_late_cross_game_nested_asset_inode_swap_rejected(
+    delivered_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = _isolated_installs(delivered_games, tmp_path)
+    original = module.inspect_consumer_first_run
+    calls = 0
+
+    def swap_after_later_game(*args, **kwargs):
+        nonlocal calls
+        result = original(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            # The first game's individual replay already passed. A later
+            # game's work must not silently invalidate that earlier result.
+            _replace_nested_asset_with_identical_bytes(tmp_path, jobs[0].install)
+        return result
+
+    monkeypatch.setattr(module, "inspect_consumer_first_run", swap_after_later_game)
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+
+
+def test_first_cohort_replay_nested_inode_swap_rejected(
+    delivered_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = _isolated_installs(delivered_games, tmp_path)
+    original = module.inspect_first_playable_delivery_batch
+
+    def swap_after_canonical_replay(*args, **kwargs):
+        result = original(*args, **kwargs)
+        _replace_nested_asset_with_identical_bytes(tmp_path, jobs[0].install)
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_first_playable_delivery_batch",
+        swap_after_canonical_replay,
+    )
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+
+
+def test_forged_well_formed_nested_inode_digest_rejected(
+    delivered_games, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = delivered_games
+    original = module.inspect_consumer_first_run
+
+    def forged(*args, **kwargs):
+        return {
+            **original(*args, **kwargs),
+            "installed_tree_snapshot_sha256": "0" * 64,
+        }
+
+    monkeypatch.setattr(module, "inspect_consumer_first_run", forged)
+    with pytest.raises(ConsumerFirstRunCohortError, match="diverged"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+
+
+def test_final_cohort_replay_nested_inode_swap_rejected(
+    delivered_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = _isolated_installs(delivered_games, tmp_path)
+    original = module.inspect_first_playable_delivery_batch
+    calls = 0
+
+    def swap_after_final_canonical_replay(*args, **kwargs):
+        nonlocal calls
+        result = original(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            _replace_nested_asset_with_identical_bytes(tmp_path, jobs[0].install)
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_first_playable_delivery_batch",
+        swap_after_final_canonical_replay,
+    )
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
