@@ -678,3 +678,77 @@ def test_batch_cli_deeply_nested_job_fails_closed_before_any_write(
     assert result["status"] == "blocked"
     assert result["release_certified"] is False
     assert not (tmp_path / "cohort.json").exists()
+
+
+@pytest.mark.parametrize("plane", ("archive", "install", "save", "receipt"))
+def test_cohort_replay_rejects_same_byte_earlier_game_inode_swap(
+    original_games, tmp_path, monkeypatch, plane,
+):
+    """A later game's replay must not hide replacement of an earlier output."""
+    import os
+    from skeleton.app import offline_first_playable_batch as module
+
+    jobs = jobs_for(original_games, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    checked = pinned(jobs, published)
+    original_inspector = module.inspect_first_playable_delivery
+    calls = 0
+    target = Path(getattr(jobs[0], plane))
+
+    def replace_earlier_output_during_second_replay(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            replacement = tmp_path / f"replacement-{plane}"
+            if plane == "install":
+                shutil.copytree(target, replacement)
+                old = tmp_path / "old-installed-source"
+                os.rename(target, old)
+                os.rename(replacement, target)
+            else:
+                shutil.copy2(target, replacement)
+                os.replace(replacement, target)
+        return original_inspector(*args, **kwargs)
+
+    monkeypatch.setattr(
+        module, "inspect_first_playable_delivery",
+        replace_earlier_output_during_second_replay,
+    )
+    with pytest.raises(
+        FirstPlayableDeliveryBatchError, match="custody changed",
+    ):
+        inspect_first_playable_delivery_batch(
+            checked, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+    assert calls == 2
+    assert summary.is_file()
+    assert published["release_certified"] is False
+
+
+def test_cohort_custody_snapshot_rejects_unreadable_later_member(
+    original_games, tmp_path,
+):
+    """The entire cohort must be admissible before replaying the first game."""
+    from skeleton.app.offline_first_playable_batch import _delivered_custody
+
+    jobs = jobs_for(original_games, tmp_path)
+    summary = tmp_path / "cohort.json"
+    published = publish_first_playable_delivery_batch(
+        jobs, summary, authorized=True,
+    )
+    first = _delivered_custody(jobs)
+    assert len(first) == 2
+    assert all(len(identities) == 4 for identities in first)
+    Path(jobs[1].receipt).unlink()
+    with pytest.raises((OSError, ValueError)):
+        inspect_first_playable_delivery_batch(
+            pinned(jobs, published), summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
+    assert Path(jobs[0].receipt).exists()

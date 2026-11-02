@@ -27,7 +27,9 @@ from skeleton.app.offline_first_playable_delivery import (
     MAX_ACTIONS, _ACTIONS, _path, _is_within, _preflight,
     inspect_first_playable_delivery, publish_first_playable_delivery,
 )
-from skeleton.app.offline_delivery_assurance import _save_identity, _source_identity
+from skeleton.app.offline_delivery_assurance import (
+    _archive_identity, _save_identity, _source_identity,
+)
 from skeleton.app.private_game_save import read_private_game_save
 
 SCHEMA = "skeleton.app.first_playable_delivery_batch.v1"
@@ -202,24 +204,52 @@ def _summary(records: list[dict[str, object]]) -> dict[str, object]:
     return body
 
 
+def _delivered_custody(
+    jobs: tuple[DeliveryJob, ...],
+) -> tuple[tuple[tuple[int, ...], ...], ...]:
+    """Snapshot all four owner-private custody planes for every installed game.
+
+    Individually pinned hashes cannot detect an attacker replacing an earlier
+    game's inode with identical bytes while a later game is being replayed.
+    Capture the entire bounded cohort before and after the replay loop.
+    Descriptor-anchored identity helpers reject symlinks, hardlinks and unsafe
+    owner/permission changes; this does not create a persistent filesystem lock.
+    """
+    return tuple((
+        _archive_identity(job.archive),
+        _source_identity(job.install),
+        _save_identity(job.save),
+        _save_identity(job.receipt),
+    ) for job in jobs)
+
+
 def _inspect_jobs(jobs: tuple[DeliveryJob, ...],
                   records: list[dict[str, object]]) -> None:
     if len(jobs) != len(records):
         raise FirstPlayableDeliveryBatchError("delivery cohort length mismatch")
-    for job, record in zip(jobs, records, strict=True):
-        inspected = inspect_first_playable_delivery(
-            job.install, job.archive, job.save, job.receipt,
-            expected_manifest_sha256=job.manifest_sha256,
-            expected_archive_sha256=record["archive_sha256"],
-            expected_save_sha256=record["save_sha256"],
-            expected_receipt_sha256=record["independent_receipt_sha256"],
-            authorized=True,
-        )
-        if (_record(inspected, job.moves) != record
-                or inspected.get("live_source_and_private_replay_reexecuted") is not True
-                or inspected.get("read_only") is not True):
+    before = _delivered_custody(jobs)
+    try:
+        for job, record in zip(jobs, records, strict=True):
+            inspected = inspect_first_playable_delivery(
+                job.install, job.archive, job.save, job.receipt,
+                expected_manifest_sha256=job.manifest_sha256,
+                expected_archive_sha256=record["archive_sha256"],
+                expected_save_sha256=record["save_sha256"],
+                expected_receipt_sha256=record["independent_receipt_sha256"],
+                authorized=True,
+            )
+            if (_record(inspected, job.moves) != record
+                    or inspected.get("live_source_and_private_replay_reexecuted") is not True
+                    or inspected.get("read_only") is not True):
+                raise FirstPlayableDeliveryBatchError(
+                    "live delivery no longer matches its independently pinned record"
+                )
+    finally:
+        # Also check on a failed replay; a later error must never hide an
+        # earlier inode substitution. Never repair, overwrite or delete input.
+        if _delivered_custody(jobs) != before:
             raise FirstPlayableDeliveryBatchError(
-                "live delivery no longer matches its independently pinned record"
+                "delivered cohort custody changed during cross-game replay"
             )
 
 
