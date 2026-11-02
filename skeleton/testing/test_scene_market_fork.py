@@ -76,7 +76,7 @@ def test_blocked_choice_is_never_committed_or_ranked():
     lambda r: r.update(checkpoint_state_digest="0" * 64),
     lambda r: r.update(qualification="certified_optimal"),
     lambda r: r["candidates"][0]["actions"][0].update(kind="deliver"),
-    lambda r: r.update(checksum="0" * 64),
+    lambda r: r["candidates"][0].update(candidate_id="forged_candidate"),
 ])
 def test_rejects_forged_branch_witness_even_if_checksum_recomputed(mutation):
     report = copy.deepcopy(original_fork())
