@@ -8,6 +8,7 @@ from ...authority.canonical import ContractViolation
 import time
 from ...orchestration.execution_spine.contracts import identifier,SpineError
 from ...orchestration.flight_control.contracts import FlightSpec,FlightConflict
+from ...orchestration.flight_control.admission import inspect_before_submit
 from .contracts import validate_payload
 
 
@@ -39,7 +40,7 @@ class FlightDispatcher:
             if self.accepting is not None and self.accepting() is not True:
                 from ...orchestration.flight_control.contracts import FlightBusy
                 raise FlightBusy('automatic native worker is not accepting new work')
-            record=app.ledger.submit(FlightSpec(
+            spec=FlightSpec(
                 app.spine.identity,
                 identifier(payload['job_id'],'job'),
                 identifier(payload['session_id'],'session'),
@@ -47,14 +48,16 @@ class FlightDispatcher:
                 payload['question'],
                 seed=payload.get('seed',0),
                 temperature=payload.get('temperature',0.8),
-                priority=payload.get('priority',0)))
+                priority=payload.get('priority',0))
+            admission=inspect_before_submit(app.ledger,app.spine,spec)
+            record=app.ledger.submit(spec)
             if self.on_submit is not None:
                 try:self.on_submit()
                 except Exception:
                     # Queue transaction already committed; wakeup is best effort
                     # and periodic polling will pick up the durable task.
                     pass
-            return {'job':record,'model_calls':0}
+            return {'job':record,'model_calls':0,'preflight':admission}
         if operation=='work_one':
             if not self.allow_manual_work:
                 raise ContractViolation('manual inference unavailable while auto worker owns backend')

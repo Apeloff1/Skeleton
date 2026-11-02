@@ -70,3 +70,14 @@ fixture activation is solely for tests and is marked **fixture-only**.
 - 1.9 GB artifact: still held until actual approved model/data bytes exist.
 
 This is source integration, not release acceptance. Draft PR remains held.
+
+## Native flight-control admission
+
+The loopback flight HTTP `submit` path now checks capacity before inserting a
+new queued request. It returns an omission/projection digest rather than
+plaintext source snippets. A duplicate previously accepted job is validated
+against the original intent by the flight ledger and is replayable even if
+its former evidence or context settings have since changed. This preflight is
+**not** execution attestation: the worker independently re-evaluates capacity
+under a session fence when it actually starts native generation. Direct
+operator bulk-import paths still rely on the worker-side mandatory admission.
