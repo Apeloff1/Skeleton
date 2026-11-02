@@ -81,7 +81,7 @@ def test_invalid_budgets_denied(field, value) -> None:
 
 @pytest.mark.parametrize("key,value", [
     ("checksum", "0" * 64),
-    ("status", "solved"),
+    ("status", "unreachable"),
     ("plan_digest", "0" * 64),
     ("expanded", 0),
     ("actions", [{"sequence": 0, "recipe_id": "build_lantern", "batches": 100}]),
