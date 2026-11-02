@@ -172,3 +172,37 @@ def render_scene_object_accessibility_html(
     if len(raw) > MAX_HTML_BYTES:
         raise StudioQuestError("scene accessibility HTML exceeds byte budget")
     return raw
+
+PROPOSAL_PROMPT = "Propose neutral source-only labels for original scene objects"
+
+
+def propose_scene_object_accessibility(
+    documents: Mapping[str, Any], scene_id: str, prompt: str, *,
+    authorized: bool, expected_source_digest: str,
+) -> dict[str, object]:
+    """Prompt-to-typed proposal. Never invent object appearance or rights."""
+    if authorized is not True:
+        raise PermissionError("scene accessibility proposal requires operator authorization")
+    if type(prompt) is not str or prompt != PROPOSAL_PROMPT:
+        raise StudioQuestError("unsupported scene accessibility proposal prompt")
+    _lease(expected_source_digest, "scene accessibility proposal source")
+    program = compile_quest_program(documents)
+    if program.source_digest != expected_source_digest:
+        raise StudioQuestError("stale scene accessibility proposal source")
+    scene_id = _safe_text(scene_id, label="proposal scene ID", maximum=128)
+    scene = next((row for row in scene_catalog(documents)
+                  if row["scene_id"] == scene_id), None)
+    if scene is None or not 1 <= len(scene["objects"]) <= MAX_OBJECTS:
+        raise StudioQuestError("unknown or oversized scene accessibility proposal")
+    labels = {}
+    for object_id in scene["objects"]:
+        _safe_text(object_id, label="proposal object ID", maximum=128)
+        description = (
+            "Original authored scene object " + object_id
+            + ". Appearance, interaction and asset delivery remain unverified."
+        )
+        labels[object_id] = _safe_text(
+            description, label="proposed description", maximum=MAX_LABEL_CHARS)
+    proposal = {"schema": REQUEST_SCHEMA, "scene_id": scene_id, "labels": labels}
+    _request(proposal)
+    return proposal

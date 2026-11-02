@@ -215,3 +215,60 @@ def test_cli_rejects_duplicate_keys_symlink_and_stale_source(
     args[args.index(source)] = "0" * 64
     assert main(args) == 2
     assert not (tmp_path / "review.html").exists()
+
+def test_prompt_to_typed_scene_labels_and_editable_canonical_handoff():
+    from skeleton.ai.game_builder.studio_scene_object_accessibility import (
+        PROPOSAL_PROMPT, propose_scene_object_accessibility,
+    )
+    from skeleton.ai.agents.jeeves.studio_scene_object_accessibility_tool import (
+        PROPOSAL_REQUEST_SCHEMA, execute_scene_object_accessibility_proposal_tool,
+    )
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import route_world_tool
+    docs, source, scene, _ = fixture()
+    proposal = propose_scene_object_accessibility(
+        docs, scene["scene_id"], PROPOSAL_PROMPT, authorized=True,
+        expected_source_digest=source)
+    assert set(proposal["labels"]) == set(scene["objects"])
+    assert all("unverified" in value for value in proposal["labels"].values())
+    receipt = compile_scene_object_accessibility(
+        docs, proposal, authorized=True, expected_source_digest=source)
+    assert receipt["source_object_coverage_complete"] is True
+    req = {
+        "schema": PROPOSAL_REQUEST_SCHEMA, "project_id": PROJECT,
+        "expected_quest_source_digest": source,
+        "scene_id": scene["scene_id"], "prompt": PROPOSAL_PROMPT,
+    }
+    direct = execute_scene_object_accessibility_proposal_tool(req, authorized=True)
+    assert direct["proposal"] == proposal
+    routed = route_world_tool({
+        "tool": "studio_original_scene_object_accessibility_proposal",
+        "arguments": req,
+    }, authorized=True)
+    assert routed["result"] == direct
+    with pytest.raises(StudioQuestError):
+        propose_scene_object_accessibility(
+            docs, scene["scene_id"], "pretend assets are certified",
+            authorized=True, expected_source_digest=source)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX private file custody")
+def test_prompt_proposal_cli_publishes_editable_private_request(
+    tmp_path, monkeypatch, capsys,
+):
+    from skeleton.ai.game_builder.studio_scene_object_accessibility_proposal_cli import main as propose
+    from skeleton.ai.game_builder.studio_scene_object_accessibility import PROPOSAL_PROMPT
+    _, source, scene, _ = fixture()
+    tmp_path.chmod(0o700)
+    monkeypatch.chdir(tmp_path)
+    args = [
+        "--project-id", PROJECT, "--quest-source-digest", source,
+        "--scene-id", scene["scene_id"], "--prompt", PROPOSAL_PROMPT,
+        "--output-file", "proposed_labels.json", "--trusted-local-operator",
+    ]
+    assert propose(args) == 0
+    assert json.loads(capsys.readouterr().out)["saved_new_private_file"] is True
+    payload = json.loads((tmp_path / "proposed_labels.json").read_text())
+    assert payload["scene_id"] == scene["scene_id"]
+    assert set(payload["labels"]) == set(scene["objects"])
+    assert (tmp_path / "proposed_labels.json").stat().st_mode & 0o077 == 0
+    assert propose(args) == 2

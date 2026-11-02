@@ -10,6 +10,7 @@ from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _canonical,
 from skeleton.ai.game_builder.studio_scene_object_accessibility import (
     REQUEST_SCHEMA as SOURCE_REQUEST_SCHEMA,
     compile_scene_object_accessibility, render_scene_object_accessibility_html,
+    PROPOSAL_PROMPT, propose_scene_object_accessibility,
 )
 
 REQUEST_SCHEMA = "skeleton.jeeves.studio_scene_object_accessibility_request.v1"
@@ -85,6 +86,62 @@ def execute_scene_object_accessibility_tool(
         "file_write_performed": False,
         "asset_rendered": False, "accessibility_device_verified": False,
         "release_certified": False,
+    }
+    result["result_digest"] = _digest(result)
+    return result
+
+PROPOSAL_REQUEST_SCHEMA = "skeleton.jeeves.studio_scene_object_accessibility_proposal_request.v1"
+PROPOSAL_RESULT_SCHEMA = "skeleton.jeeves.studio_scene_object_accessibility_proposal_result.v1"
+_PROPOSAL_FIELDS = frozenset({
+    "schema", "project_id", "expected_quest_source_digest", "scene_id", "prompt",
+})
+
+
+def scene_object_accessibility_proposal_tool_schema() -> dict[str, object]:
+    return {
+        "name": "studio_original_scene_object_accessibility_proposal",
+        "description": "Propose neutral source-only scene object descriptions for human review",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": PROPOSAL_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,75}$"},
+                "expected_quest_source_digest": {
+                    "type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "prompt": {"type": "string", "const": PROPOSAL_PROMPT},
+            },
+            "required": sorted(_PROPOSAL_FIELDS),
+        },
+    }
+
+
+def execute_scene_object_accessibility_proposal_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, object]:
+    if authorized is not True:
+        raise PermissionError("Jeeves scene label proposal requires operator authorization")
+    if type(request) is not dict or set(request) != _PROPOSAL_FIELDS:
+        raise StudioQuestError("Jeeves scene label proposal requires exact typed fields")
+    if request["schema"] != PROPOSAL_REQUEST_SCHEMA:
+        raise StudioQuestError("unsupported Jeeves scene label proposal schema")
+    project = request["project_id"]
+    if type(project) is not str or not IDENT.fullmatch(project):
+        raise StudioQuestError("invalid scene label proposal project")
+    expected = _lease(request["expected_quest_source_digest"],
+                      "Jeeves scene label proposal source")
+    if len(_canonical(request)) > 2048:
+        raise StudioQuestError("oversized Jeeves scene label proposal request")
+    documents = read_blueprint(project)
+    proposal = propose_scene_object_accessibility(
+        documents, request["scene_id"], request["prompt"],
+        authorized=True, expected_source_digest=expected)
+    result: dict[str, object] = {
+        "schema": PROPOSAL_RESULT_SCHEMA, "project_id": project,
+        "source_digest": expected, "proposal": proposal,
+        "proposal_digest": _digest(proposal),
+        "file_write_performed": False, "visual_appearance_verified": False,
+        "asset_rendered": False, "release_certified": False,
     }
     result["result_digest"] = _digest(result)
     return result
