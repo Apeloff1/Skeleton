@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-import json
 from pathlib import Path
 import subprocess
 import sys
@@ -11,7 +10,7 @@ import pytest
 
 from skeleton.game.gameplay.harbor_crafting import (
     HarborError, MAX_BUNDLE_BYTES, MAX_SOURCE_BYTES, canonical, decode, demo_actions,
-    digest, export_bundle, initial_state, load_source, normalize_action, run, step,
+    digest, export_bundle, initial_state, load_source, run, step,
     validate_source, verify_bundle,
 )
 

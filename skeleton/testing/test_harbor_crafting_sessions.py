@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 import subprocess
 import sys
 
@@ -14,7 +15,6 @@ from skeleton.game.gameplay.harbor_crafting import (
 from skeleton.game.gameplay.harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, state_at, verify_portfolio,
 )
-from pathlib import Path
 
 WORLD = Path(__file__).resolve().parents[1] / "game" / "gameplay" / "fixtures" / "harbor_lantern_quay.json"
 

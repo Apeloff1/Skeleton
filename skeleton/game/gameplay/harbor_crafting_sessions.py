@@ -10,7 +10,7 @@ from typing import Any
 
 from .harbor_crafting import (
     HarborError, MAX_BUNDLE_BYTES, canonical, digest, export_bundle,
-    normalize_action, run, verify_bundle,
+    normalize_action, verify_bundle,
 )
 
 PORTFOLIO_SCHEMA = "skeleton.game.harbor.portfolio.v1"
@@ -60,7 +60,7 @@ def resume_bundle(
 
 def branch_portfolio(bundle: Any, branches: Any) -> dict[str, Any]:
     """Build independently verifiable alternative futures from one trusted root."""
-    source, actions = _verified_actions(bundle)
+    _verified_actions(bundle)
     if not isinstance(branches, dict) or not 1 <= len(branches) <= MAX_BRANCHES:
         raise HarborError("invalid branch count")
     if bundle["state"]["ending"] is not None:
