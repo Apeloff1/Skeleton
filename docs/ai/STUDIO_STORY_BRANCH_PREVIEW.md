@@ -56,3 +56,27 @@ canonical and mirror Jeeves module paths carry byte-identical tool and
 orchestrator implementations. The tool returns request/result digests and
 explicitly denies file-write, browser-trust, native, external-evidence, and
 release claims. It never uses model-provided authorization fields.
+
+## Source-leased operator CLI
+
+The read-only `studio_story_checkpoint_cli` invokes the exact Jeeves typed
+replay contract. Its POSIX input loader accepts only owner-private regular
+JSON files by basename from a pinned current-directory descriptor; no symlink,
+FIFO, hardlink, traversal, oversized file, or changing file is accepted. It
+never writes an output file or alters a checkpoint. Platforms lacking secure
+POSIX descriptor flags fail closed; Windows is not qualified by this CLI.
+
+Example after exporting a browser checkpoint to an owner-private file:
+
+```sh
+chmod 600 current.json candidate.json
+python -m skeleton.ai.game_builder.studio_story_checkpoint_cli \\
+  --project-id studio_arena_fighting_glacial_fjord \\
+  --quest-source-digest <64-hex-canonical-quest-digest> \\
+  --checkpoint-file current.json --compare-file candidate.json \\
+  --trusted-local-operator
+```
+
+For preview, replace `--compare-file` with `--preview-stage STAGE`
+and `--alternative CHOICE`. The tool emits JSON to stdout with replay
+digests and explicit false release/native/evidence flags.
