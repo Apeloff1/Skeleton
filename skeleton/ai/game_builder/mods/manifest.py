@@ -32,7 +32,11 @@ class SemVer:
         m = _SEMVER.fullmatch(text.strip()) if isinstance(text, str) else None
         if not m:
             raise ModError(f"invalid semver {text!r}")
-        pre = tuple(int(p) if p.isdigit() else p for p in m.group(4).split(".")) if m.group(4) else ()
+        parts = m.group(4).split(".") if m.group(4) else []
+        if any(not part or (part.isdigit() and len(part) > 1 and part[0] == "0")
+               for part in parts):
+            raise ModError("invalid semver prerelease identifiers")
+        pre = tuple(int(p) if p.isdigit() else p for p in parts)
         return cls(int(m.group(1)), int(m.group(2)), int(m.group(3)), pre)
 
     def _key(self) -> tuple:
@@ -73,6 +77,10 @@ class VersionSpec:
         alts = []
         for alt in self.text.split("||"):
             alt = alt.strip()
+            # An empty OR branch otherwise becomes a match-all alternative,
+            # silently bypassing mandatory dependency version constraints.
+            if not alt:
+                raise ModError("empty version spec alternative")
             terms: list[tuple[str, SemVer]] = []
             if alt != "*":
                 for tok in re.sub(r"(>=|<=|>|<|=)\s+", r"\1", alt).split():

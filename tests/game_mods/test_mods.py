@@ -161,3 +161,21 @@ def test_pack_unpack_roundtrip_via_bundle_and_b099():
         pack_mod(m, ops, KEY, CODEC, assets={"bin/x.so": ""})
     with pytest.raises(HookError):
         pack_mod(m, [{"op": "set", "path": "title", "value": 1}], KEY, CODEC)
+
+
+@pytest.mark.parametrize("bad", [
+    "||", "1.2.3 ||", "|| 1.2.3", "1.2.3 || || 2.0.0", "* ||",
+])
+def test_version_specs_reject_empty_or_alternatives(bad):
+    """An empty OR branch must not grant unrestricted dependency versions."""
+    with pytest.raises(ModError, match="empty version spec alternative"):
+        VersionSpec(bad)
+
+
+@pytest.mark.parametrize("bad", [
+    "1.0.0-alpha..1", "1.0.0-.alpha", "1.0.0-alpha.",
+    "1.0.0-01", "1.0.0-alpha.001",
+])
+def test_semver_rejects_noncanonical_prerelease_identifiers(bad):
+    with pytest.raises(ModError, match="invalid semver"):
+        SemVer.parse(bad)
