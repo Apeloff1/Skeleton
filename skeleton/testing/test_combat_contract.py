@@ -78,7 +78,7 @@ def test_invalid_authoring_fails_closed(mutate):
     lambda s: s["state"].update(credits=999),
     lambda s: s["state"]["inventory"].update(bridge_pass=99),
     lambda s: s["state"]["objectives"].update(swift_resolution=False),
-    lambda s: s["state"]["combat"]["state"].update(winner="wayfarers"),
+    lambda s: s["state"]["combat"]["state"].update(winner="reedbound"),
     lambda s: s["journal"][0].update(receipt="0" * 64),
     lambda s: s["journal"][0]["action"].update(kind="guard"),
     lambda s: s["save"].update(parent_save_digest=None),
