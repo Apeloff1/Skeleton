@@ -89,7 +89,7 @@ Commands:
     scene-market-accept  Verify game-to-export market acceptance evidence
     scene-market-play  Play offline market quests with durable checkpoints
     scene-market-author  Edit and preview source-bound trading quests
-    scene-market  Play earned-currency trading, crafting and delivery quests
+    scene-market-party  Play cooperative role-gated market turns and export\n    scene-market-party-author  Edit party roles with replayable previews\n    scene-market-party-play  Play cooperative turns with durable checkpoints\n    scene-market  Play earned-currency trading, crafting and delivery quests
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
@@ -921,7 +921,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-hours-accept":
         from skeleton.game.gameplay.scene_market_hours_acceptance import cli as hours_accept_cli
         return hours_accept_cli(rest)
-    if cmd == "scene-market-hours":
+    if cmd == "scene-market-party":\n        from skeleton.game.gameplay.scene_market_party import cli as party_cli\n        return party_cli(rest)\n    if cmd == "scene-market-party-author":\n        from skeleton.game.gameplay.scene_market_party_author import cli as party_author_cli\n        return party_author_cli(rest)\n    if cmd == "scene-market-party-play":\n        from skeleton.game.gameplay.scene_market_party_interactive import cli as party_play_cli\n        return party_play_cli(rest)\n    if cmd == "scene-market-hours":
         from skeleton.game.gameplay.scene_market_hours import cli as hours_cli
         return hours_cli(rest)
     if cmd == "scene-market-contract-play":
