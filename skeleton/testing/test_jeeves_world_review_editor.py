@@ -14,7 +14,7 @@ from skeleton.jeeves.worlds.factions import (
 )
 from skeleton.jeeves.worlds.review_editor import ReviewEditorStore
 from skeleton.jeeves.worlds.world_canon import (
-    CanonError, WorldStore, digest, propose,
+    CanonError, WorldStore, propose,
 )
 
 
@@ -152,3 +152,13 @@ def test_cli_editor_export_import_replay(tmp_path, capsys, kind):
                        "--expected-digest", new_digest,
                        "--operation-file", str(path)]) == 2
     assert json.loads(capsys.readouterr().out)["error"] == "io_error"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-anchored custody")
+def test_editor_output_budget_fails_closed(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds import review_editor as module
+    root = tmp_path / "private"
+    faction_digest, _ = prepare(root)
+    monkeypatch.setattr(module, "_SCRIPT", "x" * 524288)
+    with pytest.raises(CanonError, match="review_editor_too_large"):
+        ReviewEditorStore(root).render("marsh", "factions", faction_digest)

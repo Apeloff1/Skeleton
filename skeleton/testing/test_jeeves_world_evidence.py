@@ -1,7 +1,6 @@
 """Source-leased clue discovery, spoiler suppression, authoring and replay."""
 from __future__ import annotations
 
-import copy
 import json
 import os
 
