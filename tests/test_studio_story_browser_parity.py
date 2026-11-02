@@ -105,6 +105,8 @@ def test_stale_lease_authority_and_forged_receipt_rejected():
         ("javascript_runtime_executed", True),
         ("release_certified", True),
         ("receipt_digest", "0" * 64),
+        ("browser_endings", [{**receipt["browser_endings"][0],
+                              "eligible": 1}] + receipt["browser_endings"][1:]),
     ]:
         changed = copy.deepcopy(receipt)
         changed[key] = value

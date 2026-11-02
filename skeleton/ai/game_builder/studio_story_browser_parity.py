@@ -147,7 +147,7 @@ def replay_story_browser_parity(
         documents, receipt.get("actions"), authorized=True,
         expected_source_digest=receipt.get("source_digest"),
         expected_initial_session_digest=receipt.get("initial_session_digest"))
-    if receipt != result:
+    if _canonical(receipt) != _canonical(result):
         raise StudioQuestError("browser parity receipt failed canonical replay")
     return result
 
