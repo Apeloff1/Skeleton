@@ -35,7 +35,7 @@ def _result(source: dict[str, Any], status: str, nodes: int,
         "score": None, "qualification": "offline_replay_witness_only",
     }
     if actions is not None:
-        terminal = simulate_contract(source, actions)
+        terminal = verify_contract(simulate_contract(source, actions))
         if terminal["state"]["phase"] != "won":
             raise SceneTravelError("contract solver witness not winning")
         report["terminal_state_digest"] = terminal["state_digest"]
@@ -102,7 +102,7 @@ def verify_contract_route(source: Any, report: Any) -> dict[str, Any]:
     if report["status"] == "found":
         if type(report["actions"]) is not list or len(report["actions"]) > MAX_DEPTH:
             raise SceneTravelError("invalid contract route actions")
-        terminal = simulate_contract(spec, report["actions"])
+        terminal = verify_contract(simulate_contract(spec, report["actions"]))
         if (terminal["state"]["phase"] != "won"
                 or terminal["state_digest"] != report["terminal_state_digest"]
                 or terminal["state"]["score"] != report["score"]):
