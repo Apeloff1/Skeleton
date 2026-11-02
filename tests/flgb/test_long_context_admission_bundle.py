@@ -181,10 +181,14 @@ class AdmissionBundleTests(unittest.TestCase):
                 self.cpu.forge = {field: value}
                 self.assertEqual(self.bundle.reserve(self.request)["state"], "hold")
                 self.assertEqual(self.bundle.status()["active"], 0)
+                self.assertFalse(self.cpu.reserved)
+                self.assertFalse(self.memory.reserved)
                 self.cpu.forge = {}
                 self.memory.forge = {field: value}
                 self.assertEqual(self.bundle.reserve(self.request)["state"], "hold")
                 self.assertEqual(self.bundle.status()["active"], 0)
+                self.assertFalse(self.cpu.reserved)
+                self.assertFalse(self.memory.reserved)
                 self.memory.forge = {}
                 self.kv.forge = {field: value}
                 self.assertEqual(self.bundle.reserve(self.request)["state"], "hold")

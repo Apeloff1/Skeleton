@@ -170,6 +170,10 @@ class LongContextAdmissionBundle:
             cpu_id = None
             try:
                 memory = self._memory.reserve(request.memory)
+                # Capture a well-formed ID before checking the rest of the
+                # receipt: a forged success flag must not leak a live claim.
+                if type(memory) is dict and self._key(memory.get("reservation_id"), 48):
+                    memory_id = memory["reservation_id"]
                 if (type(memory) is not dict or memory.get("schema") !=
                     "skeleton.ai.long-context-memory-budget.v1"
                     or memory.get("state") != "reserved"
@@ -179,10 +183,11 @@ class LongContextAdmissionBundle:
                     or memory.get("device_qualified") is not False
                     or memory.get("requires_live_backend_revalidation") is not True):
                     return self._receipt("hold", "memory_reservation_unverified")
-                memory_id = memory.get("reservation_id")
                 if not self._key(memory_id, 48):
                     return self._receipt("hold", "memory_identity_unverified")
                 cpu = self._cpu.reserve(request.cpu)
+                if type(cpu) is dict and self._key(cpu.get("reservation_id"), 64):
+                    cpu_id = cpu["reservation_id"]
                 if (type(cpu) is not dict or cpu.get("state") != "reserved"
                     or cpu.get("schema") != "skeleton.ai.cpu-capacity-guard.v1"
                     or cpu.get("device") != "cpu"
@@ -193,7 +198,6 @@ class LongContextAdmissionBundle:
                     or cpu.get("requires_live_backend_revalidation") is not True
                     or cpu.get("window_digest") != digest):
                     return self._receipt("hold", "cpu_reservation_unverified")
-                cpu_id = cpu.get("reservation_id")
                 if not self._key(cpu_id, 64):
                     return self._receipt("hold", "cpu_identity_unverified")
                 bundle_id = self._nonce(32)
