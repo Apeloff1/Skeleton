@@ -6,9 +6,11 @@ receipt. The operator must supply four independently retained lowercase
 SHA-256 pins and `--trusted-local-operator`. The command runs the canonical
 installed-game/replay/receipt assurance **twice**, with descriptor-backed
 inode custody snapshots before, between and after both passes. This
-tracks the installed root and evidence-file inodes, **not** every nested
-asset inode. Canonical ZIP/installed-content verification is separate from
-inode-inventory attestation; the latter remains an explicit release hold.
+tracks the installed root, evidence-file inodes, and a bounded descriptor-
+anchored inventory of every nested package inode at replay boundaries.
+Equal snapshots detect same-byte inode substitutions between observations,
+but do **not** create a filesystem lock or persistent rollback protection.
+Canonical ZIP/installed-content verification remains independently required.
 
 This command never installs, signs, repairs, rolls back, overwrites, starts
 services, invokes Jeeves, or executes a native Godot binary. A successful
