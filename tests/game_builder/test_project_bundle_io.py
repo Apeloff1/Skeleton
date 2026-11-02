@@ -209,4 +209,4 @@ def test_bundle_codec_faults_fail_closed_without_publishing(saver):
                   ThrowingCodec(TypeError("bad adapter")), BrokenPayloadCodec()):
         with pytest.raises(BundleError, match="bundle envelope failed integrity check"):
             bio.import_bundle("{}", codec, saver)
-    assert not saver.plane.list_slots() if hasattr(saver.plane, "list_slots") else True
+    assert saver.next_sequence("hero") == 1
