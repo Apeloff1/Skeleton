@@ -76,6 +76,8 @@ Commands:
     scene-weather-board  Inspect legal weather actions, earned gear and forecast
     scene-weather-route  Find replay-proven weather routes within explicit budgets
     scene-weather-accept  Verify playable weather source to interactive export
+    scene-market-fork-author  Edit and replay-verify authored market futures
+    scene-market-fork-accept  Prove player choice through portable game delivery
     scene-market-fork  Preview, verify, select and export alternate market futures
     scene-market-hours  Play authored merchant schedules with verified saves
     scene-market-hours-play  Interactively play merchants with portable checkpoints
@@ -900,6 +902,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-survival":
         from skeleton.game.gameplay.scene_tile_survival import cli as scene_survival_cli
         return scene_survival_cli(rest)
+    if cmd == "scene-market-fork-author":
+        from skeleton.game.gameplay.scene_market_fork_author import cli as fork_author_cli
+        return fork_author_cli(rest)
+    if cmd == "scene-market-fork-accept":
+        from skeleton.game.gameplay.scene_market_fork_acceptance import cli as fork_accept_cli
+        return fork_accept_cli(rest)
     if cmd == "scene-market-fork":
         from skeleton.game.gameplay.scene_market_fork import cli as market_fork_cli
         return market_fork_cli(rest)
