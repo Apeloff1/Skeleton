@@ -236,7 +236,7 @@ def replay_npc_knowledge_relay(
         documents, receipt.get("exchange_receipt"), receipt.get("authoring"),
         authorized=True, expected_source_digest=receipt.get("source_digest"),
         expected_session_digest=receipt.get("session_digest"))
-    if checked != receipt:
+    if _canonical(checked) != _canonical(receipt):
         raise StudioQuestError("NPC relay receipt differs from canonical replay")
     return checked
 

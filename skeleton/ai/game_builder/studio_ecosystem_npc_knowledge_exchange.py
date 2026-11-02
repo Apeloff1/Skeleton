@@ -192,7 +192,7 @@ def replay_npc_knowledge_exchange(
         receipt.get("knowledge_receipt"), receipt.get("authoring"),
         authorized=True, expected_source_digest=receipt.get("source_digest"),
         expected_session_digest=receipt.get("session_digest"))
-    if verified != receipt:
+    if _canonical(verified) != _canonical(receipt):
         raise StudioQuestError("NPC knowledge exchange failed canonical replay")
     return verified
 

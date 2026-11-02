@@ -128,7 +128,9 @@ def test_untrusted_authoring_and_forged_receipts_fail_closed():
         expected_source_digest=source)
     for forged in ({**valid, "release_certified": True},
                    {**valid, "delivered_count": 999},
-                   {**valid, "source_digest": "0" * 64}):
+                   {**valid, "source_digest": "0" * 64},
+                   {**valid, "npc_speech_verified": 0},
+                   {**valid, "file_write_performed": 0}):
         with pytest.raises(StudioQuestError):
             replay_npc_knowledge_relay(docs, forged, authorized=True)
     with pytest.raises(StudioQuestError):

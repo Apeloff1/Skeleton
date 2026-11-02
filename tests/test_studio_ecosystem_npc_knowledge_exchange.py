@@ -237,3 +237,19 @@ def test_offline_editor_import_roundtrip(tmp_path, capsys):
     path.write_text(json.dumps({**record, "knowledge_digest": "0" * 64}))
     with pytest.raises(StudioQuestError):
         load_npc_exchange_editor_export(path, **kwargs)
+
+
+def test_exchange_and_rendezvous_replay_reject_bool_integer_type_substitution():
+    from skeleton.ai.game_builder.studio_ecosystem_npc_rendezvous import (
+        replay_npc_rendezvous,
+    )
+    docs, source, rendezvous, knowledge = fixture()
+    exchange = propose_npc_knowledge_exchange(
+        docs, rendezvous, knowledge, PROMPT, authorized=True,
+        expected_source_digest=source)
+    with pytest.raises(StudioQuestError):
+        replay_npc_knowledge_exchange(
+            docs, {**exchange, "npc_speech_verified": 0}, authorized=True)
+    with pytest.raises(StudioQuestError):
+        replay_npc_rendezvous(
+            docs, {**rendezvous, "release_certified": 0}, authorized=True)

@@ -237,7 +237,7 @@ def replay_npc_rendezvous(
         documents, receipt.get("transit_receipt"), receipt.get("meetings"),
         authorized=True, expected_source_digest=receipt.get("source_digest"),
         expected_session_digest=receipt.get("session_digest"))
-    if replay != receipt:
+    if _canonical(replay) != _canonical(receipt):
         raise StudioQuestError("NPC rendezvous failed canonical replay")
     return replay
 
