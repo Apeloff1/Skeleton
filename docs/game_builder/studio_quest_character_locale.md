@@ -31,3 +31,12 @@ No output attests native gameplay, audio, translation rights, external evidence,
 device acceptance, or release readiness. The downstream engine must implement
 those independently. All source, receipt and HTML outputs are bounded, and
 private file reads reject unsafe paths.
+
+## Jeeves adapter
+
+Trusted app assembly can register `studio_quest_character_locale` using
+`register_quest_character_locale_tool(registry, trusted_documents, branch,
+npc, dialogue, dialogue_locale, localization, achievements, pacing,
+advisories, accepted_topics)`. This capability requires explicit registry
+authorization, `dry_run=False`, the exact source digest and expected locale.
+It has no filesystem write capability and rejects mutated inputs.
