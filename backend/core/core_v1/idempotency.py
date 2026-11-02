@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import secrets
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
@@ -35,14 +36,15 @@ class IdempotencyRecord:
     response: StoredResponse | None
     locked_until: float
     expires_at: float
+    lease_token: str = ""
 
 
 class IdempotencyStore(Protocol):
     def get(self, scope_key: str) -> IdempotencyRecord | None: ...
     def try_lock(self, record: IdempotencyRecord, now: float) -> bool:
         """Insert the record, or take over an expired/unlocked-without-response one."""
-    def save_response(self, scope_key: str, response: StoredResponse) -> None: ...
-    def release(self, scope_key: str) -> None: ...
+    def save_response(self, record: IdempotencyRecord, response: StoredResponse) -> bool: ...
+    def release(self, record: IdempotencyRecord) -> bool: ...
 
 
 def fingerprint(method: str, route: str, body: Any) -> str:
@@ -83,17 +85,21 @@ class Idempotency:
             if existing.locked_until > now:
                 raise conflict("CORE.IDEMPOTENCY.IN_FLIGHT",
                                "a request with this Idempotency-Key is in progress")
-        rec = IdempotencyRecord(skey, fp, None, now + LOCK_SECONDS, now + self.ttl)
+        rec = IdempotencyRecord(skey, fp, None, now + LOCK_SECONDS, now + self.ttl,
+                                secrets.token_hex(16))
         if not self.store.try_lock(rec, now):
             raise conflict("CORE.IDEMPOTENCY.IN_FLIGHT",
                            "a request with this Idempotency-Key is in progress")
         try:
             resp = action()
         except BaseException:
-            self.store.release(skey)
+            # A timed-out holder must never release its successor's lease.
+            self.store.release(rec)
             raise
         if resp.status < 500:
-            self.store.save_response(skey, resp)
+            if not self.store.save_response(rec, resp):
+                raise conflict("CORE.IDEMPOTENCY.LEASE_LOST",
+                               "Idempotency-Key lease was superseded before completion")
         else:
-            self.store.release(skey)
+            self.store.release(rec)
         return resp, False

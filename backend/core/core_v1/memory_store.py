@@ -25,15 +25,23 @@ class MemoryIdempotencyStore:
             self._d[record.scope_key] = record
             return True
 
-    def save_response(self, scope_key: str, response: StoredResponse) -> None:
+    def save_response(self, record: IdempotencyRecord, response: StoredResponse) -> bool:
         with self._lock:
-            self._d[scope_key] = replace(self._d[scope_key], response=response, locked_until=0)
+            cur = self._d.get(record.scope_key)
+            if (cur is None or cur.lease_token != record.lease_token
+                    or cur.response is not None):
+                return False
+            self._d[record.scope_key] = replace(cur, response=response, locked_until=0)
+            return True
 
-    def release(self, scope_key: str) -> None:
+    def release(self, record: IdempotencyRecord) -> bool:
         with self._lock:
-            cur = self._d.get(scope_key)
-            if cur is not None and cur.response is None:
-                del self._d[scope_key]
+            cur = self._d.get(record.scope_key)
+            if (cur is None or cur.lease_token != record.lease_token
+                    or cur.response is not None):
+                return False
+            del self._d[record.scope_key]
+            return True
 
 
 class MemorySubscriptionRepository:

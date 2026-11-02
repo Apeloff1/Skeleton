@@ -91,6 +91,9 @@ MIGRATIONS: tuple[tuple[int, str, str], ...] = (
             PRIMARY KEY (delivery_id, attempt)
         )
     """),
+    (4, "idempotency_lease_fence", """
+        ALTER TABLE core_v1_idempotency ADD COLUMN lease_token TEXT NOT NULL DEFAULT ''
+    """),
 )
 
 
@@ -130,7 +133,8 @@ class SqliteIdempotencyStore:
         resp = None
         if r["response_status"] is not None:
             resp = StoredResponse(r["response_status"], json.loads(r["response_body"]))
-        return IdempotencyRecord(r["scope_key"], r["fingerprint"], resp, r["locked_until"], r["expires_at"])
+        return IdempotencyRecord(r["scope_key"], r["fingerprint"], resp, r["locked_until"],
+                                 r["expires_at"], r["lease_token"])
 
     def try_lock(self, record: IdempotencyRecord, now: float) -> bool:
         with self.db.tx() as c:
@@ -142,20 +146,28 @@ class SqliteIdempotencyStore:
                 if not (expired or abandoned):
                     return False
                 c.execute("DELETE FROM core_v1_idempotency WHERE scope_key=?", (record.scope_key,))
-            c.execute("INSERT INTO core_v1_idempotency VALUES (?,?,?,?,?,?)",
+            c.execute("INSERT INTO core_v1_idempotency "
+                      "(scope_key, fingerprint, response_status, response_body, "
+                      "locked_until, expires_at, lease_token) VALUES (?,?,?,?,?,?,?)",
                       (record.scope_key, record.fingerprint, None, None,
-                       record.locked_until, record.expires_at))
+                       record.locked_until, record.expires_at, record.lease_token))
         return True
 
-    def save_response(self, scope_key: str, response: StoredResponse) -> None:
+    def save_response(self, record: IdempotencyRecord, response: StoredResponse) -> bool:
         with self.db.tx() as c:
-            c.execute("UPDATE core_v1_idempotency SET response_status=?, response_body=?, locked_until=0 "
-                      "WHERE scope_key=?", (response.status, json.dumps(response.body), scope_key))
+            cur = c.execute(
+                "UPDATE core_v1_idempotency SET response_status=?, response_body=?, locked_until=0 "
+                "WHERE scope_key=? AND lease_token=? AND response_status IS NULL",
+                (response.status, json.dumps(response.body), record.scope_key, record.lease_token))
+            return cur.rowcount == 1
 
-    def release(self, scope_key: str) -> None:
+    def release(self, record: IdempotencyRecord) -> bool:
         with self.db.tx() as c:
-            c.execute("DELETE FROM core_v1_idempotency WHERE scope_key=? AND response_status IS NULL",
-                      (scope_key,))
+            cur = c.execute(
+                "DELETE FROM core_v1_idempotency "
+                "WHERE scope_key=? AND lease_token=? AND response_status IS NULL",
+                (record.scope_key, record.lease_token))
+            return cur.rowcount == 1
 
     def purge_expired(self, now: float) -> int:
         with self.db.tx() as c:

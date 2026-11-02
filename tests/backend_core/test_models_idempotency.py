@@ -90,3 +90,39 @@ def test_idempotency_scope_serialization_prevents_delimiter_collisions():
     assert not replayed and response.body == {"tenant": 2}
     with pytest.raises(CoreError):
         idem.run(123, ("t", "a", "r"), "fp", first)
+
+
+def _assert_idempotency_lease_fences_stale_owner(idem, clock):
+    """Expired holder cannot overwrite or delete a successor's durable result."""
+    parts = ("tenant", "actor", "route")
+    key = "key-lease-001"
+    successor = StoredResponse(201, {"winner": "new"})
+
+    def stale_completion():
+        clock.advance(61)
+        fresh, replayed = idem.run(key, parts, "same", lambda: successor)
+        assert not replayed and fresh == successor
+        return StoredResponse(201, {"winner": "stale"})
+
+    with pytest.raises(CoreError) as err:
+        idem.run(key, parts, "same", stale_completion)
+    assert err.value.code == "CORE.IDEMPOTENCY.LEASE_LOST"
+    saved, replayed = idem.run(key, parts, "same", lambda: pytest.fail("must replay"))
+    assert replayed and saved == successor
+
+    key = "key-lease-002"
+
+    def stale_failure():
+        clock.advance(61)
+        idem.run(key, parts, "same", lambda: successor)
+        raise RuntimeError("stale owner failed after successor completed")
+
+    with pytest.raises(RuntimeError):
+        idem.run(key, parts, "same", stale_failure)
+    saved, replayed = idem.run(key, parts, "same", lambda: pytest.fail("must replay"))
+    assert replayed and saved == successor
+
+
+def test_memory_idempotency_lease_fences_stale_owner():
+    idem, clock = _idem()
+    _assert_idempotency_lease_fences_stale_owner(idem, clock)

@@ -77,3 +77,41 @@ def test_sqlite_idempotency_store(tmp_path):
     assert rep and r2.body == {"x": 1}
     clock.advance(10 ** 6)
     assert store.purge_expired(clock.now()) == 1
+
+
+def test_sqlite_idempotency_lease_fences_stale_owner(tmp_path):
+    from core.core_v1.errors import CoreError
+
+    clock = FakeClock()
+    store = SqliteIdempotencyStore(open_database(str(tmp_path / "lease.db")))
+    idem = Idempotency(store, clock)
+    parts = ("tenant", "actor", "route")
+    key = "key-lease-003"
+    successor = StoredResponse(201, {"winner": "new"})
+
+    def stale_completion():
+        clock.advance(61)
+        newer, replayed = idem.run(key, parts, "same", lambda: successor)
+        assert not replayed and newer == successor
+        return StoredResponse(201, {"winner": "stale"})
+
+    with pytest.raises(CoreError) as err:
+        idem.run(key, parts, "same", stale_completion)
+    assert err.value.code == "CORE.IDEMPOTENCY.LEASE_LOST"
+    reopened = SqliteIdempotencyStore(open_database(str(tmp_path / "lease.db")))
+    saved, replayed = Idempotency(reopened, clock).run(
+        key, parts, "same", lambda: pytest.fail("must replay"))
+    assert replayed and saved == successor
+
+    key = "key-lease-004"
+
+    def stale_failure():
+        clock.advance(61)
+        idem.run(key, parts, "same", lambda: successor)
+        raise RuntimeError("stale owner failed after takeover")
+
+    with pytest.raises(RuntimeError):
+        idem.run(key, parts, "same", stale_failure)
+    saved, replayed = Idempotency(reopened, clock).run(
+        key, parts, "same", lambda: pytest.fail("must replay"))
+    assert replayed and saved == successor
