@@ -103,7 +103,10 @@ def inspect_consumer_first_run_cohort(
                 or observed.get("source_level_replay_passes") != 2
                 or observed.get("all_input_inodes_stable_during_inspection") is not False
                 or observed.get("root_and_evidence_inodes_stable_during_inspection") is not True
-                or observed.get("nested_asset_inode_inventory_attested") is not False
+                or observed.get("nested_asset_inode_inventory_attested") is not True
+                or observed.get("nested_asset_inode_snapshots_equal") is not True
+                or type(observed.get("installed_tree_snapshot_sha256")) is not str
+                or len(observed["installed_tree_snapshot_sha256"]) != 64
                 or observed.get("read_only") is not True
                 or observed.get("release_certified") is not False
                 or observed.get("native_device_qualified") is not False
@@ -123,6 +126,7 @@ def inspect_consumer_first_run_cohort(
             "save_sha256": job.save_sha256,
             "receipt_sha256": job.receipt_sha256,
             "source_level_replay_passes": 2,
+            "installed_tree_snapshot_sha256": observed["installed_tree_snapshot_sha256"],
             "release_certified": False,
         })
         if (_delivered_custody(checked) != before
@@ -158,7 +162,8 @@ def inspect_consumer_first_run_cohort(
         # and source-root custody is not a nested asset inode inventory.
         "cohort_and_job_inodes_stable": False,
         "root_and_evidence_inodes_stable": True,
-        "nested_asset_inode_inventory_attested": False,
+        "nested_asset_inode_inventory_attested": True,
+        "nested_asset_inode_snapshots_equal": True,
         "private_jobfile_inode_attested": False,
         "read_only": True,
         "files_published": 0,
