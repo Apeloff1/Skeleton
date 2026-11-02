@@ -100,7 +100,7 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
                         or action.get("item") or action.get("choice")
                         or action["op"]
                     )
-                output_stream.write("LEGAL NOW " + ", ".join(descriptions) + "\\n")
+                output_stream.write("LEGAL NOW " + ", ".join(descriptions) + "\n")
                 continue
             if command == "help":
                 output_stream.write("Move, gather, craft, trade, deliver and choose an ending. save exports a checkpoint.\n")
