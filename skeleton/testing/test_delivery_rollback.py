@@ -55,3 +55,20 @@ def test_rollback_rejects_nonboolean_degraded_policy():
             decide(report, tolerate_degraded=bad)
     assert decide(report, tolerate_degraded=False).should_rollback
     assert not decide(report, tolerate_degraded=True).should_rollback
+
+
+def test_rollback_refuses_unknown_or_contradictory_health_evidence():
+    for report in (
+        HealthReport("unknown", (), ()),
+        HealthReport("healthy", (), ("readiness",)),
+        HealthReport("", (), ()),
+        HealthReport("healthy", (), ["not-a-tuple"]),
+        None,
+    ):
+        with pytest.raises(DeliveryError, match="health report evidence"):
+            decide(report)
+    assert decide(HealthReport("healthy", (), ())).should_rollback is False
+    assert decide(HealthReport("unhealthy", (), ("readiness",))).should_rollback is True
+    history = ReleaseHistory("staging")
+    with pytest.raises(DeliveryError, match="rollback trigger"):
+        plan_rollback(history, trigger=[])

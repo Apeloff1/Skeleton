@@ -9,6 +9,7 @@ quorum of replicas within the configured latency budget.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable, Mapping, Sequence
 
 from skeleton.build.delivery._util import DeliveryError, require_id
@@ -71,9 +72,12 @@ def evaluate_observation(spec: ProbeSpec, obs: ProbeObservation) -> ProbeResult:
         return ProbeResult(spec.probe_id, obs.replica, False, f"error:{obs.error}")
     if obs.status is None:
         return ProbeResult(spec.probe_id, obs.replica, False, "no-response")
+    if type(obs.status) is not int or not 100 <= obs.status <= 599:
+        return ProbeResult(spec.probe_id, obs.replica, False, "invalid-status")
     if obs.status not in spec.expect_status:
         return ProbeResult(spec.probe_id, obs.replica, False, f"status:{obs.status}")
-    if obs.latency_ms is None or obs.latency_ms > spec.max_latency_ms:
+    if (type(obs.latency_ms) is not int or obs.latency_ms < 0
+            or obs.latency_ms > spec.max_latency_ms):
         return ProbeResult(spec.probe_id, obs.replica, False, f"latency:{obs.latency_ms}")
     if spec.body_marker is not None and spec.body_marker not in obs.body:
         return ProbeResult(spec.probe_id, obs.replica, False, "body-marker-missing")
@@ -91,8 +95,12 @@ def evaluate(
         raise DeliveryError("at least one probe is required")
     if not replicas:
         raise DeliveryError("at least one replica is required")
-    if not 0 < quorum <= 1:
-        raise DeliveryError("quorum must be in (0, 1]")
+    if (type(quorum) not in (int, float) or not math.isfinite(quorum)
+            or not 0 < quorum <= 1):
+        raise DeliveryError("quorum must be a finite fraction in (0, 1]")
+    if (any(type(replica) is not str or not replica for replica in replicas)
+            or len(set(replicas)) != len(replicas)):
+        raise DeliveryError("replicas must be distinct nonempty identities")
     ids = [s.probe_id for s in specs]
     if len(ids) != len(set(ids)):
         raise DeliveryError("duplicate probe ids")
@@ -106,7 +114,9 @@ def evaluate(
     results: list[ProbeResult] = []
     failing_required: list[str] = []
     failing_optional: list[str] = []
-    needed = max(1, -(-int(quorum * 1000) * len(replicas) // 1000))
+    # Never round quorum down to thousandths: 0.5001 of two replicas
+    # requires both, not one. Duplicate replica identities are rejected above.
+    needed = max(1, math.ceil(quorum * len(replicas)))
     for spec in specs:
         passes = 0
         for replica in replicas:
