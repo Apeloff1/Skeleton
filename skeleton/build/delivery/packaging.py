@@ -175,7 +175,10 @@ def list_zip(data: bytes) -> dict[str, bytes]:
             if path != info.filename or path in out:
                 raise DeliveryError("zip member path is noncanonical or duplicated")
             mode = info.external_attr >> 16
-            if info.is_dir() or (info.create_system == 3 and stat.S_ISLNK(mode)):
+            # ZIP Unix metadata may encode FIFOs, sockets and device nodes,
+            # not just symlinks. Never present them as ordinary file payloads.
+            kind = stat.S_IFMT(mode)
+            if info.is_dir() or (info.create_system == 3 and kind not in (0, stat.S_IFREG)):
                 raise DeliveryError("zip nonregular member rejected")
             if info.flag_bits & 1:
                 raise DeliveryError("zip encrypted member rejected")

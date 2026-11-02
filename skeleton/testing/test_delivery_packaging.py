@@ -105,3 +105,28 @@ def test_tar_duplicate_members_are_rejected():
             tar.addfile(member, io.BytesIO(b"x"))
     with pytest.raises(DeliveryError, match="noncanonical or duplicated"):
         list_tarball(buf.getvalue())
+
+
+def test_zip_reader_rejects_unix_special_file_modes():
+    import io
+    import stat
+    import zipfile
+
+    for kind in (stat.S_IFLNK, stat.S_IFIFO, stat.S_IFSOCK, stat.S_IFCHR, stat.S_IFBLK):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            entry = zipfile.ZipInfo("special")
+            entry.create_system = 3
+            entry.external_attr = (kind | 0o644) << 16
+            z.writestr(entry, b"not an ordinary file")
+        with pytest.raises(DeliveryError, match="nonregular"):
+            list_zip(buf.getvalue())
+
+    # Explicit regular-file metadata is still accepted.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        entry = zipfile.ZipInfo("regular")
+        entry.create_system = 3
+        entry.external_attr = (stat.S_IFREG | 0o644) << 16
+        z.writestr(entry, b"ok")
+    assert list_zip(buf.getvalue()) == {"regular": b"ok"}
