@@ -44,6 +44,7 @@ from skeleton.ai.agents.jeeves import studio_npc_dialogue_choice_commit_tool as 
 from skeleton.ai.agents.jeeves import studio_npc_dialogue_chain_tool as npc_dialogue_chain
 from skeleton.ai.agents.jeeves import studio_quest_ending_witness_tool as ending_witness
 from skeleton.ai.agents.jeeves import studio_quest_softlock_audit_tool as softlock
+from skeleton.ai.agents.jeeves import studio_quest_replay_diagnostic_tool as replay_diagnostic
 from skeleton.ai.agents.jeeves import studio_quest_ending_coverage_tool as ending_coverage
 from skeleton.ai.agents.jeeves import studio_quest_readiness_tool as readiness
 from skeleton.ai.agents.jeeves import studio_prompt_quest_plan_tool as prompt_quest
@@ -98,6 +99,7 @@ _TOOL_SYMBOLS = (
     ("npc_dialogue_chain_tool_schema", "execute_npc_dialogue_chain_tool"),
     ("quest_ending_witness_tool_schema", "execute_quest_ending_witness_tool"),
     ("quest_softlock_audit_tool_schema", "execute_quest_softlock_audit_tool"),
+    ("quest_replay_diagnostic_tool_schema", "execute_quest_replay_diagnostic_tool"),
     ("quest_ending_coverage_tool_schema", "execute_quest_ending_coverage_tool"),
     ("quest_readiness_tool_schema", "execute_quest_readiness_tool"),
     ("prompt_quest_plan_tool_schema", "execute_prompt_quest_plan_tool"),
@@ -210,6 +212,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    npc_dialogue_chain if descriptor_name == "npc_dialogue_chain_tool_schema" else
                    ending_witness if descriptor_name == "quest_ending_witness_tool_schema" else
                    softlock if descriptor_name == "quest_softlock_audit_tool_schema" else
+                   replay_diagnostic if descriptor_name == "quest_replay_diagnostic_tool_schema" else
                    ending_coverage if descriptor_name == "quest_ending_coverage_tool_schema" else
                    readiness if descriptor_name == "quest_readiness_tool_schema" else
                    prompt_quest if descriptor_name == "prompt_quest_plan_tool_schema" else
