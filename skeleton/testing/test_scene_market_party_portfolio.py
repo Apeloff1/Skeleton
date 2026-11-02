@@ -87,3 +87,19 @@ def test_end_to_end_main_dispatch_and_error_channel(capsys):
     assert result["ranking"]["revision"] == 1
     assert cli(["import", "--bundle-json", "{}"]) == 2
     assert "error" in json.loads(capsys.readouterr().err)
+
+
+def test_portfolio_refuses_unranked_victory(complete):
+    source, played, vault, _ = complete
+    with pytest.raises(SceneTravelError, match="earned ranked victory"):
+        pack_portfolio(played, vault, new_league(source), slot="campaign")
+
+
+def test_portfolio_refuses_unearned_checkpoint_even_with_valid_rank(complete):
+    source, _, _, league = complete
+    partial = simulate_party(source, [])
+    partial_vault = transact_vault(new_vault(source), {
+        "kind": "put", "slot": "campaign", "expected_revision": 0,
+        "expected_slot_digest": None, "checkpoint": partial})
+    with pytest.raises(SceneTravelError, match="winning checkpoint"):
+        pack_portfolio(partial, partial_vault, league, slot="campaign")

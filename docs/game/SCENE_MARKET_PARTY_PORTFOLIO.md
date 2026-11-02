@@ -18,3 +18,8 @@ A portfolio does not create currency, game objects, rewards or victory.
 It does not merge saves or certify a signed build, online identity,
 anti-cheat service, installer, device or consumer release. Its serialized
 payload is bounded to two MiB and inherits all canonical reducer limits.
+
+A production portfolio requires both a winning canonical checkpoint and at
+least one replay-verified earned league attempt for that exact checkpoint.
+An empty league or a nonwinning saved run fails closed, even when its outer
+checksum is recomputed. Inspect-only saves remain valid outside portfolios.

@@ -47,10 +47,13 @@ def pack_portfolio(checkpoint: Any, vault: Any, league: Any,
     saved = read_slot(saves, slot)
     if saved != party:
         raise SceneTravelError("cooperative portfolio selected save mismatch")
-    if ranking_source["entries"]:
-        if not any(e["party_state_digest"] == party["state_digest"]
-                   for e in ranking_source["entries"]):
-            raise SceneTravelError("cooperative portfolio winning attempt missing")
+    if party["state"]["market"]["state"]["phase"] != "won":
+        raise SceneTravelError("cooperative portfolio requires winning checkpoint")
+    if not ranking_source["entries"]:
+        raise SceneTravelError("cooperative portfolio requires earned ranked victory")
+    if not any(e["party_state_digest"] == party["state_digest"]
+               for e in ranking_source["entries"]):
+        raise SceneTravelError("cooperative portfolio winning attempt missing")
     party_export = export_party(party)
     vault_export = export_vault(saves)
     league_export = export_league(ranking_source)
