@@ -11,12 +11,14 @@ from .harbor_crafting import (
 )
 from .harbor_crafting_authoring import author_revision, verify_revision
 from .harbor_crafting_planner import solve, verify_plan
+from .harbor_crafting_missions import mission_report, verify_mission_report, solve_missions
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
 )
 
 DEFAULT_WORLD = Path(__file__).resolve().parent / "fixtures" / "harbor_lantern_quay.json"
+DEFAULT_MISSIONS = Path(__file__).resolve().parent / "fixtures" / "harbor_lantern_quay_missions.json"
 
 
 def _read(path: str, maximum: int = MAX_BUNDLE_BYTES) -> bytes:
@@ -38,7 +40,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -51,10 +53,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-source-digest", help="CAS lease for source editing")
     parser.add_argument("--choice", choices=("signal", "shelter"), default="signal")
     parser.add_argument("--plan", help="JSON solver plan for verification")
+    parser.add_argument("--missions", default=str(DEFAULT_MISSIONS), help="Authored mission board JSON")
+    parser.add_argument("--report", help="Portable mission report JSON for replay verification")
+    parser.add_argument("--require-all", action="store_true", help="Require every authored mission to be earned")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "play-live":
+        if args.command == "verify-mission-report":
+            result = verify_mission_report(_required_json(args.report, "report"), require_all=args.require_all)
+            output = {"verified": True, **result}
+        elif args.command == "mission-report":
+            output = mission_report(
+                _required_json(args.bundle, "bundle"), decode(_read(args.missions)),
+                require_all=args.require_all,
+            )
+        elif args.command == "solve-missions":
+            output = solve_missions(
+                load_source(Path(args.source)), decode(_read(args.missions)), choice=args.choice,
+            )
+        elif args.command == "play-live":
             return play_live(load_source(Path(args.source)), sys.stdin, sys.stdout)
         if args.command == "verify-plan":
             state = verify_plan(_required_json(args.plan, "plan"))
