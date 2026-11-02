@@ -18,6 +18,8 @@ def test_original_market_acceptance_full_vertical():
     result = audit_market(source, actions, include_editor=True)
     assert result["ok"] is True
     assert result["phase"] == "won"
+    assert result["feasibility_status"] == "potentially_reachable_unproven"
+    assert len(result["feasibility_checksum"]) == 64
     assert result["credits"] == 1
     assert result["delivered"] == ["sanctuary_seal"]
     assert result["reputation"] == 5

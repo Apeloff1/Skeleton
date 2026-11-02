@@ -22,6 +22,7 @@ from skeleton.game.gameplay.scene_market_ledger import (
     audit_market_ledger, export_market_ledger, import_market_ledger,
 )
 from skeleton.game.gameplay.scene_market_reconciliation import reconcile_market
+from skeleton.game.gameplay.scene_market_feasibility import analyze_market_feasibility
 from skeleton.game.gameplay.scene_market_author import (
     edit_market, verify_market_edit,
 )
@@ -46,6 +47,9 @@ def audit_market(source: Any, actions: Any, *,
     if type(require_victory) is not bool or type(include_editor) is not bool:
         raise SceneTravelError("invalid market acceptance options")
     spec = normalize_market(source)
+    feasibility = analyze_market_feasibility(spec)
+    if require_victory and feasibility["status"] == "definitely_unreachable":
+        raise SceneTravelError("market required deliveries lack production chain")
     if type(actions) is not list or not actions:
         raise SceneTravelError("market acceptance requires action witness")
     complete = simulate_market(spec, actions)
@@ -131,6 +135,8 @@ def audit_market(source: Any, actions: Any, *,
         raise SceneTravelError("forged market economic witness accepted")
     report = {
         "schema_version": SCHEMA, "ok": True,
+        "feasibility_status": feasibility["status"],
+        "feasibility_checksum": feasibility["checksum"],
         "source_digest": complete["source_digest"],
         "state_digest": complete["state_digest"],
         "phase": complete["state"]["phase"],

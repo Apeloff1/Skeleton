@@ -421,6 +421,8 @@ def cli(argv: Sequence[str]) -> int:
         sub.add_parser(command).add_argument("--session-json", required=True)
     for command in ("import", "ledger-import"):
         sub.add_parser(command).add_argument("--bundle-json", required=True)
+    feasible = sub.add_parser("feasibility")
+    feasible.add_argument("--source-json", required=True)
     reconcile = sub.add_parser("ledger-reconcile")
     reconcile.add_argument("--before-json", required=True)
     reconcile.add_argument("--after-json", required=True)
@@ -437,6 +439,11 @@ def cli(argv: Sequence[str]) -> int:
             result = verify_market(_json(args.session_json))
         elif args.command == "export":
             result = export_market(_json(args.session_json))
+        elif args.command == "feasibility":
+            from skeleton.game.gameplay.scene_market_feasibility import (
+                analyze_market_feasibility,
+            )
+            result = analyze_market_feasibility(_json(args.source_json))
         elif args.command == "ledger-reconcile":
             from skeleton.game.gameplay.scene_market_reconciliation import (
                 reconcile_market,
