@@ -70,6 +70,14 @@ class ExecutionSpine:
             prepared=prepare_context(identity=self.identity,backend=self.backend,
                 history=saved,prompt=prompt,evidence=evidence,limits=self.limits)
             cancel.check()
+            # A backend that owns an isolated native process can reject
+            # resource pressure BEFORE a durable lease is reserved. Unknown
+            # telemetry remains a hold; existing backends without such a gate
+            # retain their previous (less-qualified) admission semantics.
+            resource_gate=getattr(self.backend,'admit_before_reservation',None)
+            if callable(resource_gate):
+                resource_gate()
+            cancel.check()
             with self.db.transaction() as conn:
                 available=requests.reserve(conn,req,self.limits,
                     lease_ns=self.limits.deadline_ms*1_000_000)

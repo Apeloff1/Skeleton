@@ -23,7 +23,8 @@ class FlightApplication:
 def activate_flight(*,model_root:str|Path,state_dir:str|Path,
                     tenant:str,subject:str,worker_id:str,
                     n_ctx:int=8192,max_new_tokens:int=512,n_threads:int=4,
-                    gpu_layers:int=0,settings:FlightPolicy|None=None)->Iterator[FlightApplication]:
+                    gpu_layers:int=0,settings:FlightPolicy|None=None,
+                    isolate_native:bool=False)->Iterator[FlightApplication]:
     """No local demo/fake fallback; startup activates an approved native model.
 
     The existing production startup is authoritative for principal binding,
@@ -33,7 +34,8 @@ def activate_flight(*,model_root:str|Path,state_dir:str|Path,
     from ...deployment.production.startup import activate
     stack,supervised=activate(model_root=model_root,state_dir=state_dir,
          tenant=tenant,subject=subject,n_ctx=n_ctx,
-         max_new_tokens=max_new_tokens,n_threads=n_threads,gpu_layers=gpu_layers)
+         max_new_tokens=max_new_tokens,n_threads=n_threads,gpu_layers=gpu_layers,
+         isolated=isolate_native)
     with stack:
         spine=supervised.spine
         ledger=FlightLedger(spine.db,spine.identity,settings=settings)

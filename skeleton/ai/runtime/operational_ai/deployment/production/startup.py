@@ -14,7 +14,7 @@ from ..boot.identity import PrincipalBinding,establish_binding
 
 def activate(*,model_root:str|Path,state_dir:str|Path,tenant:str,subject:str,
              n_ctx:int=2048,max_new_tokens:int=256,n_threads:int=4,
-             gpu_layers:int=0):
+             gpu_layers:int=0,isolated:bool=False,inference_ms:int=90000):
     """Return an ExitStack and working supervised execution spine.
 
     Caller must close stack on failure and after serving. This does not claim
@@ -28,8 +28,16 @@ def activate(*,model_root:str|Path,state_dir:str|Path,tenant:str,subject:str,
             except FileExistsError:pass
         finally:os.close(root_fd)
         manifest=load_approved_manifest(model_root)
-        model=stack.enter_context(activate_model(model_root,manifest,
-            n_ctx=n_ctx,n_threads=n_threads,n_gpu_layers=gpu_layers))
+        if type(isolated) is not bool:
+            raise SpineError('invalid native isolation option')
+        if isolated:
+            from ...model.isolation.client import IsolatedGGUFBackend
+            model=stack.enter_context(IsolatedGGUFBackend(
+                Path(model_root).absolute(),manifest,n_ctx=n_ctx,n_threads=n_threads,
+                n_gpu_layers=gpu_layers,inference_ms=inference_ms))
+        else:
+            model=stack.enter_context(activate_model(model_root,manifest,
+                n_ctx=n_ctx,n_threads=n_threads,n_gpu_layers=gpu_layers))
         identity=Identity(tenant,subject,model.model_digest,model.tokenizer_digest)
         # A preexisting unbound spine database must never be adopted by a new
         # tenant identity, even if older state-binder versions do not know it.

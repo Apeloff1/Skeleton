@@ -15,13 +15,16 @@ def main(argv:list[str]|None=None)->int:
     p.add_argument('--request-id')
     p.add_argument('--prompt',required=True)
     p.add_argument('--threads',type=int,default=4)
+    p.add_argument('--isolate-native',action='store_true',
+                   help='Run the real GGUF backend in a killable private subprocess')
     p.add_argument('--context',type=int,default=2048)
     p.add_argument('--max-new-tokens',type=int,default=256)
     args=p.parse_args(argv)
     try:
         stack,worker=activate(model_root=args.model_root,state_dir=args.state_dir,
             tenant=args.tenant,subject=args.subject,n_ctx=args.context,
-            max_new_tokens=args.max_new_tokens,n_threads=args.threads)
+            max_new_tokens=args.max_new_tokens,n_threads=args.threads,
+            isolated=args.isolate_native)
         with stack:
             session=args.session or 's_'+secrets.token_hex(16)
             if not args.session:worker.spine.create(session)

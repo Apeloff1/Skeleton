@@ -22,6 +22,8 @@ def main(argv:list[str]|None=None)->int:
     p.add_argument('--max-new-tokens',type=int,default=512)
     p.add_argument('--threads',type=int,default=4)
     p.add_argument('--gpu-layers',type=int,default=0)
+    p.add_argument('--isolate-native',action='store_true',
+                   help='Execute all GGUF inference inside a killable local worker process')
     p.add_argument('--poll-ms',type=int,default=200)
     p.add_argument('--shutdown-grace-ms',type=int,default=120000)
     args=p.parse_args(argv)
@@ -33,7 +35,8 @@ def main(argv:list[str]|None=None)->int:
         with activate_flight(model_root=args.model_root,state_dir=args.state_dir,
               tenant=args.tenant,subject=args.subject,worker_id=args.worker,
               n_ctx=args.context,max_new_tokens=args.max_new_tokens,
-              n_threads=args.threads,gpu_layers=args.gpu_layers) as app:
+              n_threads=args.threads,gpu_layers=args.gpu_layers,
+              isolate_native=args.isolate_native) as app:
             knowledge=KnowledgePlane(app.spine.db,app.spine.identity,initialize=False)
             policy=DaemonPolicy(poll_ms=args.poll_ms,
                                 shutdown_grace_ms=args.shutdown_grace_ms)
