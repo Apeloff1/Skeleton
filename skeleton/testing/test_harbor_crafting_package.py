@@ -64,7 +64,7 @@ def test_partial_gameplay_is_exportable_but_never_falsely_claims_all_missions():
 @pytest.mark.parametrize("mutation", [
     lambda p: p["manifest"][0].update({"bytes": 1}),
     lambda p: p["manifest"][1].update({"sha256": "0" * 64}),
-    lambda p: p["demo"]["points"].__class__,
+    lambda p: p["demo"].update({"points": 999}),
     lambda p: p["board"]["missions"][0].update({"points": 99}),
     lambda p: p["source"].update({"initial_coins": 99}),
     lambda p: p.update({"choice": "shelter"}),
@@ -72,14 +72,8 @@ def test_partial_gameplay_is_exportable_but_never_falsely_claims_all_missions():
 ])
 def test_package_forgery_rejected_even_if_outer_digest_is_resealed(mutation):
     built = package()
-    if mutation.__code__.co_consts and False:
-        pass
     mutation(built)
     built["package_digest"] = digest({key: value for key, value in built.items() if key != "package_digest"})
-    if mutation.__code__.co_consts and False:
-        pass
-    if mutation.__name__ == "<lambda>" and built == package():
-        return
     with pytest.raises(HarborError):
         verify_package(built)
 
@@ -131,3 +125,27 @@ def test_cli_package_build_verify_play_and_verify_play(tmp_path):
     )
     assert accepted.returncode == 0, accepted.stderr
     assert json.loads(accepted.stdout)["points"] == 60
+
+
+def test_package_rejects_noncanonical_payloads_and_oversized_actions():
+    built = package()
+    with pytest.raises(HarborError, match="list"):
+        play_package(built, {"op": "wait"})
+    with pytest.raises(HarborError):
+        play_package(built, [{"op": "wait"}] * (built["source"]["max_ticks"] + 1))
+    forged = deepcopy(built)
+    forged["manifest"] = list(reversed(forged["manifest"]))
+    forged["package_digest"] = digest({key: value for key, value in forged.items() if key != "package_digest"})
+    with pytest.raises(HarborError, match="manifest"):
+        verify_package(forged)
+
+
+def test_package_inputs_remain_immutable_through_verified_play():
+    original_source = source()
+    original_board = board()
+    before_source, before_board = deepcopy(original_source), deepcopy(original_board)
+    built = build_package(original_source, original_board)
+    played = play_package(built, demo_actions())
+    assert verify_package_play(played)["ending"] == "beacon"
+    assert original_source == before_source
+    assert original_board == before_board
