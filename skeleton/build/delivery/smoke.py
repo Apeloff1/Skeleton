@@ -69,7 +69,7 @@ def load_suite(items: Sequence[Mapping]) -> tuple[SmokeCase, ...]:
     ids = [c.case_id for c in cases]
     if len(ids) != len(set(ids)):
         raise DeliveryError("duplicate smoke case ids")
-    return cases
+    return tuple(cases)
 
 
 def evaluate(cases: Sequence[SmokeCase], outcomes: Iterable[SmokeOutcome]) -> SmokeReport:
