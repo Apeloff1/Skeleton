@@ -231,3 +231,19 @@ def test_verify_manifest_fifo_is_rejected_without_blocking(tmp_path):
     os.mkfifo(backup / "manifest.json")
     with pytest.raises(chroma_backup.BackupRejected, match="manifest"):
         chroma_backup.verify_backup(backup)
+
+
+def test_chroma_manifest_byte_limit_rejects_before_publication(tmp_path, monkeypatch):
+    """A backup must not publish a manifest that verification cannot read."""
+    def fake_docker(*args):
+        if args[0] == "inspect":
+            return json.dumps(_existing())
+        (Path(args[2]) / ("asset-" + "x" * 120 + ".bin")).write_bytes(b"bounded")
+        return ""
+
+    monkeypatch.setattr(chroma_backup, "_docker", fake_docker)
+    monkeypatch.setattr(chroma_backup, "MAX_MANIFEST_BYTES", 512)
+    destination = tmp_path / "oversized-manifest"
+    with pytest.raises(chroma_backup.BackupRejected, match="manifest byte admission"):
+        chroma_backup.backup_legacy_chroma(destination)
+    assert not destination.exists()

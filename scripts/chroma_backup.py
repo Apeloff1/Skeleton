@@ -128,6 +128,9 @@ def _manifest_files(root: Path, *, exclude_root_manifest: bool = False) -> list[
         raise BackupRejected("Chroma backup exceeds tree entry admission budget")
     entries: list[dict] = []
     count = total = 0
+    # A generated manifest must fit the same bounded read contract as
+    # verify_backup(). Account for each JSON entry before accumulating it.
+    manifest_entry_bytes = 0
     for path in sorted(paths):
         before_path = path.lstat()
         if stat.S_ISLNK(before_path.st_mode) or not (
@@ -175,11 +178,19 @@ def _manifest_files(root: Path, *, exclude_root_manifest: bool = False) -> list[
                     after.st_mtime_ns, after.st_ctime_ns
             ):
                 raise BackupRejected("Chroma file changed during descriptor read")
-        entries.append({
+        entry = {
             "path": path.relative_to(root).as_posix(),
             "bytes": size,
             "sha256": digest.hexdigest(),
-        })
+        }
+        manifest_entry_bytes += len(json.dumps(
+            entry, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("ascii")) + 2
+        # Reserve space for the fixed schema/container metadata and formatting.
+        # The final exact serialized bound is checked before publication too.
+        if manifest_entry_bytes > MAX_MANIFEST_BYTES - 4096:
+            raise BackupRejected("Chroma manifest byte admission budget exceeded")
+        entries.append(entry)
     return entries
 
 
@@ -230,9 +241,10 @@ def backup_legacy_chroma(output: Path, *, container: str = CONTAINER) -> dict:
             "migration_complete": False,
             "release_accepted": False,
         }
-        (staging / "manifest.json").write_text(
-            json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8",
-        )
+        manifest_payload = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        if len(manifest_payload) > MAX_MANIFEST_BYTES:
+            raise BackupRejected("Chroma manifest byte admission budget exceeded")
+        (staging / "manifest.json").write_bytes(manifest_payload)
         # Rename only after both copies, the second inspect and content hashes.
         # Keep evidence private; Docker cp may restore broad file permissions.
         _publish_no_replace(staging, output)
