@@ -99,6 +99,8 @@ Commands:
     scene-market-party-author  Edit party roles with replayable previews
     scene-market-party-play  Play cooperative turns with durable checkpoints
     scene-market-party-board  Inspect replay-verified legal cooperative actions
+    scene-market-party-route  Find bounded role-gated routes with replay witnesses
+    scene-market-party-accept  Prove cooperative interactive restart and export
     scene-market  Play earned-currency trading, crafting and delivery quests
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-push  Play crate physics, pressure plates, author, solve and replay
@@ -960,6 +962,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-author":
         from skeleton.game.gameplay.scene_market_party_author import cli as party_author_cli
         return party_author_cli(rest)
+    if cmd == "scene-market-party-route":
+        from skeleton.game.gameplay.scene_market_party_route import cli as party_route_cli
+        return party_route_cli(rest)
+    if cmd == "scene-market-party-accept":
+        from skeleton.game.gameplay.scene_market_party_acceptance import cli as party_accept_cli
+        return party_accept_cli(rest)
     if cmd == "scene-market-party-board":
         from skeleton.game.gameplay.scene_market_party_board import cli as party_board_cli
         return party_board_cli(rest)
