@@ -186,3 +186,27 @@ def test_bundle_rejects_invalid_utf8_before_filesystem_publication(tmp_path, sav
     assert not target.exists()
     with pytest.raises(BundleError, match="UTF-8"):
         bio.import_bundle(bad, CODEC, saver)
+
+
+def test_bundle_codec_faults_fail_closed_without_publishing(saver):
+    """Malformed injected codec failures must never become partial imports."""
+    class ThrowingCodec:
+        def __init__(self, error):
+            self.error = error
+
+        def decode(self, raw):
+            raise self.error
+
+    class BrokenPayloadCodec:
+        def decode(self, raw):
+            class Broken:
+                @property
+                def payload(self):
+                    raise RuntimeError("private codec diagnostic")
+            return Broken()
+
+    for codec in (ThrowingCodec(RuntimeError("private secret")),
+                  ThrowingCodec(TypeError("bad adapter")), BrokenPayloadCodec()):
+        with pytest.raises(BundleError, match="bundle envelope failed integrity check"):
+            bio.import_bundle("{}", codec, saver)
+    assert not saver.plane.list_slots() if hasattr(saver.plane, "list_slots") else True

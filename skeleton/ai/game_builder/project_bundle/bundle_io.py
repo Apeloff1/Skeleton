@@ -88,7 +88,10 @@ def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
     _bounded_bundle_bytes(raw)
     try:
         payload = codec.decode(raw).payload
-    except ValueError as exc:  # SaveIntegrityError is a ValueError
+    except Exception as exc:
+        # The injected codec and its payload accessor are an external trust
+        # boundary. Fail closed with a stable, non-leaking bundle error even
+        # for malformed adapters that raise outside SaveIntegrityError.
         raise BundleError("bundle envelope failed integrity check") from exc
     if (type(payload) is not dict or set(payload) != {"manifest", "sections", "receipts"}
             or type(payload["sections"]) is not dict
