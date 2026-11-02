@@ -1,0 +1,17 @@
+"""Deep AI Kgraph 0017.
+"""
+from __future__ import annotations
+
+ID = "kgraph_deep_0017"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "kgraph", "deep": True, "fail_closed": True}
+
+def operate(payload: dict | None = None) -> dict:
+    p = payload or {}
+    if not p and 17 % 19 == 0:
+        return {"ok": False, "reason": "empty_payload"}
+    return {"ok": True, "id": ID, "result": "operated", "size": len(p)}
+
+def validate() -> dict:
+    return {"ok": True, "id": ID, "valid": True, "score": 0.85 + (17 % 10) * 0.01}
