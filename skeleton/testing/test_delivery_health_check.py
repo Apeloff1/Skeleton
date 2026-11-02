@@ -53,3 +53,27 @@ def test_specs_from_config():
     specs = specs_from_config({"path": "/healthz", "probes": [{"id": "ready", "path": "/readyz", "required": False}]})
     assert [s.probe_id for s in specs] == ["liveness", "ready"]
     assert specs[1].required is False
+
+
+def test_quorum_cannot_be_rounded_down_or_count_duplicate_replicas():
+    good = [O("liveness", "r1", 200, 1)]
+    assert evaluate([LIVE], good, replicas=REPLICAS, quorum=0.5).healthy
+    assert evaluate([LIVE], good, replicas=REPLICAS, quorum=0.5001).verdict == "unhealthy"
+    for replicas in (("r1", "r1"), ("r1", "")):
+        with pytest.raises(DeliveryError, match="distinct nonempty"):
+            evaluate([LIVE], good, replicas=replicas)
+
+
+def test_quorum_rejects_untrusted_nonfinite_and_boolean_values():
+    for quorum in (True, False, float("nan"), float("inf"), -0.1, 0, 1.01, "1"):
+        with pytest.raises(DeliveryError, match="finite fraction"):
+            evaluate([LIVE], [], replicas=REPLICAS, quorum=quorum)
+
+
+def test_latency_and_status_evidence_must_be_bounded_integers():
+    for latency in (float("nan"), float("inf"), -1, True, "0", 501):
+        report = evaluate([LIVE], [O("liveness", "r1", 200, latency)], replicas=("r1",))
+        assert report.verdict == "unhealthy"
+    for status in (True, 200.0, "200", 600):
+        report = evaluate([LIVE], [O("liveness", "r1", status, 1)], replicas=("r1",))
+        assert report.verdict == "unhealthy"
