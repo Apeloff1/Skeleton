@@ -76,3 +76,21 @@ This is a production authoring preview, not a claim that changing a
 mission board rewrites the original gameplay save. A mission may be
 lost after an edit even though the underlying player's earned game
 ending remains unchanged.
+
+## Original playable distribution
+
+`package-build --source WORLD --missions BOARD` produces one bounded,
+canonical, content-addressed JSON game package with the complete authored
+world, authored quest board, deterministic manifest and an independently
+replayable, earned mission victory. `package-verify --package PACKAGE`
+validates all embedded source contracts and reconstructs the demo using
+the canonical game engine and mission planner; digest matching alone is
+not enough.
+
+`package-play --package PACKAGE --actions ACTIONS` accepts real player
+commands as canonical action JSON, executes the original game rules and
+exports the resulting portable gameplay/quest journal. Partial sessions
+are allowed, but `--require-all` rejects unearned quest completion.
+`package-verify-play --play PLAY` verifies the distribution and replays
+the entire player history. This is an original, offline JSON distribution
+format, not a signed executable installer or device-qualified game.
