@@ -446,5 +446,29 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.assertEqual(limits.lifetime_ns, 100000)
         self.assertEqual(limits.max_active_per_principal, 4)
 
+    def test_forged_pressure_receipt_cannot_create_capacity(self):
+        self.warm()
+        valid = self.guard._latch.sample()
+        self.assertEqual(valid["state"], "repeated_normal_observed")
+        forged = (
+            {"is_admission_grant": True},
+            {"observation_digest_is_authenticity_proof": True},
+            {"pressure_signals_attested": True},
+            {"restart_state_durable": True},
+            {"consecutive_normal_observations": 1},
+            {"signals": {"cpu": "normal", "memory": "normal",
+                         "thermal": "unknown", "energy": "normal"}},
+            {"required_observations": True},
+            {"schema": "untrusted"},
+        )
+        for changes in forged:
+            with self.subTest(changes=changes):
+                self.guard._latch.sample = MagicMock(return_value={
+                    **valid, **changes})
+                result = self.guard.reserve(self.request)
+                self.assertIsNone(result["reservation_id"])
+                self.assertEqual(result["state"], "hold")
+                self.assertEqual(self.guard.status()["active"], 0)
+
 if __name__ == "__main__":
     unittest.main()

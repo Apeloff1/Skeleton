@@ -131,13 +131,33 @@ class LongContextCpuCapacityGuard:
     def _pressure(self) -> str:
         try:
             result = self._latch.sample()
-            state = result["state"]
-            if (result.get("is_execution_lease") is not False
+            if type(result) is not dict:
+                raise LongContextSpoolError("invalid pressure receipt")
+            state = result.get("state")
+            if (result.get("schema") != "skeleton.ai.long-context-pressure-latch.v1"
+                    or result.get("is_execution_lease") is not False
                     or result.get("is_admission_grant") is not False
                     or result.get("device_qualified") is not False
+                    or result.get("cross_source_snapshot_atomic") is not False
+                    or result.get("pressure_signals_attested") is not False
+                    or result.get("observation_digest_is_authenticity_proof") is not False
+                    or result.get("restart_state_durable") is not False
                     or result.get("requires_live_backend_revalidation") is not True
                     or state not in ("hold", "warming", "repeated_normal_observed")):
                 state = "hold"
+            if state == "repeated_normal_observed":
+                signals = result.get("signals")
+                samples = result.get("consecutive_normal_observations")
+                required = result.get("required_observations")
+                if (type(signals) is not dict
+                        or set(signals) != {"cpu", "memory", "thermal", "energy"}
+                        or any(value != "normal" for value in signals.values())
+                        or type(required) is not int or not 2 <= required <= 16
+                        or type(samples) is not int or samples != required
+                        or result.get("reasons") != []
+                        or type(result.get("reset_epoch")) is not int
+                        or result["reset_epoch"] < 0):
+                    state = "hold"
         except Exception:
             state = "hold"
         # Warming after a sampling gap is not a stable safe observation.
