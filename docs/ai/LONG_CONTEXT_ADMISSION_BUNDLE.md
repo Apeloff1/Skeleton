@@ -38,3 +38,13 @@ bundle becomes visible. Any failed/forged/missing dependency receipt or nonce
 collision rolls back every recognizable CPU and RAM reservation. It does not
 claim fairness across independent processes or make a multi-stream *claim*
 atomic; each claim separately revalidates live backend constraints.
+
+## Monotonic bounded expiry
+
+Every bundle has a process-local monotonic deadline (default 500 ms, maximum
+configurable 5 s). Reserve and fair-cycle publication recheck elapsed time
+after potentially blocking CPU/RAM/KV observations; claim rechecks again
+after both inner claims. Status and release lazily expire tracked bundles,
+releasing both underlying reservations. A clock exception, regression, or
+fork never preserves claims. These deadlines are not durable across restart
+and cannot replace the backend's live admission and consumption fences.

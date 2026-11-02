@@ -142,6 +142,15 @@ class KvStub:
         return result
 
 
+class Clock:
+    def __init__(self):
+        self.value = 1000
+
+    def __call__(self):
+        self.value += 100
+        return self.value
+
+
 class AdmissionBundleTests(unittest.TestCase):
     def setUp(self):
         self.digest = "f" * 64
@@ -236,6 +245,47 @@ class AdmissionBundleTests(unittest.TestCase):
             self.bundle.reserve_fair_cycle([self.request])
         self.assertEqual(self.bundle.reserve_fair_cycle(
             (self.request, other), quantum_tokens=4)["state"], "hold")
+        self.assertFalse(self.memory.reserved)
+
+    def test_bundle_expiry_revokes_both_inner_reservations(self):
+        clock = Clock()
+        bundle = LongContextAdmissionBundle(
+            self.cpu, self.memory, self.kv,
+            nonce=lambda _: "c" * 64, clock=clock, lifetime_ns=1000)
+        key = bundle.reserve(self.request)["bundle_id"]
+        self.assertIsNotNone(key)
+        clock.value += 2000
+        self.assertEqual(bundle.status()["active"], 0)
+        self.assertEqual(bundle.status()["revocations"], 1)
+        self.assertEqual(bundle.claim(key, self.request)["state"], "hold")
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_bundle_slow_reservation_fails_closed(self):
+        clock = Clock()
+        bundle = LongContextAdmissionBundle(
+            self.cpu, self.memory, self.kv,
+            nonce=lambda _: "c" * 64, clock=clock, lifetime_ns=1000)
+        original = self.cpu.reserve
+        def slow(request):
+            clock.value += 2000
+            return original(request)
+        self.cpu.reserve = slow
+        result = bundle.reserve(self.request)
+        self.assertEqual(result["reason"], "bundle_observation_expired")
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
+    def test_bundle_clock_regression_revokes_claims(self):
+        clock = Clock()
+        bundle = LongContextAdmissionBundle(
+            self.cpu, self.memory, self.kv,
+            nonce=lambda _: "c" * 64, clock=clock, lifetime_ns=1000)
+        bundle.reserve(self.request)
+        clock.value = 0
+        with self.assertRaises(LongContextSpoolError):
+            bundle.status()
+        self.assertFalse(self.cpu.reserved)
         self.assertFalse(self.memory.reserved)
 
     def test_reserve_claim_release_never_grants_execution(self):

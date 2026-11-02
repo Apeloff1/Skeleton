@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import os
 from secrets import token_hex
 from threading import Lock
+from time import monotonic_ns
 from typing import Callable
 
 from .long_context_cpu_guard import CpuCapacityRequest
@@ -19,6 +20,7 @@ from .long_context_spool import LongContextSpoolError, _digest
 
 _SCHEMA = "skeleton.ai.long-context-admission-bundle.v1"
 _MAX_ACTIVE = 64
+_MAX_CLOCK = 2**63 - 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +56,7 @@ class _Bundle:
     memory_id: str
     cpu_id: str
     window_digest: str
+    expires_ns: int
     state: str = "reserved"
 
 
@@ -68,11 +71,15 @@ class LongContextAdmissionBundle:
 
     def __init__(self, cpu_guard: object, memory_guard: object,
                  kv_observer: object, *, max_active: int = 8,
-                 nonce: Callable[[int], str] = token_hex) -> None:
+                 nonce: Callable[[int], str] = token_hex,
+                 clock: Callable[[], int] = monotonic_ns,
+                 lifetime_ns: int = 500_000_000) -> None:
         if type(max_active) is not int or not 1 <= max_active <= _MAX_ACTIVE:
             raise LongContextSpoolError("invalid admission bundle limit")
-        if not callable(nonce):
-            raise LongContextSpoolError("invalid admission bundle nonce")
+        if not callable(nonce) or not callable(clock):
+            raise LongContextSpoolError("invalid admission bundle nonce or clock")
+        if type(lifetime_ns) is not int or not 1 <= lifetime_ns <= 5_000_000_000:
+            raise LongContextSpoolError("invalid admission bundle lifetime")
         for guard, names in (
             (cpu_guard, ("reserve", "claim", "release")),
             (memory_guard, ("reserve", "claim", "release")),
@@ -82,6 +89,8 @@ class LongContextAdmissionBundle:
                 raise LongContextSpoolError("invalid admission bundle dependency")
         self._cpu, self._memory, self._kv = cpu_guard, memory_guard, kv_observer
         self._nonce, self._max_active = nonce, max_active
+        self._clock, self._lifetime_ns = clock, lifetime_ns
+        self._last_ns: int | None = None
         self._pid = os.getpid()
         self._lock = Lock()
         self._entries: dict[str, _Bundle] = {}
@@ -95,6 +104,25 @@ class LongContextAdmissionBundle:
     def _open(self) -> None:
         if self._closed:
             raise LongContextSpoolError("admission bundle closed")
+
+    def _now(self) -> int:
+        """Monotonic expiry check under the coordinator lock."""
+        try:
+            value = self._clock()
+        except Exception as exc:
+            for key in tuple(self._entries):
+                self._revoke(key)
+            raise LongContextSpoolError("admission bundle clock unavailable") from exc
+        if (type(value) is not int or not 0 <= value <= _MAX_CLOCK
+                or (self._last_ns is not None and value < self._last_ns)):
+            for key in tuple(self._entries):
+                self._revoke(key)
+            raise LongContextSpoolError("admission bundle clock regressed")
+        self._last_ns = value
+        for key in tuple(self._entries):
+            if self._entries[key].expires_ns <= value:
+                self._revoke(key)
+        return value
 
     @staticmethod
     def _key(value: object, length: int) -> bool:
@@ -158,6 +186,9 @@ class LongContextAdmissionBundle:
         self._pid_guard()
         with self._lock:
             self._open()
+            now = self._now()
+            if now > _MAX_CLOCK - self._lifetime_ns:
+                return self._receipt("hold", "bundle_clock_overflow")
             if len(self._entries) >= self._max_active:
                 return self._receipt("hold", "bundle_capacity_exhausted")
             if any(item.request.cpu.stream_id == request.cpu.stream_id
@@ -200,11 +231,15 @@ class LongContextAdmissionBundle:
                     return self._receipt("hold", "cpu_reservation_unverified")
                 if not self._key(cpu_id, 64):
                     return self._receipt("hold", "cpu_identity_unverified")
+                after = self._now()
+                if after >= now + self._lifetime_ns:
+                    return self._receipt("hold", "bundle_observation_expired")
                 bundle_id = self._nonce(32)
                 if (not self._key(bundle_id, 64)
                         or bundle_id in self._entries):
                     return self._receipt("hold", "bundle_identity_unavailable")
-                self._entries[bundle_id] = _Bundle(request, memory_id, cpu_id, digest)
+                self._entries[bundle_id] = _Bundle(
+                    request, memory_id, cpu_id, digest, now + self._lifetime_ns)
                 return self._receipt("reserved", "cooperative_only",
                                      bundle_id=bundle_id, window_digest=digest)
             except Exception:
@@ -249,6 +284,10 @@ class LongContextAdmissionBundle:
         self._pid_guard()
         with self._lock:
             self._open()
+            now = self._now()
+            if now > _MAX_CLOCK - self._lifetime_ns:
+                return {**self._receipt("hold", "bundle_clock_overflow"),
+                        "reservations": []}
             ordered = tuple(sorted(requests, key=lambda r: r.cpu.stream_id))
             if (len(self._entries) + len(ordered) > self._max_active
                     or any(r.cpu.max_tokens > quantum_tokens for r in ordered)
@@ -341,6 +380,9 @@ class LongContextAdmissionBundle:
                             or type(entry.get("max_tokens")) is not int
                             or entry["max_tokens"] != request.cpu.max_tokens):
                         raise LongContextSpoolError("fair-cycle CPU stream mismatch")
+                after = self._now()
+                if after >= now + self._lifetime_ns:
+                    raise LongContextSpoolError("fair-cycle observation expired")
                 bundle_keys = [self._nonce(32) for _ in ordered]
                 if (any(not self._key(key, 64) or key in self._entries
                         for key in bundle_keys)
@@ -352,7 +394,7 @@ class LongContextAdmissionBundle:
                         request,
                         memory_map[sha256(request.memory.stream_id.encode("ascii")).hexdigest()]["reservation_id"],
                         cpu_map[_name(request.cpu.stream_id)]["reservation_id"],
-                        digest)
+                        digest, now + self._lifetime_ns)
                     inserted_keys.append(key)
                     receipts.append({
                         "stream_digest": _name(request.cpu.stream_id),
@@ -386,6 +428,7 @@ class LongContextAdmissionBundle:
         self._pid_guard()
         with self._lock:
             self._open()
+            self._now()
             entry = self._entries.get(bundle_id)
             if (entry is None or entry.state != "reserved"
                     or entry.request != request):
@@ -419,6 +462,11 @@ class LongContextAdmissionBundle:
             except Exception:
                 self._revoke(bundle_id)
                 return self._receipt("hold", "claim_revalidation_failed")
+            # CPU and RAM claims may block; an expired bundle cannot be
+            # published as claimed even if both inner guards returned success.
+            self._now()
+            if self._entries.get(bundle_id) is not entry:
+                return self._receipt("hold", "bundle_expired_during_claim")
             entry.state = "claimed"
             return self._receipt("claimed", "backend_must_revalidate",
                                  bundle_id=bundle_id, window_digest=digest)
@@ -429,6 +477,7 @@ class LongContextAdmissionBundle:
         self._pid_guard()
         with self._lock:
             self._open()
+            self._now()
             if bundle_id not in self._entries:
                 return False
             self._revoke(bundle_id)
@@ -437,6 +486,7 @@ class LongContextAdmissionBundle:
     def status(self) -> dict[str, object]:
         self._pid_guard()
         with self._lock:
+            self._now()
             return {
                 "schema": "skeleton.ai.long-context-admission-bundle-status.v1",
                 "state": "closed" if self._closed else "diagnostic",
