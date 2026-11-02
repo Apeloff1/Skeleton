@@ -1,0 +1,84 @@
+"""Static, read-only typed Jeeves tools for original-world authoring.
+
+These tools are safe to expose to a model planner: they cannot mutate
+custody, approve original content, or claim an unverified game compile.
+Operator writes remain exclusively in the reviewed CLI workflow.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from .evidence import EvidenceStore, propose_evidence
+from .factions import FactionStore, propose_factions
+from .world_canon import (
+    CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
+)
+
+SCHEMA = "jeeves.world.tool_request.v1"
+RESULT_SCHEMA = "jeeves.world.tool_result.v1"
+
+TOOLS = {
+    "world.proof": (),
+    "factions.propose_preview": (
+        "prompt", "faction_id", "name", "description",
+        "choice_id", "delta", "reason",
+    ),
+    "factions.inspect": (),
+    "factions.player": ("slot",),
+    "evidence.propose_preview": (
+        "prompt", "clue_id", "title", "detail", "unlock_choice",
+    ),
+    "evidence.inspect": (),
+    "evidence.player": ("slot",),
+}
+
+
+def manifest() -> dict[str, Any]:
+    return {
+        "schema": "jeeves.world.tool_manifest.v1",
+        "tools": [
+            {"name": name, "required_args": list(TOOLS[name]),
+             "read_only": True, "operator_write_required": True}
+            for name in sorted(TOOLS)
+        ],
+        "authority": "read_only_no_mutation_or_implicit_approval",
+    }
+
+
+def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
+    req = _keys(request, {"schema", "tool", "world_id", "args"})
+    if req["schema"] != SCHEMA:
+        raise CanonError("world_tool_schema_mismatch")
+    name = req["tool"]
+    if type(name) is not str or name not in TOOLS:
+        raise CanonError("unknown_world_tool")
+    _id(req["world_id"], "world_id")
+    args = _keys(req["args"], set(TOOLS[name]))
+    world = WorldStore(root).read(req["world_id"])
+    if name == "world.proof":
+        payload = prove(world).as_dict()
+    elif name == "factions.propose_preview":
+        payload = propose_factions(world, **args)
+    elif name == "factions.inspect":
+        payload = FactionStore(root).read(req["world_id"])
+    elif name == "factions.player":
+        _id(args["slot"], "slot")
+        payload = FactionStore(root).player(req["world_id"], args["slot"])
+    elif name == "evidence.propose_preview":
+        payload = propose_evidence(world, **args)
+    elif name == "evidence.inspect":
+        payload = EvidenceStore(root).read(req["world_id"])
+    elif name == "evidence.player":
+        _id(args["slot"], "slot")
+        payload = EvidenceStore(root).player(req["world_id"], args["slot"])
+    else:
+        raise CanonError("unknown_world_tool")
+    # Detach the result from mutable store-backed Python objects.
+    output = strict_json(canonical(payload))
+    return {
+        "schema": RESULT_SCHEMA, "tool": name, "world_id": world["id"],
+        "world_digest": digest(world), "result_digest": digest(output),
+        "result": output, "persisted": False, "review_required": (
+            name.endswith("propose_preview")),
+        "authority": "read_only_no_mutation",
+    }
