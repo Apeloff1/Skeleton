@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, TextIO
 
+from .harbor_crafting_guidance import legal_actions
 from .harbor_crafting import (
     HarborError, canonical, demo_actions, export_bundle, initial_state,
     normalize_action, step, validate_source, verify_bundle,
@@ -47,6 +48,8 @@ def parse_command(line: str) -> dict[str, str] | str:
         raise HarborError("empty terminal command")
     if parts == ["save"]:
         return "save"
+    if parts == ["hint"]:
+        return "hint"
     if parts == ["help"]:
         return "help"
     if parts == ["quit"]:
@@ -77,7 +80,7 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
     state = initial_state(world)
     actions: list[dict[str, str]] = []
     max_commands = world["max_ticks"] * 4 + 16
-    output_stream.write("LANTERN QUAY | north south east west gather craft ID trade ID deliver signal shelter wait save quit\n")
+    output_stream.write("LANTERN QUAY | north south east west gather craft ID trade ID deliver signal shelter wait hint save quit\n")
     output_stream.write(render(world, state))
     for _ in range(max_commands):
         line = input_stream.readline(MAX_COMMAND_BYTES + 2)
@@ -87,6 +90,18 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
             return 2
         try:
             command = parse_command(line)
+            if command == "hint":
+                available = legal_actions(world, state)
+                descriptions = []
+                for option in available:
+                    action = option["action"]
+                    descriptions.append(
+                        action.get("direction") or action.get("recipe")
+                        or action.get("item") or action.get("choice")
+                        or action["op"]
+                    )
+                output_stream.write("LEGAL NOW " + ", ".join(descriptions) + "\\n")
+                continue
             if command == "help":
                 output_stream.write("Move, gather, craft, trade, deliver and choose an ending. save exports a checkpoint.\n")
                 continue
