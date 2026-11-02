@@ -1,0 +1,13 @@
+"""Biome eco_apex 0327.
+"""
+from __future__ import annotations
+
+ID = "biome_eco_apex_0327"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "biome", "index": 327, "tier": 327 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 327 % 53 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}

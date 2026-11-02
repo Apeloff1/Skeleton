@@ -1,0 +1,13 @@
+"""Character eco_apex 1080.
+"""
+from __future__ import annotations
+
+ID = "character_eco_apex_1080"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "character", "index": 1080, "tier": 1080 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 1080 % 53 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}

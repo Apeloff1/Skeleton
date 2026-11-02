@@ -1,0 +1,13 @@
+"""Quest eco_apex 0162.
+"""
+from __future__ import annotations
+
+ID = "quest_eco_apex_0162"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "quest", "power": 5 + (162 % 20)}
+
+def apply(target: str, stacks: int = 1) -> dict:
+    if not target or stacks < 1:
+        return {"ok": False, "reason": "bad"}
+    return {"ok": True, "id": ID, "target": target, "stacks": min(5, stacks)}
