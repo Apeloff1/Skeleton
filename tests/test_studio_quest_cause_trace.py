@@ -98,6 +98,9 @@ def test_handoff_requires_every_selected_ending_earned():
             documents, verified, authorized=True)
         assert handoff["eligible_endings"] == earned
         assert handoff["quest_source_digest"] == program.source_digest
+        assert handoff["playable_compiler_proof_verified"] is True
+        assert handoff["canonical_html5_quest_included"] is True
+        assert len(handoff["game_html_sha256"]) == 64
         assert handoff["native_gameplay_verified"] is False
         assert handoff["release_certified"] is False
 

@@ -14,6 +14,7 @@ from pathlib import Path
 import secrets
 from typing import Any, Mapping
 
+from .studio_ecosystem_catalog import compile_preview
 from .studio_ecosystem_quest import (
     StudioQuestError, compile_quest_program, quest_progress, replay_quest,
     start_quest, step_quest,
@@ -231,12 +232,22 @@ def compile_quest_cause_handoff(
     final = replay_quest(documents, verified["plan"]["actions"], authorized=True)
     if final.digest != verified["final_session_digest"]:
         raise StudioQuestError("causal handoff session changed")
+    compiled = compile_preview(verified["project_id"], authorized=True)
+    game_html = compiled.playable.html.encode("utf-8", "strict")
+    game_receipt = compiled.receipt()
+    if (game_receipt.get("project_id") != verified["project_id"]
+            or game_receipt.get("validated_gameplay_proof") is not True
+            or sha256(game_html).hexdigest() != game_receipt.get("html_sha256")):
+        raise StudioQuestError("quest cause handoff playable compiler proof mismatch")
     handoff: dict[str, Any] = {
         "schema": HANDOFF_SCHEMA,
         "project_id": verified["project_id"],
         "quest_source_digest": verified["source_digest"],
         "quest_session_digest": final.digest,
         "cause_trace_digest": verified["trace_digest"],
+        "game_html_sha256": sha256(game_html).hexdigest(),
+        "canonical_html5_quest_included": True,
+        "playable_compiler_proof_verified": True,
         "eligible_endings": [row["ending_id"] for row in verified["ending_explanations"]],
         "canonical_quest_replay_verified": True,
         "native_gameplay_verified": False,

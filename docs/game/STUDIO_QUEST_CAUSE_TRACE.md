@@ -46,3 +46,7 @@ is not a game-engine, device, or release certification.
 Focused regressions:
 `tests/test_studio_quest_cause_trace.py` and
 `tests/test_studio_quest_cause_trace_jeeves.py`.
+
+The handoff re-invokes the canonical HTML5 preview compiler and verifies its
+project identity, gameplay proof flag, and exact HTML SHA-256. This is a
+source-bound playable HTML5 handoff, not proof of native engine behavior.
