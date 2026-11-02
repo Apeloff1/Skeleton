@@ -107,13 +107,30 @@ def _with_position(actor: ActorBody, pos: tuple[int, int, int], grounded: bool,
                    vertical_velocity_mm_s=vy)
 
 
-def _digest(tick: int, actors: Sequence[ActorBody], contacts: Iterable, prev: str) -> str:
+def _digest(
+    tick: int, actors: Sequence[ActorBody], contacts: Iterable, prev: str,
+    *, intents: Mapping[str, tuple[int, int]], statics: Sequence[AABB],
+    step_ns: int, floor_y_mm: int,
+) -> str:
+    # A receipt must bind *all* physics-authoritative inputs, not just
+    # positions. Mass, collision extents, speed and world geometry can change
+    # the next tick without changing the current actor coordinates.
     return sha256(json.dumps({
         "tick": tick, "prev": prev,
-        "actors": [[a.actor_id, list(a.controller.position), a.controller.grounded,
-                    a.vertical_velocity_mm_s] for a in actors],
+        "step_ns": step_ns, "floor_y_mm": floor_y_mm,
+        "actors": [
+            [a.actor_id, list(a.controller.position),
+             a.controller.max_speed_per_sec, a.controller.grounded,
+             a.vertical_velocity_mm_s, list(a.half_extent_mm), a.mass_g, a.role]
+            for a in actors
+        ],
+        "intents": [[name, list(intents[name])] for name in sorted(intents)],
+        "statics": [
+            [box.collider_id, list(box.min_xyz), list(box.max_xyz)]
+            for box in sorted(statics, key=lambda box: box.collider_id)
+        ],
         "contacts": sorted(list(c) for c in contacts),
-    }, separators=(",", ":")).encode()).hexdigest()
+    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def step_actors(
@@ -150,6 +167,8 @@ def step_actors(
         raise MultiActorError("previous receipt digest is invalid")
     if type(step_ns) is not int or not 1_000_000 <= step_ns <= 100_000_000:
         raise MultiActorError("step must be 1..100 ms")
+    if type(floor_y_mm) is not int or abs(floor_y_mm) > MAX_INTENT_MM_S:
+        raise MultiActorError("floor height must be a bounded integer")
     ids = [a.actor_id for a in actors]
     if len(set(ids)) != len(ids):
         raise MultiActorError("duplicate actor id")
@@ -231,7 +250,9 @@ def step_actors(
     frozen = frozenset(contacts)
     return TickReceipt(tick, ordered, frozen,
                        tuple(sorted(events, key=lambda e: (e.kind, e.actors))),
-                       _digest(tick, ordered, frozen, prev_digest), prev_digest)
+                       _digest(tick, ordered, frozen, prev_digest,
+                               intents=intents, statics=statics, step_ns=step_ns,
+                               floor_y_mm=floor_y_mm), prev_digest)
 
 
 def run_actors(actors: Sequence[ActorBody],

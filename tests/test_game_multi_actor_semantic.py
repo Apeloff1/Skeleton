@@ -142,3 +142,37 @@ def test_semantic_physics_rejects_wrong_previous_contact_container():
     with pytest.raises(MultiActorError, match="contact count or type"):
         step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP,
                     prev_contacts=[("a", "b")])
+
+
+def test_semantic_receipt_binds_physics_authority():
+    """Same coordinates with different physical authority must not share a digest."""
+    from dataclasses import replace
+
+    base = actor("a", 0)
+    variants = [
+        base,
+        replace(base, mass_g=base.mass_g + 1),
+        replace(base, half_extent_mm=(301, 500, 300)),
+        replace(base, role="player"),
+        replace(base, controller=CharacterController(
+            base.actor_id, base.controller.position,
+            base.controller.max_speed_per_sec + 1, True)),
+    ]
+    receipts = [step_actors((body,), {}, tick=0, step_ns=STEP) for body in variants]
+    assert len({receipt.state_digest for receipt in receipts}) == len(variants)
+    assert len({receipt.actors[0].controller.position for receipt in receipts}) == 1
+
+    empty = step_actors((base,), {}, tick=0, step_ns=STEP)
+    changed_intent = step_actors((base,), {"a": (0, 0)}, tick=0, step_ns=STEP)
+    changed_step = step_actors((base,), {}, tick=0, step_ns=STEP + 1)
+    changed_floor = step_actors((base,), {}, tick=0, step_ns=STEP, floor_y_mm=-1)
+    far_wall = AABB("far-wall", (10000, 0, 10000), (11000, 1000, 11000))
+    changed_world = step_actors((base,), {}, tick=0, step_ns=STEP, statics=(far_wall,))
+    assert len({r.state_digest for r in (
+        empty, changed_intent, changed_step, changed_floor, changed_world)}) == 5
+
+
+@pytest.mark.parametrize("floor", [True, 0.5, "0", 10**100, -(10**100)])
+def test_semantic_physics_rejects_noncanonical_floor_height(floor):
+    with pytest.raises(MultiActorError, match="floor height"):
+        step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP, floor_y_mm=floor)
