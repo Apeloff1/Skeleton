@@ -329,11 +329,16 @@ def publish_first_playable_delivery_batch(
     admissions: list[dict[str, object]] = []
     identities: list[tuple[int, ...]] = []
     for job in checked:
+        source_identity = _source_identity(job.source)
         admitted = _preflight(
             _path(job.source), _path(job.archive), _path(job.install),
             _path(job.save), _path(job.receipt),
             expected_manifest_sha256=job.manifest_sha256, authorized=True,
         )
+        if _source_identity(job.source) != source_identity:
+            raise FirstPlayableDeliveryBatchError(
+                "original source root changed during preflight"
+            )
         project = admitted.get("project_id")
         if type(project) is not str or not project:
             raise FirstPlayableDeliveryBatchError(
@@ -341,7 +346,7 @@ def publish_first_playable_delivery_batch(
             )
         source_projects.append(project)
         admissions.append(admitted)
-        identities.append(_source_identity(job.source))
+        identities.append(source_identity)
     # The source verifier already knows project identity. Reject duplicate
     # projects before the first ZIP is published; discovering this only when
     # assembling the final receipt would strand an otherwise valid cohort.
@@ -418,6 +423,7 @@ def resume_first_playable_delivery_batch(
     admissions: list[dict[str, object]] = []
     identities: list[tuple[int, ...]] = []
     for job in checked[:completed]:
+        source_identity = _source_identity(job.source)
         inspected = inspect_first_playable_delivery(
             job.install, job.archive, job.save, job.receipt,
             expected_manifest_sha256=job.manifest_sha256,
@@ -430,6 +436,10 @@ def resume_first_playable_delivery_batch(
             job.source, expected_manifest_sha256=job.manifest_sha256,
             authorized=True,
         )
+        if _source_identity(job.source) != source_identity:
+            raise FirstPlayableDeliveryBatchError(
+                "original source root changed during resumed prefix verification"
+            )
         if (source.get("project_id") != inspected.get("project_id")
                 or source.get("world_digest") != inspected.get("world_digest")
                 or source.get("offline_gameplay_reexecuted") is not True
@@ -439,15 +449,20 @@ def resume_first_playable_delivery_batch(
             )
         records.append(_record(inspected, job.moves))
         admissions.append(source)
-        identities.append(_source_identity(job.source))
+        identities.append(source_identity)
     _inspect_jobs(checked[:completed], records)
     source_projects = [record["project_id"] for record in records]
     for job in checked[completed:]:
+        source_identity = _source_identity(job.source)
         admitted = _preflight(
             _path(job.source), _path(job.archive), _path(job.install),
             _path(job.save), _path(job.receipt),
             expected_manifest_sha256=job.manifest_sha256, authorized=True,
         )
+        if _source_identity(job.source) != source_identity:
+            raise FirstPlayableDeliveryBatchError(
+                "original source root changed during resumed preflight"
+            )
         project = admitted.get("project_id")
         if type(project) is not str or not project:
             raise FirstPlayableDeliveryBatchError(

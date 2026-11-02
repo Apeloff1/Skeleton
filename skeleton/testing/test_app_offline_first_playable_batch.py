@@ -798,3 +798,42 @@ def test_source_cohort_detects_first_root_swap_during_second_source_replay(
         module._reverify_original_sources(jobs, admissions, identities)
     assert calls == 2
     assert all(not Path(job.archive).exists() for job in jobs)
+
+
+def test_publish_rejects_source_root_swap_inside_first_preflight(
+    original_games, tmp_path, monkeypatch,
+):
+    """Pin root inode before preflight, not after the verifier has returned."""
+    import os
+    from skeleton.app import offline_first_playable_batch as module
+
+    cloned = []
+    for index, (source, manifest_pin) in enumerate(original_games):
+        path = tmp_path / f"cloned-game-{index}"
+        shutil.copytree(source, path)
+        cloned.append((path, manifest_pin))
+    jobs = jobs_for(tuple(cloned), tmp_path)
+    first = Path(jobs[0].source)
+    replacement = tmp_path / "same-byte-game"
+    shutil.copytree(first, replacement)
+    original_preflight = module._preflight
+    calls = 0
+
+    def swap_after_successful_preflight(*args, **kwargs):
+        nonlocal calls
+        admitted = original_preflight(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            old = tmp_path / "old-game-root"
+            os.rename(first, old)
+            os.rename(replacement, first)
+        return admitted
+
+    monkeypatch.setattr(module, "_preflight", swap_after_successful_preflight)
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="during preflight"):
+        publish_first_playable_delivery_batch(
+            jobs, tmp_path / "cohort.json", authorized=True,
+        )
+    assert calls == 1
+    assert all(not Path(job.archive).exists() for job in jobs)
+    assert not (tmp_path / "cohort.json").exists()
