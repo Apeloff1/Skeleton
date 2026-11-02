@@ -208,7 +208,7 @@ def _state(program: QuestProgram, choices: tuple[tuple[str, str], ...]) -> Quest
 
 
 def start_quest(documents: Mapping[str, Any], *, authorized: bool) -> QuestSession:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("studio quest run requires operator authorization")
     return _state(compile_quest_program(documents), ())
 
@@ -223,7 +223,7 @@ def available_stages(session: QuestSession, documents: Mapping[str, Any]) -> tup
 
 def step_quest(session: QuestSession, documents: Mapping[str, Any], *,
                stage: str, alternative: str, authorized: bool) -> QuestSession:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("studio quest step requires operator authorization")
     program = compile_quest_program(documents)
     verify_quest_session(session, documents, program=program)
@@ -289,7 +289,7 @@ def quest_progress(session: QuestSession, documents: Mapping[str, Any]) -> dict[
 
 def replay_quest(documents: Mapping[str, Any], actions: Sequence[tuple[str, str]],
                  *, authorized: bool) -> QuestSession:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("studio quest replay requires operator authorization")
     if not isinstance(actions, (list, tuple)) or len(actions) > 64:
         raise StudioQuestError("invalid bounded replay")

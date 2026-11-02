@@ -59,6 +59,10 @@ function render(){
  }
  const earned=new Set(completed);
  for(const stage of source.stages){if(completed.has(stage.id))earned.add(stage.reward);}
+ for(const [id,option] of chosen){
+   const stage=byId.get(id);
+   if(stage){for(const token of (stage.choice_effects[option]||[])){earned.add(token);}}
+ }
  for(const ending of source.endings){
    const missing=ending.requires.filter(required=>!earned.has(required));
    endings.append(node("li",ending.id+": "+(missing.length===0
@@ -103,6 +107,8 @@ def story_source(documents: Mapping[str, Any]) -> dict[str, object]:
             raise StudioQuestError("scene and authored quest stage differ")
         stages.append({"id":stage.key,"prerequisites":list(stage.prerequisites),
                        "alternatives":list(stage.alternatives),"reward":stage.reward,
+                       "choice_effects":{choice:list(tokens)
+                                         for choice,tokens in stage.choice_effects},
                        "scene_id":scene["scene_id"],"objects":list(scene["objects"]),
                        "authored_goal":beat["goal"],"authored_decision":beat["decision"]})
     return {"schema":"skeleton.game_builder.offline_story_source.v1",
