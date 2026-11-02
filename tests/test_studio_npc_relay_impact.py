@@ -179,15 +179,19 @@ def test_jeeves_typed_router_and_fail_closed_handoff():
         "expected_source_digest": source,
         "baseline_receipt": baseline, "candidate_receipt": candidate,
     }
-    direct = execute_npc_relay_impact_tool(request, authorized=True)
-    assert direct["detail"]["source_replay_verified"] is True
-    assert direct["release_certified"] is False
+    from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _canonical
+    if len(_canonical(request)) <= 60 * 1024:
+        direct = execute_npc_relay_impact_tool(request, authorized=True)
+        assert direct["detail"]["source_replay_verified"] is True
+        assert direct["release_certified"] is False
+    else:
+        with pytest.raises(StudioQuestError):
+            execute_npc_relay_impact_tool(request, authorized=True)
     names = {entry["name"] for entry in world_tool_catalog()["tools"]}
     assert "studio_original_npc_relay_impact" in names
     envelope = {"tool": "studio_original_npc_relay_impact",
                 "arguments": request}
-    from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _canonical
-    if len(_canonical(envelope)) <= 64 * 1024:
+    if len(_canonical(request)) <= 60 * 1024 and len(_canonical(envelope)) <= 64 * 1024:
         routed = route_world_tool(envelope, authorized=True)
         assert routed["result"]["detail"] == direct["detail"]
     else:
