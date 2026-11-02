@@ -252,6 +252,8 @@ class CounterfactualStore:
                 stem + ".report.json", stem + ".receipt.json")
 
     def _sources(self, fd: int, world_id: str, slot: str):
+        _id(world_id, "world_id")
+        _id(slot, "slot")
         world = self.sessions._world(fd, world_id)
         session = self.sessions._session(fd, world_id, slot, world)
         return world, session
@@ -266,6 +268,7 @@ class CounterfactualStore:
         return review
 
     def _lock(self, fd: int, world_id: str) -> int:
+        _id(world_id, "world_id")
         try:
             return os.open(world_id + ".lock",
                            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,

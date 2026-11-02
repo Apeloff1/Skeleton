@@ -273,6 +273,7 @@ class QuestStore:
                 world_id + ".quest.receipt.json")
 
     def _world(self, fd: int, world_id: str) -> dict[str, Any]:
+        _id(world_id, "world_id")
         world = strict_json(self.worlds._read(fd, world_id + ".json"))
         prove(world)
         if world["id"] != world_id:
@@ -284,6 +285,7 @@ class QuestStore:
             strict_json(self.worlds._read(fd, self._name(world_id))), world)
 
     def _lock(self, fd: int, world_id: str) -> int:
+        _id(world_id, "world_id")
         try:
             return os.open(world_id + ".lock", os.O_WRONLY | os.O_CREAT |
                            os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)

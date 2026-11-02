@@ -38,6 +38,7 @@ def _artifact_read(fd: int, name: str) -> bytes:
 
 
 def _source_triplet(fd: int, store: WorldStore, world_id: str):
+    _id(world_id, "world_id")
     world = strict_json(store._read(fd, world_id + ".json"))
     assets = strict_json(store._read(fd, world_id + ".assets.json"))
     timeline = strict_json(store._read(fd, world_id + ".timeline.json"))
