@@ -20,7 +20,8 @@ from skeleton.ai.game_builder.studio_story_browser_parity import (
     PROMPT, SCHEMA, FILENAME, compile_story_browser_parity,
     propose_story_browser_parity, replay_story_browser_parity,
     compile_story_browser_handoff, publish_story_browser_parity,
-    restore_story_browser_parity,
+    restore_story_browser_parity, import_story_browser_checkpoint,
+    publish_story_browser_playable,
 )
 
 PROJECT = "studio_arena_fighting_glacial_fjord"
@@ -197,3 +198,57 @@ def test_typed_jeeves_router_and_cli(tmp_path, monkeypatch, capsys):
     assert cli.main(flags + ["--restore", str(tmp_path)]) == 0
     second = json.loads(capsys.readouterr().out)
     assert second["detail"] == first["detail"]
+
+def test_browser_checkpoint_to_cli_to_playable_handoff(tmp_path, monkeypatch, capsys):
+    from scripts import studio_story_browser_parity_cli as cli
+    docs, actions, leases = fixture()
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: docs)
+    checkpoint = {
+        "schema": "skeleton.game_builder.offline_story_choices.v1",
+        "project_id": docs["quest"]["project_id"],
+        "source_digest": leases["expected_source_digest"],
+        "choices": actions, "external_evidence_verified": False,
+        "native_genre_runtime_verified": False, "release_certified": False,
+    }
+    receipt = import_story_browser_checkpoint(docs, checkpoint, **leases)
+    assert receipt["browser_projection_parity_verified"] is True
+    for key, value in [
+        ("release_certified", 0), ("external_evidence_verified", True),
+        ("source_digest", "0" * 64),
+    ]:
+        forged = dict(checkpoint, **{key: value})
+        with pytest.raises(StudioQuestError):
+            import_story_browser_checkpoint(docs, forged, **leases)
+    checkpoint_path = tmp_path / "browser_checkpoint.json"
+    checkpoint_path.write_text(json.dumps(checkpoint))
+    os.chmod(checkpoint_path, 0o600)
+    flags = [
+        "--project", PROJECT,
+        "--expected-source", leases["expected_source_digest"],
+        "--expected-session", leases["expected_initial_session_digest"],
+        "--browser-checkpoint-file", str(checkpoint_path),
+        "--publish-playable", str(tmp_path),
+    ]
+    assert cli.main(flags) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["file_write_performed"] is True
+    assert output["playable_publication"]["file"] == "index.html"
+    assert (tmp_path / "index.html").read_bytes() == render_story_html(docs)
+    assert stat.S_IMODE((tmp_path / "index.html").stat().st_mode) == 0o600
+    with pytest.raises(FileExistsError):
+        publish_story_browser_playable(docs, receipt, tmp_path, authorized=True)
+
+
+def test_playable_durability_failure_rolls_back(tmp_path, monkeypatch):
+    from skeleton.ai.game_builder import studio_story_browser_parity as owner
+    docs, actions, leases = fixture()
+    receipt = compile_story_browser_parity(docs, actions, **leases)
+    original = owner.os.fsync
+    def fail_directory(fd):
+        if stat.S_ISDIR(owner.os.fstat(fd).st_mode):
+            raise OSError("simulated playable durability failure")
+        return original(fd)
+    monkeypatch.setattr(owner.os, "fsync", fail_directory)
+    with pytest.raises(OSError):
+        publish_story_browser_playable(docs, receipt, tmp_path, authorized=True)
+    assert not list(tmp_path.iterdir())

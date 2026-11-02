@@ -36,3 +36,18 @@ authored alternatives, and topological prerequisite order **before** changing
 the current UI session. Invalid or stale checkpoints preserve the current
 progress. The Python CLI remains the authoritative private-disk publication
 path; browser copy/paste is an untrusted local convenience, not signed custody.
+
+## Browser-to-CLI-to-playable handoff
+
+The interactive HTML's `offline_story_choices.v1` JSON checkpoint can now
+be saved as a private 0600 file and passed to
+`--browser-checkpoint-file CHECKPOINT.json`. The importer rejects unknown
+fields, stale source, non-false external/native/release claims, illegal choices,
+and stale initial-session leases, then replays the authored quest engine.
+
+`--publish-playable DIRECTORY` writes the actual CSP-bound interactive
+`index.html` with exclusive descriptor-anchored, fsynced publication and
+rollback on durability failure. The playable file is mode 0600 and never
+overwrites an existing export. The manifest proves byte identity with the
+replayed source, not browser/device execution. `--publish` for private receipt
+and `--publish-playable` for HTML are deliberately separate operations.

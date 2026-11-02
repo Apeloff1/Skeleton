@@ -28,6 +28,12 @@ PROMPT = "rehearse source-authored browser quest endings"
 FILENAME = "story_browser_parity.json"
 MAX_BYTES = 256 * 1024
 MAX_ACTION_BYTES = 16 * 1024
+MAX_PLAYABLE_BYTES = 512 * 1024
+CHECKPOINT_FIELDS = frozenset({
+    "schema", "project_id", "source_digest", "choices",
+    "external_evidence_verified", "native_genre_runtime_verified",
+    "release_certified",
+})
 
 
 def _actions(value: object, limit: int) -> list[list[str]]:
@@ -115,6 +121,36 @@ def compile_story_browser_parity(
     return receipt
 
 
+def import_story_browser_checkpoint(
+    documents: Mapping[str, Any], checkpoint: object, *,
+    authorized: bool, expected_source_digest: str,
+    expected_initial_session_digest: str,
+) -> dict[str, object]:
+    """Import the exact browser-emitted checkpoint via canonical quest replay.
+
+    The browser checkpoint is an untrusted convenience, not an authenticated
+    claim of external evidence, completed gameplay or publication authority.
+    """
+    if authorized is not True:
+        raise PermissionError("browser checkpoint import requires authorization")
+    if (type(checkpoint) is not dict or set(checkpoint) != CHECKPOINT_FIELDS
+            or checkpoint.get("schema") !=
+            "skeleton.game_builder.offline_story_choices.v1"
+            or checkpoint.get("project_id") !=
+            compile_quest_program(documents).project_id
+            or checkpoint.get("source_digest") != expected_source_digest
+            or checkpoint.get("external_evidence_verified") is not False
+            or checkpoint.get("native_genre_runtime_verified") is not False
+            or checkpoint.get("release_certified") is not False):
+        raise StudioQuestError("untrusted browser checkpoint schema or source")
+    if len(_canonical(checkpoint)) > MAX_ACTION_BYTES:
+        raise StudioQuestError("browser checkpoint exceeds byte budget")
+    return compile_story_browser_parity(
+        documents, checkpoint["choices"], authorized=True,
+        expected_source_digest=expected_source_digest,
+        expected_initial_session_digest=expected_initial_session_digest)
+
+
 def propose_story_browser_parity(
     documents: Mapping[str, Any], prompt: str, *,
     authorized: bool, expected_source_digest: str,
@@ -172,16 +208,12 @@ def compile_story_browser_handoff(
     }, html)
 
 
-def publish_story_browser_parity(
-    documents: Mapping[str, Any], receipt: object, directory: Path, *,
-    authorized: bool,
-) -> dict[str, object]:
-    verified = replay_story_browser_parity(documents, receipt, authorized=authorized)
-    raw = _canonical(verified) + b"\n"
-    if len(raw) > MAX_BYTES:
-        raise StudioQuestError("browser parity publication exceeds byte budget")
+def _publish_exclusive(
+    directory: Path, filename: str, raw: bytes, prefix: str,
+) -> None:
+    """Descriptor-anchored, private, no-clobber publish with failure rollback."""
     fd = _open_directory(directory)
-    temporary = ".browser-parity-" + secrets.token_hex(16) + ".tmp"
+    temporary = prefix + secrets.token_hex(16) + ".tmp"
     created = False
     linked = False
     try:
@@ -193,13 +225,13 @@ def publish_story_browser_parity(
             os.fsync(out)
         finally:
             os.close(out)
-        os.link(temporary, FILENAME, src_dir_fd=fd, dst_dir_fd=fd,
+        os.link(temporary, filename, src_dir_fd=fd, dst_dir_fd=fd,
                 follow_symlinks=False)
         linked = True
         os.fsync(fd)
     except BaseException:
         if linked:
-            os.unlink(FILENAME, dir_fd=fd)
+            os.unlink(filename, dir_fd=fd)
         raise
     finally:
         try:
@@ -207,9 +239,38 @@ def publish_story_browser_parity(
                 os.unlink(temporary, dir_fd=fd)
         finally:
             os.close(fd)
+
+
+def publish_story_browser_parity(
+    documents: Mapping[str, Any], receipt: object, directory: Path, *,
+    authorized: bool,
+) -> dict[str, object]:
+    verified = replay_story_browser_parity(documents, receipt, authorized=authorized)
+    raw = _canonical(verified) + b"\n"
+    if len(raw) > MAX_BYTES:
+        raise StudioQuestError("browser parity publication exceeds byte budget")
+    _publish_exclusive(directory, FILENAME, raw, ".browser-parity-")
     return {"file": FILENAME, "bytes": len(raw),
             "receipt_digest": verified["receipt_digest"],
             "file_write_performed": True, "release_certified": False}
+
+
+def publish_story_browser_playable(
+    documents: Mapping[str, Any], receipt: object, directory: Path, *,
+    authorized: bool,
+) -> dict[str, object]:
+    """Publish actual source-bound interactive HTML, not only a manifest."""
+    manifest, html = compile_story_browser_handoff(
+        documents, receipt, authorized=authorized)
+    if not 0 < len(html) <= MAX_PLAYABLE_BYTES:
+        raise StudioQuestError("browser playable HTML exceeds byte budget")
+    _publish_exclusive(directory, "index.html", html, ".browser-playable-")
+    return {"file": "index.html", "bytes": len(html),
+            "html_sha256": manifest["html_sha256"],
+            "receipt_digest": manifest["receipt_digest"],
+            "file_write_performed": True,
+            "native_genre_runtime_verified": False,
+            "release_certified": False}
 
 
 def restore_story_browser_parity(

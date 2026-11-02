@@ -12,6 +12,7 @@ from skeleton.ai.game_builder.studio_story_browser_parity import (
     PROMPT, compile_story_browser_parity, propose_story_browser_parity,
     replay_story_browser_parity, compile_story_browser_handoff,
     publish_story_browser_parity, restore_story_browser_parity,
+    import_story_browser_checkpoint, publish_story_browser_playable,
 )
 
 
@@ -23,14 +24,18 @@ def main(argv: list[str] | None = None) -> int:
     modes = ap.add_mutually_exclusive_group(required=True)
     modes.add_argument("--prompt", action="store_true")
     modes.add_argument("--authoring-file", type=Path)
+    modes.add_argument("--browser-checkpoint-file", type=Path)
     modes.add_argument("--restore", type=Path)
     ap.add_argument("--publish", type=Path)
+    ap.add_argument("--publish-playable", type=Path)
     ap.add_argument("--html-preview", action="store_true")
     ap.add_argument("--playable", action="store_true")
     args = ap.parse_args(argv)
     if args.restore and args.publish:
         ap.error("restore cannot publish")
-    if args.html_preview and args.publish:
+    if args.publish and args.publish_playable:
+        ap.error("publish receipt and playable separately")
+    if args.html_preview and (args.publish or args.publish_playable):
         ap.error("HTML preview cannot publish")
     try:
         docs = read_blueprint(args.project)
@@ -45,6 +50,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.prompt:
             proposal = propose_story_browser_parity(docs, PROMPT, **options)
             receipt = proposal["detail"]
+        elif args.browser_checkpoint_file:
+            checkpoint = _private_json(args.browser_checkpoint_file, 16384)
+            receipt = import_story_browser_checkpoint(docs, checkpoint, **options)
         else:
             authoring = _private_json(args.authoring_file, 16384)
             if set(authoring) != {"actions"}:
@@ -57,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
             "detail": receipt, "file_write_performed": False,
             "release_certified": False,
         }
-        if args.playable or args.html_preview:
+        if args.playable or args.html_preview or args.publish_playable:
             handoff, html = compile_story_browser_handoff(
                 docs, receipt, authorized=True)
             if args.html_preview:
@@ -67,6 +75,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.publish:
             output["publication"] = publish_story_browser_parity(
                 docs, receipt, args.publish, authorized=True)
+            output["file_write_performed"] = True
+        if args.publish_playable:
+            output["playable_publication"] = publish_story_browser_playable(
+                docs, receipt, args.publish_playable, authorized=True)
             output["file_write_performed"] = True
         print(json.dumps(output, sort_keys=True, separators=(",", ":"),
                          ensure_ascii=True, allow_nan=False))
