@@ -91,3 +91,21 @@ def test_cli_is_reachable(capsys):
     bundle = json.loads(capsys.readouterr().out)
     assert cli(["import", "--bundle-json", json.dumps(bundle)]) == 0
     assert json.loads(capsys.readouterr().out) == saved
+
+
+def test_stream_flushes_verified_checkpoint_before_eof_failure():
+    class FlushRecorder(io.StringIO):
+        def __init__(self):
+            super().__init__()
+            self.flush_count = 0
+
+        def flush(self):
+            self.flush_count += 1
+            return super().flush()
+
+    writer = FlushRecorder()
+    with pytest.raises(CombatSessionError, match="checkpoint emitted"):
+        play_player_campaign(original_campaign(), reader=io.StringIO(""),
+                             writer=writer)
+    assert writer.flush_count >= 2
+    assert json.loads(writer.getvalue().splitlines()[-1])["event"] == "checkpoint"

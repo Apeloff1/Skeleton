@@ -247,18 +247,22 @@ def play_player_campaign(source: Any = None, *, session: Any = None,
                 output_stream.write(json.dumps({
                     "event": "checkpoint", "session": current,
                 }) + "\n")
+                output_stream.flush()
                 raise CombatSessionError("campaign input ended; checkpoint emitted")
             try:
                 updated = _advance(current, _parse_json(line, "campaign action"))
-            except (CombatSessionError, ValueError, TypeError, KeyError) as exc:
+            except (CombatSessionError, ValueError, TypeError, KeyError,
+                    UnicodeError, RecursionError) as exc:
                 output_stream.write(json.dumps({
                     "event": "rejected", "error": str(exc),
                     "remaining_retries": 2 - attempt,
                 }) + "\n")
+                output_stream.flush()
                 if attempt == 2:
                     output_stream.write(json.dumps({
                         "event": "checkpoint", "session": current,
                     }) + "\n")
+                    output_stream.flush()
                     raise CombatSessionError("invalid actions; checkpoint emitted") from exc
             else:
                 current = updated
@@ -272,6 +276,7 @@ def play_player_campaign(source: Any = None, *, session: Any = None,
         "currency": current["state"]["currency"],
         "state_digest": current["state_digest"],
     }, sort_keys=True) + "\n")
+    output_stream.flush()
     return current
 
 
