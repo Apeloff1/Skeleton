@@ -75,6 +75,14 @@ class ExecutionSpine:
             cancel.check()
             citation_review=audit_citations(generated.text,projection.sources)
             with self.db.transaction() as conn:
+                # Source revisions are independently mutable during native inference.
+                # Revalidate while holding the SAME authoritative write transaction
+                # as the turn receipt; revoked knowledge cannot be laundered into a
+                # new grounded answer. Non-knowledge fixture providers are unchanged.
+                if projection.sources and self.evidence_provider is not None:
+                    fence=getattr(self.evidence_provider,'require_current',None)
+                    if callable(fence):
+                        fence(conn,projection.sources)
                 result=receipts.commit(conn,req,self.limits,generated,token,
                     context_sha256=projection.context_sha256,source_receipts=projection.sources,
                     omitted_turns=window.omitted_turns)

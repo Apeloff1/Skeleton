@@ -48,8 +48,19 @@ def activate(*,model_root:str|Path,state_dir:str|Path,tenant:str,subject:str,
         db=stack.enter_context(SpineDatabase(state_dir))
         gate=stack.enter_context(SessionGate(Path(state_dir)/'execution_gates'))
         limits=SpineLimits(context_tokens=n_ctx,max_output_tokens=max_new_tokens)
+        # The knowledge plane lives in the SAME durable SQLite custody as the
+        # inference spine. No remote embeddings or model-generated memory.
+        # FTS5 absence, migration ambiguity or owner mismatch refuses boot.
+        from ...context.knowledge_plane.service import KnowledgePlane
+        knowledge=KnowledgePlane(db,identity)
+        # No live inference is exposed with corrupted source custody, missing
+        # mutation receipts or mismatched FTS5 postings. These are explicit
+        # startup holds; doctor never fabricates source or model confidence.
+        knowledge.doctor(maximum=65536)
+        knowledge.check_index()
         runtime=ExecutionSpine(db=db,session_gate=gate,backend=model,
-                               identity=identity,limits=limits)
+                               identity=identity,limits=limits,
+                               evidence_provider=knowledge.evidence_provider())
         return stack, SupervisedAI(runtime)
     except BaseException:
         stack.close();raise
