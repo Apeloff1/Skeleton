@@ -40,3 +40,14 @@ Source and output sizes are bounded; inputs are private JSON files checked
 with the shared nofollow reader. Publication is descriptor-anchored, exclusive,
 0600 and fsync-backed. Every input receipt is recomputed rather than trusting
 client flags. Skipped, failed, cancelled or stale CI cannot qualify a release.
+
+## Jeeves integration
+
+Trusted app assembly may register two read-only typed capabilities with
+`register_quest_character_experience_tools(registry, trusted_documents,
+branch, npc, dialogue, localization, achievements, pacing, advisories,
+accepted_topics)`. `studio_quest_character_compile` and
+`studio_quest_character_handoff` both require explicit registry authorization,
+`dry_run=False`, and an exact source digest. Every input is pinned at
+registration and independently replayed. No filesystem write is exposed to
+Jeeves by these adapters.
