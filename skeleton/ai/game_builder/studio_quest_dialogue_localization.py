@@ -68,6 +68,8 @@ def propose_dialogue_localization(
     checked_locale = _locale(locale)
     dialogue = replay_quest_dialogue(
         documents, npc_receipt, dialogue_receipt, authorized=True)
+    if not dialogue["playable_handoff_allowed"]:
+        raise StudioQuestError("dialogue localization requires reviewed original dialogue")
     if (dialogue["source_digest"] != expected_source_digest
             or dialogue["initial_session_digest"] != expected_initial_session_digest):
         raise StudioQuestError("stale dialogue localization source or session")

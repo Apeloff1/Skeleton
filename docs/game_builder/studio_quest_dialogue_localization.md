@@ -29,3 +29,13 @@ At most 128 translated lines, 2048 characters per line, 256 KiB plan and
 384 KiB receipt. The browser cannot contact the network or write directly
 to the game source. Translation review does not establish rights, voice
 audio, native gameplay, or release qualification.
+
+## Jeeves typed integration
+
+Trusted app assembly may register read-only capabilities with
+`register_dialogue_localization_tools(registry, trusted_documents,
+verified_npc_receipt, verified_dialogue_receipt)`. The proposal, compile and
+handoff capability IDs are `studio_dialogue_locale_propose`,
+`studio_dialogue_locale_compile`, and `studio_dialogue_locale_handoff`.
+Every call requires registry authorization and exact source leases; no model
+may write files or mark unreviewed translations as playable.
