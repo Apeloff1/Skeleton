@@ -50,3 +50,13 @@ source digest. The CLI validates the complete canon graph, revokes approval
 and persists only under an optimistic lease. The browser itself has no
 filesystem write, network or model authority. Verify the published editor
 using world-lore verify-editor --world-id marsh; tampering fails closed.
+
+## Playable integration
+
+Compilation now injects reviewed lore into the canonical offline world player.
+Facts are revealed only when the player actually enters their authored scene
+with the required earned flags. The browser tracks discoveries across choices
+and clears them on restart. No future-branch spoilers are shown. The player
+retains the canonical choice and ending transitions, escapes all original
+text, uses an exact script hash in its CSP and has no network dependency.
+The source-bound receipt and byte-replay verification include this playable.

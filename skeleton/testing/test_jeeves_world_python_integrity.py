@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
     "skeleton/jeeves/worlds/lore.py",
     "skeleton/jeeves/worlds/lore_cli.py",
     "skeleton/jeeves/worlds/lore_editor.py",
+    "skeleton/jeeves/worlds/lore_player.py",
 ])
 def test_python_world_modules_parse(path: str):
     source = (ROOT / path).read_text(encoding="utf-8")
@@ -46,6 +47,7 @@ def test_main_cli_dispatch_has_real_statements():
 
 def test_repaired_world_modules_import_without_syntax_error():
     from skeleton.jeeves.worlds import cast, quest, route
-    from skeleton.jeeves.worlds import counterfactual, lore, lore_editor
+    from skeleton.jeeves.worlds import counterfactual, lore, lore_editor, lore_player
     assert route.SCHEMA and cast.SCHEMA and quest.SCHEMA
     assert counterfactual.SCHEMA and lore.SCHEMA and lore_editor.EDITOR_SCHEMA
+    assert lore_player._LORE_JS

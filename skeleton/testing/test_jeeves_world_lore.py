@@ -261,3 +261,37 @@ def test_lore_editor_cli_publish_verify_and_tamper(tmp_path, capsys):
     (root / "marsh.lore.editor.html").write_text("tampered")
     assert run(args + ["verify-editor", "--world-id", "marsh"]) == 2
     assert json.loads(capsys.readouterr().out)["error"] == "lore_editor_artifact_mismatch"
+
+
+def test_lore_is_rendered_inside_real_canonical_playable():
+    import base64
+    from hashlib import sha256
+    import re
+    from skeleton.jeeves.worlds.lore_player import render_lore_playable
+    source = world()
+    approved = approve_lore(lore(source), source, "Reviewed")
+    page = render_lore_playable(source, approved).decode("utf-8")
+    assert "const lore = model.lore;" in page
+    assert "Discovered lore" in page
+    assert "discovered = new Set(); render();" in page
+    assert "script-src 'sha256-" in page
+    assert "connect-src 'none'" in page
+    assert "jeeves.world.lore_player.v1" in page
+    scripts = re.findall(r"<script>(.*?)</script>", page, flags=re.DOTALL)
+    assert len(scripts) == 1
+    policy_hash = base64.b64encode(
+        sha256(scripts[0].encode("utf-8")).digest()).decode("ascii")
+    assert "sha256-" + policy_hash in page
+    with pytest.raises(CanonError, match="lore_review_required"):
+        render_lore_playable(source, lore(source))
+
+
+def test_lore_player_does_not_inject_authored_script():
+    from skeleton.jeeves.worlds.lore_player import render_lore_playable
+    source = world()
+    data = lore(source)
+    data["facts"][0]["statement"] = "</script><img src=x onerror=alert(1)>"
+    approved = approve_lore(data, source, "Reviewed")
+    page = render_lore_playable(source, approved).decode("utf-8")
+    assert "</script><img" not in page
+    assert "\\u003c/script>" in page
