@@ -64,3 +64,10 @@ source/event/state tampering, oversized input and CLI success/failure paths.
 No graphical frontend, installed-device acceptance, publisher signature,
 multiplayer authority or consumer release qualification is claimed. This
 is a reviewable independent gameplay vertical pending exact-head CI.
+
+## Installed package integration
+
+The project declares the `skeleton-harbor-crafting` console entry point and
+ships the authored JSON fixture as package data. After installation, use
+`skeleton-harbor-crafting demo --require-win` or the module invocation above.
+A source checkout remains usable without installing a new dependency.
