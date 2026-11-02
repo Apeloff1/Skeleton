@@ -69,6 +69,11 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.monitor.sample = MagicMock(return_value=envelope())
         self.heads = MagicMock()
         self.heads.compare_window.return_value = head_receipt()
+        # Preserve mutation-based stale-head tests for the primary stream;
+        # other streams receive independently bound canonical head identities.
+        self.heads.compare_window.side_effect = (
+            lambda stream_id, **kw: self.heads.compare_window.return_value
+            if stream_id == "stream" else head_receipt(stream_id))
         self.heads.spool.capacity_snapshot.side_effect = lambda requested_bytes: {
             "schema": "skeleton.ai.long-context-capacity.v1",
             "state": "observed_available",

@@ -216,7 +216,7 @@ class LongContextCpuCapacityGuard:
                 or not 0 <= start < stop <= 2**31 - 1
                 or stop - start > request.max_tokens
                 or type(tokens) is not list or len(tokens) != stop - start
-                or any(type(token) is not int or not 0 <= token < 2**32
+                or any(type(token) is not int or not 0 <= token < 2**31
                        for token in tokens)):
             raise LongContextSpoolError("invalid capacity token window")
         source_digest = _digest(window["source_sequence_digest"], "source sequence")
