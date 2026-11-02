@@ -206,7 +206,7 @@ def replay_waypoint_risk(
         max_hazard_contacts=receipt.get("max_hazard_contacts"),
         authorized=True, expected_source_digest=expected_source_digest,
     )
-    if verified != receipt:
+    if _canonical(verified) != _canonical(receipt):
         raise StudioQuestError("risk route failed canonical replay")
     return verified
 

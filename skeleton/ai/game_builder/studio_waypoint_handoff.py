@@ -191,7 +191,7 @@ def replay_waypoint_handoff(
         authorized=True, expected_source_digest=expected_source_digest,
         expected_session_digest=expected_session_digest,
     )
-    if verified != receipt:
+    if _canonical(verified) != _canonical(receipt):
         raise StudioQuestError("waypoint handoff failed canonical replay")
     return verified
 

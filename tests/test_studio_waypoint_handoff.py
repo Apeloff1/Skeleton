@@ -286,3 +286,17 @@ def test_malformed_unicode_in_walk_choices_is_fail_closed(source):
     session["choices"] = [["stage", "\\ud800"]]
     with pytest.raises(StudioQuestError, match="noncanonical"):
         plan(source, session)
+
+
+def test_waypoint_handoff_replay_rejects_bool_integer_type_forgery(source):
+    receipt = plan(source)
+    for forged in (
+        {**receipt, "playable_handoff_allowed": 1},
+        {**receipt, "release_certified": 0},
+    ):
+        with pytest.raises(StudioQuestError, match="canonical replay"):
+            replay_waypoint_handoff(
+                source[0], forged, authorized=True,
+                expected_source_digest=DIGEST,
+                expected_session_digest=receipt["prior_session_digest"],
+            )

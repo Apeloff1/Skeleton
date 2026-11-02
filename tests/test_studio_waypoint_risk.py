@@ -183,3 +183,17 @@ def test_cli_and_typed_jeeves_parity(source, tmp_path, monkeypatch, capsys):
 def test_starting_on_hazard_requires_explicit_health_context(source):
     with pytest.raises(StudioQuestError, match="hazardous start"):
         plan(source, start=[4, 1])
+
+
+def test_risk_replay_rejects_bool_integer_type_forgery(source):
+    receipt = plan(source)
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        replay_waypoint_risk(
+            source[0], {**receipt, "collision_checked": 1},
+            authorized=True, expected_source_digest=DIGEST,
+        )
+    with pytest.raises(StudioQuestError, match="canonical replay"):
+        replay_waypoint_risk(
+            source[0], {**receipt, "release_certified": 0},
+            authorized=True, expected_source_digest=DIGEST,
+        )
