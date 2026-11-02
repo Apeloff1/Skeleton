@@ -906,6 +906,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-tournament":
         from skeleton.game.gameplay.combat_tournament import cli as tournament_cli
         return tournament_cli(rest)
+    if cmd == "combat-campaign-timeline":
+        from skeleton.game.gameplay.combat_campaign_timeline import cli as campaign_timeline_cli
+        return campaign_timeline_cli(rest)
+    combat-campaign-timeline  Audit player turns, earned rewards and portable saves
     if cmd == "combat-campaign-player":
         from skeleton.game.gameplay.combat_campaign_player import cli as campaign_player_cli
         return campaign_player_cli(rest)
