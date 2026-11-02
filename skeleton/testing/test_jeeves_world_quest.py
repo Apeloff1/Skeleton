@@ -181,3 +181,10 @@ def test_quest_cli_progress_uses_real_player_session(tmp_path, capsys):
     session.choose("marsh", "slot1", "deliver", second_player["session_digest"])
     assert run(args + ["progress", "--world-id", "marsh", "--slot", "slot1"]) == 0
     assert json.loads(capsys.readouterr().out)["progress"]["quest_won"] is True
+
+def test_malformed_ending_type_is_typed_failure():
+    source = world()
+    data = quest()
+    data["ending"] = ["resolution"]
+    with pytest.raises(CanonError, match="unknown_quest_ending"):
+        validate_quest(data, source)
