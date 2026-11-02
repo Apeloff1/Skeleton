@@ -209,3 +209,26 @@ def test_forged_consumer_release_claim_is_rejected(
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
         )
+
+
+def test_forged_nested_inode_inventory_digest_is_rejected(
+    delivered_games, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = delivered_games
+    original = module.inspect_consumer_first_run
+
+    def forged(*args, **kwargs):
+        return {
+            **original(*args, **kwargs),
+            "installed_tree_snapshot_sha256": "Z" * 64,
+        }
+
+    monkeypatch.setattr(module, "inspect_consumer_first_run", forged)
+    with pytest.raises(ConsumerFirstRunCohortError, match="diverged"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
+        )
