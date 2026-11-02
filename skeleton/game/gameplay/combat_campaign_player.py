@@ -292,6 +292,17 @@ def cli(argv: Sequence[str]) -> int:
     for command in ("verify", "export"):
         sub.add_parser(command).add_argument("--session-json", required=True)
     sub.add_parser("import").add_argument("--bundle-json", required=True)
+    for name in ("branch-demo", "branch-accept"):
+        sub.add_parser(name)
+    branch_evaluate = sub.add_parser("branch-evaluate")
+    branch_evaluate.add_argument("--session-json", required=True)
+    branch_evaluate.add_argument("--candidates-json", required=True)
+    for name in ("branch-verify", "branch-export", "branch-choose"):
+        branch = sub.add_parser(name)
+        branch.add_argument("--report-json", required=True)
+        if name == "branch-choose":
+            branch.add_argument("--candidate-id", required=True)
+    sub.add_parser("branch-import").add_argument("--bundle-json", required=True)
     play = sub.add_parser("play")
     group = play.add_mutually_exclusive_group(required=True)
     group.add_argument("--source-json")
@@ -316,6 +327,29 @@ def cli(argv: Sequence[str]) -> int:
             result = export_player_campaign(_parse_json(args.session_json, "campaign session"))
         elif args.command == "import":
             result = import_player_campaign(_parse_json(args.bundle_json, "campaign bundle"))
+        elif args.command.startswith("branch-"):
+            from skeleton.game.gameplay.combat_campaign_branches import (
+                accept_branches, choose_branch, demo_branches, evaluate_branches,
+                export_branches, import_branches, verify_branches,
+            )
+            if args.command == "branch-demo":
+                result = demo_branches()
+            elif args.command == "branch-accept":
+                result = accept_branches()
+            elif args.command == "branch-evaluate":
+                result = evaluate_branches(
+                    _parse_json(args.session_json, "campaign checkpoint"),
+                    _parse_json(args.candidates_json, "campaign branch plans"))
+            elif args.command == "branch-import":
+                result = import_branches(_parse_json(args.bundle_json, "branch bundle"))
+            else:
+                report = _parse_json(args.report_json, "branch report")
+                if args.command == "branch-verify":
+                    result = verify_branches(report)
+                elif args.command == "branch-export":
+                    result = export_branches(report)
+                else:
+                    result = choose_branch(report, args.candidate_id)
         else:
             play_player_campaign(
                 _parse_json(args.source_json, "campaign source")
