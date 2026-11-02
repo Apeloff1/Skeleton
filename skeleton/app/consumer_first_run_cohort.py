@@ -35,6 +35,7 @@ class ConsumerFirstRunCohortError(ValueError):
 def inspect_consumer_first_run_cohort(
     jobs: Sequence[DeliveryJob], summary: str | Path, *,
     expected_summary_sha256: str, authorized: bool,
+    verify_original_sources: bool = False,
 ) -> dict[str, object]:
     """Replay all installed games and their cohort receipt across custody barriers.
 
@@ -48,12 +49,17 @@ def inspect_consumer_first_run_cohort(
         raise PermissionError("trusted local operator acknowledgement required")
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         raise ConsumerFirstRunCohortError("POSIX nofollow custody required")
+    if type(verify_original_sources) is not bool:
+        raise ConsumerFirstRunCohortError(
+            "original source verification flag must be boolean"
+        )
     pin = _pin(expected_summary_sha256)
     checked = _check_jobs(jobs, summary, inspect=True)
     before = _delivered_custody(checked)
     summary_before = _save_identity(summary)
     first = inspect_first_playable_delivery_batch(
         checked, summary, expected_summary_sha256=pin, authorized=True,
+        verify_original_sources=verify_original_sources,
     )
     if (type(first) is not dict
             or first.get("all_live_games_reexecuted") is not True
@@ -62,6 +68,7 @@ def inspect_consumer_first_run_cohort(
             or first.get("release_certified") is not False
             or first.get("native_device_qualified") is not False
             or first.get("independent_summary_sha256") != pin
+            or first.get("original_sources_reverified") is not verify_original_sources
             or type(first.get("games")) is not list
             or len(first["games"]) != len(checked)):
         raise ConsumerFirstRunCohortError("canonical cohort replay evidence invalid")
@@ -125,6 +132,7 @@ def inspect_consumer_first_run_cohort(
     # a later replay must not mask tampering with an earlier installed game.
     second = inspect_first_playable_delivery_batch(
         checked, summary, expected_summary_sha256=pin, authorized=True,
+        verify_original_sources=verify_original_sources,
     )
     if (second != first
             or _delivered_custody(checked) != before
@@ -141,6 +149,7 @@ def inspect_consumer_first_run_cohort(
         "independent_summary_sha256": pin,
         "source_level_replay_passes_per_game": 2,
         "canonical_cohort_inspections": 2,
+        "original_sources_reverified": verify_original_sources,
         "all_installed_games_and_private_saves_reexecuted": True,
         "cohort_and_job_inodes_stable": True,
         "read_only": True,
@@ -161,7 +170,7 @@ def inspect_consumer_first_run_cohort(
 def inspect_pinned_consumer_cohort(
     jobs_file: str | Path, *, expected_jobs_sha256: str,
     summary: str | Path, expected_summary_sha256: str,
-    authorized: bool,
+    authorized: bool, verify_original_sources: bool = False,
 ) -> dict[str, object]:
     """Bind the read-only acceptance run to a separately pinned private jobfile."""
     if authorized is not True:
@@ -174,6 +183,7 @@ def inspect_pinned_consumer_cohort(
         result = inspect_consumer_first_run_cohort(
             jobs, summary, expected_summary_sha256=expected_summary_sha256,
             authorized=True,
+            verify_original_sources=verify_original_sources,
         )
     finally:
         again, final_identity = read_pinned_jobs(
@@ -196,6 +206,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--expected-jobs-sha256", required=True)
     parser.add_argument("--summary", required=True)
     parser.add_argument("--expected-summary-sha256", required=True)
+    parser.add_argument("--verify-original-sources", action="store_true",
+                        help="also replay and bind each original authoring source")
     parser.add_argument("--trusted-local-operator", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -204,6 +216,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary=args.summary,
             expected_summary_sha256=args.expected_summary_sha256,
             authorized=args.trusted_local_operator,
+            verify_original_sources=args.verify_original_sources,
         )
     except (PermissionError, OSError, ValueError, TypeError, KeyError) as exc:
         print(json.dumps({
