@@ -101,7 +101,7 @@ def compile_npc_dialogue_knowledge_gate(
             "dialogue_card_digest": card["card_digest"],
             "source_text_digest": route["source_text_digest"],
             "status": status, "npc_speech_verified": False,
-            "source_text_disclosed": False,
+            "source_text_in_gate_row": False,
         }
         row["gate_proof_digest"] = _digest(row)
         rows.append(row)

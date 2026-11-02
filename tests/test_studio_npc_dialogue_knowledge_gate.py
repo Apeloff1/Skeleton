@@ -18,7 +18,7 @@ from skeleton.ai.agents.jeeves.studio_npc_dialogue_knowledge_gate_tool import (
 from skeleton.ai.agents.jeeves.studio_world_tool_router import (
     route_world_tool, world_tool_catalog,
 )
-from test_studio_npc_relay_impact import fixture, PROJECT
+from tests.test_studio_npc_relay_impact import fixture, PROJECT
 
 
 def test_prompt_to_typed_dialogue_gate_and_exact_replay():
@@ -33,7 +33,7 @@ def test_prompt_to_typed_dialogue_gate_and_exact_replay():
         docs, result, authorized=True) == result
     assert result["dialogue_spoken_verified"] is False
     assert result["release_certified"] is False
-    assert all(row["source_text_disclosed"] is False for row in result["gates"])
+    assert all(row["source_text_in_gate_row"] is False for row in result["gates"])
     assert result["allowed_count"] + result["blocked_count"] == len(result["gates"])
     if not result["playable_handoff_allowed"]:
         with pytest.raises(StudioQuestError):
