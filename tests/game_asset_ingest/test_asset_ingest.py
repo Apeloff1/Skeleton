@@ -693,3 +693,28 @@ def test_explicit_batch_invalid_or_missing_path_is_transactional(tmp_path):
         assert report.issues
         assert report.manifest.entries == []
         assert report.imported == [] and report.duplicates == []
+
+
+def test_external_sidecar_aggregate_volume_is_bounded_and_transactional(tmp_path, monkeypatch):
+    """Unimported glTF sidecars still consume bounded source-package volume."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    document = {"asset": {"version": "2.0"},
+                "buffers": [{"uri": "a.bin"}, {"uri": "b.bin"}]}
+    (tmp_path / "scene.gltf").write_text(json.dumps(document))
+    for name in ("a.bin", "b.bin"):
+        with (tmp_path / name).open("wb") as sidecar:
+            sidecar.truncate(8)
+
+    monkeypatch.setattr(pipeline, "MAX_EXTERNAL_TOTAL_BYTES", 15)
+    explicit = pipeline.import_files(tmp_path, ["scene.gltf"])
+    scanned = pipeline.import_directory(tmp_path)
+    for report in (explicit, scanned):
+        assert not report.ok
+        assert report.imported == [] and report.manifest.entries == []
+        assert any("aggregate external reference bytes exceed bound" in issue.detail
+                   for issue in report.issues)
+
+    monkeypatch.setattr(pipeline, "MAX_EXTERNAL_TOTAL_BYTES", 16)
+    assert pipeline.import_files(tmp_path, ["scene.gltf"]).ok
+    assert pipeline.import_directory(tmp_path).ok

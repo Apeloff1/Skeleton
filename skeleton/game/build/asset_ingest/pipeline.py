@@ -24,6 +24,7 @@ MAX_TREE_DEPTH = 32
 MAX_IMPORT_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_EXTERNAL_REFS_PER_ASSET = 256
 MAX_TOTAL_EXTERNAL_REFS = 8192
+MAX_EXTERNAL_TOTAL_BYTES = 512 * 1024 * 1024
 
 # A platform without dir_fd + O_NOFOLLOW must not silently downgrade to a
 # check-then-open path traversal. A native Windows handle backend is separate.
@@ -105,7 +106,7 @@ def _root_fd(root: str | Path) -> int:
 def _regular(
     root_fd: int, relative: str, *, read: bool,
     observed: dict[str, tuple[int, ...]] | None = None,
-) -> bytes | None:
+) -> bytes | int:
     parts = _parts(relative)
     parent = os.dup(root_fd)
     try:
@@ -137,7 +138,7 @@ def _regular(
                 if snapshot != opened:
                     raise AssetImportError("asset changed after directory scan")
             if not read:
-                return None
+                return before.st_size
             chunks: list[bytes] = []
             count = 0
             while count <= MAX_ASSET_BYTES:
@@ -171,6 +172,8 @@ def _check_references(
     observed: dict[str, tuple[int, ...]] | None = None,
 ) -> bool:
     total_refs = 0
+    total_bytes = 0
+    charged_paths: set[str] = set()
     for entry in report.manifest.entries:
         refs = entry.metadata.get("external_refs", [])
         if type(refs) not in (list, tuple) or len(refs) > MAX_EXTERNAL_REFS_PER_ASSET:
@@ -191,7 +194,16 @@ def _check_references(
                     _parts(ref)
                     relative = (PurePosixPath(source_path).parent / ref).as_posix()
                     _parts(relative)
-                    _regular(root_fd, relative, read=False, observed=observed)
+                    sidecar_size = _regular(root_fd, relative, read=False, observed=observed)
+                    if not isinstance(sidecar_size, int):
+                        raise AssetImportError("external reference size unavailable")
+                    if relative not in charged_paths:
+                        total_bytes += sidecar_size
+                        if total_bytes > MAX_EXTERNAL_TOTAL_BYTES:
+                            report.issues.append(ImportIssue(source_path, "broken",
+                                                             "aggregate external reference bytes exceed bound"))
+                            return False
+                        charged_paths.add(relative)
                 except (AssetImportError, OSError, ValueError, TypeError) as exc:
                     report.issues.append(ImportIssue(source_path, "missing_reference", f"{ref}: {exc}"))
     return True
@@ -225,7 +237,7 @@ def _import_from_fd(
                 report.issues.append(ImportIssue(relative, "unsupported", "unsupported extension"))
                 continue
             payload = _regular(root_fd, relative, read=True, observed=observed)
-            assert payload is not None
+            assert isinstance(payload, bytes)
             total += len(payload)
             if total > MAX_IMPORT_TOTAL_BYTES:
                 report.issues.append(ImportIssue(relative, "broken", "aggregate asset bytes exceed bound"))
