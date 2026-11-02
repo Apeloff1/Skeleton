@@ -50,6 +50,7 @@ from skeleton.ai.agents.jeeves import studio_quest_revision_migration_tool as qu
 from skeleton.ai.agents.jeeves import studio_quest_remap_proposal_tool as remap_proposal
 from skeleton.ai.agents.jeeves import studio_quest_branch_workbench_tool as branch_workbench
 from skeleton.ai.agents.jeeves import studio_quest_player_journal_tool as player_journal
+from skeleton.ai.agents.jeeves import studio_quest_localization_tool as quest_localization
 from skeleton.ai.agents.jeeves import studio_quest_ending_coverage_tool as ending_coverage
 from skeleton.ai.agents.jeeves import studio_quest_readiness_tool as readiness
 from skeleton.ai.agents.jeeves import studio_prompt_quest_plan_tool as prompt_quest
@@ -110,6 +111,7 @@ _TOOL_SYMBOLS = (
     ("quest_remap_proposal_tool_schema", "execute_quest_remap_proposal_tool"),
     ("quest_branch_workbench_tool_schema", "execute_quest_branch_workbench_tool"),
     ("quest_player_journal_tool_schema", "execute_quest_player_journal_tool"),
+    ("quest_localization_tool_schema", "execute_quest_localization_tool"),
     ("quest_ending_coverage_tool_schema", "execute_quest_ending_coverage_tool"),
     ("quest_readiness_tool_schema", "execute_quest_readiness_tool"),
     ("prompt_quest_plan_tool_schema", "execute_prompt_quest_plan_tool"),
@@ -172,6 +174,7 @@ _AUTHORING_SYMBOLS = frozenset({
     "quest_remap_proposal_tool_schema",
     "quest_branch_workbench_tool_schema",
     "quest_player_journal_tool_schema",
+    "quest_localization_tool_schema",
     "quest_replay_repair_tool_schema",
     "scene_object_accessibility_tool_schema",
 })
@@ -233,6 +236,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    remap_proposal if descriptor_name == "quest_remap_proposal_tool_schema" else
                    branch_workbench if descriptor_name == "quest_branch_workbench_tool_schema" else
                    player_journal if descriptor_name == "quest_player_journal_tool_schema" else
+                   quest_localization if descriptor_name == "quest_localization_tool_schema" else
                    ending_coverage if descriptor_name == "quest_ending_coverage_tool_schema" else
                    readiness if descriptor_name == "quest_readiness_tool_schema" else
                    prompt_quest if descriptor_name == "prompt_quest_plan_tool_schema" else
