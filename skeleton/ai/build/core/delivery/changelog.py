@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+from datetime import date as calendar_date
+from itertools import islice
 from dataclasses import dataclass
 from typing import Iterable
 
 from skeleton.build.delivery.version import Version
+from skeleton.build.delivery._util import DeliveryError
 
 _HEADER = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^()\s]{1,64})\))?(?P<bang>!)?: (?P<subject>.+)$")
 SECTIONS = (
@@ -18,6 +21,13 @@ SECTIONS = (
     ("other", "Other"),
 )
 HIDDEN_TYPES = frozenset({"chore", "ci", "style", "test", "docs", "build", "refactor"})
+MAX_CHANGELOG_CHANGES = 8192
+
+
+def _safe_markdown(text: str) -> str:
+    # Commit subjects are untrusted. Prevent raw HTML and Markdown link syntax
+    # from becoming active content in rendered release notes.
+    return re.sub(r"([\\`*_{}\[\]()<>])", r"\\\1", text)
 
 
 @dataclass(frozen=True)
@@ -76,9 +86,19 @@ def group(changes: Iterable[Change]) -> dict[str, list[Change]]:
 
 
 def render(version: Version | str, changes: Iterable[Change], *, date: str) -> str:
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
-        raise ValueError("date must be YYYY-MM-DD")
-    grouped = group(changes)
+    if not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        raise DeliveryError("date must be YYYY-MM-DD")
+    try:
+        calendar_date.fromisoformat(date)
+    except ValueError as exc:
+        raise DeliveryError("invalid calendar date") from exc
+    bounded = list(islice(changes, MAX_CHANGELOG_CHANGES + 1))
+    if len(bounded) > MAX_CHANGELOG_CHANGES:
+        raise DeliveryError("changelog change count exceeds bound")
+    if any(not isinstance(c, Change) or not isinstance(c.sha, str)
+           or not re.fullmatch(r"[0-9a-f]{7,40}", c.sha) for c in bounded):
+        raise DeliveryError("invalid changelog commit evidence")
+    grouped = group(bounded)
     lines = [f"## {version} ({date})", ""]
     for key, title in SECTIONS:
         items = grouped[key]
@@ -87,8 +107,8 @@ def render(version: Version | str, changes: Iterable[Change], *, date: str) -> s
         lines.append(f"### {title}")
         lines.append("")
         for change in items:
-            scope = f"**{change.scope}:** " if change.scope else ""
-            lines.append(f"- {scope}{change.subject} ({change.sha[:7]})")
+            scope = f"**{_safe_markdown(change.scope)}:** " if change.scope else ""
+            lines.append(f"- {scope}{_safe_markdown(change.subject)} ({change.sha[:7]})")
         lines.append("")
     if len(lines) == 2:
         lines.append("_No user-facing changes._")
