@@ -12,7 +12,8 @@ import html
 import os
 from typing import Any
 
-from .bundle import _artifact_read\nfrom .timeline import _reachable_flags
+from .bundle import _artifact_read
+from .timeline import _reachable_flags
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _list, _text,
     canonical, digest, prove, strict_json,

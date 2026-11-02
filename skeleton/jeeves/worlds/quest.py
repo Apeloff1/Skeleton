@@ -42,7 +42,9 @@ def validate_quest(data: Any, world: Any) -> dict[str, Any]:
         raise CanonError("quest_schema_mismatch")
     if obj["world_id"] != world["id"] or obj["world_digest"] != proof.source_digest:
         raise CanonError("quest_world_lease_mismatch")
-    if type(obj["ending"]) is not str or obj["ending"] not in {\n        e["scene"] for e in world["endings"]\n    }:
+    if type(obj["ending"]) is not str or obj["ending"] not in {
+        e["scene"] for e in world["endings"]
+    }:
         raise CanonError("unknown_quest_ending")
     if type(obj["approved"]) is not bool:
         raise CanonError("invalid_quest_approval")

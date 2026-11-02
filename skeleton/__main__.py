@@ -71,7 +71,12 @@ Commands:
     world-timeline Source-bound causal chronology and temporal playable handoff
     world-bundle Verified offline playable HTML and era engine handoff
     world-plan   Typed source-derived production DAG, review and compilation
-    world-editor Offline browser scene editing with source-leased JSON export\n    world-route  Reviewed world navigation, deterministic route replay and playable handoff\n    world-cast   Original NPC presence, authored dialogue and playable continuity\n    world-experience Unified reviewed world, cast and route offline playable\n    world-session Source-verified offline play, save, resume and checkpoint replay\n    world-quest  Original objective authoring, earned consequences and quest proof
+    world-editor Offline browser scene editing with source-leased JSON export
+    world-route  Reviewed world navigation, deterministic route replay and playable handoff
+    world-cast   Original NPC presence, authored dialogue and playable continuity
+    world-experience Unified reviewed world, cast and route offline playable
+    world-session Source-verified offline play, save, resume and checkpoint replay
+    world-quest  Original objective authoring, earned consequences and quest proof
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -781,7 +786,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-editor":
         from skeleton.jeeves.worlds.editor_cli import run as world_editor_cli
         return world_editor_cli(rest)
-    if cmd == "world-route":\n        from skeleton.jeeves.worlds.route_cli import run as world_route_cli\n        return world_route_cli(rest)\n    if cmd == "world-cast":\n        from skeleton.jeeves.worlds.cast_cli import run as world_cast_cli\n        return world_cast_cli(rest)\n    if cmd == "world-experience":\n        from skeleton.jeeves.worlds.experience_cli import run as world_experience_cli\n        return world_experience_cli(rest)\n    if cmd == "world-session":\n        from skeleton.jeeves.worlds.session_cli import run as world_session_cli\n        return world_session_cli(rest)\n    if cmd == "world-quest":\n        from skeleton.jeeves.worlds.quest_cli import run as world_quest_cli\n        return world_quest_cli(rest)\n    if cmd == "contracts": return _cmd_contracts(rest)
+    if cmd == "world-route":
+        from skeleton.jeeves.worlds.route_cli import run as world_route_cli
+        return world_route_cli(rest)
+    if cmd == "world-cast":
+        from skeleton.jeeves.worlds.cast_cli import run as world_cast_cli
+        return world_cast_cli(rest)
+    if cmd == "world-experience":
+        from skeleton.jeeves.worlds.experience_cli import run as world_experience_cli
+        return world_experience_cli(rest)
+    if cmd == "world-session":
+        from skeleton.jeeves.worlds.session_cli import run as world_session_cli
+        return world_session_cli(rest)
+    if cmd == "world-quest":
+        from skeleton.jeeves.worlds.quest_cli import run as world_quest_cli
+        return world_quest_cli(rest)
+    if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
     if cmd == "command": return _cmd_shared_command(rest)

@@ -11,7 +11,8 @@ import html
 import os
 from typing import Any
 
-from .bundle import _artifact_read\nfrom .world_canon import (
+from .bundle import _artifact_read
+from .world_canon import (
     CanonError, MAX_STATES, WorldStore, _id, _keys, _list, _text,
     canonical, compile_html, digest, prove, strict_json,
 )
