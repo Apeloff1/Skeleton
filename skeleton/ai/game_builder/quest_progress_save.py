@@ -65,6 +65,10 @@ def quest_section(world: DirectorWorld, state: DirectorState,
     _validate_campaign_receipt(campaign_receipt_sha256)
     if len(quests) > 4096 or len(failures) > 4096:
         raise QuestProgressSaveError("quest section exceeds bounded collection size")
+    # Reject forged objects before reading their attributes. Otherwise an
+    # untrusted section producer can escape the typed fail-closed boundary.
+    if any(not isinstance(q, QuestProgressState) for q in quests):
+        raise QuestProgressSaveError("invalid quest progress object")
     quest_ids = [q.quest_id for q in quests]
     if any(not _safe_text(qid, 128) for qid in quest_ids):
         raise QuestProgressSaveError("invalid quest identity")

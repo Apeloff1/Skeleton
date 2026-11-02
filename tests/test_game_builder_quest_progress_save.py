@@ -61,6 +61,11 @@ class QuestSaveTests(unittest.TestCase):
             with self.assertRaisesRegex(QuestProgressSaveError, "invalid campaign receipt digest"):
                 quest_section(self.w, self.state, [self.prog], campaign_receipt_sha256=receipt)
 
+    def test_quest_section_rejects_forged_objects_before_attribute_access(self):
+        for malformed in (None, {"quest_id": "q1"}, object(), "q1"):
+            with self.assertRaisesRegex(QuestProgressSaveError, "invalid quest progress object"):
+                quest_section(self.w, self.state, [malformed])
+
     def test_quest_section_rejects_duplicate_ids_before_manifest_serialization(self):
         with self.assertRaisesRegex(QuestProgressSaveError, "duplicate quest identity"):
             quest_section(self.w, self.state, [self.prog, self.prog])
