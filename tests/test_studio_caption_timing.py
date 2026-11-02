@@ -207,3 +207,31 @@ def test_cli_rejects_duplicate_json_symlink_and_stale_source(
     args[args.index(original["source_digest"])] = "0" * 64
     assert main(args) == 2
     assert not (tmp_path / "review.html").exists()
+
+def test_world_router_exposes_typed_caption_editor_only_with_authoring_opt_in():
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import (
+        world_tool_catalog, route_world_tool,
+    )
+    _, original = source()
+    names = {item["name"]: item for item in world_tool_catalog()["tools"]}
+    assert "studio_original_caption_timing" in names
+    assert names["studio_original_caption_timing"][
+        "explicit_authoring_permission_required"] is True
+    request = {
+        "tool": "studio_original_caption_timing",
+        "arguments": {
+            "schema": REQUEST_SCHEMA, "project_id": PROJECT,
+            "expected_quest_source_digest": original["source_digest"],
+            "edits_ms": {"1": 5000}, "format": "webvtt",
+        },
+    }
+    with pytest.raises(PermissionError):
+        route_world_tool(request, authorized=True)
+    routed = route_world_tool(request, authorized=True, allow_authoring=True)
+    assert routed["result"]["content"].startswith("WEBVTT")
+    assert routed["result"]["file_write_performed"] is False
+    assert routed["release_certified"] is False
+    with pytest.raises(StudioQuestError):
+        route_world_tool({
+            **request, "arguments": {**request["arguments"], "authorized": True},
+        }, authorized=True, allow_authoring=True)
