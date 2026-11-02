@@ -22,11 +22,9 @@ from .studio_ecosystem_scene_schedule import (
 )
 from .studio_quest_ending_coverage import (
     compile_ending_coverage, compile_ending_coverage_handoff,
-    replay_ending_coverage,
 )
 from .studio_quest_softlock_audit import (
     compile_quest_softlock_audit, compile_quest_softlock_handoff,
-    replay_quest_softlock_audit,
 )
 
 SCHEMA = "skeleton.game_builder.studio_quest_readiness.v1"
