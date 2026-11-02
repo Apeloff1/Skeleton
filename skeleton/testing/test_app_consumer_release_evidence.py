@@ -14,6 +14,8 @@ from skeleton.app.consumer_release_evidence import (
 )
 from skeleton.testing.test_app_consumer_first_run_readiness import delivered_first_run
 from skeleton.testing.test_app_consumer_first_run_cohort import delivered_games
+from skeleton.testing.test_app_offline_first_playable_delivery import original_source
+from skeleton.testing.test_app_offline_first_playable_batch import original_games
 from skeleton.testing.test_app_offline_first_playable_jobfile import _file
 
 
@@ -149,4 +151,60 @@ def test_untrusted_operator_cannot_trigger_live_replay(delivered_first_run):
     with pytest.raises(PermissionError):
         inspect_single_consumer_release_hold(
             *paths, **{**pins, "authorized": False},
+        )
+
+def test_cohort_wrong_jobfile_or_summary_pin_rejected(
+    delivered_games, tmp_path,
+):
+    jobs, summary, published = delivered_games
+    jobfile, job_pin = _file(tmp_path, jobs)
+    for kwargs in (
+        {"expected_jobs_sha256": "0" * 64},
+        {"expected_summary_sha256": "0" * 64},
+    ):
+        with pytest.raises(ValueError):
+            inspect_cohort_consumer_release_hold(
+                jobfile, summary, authorized=True,
+                **{
+                    "expected_jobs_sha256": job_pin,
+                    "expected_summary_sha256": published["independent_summary_sha256"],
+                    **kwargs,
+                },
+            )
+
+
+def test_cohort_rejects_non_boolean_source_verification_before_io(
+    delivered_games, tmp_path,
+):
+    jobs, summary, published = delivered_games
+    jobfile, job_pin = _file(tmp_path, jobs)
+    with pytest.raises(ConsumerReleaseEvidenceError):
+        inspect_cohort_consumer_release_hold(
+            jobfile, summary, expected_jobs_sha256=job_pin,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True, verify_original_sources="yes",
+        )
+
+
+def test_cohort_cannot_self_certify_device_or_remove_holds(
+    delivered_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import consumer_release_evidence as module
+
+    jobs, summary, published = delivered_games
+    jobfile, job_pin = _file(tmp_path, jobs)
+    original = module.inspect_pinned_consumer_cohort
+
+    def forged(*args, **kwargs):
+        return {
+            **original(*args, **kwargs),
+            "native_device_qualified": True,
+        }
+
+    monkeypatch.setattr(module, "inspect_pinned_consumer_cohort", forged)
+    with pytest.raises(ConsumerReleaseEvidenceError):
+        inspect_cohort_consumer_release_hold(
+            jobfile, summary, expected_jobs_sha256=job_pin,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
         )

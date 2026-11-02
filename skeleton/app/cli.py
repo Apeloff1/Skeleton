@@ -280,8 +280,10 @@ def _parser() -> argparse.ArgumentParser:
                    help="exercise original source, fresh install, interactive save and pinned delivery acceptance")
     sub.add_parser("consumer-first-run-readiness", add_help=False,
                    help="read-only two-pass installed playable evidence with explicit release holds")
-    sub.add_parser("consumer-release-evidence", add_help=False,
-        help="replay source-level first-run evidence; consumer release remains blocked")
+    sub.add_parser(
+        "consumer-release-evidence", add_help=False,
+        help="replay source-level first-run evidence; consumer release remains blocked",
+    )
     sub.add_parser("consumer-first-run-cohort", add_help=False,
                    help="read-only pinned 2-8 game consumer first-run replay; release blocked")
     sub.add_parser("studio-journey", add_help=False,
