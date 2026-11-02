@@ -15,6 +15,9 @@ _SEMVER = re.compile(
 )
 
 BumpKind = Literal["major", "minor", "patch", "prerelease"]
+MAX_VERSION_CHARS = 256
+MAX_VERSION_NUMBER = (1 << 63) - 1
+MAX_VERSION_IDENTIFIERS = 16
 
 
 @dataclass(frozen=True, order=False)
@@ -25,10 +28,20 @@ class Version:
     prerelease: tuple[str, ...] = ()
     build: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        if any(type(n) is not int or not 0 <= n <= MAX_VERSION_NUMBER
+               for n in (self.major, self.minor, self.patch)):
+            raise DeliveryError("version numeric fields must be bounded integers")
+        for group in (self.prerelease, self.build):
+            if (not isinstance(group, tuple) or len(group) > MAX_VERSION_IDENTIFIERS
+                    or any(type(part) is not str or not 1 <= len(part) <= 64
+                           or not re.fullmatch(r"[0-9A-Za-z-]+", part) for part in group)):
+                raise DeliveryError("version identifiers must be bounded and canonical")
+
     @classmethod
     def parse(cls, text: str) -> "Version":
-        if not isinstance(text, str):
-            raise DeliveryError("version must be text")
+        if not isinstance(text, str) or len(text) > MAX_VERSION_CHARS:
+            raise DeliveryError("version must be bounded text")
         match = _SEMVER.fullmatch(text.strip())
         if not match:
             raise DeliveryError(f"invalid semantic version: {text!r}")
@@ -87,7 +100,7 @@ class Version:
                 return Version(self.major, self.minor, self.patch)
             return Version(self.major, self.minor, self.patch + 1)
         if kind == "prerelease":
-            if not re.fullmatch(r"[A-Za-z][0-9A-Za-z-]*", pre_label):
+            if not isinstance(pre_label, str) or len(pre_label) > 32 or not re.fullmatch(r"[A-Za-z][0-9A-Za-z-]*", pre_label):
                 raise DeliveryError("prerelease label must be alphanumeric")
             if self.prerelease and self.prerelease[0] == pre_label and len(self.prerelease) == 2 and self.prerelease[1].isdigit():
                 return Version(self.major, self.minor, self.patch, (pre_label, str(int(self.prerelease[1]) + 1)))
@@ -97,6 +110,8 @@ class Version:
 
 
 def latest(versions: list[str] | tuple[str, ...], *, include_prerelease: bool = False) -> Version | None:
+    if not isinstance(versions, (list, tuple)) or len(versions) > 8192:
+        raise DeliveryError("version inventory exceeds bound")
     parsed = [Version.parse(v) for v in versions]
     if not include_prerelease:
         parsed = [v for v in parsed if not v.is_prerelease]
