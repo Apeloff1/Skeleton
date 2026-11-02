@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -22,6 +23,7 @@ from skeleton.app.offline_first_playable_delivery import (
 )
 
 SCHEMA = "skeleton.app.consumer_first_run_evidence.v1"
+_SHA256 = re.compile(r"[0-9a-f]{64}\\Z")
 RELEASE_HOLDS = (
     "NATIVE_DEVICE_QUALIFICATION_ABSENT",
     "INSTALLER_DEVICE_LIFECYCLE_UNQUALIFIED",
@@ -119,7 +121,15 @@ def inspect_consumer_first_run(
             or any(first.get(key) is not True for key in required_true)
             or any(first.get(key) is not False for key in required_false)
             or type(first.get("project_id")) is not str
-            or not first["project_id"]
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}",
+                            first["project_id"]) is None
+            or any(type(first.get(key)) is not str
+                   or _SHA256.fullmatch(first[key]) is None
+                   for key in ("world_digest", "replay_digest"))
+            or first.get("manifest_sha256") != pins["manifest"]
+            or first.get("archive_sha256") != pins["archive"]
+            or first.get("save_sha256") != pins["save"]
+            or first.get("independent_receipt_sha256") != pins["receipt"]
             or type(first.get("action_count")) is not int
             or not 1 <= first["action_count"] <= 64):
         raise ConsumerFirstRunReadinessError(

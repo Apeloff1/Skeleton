@@ -448,3 +448,62 @@ def test_consumer_first_run_evidence_replays_real_installed_game(
     wrong_pin[wrong_pin.index("--expected-save-sha256") + 1] = "0" * 64
     assert run_app_cli(wrong_pin) == 2
     assert json.loads(capsys.readouterr().err)["native_device_qualified"] is False
+
+
+def test_consumer_first_run_rejects_forged_upstream_evidence(
+    monkeypatch,
+):
+    from skeleton.app import consumer_first_run_readiness as module
+
+    pinned = {
+        "manifest": "a" * 64,
+        "archive": "b" * 64,
+        "save": "c" * 64,
+        "receipt": "d" * 64,
+    }
+    observed = {
+        "project_id": "original-game",
+        "world_digest": "e" * 64,
+        "replay_digest": "f" * 64,
+        "manifest_sha256": pinned["manifest"],
+        "archive_sha256": pinned["archive"],
+        "save_sha256": pinned["save"],
+        "independent_receipt_sha256": pinned["receipt"],
+        "action_count": 2,
+        "live_source_and_private_replay_reexecuted": True,
+        "receipt_integrity_verified": True,
+        "independent_pin_reverified": True,
+        "offline_gameplay_reexecuted": True,
+        "read_only": True,
+        "release_certified": False,
+        "native_device_qualified": False,
+        "package_signed": False,
+        "rights_certified": False,
+        "persistent_rollback_protection": False,
+    }
+    monkeypatch.setattr(module, "_custody", lambda *args: ((1, 2),) * 4)
+    def inspect(**overrides):
+        monkeypatch.setattr(
+            module, "inspect_first_playable_delivery",
+            lambda *args, **kwargs: {**observed, **overrides},
+        )
+        return module.inspect_consumer_first_run(
+            "/game", "/archive", "/save", "/receipt",
+            expected_manifest_sha256=pinned["manifest"],
+            expected_archive_sha256=pinned["archive"],
+            expected_save_sha256=pinned["save"],
+            expected_receipt_sha256=pinned["receipt"],
+            authorized=True,
+        )
+    assert inspect()["release_certified"] is False
+    for forged in (
+        {"world_digest": "not-a-digest"},
+        {"replay_digest": True},
+        {"project_id": "../foreign"},
+        {"action_count": True},
+        {"save_sha256": "0" * 64},
+        {"release_certified": True},
+        {"package_signed": True},
+    ):
+        with pytest.raises(module.ConsumerFirstRunReadinessError):
+            inspect(**forged)
