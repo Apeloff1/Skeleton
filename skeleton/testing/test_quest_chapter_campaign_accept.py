@@ -50,7 +50,7 @@ def test_editor_change_preserves_earned_victory_and_source_identity():
     ("max_depth", 1),
 ])
 def test_insufficient_route_budget_does_not_certify(field, value):
-    kwargs = {field: value}
+    kwargs = {field: value, "split_at": 0}
     with pytest.raises(CombatSessionError, match="planner returned"):
         accept_campaign(original_campaign(), demo_campaign_actions(), **kwargs)
 
