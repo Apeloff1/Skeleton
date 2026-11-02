@@ -30,6 +30,10 @@ from skeleton.ai.game_builder.studio_npc_relay_impact import (
     replay_npc_relay_impact, compile_npc_relay_impact_playable,
     publish_npc_relay_impact, restore_npc_relay_impact, FILENAME,
 )
+from skeleton.ai.game_builder.studio_npc_relay_impact_view import (
+    render_npc_relay_impact_review, publish_npc_relay_impact_review,
+    FILENAME as REVIEW_FILENAME,
+)
 from skeleton.ai.agents.jeeves.studio_npc_relay_impact_tool import (
     REQUEST_SCHEMA, execute_npc_relay_impact_tool,
 )
@@ -189,3 +193,39 @@ def test_jeeves_typed_router_and_fail_closed_handoff():
     with pytest.raises(StudioQuestError):
         execute_npc_relay_impact_tool(
             {**request, "playable_manifest": 1}, authorized=True)
+
+def test_identical_receipts_have_no_affected_scenes_or_regressions():
+    docs, source, baseline, _ = fixture()
+    result = compile_npc_relay_impact(
+        docs, baseline, baseline, authorized=True,
+        expected_source_digest=source)
+    assert result["changes"] == []
+    assert result["affected_scene_ids"] == []
+    assert result["changed_route_count"] == 0
+    assert result["delivery_regressions"] == 0
+    assert result["playable_handoff_allowed"] is False
+
+
+def test_private_offline_html_review_excludes_source_prose_and_scripts(tmp_path):
+    docs, source, baseline, candidate = fixture()
+    impact = compile_npc_relay_impact(
+        docs, baseline, candidate, authorized=True,
+        expected_source_digest=source)
+    raw = render_npc_relay_impact_review(docs, impact, authorized=True)
+    assert b"Content-Security-Policy" in raw
+    assert b"default-src 'none'" in raw
+    assert b"<script" not in raw
+    assert b"NOT VERIFIED" in raw
+    assert impact["impact_digest"].encode("ascii") in raw
+    directory = tmp_path / "review"
+    directory.mkdir(mode=0o700)
+    result = publish_npc_relay_impact_review(
+        docs, impact, directory, authorized=True)
+    assert result["file_write_performed"] is True
+    assert (directory / REVIEW_FILENAME).read_bytes() == raw
+    with pytest.raises(FileExistsError):
+        publish_npc_relay_impact_review(
+            docs, impact, directory, authorized=True)
+    with pytest.raises(PermissionError):
+        render_npc_relay_impact_review(
+            docs, impact, authorized=False)

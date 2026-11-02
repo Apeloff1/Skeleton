@@ -13,6 +13,7 @@ from skeleton.ai.game_builder.studio_npc_relay_impact import (
     publish_npc_relay_impact, restore_npc_relay_impact,
 )
 from scripts.studio_npc_knowledge_relay_cli import _private_json
+from skeleton.ai.game_builder.studio_npc_relay_impact_view import publish_npc_relay_impact_review
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,6 +24,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--candidate", type=Path)
     ap.add_argument("--restore", type=Path)
     ap.add_argument("--publish", type=Path)
+    ap.add_argument("--render-review", type=Path,
+                    help="Publish private script-free HTML impact review")
     ap.add_argument("--prompt", action="store_true")
     ap.add_argument("--playable", action="store_true")
     args = ap.parse_args(argv)
@@ -55,6 +58,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.playable:
             result["playable_handoff"] = compile_npc_relay_impact_playable(
                 docs, impact, authorized=True)
+        if args.render_review is not None:
+            result["review"] = publish_npc_relay_impact_review(
+                docs, impact, args.render_review, authorized=True)
+            result["file_write_performed"] = True
         if args.publish is not None:
             result["publication"] = publish_npc_relay_impact(
                 docs, impact, args.publish, authorized=True)
