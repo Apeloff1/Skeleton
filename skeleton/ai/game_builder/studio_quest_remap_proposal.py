@@ -14,7 +14,7 @@ import json
 
 from .studio_ecosystem_author_revision import preview_canon_revision
 from .studio_ecosystem_quest import (
-    StudioQuestError, compile_quest_program, replay_quest,
+    StudioQuestError, compile_quest_program,
 )
 from .studio_ecosystem_scene_schedule import _canonical, _digest, _lease
 from .studio_quest_revision_migration import (

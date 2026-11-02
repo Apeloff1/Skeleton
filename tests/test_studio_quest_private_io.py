@@ -1,7 +1,6 @@
 """Descriptor-anchored private Studio A authoring file custody."""
 from __future__ import annotations
 
-import json
 import os
 import pytest
 
