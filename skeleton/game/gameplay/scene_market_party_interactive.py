@@ -11,6 +11,7 @@ from skeleton.game.gameplay.scene_market import _json
 from skeleton.game.gameplay.scene_market_party import (
     _advance, new_party, original_party, simulate_party, verify_party,
 )
+from skeleton.game.gameplay.scene_market_party_board import inspect_party
 from skeleton.game.gameplay.scene_tile_walk import MAX_BYTES
 from skeleton.game.gameplay.scene_travel import SceneTravelError
 
@@ -48,7 +49,9 @@ def play_party(source: Any = None, *, session: Any = None,
     while current["state"]["market"]["state"]["phase"] == "active":
         state = current["state"]
         actor = current["source"]["players"][state["turn_index"]]
-        _emit(writer, {"event": "turn", "player_id": actor["player_id"],
+        board = inspect_party(current)
+        _emit(writer, {"event": "turn", "legal_actions": board["legal_actions"],
+                       "player_id": actor["player_id"],
                        "roles": actor["roles"], "round": state["round"],
                        "credits": state["market"]["state"]["credits"],
                        "goods": state["market"]["state"]["goods"],

@@ -7,6 +7,7 @@ Party passes never mint credits or change the underlying market state.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from collections.abc import Sequence
@@ -88,7 +89,7 @@ def _party_action(raw: Any) -> dict[str, Any]:
     # The nested canonical reducer validates every economy action and tile field.
     if action["kind"] not in ROLES.values():
         raise SceneTravelError("unsupported party action")
-    return {"player_id": actor, "action": action}
+    return {"player_id": actor, "action": copy.deepcopy(action)}
 
 
 def _advance(session: dict[str, Any], raw: Any) -> dict[str, Any]:

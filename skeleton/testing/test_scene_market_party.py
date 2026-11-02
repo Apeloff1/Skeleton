@@ -93,7 +93,7 @@ def test_bad_party_source_rejected(mutation):
     lambda s: s["state"]["market"]["state"].update(credits=999),
     lambda s: s["state"]["contributions"]["rowan"].update(merchant=999),
     lambda s: s["state"]["passes"].update(rowan=999),
-    lambda s: s["state"].update(turn_index=0),
+    lambda s: s["state"].update(turn_index=(s["state"]["turn_index"] + 1) % 3),
     lambda s: s["journal"][0].update(receipt="0" * 64),
     lambda s: s["save"].update(sequence=0),
     lambda s: s.update(source_digest="0" * 64),
@@ -140,3 +140,19 @@ def test_cli_demo_and_accept_are_user_reachable(capsys):
     receipt = json.loads(capsys.readouterr().out)
     assert receipt["phase"] == "won"
     assert receipt["export_checksum"]
+
+
+def test_caller_cannot_mutate_accepted_party_action_after_commit():
+    source, _ = original_party()
+    session = new_party(source)
+    action = {"kind": "tile", "action": {"kind": "move", "direction": "east"}}
+    try:
+        updated = _advance(session, {"player_id": "rowan", "action": action})
+    except SceneTravelError:
+        # The original authored map may disallow east from its spawn.
+        action["action"]["direction"] = "south"
+        updated = _advance(session, {"player_id": "rowan", "action": action})
+    snapshot = copy.deepcopy(updated)
+    action["action"]["direction"] = "forged"
+    assert updated == snapshot
+    assert verify_party(updated) == updated

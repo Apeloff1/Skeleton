@@ -42,3 +42,9 @@ skeleton/testing/test_scene_market_party_interactive.py`.
 
 Release remains held until those tests and all exact-head CI, provenance,
 security, original-content and consumer acceptance checks pass.
+
+The read-only `scene-market-party-board demo` command enumerates the current
+player's replay-verified legal actions. `scene-market-party-board inspect
+--session-json JSON` rejects forged checkpoints and never changes the
+original session. The interactive player emits the same legal-action board
+before each turn. This is a local gameplay aid, not a network permission grant.
