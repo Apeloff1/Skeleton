@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.studio_npc_knowledge_relay_cli import _private_json
+from skeleton.ai.game_builder.studio_quest_private_io import read_studio_private_json
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_quest_remap_proposal import (
@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         docs = read_blueprint(args.project)
         proposal = compile_quest_remap_proposal(
-            docs, _private_json(args.plan_file, 32768), authorized=True,
+            docs, read_studio_private_json(args.plan_file, 32768), authorized=True,
             expected_source_digest=args.expected_source,
             expected_initial_session_digest=args.expected_session)
         if args.review_html:
@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         }
         if args.approve:
             migration = approve_quest_remap_proposal(
-                docs, proposal, _private_json(args.approval_file, 32768),
+                docs, proposal, read_studio_private_json(args.approval_file, 32768),
                 authorized=True, expected_source_digest=args.expected_source,
                 expected_initial_session_digest=args.expected_session)
             result["migration"] = migration
