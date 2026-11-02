@@ -1,6 +1,7 @@
 """Original story bookmark source custody, UI/CLI and Jeeves regressions."""
 from __future__ import annotations
 
+from hashlib import sha256
 import copy
 import json
 import os
@@ -10,7 +11,6 @@ import pytest
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_story_html import story_source, render_story_html
-from hashlib import sha256
 from skeleton.ai.game_builder.studio_story_reading_bookmark import (
     REQUEST_SCHEMA as BOOKMARK_REQUEST_SCHEMA,
     compile_story_reading_bookmark, replay_story_reading_bookmark,

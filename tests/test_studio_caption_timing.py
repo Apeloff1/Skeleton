@@ -139,7 +139,7 @@ def test_jeeves_contract_returns_canonical_source_leased_review():
 
 
 def test_static_html_escapes_authored_markup_and_never_runs_script():
-    docs, original = source()
+    docs, _ = source()
     docs["narrative"]["premise"] = "<img src=x onerror=alert(1)>"
     changed = compile_caption_timing_edit(
         docs, {"1": 5000}, authorized=True,

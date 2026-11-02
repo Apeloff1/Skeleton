@@ -152,7 +152,8 @@ def render_story_reading_bookmark_html(
     digest = b64encode(sha256(_CSS.encode("utf-8")).digest()).decode("ascii")
     csp = ("default-src 'none'; base-uri 'none'; form-action 'none'; "
            "style-src 'sha256-" + digest + "'")
-    safe = lambda value: escape(value, quote=True)
+    def safe(value: str) -> str:
+        return escape(value, quote=True)
     alternatives = "".join("<li>" + safe(choice) + "</li>"
                            for choice in stage["alternatives"])
     dependencies = "".join("<li>" + safe(dep) + "</li>"
