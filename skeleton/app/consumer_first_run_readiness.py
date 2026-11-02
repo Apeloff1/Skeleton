@@ -21,6 +21,9 @@ from skeleton.app.offline_delivery_assurance import (
 from skeleton.app.offline_first_playable_delivery import (
     inspect_first_playable_delivery,
 )
+from skeleton.app.installed_tree_custody import (
+    installed_tree_snapshot_digest, snapshot_installed_tree,
+)
 
 SCHEMA = "skeleton.app.consumer_first_run_evidence.v1"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -30,7 +33,7 @@ RELEASE_HOLDS = (
     "SIGNED_PACKAGE_CHAIN_UNATTESTED",
     "ORIGINAL_CONTENT_RIGHTS_UNCERTIFIED",
     "GUARDED_LOCAL_AI_END_TO_END_UNQUALIFIED",
-    "NESTED_ASSET_INODE_INVENTORY_UNATTESTED",
+    "PERSISTENT_NESTED_ASSET_CUSTODY_UNQUALIFIED",
 )
 
 
@@ -82,6 +85,7 @@ def inspect_consumer_first_run(
         "receipt": _pin(expected_receipt_sha256, "receipt"),
     }
     before = _custody(installed, archive, save, receipt)
+    installed_tree = snapshot_installed_tree(installed)
     args = {
         "expected_manifest_sha256": pins["manifest"],
         "expected_archive_sha256": pins["archive"],
@@ -92,7 +96,8 @@ def inspect_consumer_first_run(
     first = inspect_first_playable_delivery(
         installed, archive, save, receipt, **args,
     )
-    if _custody(installed, archive, save, receipt) != before:
+    if (_custody(installed, archive, save, receipt) != before
+            or snapshot_installed_tree(installed) != installed_tree):
         raise ConsumerFirstRunReadinessError(
             "first-run source or private evidence changed during replay"
         )
@@ -100,6 +105,7 @@ def inspect_consumer_first_run(
         installed, archive, save, receipt, **args,
     )
     if (_custody(installed, archive, save, receipt) != before
+            or snapshot_installed_tree(installed) != installed_tree
             or first != second):
         raise ConsumerFirstRunReadinessError(
             "first-run replay or inode custody changed between passes"
@@ -155,13 +161,14 @@ def inspect_consumer_first_run(
         },
         "source_level_replay_passes": 2,
         "installed_game_and_private_save_reexecuted": True,
-        # The canonical installer compares all asset bytes to the pinned ZIP,
-        # but _source_identity snapshots the installed ROOT inode, not every
-        # nested asset inode. Never turn content integrity into a false claim
-        # that all nested file identities were continuously pinned.
+        # Every nested package inode was inventoried at each replay boundary.
+        # Equal snapshots are point-in-time evidence, NOT a filesystem lock
+        # or persistent protection against swaps between observations.
         "all_input_inodes_stable_during_inspection": False,
         "root_and_evidence_inodes_stable_during_inspection": True,
-        "nested_asset_inode_inventory_attested": False,
+        "nested_asset_inode_inventory_attested": True,
+        "nested_asset_inode_snapshots_equal": True,
+        "installed_tree_snapshot_sha256": installed_tree_snapshot_digest(installed_tree),
         "read_only": True,
         "files_published": 0,
         "native_device_qualified": False,
