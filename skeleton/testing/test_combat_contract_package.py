@@ -37,7 +37,7 @@ def test_same_source_metadata_and_actions_yield_same_package():
     lambda p: p["portable_save"]["session"]["state"].update(credits=999),
     lambda p: p["actions"][0].update(kind="guard"),
     lambda p: p["source"]["reward"].update(credits=999),
-    lambda p: p.update(checksum="0" * 64),
+    lambda p: p.update(schema_version="forged.package.v2"),
 ])
 def test_forged_package_rejected_even_when_checksum_is_recomputed(mutate):
     package = copy.deepcopy(original_package())
