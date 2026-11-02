@@ -186,3 +186,53 @@ def test_bundle_rejects_invalid_utf8_before_filesystem_publication(tmp_path, sav
     assert not target.exists()
     with pytest.raises(BundleError, match="UTF-8"):
         bio.import_bundle(bad, CODEC, saver)
+
+
+def test_bundle_receipt_flood_is_rejected_before_store_allocation(saver, monkeypatch):
+    saver.save_files("hero", "platformer", {"a.md": "abc"})
+    payload = CODEC.decode(bio.export_bundle(saver, "hero", CODEC)).payload
+    payload["receipts"]["receipts"].append(dict(payload["receipts"]["receipts"][0]))
+
+    def forbidden_allocation(cls, state):
+        raise AssertionError("unbounded receipt state was allocated")
+
+    monkeypatch.setattr(bio.ChunkReceiptStore, "from_state", classmethod(forbidden_allocation))
+    with pytest.raises(BundleError, match="receipt count mismatch"):
+        bio.import_bundle(CODEC.encode(payload), CODEC, ProjectSaver(GameSavePlane()))
+
+
+def test_bundle_receipts_reject_cross_file_and_noncanonical_chunk_authority(saver):
+    import copy
+
+    saver.save_files("hero", "platformer", {"a.md": "abc"})
+    original = CODEC.decode(bio.export_bundle(saver, "hero", CODEC)).payload
+    for change, message in (
+        (lambda p: p["receipts"]["receipts"][0]["body"].update(path="other.md"),
+         "identity or size"),
+        (lambda p: p["receipts"]["receipts"][0]["body"].update(index=True),
+         "identity or size"),
+        (lambda p: p["sections"]["files"]["a.md"].update(chunks=["a.md#999"]),
+         "noncanonical"),
+        (lambda p: p["receipts"]["receipts"][0].update(chunk_id="other.md#0"),
+         "duplicate or unknown"),
+    ):
+        payload = copy.deepcopy(original)
+        change(payload)
+        with pytest.raises(BundleError, match=message):
+            bio.import_bundle(CODEC.encode(payload), CODEC, ProjectSaver(GameSavePlane()))
+
+
+def test_bundle_receipt_chunk_size_and_declared_utf8_bytes_are_verified(saver):
+    saver.save_files("hero", "platformer", {"a.md": "a" * (bio.CHUNK_CHARS + 1)})
+    payload = CODEC.decode(bio.export_bundle(saver, "hero", CODEC)).payload
+    payload["receipts"]["receipts"][0]["body"]["text"] += "z"
+    with pytest.raises(BundleError, match="identity or size"):
+        bio.import_bundle(CODEC.encode(payload), CODEC, ProjectSaver(GameSavePlane()))
+
+    saver.save_files("other", "platformer", {"a.md": "abc"})
+    payload = CODEC.decode(bio.export_bundle(saver, "other", CODEC)).payload
+    payload["manifest"]["files"][0]["bytes"] = 4
+    payload["manifest"].pop("content_digest")
+    payload["sections"]["files"]["a.md"]["bytes"] = 4
+    with pytest.raises(BundleError, match="byte count mismatch"):
+        bio.import_bundle(CODEC.encode(payload), CODEC, ProjectSaver(GameSavePlane()))

@@ -19,7 +19,7 @@ from skeleton.ai.game_builder.game_project_workspace import PROJECT_MAX_FILES, S
 from skeleton.kernel.game_save_plane import ChunkReceiptStore
 
 from .manifest import BundleError, BundleManifest
-from .project_save import BUNDLE_SECTIONS, ProjectSaver, build_state, files_from_state, manifest_for
+from .project_save import CHUNK_CHARS, BUNDLE_SECTIONS, ProjectSaver, build_state, files_from_state, manifest_for
 
 MAX_BUNDLE_BYTES = 64_000_000
 BUNDLE_SUFFIX = ".gfbundle.json"
@@ -82,6 +82,56 @@ def export_bundle(saver: ProjectSaver, project_id: str, codec: BundleCodec, *,
     return raw
 
 
+
+def _validate_receipt_state(state: Any, manifest: BundleManifest,
+                            index: dict[str, Any]) -> None:
+    """Bound receipt allocation and prove canonical chunk identities first.
+
+    A valid envelope signature does not make its receipt inventory small or
+    internally consistent. Reject hostile shapes before from_state() creates
+    digest-indexed Python objects, and never trust a caller-provided chunk ID
+    as authority for a different file or position.
+    """
+    if type(state) is not dict or set(state) != {"receipts"} or type(state["receipts"]) is not list:
+        raise BundleError("invalid bundle receipt state")
+    expected: dict[str, tuple[str, int]] = {}
+    for entry in manifest.files:
+        item = index[entry.path]
+        if type(item) is not dict or set(item) != {"sha256", "bytes", "chunks"}:
+            raise BundleError("invalid bundle file index")
+        chunks = item["chunks"]
+        # UTF-8 bytes >= Unicode code points. This bounds the number of
+        # CHUNK_CHARS-sized pieces even for multibyte source text.
+        maximum = max(1, (entry.bytes + CHUNK_CHARS - 1) // CHUNK_CHARS)
+        if (type(item["bytes"]) is not int or item["bytes"] != entry.bytes
+                or item["sha256"] != entry.sha256 or type(chunks) is not list
+                or not 1 <= len(chunks) <= maximum):
+            raise BundleError("invalid bundle file index")
+        for number, chunk_id in enumerate(chunks):
+            canonical = f"{entry.path}#{number}"
+            if type(chunk_id) is not str or chunk_id != canonical:
+                raise BundleError("noncanonical bundle chunk identity")
+            expected[canonical] = (entry.path, number)
+    records = state["receipts"]
+    if len(records) != len(expected):
+        raise BundleError("bundle receipt count mismatch")
+    seen: set[str] = set()
+    for record in records:
+        if type(record) is not dict or set(record) != {"chunk_id", "body"}:
+            raise BundleError("invalid bundle receipt record")
+        chunk_id = record["chunk_id"]
+        if type(chunk_id) is not str or chunk_id not in expected or chunk_id in seen:
+            raise BundleError("duplicate or unknown bundle receipt")
+        path, number = expected[chunk_id]
+        body = record["body"]
+        if (type(body) is not dict or set(body) != {"path", "index", "text"}
+                or body["path"] != path or type(body["index"]) is not int
+                or body["index"] != number or type(body["text"]) is not str
+                or len(body["text"]) > CHUNK_CHARS):
+            raise BundleError("bundle receipt identity or size mismatch")
+        seen.add(chunk_id)
+
+
 def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
                   sequence: int | None = None) -> BundleManifest:
     """Verify a bundle end to end, then save it as a new version in ``saver``."""
@@ -104,10 +154,14 @@ def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
     sections = payload["sections"]
     if set(sections["files"]) != set(manifest.file_map()):
         raise BundleError("file index disagrees with manifest")
+    _validate_receipt_state(payload["receipts"], manifest, sections["files"])
     receipts = ChunkReceiptStore.from_state(payload["receipts"])
     if receipts.root() != manifest.receipt_root:
         raise BundleError("receipt root mismatch")
     files = files_from_state(sections, receipts)
+    for entry in manifest.files:
+        if len(files[entry.path].encode("utf-8")) != entry.bytes:
+            raise BundleError("bundle file byte count mismatch")
     if {p: e["sha256"] for p, e in sections["files"].items()} != manifest.file_map():
         raise BundleError("file digests disagree with manifest")
     check = manifest_for(sections, receipts, manifest.sequence, manifest.save_schema_version)
