@@ -235,7 +235,7 @@ def render_quest_remap_review_html(
     candidates = json.dumps(checked["candidate_remaps"], indent=2,
                             sort_keys=True, ensure_ascii=True)
     expected = json.dumps(checked["candidate_remaps"], separators=(",", ":"),
-                          ensure_ascii=True)
+                          sort_keys=True, ensure_ascii=True)
     script_hash = b64encode(sha256(_SCRIPT.encode("utf-8")).digest()).decode("ascii")
     csp = ("default-src 'none'; script-src 'sha256-" + script_hash +
            "'; connect-src 'none'; img-src 'none'; style-src 'none'; "

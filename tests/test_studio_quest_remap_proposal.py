@@ -19,7 +19,42 @@ from skeleton.ai.game_builder.studio_quest_revision_migration import (
     compile_quest_migration_handoff, replay_quest_revision_migration,
 )
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
-from tests.test_studio_quest_revision_migration import fixture, PROJECT
+from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
+from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+from skeleton.ai.game_builder.studio_ecosystem_quest import (
+    compile_quest_program, start_quest,
+)
+
+PROJECT = "studio_puzzle_expedition_copper_mesa"
+
+
+def fixture():
+    docs = read_blueprint(PROJECT)
+    program = compile_quest_program(docs)
+    old_actions = [[stage.key, stage.alternatives[0]] for stage in program.stages]
+    source_key = "stage_graph" if docs["quest"].get("stage_graph") else "stages"
+    changed = program.stages[0].alternatives[0] + " revised"
+    revision = {
+        "schema": "skeleton.game_builder.studio_author_revision_request.v1",
+        "project_id": PROJECT,
+        "expected_source_digest": audit_canon_source(
+            docs, authorized=True)["source_digest"],
+        "edits": [{
+            "section": "quest", "path": [source_key, 0, "alternatives", 0],
+            "value": changed,
+        }],
+    }
+    plan = {
+        "revision_request": revision, "actions": old_actions,
+        "target_ending": program.endings[0][0],
+    }
+    leases = {
+        "authorized": True,
+        "expected_source_digest": program.source_digest,
+        "expected_initial_session_digest": start_quest(
+            docs, authorized=True).digest,
+    }
+    return docs, plan, leases, changed
 
 
 def make():
