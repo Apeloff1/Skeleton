@@ -54,3 +54,19 @@ def test_farm_reproducible_entry():
 def test_farm_rejections(items):
     with pytest.raises(DeliveryError):
         entry_from_reproducible(items, path="a", kind="wheel", size=1)
+
+def test_farm_requires_distinct_attestation_evidence():
+    from dataclasses import replace
+
+    good = [_farm("w1"), _farm("w2")]
+    forged = [good[0], replace(good[1], attestation_evidence=good[0].attestation_evidence)]
+    for bad in (forged,
+                [good[0], replace(good[1], attestation_evidence="")],
+                [good[0], replace(good[1], environment_digest="invalid")],
+                [good[0], replace(good[1], output_digest="invalid")]):
+        with pytest.raises(DeliveryError, match="attestation evidence"):
+            entry_from_reproducible(bad, path="artifact.whl", kind="wheel", size=3)
+        with pytest.raises(DeliveryError):
+            witness_metadata(bad)
+    with pytest.raises(DeliveryError):
+        witness_metadata([])
