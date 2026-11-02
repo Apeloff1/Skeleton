@@ -83,6 +83,7 @@ Commands:
     world-evidence Original clue discovery, reviewed canon and replayed playable
     world-promises Reviewed narrative promises, closure proof and playable handoff
     world-context Bounded source-leased author note custody and replay
+    world-integrated Verified cast, route, promises and private context playable
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -820,6 +821,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-evidence":
         from skeleton.jeeves.worlds.evidence_cli import run as world_evidence_cli
         return world_evidence_cli(rest)
+    if cmd == "world-integrated":
+        from skeleton.jeeves.worlds.integrated_cli import run as world_integrated_cli
+        return world_integrated_cli(rest)
     if cmd == "world-context":
         from skeleton.jeeves.worlds.context_cli import run as world_context_cli
         return world_context_cli(rest)
