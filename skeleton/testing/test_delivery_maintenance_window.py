@@ -42,6 +42,6 @@ def test_window_parser_rejects_invalid_clock_normalization():
 def test_freeze_rejects_invalid_timestamp_and_reason_evidence():
     for start, end, reason in ((True, 100, "x"), (1.0, 100, "x"),
                                (-1, 100, "x"), (1, 2.0, "x"),
-                               (1, 2, ""), (1, 2, "forged\\nreason")):
+                               (1, 2, ""), (1, 2, "forged" + chr(10) + "reason")):
         with pytest.raises(DeliveryError):
             Freeze(start, end, reason)
