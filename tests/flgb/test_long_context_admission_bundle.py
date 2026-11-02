@@ -56,7 +56,8 @@ class GuardStub:
             receipt = {
                 "schema": "skeleton.ai.cpu-capacity-guard.v1",
                 "state": "claimed", "claimed": True,
-                "window_digest": self.digest, "device_qualified": False,
+                "window_digest": self.digest, "device": "cpu",
+                "device_qualified": False,
                 "is_execution_lease": False, "is_admission_grant": False,
                 "cross_process_exclusive": False,
                 "requires_live_backend_revalidation": True,
@@ -489,7 +490,7 @@ class AdmissionBundleTests(unittest.TestCase):
         def delayed_observe(*args, **kwargs):
             calls[0] += 1
             result = original(*args, **kwargs)
-            if calls[0] >= 4:
+            if calls[0] >= 2:
                 clock.value += 2000
             return result
         self.kv.observe = delayed_observe
