@@ -33,8 +33,8 @@
       "skeleton/ai/runtime/deterministic_capabilities.py",
       "skeleton/ai/mathematics",
       "skeleton/ai/runtime/__init__.py",
-      "skeleton/ai/runtime/production_fabric/__init__.py",
-      "skeleton/ai/runtime/production_fabric/contracts"
+      "skeleton/ai/runtime/operational_ai/__init__.py",
+      "skeleton/ai/runtime/operational_ai/authority"
     ],
     "MBW-01": [
       "skeleton/ai/admission_transaction.py",
@@ -62,7 +62,7 @@
       "skeleton/ai/runtime/storage",
       "skeleton/ai/runtime/reliability",
       "skeleton/ai/runtime/resilience",
-      "skeleton/ai/runtime/production_fabric/persistence"
+      "skeleton/ai/runtime/operational_ai/persistence"
     ],
     "MBW-02": [
       "skeleton/ai/claim_deduplication.py",
@@ -93,7 +93,8 @@
       "skeleton/ai/runtime/provider_runtime.py",
       "skeleton/ai/runtime/cortex",
       "skeleton/ai/runtime/learning_foundation",
-      "skeleton/ai/runtime/production_fabric/context"
+      "skeleton/ai/runtime/operational_ai/model",
+      "skeleton/ai/runtime/operational_ai/context"
     ],
     "MBW-03": [
       "skeleton/ai/artifact_review.py",
@@ -116,7 +117,7 @@
       "skeleton/ai/runtime/provenance",
       "skeleton/ai/runtime/artifact_plane",
       "skeleton/ai/runtime/skills",
-      "skeleton/ai/runtime/production_fabric/security"
+      "skeleton/ai/runtime/operational_ai/tools"
     ],
     "MBW-04": [
       "skeleton/ai/autonomy_control_theory.py",
@@ -149,7 +150,7 @@
       "skeleton/ai/runtime/capability_graph.py",
       "skeleton/ai/runtime/capabilities",
       "skeleton/ai/runtime/workflow_ir.py",
-      "skeleton/ai/runtime/production_fabric/planning"
+      "skeleton/ai/runtime/operational_ai/orchestration"
     ],
     "MBW-05": [
       "skeleton/ai/api_client_generator.py",
@@ -178,7 +179,7 @@
       "skeleton/ai/runtime/objective_normalization.py",
       "skeleton/ai/runtime/objectives.py",
       "skeleton/ai/runtime/extensions",
-      "skeleton/ai/runtime/production_fabric/product"
+      "skeleton/ai/runtime/operational_ai/transport"
     ],
     "MBW-06": [
       "skeleton/ai/research.py",
@@ -193,7 +194,7 @@
       "skeleton/ai/runtime/simulation",
       "skeleton/ai/runtime/p3t2",
       "skeleton/ai/runtime/functional_ai.py",
-      "skeleton/ai/runtime/production_fabric/evaluation"
+      "skeleton/ai/runtime/operational_ai/evaluation"
     ],
     "MBW-07": [
       "skeleton/ai/topology_placement.py",
@@ -213,7 +214,7 @@
       "skeleton/ai/runtime/deployment_profiles.py",
       "skeleton/ai/runtime/system_completion.py",
       "skeleton/ai/runtime/game_rights.py",
-      "skeleton/ai/runtime/production_fabric/delivery"
+      "skeleton/ai/runtime/operational_ai/deployment"
     ]
   },
   "admission_semantics": "No archive is published until real byte budget, artifact provenance and streaming integrity checks succeed. The build order is driven by machine/ai_master_build_sequence.json. This is not a release attestation.",
@@ -228,7 +229,8 @@
     "MBW-07": [
       "scripts/build_ai_ecosystem_bundle.py",
       "docs/ai/ORDERED_1P9GB_ECOSYSTEM_PACKAGE.md",
-      "README.md"
+      "README.md",
+      "docs/ai/OPERATIONAL_AI_CORE_2026_11_02.md"
     ]
   }
 }
