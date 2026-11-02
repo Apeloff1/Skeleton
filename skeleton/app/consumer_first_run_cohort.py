@@ -101,6 +101,9 @@ def inspect_consumer_first_run_cohort(
                 or observed.get("save_sha256") != job.save_sha256
                 or observed.get("receipt_sha256") != job.receipt_sha256
                 or observed.get("source_level_replay_passes") != 2
+                or observed.get("all_input_inodes_stable_during_inspection") is not False
+                or observed.get("root_and_evidence_inodes_stable_during_inspection") is not True
+                or observed.get("nested_asset_inode_inventory_attested") is not False
                 or observed.get("read_only") is not True
                 or observed.get("release_certified") is not False
                 or observed.get("native_device_qualified") is not False
@@ -151,7 +154,12 @@ def inspect_consumer_first_run_cohort(
         "canonical_cohort_inspections": 2,
         "original_sources_reverified": verify_original_sources,
         "all_installed_games_and_private_saves_reexecuted": True,
-        "cohort_and_job_inodes_stable": True,
+        # Direct in-memory cohort inspection cannot attest a private jobfile,
+        # and source-root custody is not a nested asset inode inventory.
+        "cohort_and_job_inodes_stable": False,
+        "root_and_evidence_inodes_stable": True,
+        "nested_asset_inode_inventory_attested": False,
+        "private_jobfile_inode_attested": False,
         "read_only": True,
         "files_published": 0,
         "native_device_qualified": False,
@@ -194,7 +202,11 @@ def inspect_pinned_consumer_cohort(
             raise ConsumerFirstRunCohortError(
                 "private jobfile inode or bytes changed during consumer replay"
             )
-    return {**result, "independent_jobs_sha256": _pin(expected_jobs_sha256)}
+    return {
+        **result,
+        "independent_jobs_sha256": _pin(expected_jobs_sha256),
+        "private_jobfile_inode_attested": True,
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
