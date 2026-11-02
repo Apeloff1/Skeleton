@@ -9,6 +9,7 @@ from .harbor_crafting import (
     HarborError, MAX_BUNDLE_BYTES, canonical, decode, demo_actions,
     export_bundle, load_source, verify_bundle,
 )
+from .harbor_crafting_authoring import author_revision, verify_revision
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
 )
@@ -35,7 +36,7 @@ def _required_json(path: str | None, name: str):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -43,10 +44,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--branches", help="JSON map of branch names to action arrays")
     parser.add_argument("--expected-terminal-digest", help="CAS lease for resume")
     parser.add_argument("--tick", type=int, help="Historical checkpoint tick")
+    parser.add_argument("--edits", help="JSON list of transactional source edits")
+    parser.add_argument("--revision", help="JSON source revision for verification")
+    parser.add_argument("--expected-source-digest", help="CAS lease for source editing")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify":
+        if args.command == "verify-author":
+            source = verify_revision(_required_json(args.revision, "revision"))
+            output = {"verified": True, "source": source}
+        elif args.command == "author":
+            if not args.expected_source_digest:
+                raise HarborError("--expected-source-digest is required for author")
+            output = author_revision(
+                load_source(Path(args.source)), _required_json(args.edits, "edits"),
+                expected_source_digest=args.expected_source_digest,
+            )
+        elif args.command == "verify":
             state = verify_bundle(_required_json(args.bundle, "bundle"), require_win=args.require_win)
             output = {"verified": True, "state": state}
         elif args.command == "verify-portfolio":
