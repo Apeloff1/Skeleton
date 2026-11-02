@@ -7,6 +7,9 @@ from pathlib import Path
 from scripts.studio_npc_knowledge_relay_cli import _private_json
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_quest_consequence_editor import (
+    render_quest_consequence_editor, import_quest_consequence_editor_export,
+)
 from skeleton.ai.game_builder.studio_quest_consequence_diff import (
     PROMPT, compile_quest_consequence_diff, propose_quest_consequence_diff,
     replay_quest_consequence_diff, compile_quest_consequence_handoff,
@@ -24,12 +27,16 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--prompt", action="store_true")
     modes.add_argument("--authoring-file", type=Path)
     modes.add_argument("--restore", type=Path)
+    modes.add_argument("--editor-export", type=Path)
     parser.add_argument("--publish", type=Path)
     parser.add_argument("--playable", action="store_true")
     parser.add_argument("--html-preview", action="store_true")
+    parser.add_argument("--editor-preview", action="store_true")
     args = parser.parse_args(argv)
     if args.restore and args.publish:
         parser.error("restore cannot publish")
+    if args.editor_preview and (args.publish or args.playable or args.html_preview):
+        parser.error("editor preview cannot publish or hand off")
     if args.html_preview and (args.publish or args.playable):
         parser.error("HTML preview cannot publish or hand off")
     try:
@@ -42,12 +49,19 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_digest=args.expected_source)
             if report["initial_session_digest"] != args.expected_session:
                 raise StudioQuestError("stale restored consequence session")
+        elif args.editor_export:
+            report = import_quest_consequence_editor_export(
+                docs, args.editor_export, **options)
         elif args.prompt:
             report = propose_quest_consequence_diff(docs, PROMPT, **options)
         else:
             report = compile_quest_consequence_diff(
                 docs, _private_json(args.authoring_file, 32768), **options)
         replay_quest_consequence_diff(docs, report, authorized=True)
+        if args.editor_preview:
+            html, _ = render_quest_consequence_editor(docs, report, authorized=True)
+            print(html.decode("utf-8"))
+            return 0
         if args.html_preview:
             print(render_quest_consequence_html(
                 docs, report, authorized=True).decode("utf-8"))
