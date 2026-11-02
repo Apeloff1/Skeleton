@@ -208,3 +208,38 @@ def test_world_router_requires_separate_authoring_authority():
     assert receipt["result"]["canonical_replay"]["merged_action_count"] == 0
     assert receipt["file_write_performed"] is False
     assert receipt["release_certified"] is False
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX durability barrier only")
+def test_private_merge_rolls_back_on_directory_fsync_failure(
+        tmp_path, monkeypatch, capsys):
+    import stat
+
+    _, source = _sources()
+    tmp_path.chmod(0o700)
+    monkeypatch.chdir(tmp_path)
+    empty = _receipt(source, [])
+    for name in ("base.json", "left.json", "right.json"):
+        path = tmp_path / name
+        path.write_bytes(empty)
+        path.chmod(0o600)
+    real_fsync = os.fsync
+
+    def fail_directory_barrier(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError("injected directory durability failure")
+        return real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_directory_barrier)
+    assert main([
+        "--project-id", PROJECT,
+        "--quest-source-digest", source["source_digest"],
+        "--ancestor-file", "base.json",
+        "--current-file", "left.json",
+        "--candidate-file", "right.json",
+        "--output-file", "merged.json",
+        "--trusted-local-operator",
+    ]) == 2
+    assert "error:" in capsys.readouterr().err
+    assert not (tmp_path / "merged.json").exists()
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "base.json", "left.json", "right.json"]

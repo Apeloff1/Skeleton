@@ -25,7 +25,7 @@ def _read_private_checkpoint(filename: str) -> str:
     """Pin the current directory and open one bounded nofollow regular file."""
     if (type(filename) is not str or not 1 <= len(filename) <= 255
             or filename in (".", "..") or "/" in filename or "\\" in filename
-            or any(ord(char) < 32 for char in filename)):
+            or any(ord(char) < 32 or ord(char) == 127 for char in filename)):
         raise StudioQuestError("checkpoint must be a plain current-directory filename")
     if not all(hasattr(os, attr) for attr in ("O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
         raise StudioQuestError("secure checkpoint input unavailable on this platform")

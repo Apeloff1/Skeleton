@@ -71,10 +71,12 @@ def _publish_private(name: str, payload: str) -> None:
             os.unlink(name, dir_fd=directory)
             raise
     finally:
-        if created:
-            os.unlink(temporary, dir_fd=directory)
-            os.fsync(directory)
-        os.close(directory)
+        try:
+            if created:
+                os.unlink(temporary, dir_fd=directory)
+                os.fsync(directory)
+        finally:
+            os.close(directory)
 
 
 def parser() -> argparse.ArgumentParser:
