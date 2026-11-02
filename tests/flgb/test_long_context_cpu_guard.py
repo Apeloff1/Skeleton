@@ -144,7 +144,7 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.clock.value = 0
         with self.assertRaisesRegex(LongContextSpoolError, "clock regressed"):
             self.guard.status()
-        self.assertEqual(self.guard.status()["active"], 0)
+        self.assertEqual(len(self.guard._reservations), 0)
         with patch("skeleton.ai.model_runtime.long_context_cpu_guard.os.getpid",
                    return_value=-1):
             with self.assertRaisesRegex(LongContextSpoolError, "after fork"):
@@ -172,6 +172,48 @@ class CpuCapacityGuardTests(unittest.TestCase):
             CpuCapacityRequest("../owner", "stream", "a" * 64, "b" * 64, 4, 8)
         with self.assertRaises(LongContextSpoolError):
             CpuCapacityLimits(max_active=True)
+
+
+    def test_expired_reservation_cannot_be_claimed(self):
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier,
+                limits=CpuCapacityLimits(lifetime_ns=5_000), clock=self.clock)
+        for _ in range(3):
+            guard.observe()
+        key = guard.reserve(self.request)["reservation_id"]
+        self.assertIsNotNone(key)
+        self.clock.value += 10_000
+        self.assertFalse(guard.claim(key, self.request)["claimed"])
+        self.assertEqual(guard.status()["active"], 0)
+
+    def test_budget_rejects_second_stream_without_overbooking(self):
+        with patch("skeleton.ai.model_runtime.long_context_cpu_guard.LongContextProgressHead",
+                   MagicMock):
+            guard = LongContextCpuCapacityGuard(
+                self.heads, self.monitor, self.verifier,
+                limits=CpuCapacityLimits(max_active=1, max_tokens=8,
+                                         max_bytes=64), clock=self.clock)
+        for _ in range(3):
+            guard.observe()
+        self.assertIsNotNone(guard.reserve(self.request)["reservation_id"])
+        other = CpuCapacityRequest("owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
+        self.assertEqual(guard.reserve(other)["reason"], "budget_exhausted")
+        self.assertEqual(guard.status()["reserved_tokens"], 8)
+
+    def test_claim_rejects_wrong_principal_and_request(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        wrong = CpuCapacityRequest("other", "stream", "a" * 64, "b" * 64, 4, 8, 64)
+        self.assertFalse(self.guard.claim(key, wrong)["claimed"])
+        self.assertTrue(self.guard.claim(key, self.request)["claimed"])
+
+    def test_verifier_exception_is_not_permission(self):
+        self.warm()
+        self.verifier.side_effect = RuntimeError("auth service unavailable")
+        self.assertEqual(self.guard.reserve(self.request)["reason"],
+                         "principal_unverified")
 
 
 if __name__ == "__main__":
