@@ -37,16 +37,12 @@ def _route(
 ) -> list[dict[str, str]]:
     """Time-expanded BFS accounts for moving NPC collision and wait actions."""
     queue = deque([(start, [])])
-    seen: set[tuple[Any, ...]] = set()
     period = len(source["npc"]["route"])
-    while queue and len(seen) < MAX_ROUTE_NODES:
+    def key(state: dict[str, Any]) -> tuple[Any, ...]:
+        return (tuple(state["pos"]), tuple(state["npc_pos"]), state["tick"] % period)
+    seen: set[tuple[Any, ...]] = {key(start)}
+    while queue:
         state, actions = queue.popleft()
-        key = (
-            tuple(state["pos"]), tuple(state["npc_pos"]), state["tick"] % period
-        )
-        if key in seen:
-            continue
-        seen.add(key)
         if reached(state):
             return actions
         if state["tick"] >= source["max_ticks"]:
@@ -56,6 +52,12 @@ def _route(
                 after = step(source, state, action)
             except HarborError:
                 continue
+            identity = key(after)
+            if identity in seen:
+                continue
+            if len(seen) >= MAX_ROUTE_NODES:
+                raise HarborError("bounded route solver state budget exhausted")
+            seen.add(identity)
             queue.append((after, actions + [action]))
     raise HarborError("bounded route solver could not reach objective")
 
