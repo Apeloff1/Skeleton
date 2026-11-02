@@ -17,6 +17,8 @@ from .harbor_crafting_mission_branches import mission_branch_report, verify_miss
 from .harbor_crafting_mission_compare import compare_mission_revision, verify_mission_comparison
 from .harbor_crafting_package import build_package, verify_package, play_package, verify_package_play
 from .harbor_crafting_market import market_report, verify_market_report, market_checkpoint, market_resume, market_futures, verify_market_futures
+from .harbor_crafting_market_preview import preview_market, verify_market_preview, apply_market_preview, MAX_BYTES as MAX_PREVIEW_BYTES
+from .harbor_crafting_market import MAX_BYTES as MAX_MARKET_BYTES
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -36,16 +38,16 @@ def _read(path: str, maximum: int = MAX_BUNDLE_BYTES) -> bytes:
         raise HarborError("cannot read requested input") from exc
 
 
-def _required_json(path: str | None, name: str):
+def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES):
     if not path:
         raise HarborError("--" + name + " is required")
-    return decode(_read(path))
+    return decode(_read(path, maximum), maximum)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -65,30 +67,43 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mission-revision", help="Portable mission revision JSON")
     parser.add_argument("--comparison", help="Portable replay-derived mission revision comparison")
     parser.add_argument("--package", help="Portable original game package")
+    parser.add_argument("--preview", help="Portable source-bound market preview JSON")
     parser.add_argument("--play", help="Portable gameplay session produced from a package")
     parser.add_argument("--preview-bundle", help="Optional canonical gameplay bundle for edited mission preview")
     parser.add_argument("--require-all", action="store_true", help="Require every authored mission to be earned")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify-market-futures":
+        if args.command == "market-apply":
+            if not args.expected_terminal_digest:
+                raise HarborError("--expected-terminal-digest is required for market-apply")
+            output = apply_market_preview(
+                _required_json(args.preview, "preview", MAX_PREVIEW_BYTES),
+                expected_terminal_digest=args.expected_terminal_digest, require_win=args.require_win)
+        elif args.command == "verify-market-preview":
+            output = {"verified": True, **verify_market_preview(
+                _required_json(args.preview, "preview", MAX_PREVIEW_BYTES))}
+        elif args.command == "market-preview":
+            output = preview_market(
+                _required_json(args.bundle, "bundle"), _required_json(args.actions, "actions"))
+        elif args.command == "verify-market-futures":
             output = {"verified": True, "branches": verify_market_futures(
-                _required_json(args.report, "report"))}
+                _required_json(args.report, "report", MAX_MARKET_BYTES * 4))}
         elif args.command == "market-futures":
             output = market_futures(_required_json(args.bundle, "bundle"))
         elif args.command == "market-checkpoint":
             if args.tick is None:
                 raise HarborError("--tick is required for market-checkpoint")
-            output = market_checkpoint(_required_json(args.report, "report"), args.tick)
+            output = market_checkpoint(_required_json(args.report, "report", MAX_MARKET_BYTES), args.tick)
         elif args.command == "market-resume":
             if not args.expected_terminal_digest:
                 raise HarborError("--expected-terminal-digest is required for market-resume")
             output = market_resume(
-                _required_json(args.report, "report"), _required_json(args.actions, "actions"),
+                _required_json(args.report, "report", MAX_MARKET_BYTES), _required_json(args.actions, "actions"),
                 expected_terminal_digest=args.expected_terminal_digest, require_win=args.require_win)
         elif args.command == "verify-market":
             output = {"verified": True, "totals": verify_market_report(
-                _required_json(args.report, "report"))}
+                _required_json(args.report, "report", MAX_MARKET_BYTES))}
         elif args.command == "market-report":
             output = market_report(_required_json(args.bundle, "bundle"))
         elif args.command == "package-verify-play":
