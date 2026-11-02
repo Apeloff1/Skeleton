@@ -752,3 +752,49 @@ def test_cohort_custody_snapshot_rejects_unreadable_later_member(
             authorized=True,
         )
     assert Path(jobs[0].receipt).exists()
+
+
+def test_source_cohort_detects_first_root_swap_during_second_source_replay(
+    original_games, tmp_path, monkeypatch,
+):
+    """Later source verification cannot hide same-byte earlier-root replacement."""
+    import os
+    from skeleton.app import offline_first_playable_batch as module
+    from skeleton.ai.game_builder.dual_runtime_verify import verify_exported_package
+
+    copied = []
+    for index, (source, manifest_pin) in enumerate(original_games):
+        new_source = tmp_path / f"source-copy-{index}"
+        shutil.copytree(source, new_source)
+        copied.append((new_source, manifest_pin))
+    jobs = jobs_for(tuple(copied), tmp_path)
+    identities = tuple(module._source_identity(job.source) for job in jobs)
+    admissions = tuple(
+        verify_exported_package(
+            job.source, expected_manifest_sha256=job.manifest_sha256,
+            authorized=True,
+        )
+        for job in jobs
+    )
+    first = Path(jobs[0].source)
+    replacement = tmp_path / "identical-source"
+    shutil.copytree(first, replacement)
+    original_verify = module.verify_exported_package
+    calls = 0
+
+    def swap_first_after_second_verification(*args, **kwargs):
+        nonlocal calls
+        result = original_verify(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            old = tmp_path / "previous-source"
+            os.rename(first, old)
+            os.rename(replacement, first)
+        return result
+
+    monkeypatch.setattr(module, "verify_exported_package",
+                        swap_first_after_second_verification)
+    with pytest.raises(FirstPlayableDeliveryBatchError, match="source root changed"):
+        module._reverify_original_sources(jobs, admissions, identities)
+    assert calls == 2
+    assert all(not Path(job.archive).exists() for job in jobs)

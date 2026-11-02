@@ -283,6 +283,14 @@ def _reverify_original_sources(
             raise FirstPlayableDeliveryBatchError(
                 "original game source changed during cohort delivery"
             )
+    # The last replay may replace a previously verified source directory with
+    # an identical-byte inode. Recheck *every* original root after the last
+    # verifier returns; the cohort must not accept a stale first-game root.
+    if any(_source_identity(job.source) != identity
+           for job, identity in zip(jobs, identities, strict=True)):
+        raise FirstPlayableDeliveryBatchError(
+            "original source root changed during cross-game verification"
+        )
 
 
 def _checkpoint_published_cohort(
