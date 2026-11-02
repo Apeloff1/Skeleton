@@ -21,6 +21,7 @@ from .harbor_crafting_market_preview import preview_market, verify_market_previe
 from .harbor_crafting_market import MAX_BYTES as MAX_MARKET_BYTES
 from .harbor_crafting_market_balance import balance_market, verify_market_balance, MAX_BYTES as MAX_BALANCE_BYTES
 from .harbor_crafting_market_distribution import build_market_distribution, verify_market_distribution, play_market_distribution, verify_market_distribution_play, MAX_BYTES as MAX_DISTRIBUTION_BYTES
+from .harbor_crafting_npc import npc_observations, verify_npc_observations, npc_forecast, verify_npc_forecast, MAX_BYTES as MAX_NPC_BYTES
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -49,7 +50,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -76,7 +77,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify-market-distribution-play":
+        if args.command == "verify-npc-forecast":
+            output = {"verified": True, "terminal": verify_npc_forecast(
+                _required_json(args.report, "report", MAX_NPC_BYTES))}
+        elif args.command == "npc-forecast":
+            if args.tick is None:
+                raise HarborError("--tick is required for npc-forecast")
+            output = npc_forecast(_required_json(args.bundle, "bundle"), args.tick)
+        elif args.command == "verify-npc-report":
+            output = {"verified": True, "terminal": verify_npc_observations(
+                _required_json(args.report, "report", MAX_NPC_BYTES))}
+        elif args.command == "npc-report":
+            output = npc_observations(_required_json(args.bundle, "bundle"))
+        elif args.command == "verify-market-distribution-play":
             output = {"verified": True, "totals": verify_market_distribution_play(
                 _required_json(args.play, "play", MAX_DISTRIBUTION_BYTES * 2),
                 require_all=args.require_all)}
