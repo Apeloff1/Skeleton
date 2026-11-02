@@ -607,3 +607,63 @@ def test_directory_symlink_swap_discards_all_scanned_assets(tmp_path, monkeypatc
     assert not report.ok
     assert report.imported == [] and report.manifest.entries == []
     assert any(issue.code == "unsafe" for issue in report.issues)
+
+
+def test_duplicate_mesh_alias_requires_each_source_relative_sidecar(tmp_path):
+    """Content deduplication cannot hide a missing dependency of an alias."""
+    for directory in ("a", "z"):
+        (tmp_path / directory).mkdir()
+        (tmp_path / directory / "mesh.obj").write_bytes(OBJ)
+    (tmp_path / "a" / "cube.mtl").write_text("newmtl stone\n")
+    paths = ["a/mesh.obj", "z/mesh.obj"]
+
+    report = import_files(tmp_path, paths)
+    assert not report.ok
+    assert any(issue.path == "z/mesh.obj" and issue.code == "missing_reference"
+               for issue in report.issues)
+
+    scanned = import_directory(tmp_path)
+    assert not scanned.ok
+    assert scanned.manifest.entries == []
+    assert any(issue.path == "z/mesh.obj" and issue.code == "missing_reference"
+               for issue in scanned.issues)
+
+    (tmp_path / "z" / "cube.mtl").write_text("newmtl stone\n")
+    report = import_files(tmp_path, paths)
+    assert report.ok, report.issues
+    assert report.duplicates == ["z/mesh.obj"]
+    assert len(report.manifest.entries) == 1
+    assert import_directory(tmp_path).ok
+
+
+def test_duplicate_mesh_alias_symlink_sidecar_is_not_trusted(tmp_path):
+    """A valid canonical sidecar does not authorize an alias symlink."""
+    for directory in ("a", "z"):
+        (tmp_path / directory).mkdir()
+        (tmp_path / directory / "mesh.obj").write_bytes(OBJ)
+    sidecar = tmp_path / "a" / "cube.mtl"
+    sidecar.write_text("newmtl stone\n")
+    (tmp_path / "z" / "cube.mtl").symlink_to(sidecar)
+    report = import_files(tmp_path, ["a/mesh.obj", "z/mesh.obj"])
+    assert not report.ok
+    assert any(issue.path == "z/mesh.obj" and issue.code == "missing_reference"
+               for issue in report.issues)
+    scanned = import_directory(tmp_path)
+    assert not scanned.ok and scanned.manifest.entries == []
+
+
+def test_duplicate_mesh_alias_reference_budget_is_global(tmp_path, monkeypatch):
+    """An alias multiplies source references and consumes the same global cap."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    for directory in ("a", "z"):
+        (tmp_path / directory).mkdir()
+        (tmp_path / directory / "mesh.obj").write_bytes(OBJ)
+        (tmp_path / directory / "cube.mtl").write_text("newmtl stone\n")
+    monkeypatch.setattr(pipeline, "MAX_TOTAL_EXTERNAL_REFS", 1)
+    report = pipeline.import_files(tmp_path, ["a/mesh.obj", "z/mesh.obj"])
+    assert not report.ok
+    assert report.manifest.entries == []
+    assert report.imported == []
+    assert any("external reference count exceeds bound" in issue.detail
+               for issue in report.issues)

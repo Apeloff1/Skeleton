@@ -173,20 +173,27 @@ def _check_references(
     total_refs = 0
     for entry in report.manifest.entries:
         refs = entry.metadata.get("external_refs", [])
-        if (type(refs) not in (list, tuple)
-                or len(refs) > MAX_EXTERNAL_REFS_PER_ASSET
-                or total_refs + len(refs) > MAX_TOTAL_EXTERNAL_REFS):
+        if type(refs) not in (list, tuple) or len(refs) > MAX_EXTERNAL_REFS_PER_ASSET:
             report.issues.append(ImportIssue(entry.path, "broken",
                                              "external reference count exceeds bound"))
             return False
-        total_refs += len(refs)
-        for ref in refs:
-            try:
-                _parts(ref)
-                relative = (PurePosixPath(entry.path).parent / ref).as_posix()
-                _regular(root_fd, relative, read=False, observed=observed)
-            except (AssetImportError, OSError, ValueError, TypeError) as exc:
-                report.issues.append(ImportIssue(entry.path, "missing_reference", f"{ref}: {exc}"))
+        # Deduplication collapses identical bytes, not their source-relative
+        # dependencies. Every alias must resolve its own sidecars; checking
+        # only the canonical path silently trusts missing or swapped inputs.
+        for source_path in (entry.path, *entry.aliases):
+            if total_refs + len(refs) > MAX_TOTAL_EXTERNAL_REFS:
+                report.issues.append(ImportIssue(source_path, "broken",
+                                                 "external reference count exceeds bound"))
+                return False
+            total_refs += len(refs)
+            for ref in refs:
+                try:
+                    _parts(ref)
+                    relative = (PurePosixPath(source_path).parent / ref).as_posix()
+                    _parts(relative)
+                    _regular(root_fd, relative, read=False, observed=observed)
+                except (AssetImportError, OSError, ValueError, TypeError) as exc:
+                    report.issues.append(ImportIssue(source_path, "missing_reference", f"{ref}: {exc}"))
     return True
 
 
