@@ -11,7 +11,9 @@ to compile a deterministic predicate witness trace. The CLI also accepts a
 private authored `--authoring-file` containing baseline/candidate actions.
 `--html-preview` returns an escaped, script-free human-readable audit.
 `--publish DIRECTORY` writes a no-clobber private receipt, and
-`--restore DIRECTORY` checks the original consequence and causal receipts.
+`--restore DIRECTORY` reconstructs and replays the canonical consequence
+receipt from the self-contained private causal receipt. A second file is not
+required.
 `--playable` requests a guarded sandbox handoff, not native game certification.
 
 Every branch step is replayed from the canonical source; witness origins are

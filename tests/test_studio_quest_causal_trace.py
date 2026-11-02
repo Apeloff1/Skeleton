@@ -259,3 +259,55 @@ def test_cli_offline_editor_export_recompiles_and_audits(tmp_path, monkeypatch, 
     assert output["trace"]["ending_delta"]["gained"] == ["war"]
     assert output["playable_handoff"]["native_gameplay_verified"] is False
     assert output["file_write_performed"] is False
+
+
+def test_external_predicate_never_minted_by_authored_choice():
+    docs = source()
+    docs["narrative"]["endings"].append({
+        "id": "external_witness", "requires": ["verified_real_witness"],
+    })
+    diff, trace = receipts(docs)
+    rows = {row["ending_id"]: row for row in trace["ending_predicate_proofs"]}
+    assert rows["external_witness"]["baseline_eligible"] is False
+    assert rows["external_witness"]["candidate_eligible"] is False
+    assert rows["external_witness"]["baseline_missing"] == [
+        "verified_real_witness"]
+    assert rows["external_witness"]["baseline_witnesses"] == {}
+    assert trace["external_evidence_verified"] is False
+    assert replay_quest_causal_trace(
+        docs, diff, trace, authorized=True) == trace
+
+
+def test_repeated_authored_reward_preserves_both_witness_origins():
+    docs = source()
+    docs["quest"]["stage_graph"].append({
+        "id": "bridge", "prerequisites": ["gate"],
+        "alternatives": ["help"], "reward": "gate_open",
+    })
+    plan = {
+        "baseline_actions": [["gate", "mercy"], ["bridge", "help"]],
+        "candidate_actions": [["gate", "force"]],
+    }
+    diff, trace = receipts(docs, plan)
+    origins = trace["baseline"]["witnesses"]["gate_open"]
+    assert [row["stage_id"] for row in origins] == ["gate", "bridge"]
+    assert all(row["origin"] == "authored_reward" for row in origins)
+    assert len(trace["candidate"]["witnesses"]["gate_open"]) == 1
+    assert replay_quest_causal_trace(
+        docs, diff, trace, authorized=True) == trace
+
+
+def test_cli_restore_rejects_stale_operator_session_lease(tmp_path, monkeypatch):
+    from scripts import studio_quest_causal_trace_cli as cli
+    docs = source()
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: docs)
+    diff, trace = receipts(docs)
+    publish_quest_causal_trace(
+        docs, diff, trace, tmp_path, authorized=True)
+    with pytest.raises(SystemExit):
+        cli.main([
+            "--project", "original",
+            "--expected-source", leases(docs)["expected_source_digest"],
+            "--expected-session", "0" * 64,
+            "--restore", str(tmp_path),
+        ])
