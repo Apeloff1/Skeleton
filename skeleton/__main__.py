@@ -81,6 +81,7 @@ Commands:
     world-lore   Original lore canon, branch contradiction proof and player reveal
     world-factions Reviewed faction reputation, earned choices and playable handoff
     world-evidence Original clue discovery, reviewed canon and replayed playable
+    world-promises Reviewed narrative promises, closure proof and playable handoff
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -818,6 +819,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-evidence":
         from skeleton.jeeves.worlds.evidence_cli import run as world_evidence_cli
         return world_evidence_cli(rest)
+    if cmd == "world-promises":
+        from skeleton.jeeves.worlds.promises_cli import run as world_promises_cli
+        return world_promises_cli(rest)
     if cmd == "world-tools":
         from skeleton.jeeves.worlds.tools_cli import run as world_tools_cli
         return world_tools_cli(rest)

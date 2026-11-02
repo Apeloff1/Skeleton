@@ -14,13 +14,14 @@ from typing import Any
 
 from .evidence import EvidenceStore
 from .factions import FactionStore
+from .promises import PromiseStore
 from .world_canon import (
     CanonError, MAX_SOURCE_BYTES, WorldStore, _id, canonical, digest, strict_json,
 )
 
 EDITOR_SCHEMA = "jeeves.world.review_editor.v1"
 RECEIPT_SCHEMA = "jeeves.world.review_editor_receipt.v1"
-KINDS = frozenset({"factions", "evidence"})
+KINDS = frozenset({"factions", "evidence", "promises"})
 
 _SCRIPT = r"""
 "use strict";
@@ -103,6 +104,8 @@ class ReviewEditorStore:
             data = FactionStore(self.worlds.root).read(world_id)
         elif kind == "evidence":
             data = EvidenceStore(self.worlds.root).read(world_id)
+        elif kind == "promises":
+            data = PromiseStore(self.worlds.root).read(world_id)
         else:
             raise CanonError("invalid_review_kind")
         if data["world_digest"] != digest(world):

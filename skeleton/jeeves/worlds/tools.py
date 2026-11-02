@@ -10,6 +10,7 @@ from typing import Any
 
 from .evidence import EvidenceStore, propose_evidence
 from .factions import FactionStore, propose_factions
+from .promises import PromiseStore, propose_promises, prove_promises
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
 )
@@ -19,6 +20,13 @@ RESULT_SCHEMA = "jeeves.world.tool_result.v1"
 
 TOOLS = {
     "world.proof": (),
+    "promises.propose_preview": (
+        "prompt", "promise_id", "title", "setup", "payoff",
+        "trigger_choice", "resolve_choice", "required",
+    ),
+    "promises.inspect": (),
+    "promises.proof": (),
+    "promises.player": ("slot",),
     "factions.propose_preview": (
         "prompt", "faction_id", "name", "description",
         "choice_id", "delta", "reason",
@@ -57,6 +65,15 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     world = WorldStore(root).read(req["world_id"])
     if name == "world.proof":
         payload = prove(world).as_dict()
+    elif name == "promises.propose_preview":
+        payload = propose_promises(world, **args)
+    elif name == "promises.inspect":
+        payload = PromiseStore(root).read(req["world_id"])
+    elif name == "promises.proof":
+        payload = prove_promises(PromiseStore(root).read(req["world_id"]), world)
+    elif name == "promises.player":
+        _id(args["slot"], "slot")
+        payload = PromiseStore(root).player(req["world_id"], args["slot"])
     elif name == "factions.propose_preview":
         payload = propose_factions(world, **args)
     elif name == "factions.inspect":
