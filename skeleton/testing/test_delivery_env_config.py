@@ -56,3 +56,26 @@ def test_load_layers_rejects_non_objects():
         load_layers({"dev": "[]"})
     with pytest.raises(DeliveryError):
         load_layers({"dev": "{"})
+
+def test_layer_json_rejects_duplicate_keys_and_nonfinite_values():
+    for raw in (
+        '{"tier":"production","tier":"dev"}',
+        '{"health":{"path":"/ready","path":"/health"}}',
+        '{"replicas":NaN}', '{"replicas":Infinity}', '{"replicas":-Infinity}',
+    ):
+        with pytest.raises(DeliveryError, match="duplicate|nonfinite"):
+            load_layers({"dev": raw})
+    assert load_layers({"dev": '{"tier":"dev"}'}) == {"dev": {"tier": "dev"}}
+
+
+def test_layer_inventory_and_text_are_bounded(monkeypatch):
+    from skeleton.build.delivery import env_config as module
+
+    monkeypatch.setattr(module, "MAX_LAYER_JSON_CHARS", 8)
+    with pytest.raises(DeliveryError, match="exceeds bound"):
+        load_layers({"dev": '{"tier":"dev"}'})
+    with pytest.raises(DeliveryError, match="exceeds bound"):
+        load_layers({"dev": 12})
+    monkeypatch.setattr(module, "MAX_CONFIG_LAYERS", 1)
+    with pytest.raises(DeliveryError, match="inventory exceeds"):
+        load_layers({"dev": "{}", "staging": "{}"})

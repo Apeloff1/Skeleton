@@ -19,6 +19,21 @@ TIERS = ("dev", "staging", "production")
 REQUIRED_KEYS = ("tier", "replicas", "health", "rollout")
 MAX_DEPTH = 8
 MAX_REPLICAS = 512
+MAX_LAYER_JSON_CHARS = 1_000_000
+MAX_CONFIG_LAYERS = 64
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise DeliveryError(f"duplicate config JSON key {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> Any:
+    raise DeliveryError(f"nonfinite config JSON constant {value!r}")
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any], *, _depth: int = 0) -> dict[str, Any]:
@@ -104,11 +119,16 @@ def resolve(name: str, layers: Mapping[str, Mapping[str, Any]]) -> EnvironmentCo
 
 
 def load_layers(texts: Mapping[str, str]) -> dict[str, dict[str, Any]]:
+    if not isinstance(texts, Mapping) or len(texts) > MAX_CONFIG_LAYERS:
+        raise DeliveryError("config layer inventory exceeds bound")
     out: dict[str, dict[str, Any]] = {}
     for name, text in texts.items():
         require_env_name(name)
+        if type(text) is not str or len(text) > MAX_LAYER_JSON_CHARS:
+            raise DeliveryError(f"{name}: config JSON text exceeds bound")
         try:
-            data = json.loads(text)
+            data = json.loads(text, object_pairs_hook=_unique_json_object,
+                              parse_constant=_reject_json_constant)
         except json.JSONDecodeError as exc:
             raise DeliveryError(f"{name}: invalid JSON: {exc}") from exc
         if not isinstance(data, dict):
