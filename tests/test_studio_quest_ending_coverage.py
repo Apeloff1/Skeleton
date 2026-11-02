@@ -138,3 +138,77 @@ def test_typed_prompt_and_jeeves_router_adapter(monkeypatch):
     with pytest.raises(StudioQuestError):
         tool.execute_quest_ending_coverage_tool(
             {**request, "allow_authoring": True}, authorized=True)
+
+
+def test_duplicate_json_evidence_fails_closed(tmp_path):
+    source = docs()
+    (tmp_path / FILENAME).write_text('{"schema":"one","schema":"two"}')
+    with pytest.raises(StudioQuestError):
+        restore_ending_coverage(
+            source, tmp_path, authorized=True,
+            expected_source_digest=leases(source)["expected_source_digest"])
+
+
+def test_router_exposes_read_only_ending_coverage(monkeypatch):
+    from skeleton.ai.agents.jeeves.studio_world_tool_router import (
+        route_world_tool, world_tool_catalog,
+    )
+    source = docs()
+    monkeypatch.setattr(tool, "read_blueprint", lambda _: source)
+    lease = leases(source)
+    request = {
+        "tool": "studio_original_quest_ending_coverage",
+        "arguments": {
+            "schema": tool.REQUEST_SCHEMA, "project_id": "test-world",
+            "authoring": plan(),
+            "expected_source_digest": lease["expected_source_digest"],
+            "expected_initial_session_digest":
+                lease["expected_initial_session_digest"],
+        },
+    }
+    catalog = world_tool_catalog()
+    descriptor = next(
+        item for item in catalog["tools"]
+        if item["name"] == request["tool"])
+    assert descriptor["explicit_authoring_permission_required"] is False
+    with pytest.raises(PermissionError):
+        route_world_tool(request, authorized=False)
+    result = route_world_tool(request, authorized=True)
+    assert result["file_write_performed"] is False
+    assert result["result"]["detail"]["coverage_complete"] is True
+    assert result["release_certified"] is False
+    with pytest.raises(StudioQuestError):
+        route_world_tool({
+            **request, "arguments": {
+                **request["arguments"], "allow_authoring": True,
+            },
+        }, authorized=True)
+
+
+def test_operator_cli_source_lease_and_handoff(monkeypatch, tmp_path, capsys):
+    from scripts import studio_quest_ending_coverage_cli as cli
+    source = docs()
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: source)
+    lease = leases(source)
+    args = [
+        "--project", "test-world",
+        "--expected-source", lease["expected_source_digest"],
+        "--expected-session", lease["expected_initial_session_digest"],
+        "--prompt", "--playable", "--publish", str(tmp_path),
+    ]
+    assert cli.main(args) == 0
+    response = __import__("json").loads(capsys.readouterr().out)
+    assert response["coverage"]["coverage_complete"] is True
+    assert response["playable_handoff"]["canonical_quest_replay_verified"] is True
+    assert response["file_write_performed"] is True
+    assert (tmp_path / FILENAME).is_file()
+    restored_args = [
+        "--project", "test-world",
+        "--expected-source", lease["expected_source_digest"],
+        "--expected-session", lease["expected_initial_session_digest"],
+        "--restore", str(tmp_path),
+    ]
+    assert cli.main(restored_args) == 0
+    restored = __import__("json").loads(capsys.readouterr().out)
+    assert restored["coverage"] == response["coverage"]
+    assert restored["file_write_performed"] is False
