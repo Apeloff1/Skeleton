@@ -9,6 +9,7 @@ import stat
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+from skeleton.ai.game_builder.studio_ecosystem_scene_schedule import _open_directory
 from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_relay import (
     PROMPT, MAX_BYTES, compile_npc_knowledge_relay, propose_npc_knowledge_relay,
     replay_npc_knowledge_relay, compile_npc_relay_playable,
@@ -20,18 +21,24 @@ from skeleton.ai.game_builder.studio_ecosystem_npc_knowledge_relay_editor import
 
 
 def _private_json(path: Path, limit: int) -> dict[str, object]:
+    if not isinstance(path, Path):
+        raise StudioQuestError("NPC relay JSON path must be typed")
     flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
-    fd = os.open(path, flags)
+    parent_fd = _open_directory(path.parent)
     try:
-        info = os.fstat(fd)
-        if (not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= limit
-                or (os.name == "posix" and
-                    (info.st_uid != os.getuid() or info.st_mode & 0o077
-                     or info.st_nlink != 1))):
-            raise StudioQuestError("NPC relay JSON must be a private regular file")
-        raw = os.read(fd, limit + 1)
+        fd = os.open(path.name, flags, dir_fd=parent_fd)
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= limit
+                    or (os.name == "posix" and
+                        (info.st_uid != os.getuid() or info.st_mode & 0o077
+                         or info.st_nlink != 1))):
+                raise StudioQuestError("NPC relay JSON must be a private regular file")
+            raw = os.read(fd, limit + 1)
+        finally:
+            os.close(fd)
     finally:
-        os.close(fd)
+        os.close(parent_fd)
     if not raw or len(raw) > limit:
         raise StudioQuestError("invalid bounded NPC relay JSON file")
     def unique(pairs):

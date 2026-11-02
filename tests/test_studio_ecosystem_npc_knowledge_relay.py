@@ -260,3 +260,20 @@ def test_offline_csp_editor_export_import_recompiles_source(tmp_path, capsys):
     edit.symlink_to(tmp_path / "missing")
     with pytest.raises(OSError):
         load_npc_relay_editor_export(edit, **kwargs)
+
+
+def test_cli_private_json_rejects_symlinked_parent_and_nonregular_input(tmp_path):
+    from scripts.studio_npc_knowledge_relay_cli import _private_json
+    private = tmp_path / "receipt.json"
+    private.write_text('{"routes":[]}')
+    private.chmod(0o600)
+    linked = tmp_path / "linked"
+    linked.symlink_to(tmp_path, target_is_directory=True)
+    with pytest.raises(OSError):
+        _private_json(linked / "receipt.json", 32768)
+    with pytest.raises((OSError, StudioQuestError)):
+        _private_json(tmp_path, 32768)
+    private.unlink()
+    private.symlink_to(tmp_path / "absent")
+    with pytest.raises(OSError):
+        _private_json(private, 32768)
