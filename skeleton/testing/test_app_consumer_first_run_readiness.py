@@ -110,7 +110,7 @@ def test_untrusted_or_noncanonical_pins_fail_closed(delivered_first_run):
     with pytest.raises(ValueError):
         inspect_consumer_first_run(*paths, **{
             **pins, "expected_receipt_sha256":
-                pins["expected_receipt_sha256"].upper(),
+                "A" * 64,
         })
 
 
