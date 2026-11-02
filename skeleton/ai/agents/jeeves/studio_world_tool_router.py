@@ -38,6 +38,7 @@ from skeleton.ai.agents.jeeves import studio_npc_dialogue_chain_tool as npc_dial
 from skeleton.ai.agents.jeeves import studio_quest_ending_witness_tool as ending_witness
 from skeleton.ai.agents.jeeves import studio_quest_softlock_audit_tool as softlock
 from skeleton.ai.agents.jeeves import studio_quest_ending_coverage_tool as ending_coverage
+from skeleton.ai.agents.jeeves import studio_quest_readiness_tool as readiness
 from skeleton.ai.agents.jeeves import studio_prompt_quest_plan_tool as prompt_quest
 from skeleton.ai.agents.jeeves import studio_prompt_quest_playtest_tool as prompt_playtest
 from skeleton.ai.agents.jeeves import studio_quest_regression_matrix_tool as regression_matrix
@@ -91,6 +92,7 @@ _TOOL_SYMBOLS = (
     ("quest_ending_witness_tool_schema", "execute_quest_ending_witness_tool"),
     ("quest_softlock_audit_tool_schema", "execute_quest_softlock_audit_tool"),
     ("quest_ending_coverage_tool_schema", "execute_quest_ending_coverage_tool"),
+    ("quest_readiness_tool_schema", "execute_quest_readiness_tool"),
     ("prompt_quest_plan_tool_schema", "execute_prompt_quest_plan_tool"),
     ("prompt_quest_playtest_tool_schema", "execute_prompt_quest_playtest_tool"),
     ("quest_regression_matrix_tool_schema", "execute_quest_regression_matrix_tool"),
@@ -183,6 +185,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    ending_witness if descriptor_name == "quest_ending_witness_tool_schema" else
                    softlock if descriptor_name == "quest_softlock_audit_tool_schema" else
                    ending_coverage if descriptor_name == "quest_ending_coverage_tool_schema" else
+                   readiness if descriptor_name == "quest_readiness_tool_schema" else
                    prompt_quest if descriptor_name == "prompt_quest_plan_tool_schema" else
                    prompt_playtest if descriptor_name == "prompt_quest_playtest_tool_schema" else
                    regression_matrix if descriptor_name == "quest_regression_matrix_tool_schema" else
