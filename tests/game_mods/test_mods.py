@@ -179,3 +179,23 @@ def test_version_specs_reject_empty_or_alternatives(bad):
 def test_semver_rejects_noncanonical_prerelease_identifiers(bad):
     with pytest.raises(ModError, match="invalid semver"):
         SemVer.parse(bad)
+
+def test_resolver_rejects_unbounded_and_malformed_inputs():
+    from itertools import repeat
+    from skeleton.ai.game_builder.mods.resolve import MAX_RESOLVE_MODS
+
+    with pytest.raises(ResolveError, match="count exceeds"):
+        resolve_load_order(repeat(mm("same"), MAX_RESOLVE_MODS + 1))
+    with pytest.raises(ResolveError, match="invalid mod manifest"):
+        resolve_load_order([mm("good"), object()])
+    assert resolve_load_order([mm("good")]).ids() == ["good"]
+
+
+def test_resolver_rejects_unbounded_direct_manifest_edges():
+    from dataclasses import replace
+    from skeleton.ai.game_builder.mods.resolve import MAX_RESOLVE_REFERENCES
+
+    direct = replace(mm("core"), load_after=tuple(
+        f"mod{i}" for i in range(MAX_RESOLVE_REFERENCES + 1)))
+    with pytest.raises(ResolveError, match="dependency graph exceeds"):
+        resolve_load_order([direct])
