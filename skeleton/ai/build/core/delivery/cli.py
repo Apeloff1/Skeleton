@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -27,20 +29,91 @@ from skeleton.build.delivery.rollback import plan_rollback
 from skeleton.build.delivery.secrets_guard import scan_text
 
 MAX_READ = 50 * 1024 * 1024
+MAX_READ_FILES = 2048
+MAX_READ_ENTRIES = 16384
+MAX_READ_DEPTH = 32
 
 
 def _read_tree(root: Path) -> dict[str, bytes]:
-    if not root.is_dir():
-        raise DeliveryError(f"{root} is not a directory")
-    out: dict[str, bytes] = {}
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise DeliveryError(f"symlinks are not packaged: {path}")
-        if path.is_file():
-            if path.stat().st_size > MAX_READ:
-                raise DeliveryError(f"{path} exceeds 50 MB")
-            out[path.relative_to(root).as_posix()] = path.read_bytes()
-    return out
+    """Read a bounded, descriptor-held snapshot without pathname reopen races."""
+    if not (hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
+            and hasattr(os, "O_NONBLOCK") and os.open in os.supports_dir_fd):
+        raise DeliveryError("secure delivery tree reading unavailable")
+    raw = os.fspath(root)
+    if (not isinstance(raw, str) or not raw or len(raw) > 4096
+            or "\x00" in raw or ".." in Path(raw).parts):
+        raise DeliveryError("unsafe delivery tree root")
+    absolute = os.path.abspath(raw)
+    components = [part for part in absolute.split(os.sep) if part]
+    if len(components) > 128:
+        raise DeliveryError("delivery root depth exceeds bound")
+    dir_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_NOCTTY", 0)
+    current = os.open(os.sep, dir_flags)
+    try:
+        for part in components:
+            child = os.open(part, dir_flags, dir_fd=current)
+            os.close(current)
+            current = child
+        out: dict[str, bytes] = {}
+        total = 0
+        entries = 0
+
+        def walk(directory_fd: int, prefix: str, depth: int) -> None:
+            nonlocal total, entries
+            if depth > MAX_READ_DEPTH:
+                raise DeliveryError("delivery tree depth exceeds bound")
+            with os.scandir(directory_fd) as iterator:
+                for entry in iterator:
+                    entries += 1
+                    if entries > MAX_READ_ENTRIES:
+                        raise DeliveryError("delivery tree entry count exceeds bound")
+                    path = prefix + entry.name
+                    observed = entry.stat(follow_symlinks=False)
+                    if stat.S_ISDIR(observed.st_mode):
+                        child_fd = os.open(entry.name, dir_flags, dir_fd=directory_fd)
+                        try:
+                            opened = os.fstat(child_fd)
+                            if (opened.st_dev, opened.st_ino) != (observed.st_dev, observed.st_ino):
+                                raise DeliveryError("delivery directory changed during scan")
+                            walk(child_fd, path + "/", depth + 1)
+                        finally:
+                            os.close(child_fd)
+                    elif stat.S_ISREG(observed.st_mode):
+                        if len(out) >= MAX_READ_FILES:
+                            raise DeliveryError("delivery file count exceeds bound")
+                        leaf_fd = os.open(entry.name, file_flags, dir_fd=directory_fd)
+                        try:
+                            before = os.fstat(leaf_fd)
+                            identity = lambda s: (s.st_dev, s.st_ino, s.st_size,
+                                                  s.st_mtime_ns, s.st_ctime_ns)
+                            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                                    or identity(before) != identity(observed)):
+                                raise DeliveryError("delivery file changed or aliases external inode")
+                            if before.st_size > MAX_READ - total:
+                                raise DeliveryError("delivery tree exceeds byte limit")
+                            blocks: list[bytes] = []
+                            read = 0
+                            while read <= before.st_size:
+                                block = os.read(leaf_fd, min(1024 * 1024, before.st_size + 1 - read))
+                                if not block:
+                                    break
+                                read += len(block)
+                                blocks.append(block)
+                            if read != before.st_size or identity(os.fstat(leaf_fd)) != identity(before):
+                                raise DeliveryError("delivery file changed during descriptor read")
+                            out[path] = b"".join(blocks)
+                            total += read
+                        finally:
+                            os.close(leaf_fd)
+                    else:
+                        raise DeliveryError("delivery tree contains nonregular member")
+        walk(current, "", 0)
+        return out
+    except OSError as exc:
+        raise DeliveryError("delivery tree descriptor traversal failed") from exc
+    finally:
+        os.close(current)
 
 
 def _kind(path: str) -> str:

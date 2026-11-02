@@ -46,3 +46,42 @@ def test_rollback(tmp_path, capsys):
     path.write_text(json.dumps(h.to_list()))
     assert main(["rollback", str(path), "--env", "staging"]) == 0
     assert json.loads(capsys.readouterr().out)["to"] == "r1"
+
+def test_delivery_tree_rejects_symlink_and_hardlink_sources(tmp_path):
+    import os
+    import pytest
+    from skeleton.build.delivery.cli import _read_tree
+    from skeleton.build.delivery._util import DeliveryError
+
+    root = tmp_path / "dist"
+    root.mkdir()
+    (root / "good.whl").write_bytes(b"good")
+    outside = tmp_path / "outside.whl"
+    outside.write_bytes(b"private")
+    (root / "linked.whl").symlink_to(outside)
+    with pytest.raises(DeliveryError):
+        _read_tree(root)
+    (root / "linked.whl").unlink()
+    os.link(outside, root / "linked.whl")
+    with pytest.raises(DeliveryError, match="aliases external inode"):
+        _read_tree(root)
+    (root / "linked.whl").unlink()
+    assert _read_tree(root) == {"good.whl": b"good"}
+    alias = tmp_path / "alias"
+    alias.symlink_to(root, target_is_directory=True)
+    with pytest.raises(DeliveryError):
+        _read_tree(alias)
+
+
+def test_delivery_tree_enforces_aggregate_bound(tmp_path, monkeypatch):
+    import pytest
+    from skeleton.build.delivery import cli
+    from skeleton.build.delivery._util import DeliveryError
+
+    root = tmp_path / "dist"
+    root.mkdir()
+    (root / "a.whl").write_bytes(b"ab")
+    (root / "b.whl").write_bytes(b"cd")
+    monkeypatch.setattr(cli, "MAX_READ", 3)
+    with pytest.raises(DeliveryError, match="byte limit"):
+        cli._read_tree(root)
