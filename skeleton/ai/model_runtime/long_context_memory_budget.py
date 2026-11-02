@@ -151,9 +151,15 @@ class LongContextMemoryBudgetGuard:
                 return False
             host = result.get("host_available_bytes")
             group = result.get("cgroup_remaining_bytes")
-            if (type(host) is not int or type(group) is not int
-                    or not 0 <= host <= _MAX or not 0 <= group <= _MAX
-                    or headroom > min(host, group)):
+            host_total = result.get("host_total_bytes")
+            group_limit = result.get("cgroup_effective_limit_bytes")
+            reserve = result.get("reserve_bytes")
+            if (any(type(value) is not int for value in
+                    (host, group, host_total, group_limit, reserve))
+                    or not 0 <= host <= host_total <= _MAX
+                    or not 0 <= group <= group_limit <= _MAX
+                    or not 0 <= reserve <= 1024**4
+                    or headroom != max(0, min(host, group) - reserve)):
                 return False
             return required <= headroom
         except Exception:

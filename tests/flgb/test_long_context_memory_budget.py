@@ -28,7 +28,10 @@ def envelope(required, *, headroom=4096, **changes):
         "observed_headroom_bytes": headroom,
         "request_observed_sufficient": required <= headroom,
         "host_available_bytes": 8192,
+        "host_total_bytes": 16384,
         "cgroup_remaining_bytes": 8192,
+        "cgroup_effective_limit_bytes": 16384,
+        "reserve_bytes": 4096,
         "device_qualified": False,
         "is_admission_grant": False,
         "is_execution_lease": False,
@@ -112,6 +115,10 @@ class MemoryBudgetGuardTests(unittest.TestCase):
             {"request_observed_sufficient": True, "observed_headroom_bytes": 0},
             {"state": "hold"},
             {"host_available_bytes": True},
+            {"reserve_bytes": -1},
+            {"reserve_bytes": 0},
+            {"host_total_bytes": 1},
+            {"cgroup_effective_limit_bytes": 1},
         ):
             with self.subTest(change=change):
                 self.observer.side_effect = (
