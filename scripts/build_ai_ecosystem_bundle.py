@@ -433,7 +433,7 @@ def verify(path: Path, *, minimum: int, maximum: int, required_source_bytes: int
             if embedded is not None:
                 raise PackageError("manifest must be final archive entry")
             tokens = name.split("/")
-            if len(tokens) < 6 or tokens[0:2] != ["bundle", "stages"] or tokens[2] not in WAVES or tokens[3] not in ("source", "payload"):
+            if len(tokens) < 5 or tokens[0:2] != ["bundle", "stages"] or tokens[2] not in WAVES or tokens[3] not in ("source", "payload"):
                 raise PackageError(f"unrecognized archive member: {name}")
             rank = WAVES.index(tokens[2])
             if rank < last_wave:

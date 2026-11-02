@@ -93,6 +93,26 @@ class OrderedBundleTests(unittest.TestCase):
         self.assertEqual(bundle.verify(self.output, minimum=1, maximum=1_000_000,
                                       required_source_bytes=16)["entries"], 9)
 
+    def test_root_level_support_files_are_valid_archive_members(self) -> None:
+        # The real profile includes README.md, pyproject.toml and other root
+        # support paths. Their tar member is exactly five path segments.
+        (self.repo / "README.md").write_text("actual root documentation\n", encoding="utf-8")
+        (self.repo / "pyproject.toml").write_text("[project]\nname='fixture'\n", encoding="utf-8")
+        self.profile["support_files"] = {
+            "MBW-00": ["pyproject.toml"], "MBW-07": ["README.md"],
+        }
+        write_json(self.repo / "machine/ai_ecosystem_bundle_v1.json", self.profile)
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "include root-level support contract")
+        receipt = self.do_build()
+        with tarfile.open(self.output, "r") as tar:
+            names = tar.getnames()
+        self.assertIn("bundle/stages/MBW-00/source/pyproject.toml", names)
+        self.assertIn("bundle/stages/MBW-07/source/README.md", names)
+        self.assertEqual(receipt["entries"], 11)
+        self.assertEqual(bundle.verify(self.output, minimum=1, maximum=1_000_000,
+                                      required_source_bytes=16)["entries"], 11)
+
     def test_archive_size_hold_is_no_publish(self) -> None:
         self.profile["minimum_archive_bytes"] = 1_000_000
         write_json(self.repo / "machine/ai_ecosystem_bundle_v1.json", self.profile)
