@@ -22,6 +22,14 @@ from skeleton.build.delivery.artifact_manifest import MAX_ARTIFACT_BYTES, Artifa
 DEFAULT_EPOCH = 315532800  # 1980-01-01, the earliest timestamp zip supports
 EXECUTABLE_SUFFIXES = (".sh",)
 MAX_PACKAGE_FILES = 20000
+MAX_PACKAGE_EPOCH = (1 << 32) - 1  # portable gzip mtime field
+
+
+def _validate_epoch(epoch: int, *, zip_format: bool) -> None:
+    if type(epoch) is not int or not 0 <= epoch <= MAX_PACKAGE_EPOCH:
+        raise DeliveryError("package epoch must be a bounded integer")
+    if zip_format and epoch < DEFAULT_EPOCH:
+        raise DeliveryError("zip timestamps cannot precede 1980")
 
 
 @dataclass(frozen=True)
@@ -78,6 +86,7 @@ def build_tarball(
 ) -> PackageResult:
     if not name.endswith(".tar.gz"):
         raise DeliveryError("tarball name must end with .tar.gz")
+    _validate_epoch(epoch, zip_format=False)
     entries = _normalize_files(files, prefix)
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as tar:
@@ -107,8 +116,7 @@ def build_zip(
 ) -> PackageResult:
     if not name.endswith(".zip"):
         raise DeliveryError("zip name must end with .zip")
-    if epoch < DEFAULT_EPOCH:
-        raise DeliveryError("zip timestamps cannot precede 1980")
+    _validate_epoch(epoch, zip_format=True)
     import time
 
     stamp = time.gmtime(epoch)[:6]

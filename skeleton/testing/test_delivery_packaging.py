@@ -130,3 +130,16 @@ def test_zip_reader_rejects_unix_special_file_modes():
         entry.external_attr = (stat.S_IFREG | 0o644) << 16
         z.writestr(entry, b"ok")
     assert list_zip(buf.getvalue()) == {"regular": b"ok"}
+
+@pytest.mark.parametrize("epoch", (True, False, 1.5, "315532800", -1, 1 << 32))
+def test_package_builders_reject_noncanonical_epoch(epoch):
+    with pytest.raises(DeliveryError, match="bounded integer"):
+        build_zip("pkg.zip", FILES, epoch=epoch)
+    with pytest.raises(DeliveryError, match="bounded integer"):
+        build_tarball("pkg.tar.gz", FILES, epoch=epoch)
+
+
+def test_tarball_accepts_portable_epoch_zero_but_zip_requires_1980():
+    assert build_tarball("pkg.tar.gz", {"a": b"x"}, epoch=0).file_count == 1
+    with pytest.raises(DeliveryError, match="1980"):
+        build_zip("pkg.zip", {"a": b"x"}, epoch=0)
