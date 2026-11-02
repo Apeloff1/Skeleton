@@ -32,7 +32,7 @@ def _safe(value: object, label: str) -> str:
 
 def _md(value: str) -> str:
     """Escape Markdown syntax as well as raw HTML in authored prose."""
-    special = "\\\`*_{}[]()#+-.!|>"
+    special = "`*_{}[]()#+-.!|>" + chr(92)
     return "".join("\\" + char if char in special else char
                    for char in escape(value))
 
