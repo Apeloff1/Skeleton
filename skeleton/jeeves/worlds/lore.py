@@ -17,7 +17,7 @@ from .session import replay_choices, validate_session
 from .timeline import _reachable_flags
 from .world_canon import (
     CanonError, MAX_STATES, WorldStore, _id, _keys, _list, _text,
-    canonical, compile_html, digest, prove, strict_json,
+    canonical, digest, prove, strict_json,
 )
 
 SCHEMA = "jeeves.world.lore.v1"
@@ -330,9 +330,10 @@ class LoreStore:
             os.close(fd)
 
     def _outputs(self, world: Any, data: Any):
+        from .lore_player import render_lore_playable
         handoff = compile_lore(data, world)
         contents = [
-            compile_html(world).encode("utf-8"),
+            render_lore_playable(world, data),
             render_lore(handoff), canonical(handoff),
         ]
         names = self._names(world["id"])
