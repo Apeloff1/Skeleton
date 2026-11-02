@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from hashlib import sha256
-from html import escape
+from html import escape, unescape
 import re
 from typing import Any, Mapping
 
@@ -203,7 +203,7 @@ def render_caption_timing_review_html(
             "<li><h2>Cue " + str(row["cue_index"]) + "</h2>"
             "<p><time>" + start + " → " + end + "</time> — "
             "<strong>" + change + "</strong></p><pre>"
-            + escape(row["canonical_text"], quote=True) + "</pre></li>")
+            + escape(unescape(row["canonical_text"]), quote=True) + "</pre></li>")
     markup = (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
