@@ -234,6 +234,88 @@ class LongContextCpuCapacityGuard:
             return {**self._snapshot("reserved"), "reservation_id": key,
                     "window_digest": digest, "expires_ns": now + self._limits.lifetime_ns}
 
+    def reserve_fair_cycle(
+        self, requests: tuple[CpuCapacityRequest, ...], *,
+        quantum_tokens: int = 256,
+    ) -> dict[str, object]:
+        """All-or-nothing, one-quantum-per-stream cooperative CPU cycle.
+
+        No first-fit partial admission: if any candidate cannot be checked,
+        the entire cycle holds. This is fairness *within this call*, not a
+        guarantee across processes or independent callers. Every backend
+        must independently revalidate before actual token consumption.
+        """
+        if type(requests) is not tuple or not 1 <= len(requests) <= 64:
+            raise LongContextSpoolError("invalid fair cycle")
+        _bounded(quantum_tokens, "quantum_tokens", 1, 4096)
+        names: set[str] = set()
+        for request in requests:
+            if not isinstance(request, CpuCapacityRequest):
+                raise LongContextSpoolError("invalid fair cycle request")
+            if request.stream_id in names:
+                raise LongContextSpoolError("duplicate fair cycle stream")
+            names.add(request.stream_id)
+        self._pid_guard()
+        with self._lock:
+            if self._closed:
+                raise LongContextSpoolError("capacity guard closed")
+            now = self._now()
+            state = self._pressure()
+            if state != "repeated_normal_observed":
+                return {**self._snapshot("hold"), "reservations": [],
+                        "reason": "pressure_not_stable"}
+            active = self._snapshot(state)
+            requested_tokens = sum(r.max_tokens for r in requests)
+            requested_bytes = sum(r.requested_bytes for r in requests)
+            if (len(self._reservations) + len(requests) > self._limits.max_active
+                    or active["reserved_tokens"] + requested_tokens >
+                    self._limits.max_tokens
+                    or active["reserved_bytes"] + requested_bytes >
+                    self._limits.max_bytes
+                    or any(r.max_tokens > quantum_tokens for r in requests)
+                    or any(r.stream_id in
+                           (item.request.stream_id for item in self._reservations.values())
+                           for r in requests)):
+                return {**active, "state": "hold", "reservations": [],
+                        "reason": "fair_cycle_budget_or_duplicate"}
+            ordered = sorted(requests, key=lambda r: _name(r.stream_id))
+            if not all(self._authorized(r) for r in ordered):
+                return {**active, "state": "hold", "reservations": [],
+                        "reason": "principal_unverified"}
+            try:
+                windows = [(r, self._window(r)) for r in ordered]
+                capacity = self._heads.spool.capacity_snapshot(
+                    requested_bytes=requested_bytes)
+                if (type(capacity) is not dict
+                        or capacity.get("request_observed_sufficient") is not True
+                        or type(capacity.get("observed_publishable_bytes")) is not int
+                        or capacity["observed_publishable_bytes"] <= 0):
+                    raise LongContextSpoolError("disk capacity hold")
+            except (LongContextSpoolError, OSError, ValueError, TypeError):
+                return {**active, "state": "hold", "reservations": [],
+                        "reason": "fair_cycle_custody_unverified"}
+            if now > _MAX_CLOCK - self._limits.lifetime_ns:
+                raise LongContextSpoolError("capacity clock overflow")
+            keys = [token_hex(32) for _ in windows]
+            if len(set(keys)) != len(keys) or any(
+                key in self._reservations for key in keys
+            ):
+                raise LongContextSpoolError("capacity identity collision")
+            expires = now + self._limits.lifetime_ns
+            receipts = []
+            for key, (request, digest) in zip(keys, windows):
+                self._reservations[key] = _Reservation(request, digest, expires)
+                receipts.append({
+                    "stream_digest": _name(request.stream_id),
+                    "reservation_id": key,
+                    "window_digest": digest,
+                    "max_tokens": request.max_tokens,
+                    "expires_ns": expires,
+                })
+            return {**self._snapshot("reserved"), "reservations": receipts,
+                    "cycle_atomic_within_process": True,
+                    "cross_process_exclusive": False}
+
     def claim(self, reservation_id: str, request: CpuCapacityRequest) -> dict[str, object]:
         self._validate_key(reservation_id)
         if not isinstance(request, CpuCapacityRequest):
