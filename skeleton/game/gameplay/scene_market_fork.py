@@ -18,7 +18,7 @@ from skeleton.game.gameplay.scene_market import (
     _action, _advance, _bounded, _json, original_market, simulate_market,
     verify_market,
 )
-from skeleton.game.gameplay.scene_tile_walk import MAX_STEPS
+from skeleton.game.gameplay.scene_tile_walk import MAX_STEPS, _action as tile_action
 from skeleton.game.gameplay.scene_travel import SceneTravelError, _id, _object
 
 SCHEMA = "skeleton.scene_market_fork.v1"
@@ -27,6 +27,14 @@ MAX_CANDIDATES = 12
 MAX_ACTIONS = 24
 MAX_TOTAL_ACTIONS = 96
 MAX_INPUT_BYTES = 128 * 1024
+
+
+def _normalize_action(raw: Any) -> dict[str, Any]:
+    """Validate both market and nested tile command schemas before preview."""
+    action = _action(raw)
+    if action["kind"] == "tile":
+        return {"kind": "tile", "action": tile_action(action["action"])}
+    return action
 
 
 def normalize_candidates(raw: Any, *, remaining: int) -> list[dict[str, Any]]:
@@ -55,7 +63,7 @@ def normalize_candidates(raw: Any, *, remaining: int) -> list[dict[str, Any]]:
         # rejection; invalid schemas are never silently counted as gameplay.
         normalized.append({
             "candidate_id": name,
-            "actions": [_action(action) for action in actions],
+            "actions": [_normalize_action(action) for action in actions],
         })
     return sorted(normalized, key=lambda item: item["candidate_id"])
 

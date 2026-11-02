@@ -14,6 +14,7 @@ from typing import Any
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.scene_market import _bounded, _json
+from skeleton.game.gameplay.scene_tile_walk import MAX_STEPS
 from skeleton.game.gameplay.scene_market_fork import (
     MAX_CANDIDATES, evaluate_market_fork, normalize_candidates, original_fork,
     verify_market_fork,
@@ -30,7 +31,7 @@ def _normalize_edit(raw: Any) -> dict[str, Any]:
     kind = raw.get("kind")
     if kind in ("add", "replace"):
         obj = _object(raw, {"kind", "candidate"}, "fork editor candidate")
-        candidate = normalize_candidates([obj["candidate"]], remaining=1024)[0]
+        candidate = normalize_candidates([obj["candidate"]], remaining=MAX_STEPS)[0]
         return {"kind": kind, "candidate": candidate}
     if kind == "remove":
         obj = _object(raw, {"kind", "candidate_id"}, "fork editor removal")
