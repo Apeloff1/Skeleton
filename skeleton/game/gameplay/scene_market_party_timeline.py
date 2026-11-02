@@ -7,6 +7,7 @@ Forks are new offline playthroughs, not merges into an authoritative save.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from collections.abc import Sequence
@@ -136,7 +137,7 @@ def fork_party(checkpoint: Any, sequence: int,
         "fork_state_digest": branch["state_digest"],
         "fork_save_digest": dig(branch["save"]),
         "fork_phase": branch["state"]["market"]["state"]["phase"],
-        "turns": turns,
+        "turns": copy.deepcopy(turns),
         "turn_count": len(turns),
         "portable": portable,
         "qualification": "offline_fork_not_authoritative_save_merge",

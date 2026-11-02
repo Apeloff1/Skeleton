@@ -99,7 +99,7 @@ def test_fork_rejects_illegal_actor_and_oversized_turns(campaign):
 @pytest.mark.parametrize("field,value", [
     ("checksum", "0" * 64),
     ("parent_state_digest", "0" * 64),
-    ("fork_phase", "won"),
+    ("fork_phase", "active"),
     ("fork_state_digest", "0" * 64),
 ])
 def test_tampered_fork_fails_even_if_checksum_recomputed(campaign, field, value):
