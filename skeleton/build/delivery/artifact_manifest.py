@@ -183,6 +183,12 @@ def verify_files(manifest: ArtifactManifest, observed: Mapping[str, bytes]) -> t
     seen: set[str] = set()
     for raw_path, data in observed.items():
         path = normalize_relpath(raw_path)
+        # A manifest identifies one canonical spelling per artifact. Alias
+        # spellings or duplicate normalized names must never pass verification.
+        if raw_path != path:
+            problems.append(f"noncanonical:{raw_path}")
+        if path in seen:
+            problems.append(f"duplicate:{path}")
         seen.add(path)
         entry = manifest.find(path)
         if entry is None:

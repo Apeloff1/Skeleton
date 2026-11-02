@@ -71,3 +71,13 @@ def test_verify_files():
     assert verify_files(m, {"a": b"hello", "b": b"zz"}) == ()
     problems = verify_files(m, {"a": b"hellO", "x": b""})
     assert problems == ("digest:a", "missing:b", "unexpected:x")
+
+def test_verify_files_rejects_noncanonical_aliases_and_duplicate_identities():
+    m = _manifest(_entry("artifacts/a.bin", b"ok"))
+    assert verify_files(m, {"artifacts/a.bin": b"ok"}) == ()
+    assert verify_files(m, {"./artifacts/a.bin": b"ok"}) == (
+        "noncanonical:./artifacts/a.bin",)
+    assert verify_files(m, {"artifacts//a.bin": b"ok"}) == (
+        "noncanonical:artifacts//a.bin",)
+    assert verify_files(m, {"artifacts/a.bin": b"ok", "./artifacts/a.bin": b"ok"}) == (
+        "duplicate:artifacts/a.bin", "noncanonical:./artifacts/a.bin")
