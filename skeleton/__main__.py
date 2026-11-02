@@ -68,6 +68,7 @@ Commands:
     combat-career  Play, train, save and replay a multi-season coaching career
     combat-tournament  Play and replay a source-bound four-entrant bracket
     combat-inspect  Inspect verified combat timelines and compare saved branches
+    combat-stamina  Play tactical stamina, author and export verified saves
     combat-drill  Play, grade, resume and verify offline combat lessons
     combat-drill-solve  Find replayable bounded shortest combat lesson solutions
     combat-balance  Analyze source-bound combat victory and verify replay receipts
@@ -922,6 +923,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-drill-solve":
         from skeleton.game.gameplay.combat_drill_solver import cli as drill_solver_cli
         return drill_solver_cli(rest)
+    if cmd == "combat-stamina":
+        from skeleton.game.gameplay.combat_stamina import cli as stamina_cli
+        return stamina_cli(rest)
     if cmd == "combat-drill":
         from skeleton.game.gameplay.combat_drill import cli as drill_cli
         return drill_cli(rest)
