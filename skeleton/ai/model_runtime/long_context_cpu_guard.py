@@ -7,6 +7,7 @@ invalidates every reservation; hardware and disk claims remain observational.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import os
 from secrets import token_hex
 from threading import Lock
@@ -16,7 +17,7 @@ from typing import Callable
 from .long_context_fairness import _bounded
 from .long_context_pressure_latch import LongContextPressureLatch
 from .long_context_progress import LongContextProgressHead, _name
-from .long_context_spool import LongContextSpoolError, _digest
+from .long_context_spool import LongContextSpoolError, _canonical, _digest
 from .long_context_telemetry_fusion import LongContextTelemetryFusion
 
 _MAX_CLOCK = 2**63 - 1
@@ -179,6 +180,12 @@ class LongContextCpuCapacityGuard:
             return False
 
     def _window(self, request: CpuCapacityRequest) -> str:
+        """Verify the full generation-fenced head and token-window digest.
+
+        A digest-looking string is not proof that the returned token IDs match
+        the requested stream or checkpoint. Validate the canonical records
+        even when the progress provider is replaced by an untrusted adapter.
+        """
         result = self._heads.compare_window(
             request.stream_id,
             expected_checkpoint_digest=request.checkpoint_digest,
@@ -186,20 +193,41 @@ class LongContextCpuCapacityGuard:
             expected_tokenizer_digest=request.tokenizer_digest,
             max_tokens=request.max_tokens,
         )
-        if (type(result) is not dict
-                or result.get("is_execution_lease") is not False
-                or result.get("checkpoint_digest") != request.checkpoint_digest
-                or result.get("tokenizer_digest") != request.tokenizer_digest
-                or result.get("generation") != request.generation):
+        if type(result) is not dict or result.get("is_execution_lease") is not False:
+            raise LongContextSpoolError("invalid capacity head")
+        body = {
+            "schema": "skeleton.ai.long-context-head.v1",
+            "stream_digest": _name(request.stream_id),
+            "checkpoint_digest": request.checkpoint_digest,
+            "tokenizer_digest": request.tokenizer_digest,
+            "generation": request.generation,
+        }
+        if (any(type(result.get(key)) is not type(value)
+                or result.get(key) != value for key, value in body.items())
+                or result.get("record_digest") != sha256(_canonical(body)).hexdigest()):
             raise LongContextSpoolError("stale capacity head")
         window = result.get("window")
-        if (type(window) is not dict
-                or type(window.get("start")) is not int
-                or type(window.get("stop")) is not int
-                or not 0 <= window["start"] < window["stop"]
-                or window["stop"] - window["start"] > request.max_tokens):
-            raise LongContextSpoolError("invalid capacity window")
-        return _digest(window.get("digest"), "window")
+        if type(window) is not dict or set(window) != {
+            "start", "stop", "token_ids", "source_sequence_digest", "digest"
+        }:
+            raise LongContextSpoolError("invalid capacity window fields")
+        start, stop, tokens = (window["start"], window["stop"], window["token_ids"])
+        if (type(start) is not int or type(stop) is not int
+                or not 0 <= start < stop <= 2**31 - 1
+                or stop - start > request.max_tokens
+                or type(tokens) is not list or len(tokens) != stop - start
+                or any(type(token) is not int or not 0 <= token < 2**32
+                       for token in tokens)):
+            raise LongContextSpoolError("invalid capacity token window")
+        source_digest = _digest(window["source_sequence_digest"], "source sequence")
+        digest = _digest(window["digest"], "window")
+        calculated = sha256(_canonical({
+            "start": start, "stop": stop, "token_ids": tokens,
+            "source_sequence_digest": source_digest,
+        })).hexdigest()
+        if digest != calculated:
+            raise LongContextSpoolError("capacity window digest mismatch")
+        return digest
 
     def _disk_observed_sufficient(self, requested_bytes: int) -> bool:
         """Validate a fresh, non-authorizing quota/volume observation.

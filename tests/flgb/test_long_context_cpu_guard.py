@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, patch
 from skeleton.ai.model_runtime.long_context_cpu_guard import (
     CpuCapacityLimits, CpuCapacityRequest, LongContextCpuCapacityGuard,
 )
-from skeleton.ai.model_runtime.long_context_spool import LongContextSpoolError
+from skeleton.ai.model_runtime.long_context_spool import LongContextSpoolError, _canonical
+from skeleton.ai.model_runtime.long_context_progress import _name
 from skeleton.ai.model_runtime.long_context_telemetry_fusion import LongContextTelemetryFusion
 
 
@@ -43,17 +44,31 @@ def envelope(level="normal", event=0):
     return obj
 
 
+def head_receipt(stream_id="stream"):
+    body = {
+        "schema": "skeleton.ai.long-context-head.v1",
+        "stream_digest": _name(stream_id),
+        "checkpoint_digest": "a" * 64, "tokenizer_digest": "b" * 64,
+        "generation": 4,
+    }
+    window = {
+        "start": 0, "stop": 8, "token_ids": list(range(8)),
+        "source_sequence_digest": "d" * 64,
+    }
+    return {
+        **body, "record_digest": sha256(_canonical(body)).hexdigest(),
+        "is_execution_lease": False,
+        "window": {**window, "digest": sha256(_canonical(window)).hexdigest()},
+    }
+
+
 class CpuCapacityGuardTests(unittest.TestCase):
     def setUp(self):
         self.clock = Tick()
         self.monitor = LongContextTelemetryFusion()
         self.monitor.sample = MagicMock(return_value=envelope())
         self.heads = MagicMock()
-        self.heads.compare_window.return_value = {
-            "checkpoint_digest": "a" * 64, "tokenizer_digest": "b" * 64,
-            "generation": 4, "is_execution_lease": False,
-            "window": {"start": 0, "stop": 8, "digest": "c" * 64},
-        }
+        self.heads.compare_window.return_value = head_receipt()
         self.heads.spool.capacity_snapshot.side_effect = lambda requested_bytes: {
             "schema": "skeleton.ai.long-context-capacity.v1",
             "state": "observed_available",
@@ -122,6 +137,31 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.guard.observe()
         self.assertFalse(self.guard.claim(key, self.request)["claimed"])
 
+    def test_forged_head_and_token_window_never_reserve(self):
+        self.warm()
+        for mutate in (
+            lambda r: r.update(record_digest="0" * 64),
+            lambda r: r.update(stream_digest="0" * 64),
+            lambda r: r.update(schema="untrusted"),
+            lambda r: r.update(generation=True),
+            lambda r: r["window"].update(token_ids=[True] + list(range(1, 8))),
+            lambda r: r["window"].update(token_ids=[999] + list(range(1, 8))),
+            lambda r: r["window"].update(source_sequence_digest="0" * 64),
+            lambda r: r["window"].update(digest="0" * 64),
+            lambda r: r["window"].update(stop=9),
+            lambda r: r["window"].update(unknown_field=True),
+            lambda r: r["window"].update(start=False),
+        ):
+            with self.subTest(mutate=mutate):
+                forged = head_receipt()
+                mutate(forged)
+                self.heads.compare_window.return_value = forged
+                self.assertEqual(self.guard.reserve(self.request)["reason"],
+                                 "custody_or_disk_unverified")
+                self.assertEqual(self.guard.status()["active"], 0)
+        self.heads.compare_window.return_value = head_receipt()
+        self.assertIsNotNone(self.guard.reserve(self.request)["reservation_id"])
+
     def test_stale_head_and_disk_hold(self):
         self.warm()
         self.heads.compare_window.return_value["generation"] = 5
@@ -160,6 +200,7 @@ class CpuCapacityGuardTests(unittest.TestCase):
 
     def test_fair_cycle_is_all_or_nothing(self):
         self.warm()
+        self.heads.compare_window.side_effect = lambda stream_id, **kw: head_receipt(stream_id)
         other = CpuCapacityRequest("owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
         result = self.guard.reserve_fair_cycle((self.request, other),
                                                quantum_tokens=8)
@@ -183,8 +224,7 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.warm()
         other = CpuCapacityRequest("owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
         self.heads.compare_window.side_effect = [
-            self.heads.compare_window.return_value,
-            LongContextSpoolError("stale head"),
+            head_receipt("other"), LongContextSpoolError("stale head"),
         ]
         result = self.guard.reserve_fair_cycle((self.request, other),
                                                quantum_tokens=8)
