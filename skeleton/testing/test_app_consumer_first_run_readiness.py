@@ -48,7 +48,10 @@ def test_real_installed_game_and_private_save_replayed_without_release_claim(
     assert result["status"] == "source_level_first_run_replayed_release_blocked"
     assert result["source_level_replay_passes"] == 2
     assert result["installed_game_and_private_save_reexecuted"] is True
-    assert result["all_input_inodes_stable_during_inspection"] is True
+    assert result["all_input_inodes_stable_during_inspection"] is False
+    assert result["root_and_evidence_inodes_stable_during_inspection"] is True
+    assert result["nested_asset_inode_inventory_attested"] is False
+    assert "NESTED_ASSET_INODE_INVENTORY_UNATTESTED" in result["release_holds"]
     assert result["read_only"] is True
     assert result["files_published"] == 0
     assert result["action_count"] == 3
