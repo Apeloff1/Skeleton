@@ -100,7 +100,7 @@ def test_bad_authored_source_rejected(mutate):
 
 @pytest.mark.parametrize("mutate", [
     lambda x: x["state"]["items"].update(signal_beacon=10),
-    lambda x: x["state"]["choices"].update(guide="aid"),
+    lambda x: x["state"]["choices"].update(guide="decline"),
     lambda x: x["state"]["expedition"]["state"].update(currency=99999),
     lambda x: x["journal"][0].update(receipt="0" * 64),
     lambda x: x["journal"][0]["action"].update(decision="decline"),
