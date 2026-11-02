@@ -109,3 +109,19 @@ Production readiness still requires on-device live-model inference with an
 independently approved model, exact-head CI/security review, model licensing,
 context budget validation and durable restore testing. None of these are
 implicitly passed by committing source files.
+
+## Secondary entrypoints and recovery
+
+The native JSON-checkpoint CLI (`transport.cli`) also uses the exact same
+principal/model state binding and cross-process session fence. Its chat,
+memory and audit database files must be siblings in one owner-private state
+root; scattered storage paths cannot bypass the boundary. As on the GGUF
+route, first use of a previously populated, unbound directory intentionally
+fails pending independent migration review.
+
+The installed-model audit reconciliation operator CLI (`deployment.install.cli
+reconcile-audit`) requires the same `state.identity.json` identity check
+before opening any conversation database, even for `--dry-run`. The caller
+cannot select a different tenant/user to inspect or backfill somebody else's
+stored receipts by changing command-line flags. This is an OS-local boundary,
+not protection against untrusted programs already running under the same UID.

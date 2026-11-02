@@ -56,6 +56,12 @@ def main(argv: list[str] | None = None) -> int:
             # Existing chat DB is a prerequisite; never initialize a new history.
             model=inspect_installed_model(args.model_root)
             state=args.state_dir.absolute()
+            # Recovery can disclose or mutate private transcripts indirectly.
+            # It must never bypass the principal/model binding enforced by
+            # the real GGUF launcher, even in read-only --dry-run mode.
+            from ..boot.identity import PrincipalBinding, inspect_binding
+            inspect_binding(state, PrincipalBinding(args.tenant,args.user,
+                model.model_sha256,model.model_sha256))
             from ...model.gguf.file_guard import open_trusted_root
             import os
             fd=open_trusted_root(state)

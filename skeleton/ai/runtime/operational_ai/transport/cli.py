@@ -28,17 +28,41 @@ from ..orchestration.service import OfflineAIService
 from ..persistence.journal import EventJournal
 from ..tools.builtins import register_builtins
 from ..tools.catalog import ToolCatalog
+from ..deployment.boot.identity import PrincipalBinding,establish_binding
+from ..model.gguf.file_guard import open_trusted_root
+from ..orchestration.custody.session import ProcessSessionFence
 
 
 def build_service(args:argparse.Namespace,stack:ExitStack)->OfflineAIService:
+    # All persistent stores MUST share one owner-private directory. This
+    # prevents an independent CLI path from bypassing principal custody.
+    locations=(args.database.absolute(),args.memory_db.absolute(),args.journal_db.absolute())
+    state=locations[0].parent
+    if any(path.parent!=state or path.name in ('.','..') for path in locations):
+        raise ContractViolation("AI stores must share one private state directory")
+    root_fd=open_trusted_root(state)
+    try:
+        if os.fstat(root_fd).st_mode&0o077:
+            raise ContractViolation("AI state directory must be private")
+    finally:
+        os.close(root_fd)
     from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
     checkpoint=Path(args.checkpoint).absolute()
     artifact=ModelArtifact(args.model_name,checkpoint.name,args.sha256,checkpoint.stat().st_size,
                            args.license,tokenizer_sha256=args.tokenizer_sha256)
     backend=from_checkpoint(ModelCatalog(checkpoint.parent,[artifact]),artifact.name)
-    store=stack.enter_context(OfflineChatStore(args.database))
-    memory=stack.enter_context(MemoryStore(args.memory_db))
-    journal=stack.enter_context(EventJournal(args.journal_db))
+    # Pin both actor and model identities *before* any SQLite file is opened.
+    establish_binding(state,PrincipalBinding(args.tenant,args.user,
+                       backend.model_digest,backend.tokenizer_digest))
+    root_fd=open_trusted_root(state)
+    try:
+        try:os.mkdir('session_locks',mode=0o700,dir_fd=root_fd)
+        except FileExistsError:pass
+    finally:os.close(root_fd)
+    process_fence=stack.enter_context(ProcessSessionFence(state/'session_locks'))
+    store=stack.enter_context(OfflineChatStore(locations[0]))
+    memory=stack.enter_context(MemoryStore(locations[1]))
+    journal=stack.enter_context(EventJournal(locations[2]))
     actor=Actor(args.tenant,args.user,backend.model_digest,backend.tokenizer_digest)
     catalog=ToolCatalog()
     register_builtins(catalog)
@@ -49,7 +73,8 @@ def build_service(args:argparse.Namespace,stack:ExitStack)->OfflineAIService:
     limits=Limits(context_tokens=safe_context,output_tokens=args.max_new_tokens,
                   input_bytes=args.input_bytes,output_bytes=args.output_bytes)
     return OfflineAIService(actor=actor,gateway=ModelGateway(backend),chat_store=store,
-                            memory=memory,journal=journal,catalog=catalog,limits=limits)
+                            memory=memory,journal=journal,catalog=catalog,limits=limits,
+                            process_fence=process_fence)
 
 
 def main(argv:list[str]|None=None)->int:
@@ -81,6 +106,11 @@ def main(argv:list[str]|None=None)->int:
     args=parser.parse_args(argv)
     if args.session and args.system:
         parser.error("system instruction can only be supplied when creating a session")
+    if args.serve:
+        candidate=os.environ.get(args.bearer_env,'')
+        if not 32<=len(candidate)<=512 or any(ord(c)<33 or ord(c)>126 for c in candidate):
+            print(json.dumps({'status':'blocked','reason':'InvalidBearerSecret'}),file=sys.stderr)
+            return 2
     try:
         require_digest(args.sha256)
         with ExitStack() as stack:
@@ -104,7 +134,7 @@ def main(argv:list[str]|None=None)->int:
             print(json.dumps(result.to_record(),ensure_ascii=False,sort_keys=True))
             return 0
     except (ContractViolation,OSError,ValueError,RuntimeError) as exc:
-        print(json.dumps({"status":"blocked","error":str(exc)}),file=sys.stderr)
+        print(json.dumps({"status":"blocked","reason":type(exc).__name__}),file=sys.stderr)
         return 2
 
 
