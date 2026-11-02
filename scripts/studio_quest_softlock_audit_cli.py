@@ -8,7 +8,7 @@ from pathlib import Path
 from scripts.studio_npc_knowledge_relay_cli import _private_json
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import (
-    StudioQuestError,
+    StudioQuestError, replay_quest,
 )
 from skeleton.ai.game_builder.studio_quest_softlock_audit import (
     PROMPT, compile_quest_softlock_audit,
@@ -58,7 +58,14 @@ def main(argv: list[str] | None = None) -> int:
             baseline = _private_json(args.baseline_audit_file, 512 * 1024)
             authoring = load_quest_softlock_editor_export(
                 docs, baseline, args.editor_export_file, **kwargs)
-            result = compile_quest_softlock_audit(docs, authoring, **kwargs)
+            # The editor lease refers to the original baseline prefix. The
+            # candidate prefix is a new canonical session and must be
+            # independently replayed, never inherited from the browser.
+            candidate = replay_quest(docs, authoring["initial_actions"], authorized=True)
+            result = compile_quest_softlock_audit(
+                docs, authoring, authorized=True,
+                expected_source_digest=args.expected_source,
+                expected_initial_session_digest=candidate.digest)
         elif args.prompt:
             result = propose_quest_softlock_audit(docs, PROMPT, **kwargs)
         else:

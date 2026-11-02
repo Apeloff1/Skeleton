@@ -38,5 +38,8 @@ publish a CSP-hashed, network-disabled HTML editor. It exports a JSON envelope
 containing exact baseline/source/session leases and a typed authoring plan.
 Pass `--editor-export-file <private-json> --baseline-audit-file <private-json>`
 to import it; the baseline must be the original canonical audit receipt.
-Import is never authority: the CLI recompiles the edited plan against the
-current source and exact initial-session digest before publication or handoff.
+Import is never authority: the CLI first checks the original baseline session
+lease, independently replays the edited initial action prefix to derive a new
+candidate session digest, and recompiles against that exact candidate digest.
+The audit scope is the selected prefix and ending subset, never an assertion
+that all other authored branches are safe.
