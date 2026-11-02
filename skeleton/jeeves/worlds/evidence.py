@@ -14,7 +14,7 @@ from typing import Any
 from .session import replay_choices, validate_session
 from .world_canon import (
     CanonError, MAX_STATES, WorldStore, _id, _keys, _list, _text,
-    canonical, compile_html, digest, prove, strict_json,
+    canonical, digest, prove, strict_json,
 )
 
 SCHEMA = "jeeves.world.evidence.v1"
@@ -321,7 +321,10 @@ class EvidenceStore:
     def _outputs(self, world: Any, data: Any):
         handoff = compile_evidence(data, world)
         names = self._artifacts(world["id"])
-        contents = [compile_html(world).encode("utf-8"), canonical(handoff)]
+        from .overlay import compile_overlay_html
+        contents = [compile_overlay_html(
+            world, evidence=data).encode("utf-8"),
+            canonical(handoff)]
         receipt = {
             "schema": RECEIPT_SCHEMA, "world_id": world["id"],
             "world_digest": digest(world), "evidence_digest": digest(data),

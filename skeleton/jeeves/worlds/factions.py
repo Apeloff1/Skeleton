@@ -272,7 +272,10 @@ class FactionStore:
     def _outputs(self, world: Any, data: Any):
         handoff = compile_factions(data, world)
         names = self._artifacts(world["id"])
-        contents = [compile_html(world).encode("utf-8"), canonical(handoff)]
+        from .overlay import compile_overlay_html
+        contents = [compile_overlay_html(
+            world, factions=data).encode("utf-8"),
+            canonical(handoff)]
         receipt = {
             "schema": RECEIPT_SCHEMA, "world_id": world["id"],
             "world_digest": digest(world), "factions_digest": digest(data),
