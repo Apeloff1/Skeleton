@@ -183,6 +183,11 @@ def step_actors(
         raise MultiActorError("duplicate static collider id")
     if static_ids & set(ids):
         raise MultiActorError("static collider id collides with actor id")
+    known_ids = set(ids) | static_ids
+    if any(a not in known_ids or b not in known_ids
+           or (a in static_ids and b in static_ids)
+           for a, b in prev_contacts):
+        raise MultiActorError("previous contact references unknown or static-only bodies")
     events: list[SemanticEvent] = []
     moved: dict[str, ActorBody] = {}
     # 1 + 2: controller intent, gravity, floor.

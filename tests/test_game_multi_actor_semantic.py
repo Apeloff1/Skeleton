@@ -176,3 +176,14 @@ def test_semantic_receipt_binds_physics_authority():
 def test_semantic_physics_rejects_noncanonical_floor_height(floor):
     with pytest.raises(MultiActorError, match="floor height"):
         step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP, floor_y_mm=floor)
+
+
+def test_previous_contacts_cannot_forge_ghost_or_static_only_transitions():
+    body = actor("a", 0)
+    wall = AABB("wall", (10000, 0, 0), (11000, 1000, 1000))
+    other = AABB("wall2", (20000, 0, 0), (21000, 1000, 1000))
+    for contacts in (frozenset({("a", "ghost")}),
+                     frozenset({("wall", "wall2")})):
+        with pytest.raises(MultiActorError, match="previous contact references"):
+            step_actors((body,), {}, tick=0, step_ns=STEP,
+                        statics=(wall, other), prev_contacts=contacts)
