@@ -102,6 +102,8 @@ Commands:
     scene-market  Play earned-currency trading, crafting and delivery quests
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-push  Play crate physics, pressure plates, author, solve and replay
+    scene-push-play  Play live JSON-line crate puzzles with verified checkpoints
+    scene-push-accept  Prove playable puzzle, editor, restart and portable export
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -1021,6 +1023,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-weather-author":
         from skeleton.game.gameplay.scene_weather_author import cli as weather_author_cli
         return weather_author_cli(rest)
+    if cmd == "scene-push-play":
+        from skeleton.game.gameplay.scene_tile_push_interactive import cli as push_play_cli
+        return push_play_cli(rest)
+    if cmd == "scene-push-accept":
+        from skeleton.game.gameplay.scene_tile_push_acceptance import cli as push_accept_cli
+        return push_accept_cli(rest)
     if cmd == "scene-push":
         from skeleton.game.gameplay.scene_tile_push import cli as scene_push_cli
         return scene_push_cli(rest)

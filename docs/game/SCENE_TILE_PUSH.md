@@ -56,3 +56,19 @@ physical crate collisions, locked exits, earned keys, deterministic
 save/resume, transactional authoring, solver exhaustion, malformed JSON,
 forged journals, bundle tampering and CLI dispatch. No consumer-device or
 release qualification is implied by source publication.
+
+## Live play and end-to-end acceptance
+
+`python -m skeleton scene-push-play demo` replays the original puzzle through
+exactly the same bounded JSON-line input protocol used by a real player.
+`scene-push-play play --source-json ...` prompts with a state digest, legal
+actions, crate locations and activated plates, then accepts one action JSON
+per line. Supply `--session-json` to resume an independently replay-verified
+checkpoint. Invalid input is retried at most three times without changing
+state; EOF, exhausted turns and malformed commands never become a victory.
+
+`python -m skeleton scene-push-accept demo` proves a real authored victory,
+mid-session portable export/import, exact restart equality, editor preview,
+full replay and final portable package. `scene-push-accept accept --source-json
+... --actions-json ...` verifies custom authored levels. Acceptance receipts
+are deterministic integrity evidence, not device or release certificates.
