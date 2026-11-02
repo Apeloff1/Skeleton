@@ -139,6 +139,7 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton scene-weather-play")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo")
+    sub.add_parser("demo-script")
     p = sub.add_parser("play")
     p.add_argument("--source-json")
     p.add_argument("--session-json")
@@ -149,6 +150,12 @@ def cli(argv: Sequence[str]) -> int:
         if args.command == "demo":
             source, _ = original_weather()
             result = play_weather(source=source)
+        elif args.command == "demo-script":
+            from io import StringIO
+            source, actions = original_weather()
+            script = "".join(json.dumps(action, sort_keys=True) + "\n"
+                             for action in actions)
+            result = play_weather(source=source, input_stream=StringIO(script))
         else:
             if bool(args.source_json) == bool(args.session_json):
                 raise SceneTravelError("supply source or session JSON")
