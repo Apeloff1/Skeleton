@@ -118,8 +118,10 @@ def test_interactive_player_can_complete_original_drill() -> None:
     out = io.StringIO()
     result = play_drill(original_drill(), reader=inp, writer=out)
     assert result["outcome"] == "passed"
-    assert '"event": "drill_turn"' in out.getvalue()
-    assert '"event": "drill_terminal"' in out.getvalue()
+    events = [json.loads(line)["event"] for line in out.getvalue().splitlines()]
+    assert events[0] == "drill_turn"
+    assert events[-1] == "drill_terminal"
+    assert events.count("drill_turn") == 2
 
 
 def test_interactive_rejects_eof_without_fabricating_save() -> None:
