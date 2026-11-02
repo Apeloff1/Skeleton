@@ -667,3 +667,21 @@ def test_duplicate_mesh_alias_reference_budget_is_global(tmp_path, monkeypatch):
     assert report.imported == []
     assert any("external reference count exceeds bound" in issue.detail
                for issue in report.issues)
+
+
+def test_jpeg_rejects_forged_frame_inside_malformed_segment():
+    # The old scanner could accept a forged SOF outside a valid segment.
+    sof = (b"\xff\xc0\x00\x11\x08" + struct.pack(">HH", 3, 5)
+           + b"\x03" + b"\x00" * 9)
+    valid = b"\xff\xd8\xff\xe0\x00\x04\x00\x00" + sof
+    assert import_bytes("valid.jpg", valid).metadata["width"] == 5
+    invalid = (
+        b"\xff\xd8\xff\xe0\x00\x01" + sof,  # invalid short segment
+        b"\xff\xd8\xff\xe0\x00\x20\x00\x00" + sof,  # segment overruns source
+        b"\xff\xd8\xff\xd9" + sof,  # terminal marker before frame
+        b"\xff\xd8" + sof[:3] + b"\x07" + sof[4:],  # frame length shorter than header
+        b"\xff\xd8" + sof[:9] + b"\x00" + sof[10:],  # zero channel count
+    )
+    for forged in invalid:
+        with pytest.raises(AssetImportError):
+            import_bytes("forged.jpg", forged)
