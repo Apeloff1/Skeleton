@@ -53,7 +53,10 @@ def test_real_two_game_install_play_save_restore_and_consumer_readiness(
     assert result["all_installed_games_and_private_saves_reexecuted"] is True
     assert result["canonical_cohort_inspections"] == 2
     assert result["source_level_replay_passes_per_game"] == 2
-    assert result["cohort_and_job_inodes_stable"] is True
+    assert result["cohort_and_job_inodes_stable"] is False
+    assert result["root_and_evidence_inodes_stable"] is True
+    assert result["nested_asset_inode_inventory_attested"] is False
+    assert result["private_jobfile_inode_attested"] is False
     assert result["read_only"] is True
     assert result["files_published"] == 0
     assert result["release_holds"]
@@ -96,6 +99,7 @@ def test_cli_pinned_private_jobfile_and_explicit_release_holds(
     report = json.loads(capsys.readouterr().out)
     assert report["game_count"] == 2
     assert report["independent_jobs_sha256"] == job_pin
+    assert report["private_jobfile_inode_attested"] is True
     assert report["native_device_qualified"] is False
     assert report["release_certified"] is False
     assert report["files_published"] == 0
