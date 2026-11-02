@@ -152,6 +152,7 @@ Commands:
     status      Shared runtime status command
     config      Shared non-secret configuration command
     help        Show this help message
+    combat-campaign-timeline  Audit player turns, earned rewards and portable saves
 """
 
 from __future__ import annotations
@@ -909,7 +910,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-campaign-timeline":
         from skeleton.game.gameplay.combat_campaign_timeline import cli as campaign_timeline_cli
         return campaign_timeline_cli(rest)
-    combat-campaign-timeline  Audit player turns, earned rewards and portable saves
     if cmd == "combat-campaign-player":
         from skeleton.game.gameplay.combat_campaign_player import cli as campaign_player_cli
         return campaign_player_cli(rest)
