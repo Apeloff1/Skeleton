@@ -11,6 +11,25 @@ from .evidence import (
 from .world_canon import CanonError, WorldStore, digest, strict_json
 
 
+def _operation_bytes(args: argparse.Namespace) -> bytes:
+    if args.operation_json is not None:
+        return args.operation_json.encode("utf-8")
+    import os
+    import stat
+    fd = os.open(args.operation_file, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 524288:
+            raise CanonError("unsafe_operation_file")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            raw = stream.read(524289)
+        if len(raw) > 524288:
+            raise CanonError("operation_too_large")
+        return raw
+    finally:
+        os.close(fd)
+
+
 def run(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton world-evidence")
     parser.add_argument("--store", required=True)
@@ -19,13 +38,16 @@ def run(argv: list[str]) -> int:
     for field in ("world-id", "prompt", "clue-id", "title", "detail",
                   "unlock-choice"):
         proposal.add_argument("--" + field, required=True)
-    for action in ("inspect", "edit", "approve", "compile", "verify", "player"):
+    for action in ("inspect", "edit", "approve", "compile", "verify", "player",
+                   "editor", "verify-editor"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
-        if action in ("edit", "approve", "compile"):
+        if action in ("edit", "approve", "compile", "editor"):
             cmd.add_argument("--expected-digest", required=True)
         if action == "edit":
-            cmd.add_argument("--operation-json", required=True)
+            input_group = cmd.add_mutually_exclusive_group(required=True)
+            input_group.add_argument("--operation-json")
+            input_group.add_argument("--operation-file")
         if action == "approve":
             cmd.add_argument("--note", required=True)
         if action == "player":
@@ -33,7 +55,15 @@ def run(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     try:
         store = EvidenceStore(args.store)
-        if args.action == "verify":
+        if args.action == "editor":
+            from .review_editor import ReviewEditorStore
+            result = {"ok": True, "editor": ReviewEditorStore(args.store).render(
+                args.world_id, "evidence", args.expected_digest)}
+        elif args.action == "verify-editor":
+            from .review_editor import ReviewEditorStore
+            result = {"ok": True, "editor": ReviewEditorStore(args.store).verify(
+                args.world_id, "evidence")}
+        elif args.action == "verify":
             result = {"ok": True, "receipt": store.verify(args.world_id)}
         elif args.action == "compile":
             result = {"ok": True, "receipt": store.compile(
@@ -58,7 +88,7 @@ def run(argv: list[str]) -> int:
                     if digest(data) != args.expected_digest:
                         raise CanonError("stale_evidence")
                     updated = (edit_evidence(
-                        data, world, strict_json(args.operation_json.encode("utf-8")))
+                        data, world, strict_json(_operation_bytes(args)))
                         if args.action == "edit" else
                         approve_evidence(data, world, args.note))
                     result = {"ok": True, "evidence_digest": store.publish(
