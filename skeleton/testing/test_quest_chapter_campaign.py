@@ -72,7 +72,7 @@ def test_alternate_ending_blocks_future_chapters_without_granting_flags():
     lambda s: s["state"].update(flags=["harbor_secured"]),
     lambda s: s["state"]["history"][0].update(accepted=False),
     lambda s: s["state"].update(chapter_index=1),
-    lambda s: s["state"].update(phase="won"),
+    lambda s: s["state"].update(phase="lost"),
     lambda s: s["journal"][0].update(receipt="0" * 64),
     lambda s: s["journal"][1]["action"].update(kind="advance"),
     lambda s: s["save"].update(parent_save_digest=None),
@@ -83,6 +83,7 @@ def test_tampered_campaign_save_is_rejected(mutation):
         saved = _finished()
     bad = copy.deepcopy(saved)
     mutation(bad)
+    assert bad != saved, "tamper fixture must modify the checkpoint"
     with pytest.raises(CombatSessionError):
         verify_campaign(bad)
 
