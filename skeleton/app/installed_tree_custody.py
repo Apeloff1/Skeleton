@@ -109,8 +109,19 @@ def snapshot_installed_tree(root: str | Path) -> tuple[tuple[str, tuple[int, ...
                 raise InstalledTreeCustodyError(
                     "installed tree entry budget exceeded"
                 )
-        if (tuple(sorted(_bounded_names(fd, MAX_ENTRIES + 1)))
-                != tuple(sorted(names))
+        # os.scandir(fd) may advance the shared directory stream offset.
+        # Reopen "." relative to the pinned descriptor for an independent
+        # directory stream rather than trusting a second scan on the same fd.
+        reopened = os.open(".", _flags(True), dir_fd=fd)
+        try:
+            if _identity(os.fstat(reopened)) != before:
+                raise InstalledTreeCustodyError(
+                    "installed directory replaced during inventory"
+                )
+            final_names = _bounded_names(reopened, MAX_ENTRIES + 1)
+        finally:
+            os.close(reopened)
+        if (tuple(sorted(final_names)) != tuple(sorted(names))
                 or _identity(os.fstat(fd)) != before):
             raise InstalledTreeCustodyError(
                 "installed directory changed during inventory"
