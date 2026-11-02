@@ -404,3 +404,47 @@ def test_archive_publication_source_swap_blocks_install_and_preserves_zip(
         )
     assert archive.is_file()
     assert all(not item.exists() for item in (install, save, receipt))
+
+
+def test_consumer_first_run_evidence_replays_real_installed_game(
+    original_source, tmp_path, capsys,
+):
+    """Canonical CLI checks actual install/save twice, without release claims."""
+    published, (archive, install, save, receipt), manifest_pin = _publish(
+        original_source, tmp_path,
+    )
+    command = [
+        "consumer-first-run-readiness",
+        "--installed", str(install),
+        "--archive", str(archive),
+        "--save", str(save),
+        "--receipt", str(receipt),
+        "--expected-manifest-sha256", manifest_pin,
+        "--expected-archive-sha256", published["archive_sha256"],
+        "--expected-save-sha256", published["save_sha256"],
+        "--expected-receipt-sha256", published["independent_receipt_sha256"],
+        "--trusted-local-operator",
+    ]
+    before = {path: path.read_bytes() for path in (archive, save, receipt)}
+    assert run_app_cli(command) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["source_level_replay_passes"] == 2
+    assert result["installed_game_and_private_save_reexecuted"] is True
+    assert result["all_input_inodes_stable_during_inspection"] is True
+    assert result["files_published"] == 0
+    assert result["read_only"] is True
+    assert result["native_device_qualified"] is False
+    assert result["windows_laptop_qualified"] is False
+    assert result["installer_qualified"] is False
+    assert result["guarded_local_ai_qualified"] is False
+    assert result["package_signed"] is False
+    assert result["rights_certified"] is False
+    assert result["release_certified"] is False
+    assert "NATIVE_DEVICE_QUALIFICATION_ABSENT" in result["release_holds"]
+    assert all(path.read_bytes() == data for path, data in before.items())
+    assert run_app_cli(command[:-1]) == 2
+    assert json.loads(capsys.readouterr().err)["release_certified"] is False
+    wrong_pin = list(command)
+    wrong_pin[wrong_pin.index("--expected-save-sha256") + 1] = "0" * 64
+    assert run_app_cli(wrong_pin) == 2
+    assert json.loads(capsys.readouterr().err)["native_device_qualified"] is False
