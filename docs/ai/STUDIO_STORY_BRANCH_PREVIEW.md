@@ -45,3 +45,14 @@ keys, forged release claims, stale sources, or illegal actions.
 
 The Node runtime harness covers undo and comparison without mutation. The
 Python suite covers independent replay, session digests, and hostile input.
+
+## Typed Jeeves read-only tool
+
+`studio_original_story_checkpoint` exposes the same canonical preview and
+checkpoint comparison through a closed request schema, exact quest-source
+lease, bounded UTF-8 checkpoint strings, and explicit operator authorization.
+The Jeeves game orchestrator delegates to the canonical Python replay. Both
+canonical and mirror Jeeves module paths carry byte-identical tool and
+orchestrator implementations. The tool returns request/result digests and
+explicitly denies file-write, browser-trust, native, external-evidence, and
+release claims. It never uses model-provided authorization fields.

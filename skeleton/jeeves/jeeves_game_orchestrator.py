@@ -87,6 +87,12 @@ class JeevesGameOrchestrator:
         from .studio_choice_rehearsal_tool import execute_choice_rehearsal_tool
         return execute_choice_rehearsal_tool(request, authorized=authorized)
 
+    def authoritative_story_checkpoint(self, request: Mapping[str, Any], *,
+                                       authorized: bool = False) -> dict[str, Any]:
+        """Preview or compare source-bound browser checkpoints without writes."""
+        from .studio_story_checkpoint_tool import execute_story_checkpoint_tool
+        return execute_story_checkpoint_tool(request, authorized=authorized)
+
     def model_card(self) -> str:
         return (
             "Jeeves game orchestrator: one call produces unified brief, advanced systems, "
