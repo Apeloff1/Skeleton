@@ -211,6 +211,22 @@ class AdmissionBundleTests(unittest.TestCase):
         self.assertFalse(self.memory.reserved)
         self.assertEqual(self.bundle.status()["active"], 0)
 
+    def test_fair_cycle_partial_publication_failure_rolls_back(self):
+        other = self.fair_setup()
+        self.bundle._nonce = lambda n, seq=iter(("c" * 64, "e" * 64)): next(seq)
+        class FailSecond(dict):
+            def __setitem__(self, key, value):
+                if len(self) >= 1:
+                    raise MemoryError("simulated publication failure")
+                return super().__setitem__(key, value)
+        self.bundle._entries = FailSecond()
+        result = self.bundle.reserve_fair_cycle((self.request, other),
+                                                quantum_tokens=8)
+        self.assertEqual(result["state"], "hold")
+        self.assertEqual(self.bundle.status()["active"], 0)
+        self.assertFalse(self.cpu.reserved)
+        self.assertFalse(self.memory.reserved)
+
     def test_fair_cycle_input_validation_and_budget(self):
         other = self.fair_setup()
         with self.assertRaises(LongContextSpoolError):

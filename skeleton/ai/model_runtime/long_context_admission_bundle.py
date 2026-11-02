@@ -263,6 +263,7 @@ class LongContextAdmissionBundle:
                         "reservations": []}
             memory_keys: list[str] = []
             cpu_keys: list[str] = []
+            inserted_keys: list[str] = []
             published = False
             try:
                 memory = self._memory.reserve_fair_cycle(
@@ -276,6 +277,7 @@ class LongContextAdmissionBundle:
                         or memory.get("state") != "reserved"
                         or memory.get("cycle_atomic_within_process") is not True
                         or memory.get("cross_process_exclusive") is not False
+                        or memory.get("device_qualified") is not False
                         or any(memory.get(k) is not False for k in (
                             "is_execution_lease", "is_admission_grant",
                             "is_memory_allocation"))
@@ -284,6 +286,8 @@ class LongContextAdmissionBundle:
                         or len(memory["reservations"]) != len(ordered)):
                     return {**self._receipt("hold", "fair_cycle_memory_unverified"),
                             "reservations": []}
+                if len(set(memory_keys)) != len(ordered):
+                    raise LongContextSpoolError("duplicate fair-cycle RAM identity")
                 memory_map = {}
                 from hashlib import sha256
                 for entry in memory["reservations"]:
@@ -320,6 +324,8 @@ class LongContextAdmissionBundle:
                         or len(cpu["reservations"]) != len(ordered)):
                     return {**self._receipt("hold", "fair_cycle_cpu_unverified"),
                             "reservations": []}
+                if len(set(cpu_keys)) != len(ordered):
+                    raise LongContextSpoolError("duplicate fair-cycle CPU identity")
                 cpu_map = {}
                 from .long_context_progress import _name
                 for entry in cpu["reservations"]:
@@ -347,6 +353,7 @@ class LongContextAdmissionBundle:
                         memory_map[sha256(request.memory.stream_id.encode("ascii")).hexdigest()]["reservation_id"],
                         cpu_map[_name(request.cpu.stream_id)]["reservation_id"],
                         digest)
+                    inserted_keys.append(key)
                     receipts.append({
                         "stream_digest": _name(request.cpu.stream_id),
                         "bundle_id": key, "window_digest": digest,
@@ -361,6 +368,10 @@ class LongContextAdmissionBundle:
                         "reservations": []}
             finally:
                 if not published:
+                    # A failure while publishing later entries must not leave
+                    # an earlier stream visible as a partial fair cycle.
+                    for key in inserted_keys:
+                        self._entries.pop(key, None)
                     for guard, keys in ((self._cpu, cpu_keys),
                                         (self._memory, memory_keys)):
                         for key in set(keys):
@@ -389,6 +400,7 @@ class LongContextAdmissionBundle:
                     or cpu.get("claimed") is not True
                     or cpu.get("schema") != "skeleton.ai.cpu-capacity-guard.v1"
                     or cpu.get("window_digest") != digest
+                    or cpu.get("device") != "cpu"
                     or cpu.get("device_qualified") is not False
                     or cpu.get("is_execution_lease") is not False
                     or cpu.get("is_admission_grant") is not False

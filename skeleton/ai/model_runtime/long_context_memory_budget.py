@@ -286,8 +286,15 @@ class LongContextMemoryBudgetGuard:
             after = self._now()
             if after - now >= self._limits.lifetime_ns:
                 return self._receipt("hold", "memory_observation_expired")
-            key = token_hex(24)
-            if key in self._entries:
+            if after > _MAX - self._limits.lifetime_ns:
+                return self._receipt("hold", "memory_clock_overflow")
+            try:
+                key = token_hex(24)
+            except Exception:
+                return self._receipt("hold", "reservation_identity_unavailable")
+            if (type(key) is not str or len(key) != 48
+                    or any(c not in "0123456789abcdef" for c in key)
+                    or key in self._entries):
                 return self._receipt("hold", "reservation_collision")
             self._entries[key] = _Entry(request, after + self._limits.lifetime_ns)
             return self._receipt("reserved", "cooperative_only", key)

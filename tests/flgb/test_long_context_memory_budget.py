@@ -61,6 +61,16 @@ class MemoryBudgetGuardTests(unittest.TestCase):
         self.two = MemoryBudgetRequest("owner", "stream-b", 512)
         self.other = MemoryBudgetRequest("other", "stream-c", 512)
 
+    def test_nonce_failure_and_invalid_identity_never_publish(self):
+        for outcome in (OSError("entropy unavailable"), "not-a-token"):
+            with self.subTest(outcome=outcome):
+                with patch("skeleton.ai.model_runtime.long_context_memory_budget.token_hex",
+                           side_effect=outcome if isinstance(outcome, Exception) else None,
+                           return_value=outcome if isinstance(outcome, str) else None):
+                    result = self.guard.reserve(self.one)
+                self.assertEqual(result["state"], "hold")
+                self.assertEqual(self.guard.status()["active"], 0)
+
     def test_fair_cycle_atomic_claim_and_release(self):
         result = self.guard.reserve_fair_cycle((self.other, self.one))
         self.assertEqual(result["state"], "reserved")
