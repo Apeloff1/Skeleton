@@ -118,3 +118,9 @@ the same underlying file inode into the new directory is rejected at the
 next replay boundary, even when the file digest remains identical. This
 closes a path-custody gap not addressed by file-only inode comparisons.
 No persistent lock or device qualification is implied.
+
+Cohort acceptance also snapshots the parent-directory identities of every
+game's installed root, archive, private save, and receipt before replay,
+and rechecks all of them at each cross-game barrier. A later game cannot
+launder a replacement evidence parent for an earlier game merely by moving
+the original file inode into the new directory.

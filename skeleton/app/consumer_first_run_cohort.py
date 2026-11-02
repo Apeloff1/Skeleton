@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Sequence
 
 from skeleton.app.consumer_first_run_readiness import (
-    RELEASE_HOLDS, inspect_consumer_first_run,
+    RELEASE_HOLDS, _custody as _consumer_input_custody,
+    inspect_consumer_first_run,
 )
 from skeleton.app.offline_delivery_assurance import _save_identity
 from skeleton.app.installed_tree_custody import (
@@ -96,8 +97,24 @@ def inspect_consumer_first_run_cohort(
         _nested_snapshots(checked, original_sources=True)
         if verify_original_sources else None
     )
+    # A later game may move an earlier game's *same file inode* into a
+    # different parent directory. File and root identities alone cannot
+    # detect that path-custody substitution across consumer games.
+    input_parents_before = tuple(
+        _consumer_input_custody(
+            job.install, job.archive, job.save, job.receipt,
+        ) for job in checked
+    )
 
     def require_all_nested_custody() -> None:
+        if tuple(
+            _consumer_input_custody(
+                job.install, job.archive, job.save, job.receipt,
+            ) for job in checked
+        ) != input_parents_before:
+            raise ConsumerFirstRunCohortError(
+                "consumer evidence parent inode changed during cross-game replay"
+            )
         _require_nested_custody(checked, nested_before)
         if source_nested_before is not None:
             _require_nested_custody(
@@ -215,6 +232,7 @@ def inspect_consumer_first_run_cohort(
         "nested_asset_inode_inventory_attested": True,
         "nested_asset_inode_snapshots_equal": True,
         "all_games_nested_inodes_checked_after_each_replay": True,
+        "all_game_evidence_parent_inodes_checked_after_each_replay": True,
         "original_source_nested_inode_inventory_attested": verify_original_sources,
         "original_source_nested_inode_snapshots_equal": verify_original_sources,
         "private_jobfile_inode_attested": False,

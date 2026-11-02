@@ -57,6 +57,7 @@ def test_real_two_game_install_play_save_restore_and_consumer_readiness(
     assert result["root_and_evidence_inodes_stable"] is True
     assert result["nested_asset_inode_inventory_attested"] is True
     assert result["nested_asset_inode_snapshots_equal"] is True
+    assert result["all_game_evidence_parent_inodes_checked_after_each_replay"] is True
     assert all(len(game["installed_tree_snapshot_sha256"]) == 64
                for game in result["games"])
     assert result["private_jobfile_inode_attested"] is False
@@ -397,4 +398,43 @@ def test_late_original_source_nested_swap_rejected_when_requested(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True, verify_original_sources=True,
+        )
+
+
+def test_late_cross_game_evidence_parent_swap_preserving_file_inode_rejected(
+    delivered_games, tmp_path, monkeypatch,
+):
+    from skeleton.app import consumer_first_run_cohort as module
+
+    jobs, summary, published = delivered_games
+    parent = tmp_path / "private-receipt-parent"
+    parent.mkdir(mode=0o700)
+    receipt = parent / "receipt.json"
+    receipt.write_bytes(Path(jobs[0].receipt).read_bytes())
+    receipt.chmod(0o600)
+    jobs = (replace(jobs[0], receipt=receipt), jobs[1])
+    inode = receipt.stat().st_ino
+    original = module.inspect_consumer_first_run
+    calls = 0
+
+    def swap_parent_after_later_game(*args, **kwargs):
+        nonlocal calls
+        result = original(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            retired = tmp_path / "retired-receipt-parent"
+            os.rename(parent, retired)
+            parent.mkdir(mode=0o700)
+            os.rename(retired / receipt.name, receipt)
+            assert receipt.stat().st_ino == inode
+        return result
+
+    monkeypatch.setattr(
+        module, "inspect_consumer_first_run", swap_parent_after_later_game,
+    )
+    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode"):
+        inspect_consumer_first_run_cohort(
+            jobs, summary,
+            expected_summary_sha256=published["independent_summary_sha256"],
+            authorized=True,
         )
