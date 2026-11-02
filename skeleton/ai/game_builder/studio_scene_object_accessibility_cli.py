@@ -12,6 +12,7 @@ from skeleton.ai.agents.jeeves.studio_scene_object_accessibility_tool import (
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_scene_object_accessibility import (
+    REQUEST_SCHEMA as SOURCE_REQUEST_SCHEMA,
     replay_scene_object_accessibility, render_scene_object_accessibility_html,
 )
 from skeleton.ai.game_builder.studio_story_checkpoint_cli import _read_private_checkpoint
@@ -77,8 +78,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_source_digest=args.quest_source_digest).decode("utf-8")
             digest = receipt["accessibility_digest"]
         else:
-            if type(data) is not dict or set(data) != {"scene_id", "labels"}:
+            if (type(data) is not dict or set(data) not in (
+                    {"scene_id", "labels"}, {"schema", "scene_id", "labels"})):
                 raise StudioQuestError("scene label input requires exact fields")
+            if "schema" in data and data["schema"] != SOURCE_REQUEST_SCHEMA:
+                raise StudioQuestError("unsupported scene label proposal schema")
             result = execute_scene_object_accessibility_tool({
                 "schema": REQUEST_SCHEMA, "project_id": args.project_id,
                 "expected_quest_source_digest": args.quest_source_digest,

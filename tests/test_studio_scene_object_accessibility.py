@@ -272,3 +272,13 @@ def test_prompt_proposal_cli_publishes_editable_private_request(
     assert set(payload["labels"]) == set(scene["objects"])
     assert (tmp_path / "proposed_labels.json").stat().st_mode & 0o077 == 0
     assert propose(args) == 2
+    # Feed the private typed proposal directly into the canonical editor compiler.
+    author_args = [
+        "--project-id", PROJECT, "--quest-source-digest", source,
+        "--request-file", "proposed_labels.json", "--format", "json",
+        "--output-file", "compiled_labels.json", "--trusted-local-operator",
+    ]
+    assert main(author_args) == 0
+    receipt = json.loads((tmp_path / "compiled_labels.json").read_text())
+    assert receipt["source_object_coverage_complete"] is True
+    assert receipt["asset_rendered"] is False
