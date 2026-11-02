@@ -268,3 +268,29 @@ def test_invalid_migration_clock_never_persists_bad_checkpoint(stores):
     with pytest.raises(ValueError, match="checkpoint clock"):
         invalid.encrypt_plaintext()
     assert checkpoints.get(JOB_ENCRYPT) is None
+
+
+def test_secret_checkpoint_monotonicity_survives_concurrent_stale_writer(stores):
+    """A slower worker must not rewind a completed or advanced checkpoint."""
+    from core.core_v1.secret_migration import Checkpoint
+
+    _, checkpoints = stores
+    checkpoints.save(Checkpoint(JOB_ENCRYPT, "sec_0010", False, 100.0))
+    for stale in (
+        Checkpoint(JOB_ENCRYPT, "sec_0009", False, 101.0),
+        Checkpoint(JOB_ENCRYPT, "sec_0010", False, 99.0),
+    ):
+        with pytest.raises(ValueError, match="checkpoint regression"):
+            checkpoints.save(stale)
+    assert checkpoints.get(JOB_ENCRYPT).cursor == "sec_0010"
+    checkpoints.save(Checkpoint(JOB_ENCRYPT, "sec_0010", True, 102.0))
+    with pytest.raises(ValueError, match="checkpoint regression"):
+        checkpoints.save(Checkpoint(JOB_ENCRYPT, "sec_0011", False, 103.0))
+    assert checkpoints.get(JOB_ENCRYPT).done is True
+
+    # Explicit force-reset is a separate operator action, not an implicit
+    # rewind permitted by a stale worker.
+    checkpoints.reset(JOB_ENCRYPT)
+    checkpoints.save(Checkpoint(JOB_ENCRYPT, "", False, 104.0))
+    assert checkpoints.get(JOB_ENCRYPT).cursor == ""
+    assert checkpoints.get(JOB_ENCRYPT).done is False

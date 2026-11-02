@@ -301,9 +301,16 @@ class SqliteCheckpointStore:
 
     def save(self, cp) -> None:
         with self.db.tx() as c:
-            c.execute("INSERT INTO core_v1_job_checkpoints VALUES (?,?,?,?) ON CONFLICT(job) DO UPDATE SET "
-                      "cursor=excluded.cursor, done=excluded.done, updated_at=excluded.updated_at",
-                      (cp.job, cp.cursor, int(cp.done), cp.updated_at))
+            updated = c.execute(
+                "INSERT INTO core_v1_job_checkpoints VALUES (?,?,?,?) "
+                "ON CONFLICT(job) DO UPDATE SET "
+                "cursor=excluded.cursor, done=excluded.done, updated_at=excluded.updated_at "
+                "WHERE excluded.cursor >= core_v1_job_checkpoints.cursor "
+                "AND excluded.updated_at >= core_v1_job_checkpoints.updated_at "
+                "AND (core_v1_job_checkpoints.done=0 OR excluded.done=1)",
+                (cp.job, cp.cursor, int(cp.done), cp.updated_at))
+            if updated.rowcount != 1:
+                raise ValueError("secret migration checkpoint regression")
 
     def reset(self, job: str) -> None:
         with self.db.tx() as c:

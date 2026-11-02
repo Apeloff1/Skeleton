@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
@@ -45,15 +46,25 @@ class JobCheckpointStore(Protocol):
 class MemoryCheckpointStore:
     def __init__(self) -> None:
         self._d: dict[str, Checkpoint] = {}
+        self._lock = threading.Lock()
 
     def get(self, job: str) -> Checkpoint | None:
-        return self._d.get(job)
+        with self._lock:
+            return self._d.get(job)
 
     def save(self, cp: Checkpoint) -> None:
-        self._d[cp.job] = cp
+        with self._lock:
+            previous = self._d.get(cp.job)
+            if previous is not None and (
+                cp.cursor < previous.cursor or cp.updated_at < previous.updated_at
+                or (previous.done and not cp.done)
+            ):
+                raise ValueError("secret migration checkpoint regression")
+            self._d[cp.job] = cp
 
     def reset(self, job: str) -> None:
-        self._d.pop(job, None)
+        with self._lock:
+            self._d.pop(job, None)
 
 
 @dataclass
