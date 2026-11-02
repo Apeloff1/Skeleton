@@ -22,6 +22,7 @@ from skeleton.app.consumer_first_run_cohort import inspect_pinned_consumer_cohor
 
 SCHEMA = "skeleton.app.consumer_release_evidence.v1"
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
+_PROJECT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 _REQUIRED_FALSE = (
     "release_certified", "native_device_qualified", "native_godot_executed",
     "windows_laptop_qualified", "installer_qualified",
@@ -58,7 +59,8 @@ def _validate_evidence(evidence: object, *, cohort: bool) -> dict[str, object]:
         raise ConsumerReleaseEvidenceError("canonical replay schema mismatch")
     if (any(evidence.get(key) is not False for key in _REQUIRED_FALSE)
             or any(evidence.get(key) is not True for key in _REQUIRED_TRUE)
-            or evidence.get("files_published") != 0
+            or type(evidence.get("files_published")) is not int
+            or evidence["files_published"] != 0
             or type(evidence.get("release_holds")) is not list
             or evidence["release_holds"] != list(RELEASE_HOLDS)):
         raise ConsumerReleaseEvidenceError(
@@ -71,16 +73,19 @@ def _validate_evidence(evidence: object, *, cohort: bool) -> dict[str, object]:
                 or type(games) is not list or len(games) != count
                 or evidence.get("private_jobfile_inode_attested") is not True
                 or evidence.get("all_installed_games_and_private_saves_reexecuted") is not True
-                or evidence.get("canonical_cohort_inspections") != 2
-                or evidence.get("source_level_replay_passes_per_game") != 2):
+                or type(evidence.get("canonical_cohort_inspections")) is not int
+                or evidence["canonical_cohort_inspections"] != 2
+                or type(evidence.get("source_level_replay_passes_per_game")) is not int
+                or evidence["source_level_replay_passes_per_game"] != 2):
             raise ConsumerReleaseEvidenceError("pinned consumer cohort replay incomplete")
         project_ids: set[str] = set()
         for index, game in enumerate(games):
             if (type(game) is not dict or game.get("index") != index
                     or type(game.get("project_id")) is not str
-                    or not game["project_id"]
+                    or _PROJECT.fullmatch(game["project_id"]) is None
                     or game["project_id"] in project_ids
-                    or game.get("source_level_replay_passes") != 2
+                    or type(game.get("source_level_replay_passes")) is not int
+                    or game["source_level_replay_passes"] != 2
                     or game.get("release_certified") is not False):
                 raise ConsumerReleaseEvidenceError("consumer cohort game identity invalid")
             for key in (
@@ -93,10 +98,11 @@ def _validate_evidence(evidence: object, *, cohort: bool) -> dict[str, object]:
         _sha(evidence.get("independent_jobs_sha256"), "jobs")
         _sha(evidence.get("independent_summary_sha256"), "summary")
     else:
-        if (evidence.get("source_level_replay_passes") != 2
+        if (type(evidence.get("source_level_replay_passes")) is not int
+                or evidence["source_level_replay_passes"] != 2
                 or evidence.get("installed_game_and_private_save_reexecuted") is not True
                 or type(evidence.get("project_id")) is not str
-                or not evidence["project_id"]
+                or _PROJECT.fullmatch(evidence["project_id"]) is None
                 or type(evidence.get("action_count")) is not int
                 or not 1 <= evidence["action_count"] <= 64):
             raise ConsumerReleaseEvidenceError("single-game source replay incomplete")

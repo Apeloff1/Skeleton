@@ -128,7 +128,11 @@ def test_independent_single_pins_fail_closed(delivered_first_run, field):
     {"release_holds": []},
     {"installed_tree_snapshot_sha256": "z" * 64},
     {"files_published": 1},
+    {"files_published": False},
     {"source_level_replay_passes": 1},
+    {"source_level_replay_passes": 2.0},
+    {"project_id": "../escape"},
+    {"project_id": "bad\\nproject"},
 ])
 def test_forged_canonical_replay_claims_rejected(
     delivered_first_run, monkeypatch, forgery,
