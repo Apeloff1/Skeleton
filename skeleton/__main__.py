@@ -79,6 +79,7 @@ Commands:
     world-quest  Original objective authoring, earned consequences and quest proof
     world-counterfactual Reviewed alternate endings from actual player choices
     world-lore   Original lore canon, branch contradiction proof and player reveal
+    world-factions Reviewed faction reputation, earned choices and playable handoff
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -809,6 +810,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-lore":
         from skeleton.jeeves.worlds.lore_cli import run as world_lore_cli
         return world_lore_cli(rest)
+    if cmd == "world-factions":
+        from skeleton.jeeves.worlds.factions_cli import run as world_factions_cli
+        return world_factions_cli(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
