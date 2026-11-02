@@ -67,7 +67,7 @@ def quest_section(world: DirectorWorld, state: DirectorState,
         raise QuestProgressSaveError("quest section exceeds bounded collection size")
     # Reject forged objects before reading their attributes. Otherwise an
     # untrusted section producer can escape the typed fail-closed boundary.
-    if any(not isinstance(q, QuestProgressState) for q in quests):
+    if any(type(q) is not QuestProgressState for q in quests):
         raise QuestProgressSaveError("invalid quest progress object")
     quest_ids = [q.quest_id for q in quests]
     if any(not _safe_text(qid, 128) for qid in quest_ids):
@@ -75,10 +75,10 @@ def quest_section(world: DirectorWorld, state: DirectorState,
     if len(set(quest_ids)) != len(quest_ids):
         raise QuestProgressSaveError("duplicate quest identity in section")
     for quest in quests:
-        if not isinstance(quest, QuestProgressState):
+        if type(quest) is not QuestProgressState:
             raise QuestProgressSaveError("invalid quest progress object")
         _progress(quest.as_dict())
-    if any(not isinstance(failure, QuestFailure) for failure in failures):
+    if any(type(failure) is not QuestFailure for failure in failures):
         raise QuestProgressSaveError("invalid quest failure object")
     failure_docs = [{"quest": f.quest, "kind": f.kind, "reason": f.reason}
                     for f in failures]

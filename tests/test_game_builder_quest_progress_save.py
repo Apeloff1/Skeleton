@@ -66,6 +66,27 @@ class QuestSaveTests(unittest.TestCase):
             with self.assertRaisesRegex(QuestProgressSaveError, "invalid quest progress object"):
                 quest_section(self.w, self.state, [malformed])
 
+    def test_quest_section_rejects_subclass_overrides_before_callbacks(self):
+        from skeleton.frontier.progression.quests import QuestProgressState
+
+        class ForgedProgress(QuestProgressState):
+            def as_dict(self):
+                raise AssertionError("untrusted quest callback executed")
+
+        class ForgedFailure(QuestFailure):
+            def __getattribute__(self, name):
+                if name in ("quest", "kind", "reason"):
+                    raise AssertionError("untrusted failure attribute executed")
+                return super().__getattribute__(name)
+
+        forged = ForgedProgress(self.prog.quest_id, self.prog.status,
+                                self.prog.objectives)
+        with self.assertRaisesRegex(QuestProgressSaveError, "invalid quest progress object"):
+            quest_section(self.w, self.state, [forged])
+        failure = ForgedFailure("q2", "turn_limit", "late")
+        with self.assertRaisesRegex(QuestProgressSaveError, "invalid quest failure object"):
+            quest_section(self.w, self.state, [self.prog], failures=[failure])
+
     def test_quest_section_rejects_duplicate_ids_before_manifest_serialization(self):
         with self.assertRaisesRegex(QuestProgressSaveError, "duplicate quest identity"):
             quest_section(self.w, self.state, [self.prog, self.prog])
