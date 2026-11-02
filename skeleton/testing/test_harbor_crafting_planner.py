@@ -132,6 +132,7 @@ def test_route_solver_is_bounded_and_does_not_fabricate_wins():
     source["map"] = [
         "########", "#......#", "########", "#......#", "#...#..#", "########"
     ]
+    source["npc"]["route"] = [[4, 1], [5, 1]]
     # The authored food deposit and dock are on the disconnected side.
     # The world is geometrically valid but no legal route reaches the cargo.
     with pytest.raises(HarborError, match="route solver"):
