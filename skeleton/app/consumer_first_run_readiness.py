@@ -23,7 +23,7 @@ from skeleton.app.offline_first_playable_delivery import (
 )
 
 SCHEMA = "skeleton.app.consumer_first_run_evidence.v1"
-_SHA256 = re.compile(r"[0-9a-f]{64}\\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 RELEASE_HOLDS = (
     "NATIVE_DEVICE_QUALIFICATION_ABSENT",
     "INSTALLER_DEVICE_LIFECYCLE_UNQUALIFIED",
