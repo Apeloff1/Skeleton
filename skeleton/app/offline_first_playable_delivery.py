@@ -102,14 +102,26 @@ def _preflight(
     preflight_receipt_destination(
         receipt, protected_roots=(source, install), authorized=True,
     )
+    # Byte-identical directory replacement is still a custody change. Bind
+    # the original source root across BOTH independent verifier passes, not
+    # only after admission returns to the publisher.
+    source_identity = _source_identity(source)
     before = verify_exported_package(
         source, expected_manifest_sha256=expected_manifest_sha256,
         authorized=True,
     )
+    if _source_identity(source) != source_identity:
+        raise FirstPlayableDeliveryAcceptanceError(
+            "original source root changed during first admission replay"
+        )
     after = verify_exported_package(
         source, expected_manifest_sha256=expected_manifest_sha256,
         authorized=True,
     )
+    if _source_identity(source) != source_identity:
+        raise FirstPlayableDeliveryAcceptanceError(
+            "original source root changed during second admission replay"
+        )
     if before != after or before.get("offline_gameplay_reexecuted") is not True:
         raise FirstPlayableDeliveryAcceptanceError(
             "original source changed or did not replay during admission"

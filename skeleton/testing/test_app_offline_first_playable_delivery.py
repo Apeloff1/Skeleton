@@ -329,3 +329,43 @@ def test_dotdot_install_alias_into_original_source_fails_before_publication(
         )
     assert not (source / "new-install").exists()
     assert all(not path.exists() for path in (archive, install, save, receipt))
+
+
+@pytest.mark.parametrize("swap_on", [1, 2])
+def test_identical_byte_source_root_swap_during_preflight_fails_before_write(
+    original_source, tmp_path, monkeypatch, swap_on,
+):
+    """Two matching game hashes do not excuse an inode substitution."""
+    import shutil
+    from skeleton.app import offline_first_playable_delivery as module
+
+    source = tmp_path / "original-copy"
+    replacement = tmp_path / "replacement"
+    shutil.copytree(original_source[0], source)
+    shutil.copytree(original_source[0], replacement)
+    old = tmp_path / "old-source"
+    archive, install, save, receipt = _destinations(tmp_path)
+    original_verify = module.verify_exported_package
+    calls = 0
+
+    def replace_after_replay(*args, **kwargs):
+        nonlocal calls
+        observed = original_verify(*args, **kwargs)
+        calls += 1
+        if calls == swap_on:
+            source.rename(old)
+            replacement.rename(source)
+        return observed
+
+    monkeypatch.setattr(module, "verify_exported_package", replace_after_replay)
+    with pytest.raises(
+        FirstPlayableDeliveryAcceptanceError, match="source root changed",
+    ):
+        publish_first_playable_delivery(
+            source, archive, install, save, receipt,
+            expected_manifest_sha256=original_source[1],
+            moves=("up", "right"), authorized=True,
+        )
+    assert calls == swap_on
+    assert all(not item.exists() for item in (archive, install, save, receipt))
+    assert old.is_dir() and source.is_dir()

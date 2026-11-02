@@ -553,7 +553,7 @@ def _validated_stored_records(
         "action_count", "moves_sha256",
     ))
     records: list[dict[str, object]] = []
-    for index, (raw, job) in enumerate(zip(raw_games, jobs, strict=True)):
+    for raw, job in zip(raw_games, jobs, strict=True):
         if type(raw) is not dict or raw.keys() != required:
             raise FirstPlayableDeliveryBatchError(
                 "malformed canonical summary game record"
