@@ -6,6 +6,7 @@ from .contracts import InferenceRequest,GenerationReceipt,SpineLimits,Conflict,I
 from .principal import require_session
 from .chain import append
 from .outbox import emit
+from .capacity.proofs import validate_decision, decision_digest
 
 def _validate_result(req,limit,result):
     if not isinstance(result,GenerationReceipt):raise Conflict('backend did not return verified receipt')
@@ -16,7 +17,8 @@ def _validate_result(req,limit,result):
     if len(result.text.encode('utf8'))>limit.response_bytes:raise Conflict('response byte budget exceeded')
 
 def commit(conn,req:InferenceRequest,limits:SpineLimits,result:GenerationReceipt,token:int,*,
-           context_sha256:str,source_receipts:tuple[dict,...]=(),omitted_turns:int=0)->dict:
+           context_sha256:str,source_receipts:tuple[dict,...]=(),omitted_turns:int=0,
+           capacity_report:dict|None=None)->dict:
     hexdigest(context_sha256,'context projection')
     if type(omitted_turns)is not int or not 0<=omitted_turns<=limits.max_history:
         raise Conflict('invalid omitted-history accounting')
@@ -28,6 +30,28 @@ def commit(conn,req:InferenceRequest,limits:SpineLimits,result:GenerationReceipt
         hexdigest(item['sha256'],'source passage')
         refs.append({'id':item['source_id'],'revision':item['revision'],
                      'passage_sha256':item['sha256'],'document_sha256':item.get('document_sha256')})
+    if capacity_report is not None:
+        validate_decision(capacity_report)
+        if (capacity_report['projection_sha256']!=context_sha256 or
+            capacity_report['omitted_turns']!=omitted_turns or
+            capacity_report['retained_sources']!=len(source_receipts)):
+            raise Conflict('capacity and authoritative commit do not agree')
+        recomputed=decision_digest(req.identity,limits,context_sha256,
+            capacity_report['history_sha256'],
+            capacity_report['candidate_evidence_sha256'],
+            capacity_report['selected_evidence_sha256'],omitted_turns,
+            capacity_report['omitted_sources'],
+            capacity_report['token_admission'],
+            capacity_report['native_prompt_tokens'])
+        if recomputed!=capacity_report['proof_sha256']:
+            raise Conflict('context capacity proof digest is invalid')
+        if (capacity_report['token_admission']=='exact-backend-count-admitted'
+            and capacity_report['native_prompt_tokens']!=result.prompt_tokens):
+            raise Conflict('native tokenizer preflight and generation accounting disagree')
+        expected_selected=[{'source':item['source_id'],
+            'revision':item['revision'],'sha256':item['sha256']} for item in source_receipts]
+        if sha256(canonical(expected_selected)).hexdigest()!=capacity_report['selected_evidence_sha256']:
+            raise Conflict('capacity source digests disagree with committed evidence')
     _validate_result(req,limits,result)
     saved=require_session(conn,req.identity,req.session)
     if saved['state']!='open':raise Conflict('session closed before commit')
@@ -48,6 +72,8 @@ def commit(conn,req:InferenceRequest,limits:SpineLimits,result:GenerationReceipt
            'finish_reason':result.finish_reason,'principal':req.identity.key(),
            'context_sha256':context_sha256,'omitted_turns':omitted_turns,
            'evidence_refs':refs}
+    if capacity_report is not None:
+        event['context_capacity']=capacity_report
     raw=canonical(event)
     if conn.execute("UPDATE sessions SET revision=? WHERE session=? AND revision=? AND state='open'",
         (revision,req.session,saved['revision'])).rowcount!=1:raise Conflict('concurrent session revision update')

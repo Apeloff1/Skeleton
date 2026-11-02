@@ -16,6 +16,8 @@ from .context import Evidence,compile_projection
 from .window import plan
 from .citation_guard import audit_citations
 from .token_admission import inspect_token_budget
+from .capacity import prepare_context
+from .capacity.proofs import describe_decision
 from .adapter import generate,RealBackend
 from .lease import SessionGate
 from .cancellation import Cancellation
@@ -52,42 +54,50 @@ class ExecutionSpine:
         cancel=cancellation or Cancellation(deadline_ms=self.limits.deadline_ms)
         cancel.check()
         with self.session_gate.hold(session,deadline_ms=cancel.remaining_ms()):
-            with self.db.transaction() as conn:
+            # Check idempotent replay *before* preparing a fresh context: a
+            # committed result is authoritative even if sources were later
+            # deleted, the model changed its tokenizer implementation, or the
+            # current context ceiling was tightened.
+            with self.db.snapshot() as conn:
                 replay=receipts.replay(conn,req)
                 if replay is not None:return replay
+                saved=history.load(conn,self.identity,session,self.limits)
+            # Context admission is entirely read-only and MUST precede durable
+            # request reservation. A malformed source or an overlong prompt
+            # cannot strand an inference lease before the model even starts.
+            cancel.check()
+            evidence=self.evidence_provider(self.identity,prompt) if self.evidence_provider else ()
+            prepared=prepare_context(identity=self.identity,backend=self.backend,
+                history=saved,prompt=prompt,evidence=evidence,limits=self.limits)
+            cancel.check()
+            with self.db.transaction() as conn:
                 available=requests.reserve(conn,req,self.limits,
                     lease_ns=self.limits.deadline_ms*1_000_000)
                 if available['state']=='committed':
                     return receipts.replay(conn,req) or (_ for _ in ()).throw(Conflict('lost committed receipt'))
                 token=available['token']
-            # Prove the complete prior transcript before using its bytes.
-            cancel.check()
-            with self.db.snapshot() as conn:
-                saved=history.load(conn,self.identity,session,self.limits)
-            evidence=tuple(self.evidence_provider(self.identity,prompt)) if self.evidence_provider else ()
-            window=plan(saved,self.limits,reserve_bytes=min(8192,4096+len(prompt.encode('utf8'))))
-            projection=compile_projection(self.identity,window.messages,prompt,evidence,self.limits)
-            inspect_token_budget(self.backend,projection.messages,self.limits)
-            cancel.check()
-            # The native backend is the only model caller; no answer synthesis.
-            generated=generate(self.backend,self.identity,projection.messages,self.limits,
+            # Native inference is the only speculative operation after reserve.
+            # An exception must leave the pending request held rather than
+            # guessing whether execution was completed by the backend.
+            generated=generate(self.backend,self.identity,prepared.messages,self.limits,
                                seed=seed,temperature=float(temperature))
             cancel.check()
-            citation_review=audit_citations(generated.text,projection.sources)
+            citation_review=audit_citations(generated.text,prepared.sources)
             with self.db.transaction() as conn:
-                # Source revisions are independently mutable during native inference.
-                # Revalidate while holding the SAME authoritative write transaction
-                # as the turn receipt; revoked knowledge cannot be laundered into a
-                # new grounded answer. Non-knowledge fixture providers are unchanged.
-                if projection.sources and self.evidence_provider is not None:
+                if prepared.sources and self.evidence_provider is not None:
                     fence=getattr(self.evidence_provider,'require_current',None)
                     if callable(fence):
-                        fence(conn,projection.sources)
+                        fence(conn,prepared.sources)
                 result=receipts.commit(conn,req,self.limits,generated,token,
-                    context_sha256=projection.context_sha256,source_receipts=projection.sources,
-                    omitted_turns=window.omitted_turns)
-            return result | {'text':generated.text,'context_sha256':projection.context_sha256,
-                             'evidence_sources':len(projection.sources),'omitted_context_turns':window.omitted_turns,
+                    context_sha256=prepared.projection.context_sha256,
+                    source_receipts=prepared.sources,
+                    omitted_turns=prepared.omitted_turns,
+                    capacity_report=describe_decision(prepared))
+            return result | {'text':generated.text,
+                             'context_sha256':prepared.projection.context_sha256,
+                             'evidence_sources':len(prepared.sources),
+                             'omitted_context_turns':prepared.omitted_turns,
+                             'omitted_evidence_sources':prepared.omitted_sources,
                              'citation_review':citation_review}
 
     def replay(self,session:str,request_id:str,prompt:str,*,seed:int=0,temperature:float=0.8)->dict|None:
