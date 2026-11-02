@@ -31,3 +31,17 @@ python -m pytest -q tests/test_studio_ecosystem_story_review.py \\
   tests/test_studio_ecosystem_story_html.py \\
   tests/test_studio_story_browser_js_runtime.py
 ```
+
+## Nonmutating checkpoint comparison and undo
+
+The offline story director can now undo its last source-authored action, or
+compare a pasted checkpoint with the current state. Comparison requires the
+same canonical JSON, source lease, and legal action order as restore, and
+reports the common action prefix plus newly gained/lost authored sandbox
+endings. It never overwrites the current session. The Python
+`compare_browser_story_receipts` independently replays **both** untrusted
+histories through the authoritative quest state machine, refusing duplicate
+keys, forged release claims, stale sources, or illegal actions.
+
+The Node runtime harness covers undo and comparison without mutation. The
+Python suite covers independent replay, session digests, and hostile input.

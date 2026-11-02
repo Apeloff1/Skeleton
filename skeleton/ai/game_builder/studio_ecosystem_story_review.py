@@ -100,3 +100,49 @@ def preview_browser_story_choice(raw: bytes, documents: Mapping[str, Any], *,
         "native_genre_runtime_verified": False,
         "release_certified": False,
     }
+
+
+def compare_browser_story_receipts(current_raw: bytes, candidate_raw: bytes,
+                                   documents: Mapping[str, Any], *,
+                                   authorized: bool) -> dict[str, object]:
+    """Compare two untrusted browser histories after independent canonical replay.
+
+    This is a nonmutating authored-sandbox diff, not a merge, a new save, or
+    evidence of external world consequences. Both histories must be bound to
+    the exact same current authoritative quest source.
+    """
+    program, current = _replay_browser_story_receipt(current_raw, documents,
+                                                     authorized=authorized)
+    other_program, candidate = _replay_browser_story_receipt(candidate_raw,
+                                                             documents,
+                                                             authorized=authorized)
+    if program.source_digest != other_program.source_digest:
+        raise StudioQuestError("cross-source story comparison refused")
+    common = 0
+    for left, right in zip(current.choices, candidate.choices):
+        if left != right:
+            break
+        common += 1
+    before = quest_progress(current, documents)
+    after = quest_progress(candidate, documents)
+    previous = set(before["sandbox_endings_eligible"])
+    proposed = set(after["sandbox_endings_eligible"])
+    return {
+        "schema": "skeleton.game_builder.offline_story_checkpoint_compare.v1",
+        "project_id": program.project_id,
+        "source_digest": program.source_digest,
+        "current_session_digest": current.digest,
+        "candidate_session_digest": candidate.digest,
+        "common_action_prefix": common,
+        "current_only_actions": [list(pair) for pair in current.choices[common:]],
+        "candidate_only_actions": [list(pair) for pair in candidate.choices[common:]],
+        "newly_eligible_sandbox_endings": sorted(proposed - previous),
+        "no_longer_eligible_sandbox_endings": sorted(previous - proposed),
+        "unmet_candidate_ending_predicates": after["unmet_ending_predicates"],
+        "current_session_unchanged": True,
+        "candidate_session_unchanged": True,
+        "replayed_from_authoritative_source": True,
+        "external_evidence_verified": False,
+        "native_genre_runtime_verified": False,
+        "release_certified": False,
+    }

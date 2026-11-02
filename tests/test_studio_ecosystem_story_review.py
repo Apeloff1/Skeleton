@@ -3,7 +3,8 @@ from copy import deepcopy
 import pytest
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_story_html import story_source
-from skeleton.ai.game_builder.studio_ecosystem_story_review import (inspect_browser_story_receipt, preview_browser_story_choice)
+from skeleton.ai.game_builder.studio_ecosystem_story_review import (inspect_browser_story_receipt, preview_browser_story_choice,
+    compare_browser_story_receipts)
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 def _receipt(docs,actions):
@@ -83,3 +84,38 @@ def test_choice_preview_rejects_invalid_action_stale_source_and_authority():
         preview_browser_story_choice(json.dumps(forged).encode(), docs,
                                      stage=stage["id"],
                                      alternative=stage["alternatives"][0], authorized=True)
+
+
+def test_checkpoint_comparison_replays_two_histories_and_preserves_current():
+    from skeleton.ai.game_builder.studio_ecosystem_quest import replay_quest
+    docs = read_blueprint("studio_arena_fighting_glacial_fjord")
+    first = story_source(docs)["stages"][0]
+    base = json.dumps(_receipt(docs, [])).encode()
+    action = [[first["id"], first["alternatives"][0]]]
+    other = json.dumps(_receipt(docs, action)).encode()
+    result = compare_browser_story_receipts(base, other, docs, authorized=True)
+    assert result["common_action_prefix"] == 0
+    assert result["current_only_actions"] == []
+    assert result["candidate_only_actions"] == action
+    assert result["current_session_digest"] == replay_quest(docs, [], authorized=True).digest
+    assert result["candidate_session_digest"] == replay_quest(docs, action, authorized=True).digest
+    assert result["current_session_unchanged"] is True
+    assert result["release_certified"] is False
+    identical = compare_browser_story_receipts(other, other, docs, authorized=True)
+    assert identical["common_action_prefix"] == 1
+    assert identical["candidate_only_actions"] == []
+
+
+def test_checkpoint_comparison_rejects_forged_pasted_receipt():
+    docs = read_blueprint("studio_arena_fighting_glacial_fjord")
+    base = json.dumps(_receipt(docs, [])).encode()
+    forged = _receipt(docs, [])
+    forged["release_certified"] = True
+    with pytest.raises(StudioQuestError):
+        compare_browser_story_receipts(base, json.dumps(forged).encode(),
+                                       docs, authorized=True)
+    with pytest.raises(StudioQuestError):
+        compare_browser_story_receipts(base, b'{"schema":1,"schema":2}',
+                                       docs, authorized=True)
+    with pytest.raises(PermissionError):
+        compare_browser_story_receipts(base, base, docs, authorized=False)

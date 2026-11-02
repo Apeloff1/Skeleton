@@ -35,13 +35,14 @@ const endings=document.getElementById("endings");
 const checkpoint=document.getElementById("checkpoint");
 const checkpointStatus=document.getElementById("checkpoint-status");
 const previewStatus=document.getElementById("choice-preview");
+const compareStatus=document.getElementById("checkpoint-compare-status");
 function node(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;}
-function reset(){chosen.length=0;completed.clear();previewStatus.textContent="";render();}
+function reset(){chosen.length=0;completed.clear();previewStatus.textContent="";compareStatus.textContent="";render();}
 function act(id,option){
  const stage=byId.get(id);
  if(!stage||completed.has(id)||!stage.prerequisites.every(dep=>completed.has(dep))||
     !stage.alternatives.includes(option)){return;}
- chosen.push([id,option]);completed.add(id);previewStatus.textContent="";render();
+ chosen.push([id,option]);completed.add(id);previewStatus.textContent="";compareStatus.textContent="";render();
 }
 function parseCheckpoint(raw){
  if(typeof raw!=="string"||raw.length>16384){throw Error("checkpoint too large");}
@@ -84,6 +85,7 @@ function restoreCheckpoint(){
    completed.clear();
    for(const [id] of actions){completed.add(id);}
    previewStatus.textContent="";
+   compareStatus.textContent="";
    render();
    checkpointStatus.textContent="Source-matched sandbox checkpoint restored";
  }catch(error){
@@ -125,9 +127,41 @@ function previewChoice(id,option){
    "; still unmet: "+(remaining.join("; ")||"none")+
    ". This preview does not commit a choice or verify external consequences.";
 }
+function undoChoice(){
+ if(chosen.length===0){return;}
+ const last=chosen.pop();
+ completed.delete(last[0]);
+ previewStatus.textContent="";
+ compareStatus.textContent="";
+ render();
+}
+function compareCheckpoint(){
+ try{
+   const other=parseCheckpoint(checkpoint.value);
+   let common=0;
+   while(common<chosen.length&&common<other.length&&
+     chosen[common][0]===other[common][0]&&chosen[common][1]===other[common][1]){
+     common++;
+   }
+   const eligible=history=>source.endings.filter(ending=>
+     ending.requires.every(token=>earnedFacts(history).has(token))).map(ending=>ending.id);
+   const current=new Set(eligible(chosen));
+   const proposed=new Set(eligible(other));
+   const gained=[...proposed].filter(id=>!current.has(id));
+   const lost=[...current].filter(id=>!proposed.has(id));
+   compareStatus.textContent="Source-verified sandbox comparison: common actions "+
+     common+"; current-only "+(chosen.length-common)+"; pasted-only "+
+     (other.length-common)+"; endings gained "+(gained.join(", ")||"none")+
+     "; endings lost "+(lost.join(", ")||"none")+
+     ". No choice was changed or externally verified.";
+ }catch(error){
+   compareStatus.textContent="Checkpoint comparison rejected; current progress preserved";
+ }
+}
 function render(){
  host.replaceChildren();endings.replaceChildren();
  summary.textContent=completed.size+" of "+source.stages.length+" authored stages complete";
+ document.getElementById("undo").disabled=chosen.length===0;
  premise.textContent=source.premise+" — "+source.protagonist_name;
  for(const stage of source.stages){
    const open=!completed.has(stage.id)&&stage.prerequisites.every(dep=>completed.has(dep));
@@ -162,6 +196,8 @@ function render(){
  transcript.textContent=JSON.stringify(receipt,null,2);
 }
 document.getElementById("restart").addEventListener("click",reset);
+document.getElementById("undo").addEventListener("click",undoChoice);
+document.getElementById("checkpoint-compare").addEventListener("click",compareCheckpoint);
 document.getElementById("checkpoint-copy").addEventListener("click",()=>{
  checkpoint.value=transcript.textContent;
  checkpointStatus.textContent="Copy this checkpoint to save it privately";
@@ -240,13 +276,16 @@ def render_story_html(documents: Mapping[str, Any]) -> bytes:
         "<section><h2>Ending requirements</h2>"
         "<ul id='endings'></ul></section>"
         "<section><h2>Replay transcript</h2><button type='button' id='restart'>"
-        "Restart simulation</button><pre id='transcript'></pre>"
+        "Restart simulation</button><button type='button' id='undo'>"
+        "Undo last authored choice</button><pre id='transcript'></pre>"
         "<h3>Private copy/paste checkpoint</h3>"
         "<p>Save the text yourself; restoring verifies source and legal quest order.</p>"
         "<button type='button' id='checkpoint-copy'>Copy current receipt into editor</button>"
         "<label for='checkpoint'>Checkpoint JSON</label>"
         "<textarea id='checkpoint' rows='8' maxlength='16384' spellcheck='false'></textarea>"
         "<button type='button' id='checkpoint-restore'>Restore pasted checkpoint</button>"
+        "<button type='button' id='checkpoint-compare'>Compare pasted checkpoint</button>"
+        "<p id='checkpoint-compare-status' role='status' aria-live='polite'></p>"
         "<p id='checkpoint-status' role='status' aria-live='polite'></p>"
         "</section></main>"
         "<script type='application/json' id='studio-source'>"+payload+"</script>"

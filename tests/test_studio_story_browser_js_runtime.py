@@ -31,7 +31,8 @@ class Element {
 }
 const ids=["studio-source","stages","summary","premise","transcript",
  "endings","restart","checkpoint","checkpoint-status","choice-preview",
- "checkpoint-copy","checkpoint-restore"];
+ "checkpoint-copy","checkpoint-restore","undo", "checkpoint-compare",
+ "checkpoint-compare-status"];
 const nodes=Object.fromEntries(ids.map(id=>[id,new Element()]));
 const source={
  project_id:"original",source_digest:"a".repeat(64),
@@ -66,6 +67,14 @@ assert.match(nodes.endings.children[0].textContent,/eligible in authored sandbox
 assert.match(nodes.endings.children[1].textContent,/unmet predicates/);
 nodes["checkpoint-copy"].handlers.click();
 const good=nodes.checkpoint.value;
+nodes["checkpoint-compare"].handlers.click();
+assert.match(nodes["checkpoint-compare-status"].textContent,/common actions 1/);
+assert.equal(nodes.summary.textContent,"1 of 1 authored stages complete");
+nodes.undo.handlers.click();
+assert.equal(nodes.summary.textContent,"0 of 1 authored stages complete");
+nodes["checkpoint-compare"].handlers.click();
+assert.match(nodes["checkpoint-compare-status"].textContent,/pasted-only 1/);
+assert.equal(nodes.summary.textContent,"0 of 1 authored stages complete");
 nodes.restart.handlers.click();
 assert.equal(nodes.summary.textContent,"0 of 1 authored stages complete");
 nodes["checkpoint-restore"].handlers.click();
