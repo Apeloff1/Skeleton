@@ -10,7 +10,7 @@ native gameplay proof, provenance signatures, or release acceptance.
    `{"actions":[["stage_id","authored_alternative"]]}` with mode 0600.
 2. Run `python -m scripts.studio_quest_cause_trace_cli --project PROJECT
    --actions-file actions.json`. The typed plan has `reviewed=false`.
-3. Review the exact stage order, ending IDs, and source/session digests.
+3. Run the same proposal command with `--editor-html` to obtain a CSP-bound offline interactive review page. It exports a selected-endings plan but does not compile or persist anything itself. Review the exact stage order, ending IDs, and source/session digests.
    Change **only** `reviewed` to `true`, or narrow `target_endings` to
    the subset requiring an explanation. Save private `plan.json`.
 4. Run `python -m scripts.studio_quest_cause_trace_cli --project PROJECT
