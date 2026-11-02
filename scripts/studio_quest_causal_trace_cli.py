@@ -10,6 +10,9 @@ from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_quest_consequence_diff import (
     PROMPT, compile_quest_consequence_diff, propose_quest_consequence_diff,
 )
+from skeleton.ai.game_builder.studio_quest_consequence_editor import (
+    render_quest_consequence_editor, import_quest_consequence_editor_export,
+)
 from skeleton.ai.game_builder.studio_quest_causal_trace import (
     compile_quest_causal_trace, replay_quest_causal_trace,
     compile_quest_causal_handoff, render_quest_causal_html,
@@ -26,15 +29,19 @@ def main(argv: list[str] | None = None) -> int:
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--prompt", action="store_true")
     modes.add_argument("--authoring-file", type=Path)
+    modes.add_argument("--editor-export", type=Path)
     modes.add_argument("--restore", type=Path)
     parser.add_argument("--publish", type=Path)
     parser.add_argument("--html-preview", action="store_true")
+    parser.add_argument("--editor-preview", action="store_true")
     parser.add_argument("--playable", action="store_true")
     args = parser.parse_args(argv)
     if args.restore and args.publish:
         parser.error("restore cannot publish")
-    if args.html_preview and (args.publish or args.playable):
+    if args.html_preview and (args.publish or args.playable or args.editor_preview):
         parser.error("HTML preview cannot publish or hand off")
+    if args.editor_preview and (args.publish or args.playable):
+        parser.error("Editor preview cannot publish or hand off")
     try:
         docs = read_blueprint(args.project)
         options = {
@@ -57,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.prompt:
                 consequence = propose_quest_consequence_diff(
                     docs, PROMPT, **options)
+            elif args.editor_export:
+                consequence = import_quest_consequence_editor_export(
+                    docs, args.editor_export, **options)
             else:
                 authoring = _private_json(args.authoring_file, 32768)
                 consequence = compile_quest_consequence_diff(
@@ -64,6 +74,11 @@ def main(argv: list[str] | None = None) -> int:
             trace = compile_quest_causal_trace(
                 docs, consequence, authorized=True)
         replay_quest_causal_trace(docs, consequence, trace, authorized=True)
+        if args.editor_preview:
+            html, _ = render_quest_consequence_editor(
+                docs, consequence, authorized=True)
+            print(html.decode("utf-8"))
+            return 0
         if args.html_preview:
             print(render_quest_causal_html(
                 docs, consequence, trace, authorized=True).decode("utf-8"))

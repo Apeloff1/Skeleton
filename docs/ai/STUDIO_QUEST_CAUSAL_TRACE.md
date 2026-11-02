@@ -25,3 +25,9 @@ Run focused validation against the exact remote head:
 tests/test_studio_quest_consequence_diff.py`.
 Then require full exact-head CI and independent review. No release/device
 qualification is implied by these source changes.
+
+The same CLI can render a CSP-hashed offline edit surface with
+`--prompt --editor-preview`. After editing actual stage/choice histories,
+import its private source-leased JSON with `--editor-export PATH`. The
+import replays both canonical branches before a causal witness audit and
+optional guarded sandbox handoff. Browser exports do not grant authority.

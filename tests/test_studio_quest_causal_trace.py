@@ -126,6 +126,8 @@ def test_html_escapes_authored_ending_and_blocks_scripts():
     html = render_quest_causal_html(docs, diff, trace, authorized=True)
     assert b"script-src 'none'" in html
     assert b"&lt;script&gt;" in html
+    assert b"authored_choice_effect" in html
+    assert b"stage gate" in html
     assert b"<script>alert(1)</script>" not in html
 
 
@@ -232,3 +234,28 @@ def test_cli_private_publish_then_self_contained_restore(tmp_path, monkeypatch, 
     second = json.loads(capsys.readouterr().out)
     assert second["trace"] == first["trace"]
     assert second["file_write_performed"] is False
+
+
+def test_cli_offline_editor_export_recompiles_and_audits(tmp_path, monkeypatch, capsys):
+    from scripts import studio_quest_causal_trace_cli as cli
+    from tests.test_studio_quest_consequence_editor import export
+    docs = source()
+    monkeypatch.setattr(cli, "read_blueprint", lambda _: docs)
+    flags = [
+        "--project", "original",
+        "--expected-source", leases(docs)["expected_source_digest"],
+        "--expected-session", leases(docs)["expected_initial_session_digest"],
+    ]
+    assert cli.main(flags + ["--prompt", "--editor-preview"]) == 0
+    html = capsys.readouterr().out
+    assert "script-src 'sha256-" in html
+    assert "Source-bound quest consequence editor" in html
+    path = tmp_path / "edited.json"
+    path.write_text(json.dumps(export(docs)))
+    os.chmod(path, 0o600)
+    assert cli.main(flags + ["--editor-export", str(path),
+                             "--playable"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["trace"]["ending_delta"]["gained"] == ["war"]
+    assert output["playable_handoff"]["native_gameplay_verified"] is False
+    assert output["file_write_performed"] is False

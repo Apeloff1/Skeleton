@@ -209,15 +209,34 @@ def render_quest_causal_html(
         return escape(str(value), quote=True)
     items = []
     for row in checked["ending_predicate_proofs"]:
-        requirements = "".join("<li>" + safe(x) + "</li>"
-                               for x in row["authored_requirements"])
-        items.append("<section><h2>" + safe(row["ending_id"]) + "</h2><p>"
-                     "Baseline eligible: " + safe(row["baseline_eligible"])
-                     + "; candidate eligible: " + safe(row["candidate_eligible"])
-                     + "</p><ul>" + requirements + "</ul><p>Baseline missing: "
-                     + safe(", ".join(row["baseline_missing"]))
-                     + "; candidate missing: "
-                     + safe(", ".join(row["candidate_missing"])) + "</p></section>")
+        predicate_rows = []
+        for token in row["authored_requirements"]:
+            origins = []
+            for branch in ("baseline", "candidate"):
+                witnesses = row[branch + "_witnesses"].get(token, [])
+                for witness in witnesses:
+                    origins.append(
+                        "<li>" + safe(branch) + ": stage "
+                        + safe(witness["stage_id"]) + ", choice "
+                        + safe(witness["alternative"]) + ", action "
+                        + safe(witness["action_index"]) + ", origin "
+                        + safe(witness["origin"]) + "</li>"
+                    )
+            predicate_rows.append(
+                "<li><strong>" + safe(token) + "</strong>"
+                + ("<ul>" + "".join(origins) + "</ul>" if origins
+                   else " (unmet in both branches)") + "</li>"
+            )
+        items.append(
+            "<section><h2>" + safe(row["ending_id"]) + "</h2><p>"
+            "Baseline eligible: " + safe(row["baseline_eligible"])
+            + "; candidate eligible: " + safe(row["candidate_eligible"])
+            + "</p><ul>" + "".join(predicate_rows)
+            + "</ul><p>Baseline missing: "
+            + safe(", ".join(row["baseline_missing"]))
+            + "; candidate missing: "
+            + safe(", ".join(row["candidate_missing"])) + "</p></section>"
+        )
     html = (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta http-equiv='Content-Security-Policy' content=\"default-src "
