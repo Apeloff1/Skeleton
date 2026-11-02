@@ -58,13 +58,22 @@ def header_cert_source(header: str = CERT_HEADER) -> CertSource:
     The caller must authenticate mTLS upstream and overwrite this header;
     passing untrusted client headers as proof of a certificate is unsafe.
     """
+    if (type(header) is not str or not header or any(
+            char in header for char in "\r\n,\x00")):
+        raise ValueError("unsafe certificate header name")
     name = header.lower()
 
     def _source(headers: Mapping[str, str]) -> Optional[str]:
-        for k, v in headers.items():
-            if str(k).lower() == name:
-                return str(v).strip() or None
-        return None
+        # Duplicate mixed-case names and comma-folded values are ambiguous at
+        # proxy boundaries. Never choose the first attacker-controlled value.
+        values = [value for key, value in headers.items()
+                  if type(key) is str and key.lower() == name]
+        if len(values) != 1 or type(values[0]) is not str:
+            return None
+        value = values[0].strip()
+        if not value or any(char in value for char in "\r\n,\x00"):
+            return None
+        return value
 
     return _source
 

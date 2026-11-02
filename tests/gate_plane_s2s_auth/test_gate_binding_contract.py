@@ -120,3 +120,28 @@ def test_untrusted_cnf_header_is_rejected_by_default(ring, registry, nonces, clo
     assert decision.http_status == 401
     assert decision.reason == "binding_missing"
     assert nonces.calls == 0
+
+
+def test_header_cert_adapter_rejects_ambiguous_proxy_evidence(ring, registry, nonces, clock, signer_for):
+    gate = _asm(ring, registry, nonces, clock, cert_source=header_cert_source()).gate
+    signer = signer_for("bound-svc")
+    for evidence in (
+        {"x-client-cert-sha256": FP_A, "X-Client-Cert-Sha256": FP_B},
+        {"x-client-cert-sha256": FP_A + "," + FP_B},
+        {"x-client-cert-sha256": FP_A + "\r\nX-Client-Cert-Sha256: " + FP_B},
+        {"x-client-cert-sha256": None},
+    ):
+        token = signer.mint("gate", ["forge:read"])
+        decision = gate.evaluate("GET", "/api/v1/forge/x",
+                                 {"authorization": f"Service {token}", **evidence})
+        assert decision.http_status == 401
+        assert decision.reason == "binding_missing"
+    assert nonces.calls == 0
+
+
+def test_header_cert_adapter_rejects_unsafe_configured_header_name():
+    import pytest
+
+    for name in ("", "x-client-cert-sha256\r\nAuthorization", "x-client-cert,sha256"):
+        with pytest.raises(ValueError, match="unsafe certificate header name"):
+            header_cert_source(name)
