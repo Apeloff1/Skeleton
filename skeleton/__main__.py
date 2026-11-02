@@ -66,6 +66,7 @@ Commands:
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
     creator     Canonical typed creator command surface (create/edit/test/preview/export)
+    world-canon  Original-world prompt, typed edit, proof and offline playable compile
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -757,6 +758,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "doctor": return _cmd_doctor(rest)
     if cmd == "creator": return _cmd_creator(rest)
+    if cmd == "world-canon":
+        from skeleton.jeeves.worlds.cli import run as world_canon_cli
+        return world_canon_cli(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
