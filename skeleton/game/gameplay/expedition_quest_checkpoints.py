@@ -201,10 +201,12 @@ def original_fork() -> dict[str, Any]:
 def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton quest-checkpoints")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("demo")
+    demo = commands.add_parser("demo")
+    demo.add_argument("--source-digest", default=argparse.SUPPRESS)
     for name in ("timeline", "checkpoint", "fork", "compare"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--session-json", required=True)
+        cmd.add_argument("--source-digest", default=argparse.SUPPRESS)
         if name in ("checkpoint", "fork"):
             cmd.add_argument("--tick", type=int, required=True)
         if name == "fork":
@@ -213,6 +215,7 @@ def cli(argv: Sequence[str]) -> int:
             cmd.add_argument("--other-session-json", required=True)
     check = commands.add_parser("verify-fork")
     check.add_argument("--record-json", required=True)
+    check.add_argument("--source-digest", default=argparse.SUPPRESS)
     parser.add_argument("--source-digest")
     args = parser.parse_args(list(argv))
     try:

@@ -49,10 +49,23 @@ def test_unearned_guard_gate_requires_guard_action():
     source["objectives"].append(
         {"id": "defensive_discipline", "kind": "guard", "minimum": 1}
     )
+    # The original speed objective allows four ticks, but a guard consumes
+    # one extra player turn: keep both objectives satisfiable without
+    # weakening the production solver or inventing an earned guard.
+    source["objectives"][1]["maximum_turns"] = 5
     report = solve_contract(source, max_depth=10)
     assert any(a["kind"] == "guard" for a in report["actions"])
     assert report["session"]["state"]["phase"] == "won"
     assert report["session"]["state"]["objectives"]["defensive_discipline"]
+
+
+def test_guard_and_original_speed_limit_are_jointly_impossible():
+    source = original_contract()
+    source["objectives"].append(
+        {"id": "defensive_discipline", "kind": "guard", "minimum": 1}
+    )
+    with pytest.raises(CombatSessionError, match="no earned contract route"):
+        solve_contract(source, max_depth=10)
 
 
 def test_impossible_speed_gate_is_not_forged():

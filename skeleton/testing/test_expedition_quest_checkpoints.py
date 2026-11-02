@@ -131,6 +131,13 @@ def test_cli_and_canonical_main_dispatch(capsys, played):
     assert cli(["timeline", "--session-json", json.dumps(played),
                 "--source-digest", "0" * 64]) == 2
     assert "mismatch" in capsys.readouterr().err
+    # Both pre-command and subcommand positions retain the same fail-closed pin.
+    assert cli(["--source-digest", "0" * 64, "timeline",
+                "--session-json", json.dumps(played)]) == 2
+    assert "mismatch" in capsys.readouterr().err
+    assert cli(["timeline", "--session-json", json.dumps(played),
+                "--source-digest", played["source_digest"]]) == 0
+    assert json.loads(capsys.readouterr().out)["source_digest"] == played["source_digest"]
 
 
 def test_oversized_and_invalid_json_fail_closed(played):
