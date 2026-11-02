@@ -87,9 +87,17 @@ def _traffic_stages(strategy: str, rollout: dict[str, Any], replicas: int) -> li
 def compile_plan(manifest: ArtifactManifest, env: EnvironmentConfig) -> DeployPlan:
     rollout = dict(env.values["rollout"])
     strategy = rollout["strategy"]
+    if strategy not in ("rolling", "blue-green", "canary"):
+        raise DeliveryError("unknown rollout strategy")
+    if type(env.replicas) is not int or not 1 <= env.replicas <= 512:
+        raise DeliveryError("invalid deployment replica count")
     if env.tier == "production" and manifest.version and "-" in manifest.version:
         raise DeliveryError("prerelease versions cannot deploy to production")
-    bake = int(rollout.get("bake_seconds", 0 if env.tier == "dev" else 300))
+    # int(...) silently turns True, negative floats and numeric strings into
+    # accepted bake durations, bypassing the configured stabilization contract.
+    bake = rollout.get("bake_seconds", 0 if env.tier == "dev" else 300)
+    if type(bake) is not int or not 0 <= bake <= 86400:
+        raise DeliveryError("bake_seconds must be a bounded nonnegative integer")
     steps: list[tuple[str, str, dict[str, Any]]] = [
         ("lock", env.name, {"release_id": manifest.release_id}),
         ("verify-manifest", manifest.release_id, {"digest": manifest.digest}),

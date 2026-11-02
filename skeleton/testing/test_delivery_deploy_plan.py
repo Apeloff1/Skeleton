@@ -56,3 +56,17 @@ def test_rejections():
         compile_plan(_manifest(), _env({"strategy": "canary", "stages": [10, 50]}))
     with pytest.raises(DeliveryError, match="prerelease"):
         compile_plan(_manifest("1.0.0-rc.1"), _env({"strategy": "blue-green"}, tier="production"))
+
+def test_deploy_plan_rejects_noncanonical_bake_and_forged_strategy():
+    from dataclasses import replace
+
+    for bad in (-1, True, False, 1.5, "30", 86401):
+        with pytest.raises(DeliveryError, match="bake_seconds"):
+            compile_plan(_manifest(), _env({"strategy": "rolling", "bake_seconds": bad}))
+    good = _env({"strategy": "rolling"})
+    forged = replace(good, values={**good.values, "rollout": {"strategy": "unknown"}})
+    with pytest.raises(DeliveryError, match="unknown rollout"):
+        compile_plan(_manifest(), forged)
+    forged = replace(good, values={**good.values, "replicas": True})
+    with pytest.raises(DeliveryError, match="replica count"):
+        compile_plan(_manifest(), forged)
