@@ -35,3 +35,14 @@ the tool requires out-of-band authorization and exact typed source leases.
 
 Regression: `pytest -q tests/test_studio_quest_replay_diagnostic.py`.
 Native gameplay, consumer devices, external evidence and release remain held.
+
+## Offline authoring editor
+
+`--editor-preview` renders a standalone accessible HTML form with a
+CSP-hashed static script and no network access. The form exports a typed
+JSON plan and a source/session/baseline lease; browser output is never trusted.
+Publish a baseline receipt first with `--publish DIRECTORY`, then import
+using `--editor-export FILE --baseline DIRECTORY` with the same source and
+session leases. The CLI replays the baseline and recompiles the edited plan
+before any handoff. The export must be a private regular file, not a symlink,
+and must fit the 32 KiB bound. No implicit overwrite or privilege grant.

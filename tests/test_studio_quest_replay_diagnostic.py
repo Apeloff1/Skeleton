@@ -215,3 +215,60 @@ def test_catalog_tool_registration_and_reject_untrusted_envelopes():
     with pytest.raises((StudioQuestError, PermissionError)):
         route_world_tool({"tool": name, "arguments": {
             "schema": REQUEST_SCHEMA, "authorized": True}}, authorized=True)
+
+def test_offline_editor_csp_and_canonical_reimport(tmp_path):
+    from skeleton.ai.game_builder.studio_quest_replay_diagnostic_editor import (
+        EXPORT_SCHEMA, render_replay_diagnostic_editor,
+        import_replay_diagnostic_editor_export,
+    )
+    docs = source()
+    baseline = compile_replay_diagnostic(docs, plan([]), **leases(docs))
+    html, proof = render_replay_diagnostic_editor(docs, baseline, authorized=True)
+    assert b"script-src 'sha256-" in html
+    assert b"connect-src 'none'" in html
+    assert b"Export for canonical replay" in html
+    assert proof["authoring_export_only"] is True
+    assert proof["release_certified"] is False
+    payload = {
+        "schema": EXPORT_SCHEMA, "project_id": "original",
+        "source_digest": baseline["source_digest"],
+        "initial_session_digest": baseline["initial_session_digest"],
+        "baseline_diagnostic_digest": baseline["diagnostic_digest"],
+        "authoring": plan([["arrival", "observe"], ["report", "truth"]]),
+    }
+    path = tmp_path / "export.json"
+    path.write_text(json.dumps(payload))
+    os.chmod(path, 0o600)
+    report = import_replay_diagnostic_editor_export(
+        docs, baseline, path, **leases(docs))
+    assert report["status"] == "verified"
+    assert report["accepted_actions"] == payload["authoring"]["actions"]
+    payload["baseline_diagnostic_digest"] = "0" * 64
+    path.write_text(json.dumps(payload))
+    with pytest.raises(StudioQuestError):
+        import_replay_diagnostic_editor_export(
+            docs, baseline, path, **leases(docs))
+
+
+def test_offline_editor_import_rejects_duplicate_and_symlink(tmp_path):
+    from skeleton.ai.game_builder.studio_quest_replay_diagnostic_editor import (
+        import_replay_diagnostic_editor_export,
+    )
+    docs = source()
+    baseline = compile_replay_diagnostic(docs, plan([]), **leases(docs))
+    path = tmp_path / "export.json"
+    path.write_text('{"schema":"x","schema":"y"}')
+    os.chmod(path, 0o600)
+    with pytest.raises(StudioQuestError):
+        import_replay_diagnostic_editor_export(
+            docs, baseline, path, **leases(docs))
+    target = tmp_path / "target"
+    target.write_text("{}")
+    link = tmp_path / "linked.json"
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink unsupported")
+    with pytest.raises(OSError):
+        import_replay_diagnostic_editor_export(
+            docs, baseline, link, **leases(docs))
