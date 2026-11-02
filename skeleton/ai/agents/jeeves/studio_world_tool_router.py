@@ -46,6 +46,7 @@ from skeleton.ai.agents.jeeves import studio_quest_ending_witness_tool as ending
 from skeleton.ai.agents.jeeves import studio_quest_softlock_audit_tool as softlock
 from skeleton.ai.agents.jeeves import studio_quest_replay_diagnostic_tool as replay_diagnostic
 from skeleton.ai.agents.jeeves import studio_quest_revision_migration_tool as quest_migration
+from skeleton.ai.agents.jeeves import studio_quest_remap_proposal_tool as remap_proposal
 from skeleton.ai.agents.jeeves import studio_quest_ending_coverage_tool as ending_coverage
 from skeleton.ai.agents.jeeves import studio_quest_readiness_tool as readiness
 from skeleton.ai.agents.jeeves import studio_prompt_quest_plan_tool as prompt_quest
@@ -102,6 +103,7 @@ _TOOL_SYMBOLS = (
     ("quest_softlock_audit_tool_schema", "execute_quest_softlock_audit_tool"),
     ("quest_replay_diagnostic_tool_schema", "execute_quest_replay_diagnostic_tool"),
     ("quest_revision_migration_tool_schema", "execute_quest_revision_migration_tool"),
+    ("quest_remap_proposal_tool_schema", "execute_quest_remap_proposal_tool"),
     ("quest_ending_coverage_tool_schema", "execute_quest_ending_coverage_tool"),
     ("quest_readiness_tool_schema", "execute_quest_readiness_tool"),
     ("prompt_quest_plan_tool_schema", "execute_prompt_quest_plan_tool"),
@@ -161,6 +163,7 @@ _AUTHORING_SYMBOLS = frozenset({
     "caption_timing_tool_schema",
     "story_reading_bookmark_tool_schema",
     "quest_revision_migration_tool_schema",
+    "quest_remap_proposal_tool_schema",
     "scene_object_accessibility_tool_schema",
 })
 
@@ -217,6 +220,7 @@ def _registry() -> dict[str, tuple[dict[str, Any], Any, bool]]:
                    softlock if descriptor_name == "quest_softlock_audit_tool_schema" else
                    replay_diagnostic if descriptor_name == "quest_replay_diagnostic_tool_schema" else
                    quest_migration if descriptor_name == "quest_revision_migration_tool_schema" else
+                   remap_proposal if descriptor_name == "quest_remap_proposal_tool_schema" else
                    ending_coverage if descriptor_name == "quest_ending_coverage_tool_schema" else
                    readiness if descriptor_name == "quest_readiness_tool_schema" else
                    prompt_quest if descriptor_name == "prompt_quest_plan_tool_schema" else
