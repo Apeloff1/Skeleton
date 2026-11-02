@@ -258,3 +258,15 @@ def test_analytics_rejected_counter_covers_pre_schema_boundary():
     assert c.ingest("player", "session", valid) is not None
     assert c.counts["rejected"] == 5
     assert c.counts["kept"] == 1
+
+
+@pytest.mark.parametrize("bad", ["player\u202ehidden", "player\u200dhidden",
+                                   "player\u2028hidden", "player\ud800hidden"])
+def test_raw_identity_rejects_unicode_controls_and_unpaired_surrogates(bad):
+    c = collector()
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    with pytest.raises(EventError, match="non-control"):
+        c.ingest(bad, "session", event)
+    with pytest.raises(EventError, match="non-control"):
+        c.opt_out(bad)
+    assert not c.events and not c.opted_out

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import unicodedata
 from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Mapping
 
@@ -22,7 +23,8 @@ MAX_RAW_ID_CHARS = 256
 def _raw_identity(value: str, label: str) -> str:
     """Bound opaque identities before hashing; forbid ambiguous separators."""
     if (type(value) is not str or not 1 <= len(value) <= MAX_RAW_ID_CHARS
-            or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value)):
+            or any(unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+                   for char in value)):
         raise EventError(f"{label} must be a bounded non-control string")
     return value
 
