@@ -54,9 +54,19 @@ class CpuCapacityGuardTests(unittest.TestCase):
             "generation": 4, "is_execution_lease": False,
             "window": {"start": 0, "stop": 8, "digest": "c" * 64},
         }
-        self.heads.spool.capacity_snapshot.return_value = {
+        self.heads.spool.capacity_snapshot.side_effect = lambda requested_bytes: {
+            "schema": "skeleton.ai.long-context-capacity.v1",
+            "state": "observed_available",
+            "is_admission_lease": False,
+            "hardware_qualification": "not_assessed",
             "request_observed_sufficient": True,
+            "used_bytes": 0,
+            "quota_bytes": 4096,
+            "quota_remaining_bytes": 4096,
+            "volume_available_bytes": 8192,
+            "disk_reserve_bytes": 0,
             "observed_publishable_bytes": 4096,
+            "requested_bytes": requested_bytes,
         }
         self.authorized = True
         self.verifier = MagicMock(side_effect=lambda _: self.authorized)
@@ -118,8 +128,10 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.assertEqual(self.guard.reserve(self.request)["reason"],
                          "custody_or_disk_unverified")
         self.heads.compare_window.return_value["generation"] = 4
-        self.heads.spool.capacity_snapshot.return_value[
-            "request_observed_sufficient"] = False
+        self.heads.spool.capacity_snapshot.side_effect = lambda requested_bytes: {
+            **self._capacity(requested_bytes),
+            "request_observed_sufficient": False, "state": "hold",
+        }
         self.assertIsNone(self.guard.reserve(self.request)["reservation_id"])
 
     def test_claim_revalidates_head(self):
@@ -264,6 +276,85 @@ class CpuCapacityGuardTests(unittest.TestCase):
         self.verifier.side_effect = RuntimeError("auth service unavailable")
         self.assertEqual(self.guard.reserve(self.request)["reason"],
                          "principal_unverified")
+
+    def _capacity(self, requested_bytes: int) -> dict:
+        return {
+            "schema": "skeleton.ai.long-context-capacity.v1",
+            "state": "observed_available",
+            "is_admission_lease": False,
+            "hardware_qualification": "not_assessed",
+            "request_observed_sufficient": True,
+            "used_bytes": 0, "quota_bytes": 4096,
+            "quota_remaining_bytes": 4096,
+            "volume_available_bytes": 8192,
+            "disk_reserve_bytes": 0,
+            "observed_publishable_bytes": 4096,
+            "requested_bytes": requested_bytes,
+        }
+
+    def test_claim_rechecks_disk_after_reservation(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.assertIsNotNone(key)
+        self.heads.spool.capacity_snapshot.side_effect = lambda requested_bytes: {
+            **self._capacity(requested_bytes),
+            "volume_available_bytes": 0,
+            "observed_publishable_bytes": 0,
+            "state": "hold", "request_observed_sufficient": False,
+        }
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+        self.assertFalse(self.guard.release(key))
+        self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_claim_rejects_changed_quota_and_sensor_failure(self):
+        self.warm()
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.heads.spool.capacity_snapshot.side_effect = OSError("volume gone")
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+        self.assertFalse(self.guard.release(key))
+        self.heads.spool.capacity_snapshot.side_effect = (
+            lambda requested_bytes: self._capacity(requested_bytes))
+        key = self.guard.reserve(self.request)["reservation_id"]
+        self.heads.spool.capacity_snapshot.side_effect = lambda requested_bytes: {
+            **self._capacity(requested_bytes), "quota_remaining_bytes": 0,
+        }
+        self.assertFalse(self.guard.claim(key, self.request)["claimed"])
+
+    def test_disk_snapshot_forged_lease_and_inconsistent_arithmetic_hold(self):
+        self.warm()
+        for changes in (
+            {"is_admission_lease": True},
+            {"hardware_qualification": "certified"},
+            {"observed_publishable_bytes": True},
+            {"observed_publishable_bytes": 999999},
+            {"requested_bytes": 0},
+            {"used_bytes": -1},
+            {"schema": "unexpected"},
+        ):
+            with self.subTest(changes=changes):
+                self.heads.spool.capacity_snapshot.side_effect = (
+                    lambda requested_bytes, changes=changes: {
+                        **self._capacity(requested_bytes), **changes})
+                self.assertEqual(
+                    self.guard.reserve(self.request)["reason"],
+                    "custody_or_disk_unverified")
+                self.assertEqual(self.guard.status()["active"], 0)
+
+    def test_fair_cycle_rechecks_disk_independently_on_each_claim(self):
+        self.warm()
+        other = CpuCapacityRequest(
+            "owner", "other", "a" * 64, "b" * 64, 4, 8, 64)
+        receipts = self.guard.reserve_fair_cycle(
+            (self.request, other), quantum_tokens=8)["reservations"]
+        self.assertEqual(len(receipts), 2)
+        self.heads.spool.capacity_snapshot.side_effect = (
+            lambda requested_bytes: self._capacity(requested_bytes))
+        self.assertTrue(self.guard.claim(
+            receipts[0]["reservation_id"], other)["claimed"])
+        self.heads.spool.capacity_snapshot.side_effect = OSError("disk offline")
+        self.assertFalse(self.guard.claim(
+            receipts[1]["reservation_id"], self.request)["claimed"])
+        self.assertEqual(self.guard.status()["active"], 1)
 
 
 if __name__ == "__main__":

@@ -167,6 +167,40 @@ class LongContextCpuCapacityGuard:
             raise LongContextSpoolError("invalid capacity window")
         return _digest(window.get("digest"), "window")
 
+    def _disk_observed_sufficient(self, requested_bytes: int) -> bool:
+        """Validate a fresh, non-authorizing quota/volume observation.
+
+        This is never a disk lease: guarded publication must recheck the
+        filesystem and quotas under its own cross-process lock.
+        """
+        snapshot = self._heads.spool.capacity_snapshot(
+            requested_bytes=requested_bytes)
+        if type(snapshot) is not dict:
+            return False
+        if (snapshot.get("schema") != "skeleton.ai.long-context-capacity.v1"
+                or snapshot.get("state") != "observed_available"
+                or snapshot.get("is_admission_lease") is not False
+                or snapshot.get("hardware_qualification") != "not_assessed"
+                or snapshot.get("request_observed_sufficient") is not True):
+            return False
+        fields = ("used_bytes", "quota_bytes", "quota_remaining_bytes",
+                  "volume_available_bytes", "disk_reserve_bytes",
+                  "observed_publishable_bytes", "requested_bytes")
+        if any(type(snapshot.get(name)) is not int or snapshot[name] < 0
+               for name in fields):
+            return False
+        used, quota = snapshot["used_bytes"], snapshot["quota_bytes"]
+        available, reserve = (snapshot["volume_available_bytes"],
+                              snapshot["disk_reserve_bytes"])
+        remaining = snapshot["quota_remaining_bytes"]
+        publishable = snapshot["observed_publishable_bytes"]
+        if (used > quota or remaining != quota - used
+                or publishable != min(remaining, max(0, available - reserve))
+                or snapshot["requested_bytes"] != requested_bytes):
+            return False
+        return (publishable > 0 if requested_bytes == 0
+                else publishable >= requested_bytes)
+
     def _snapshot(self, state: str) -> dict[str, object]:
         items = tuple(self._reservations.values())
         return {
@@ -214,12 +248,7 @@ class LongContextCpuCapacityGuard:
                         "reason": "budget_exhausted"}
             try:
                 digest = self._window(request)
-                capacity = self._heads.spool.capacity_snapshot(
-                    requested_bytes=request.requested_bytes)
-                if (type(capacity) is not dict
-                        or capacity.get("request_observed_sufficient") is not True
-                        or type(capacity.get("observed_publishable_bytes")) is not int
-                        or capacity["observed_publishable_bytes"] <= 0):
+                if not self._disk_observed_sufficient(request.requested_bytes):
                     raise LongContextSpoolError("disk capacity hold")
             except (LongContextSpoolError, OSError, ValueError, TypeError):
                 return {**self._snapshot("hold"), "reservation_id": None,
@@ -284,12 +313,7 @@ class LongContextCpuCapacityGuard:
                         "reason": "principal_unverified"}
             try:
                 windows = [(r, self._window(r)) for r in ordered]
-                capacity = self._heads.spool.capacity_snapshot(
-                    requested_bytes=requested_bytes)
-                if (type(capacity) is not dict
-                        or capacity.get("request_observed_sufficient") is not True
-                        or type(capacity.get("observed_publishable_bytes")) is not int
-                        or capacity["observed_publishable_bytes"] <= 0):
+                if not self._disk_observed_sufficient(requested_bytes):
                     raise LongContextSpoolError("disk capacity hold")
             except (LongContextSpoolError, OSError, ValueError, TypeError):
                 return {**active, "state": "hold", "reservations": [],
@@ -337,6 +361,10 @@ class LongContextCpuCapacityGuard:
             try:
                 if self._window(request) != item.window_digest:
                     raise LongContextSpoolError("window changed before claim")
+                # The reservation-time disk observation may have expired or
+                # another process may have consumed the available quota.
+                if not self._disk_observed_sufficient(request.requested_bytes):
+                    raise LongContextSpoolError("disk capacity changed before claim")
             except (LongContextSpoolError, OSError, ValueError, TypeError):
                 self._reservations.pop(reservation_id, None)
                 self._revocations += 1
