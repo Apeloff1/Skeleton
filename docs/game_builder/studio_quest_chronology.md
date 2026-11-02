@@ -1,0 +1,13 @@
+# Canonical quest chronology: causal time-window workbench
+
+This Studio A vertical binds an **original authored quest action sequence** to operator-reviewed, deterministic time windows. Unlike the pacing storyboard (which records estimates and intensity), chronology **rejects overlapping actions, early starts and missed authored deadlines**. It never mints evidence for a narrative ending or claims wall-clock/engine validation.
+
+The flow is original quest source → exact-source leased prompt → typed proposed time windows → offline CSP-protected editor → reviewed JSON → canonical replay and window proof → private non-overwriting receipt → deterministic restore and HTML preview. The source graph and action order are immutable. The only editable fields are time windows, duration, notes and review flags. The compiler checks the canonical quest simulator's actual choices, stage prerequisites, ending predicates and session digest.
+
+CLI: `python -m scripts.studio_quest_chronology_cli --project PROJECT --actions-file private-actions.json`. The private actions file is a JSON object with an `actions` list of `[stage_id, choice]` pairs. Save the proposal as private JSON (mode 0600). `--editor-html` renders the network-disabled editor. After reviewing every row, `--plan-file reviewed.json` compiles. `--preview-html` provides an inert chronology review. `--publish EXISTING_PRIVATE_DIRECTORY` atomically creates `studio_quest_chronology.json` without overwriting. `--restore DIRECTORY` recomputes and compares the exact source-bound receipt.
+
+Jeeves registers `studio_quest_chronology_proposal` and `studio_quest_chronology_compile` as typed read-only capabilities. All requests require explicit authority, exact source and initial-session digests, and an unchanged registration snapshot.
+
+Hard limits: 64 actions, 128 KiB plan, 256 KiB receipt and HTML, one-week horizon (10,080 minutes), durations of 1–1,440 minutes and safe notes of up to 240 characters. All rows require human review; exact action identities and order cannot change. Negative tests include forged sessions, early/late windows, overlapping actions, Boolean/integer confusion, Unicode control characters, symlinks, changed parent/source, private-file tampering and permission checks.
+
+`canonical_quest_replay_verified` and `temporal_window_consistency_verified` indicate deterministic authored-sandbox proofs only. `external_clock_verified`, `native_gameplay_verified`, and `release_certified` remain false. Focused regression files are `tests/test_studio_quest_chronology.py` and `tests/test_studio_quest_chronology_jeeves.py`. Exact-head CI, source-backed test execution and release qualification remain separate.
