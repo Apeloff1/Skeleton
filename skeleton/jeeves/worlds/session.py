@@ -155,6 +155,16 @@ class SessionStore:
         except FileExistsError:
             raise CanonError("lease_busy") from None
 
+    @staticmethod
+    def _require_world_lease(world: Any, expected_world_digest: str | None) -> None:
+        """Reject revisions made between laptop artifact proof and session I/O.
+
+        The check for mutating operations occurs under the world writer lock,
+        preventing a source edit from silently reauthorizing a player session.
+        """
+        if expected_world_digest is not None and digest(world) != expected_world_digest:
+            raise CanonError("session_world_lease_mismatch")
+
     def read(self, world_id: str, slot: str) -> dict[str, Any]:
         _id(slot, "slot")
         fd = self.worlds._directory()
@@ -165,7 +175,8 @@ class SessionStore:
             os.close(fd)
 
     def create(self, world_id: str, slot: str, *,
-               imported: Any = None) -> dict[str, Any]:
+               imported: Any = None,
+               expected_world_digest: str | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
@@ -174,6 +185,7 @@ class SessionStore:
             try:
                 os.close(lock_fd)
                 world = self._world(fd, world_id)
+                self._require_world_lease(world, expected_world_digest)
                 data = (import_session(imported, world) if imported is not None
                         else new_session(world))
                 try:
@@ -192,7 +204,8 @@ class SessionStore:
             os.close(fd)
 
     def choose(self, world_id: str, slot: str, choice_id: str,
-               expected_digest: str) -> dict[str, Any]:
+               expected_digest: str, *,
+               expected_world_digest: str | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
@@ -201,6 +214,7 @@ class SessionStore:
             try:
                 os.close(lock_fd)
                 world = self._world(fd, world_id)
+                self._require_world_lease(world, expected_world_digest)
                 data = self._session(fd, world_id, slot, world)
                 if digest(data) != expected_digest:
                     raise CanonError("stale_session")
@@ -213,23 +227,27 @@ class SessionStore:
         finally:
             os.close(fd)
 
-    def inspect(self, world_id: str, slot: str) -> dict[str, Any]:
+    def inspect(self, world_id: str, slot: str, *,
+                expected_world_digest: str | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
         try:
             world = self._world(fd, world_id)
+            self._require_world_lease(world, expected_world_digest)
             data = self._session(fd, world_id, slot, world)
             return player_view(data, world)
         finally:
             os.close(fd)
 
-    def export(self, world_id: str, slot: str) -> dict[str, Any]:
+    def export(self, world_id: str, slot: str, *,
+               expected_world_digest: str | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
         try:
             world = self._world(fd, world_id)
+            self._require_world_lease(world, expected_world_digest)
             data = self._session(fd, world_id, slot, world)
             return export_session(data, world)
         finally:

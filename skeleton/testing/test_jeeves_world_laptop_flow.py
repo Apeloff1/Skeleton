@@ -206,3 +206,57 @@ def test_readonly_prompt_to_typed_jeeves_proposal_never_persists(tmp_path):
     assert response["result"]["proof"]["ending_witnesses"]["resolution"] == ["pursue_goal"]
     assert not (tmp_path / "lighthouse.json").exists()
     assert response["world_digest"] == digest(response["result"]["world"])
+
+
+def test_laptop_session_create_rejects_revision_between_verify_and_write(tmp_path, monkeypatch):
+    flow, _, _, _ = ready(tmp_path)
+    original = flow.sessions.create
+
+    def concurrent_edit(world_id, slot, **kwargs):
+        world = flow.worlds.read(world_id)
+        changed = dict(world)
+        changed["prompt"] = world["prompt"] + " unreviewed concurrent edit"
+        flow.worlds.publish(changed, expected_digest=digest(world))
+        return original(world_id, slot, **kwargs)
+
+    monkeypatch.setattr(flow.sessions, "create", concurrent_edit)
+    reject("session_world_lease_mismatch",
+           lambda: flow.create_session("lighthouse", "raced"))
+    assert not (tmp_path / "lighthouse.raced.session.json").exists()
+
+
+def test_laptop_session_choose_rejects_revision_between_verify_and_write(tmp_path, monkeypatch):
+    flow, _, _, _ = ready(tmp_path)
+    initial = flow.create_session("lighthouse", "raced")
+    path = tmp_path / "lighthouse.raced.session.json"
+    before = path.read_bytes()
+    original = flow.sessions.choose
+
+    def concurrent_edit(world_id, slot, choice_id, expected_digest, **kwargs):
+        world = flow.worlds.read(world_id)
+        changed = dict(world)
+        changed["prompt"] = world["prompt"] + " unreviewed concurrent edit"
+        flow.worlds.publish(changed, expected_digest=digest(world))
+        return original(world_id, slot, choice_id, expected_digest, **kwargs)
+
+    monkeypatch.setattr(flow.sessions, "choose", concurrent_edit)
+    reject("session_world_lease_mismatch", lambda: flow.choose(
+        "lighthouse", "raced", "rescue", initial["session_digest"]))
+    assert path.read_bytes() == before
+
+
+def test_session_read_and_export_fail_if_source_changes_after_laptop_proof(tmp_path, monkeypatch):
+    flow, _, _, _ = ready(tmp_path)
+    flow.create_session("lighthouse", "raced")
+    original = flow.sessions.inspect
+
+    def concurrent_edit(world_id, slot, **kwargs):
+        world = flow.worlds.read(world_id)
+        changed = dict(world)
+        changed["prompt"] = world["prompt"] + " unreviewed concurrent edit"
+        flow.worlds.publish(changed, expected_digest=digest(world))
+        return original(world_id, slot, **kwargs)
+
+    monkeypatch.setattr(flow.sessions, "inspect", concurrent_edit)
+    reject("session_world_lease_mismatch",
+           lambda: flow.inspect_session("lighthouse", "raced"))

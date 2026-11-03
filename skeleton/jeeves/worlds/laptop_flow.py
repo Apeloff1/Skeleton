@@ -271,18 +271,20 @@ class LaptopFlow:
         return {"laptop": laptop, "engine": engine}
 
     def create_session(self, world_id: str, slot: str, imported: Any = None) -> dict[str, Any]:
-        self.verify(world_id)
-        return self.sessions.create(world_id, slot, imported=imported)
+        lease = self.verify(world_id)["source_digest"]
+        return self.sessions.create(world_id, slot, imported=imported,
+                                    expected_world_digest=lease)
 
     def choose(self, world_id: str, slot: str, choice_id: str,
                expected_session_digest: str) -> dict[str, Any]:
-        self.verify(world_id)
-        return self.sessions.choose(world_id, slot, choice_id, expected_session_digest)
+        lease = self.verify(world_id)["source_digest"]
+        return self.sessions.choose(world_id, slot, choice_id, expected_session_digest,
+                                    expected_world_digest=lease)
 
     def inspect_session(self, world_id: str, slot: str) -> dict[str, Any]:
-        self.verify(world_id)
-        return self.sessions.inspect(world_id, slot)
+        lease = self.verify(world_id)["source_digest"]
+        return self.sessions.inspect(world_id, slot, expected_world_digest=lease)
 
     def export_session(self, world_id: str, slot: str) -> dict[str, Any]:
-        self.verify(world_id)
-        return self.sessions.export(world_id, slot)
+        lease = self.verify(world_id)["source_digest"]
+        return self.sessions.export(world_id, slot, expected_world_digest=lease)
