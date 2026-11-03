@@ -30,7 +30,7 @@ const rows = [];
 for (const conversation of model.source.conversations) {
   root.append(node("h2", conversation.id + " — " + conversation.actor));
   for (const current of conversation.nodes)
-    rows.push({current, field: input("Node " + current.id, current.text)});
+    rows.push({conversation: conversation.id, current, field: input("Node " + current.id, current.text)});
 }
 const button = node("button", "Export unapproved JSON");
 button.type = "button";
@@ -38,10 +38,9 @@ button.addEventListener("click", () => {
   const draft = JSON.parse(JSON.stringify(model.source));
   draft.prompt = prompt.value; draft.approved = false; draft.review_note = "";
   for (const row of rows) {
-    for (const conversation of draft.conversations) {
-      const found = conversation.nodes.find(n => n.id === row.current.id);
-      if (found) found.text = row.field.value;
-    }
+    const conversation = draft.conversations.find(c => c.id === row.conversation);
+    const found = conversation.nodes.find(n => n.id === row.current.id);
+    found.text = row.field.value;
   }
   const blob = new Blob([JSON.stringify(draft, null, 2)], {type: "application/json"});
   const url = URL.createObjectURL(blob);
