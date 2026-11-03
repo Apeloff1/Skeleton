@@ -10,11 +10,12 @@ import re
 from typing import Sequence
 
 from skeleton.ai.build.build_farm import BuildFarmArtifact
-from skeleton.build.delivery._util import DeliveryError
+from skeleton.build.delivery._util import DeliveryError, require_id
 from skeleton.build.delivery.artifact_manifest import ArtifactEntry
 
 MIN_WITNESSES = 2
 MAX_WITNESSES = 128
+MAX_WITNESS_METADATA_CHARS = 512
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -26,6 +27,10 @@ def _checked_witnesses(artifacts: Sequence[BuildFarmArtifact]) -> tuple[BuildFar
         raise DeliveryError("reproducible artifact requires at least two witnesses")
     if any(not isinstance(a, BuildFarmArtifact) for a in items):
         raise DeliveryError("build farm artifacts required")
+    for artifact in items:
+        require_id(artifact.job_id, field="farm job id")
+        require_id(artifact.worker_id, field="farm worker id")
+        require_id(artifact.attestation_evidence, field="farm attestation evidence id")
     if len({a.job_id for a in items}) != 1:
         raise DeliveryError("witnesses must share one job")
     if len({a.worker_id for a in items}) != len(items):
@@ -56,8 +61,8 @@ def entry_from_reproducible(
 def witness_metadata(artifacts: Sequence[BuildFarmArtifact]) -> dict[str, str]:
     """Manifest metadata recording which workers attested an artifact."""
     items = sorted(_checked_witnesses(artifacts), key=lambda a: a.worker_id)
-    return {
-        "farm.job": items[0].job_id if items else "",
-        "farm.workers": ",".join(a.worker_id for a in items),
-        "farm.evidence": ",".join(a.attestation_evidence for a in items),
-    }
+    workers = ",".join(a.worker_id for a in items)
+    evidence = ",".join(a.attestation_evidence for a in items)
+    if len(workers) > MAX_WITNESS_METADATA_CHARS or len(evidence) > MAX_WITNESS_METADATA_CHARS:
+        raise DeliveryError("farm witness metadata exceeds manifest bound")
+    return {"farm.job": items[0].job_id, "farm.workers": workers, "farm.evidence": evidence}
