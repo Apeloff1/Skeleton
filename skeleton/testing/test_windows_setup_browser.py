@@ -139,7 +139,8 @@ def test_real_loopback_http_setup_probe_does_not_confuse_spa_root_with_setup(
             if self.path == "/setup":
                 if mode == "setup-available-backend-offline":
                     self.send_response(200)
-                    body = b"setup-page"
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    body = b"<!doctype html><html><head><title>Setup</title></head><body>setup-page</body></html>"
                 elif mode == "setup-redirected-to-root":
                     self.send_response(302)
                     self.send_header("Location", "/index.html")
@@ -271,3 +272,39 @@ def test_direct_setup_probe_rejects_nonlocal_or_credentialed_origin(origin):
     assert result.url == ""
     assert "private" not in repr(result)
     assert "secret" not in repr(result)
+
+
+def test_setup_probe_rejects_json_200_and_empty_html_200(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from skeleton.app.assembly import load_manifest
+    from skeleton.app.health import probe_local_setup
+
+    state = {"body": b'{"ok": true}', "type": "application/json"}
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", state["type"])
+            self.end_headers()
+            self.wfile.write(state["body"])
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        origin = f"http://127.0.0.1:{server.server_address[1]}"
+        frontend = replace(
+            load_manifest().service("frontend"), public_url=origin,
+            health_path="/setup",
+        )
+        assert not probe_local_setup(frontend).ok
+        state.update(body=b"", type="text/html")
+        assert not probe_local_setup(frontend).ok
+        state.update(body=b"<!doctype html><html><body>Setup</body></html>", type="text/html")
+        assert probe_local_setup(frontend).ok
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)

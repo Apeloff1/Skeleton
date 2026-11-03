@@ -128,8 +128,16 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
         with opener.open(request, timeout=timeout) as response:
             status = int(getattr(response, "status", 200))
             effective = response.geturl()
-            response.read(256)
-        ok = 200 <= status < 300 and effective == url
+            content_type = response.headers.get_content_type().lower()
+            sample = response.read(512)
+        # A local port can be occupied by a different process that returns
+        # HTTP 200. Only an HTML document may admit the setup browser, never
+        # a JSON health response or empty generic success payload.
+        html_document = (
+            content_type == "text/html"
+            and sample.lstrip(b"\\xef\\xbb\\xbf \\t\\r\\n").lower().startswith(b"<!doctype html")
+        )
+        ok = 200 <= status < 300 and effective == url and html_document
         return ProbeResult(
             service=service.name, url=url, ok=ok, status=status,
             detail="healthy" if ok else "setup endpoint did not answer directly",
