@@ -1,0 +1,14 @@
+{
+  "schema": "ridge.rescue.challenge.catalog.v1",
+  "title": "Cinder Ridge: Eight Evacuation Frontiers",
+  "ids": [
+    "north-pass",
+    "east-bank",
+    "west-cliff",
+    "south-wind",
+    "fog-causeway",
+    "inland-arc",
+    "beacon-approach",
+    "signal-crossing"
+  ]
+}

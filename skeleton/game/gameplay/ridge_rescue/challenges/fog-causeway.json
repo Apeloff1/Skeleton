@@ -1,0 +1,82 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "fog-causeway",
+  "title": "Fog Causeway",
+  "ending": "salvage",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: Fog Causeway",
+    "rows": [
+      ".....",
+      ".#...",
+      "....^",
+      "...#.",
+      "....."
+    ],
+    "start": [
+      0,
+      0
+    ],
+    "shelter": [
+      4,
+      4
+    ],
+    "civilians": [
+      {
+        "id": "bryn",
+        "at": [
+          0,
+          1
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "bryn"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "rest"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "salvage"
+    }
+  ]
+}

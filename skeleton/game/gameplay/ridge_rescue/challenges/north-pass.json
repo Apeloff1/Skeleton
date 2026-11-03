@@ -1,0 +1,79 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "north-pass",
+  "title": "The North Pass",
+  "ending": "salvage",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: The North Pass",
+    "rows": [
+      ".....",
+      "..#..",
+      "..#..",
+      "..#..",
+      "....."
+    ],
+    "start": [
+      0,
+      0
+    ],
+    "shelter": [
+      4,
+      4
+    ],
+    "civilians": [
+      {
+        "id": "tala",
+        "at": [
+          1,
+          0
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "tala"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "salvage"
+    }
+  ]
+}
