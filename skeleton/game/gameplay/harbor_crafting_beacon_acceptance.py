@@ -1,13 +1,10 @@
 """Deterministic original-game acceptance bound to a full playable rescue."""
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from .harbor_crafting import HarborError, _keys, canonical, digest
-from .harbor_crafting_beacon_package import (
-    MAX_PLAY_BYTES, verify_beacon_package_play,
-)
+from .harbor_crafting_beacon_package import verify_beacon_package_play
 
 SCHEMA = "skeleton.game.harbor.beacon-acceptance.v1"
 MAX_ACCEPTANCE_BYTES = 32768
