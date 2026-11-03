@@ -80,3 +80,41 @@ def test_readonly_jeeves_and_cli_director(tmp_path, capsys):
                 "--expected-digests-json", json.dumps(
                     output["source_digests"])]) == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
+
+
+def test_director_session_transition_and_exact_world_revision(tmp_path):
+    store, world = fixture(tmp_path)
+    SessionStore(tmp_path).create("director", "reader")
+    before = SessionStore(tmp_path).read("director", "reader")
+    result = SessionStore(tmp_path).choose(
+        "director", "reader", "pursue_goal",
+        __import__("skeleton.jeeves.worlds.world_canon",
+                   fromlist=["digest"]).digest(before))
+    assert result["ending"] == "Return home"
+    view = store.player("director", "reader")
+    assert view["player"]["scene"] == "resolution"
+    assert view["player"]["chapters"]["current"]["act"] == "last"
+    assert len(view["player"]["chapters"]["visits"]) == 2
+    assert len(view["player"]["cinematics"]["visits"]) == 1
+    # A source revision is not permission to replay old approved storyboards.
+    from skeleton.jeeves.worlds.world_canon import WorldStore, edit, digest
+    changed = edit(world, {"action": "replace_scene", "value": {
+        "id": "opening", "title": "A revised original coast",
+        "narrative": "A new authored opening."}})
+    WorldStore(tmp_path).publish(changed, expected_digest=digest(world))
+    reject("chapters_source_lease_mismatch", lambda: store.inspect("director"))
+    reject("chapters_source_lease_mismatch", lambda: store.player("director", "reader"))
+
+
+def test_director_tool_player_never_mutates(tmp_path):
+    store, _ = fixture(tmp_path)
+    SessionStore(tmp_path).create("director", "reader")
+    before = (tmp_path / "director.reader.session.json").read_bytes()
+    result = invoke_world_tool(str(tmp_path), {
+        "schema": "jeeves.world.tool_request.v1",
+        "tool": "world.director_player", "world_id": "director",
+        "args": {"slot": "reader"},
+    })
+    assert result["persisted"] is False
+    assert result["result"]["revision"] == 0
+    assert (tmp_path / "director.reader.session.json").read_bytes() == before

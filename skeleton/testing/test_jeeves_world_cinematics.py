@@ -167,3 +167,15 @@ def test_untrusted_text_escaped_and_editor_source_lease(tmp_path):
     playable = (tmp_path / "testworld.cinematics.playable.html").read_text()
     assert "</script><script>alert(1)</script>" not in playable
     assert "\\u003c/script>" in playable
+
+
+def test_scene_local_beat_ids_remain_independent(tmp_path):
+    world, store, source = setup(tmp_path)
+    # Beat identity is local to its scene, not global across a story.
+    source["sequences"][1]["beats"][0]["id"] = "arrival"
+    assert validate_cinematics(source, world) == source
+    from skeleton.jeeves.worlds.cinematics_editor import _EDITOR_JS
+    assert "inputs[cursor++]" in _EDITOR_JS
+    assert "byId.get(beat.id)" not in _EDITOR_JS
+    first = store.publish(world["id"], source, create=True)
+    assert store.editor(world["id"], first)["html_sha256"]
