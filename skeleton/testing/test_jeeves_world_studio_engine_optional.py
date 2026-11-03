@@ -8,6 +8,7 @@ import pytest
 from skeleton.jeeves.worlds.chapters import ChapterStore
 from skeleton.jeeves.worlds.cinematics import CinematicsStore
 from skeleton.jeeves.worlds.studio_engine import StudioEngineStore
+from skeleton.jeeves.worlds.weather import WeatherStore
 from skeleton.jeeves.worlds.world_canon import CanonError, WorldStore
 from skeleton.testing.test_jeeves_world_studio_engine import ERA, fixture
 
@@ -76,3 +77,40 @@ def test_optional_source_revision_invalidates_existing_engine_receipt(tmp_path):
            lambda: engine.verify("harbor"))
     chapters.approve("harbor", digest, "Reviewed")
     reject("studio_engine_receipt_mismatch", lambda: engine.verify("harbor"))
+
+
+def test_weather_environment_requires_review_and_recompiles_engine(tmp_path):
+    engine = fixture(tmp_path)
+    world = WorldStore(tmp_path).read("harbor")
+    initial = engine.inspect("harbor", ERA)
+    engine.compile("harbor", initial["source_digests"], ERA)
+    weather = WeatherStore(tmp_path)
+    source = weather.propose(
+        "harbor", prompt="Original harbor environmental conditions",
+        scenes=[{
+            "scene": scene["id"], "weather": "fog", "visibility": "limited",
+            "description": "The harbor is misty near " + scene["title"],
+        } for scene in sorted(world["scenes"], key=lambda item: item["id"])],
+        overrides=[],
+    )
+    lease = weather.publish("harbor", source, create=True)
+    reject("studio_engine_optional_review_required",
+           lambda: engine.inspect("harbor", ERA))
+    weather.approve("harbor", lease, "Reviewed original scene weather")
+    reject("studio_engine_receipt_mismatch",
+           lambda: engine.verify("harbor"))
+    info = engine.inspect("harbor", ERA)
+    assert info["optional_planes"] == ["weather"]
+    assert "weather" in info["source_digests"]
+    stale = dict(info["source_digests"])
+    stale["weather"] = "0" * 64
+    reject("studio_engine_stale_source",
+           lambda: engine.compile("harbor", stale, ERA))
+    receipt = engine.compile("harbor", info["source_digests"], ERA)
+    assert engine.verify("harbor") == receipt
+    manifest = json.loads((tmp_path / receipt["manifest_file"]).read_text())
+    assert set(manifest["optional_handoffs"]) == {"weather"}
+    assert all(node["weather"]["weather"] == "fog"
+               for node in manifest["scene_nodes"])
+    assert manifest["optional_handoffs"]["weather"]["source_digest"] == (
+        info["source_digests"]["weather"])
