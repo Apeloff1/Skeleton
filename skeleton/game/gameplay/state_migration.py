@@ -149,7 +149,7 @@ class GameplayStateEnvelope:
         # Untrusted serialized saves must be plain JSON dictionaries. Do not
         # execute custom Mapping iteration/lookup hooks before shape checks.
         if type(section) is not dict:
-            raise GameplayMigrationError("gameplay save section must be a plain dict")
+            raise GameplayMigrationError("gameplay save schema section must be a plain dict")
         if section.get("schema") != ENVELOPE_SCHEMA:
             raise GameplayMigrationError("unknown gameplay save schema")
         if len(section) != len(SECTION_KEYS):
