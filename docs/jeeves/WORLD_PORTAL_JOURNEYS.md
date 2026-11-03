@@ -28,3 +28,11 @@ approvals, missing travel links and tampered artifacts fail closed. This is a
 source-verifiable playable handoff, not a device, rights or release certificate.
 
 Focused regression: `python -m pytest skeleton/testing/test_jeeves_world_portals.py -q`.
+
+Before review, `editor --network-id two_worlds --expected-network-digest SHA`
+writes a CSP-bound offline visual portal editor into private custody. Add or
+remove portals, export unapproved typed JSON, then submit it through the
+optimistic `save` lease. The browser cannot approve or publish. The
+read-only Jeeves `world.portals_propose_preview` tool accepts a root world,
+network ID, original prompt, ending and destination; its output is never
+implicitly approved or persisted.

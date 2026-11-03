@@ -418,6 +418,26 @@ class PortalStore:
             raise CanonError("portals_receipt_too_large")
         return receipt, playable
 
+    def editor(self, network_id: str, *, expected_network_digest: str) -> dict[str, str]:
+        """Write a CSP-bound offline editor under the same multi-world lease."""
+        from .portals_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            network = self._read(fd, network_id)
+            ids = self._world_ids(network)
+            with self._locks(fd, [network_id + ".portals"] + ids):
+                network = self._read(fd, network_id)
+                worlds = self._sources(fd, ids)
+                if digest(network) != expected_network_digest:
+                    raise CanonError("portals_stale_edit")
+                output = render_editor(network, worlds)
+                name = network_id + ".portals.editor.html"
+                self.worlds._write(fd, name, output)
+                return {"html_file": name, "html_sha256": sha256(output).hexdigest(),
+                        "network_digest": digest(network)}
+        finally:
+            os.close(fd)
+
     def compile(self, network_id: str, *, expected_network_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:

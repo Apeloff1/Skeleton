@@ -40,6 +40,7 @@ TOOLS = {
     "world.assurance_preview": (),
     "world.atlas_preview": (),
     "world.portals_preview": ("network_id",),
+    "world.portals_propose_preview": ("network_id", "prompt", "from_ending", "to_world"),
     "world.atlas_propose_preview": ("prompt",),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
@@ -103,6 +104,11 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
     elif name == "world.invariants_preview":
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
+    elif name == "world.portals_propose_preview":
+        payload = PortalStore(root).propose(
+            args["network_id"], args["prompt"], root_world=req["world_id"],
+            from_ending=args["from_ending"], to_world=args["to_world"],
+        )
     elif name == "world.portals_preview":
         payload = PortalStore(root).inspect(args["network_id"])
         if payload["network"]["root_world"] != req["world_id"]:
