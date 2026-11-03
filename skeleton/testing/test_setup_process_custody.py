@@ -397,3 +397,19 @@ def test_model_mount_symlink_cannot_chmod_target(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="real directory"):
         _prepare_model_directory(root, {})
     assert stat.S_IMODE(target.stat().st_mode) == 0o700
+
+
+def test_setup_lock_hardlink_alias_rejected_before_chmod(tmp_path):
+    if os.name == "nt":
+        pytest.skip("POSIX hardlink custody contract")
+    root = _root(tmp_path)
+    target = root / "external-lock-alias"
+    target.write_bytes(b"external-lock-unchanged")
+    target.chmod(0o644)
+    os.link(target, root / ".skeleton-setup.lock")
+    original = target.read_bytes()
+    with pytest.raises(ValueError, match="stable, unaliased regular file"):
+        ensure_runtime_environment(root)
+    assert target.read_bytes() == original
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+    assert not (root / ".env").exists()
