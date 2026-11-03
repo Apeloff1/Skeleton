@@ -162,6 +162,84 @@ def render_html(view: Any) -> bytes:
     return page
 
 
+
+_PLAYABLE_JS = r"""
+"use strict";
+const model = JSON.parse(document.getElementById("weather-data").textContent);
+const world = model.world, weather = model.weather;
+const scenes = new Map(world.scenes.map(s => [s.id, s]));
+const endings = new Map(world.endings.map(e => [e.scene, e.label]));
+const conditions = new Map(weather.scenes.map(s => [s.scene, s]));
+const overrides = new Map(weather.overrides.map(o => [o.choice, o]));
+const root = document.getElementById("play");
+let scene = world.start, flags = new Set(), choices = [];
+let condition = conditions.get(scene);
+function node(tag, value) {
+  const el = document.createElement(tag);
+  el.textContent = value; return el;
+}
+function reset() {
+  scene = world.start; flags = new Set(); choices = [];
+  condition = conditions.get(scene); render();
+}
+function advance(choice) {
+  if (choice.from !== scene || !choice.requires.every(f => flags.has(f))) return;
+  for (const flag of choice.grants) flags.add(flag);
+  choices.push(choice.id); scene = choice.to;
+  condition = overrides.get(choice.id) || conditions.get(scene);
+  render();
+}
+function render() {
+  root.replaceChildren();
+  const current = scenes.get(scene);
+  root.append(node("h1", current.title));
+  root.append(node("p", current.narrative));
+  root.append(node("h2", "Weather: " + condition.weather));
+  root.append(node("p", "Visibility: " + condition.visibility));
+  root.append(node("p", conditions.get(scene).description));
+  root.append(node("p", "Choices taken: " + choices.join(", ")));
+  if (endings.has(scene)) {
+    root.append(node("h2", "Ending: " + endings.get(scene)));
+    const restart = node("button", "Restart");
+    restart.addEventListener("click", reset); root.append(restart); return;
+  }
+  for (const choice of world.choices.filter(c => c.from === scene)) {
+    if (!choice.requires.every(f => flags.has(f))) continue;
+    const button = node("button", choice.label);
+    button.addEventListener("click", () => advance(choice));
+    root.append(button);
+  }
+}
+render();
+""".strip()
+
+
+def render_weather_playable(source: Any, world: Any) -> bytes:
+    """Compile actual offline choice traversal, not a static scene catalogue."""
+    import base64
+    validate_weather(source, world)
+    if not source["approved"]:
+        raise CanonError("weather_review_required")
+    payload = canonical({"world": world, "weather": source}).decode("utf-8")
+    payload = payload.replace("<", "\\u003c")
+    policy = base64.b64encode(sha256(_PLAYABLE_JS.encode()).digest()).decode("ascii")
+    page = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" content="default-src '
+        "'none'; script-src 'sha256-" + policy +
+        "'; connect-src 'none'; img-src 'none'; style-src 'none'; "
+        "base-uri 'none'; form-action 'none'" + '">'
+        '<title>Original weather-driven world</title></head><body>'
+        '<main id="play" aria-live="polite"></main>'
+        '<script id="weather-data" type="application/json">' + payload +
+        '</script><script>' + _PLAYABLE_JS + '</script></body></html>\n'
+    ).encode("utf-8")
+    if len(page) > 1572864:
+        raise CanonError("weather_playable_too_large")
+    return page
+
+
 class WeatherStore:
     """World-scoped descriptor-anchored custody, review and replay."""
     def __init__(self, root: str | os.PathLike[str]) -> None:
@@ -334,6 +412,59 @@ class WeatherStore:
                 self.worlds._write(fd, name, page)
                 return {"html_file": name, "html_sha256": sha256(page).hexdigest(),
                         "source_digest": digest(source), "review_required": True}
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _playable_artifacts(world_id: str) -> tuple[str, str]:
+        stem = _id(world_id, "world_id")
+        return stem + ".weather.playable.html", stem + ".weather.playable.receipt.json"
+
+    def _playable(self, fd: int, world_id: str) -> tuple[dict[str, Any], bytes]:
+        world, source = self._sources(fd, world_id)
+        page = render_weather_playable(source, world)
+        receipt = {
+            "schema": "jeeves.world.weather_playable_receipt.v1",
+            "world_id": world_id, "world_digest": digest(world),
+            "weather_digest": digest(source),
+            "html_sha256": sha256(page).hexdigest(),
+        }
+        return receipt, page
+
+    def compile_playable(self, world_id: str,
+                         expected_source_digest: str) -> dict[str, Any]:
+        fd = self.worlds._directory()
+        try:
+            self._locked(fd, world_id)
+            try:
+                receipt, page = self._playable(fd, world_id)
+                if receipt["weather_digest"] != expected_source_digest:
+                    raise CanonError("weather_stale_source")
+                names = self._playable_artifacts(world_id)
+                self.worlds._write(fd, names[0], page)
+                self.worlds._write(fd, names[1], canonical(receipt))
+                return {**receipt, "html_file": names[0],
+                        "receipt_file": names[1]}
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
+    def verify_playable(self, world_id: str) -> dict[str, Any]:
+        fd = self.worlds._directory()
+        try:
+            self._locked(fd, world_id)
+            try:
+                names = self._playable_artifacts(world_id)
+                recorded = strict_json(self.worlds._read(fd, names[1]))
+                receipt, page = self._playable(fd, world_id)
+                if recorded != receipt:
+                    raise CanonError("weather_playable_receipt_mismatch")
+                if self.worlds._read(fd, names[0]) != page:
+                    raise CanonError("weather_playable_artifact_mismatch")
+                return receipt
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:

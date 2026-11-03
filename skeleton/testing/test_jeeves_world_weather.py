@@ -145,3 +145,28 @@ def test_editor_and_read_only_typed_preview(tmp_path, capsys):
     assert run(["--store", str(tmp_path), "propose", "--world-id", "harbor",
                 "--file", str(proposal_path)]) == 0
     assert json.loads(capsys.readouterr().out)["result"]["review_required"]
+
+
+def test_interactive_weather_playable_compilation_and_tamper_proof(tmp_path):
+    _, _, store, source = setup(tmp_path)
+    lease = store.publish("harbor", source, create=True)
+    with pytest.raises(CanonError, match="weather_review_required"):
+        store.compile_playable("harbor", lease)
+    approved = store.approve("harbor", lease, "Reviewed gameplay")
+    with pytest.raises(CanonError, match="weather_stale_source"):
+        store.compile_playable("harbor", "0" * 64)
+    receipt = store.compile_playable("harbor", approved)
+    assert store.verify_playable("harbor")["html_sha256"] == receipt["html_sha256"]
+    page = (tmp_path / receipt["html_file"]).read_bytes()
+    assert b"Choices taken:" in page
+    assert b"weather-data" in page
+    assert b"script-src 'sha256-" in page
+    assert b"connect-src 'none'" in page
+    assert b"new Set()" in page
+    assert b"choice.requires.every" in page
+    assert b"overrides.get(choice.id)" in page
+    forged = json.loads((tmp_path / receipt["receipt_file"]).read_text())
+    forged["weather_digest"] = "0" * 64
+    (tmp_path / receipt["receipt_file"]).write_bytes(canonical(forged))
+    with pytest.raises(CanonError, match="weather_playable_receipt_mismatch"):
+        store.verify_playable("harbor")

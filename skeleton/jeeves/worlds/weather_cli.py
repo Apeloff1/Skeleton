@@ -15,14 +15,15 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--store", required=True)
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("propose", "publish", "inspect", "approve",
-                   "player", "compile", "verify", "editor"):
+                   "player", "compile", "verify", "editor",
+                   "compile-playable", "verify-playable"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
         if action in {"propose", "publish"}:
             cmd.add_argument("--file", required=True)
         if action == "publish":
             cmd.add_argument("--create", action="store_true")
-        if action in {"publish", "approve", "compile", "editor"}:
+        if action in {"publish", "approve", "compile", "editor", "compile-playable"}:
             cmd.add_argument("--expected-digest", required=True)
         if action == "approve":
             cmd.add_argument("--note", required=True)
@@ -56,6 +57,10 @@ def run(argv: list[str]) -> int:
                                    args.expected_session_digest)
         elif args.action == "verify":
             result = store.verify(args.world_id, args.slot)
+        elif args.action == "compile-playable":
+            result = store.compile_playable(args.world_id, args.expected_digest)
+        elif args.action == "verify-playable":
+            result = store.verify_playable(args.world_id)
         else:
             result = store.editor(args.world_id, args.expected_digest)
     except (CanonError, OSError, ValueError, TypeError) as exc:
