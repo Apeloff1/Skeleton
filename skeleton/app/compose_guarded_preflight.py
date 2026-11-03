@@ -80,6 +80,11 @@ async def inspect_compose_mongo_epoch(
             or not hello["setName"]
             or hello.get("isWritablePrimary") is not True):
         return _result("mongo_replica_set_primary_required")
+    # These fields are the stable parts of a primary observation. A changed
+    # election, host or replica-set identity during preflight invalidates
+    # the read window. No field here is a cryptographic cluster identity.
+    topology_fields = ("setName", "me", "primary", "electionId", "setVersion")
+    initial_topology = tuple(hello.get(field) for field in topology_fields)
     # A healthy unauthenticated replica set is not an acceptable canonical
     # custody authority. Inspect the current connection without publishing
     # usernames, role names, credentials or raw server responses.
@@ -101,9 +106,30 @@ async def inspect_compose_mongo_epoch(
         return _result("mongo_authenticated_session_required", replica_set=True)
     try:
         epoch = MongoCanonicalSourceEpoch(database)
-        await epoch.read_epoch(
-            tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
-        )
+        async with asyncio.timeout(3.0):
+            first_epoch = await epoch.read_epoch(
+                tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
+            )
+        # A single successful read can be superseded by an intervening
+        # canonical writer or primary election. Recheck both after the first
+        # read, never claiming a continuous lock or complete writer inventory.
+        async with asyncio.timeout(3.0):
+            last_hello = await database.command("hello")
+        if (type(last_hello) is not dict
+                or last_hello.get("isWritablePrimary") is not True
+                or tuple(last_hello.get(field) for field in topology_fields)
+                != initial_topology):
+            return _result("mongo_primary_changed_during_preflight",
+                           replica_set=True, authenticated=True)
+        async with asyncio.timeout(3.0):
+            final_epoch = await epoch.read_epoch(
+                tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
+            )
+        if (type(first_epoch) is not int or first_epoch < 2
+                or first_epoch % 2 or final_epoch != first_epoch
+                or type(final_epoch) is not int):
+            return _result("canonical_actor_epoch_changed_during_preflight",
+                           replica_set=True, authenticated=True)
     except Exception:
         return _result("canonical_actor_epoch_unavailable", replica_set=True, authenticated=True)
     return _result("mongo_epoch_observed_only", replica_set=True, epoch=True, authenticated=True)

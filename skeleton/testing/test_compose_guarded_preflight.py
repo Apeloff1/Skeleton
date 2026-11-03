@@ -68,8 +68,58 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["independent_reviewer_verified"])
         self.assertFalse(result["canonical_writer_inventory_verified"])
         self.assertFalse(result["writes_performed"])
+        self.assertEqual(FakeEpoch.instances[0].calls, 2)
+        self.assertEqual(self.db.calls, 3)
+
+    async def test_primary_election_between_reads_denies_stable_epoch(self):
+        class RotatingDB(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "hello" and self.calls == 3:
+                    return {"setName": "rs0", "isWritablePrimary": True,
+                            "electionId": "new-election"}
+                return result
+        self.db = RotatingDB()
+        self.db.hello["electionId"] = "old-election"
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_primary_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
         self.assertEqual(FakeEpoch.instances[0].calls, 1)
-        self.assertEqual(self.db.calls, 2)
+
+    async def test_primary_loss_between_reads_denies(self):
+        class LostPrimary(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "hello" and self.calls == 3:
+                    return {"setName": "rs0", "isWritablePrimary": False}
+                return result
+        self.db = LostPrimary()
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_primary_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+
+    async def test_epoch_advance_between_reads_denies(self):
+        class AdvancingEpoch(FakeEpoch):
+            async def read_epoch(self, **kwargs):
+                self.calls += 1
+                return 2 if self.calls == 1 else 4
+        with patch("skeleton.app.compose_guarded_preflight.MongoCanonicalSourceEpoch",
+                   AdvancingEpoch):
+            result = await self.inspect()
+        self.assertEqual(result["code"], "canonical_actor_epoch_changed_during_preflight")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_invalid_epoch_type_denies(self):
+        class BooleanEpoch(FakeEpoch):
+            async def read_epoch(self, **kwargs):
+                self.calls += 1
+                return True
+        with patch("skeleton.app.compose_guarded_preflight.MongoCanonicalSourceEpoch",
+                   BooleanEpoch):
+            result = await self.inspect()
+        self.assertEqual(result["code"], "canonical_actor_epoch_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
 
     async def test_standalone_is_unavailable(self):
         self.db.hello = {"isWritablePrimary": True}
