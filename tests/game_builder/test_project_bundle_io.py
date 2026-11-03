@@ -97,6 +97,23 @@ def test_bundle_read_refuses_symlink_and_same_size_rewrite(tmp_path, monkeypatch
     assert changed[0]
 
 
+
+def test_bundle_read_rejects_hardlinked_source_alias(tmp_path):
+    import os
+
+    outside = tmp_path / "unrelated-tenant.json"
+    outside.write_text('{"private":"other tenant"}', encoding="utf-8")
+    alias = tmp_path / "hero.gfbundle.json"
+    try:
+        os.link(outside, alias)
+    except (OSError, NotImplementedError):
+        pytest.skip("hard links unavailable on this filesystem")
+    with pytest.raises(BundleError, match="hard-linked"):
+        bio.read_bundle(alias)
+    assert outside.read_text(encoding="utf-8") == '{"private":"other tenant"}'
+
+
+
 def test_bundle_read_rejects_fifo_without_waiting_for_writer(tmp_path):
     import os
 

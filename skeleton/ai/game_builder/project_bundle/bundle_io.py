@@ -288,6 +288,10 @@ def read_bundle(path: Path) -> str:
             before = os.fstat(fd)
             if not stat.S_ISREG(before.st_mode):
                 raise BundleError("bundle must be a regular file")
+            # A second directory entry can alias an unrelated tenant's inode.
+            # The signed envelope does not authorize that filesystem alias.
+            if before.st_nlink != 1:
+                raise BundleError("hard-linked bundle source is not trusted")
             if before.st_size > MAX_BUNDLE_BYTES:
                 raise BundleError("bundle exceeds size limit")
             blocks: list[bytes] = []
