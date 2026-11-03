@@ -154,14 +154,30 @@ def _publish(path: Path, payload: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
     fd = None
+    owned_identity = None
     try:
         fd = os.open(path, flags, 0o600)
+        opened = os.fstat(fd)
+        owned_identity = (opened.st_dev, opened.st_ino)
         with os.fdopen(fd, "wb") as output:
             fd = None
             output.write(payload)
             output.flush()
             os.fsync(output.fileno())
     except OSError as exc:
+        # A failed write must not strand a partial archive or launcher.
+        # Never unlink a replacement placed by another process.
+        if owned_identity is not None:
+            try:
+                current = path.lstat()
+                if (current.st_dev, current.st_ino) == owned_identity:
+                    path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                # Preserve the original failure; a surviving file is still
+                # create-only and will not be silently overwritten.
+                pass
         raise BundleError("portable game create-only publication refused") from exc
     finally:
         if fd is not None:

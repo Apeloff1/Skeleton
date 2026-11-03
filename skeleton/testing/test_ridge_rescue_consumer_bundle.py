@@ -58,3 +58,26 @@ def test_packaged_game_acceptance_executes_without_checkout(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert '"portable_export_verified":true' in result.stdout
+
+
+def test_failed_bundle_write_cleans_only_its_own_partial_file(tmp_path, monkeypatch):
+    """A failed fsync must not strand a plausible, truncated consumer export."""
+    from skeleton.game.gameplay.ridge_rescue import consumer_bundle as bundle
+
+    target = tmp_path / "cinder-ridge-partial.pyz"
+    def fail_sync(_fd):
+        raise OSError("simulated disk failure")
+    monkeypatch.setattr(bundle.os, "fsync", fail_sync)
+    with pytest.raises(BundleError, match="create-only"):
+        bundle._publish(target, b"partial game")
+    assert not target.exists()
+
+
+def test_failed_publication_does_not_remove_preexisting_file(tmp_path):
+    from skeleton.game.gameplay.ridge_rescue import consumer_bundle as bundle
+
+    target = tmp_path / "cinder-ridge-existing.pyz"
+    target.write_bytes(b"existing-owner-data")
+    with pytest.raises(BundleError, match="create-only"):
+        bundle._publish(target, b"new")
+    assert target.read_bytes() == b"existing-owner-data"
