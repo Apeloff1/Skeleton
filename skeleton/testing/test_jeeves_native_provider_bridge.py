@@ -13,7 +13,7 @@ from skeleton.jeeves.agent.native_receipt_boundary import NativeReceiptError
 from skeleton.jeeves.agent.native_runtime import NativeJeevesRuntime, NativeRuntimeHold
 from skeleton.jeeves.agent.native_readiness import inspect_native_jeeves
 from skeleton.jeeves.agent.native_schema_boundary import NativeSchemaError
-from skeleton.jeeves.agent.provider import ProviderExhausted
+from skeleton.jeeves.agent.provider import ProviderExhausted, ProviderError
 from skeleton.jeeves.agent.runtime import AgentConfig, RunInputs
 from skeleton.jeeves.agent.types import Budget, Goal, ModelMessage, ModelRequest
 
@@ -37,6 +37,7 @@ class SimulatedSpine:
         self.generations = 0
         self.generated_text = '{"answer":"ok","confidence":1,"refs":[]}'
         self.fail_uncertain = False
+        self.return_without_commit = False
         self.tamper_committed = False
         self.db = object()
 
@@ -84,7 +85,8 @@ class SimulatedSpine:
             "generated_tokens": 40, "finish_reason": "stop",
             "replayed": False,
         }
-        self.turns[key] = {"request_prompt": prompt, "result": dict(result)}
+        if not self.return_without_commit:
+            self.turns[key] = {"request_prompt": prompt, "result": dict(result)}
         self.pending.remove(key)
         return result
 
@@ -160,7 +162,7 @@ class TestNativeProviderWiring(unittest.TestCase):
         self.assertEqual(self.worker.spine.generations, 1)
 
     def test_judgment_budget_below_native_ceiling_refused(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ProviderError):
             self.provider.complete(request(max_tokens=64))
         self.assertEqual(self.worker.spine.generations, 0)
 
@@ -169,8 +171,17 @@ class TestNativeProviderWiring(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.provider.complete(request())
         self.assertEqual(self.worker.spine.generations, 1)
-        with self.assertRaises((Conflict, ValueError)):
+        with self.assertRaises((Conflict, ProviderError)):
             self.provider.complete(request())
+        self.assertEqual(self.worker.spine.generations, 1)
+
+    def test_returned_native_text_without_sqlite_commit_is_held(self):
+        self.worker.spine.return_without_commit = True
+        with self.assertRaises(ProviderError):
+            self.provider.complete(request(request_id="notcommitted"))
+        self.assertEqual(self.worker.spine.generations, 1)
+        with self.assertRaises(ProviderError):
+            self.provider.complete(request(request_id="notcommitted"))
         self.assertEqual(self.worker.spine.generations, 1)
 
     def test_router_never_retries_uncertain_native(self):
@@ -183,7 +194,7 @@ class TestNativeProviderWiring(unittest.TestCase):
     def test_model_identity_change_disables_provider(self):
         self.worker.spine.backend.model_digest = "c" * 64
         self.assertFalse(self.provider.available())
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ProviderError):
             self.provider.complete(request())
 
 
