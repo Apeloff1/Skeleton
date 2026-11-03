@@ -241,6 +241,26 @@ This pure-source preflight is not a substitute for model byte/source
 rights verification, descriptor-anchored file admission, native GPU memory
 reservation, SQLite transaction checks or independent device qualification.
 
+## Signed-source preflight before GGUF model activation
+
+An explicitly supplied source manifest is now HMAC-authenticated, decoded,
+checked against the operator's tenant/subject and one-hour approval epoch,
+and all original source bytes are read from descriptor-anchored private
+files **before** the model installer activates a GGUF backend.
+
+The preflight returns a source-only SHA receipt with no prompt, original
+source text, model key, or private file paths. It does not claim the real
+model was loaded. After activation, the actual native GGUF model and
+tokenizer identities are compared to the signed source scope. Subsequent
+selection and SQLite commit still independently reopen and verify the
+signed source bytes: a preflight does not grant perpetual authority if
+files are swapped or approval expires during generation.
+
+Expired HMACs, foreign tenants, invalid source roots, symlinks, substituted
+files, unsigned source content or source cap violations now prevent
+unnecessary native startup. Source rights remain operator-attested only,
+not independently licensed by this feature.
+
 ## Required source validation
 
 After the source publication and repairs are complete, run these in order:
@@ -255,13 +275,14 @@ After the source publication and repairs are complete, run these in order:
 8. python -m unittest skeleton.testing.test_jeeves_native_sqlite_integration -v
 9. python -m unittest skeleton.testing.test_jeeves_native_source_tool -v
 10. python -m unittest skeleton.testing.test_jeeves_native_operator_preflight -v
-11. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_source_tool.py skeleton/jeeves/agent/native_operator_preflight.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
-12. python scripts/check_architecture_map.py
-13. python scripts/check_ai_app_construction.py
-14. python scripts/check_capability_interfaces.py
-15. python scripts/check_provider_bootstrap.py
-16. python scripts/check_enterprise_ai_superiority.py --json
-17. python scripts/check_enterprise_ai_implementation_notes.py --json
+11. python -m unittest skeleton.testing.test_jeeves_native_source_preflight -v
+12. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_source_tool.py skeleton/jeeves/agent/native_operator_preflight.py skeleton/jeeves/agent/native_source_preflight.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
+13. python scripts/check_architecture_map.py
+14. python scripts/check_ai_app_construction.py
+15. python scripts/check_capability_interfaces.py
+16. python scripts/check_provider_bootstrap.py
+17. python scripts/check_enterprise_ai_superiority.py --json
+18. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,

@@ -21,6 +21,7 @@ from .native_signed_evidence import (
     NativeSignedEvidenceProvider, attach_signed_native_evidence,
 )
 from .native_operator_preflight import check_operator_admission
+from .native_source_preflight import verify_sources_before_native_start
 from .native_source_tool import (
     BoundSignedSourceTool, readonly_source_grant,
 )
@@ -88,6 +89,24 @@ def main(argv: list[str] | None = None) -> int:
             task = raw.decode("utf-8", "strict").strip()
             if not task:
                 raise ValueError("task cannot be empty")
+        source_manifest = None
+        operator_key = None
+        source_preflight = None
+        if args.source_root is not None:
+            from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import (
+                _environment_key, _read_private_manifest,
+            )
+            source_manifest = _read_private_manifest(args.signed_source_manifest)
+            operator_key = _environment_key()
+            source_preflight = verify_sources_before_native_start(
+                source_root=args.source_root,
+                signed_manifest=source_manifest,
+                operator_key=operator_key,
+                tenant=args.tenant,
+                subject=args.subject,
+                observed_at=int(time.time()),
+                maximum_sources=args.max_sources,
+            )
         stack, worker, installed = activate_checked(
             model_root=args.model_root, state_dir=args.state_dir,
             tenant=args.tenant, subject=args.subject,
@@ -102,21 +121,13 @@ def main(argv: list[str] | None = None) -> int:
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
             source_provider = None
-            if args.source_root is not None:
-                from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import (
-                    _environment_key, _read_private_manifest,
-                )
-                from skeleton.ai.runtime.operational_ai.offline_cognition.core.contracts import Scope
-                manifest = _read_private_manifest(args.signed_source_manifest)
+            if source_preflight is not None:
+                source_preflight.verify_active_model(worker.spine.identity)
                 source_provider = NativeSignedEvidenceProvider(
                     source_root=args.source_root,
-                    raw_manifest=manifest,
-                    operator_key=_environment_key(),
-                    scope=Scope(
-                        args.tenant, args.subject,
-                        worker.spine.identity.model_sha256,
-                        worker.spine.identity.tokenizer_sha256,
-                    ),
+                    raw_manifest=source_manifest,
+                    operator_key=operator_key,
+                    scope=source_preflight.scope,
                     maximum_sources=args.max_sources,
                     clock=time.time,
                 )
