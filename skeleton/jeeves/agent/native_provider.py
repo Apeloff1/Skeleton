@@ -55,6 +55,7 @@ class NativeJeevesProvider:
         # Per-process serialization complements the native process/session
         # locks and avoids races around durable session allocation.
         self._lock = threading.RLock()
+        self._attempted: set[str] = set()
 
     @property
     def identity(self) -> ActiveModel:
@@ -115,10 +116,30 @@ class NativeJeevesProvider:
             if saved is not None:
                 result = saved
             else:
-                result = self._bridge.turn(
+                if native_request_id in self._attempted:
+                    raise ProviderError("uncertain native request requires explicit custody reconciliation")
+                # This in-process fence prevents a repeated call after an
+                # exception. The canonical SQLite pending-state fence also
+                # survives a process crash and prevents a duplicate inference.
+                self._attempted.add(native_request_id)
+                generated = self._bridge.turn(
                     session, native_request_id, prompt.text,
                     seed=0, temperature=temperature,
                 )
+                # The worker's returned dictionary alone is not proof that
+                # SQLite committed. Independently read the authoritative
+                # committed response and compare the exact original bytes.
+                committed = self._worker.spine.replay(
+                    session, native_request_id, prompt.text,
+                    seed=0, temperature=temperature,
+                )
+                if committed is None:
+                    raise ProviderError("native response lacks a durable committed replay")
+                if (committed.get("text") != generated.get("text")
+                    or committed.get("output_sha256") != generated.get("output_sha256")):
+                    raise ProviderError("native response differs from durable committed bytes")
+                result = dict(committed)
+                result["replayed"] = False
         verified = receive_committed_turn(
             result, active=self._identity,
             session_id=session, native_request_id=native_request_id,
