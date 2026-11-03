@@ -149,3 +149,39 @@ def test_laptop_diagnostic_with_saved_slot_reaches_acceptance(tmp_path):
     assert report["checks"]["acceptance"]["persisted_slot_verified"] is True
     assert report["next_action"] == "source_playable_handoff_ready_for_engine_validation"
     assert not (tmp_path / "lighthouse.lock").exists()
+
+
+def test_diagnostic_distinguishes_transient_lease_contention_from_corruption(
+        tmp_path, monkeypatch):
+    """Do not tell operators to overwrite a valid world during an active writer."""
+    flow = ready(tmp_path)
+    flow.create_session("lighthouse", "saved")
+    original_verify = flow.verify
+    original_inspect = flow.inspect_session
+    original_acceptance = flow.acceptance
+
+    def busy(*_args, **_kwargs):
+        raise CanonError("lease_busy")
+
+    monkeypatch.setattr(flow, "verify", busy)
+    builder_busy = flow.diagnose("lighthouse", "saved")
+    assert builder_busy["checks"]["builder"] == {"ok": False, "error": "lease_busy"}
+    assert builder_busy["next_action"] == "retry_after_current_writer_finishes"
+    monkeypatch.setattr(flow, "verify", original_verify)
+
+    monkeypatch.setattr(flow, "inspect_session", busy)
+    session_busy = flow.diagnose("lighthouse", "saved")
+    assert session_busy["checks"]["session"] == {"ok": False, "error": "lease_busy"}
+    assert session_busy["next_action"] == "retry_after_current_writer_finishes"
+    monkeypatch.setattr(flow, "inspect_session", original_inspect)
+
+    monkeypatch.setattr(flow, "acceptance", busy)
+    acceptance_busy = flow.diagnose("lighthouse", "saved")
+    assert acceptance_busy["checks"]["acceptance"] == {
+        "ok": False, "error": "lease_busy"}
+    assert acceptance_busy["next_action"] == "retry_after_current_writer_finishes"
+    monkeypatch.setattr(flow, "acceptance", original_acceptance)
+
+    recovered = flow.diagnose("lighthouse", "saved")
+    assert recovered["checks"]["acceptance"]["ok"] is True
+    assert recovered["next_action"] == "source_playable_handoff_ready_for_engine_validation"

@@ -336,7 +336,9 @@ class LaptopFlow:
             self.verify(world_id)
         except CanonError as exc:
             report["checks"]["builder"] = {"ok": False, "error": exc.code}
-            report["next_action"] = "compile_and_verify_reviewed_source"
+            report["next_action"] = (
+                "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                else "compile_and_verify_reviewed_source")
             return report
         report["checks"]["builder"] = {"ok": True}
         if slot is not None:
@@ -344,7 +346,9 @@ class LaptopFlow:
                 session = self.inspect_session(world_id, slot)
             except CanonError as exc:
                 report["checks"]["session"] = {"ok": False, "error": exc.code}
-                report["next_action"] = "inspect_session_or_restore_from_trusted_export"
+                report["next_action"] = (
+                    "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                    else "inspect_session_or_restore_from_trusted_export")
                 return report
             report["checks"]["session"] = {
                 "ok": True, "session_digest": session["session_digest"],
@@ -354,7 +358,9 @@ class LaptopFlow:
             acceptance = self.acceptance(world_id, slot)
         except CanonError as exc:
             report["checks"]["acceptance"] = {"ok": False, "error": exc.code}
-            report["next_action"] = "repair_canonical_replay_or_save_before_engine_handoff"
+            report["next_action"] = (
+                "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                else "repair_canonical_replay_or_save_before_engine_handoff")
             return report
         report["checks"]["acceptance"] = {
             "ok": True, "ending_witness_count": len(acceptance["ending_witnesses"]),
