@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "lists_14",
+  "domain": "lists",
+  "prompt": "Sort these fictional inventory counts ascending; output comma-space separated digits: 15, 22, 14, 18.",
+  "completion": "14, 15, 18, 22",
+  "group_id": "lists_14",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

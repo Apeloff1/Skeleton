@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "explanations_12",
+  "domain": "explanations",
+  "prompt": "Give this exact concise training definition of citation for fictional glossary row 12.",
+  "completion": "A reference connecting a claim to its source.",
+  "group_id": "explanations_12",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

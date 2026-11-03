@@ -1,0 +1,18 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "plan_20",
+  "domain": "plan",
+  "objective": "Enforce explicit owner approval and bounded native optimizer work, profile 20",
+  "trust_boundary": "Untrusted candidate settings cannot escalate native training resources",
+  "input": {
+    "run_id": "run_original",
+    "learning_rate_ppm": 10000,
+    "steps": 16384,
+    "batch_lines": 0,
+    "approved": true
+  },
+  "expected_allow": false,
+  "expected_reason": "operator_or_optimizer_limit_hold",
+  "model_qualified": false,
+  "release_certified": false
+}

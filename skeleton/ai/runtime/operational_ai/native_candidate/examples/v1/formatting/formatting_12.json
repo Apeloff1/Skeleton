@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "formatting_12",
+  "domain": "formatting",
+  "prompt": "Format fictional label agent and numeric identity 111 as label:number, with no spaces.",
+  "completion": "agent:111",
+  "group_id": "formatting_12",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

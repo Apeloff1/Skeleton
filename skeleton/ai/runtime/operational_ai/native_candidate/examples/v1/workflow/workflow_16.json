@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "workflow_16",
+  "domain": "workflow",
+  "prompt": "For fictional candidate workflow 715, current phase=evaluate. Name its next permitted stage only.",
+  "completion": "publish_candidate",
+  "group_id": "workflow_16",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

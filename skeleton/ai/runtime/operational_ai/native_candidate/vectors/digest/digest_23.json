@@ -1,0 +1,16 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "digest_23",
+  "domain": "digest",
+  "objective": "Bind checkpoint, tokenizer and source identity to exact lowercase SHA256 representation 23",
+  "trust_boundary": "Untrusted digest spelling cannot authorize a different weight or source blob",
+  "input": {
+    "value": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
+  "expected_allow": false,
+  "expected_reason": "digest_form_refused",
+  "model_qualified": false,
+  "release_certified": false
+}

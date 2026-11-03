@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "syntax_04",
+  "domain": "syntax",
+  "prompt": "Normalize this fictional identifier by replacing spaces with underscores and lowercasing: MARBLE Service 4.",
+  "completion": "marble_service_4",
+  "group_id": "syntax_04",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

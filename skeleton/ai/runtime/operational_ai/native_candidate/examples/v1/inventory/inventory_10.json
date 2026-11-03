@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "inventory_10",
+  "domain": "inventory",
+  "prompt": "A fictional warehouse has 97 units, ships 6 and receives 15. Give its new stock integer only.",
+  "completion": "106",
+  "group_id": "inventory_10",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

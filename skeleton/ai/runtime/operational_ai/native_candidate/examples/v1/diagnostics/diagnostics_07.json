@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "diagnostics_07",
+  "domain": "diagnostics",
+  "prompt": "Classify synthetic AI diagnostic 106: code missing_checkpoint. Output exactly ready or blocked.",
+  "completion": "blocked",
+  "group_id": "diagnostics_07",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

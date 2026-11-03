@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "csv_columns_01",
+  "domain": "csv_columns",
+  "prompt": "Produce a two-column CSV with header place,count and one row Halden,10.",
+  "completion": "place,count\nHalden,10",
+  "group_id": "csv_columns_01",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

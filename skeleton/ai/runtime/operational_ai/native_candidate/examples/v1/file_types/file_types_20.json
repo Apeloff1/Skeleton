@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "file_types_20",
+  "domain": "file_types",
+  "prompt": "Classify the extension of fictional file report_119.csv into one type label.",
+  "completion": "tabular_data",
+  "group_id": "file_types_20",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

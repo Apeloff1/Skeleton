@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "summaries_16",
+  "domain": "summaries",
+  "prompt": "Summarize this original fictional note using exactly the format Name in Place: Quartz was deployed in Bergen for demonstration 215.",
+  "completion": "Quartz in Bergen",
+  "group_id": "summaries_16",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}
