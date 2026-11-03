@@ -16,6 +16,15 @@ provisioned stable actor epoch, and the installed canonical conversation and
 memory writer inventory. It binds the exact native transformer backend,
 runtime and tokenizer digests. It receives a reviewer from the trusted
 application root rather than from model output, prompts or request metadata.
+The trusted root must also pin a `ReviewerTrustAnchor` containing an
+Ed25519 public key, authority ID and deployment domain. Every activation
+and pre/postflight check sends a fresh nonce challenge to the reviewer
+signing client. The signed payload binds canonical scope, epoch and exact
+model/runtime/tokenizer digests. The epoch is read linearly again after
+attestation to reject a writer entering WRITING during the reviewer round trip.
+A valid signature proves key possession only, NOT independently audited
+reviewer isolation or policy correctness. Never place a private reviewer
+signing key in the application, Compose environment, or repository.
 
 `compose_mongo_guarded_native_adapter` constructs the native backend,
 performs explicit activation, and creates the canonical guarded service with
@@ -57,8 +66,11 @@ reviewer is actually independent merely because it is callable.
    Mongo clients, backups, migrations and maintenance scripts; in-process
    inventory cannot fence an unknown external writer.
 5. Construct an independently administered `BoundedAdversarialReviewer`
-   and an authoritative `TrustedSnapshotReader`. Review the reviewer's
-   trust domain and isolation from the model. Bind actual loaded native
+   and an authoritative `TrustedSnapshotReader`. Provide a pinned
+   `ReviewerTrustAnchor` and async `attest_challenge(payload)` method
+   on the reviewer client backed by a separately administered signer.
+   Audit the signing-key isolation, reviewer trust domain and separation
+   from model execution. Bind actual loaded native
    model, runtime and tokenizer digests from the backend, never from a
    user request or unchecked environment variable.
 6. Invoke the explicit async composition factory only after all checks
@@ -123,7 +135,7 @@ inventing an activated model.
 
 ## Deterministic focused test
 
-`python -m unittest skeleton.testing.test_compose_guarded_activation skeleton.testing.test_compose_guarded_service skeleton.testing.test_mongo_epoch_revocation skeleton.testing.test_compose_guarded_preflight`
+`python -m unittest skeleton.testing.test_compose_guarded_activation skeleton.testing.test_compose_guarded_service skeleton.testing.test_mongo_epoch_revocation skeleton.testing.test_compose_guarded_preflight skeleton.testing.test_reviewer_custody`
 
 The fake Mongo unit tests prove state transitions and error handling only.
 They do not substitute for real replica-set behavior, independent reviewer

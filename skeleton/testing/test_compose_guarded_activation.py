@@ -4,6 +4,9 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 import unittest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from skeleton.ai.runtime.inference.reviewer_custody import ReviewerTrustAnchor
 from unittest.mock import patch
 
 from skeleton.ai.runtime.inference.compose_activation import (
@@ -50,6 +53,25 @@ class FakeNative:
             raise ValueError("secret model diagnostic")
 
 
+class FakeReviewer:
+    def __init__(self, signer):
+        self.signer = signer
+        self.challenge_count = 0
+        self.replayed_signature = None
+        self.on_challenge = None
+
+    def __call__(self, *args):
+        return True
+
+    async def attest_challenge(self, payload):
+        self.challenge_count += 1
+        if self.on_challenge is not None:
+            await self.on_challenge(payload)
+        if self.replayed_signature is not None:
+            return self.replayed_signature
+        return self.signer.sign(payload)
+
+
 class ActivationTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.database = FakeDatabase()
@@ -77,7 +99,16 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             records=collection(), idempotency=collection(),
             revisions=collection(), projection_outbox=collection(),
         )
-        self.reviewer = lambda *args: True
+        self.signer = Ed25519PrivateKey.generate()
+        self.reviewer = FakeReviewer(self.signer)
+        self.trust_anchor = ReviewerTrustAnchor(
+            authority_id="security-reviewer-prod",
+            deployment_domain="separate-reviewer-domain",
+            ed25519_public_key=self.signer.public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            ),
+        )
         self.native_patch = patch(
             "skeleton.ai.runtime.inference.native_transformer.NativeTransformerModel",
             FakeNative,
@@ -100,6 +131,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             backend=self.backend,
             reviewer=self.reviewer,
             reviewer_authority_id="security-reviewer-prod",
+            reviewer_trust_anchor=self.trust_anchor,
             tenant_id="tenant",
             actor_id="owner",
             context_id="context",
@@ -269,6 +301,44 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             self.make(reviewer_authority_id="\nunsafe")
         with self.assertRaises(ActivationBlocked):
             self.make(reviewer_authority_id="")
+
+    async def test_fresh_reviewer_attestation_on_each_probe(self):
+        gate = self.make()
+        permit = await gate.activate()
+        self.assertEqual(self.reviewer.challenge_count, 1)
+        self.assertEqual(await gate.assert_active(permit), permit)
+        self.assertEqual(self.reviewer.challenge_count, 2)
+
+    async def test_replayed_reviewer_signature_blocks(self):
+        gate = self.make()
+        permit = await gate.activate()
+        async def capture(payload):
+            if self.reviewer.replayed_signature is None:
+                self.reviewer.replayed_signature = self.signer.sign(payload)
+        self.reviewer.on_challenge = capture
+        with self.assertRaisesRegex(ActivationBlocked, "reviewer custody"):
+            await gate.assert_active(permit)
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
+    async def test_wrong_signer_blocks(self):
+        self.reviewer.signer = Ed25519PrivateKey.generate()
+        with self.assertRaisesRegex(ActivationBlocked, "reviewer custody"):
+            await self.make().activate()
+
+    async def test_unpinned_reviewer_blocks(self):
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor"):
+            self.make(reviewer_trust_anchor=None)
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor"):
+            self.make(reviewer_authority_id="untrusted-reviewer")
+
+    async def test_writer_enters_during_reviewer_challenge(self):
+        async def writer_started(_payload):
+            self.epoch_value = 3
+        self.reviewer.on_challenge = writer_started
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "source changed"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
     async def test_scope_and_digest_denies(self):
         with self.assertRaises(ActivationBlocked):

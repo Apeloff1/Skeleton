@@ -20,6 +20,7 @@ from skeleton.persistence.mongo_source_epoch import (
     verify_canonical_source_writer_inventory,
 )
 from skeleton.provider_runtime import ProviderPolicyError
+from .reviewer_custody import ReviewerCustodyError, ReviewerCustodyVerifier, ReviewerTrustAnchor
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_PROBE_SECONDS = 5.0
@@ -69,6 +70,7 @@ class MongoGuardedActivation:
         backend: Any,
         reviewer: Any,
         reviewer_authority_id: str,
+        reviewer_trust_anchor: ReviewerTrustAnchor,
         tenant_id: str,
         actor_id: str,
         context_id: str,
@@ -108,6 +110,13 @@ class MongoGuardedActivation:
         self._backend = backend
         self._reviewer = reviewer
         self._reviewer_authority_id = reviewer_authority_id
+        try:
+            self._reviewer_verifier = ReviewerCustodyVerifier(
+                reviewer=reviewer, authority_id=reviewer_authority_id,
+                trust_anchor=reviewer_trust_anchor,
+            )
+        except ReviewerCustodyError:
+            raise ActivationBlocked("independent reviewer trust anchor required") from None
         self._tenant_id = tenant_id
         self._actor_id = actor_id
         self._context_id = context_id
@@ -172,13 +181,33 @@ class MongoGuardedActivation:
                 conversation=self._conversation, memory=self._memory, epoch=self._epoch,
             )
             self._verify_backend()
-            return await self._epoch.read_epoch(
+            first_epoch = await self._epoch.read_epoch(
                 tenant_id=self._tenant_id,
                 actor_id=self._actor_id,
                 context_id=self._context_id,
             )
+            await self._reviewer_verifier.verify(
+                tenant_id=self._tenant_id, actor_id=self._actor_id,
+                context_id=self._context_id, epoch=first_epoch,
+                model_digest=self._identity[0],
+                runtime_digest=self._identity[1],
+                tokenizer_digest=self._identity[2],
+            )
+            # A canonical writer may enter WRITING while the reviewer signs.
+            # A second linearizable read is required after that await.
+            final_epoch = await self._epoch.read_epoch(
+                tenant_id=self._tenant_id,
+                actor_id=self._actor_id,
+                context_id=self._context_id,
+            )
+            if final_epoch != first_epoch:
+                raise ActivationBlocked("canonical source changed during reviewer attestation")
+            self._verify_backend()
+            return final_epoch
         except ActivationBlocked:
             raise
+        except ReviewerCustodyError:
+            raise ActivationBlocked("independent reviewer custody unavailable") from None
         except (MongoSourceEpochError, TimeoutError):
             raise ActivationBlocked("canonical source epoch unavailable") from None
         except Exception:
@@ -263,6 +292,7 @@ async def compose_mongo_guarded_native_adapter(
     snapshots: Any,
     reviewer: Any,
     reviewer_authority_id: str,
+    reviewer_trust_anchor: ReviewerTrustAnchor,
     tenant_id: str,
     actor_id: str,
     context_id: str,
@@ -290,6 +320,7 @@ async def compose_mongo_guarded_native_adapter(
         database=database, epoch=epoch, conversation=conversation, memory=memory,
         backend=backend, reviewer=reviewer,
         reviewer_authority_id=reviewer_authority_id,
+        reviewer_trust_anchor=reviewer_trust_anchor,
         tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
         expected_model_digest=backend.model_digest,
         expected_runtime_digest=backend.runtime_digest,
