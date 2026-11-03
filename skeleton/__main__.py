@@ -106,6 +106,7 @@ Commands:
     world-testimony Reviewed NPC witnesses, contradiction proof and playable handoff
     world-relationships Reviewed original NPC trust, replay and playable handoff
     world-events Reviewed one-shot world events, flag closure and HTML5 handoff
+    world-dialogue-locales Reviewed original branching NPC language editions
     world-dialogue-transcript Private source-leased NPC conversation custody and replay
     world-interaction Unified original economy, character arcs and dialogue HTML5
     world-dialogue Reviewed interactive NPC dialogue and atomic world-choice handoff
@@ -923,6 +924,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-atlas":
         from skeleton.jeeves.worlds.atlas_cli import run as world_atlas_cli
         return world_atlas_cli(rest)
+    if cmd == "world-dialogue-locales":
+        from skeleton.jeeves.worlds.dialogue_localization_cli import run as dialogue_locales_cli
+        return dialogue_locales_cli(rest)
     if cmd == "world-dialogue-transcript":
         from skeleton.jeeves.worlds.dialogue_transcript_cli import run as transcript_cli
         return transcript_cli(rest)
