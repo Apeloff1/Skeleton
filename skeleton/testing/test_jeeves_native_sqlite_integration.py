@@ -8,6 +8,7 @@ model, native device, model rights or release qualification.
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -32,8 +33,10 @@ from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor
 )
 from skeleton.jeeves.agent.native_chat import NativeJeevesChat, NativeChatHold
 from skeleton.jeeves.agent.native_provider import NativeJeevesProvider
+from skeleton.jeeves.agent.native_runtime import NativeJeevesRuntime
+from skeleton.jeeves.agent.runtime import RunInputs
 from skeleton.jeeves.agent.provider import ProviderError
-from skeleton.jeeves.agent.types import ModelMessage, ModelRequest
+from skeleton.jeeves.agent.types import ModelMessage, ModelRequest, Goal, Budget
 
 
 MODEL = "a" * 64
@@ -69,6 +72,48 @@ class SyntheticallyGenerated:
             model_digest=self.model_digest,
             tokenizer_digest=self.tokenizer_digest,
             finish_reason="stop",
+        )
+
+
+class ScriptedAgentBackend(SyntheticallyGenerated):
+    """Finite deterministic model-shaped responses; explicitly NOT real AI."""
+
+    def generate(self, messages, *, max_output_tokens, seed, temperature):
+        try:
+            envelope = json.loads(messages[-1]["content"])
+            schema = envelope.get("response_schema") or {}
+            properties = schema.get("properties") or {}
+        except (ValueError, KeyError, TypeError) as exc:
+            raise AssertionError("agent source model did not receive typed envelope") from exc
+        if "steps" in properties:
+            self.answer = json.dumps({
+                "rationale": "Reason from bounded local context only.",
+                "steps": [{
+                    "id": "step-1",
+                    "title": "Reasoning",
+                    "description": "Produce one reasoning-only result.",
+                    "dependencies": [],
+                    "tool": None,
+                    "arguments": {},
+                    "expected_outcome": "No external effects.",
+                    "verification": "Reasoning step only.",
+                    "risk": "read_only",
+                    "max_attempts": 1,
+                }],
+            }, sort_keys=True)
+        elif "answer" in properties:
+            self.answer = json.dumps({
+                "answer": "Local synthetic reasoning completed.",
+                "confidence": 0.9,
+                "claims": [],
+                "unresolved": [],
+                "memory_candidates": [],
+            }, sort_keys=True)
+        else:
+            self.answer = "Synthetic reasoning only; no external effects claimed."
+        return super().generate(
+            messages, max_output_tokens=max_output_tokens,
+            seed=seed, temperature=temperature,
         )
 
 
@@ -122,6 +167,40 @@ class TestNativeJeevesRealSqliteBoundary(unittest.TestCase):
                       ModelMessage("user", text)),
             max_tokens=128,
         )
+
+    def test_full_strict_agent_loop_uses_three_committed_model_calls(self):
+        # Real host planning, reasoning, verification, finalization, SQLite
+        # commits and supervisor; the token generator is test-only scripted.
+        self._cold_open(ScriptedAgentBackend())
+        runtime = NativeJeevesRuntime(self.worker)
+        result = runtime.run(RunInputs(
+            goal=Goal("goal_native_synthetic", "Produce a bounded answer."),
+            tenant_id="local", user_id="operator",
+            budget=Budget(
+                max_steps=5, max_model_calls=6,
+                max_tool_calls=1, max_tokens=20000,
+                max_wall_seconds=120,
+            ),
+            preferred_provider="jeeves_native",
+        ))
+        self.assertTrue(result.success)
+        self.assertEqual(result.answer, "Local synthetic reasoning completed.")
+        self.assertEqual(self.backend.calls, 3)
+        self.assertEqual(result.usage.model_calls, 3)
+        self.assertEqual(result.usage.tool_calls, 0)
+        with self.db.snapshot() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM turns").fetchone()[0], 3)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM outbox").fetchone()[0], 3)
+
+    def test_full_agent_rejects_foreign_principal_preinference(self):
+        self._cold_open(ScriptedAgentBackend())
+        runtime = NativeJeevesRuntime(self.worker)
+        with self.assertRaises(ValueError):
+            runtime.run(RunInputs(
+                goal=Goal("goal_native_foreign", "Unsafe cross-owner attempt"),
+                tenant_id="other", user_id="operator",
+            ))
+        self.assertEqual(self.backend.calls, 0)
 
     def test_one_native_chat_commits_real_sqlite_and_outbox(self):
         chat = NativeJeevesChat(self.worker)

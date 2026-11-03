@@ -261,6 +261,25 @@ files, unsigned source content or source cap violations now prevent
 unnecessary native startup. Source rights remain operator-attested only,
 not independently licensed by this feature.
 
+## Complete bounded Jeeves agent loop (synthetic model only)
+
+The SQLite integration suite now also drives the full existing strict
+Jeeves planner, reasoning-step executor, host verifier and finalizer through
+three independently reserved and committed ExecutionSpine native requests.
+A script-shaped synthetic backend returns deterministic model-output JSON,
+while host planning contracts, token usage, checkpoints, model identity,
+SQLite/WAL commits and outbox accounting remain real implementations.
+
+The test checks that the strict agent returns a completed bounded answer,
+uses exactly three source-bound model requests, performs zero ungranted
+tools, and generates exactly three committed SQLite receipts and events.
+Foreign-tenant attempts must be blocked before the first model call.
+
+This is *interface* evidence. It is not evidence that an actual GGUF can
+follow the planning/finalization schema, that the model reaches acceptable
+reasoning quality, that the target laptop handles a cold real inference,
+or that the app has achieved a complete operational AI deployment.
+
 ## Required source validation
 
 After the source publication and repairs are complete, run these in order:
