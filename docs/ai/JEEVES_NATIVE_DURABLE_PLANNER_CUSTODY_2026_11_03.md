@@ -126,3 +126,34 @@ tool effect counts. The resulting diagnostic has no prompt, response or memory
 body. It never resumes, retries, loads model bytes, relaxes a hold or certifies
 physical GGUF/device readiness. A missing model, stale approval or uncertain
 effect remains a separate explicit release hold.
+
+
+## Approved real-model multi-turn acceptance
+
+The `native_session_cli` exercises one source-installed GGUF over several
+host-bound turns with strict input/output capacity and an optional independent
+cold model reload and SQLite replay. Example operator-owned casebook:
+
+```json
+{"schema":"jeeves.native_session_casebook.v1","cases":[
+  {"case_id":"intro","prompt":"Describe your available local capabilities."},
+  {"case_id":"followup","prompt":"Which capabilities require explicit approval?"}
+]}
+```
+
+```bash
+python -m skeleton.jeeves.agent.native_session_cli \
+  --model-root /approved/private/model --state-dir /approved/private/state \
+  --tenant local --subject operator --approve-native --casebook-stdin \
+  --cold-replay < /approved/private/cases.json
+```
+
+The operator CLI requires an independent source-verified installed model.
+It returns digests and measured usage rather than private text. Every fresh
+turn requires an authoritative SQLite commit; cold replay must use those
+previous request IDs, with zero additional native generation. An absent source
+receipt, changed model identity, model failure, uncertain native request,
+timeout, incorrect objective hash or changed casebook is a hold. Source-only
+CI intentionally substitutes a synthetic generator but exercises the actual
+supervisor, DB, transcript and CLI call path. No physical acceptance is
+claimed until an approved laptop invocation captures real receipts.
