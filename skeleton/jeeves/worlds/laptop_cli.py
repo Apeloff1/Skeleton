@@ -67,8 +67,22 @@ def run(argv: list[str]) -> int:
         else:
             result = flow.export_session(args.world_id, args.slot)
     except (CanonError, OSError, ValueError, TypeError, OverflowError) as exc:
-        print(json.dumps({"ok": False, "error": exc.code if isinstance(exc, CanonError)
-                          else "invalid_input"}, sort_keys=True))
+        code = exc.code if isinstance(exc, CanonError) else "invalid_input"
+        recovery = {
+            "stale_source": "inspect_source_and_repeat_review",
+            "review_stale_source": "inspect_source_and_repeat_review",
+            "review_required": "review_source_before_compile",
+            "stale_session": "inspect_session_and_retry_with_latest_digest",
+            "session_world_lease_mismatch": "reconcile_source_revision_before_restore",
+            "session_checksum_mismatch": "reject_export_and_restore_from_trusted_copy",
+            "laptop_builder_mismatch": "recompile_and_verify_from_reviewed_source",
+            "laptop_html_mismatch": "recompile_and_verify_from_reviewed_source",
+            "laptop_receipt_mismatch": "recompile_and_verify_from_reviewed_source",
+            "lease_busy": "retry_after_current_writer_finishes",
+        }
+        print(json.dumps({"ok": False, "error": code, "phase": args.action,
+                          "next_action": recovery.get(code, "inspect_input_and_custody")},
+                         sort_keys=True))
         return 2
     print(json.dumps({"ok": True, "result": result}, sort_keys=True, ensure_ascii=False))
     return 0

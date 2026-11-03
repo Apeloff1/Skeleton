@@ -141,7 +141,10 @@ def test_cli_end_to_end_and_typed_errors(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["result"]["scene"]["id"] == "shelter"
     assert run(["--store", root, "compile", "--world-id", "lighthouse",
                 "--expected-digest", "0" * 64]) == 2
-    assert json.loads(capsys.readouterr().out)["error"] == "stale_source"
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["error"] == "stale_source"
+    assert failure["phase"] == "compile"
+    assert failure["next_action"] == "inspect_source_and_repeat_review"
 
 
 def test_readonly_jeeves_preview_matches_compiled_source(tmp_path):
