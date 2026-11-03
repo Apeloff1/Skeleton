@@ -189,11 +189,14 @@ services:
       - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}
       - NODE_ENV=${NODE_ENV:-development}
+    # Keep the first-run setup and diagnostics UI available when the API or
+    # guarded AI engine is unhealthy. Their own health gates remain unchanged;
+    # an unavailable API must still fail closed rather than blocking the UI.
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
       skeleton:
-        condition: service_healthy
+        condition: service_started
     networks:
       - tutolage
 
