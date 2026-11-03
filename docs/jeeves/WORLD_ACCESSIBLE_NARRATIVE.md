@@ -24,3 +24,7 @@ proof records complete source coverage and canonical ending witnesses.
 
 Focused regression: `python -m pytest skeleton/testing/test_jeeves_world_accessibility.py -q`.
 No screen-reader, device or release certification is claimed.
+
+Scene landmark metadata is applied to the rendered narration: a region
+landmark produces an explicitly named ARIA region, while main narration
+remains within the primary document landmark.

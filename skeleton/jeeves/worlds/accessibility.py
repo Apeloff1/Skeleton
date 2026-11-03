@@ -17,7 +17,7 @@ RECEIPT_SCHEMA = "jeeves.world.accessibility_receipt.v1"
 
 
 def validate_accessibility(source: Any, world: Any) -> dict[str, Any]:
-    world_proof = prove(world)
+    prove(world)
     obj = _keys(source, {"schema", "world_id", "world_digest", "prompt",
                          "approved", "review_note", "scenes", "choices", "endings"})
     if obj["schema"] != SCHEMA:
@@ -161,6 +161,7 @@ function render() {
   root.append(heading, node("p", current.narrative));
   const narration = node("p", description.summary);
   narration.setAttribute("aria-label", "Scene description");
+  if (description.landmark === "region") narration.setAttribute("role", "region");
   root.append(narration);
   root.append(node("p", "Choice history: " + trace.join(", ")));
   if (endings.has(scene)) {
