@@ -169,6 +169,7 @@ def _consumer_process_contract() -> dict:
             not report["portable_restore_audited"] or
             not report["partial_restore_resume_verified"] or
             not report["stdin_export_verification"] or
+            not report["full_history_backup_restored"] or
             not report["restore_overwrite_rejected"] or
             not report["tampered_restore_rejected"] or
             not report["invalid_mutation_rejected"] or

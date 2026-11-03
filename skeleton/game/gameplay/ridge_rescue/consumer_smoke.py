@@ -163,6 +163,27 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
     _invoke(command, ["restore", "--slot", "tampered", "--file", "-"],
             env=env, cwd=root, stdin=damaged.decode("utf-8", errors="replace"),
             expect_success=False)
+    # A versioned full-history backup must survive a separate-process restore,
+    # including its exact action ledger, without replacing any existing slot.
+    backup = json.loads(_invoke(command, ["backup", "--slot", "smoke"], env=env, cwd=root))
+    backup_payload = Path(backup["path"]).read_bytes()
+    verified_backup = json.loads(_invoke(
+        command, ["verify-backup", "--file", "-"], env=env, cwd=root,
+        stdin=backup_payload.decode("utf-8"),
+    ))
+    if not verified_backup["verified"] or verified_backup["head"] != expected_head:
+        raise SmokeError("portable backup verification failed")
+    backup_restored = json.loads(_invoke(
+        command, ["restore-backup", "--slot", "backup-restored", "--file", "-"],
+        env=env, cwd=root, stdin=backup_payload.decode("utf-8"),
+    ))
+    if backup_restored["head"] != expected_head or backup_restored["revision"] != len(choices):
+        raise SmokeError("full-history backup restoration diverged")
+    backup_audit = json.loads(_invoke(
+        command, ["audit", "--slot", "backup-restored"], env=env, cwd=root,
+    ))
+    if not backup_audit["verified"] or backup_audit["audit_entries"] != len(choices):
+        raise SmokeError("restored backup action history is incomplete")
     # A rejected mutation must not damage the earned save or append history.
     invalid = _invoke(
         command, ["step", "--slot", "smoke", "--action", '{"verb":"fly"}',
@@ -187,6 +208,7 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         "portable_restore_audited": True,
         "partial_restore_resume_verified": True,
         "stdin_export_verification": True,
+        "full_history_backup_restored": True,
         "restore_overwrite_rejected": True,
         "tampered_restore_rejected": True,
         "invalid_mutation_rejected": True,
