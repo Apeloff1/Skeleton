@@ -18,11 +18,12 @@ from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
 SCHEMA = "skeleton.app.compose_guarded_mongo_preflight.v1"
 
 
-def _result(code: str, *, replica_set: bool = False, epoch: bool = False) -> dict[str, object]:
+def _result(code: str, *, replica_set: bool = False, epoch: bool = False, authenticated: bool = False) -> dict[str, object]:
     return {
         "schema_version": SCHEMA,
         "code": code,
         "mongo_replica_set_primary_observed": replica_set,
+        "mongo_authenticated_session_observed": authenticated,
         "canonical_actor_epoch_stable_observed": epoch,
         "canonical_writer_inventory_verified": False,
         "canonical_database_name_aligned_observed": False,
@@ -79,14 +80,33 @@ async def inspect_compose_mongo_epoch(
             or not hello["setName"]
             or hello.get("isWritablePrimary") is not True):
         return _result("mongo_replica_set_primary_required")
+    # A healthy unauthenticated replica set is not an acceptable canonical
+    # custody authority. Inspect the current connection without publishing
+    # usernames, role names, credentials or raw server responses.
+    try:
+        async with asyncio.timeout(3.0):
+            auth = await database.command("connectionStatus")
+    except Exception:
+        return _result("mongo_authenticated_session_unavailable", replica_set=True)
+    if (type(auth) is not dict
+            or type(auth.get("authInfo")) is not dict
+            or type(auth["authInfo"].get("authenticatedUsers")) is not list
+            or not auth["authInfo"]["authenticatedUsers"]
+            or any(
+                type(user) is not dict
+                or type(user.get("user")) is not str or not user["user"]
+                or type(user.get("db")) is not str or not user["db"]
+                for user in auth["authInfo"]["authenticatedUsers"]
+            )):
+        return _result("mongo_authenticated_session_required", replica_set=True)
     try:
         epoch = MongoCanonicalSourceEpoch(database)
         await epoch.read_epoch(
             tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
         )
     except Exception:
-        return _result("canonical_actor_epoch_unavailable", replica_set=True)
-    return _result("mongo_epoch_observed_only", replica_set=True, epoch=True)
+        return _result("canonical_actor_epoch_unavailable", replica_set=True, authenticated=True)
+    return _result("mongo_epoch_observed_only", replica_set=True, epoch=True, authenticated=True)
 
 
 async def _run_from_environment() -> dict[str, object]:

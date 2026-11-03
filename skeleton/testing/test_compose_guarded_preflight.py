@@ -13,6 +13,7 @@ from skeleton.persistence.mongo_source_epoch import MongoSourceEpochError
 class FakeDB:
     def __init__(self):
         self.hello = {"setName": "rs0", "isWritablePrimary": True}
+        self.auth = {"authInfo": {"authenticatedUsers": [{"user": "ci", "db": "admin"}]}}
         self.calls = 0
         self.error = None
 
@@ -20,7 +21,7 @@ class FakeDB:
         self.calls += 1
         if self.error:
             raise self.error
-        return self.hello
+        return self.auth if name == "connectionStatus" else self.hello
 
 
 class FakeEpoch:
@@ -60,6 +61,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["schema_version"], SCHEMA)
         self.assertEqual(result["code"], "mongo_epoch_observed_only")
         self.assertTrue(result["mongo_replica_set_primary_observed"])
+        self.assertTrue(result["mongo_authenticated_session_observed"])
         self.assertTrue(result["canonical_actor_epoch_stable_observed"])
         self.assertFalse(result["guarded_local_ai_ready"])
         self.assertFalse(result["activated_model_tokenizer_verified"])
@@ -67,6 +69,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["canonical_writer_inventory_verified"])
         self.assertFalse(result["writes_performed"])
         self.assertEqual(FakeEpoch.instances[0].calls, 1)
+        self.assertEqual(self.db.calls, 2)
 
     async def test_standalone_is_unavailable(self):
         self.db.hello = {"isWritablePrimary": True}
@@ -84,6 +87,35 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.db.hello["isWritablePrimary"] = 1
         result = await self.inspect()
         self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+
+    async def test_unauthenticated_mongo_denied_before_epoch(self):
+        self.db.auth = {"authInfo": {"authenticatedUsers": []}}
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_authenticated_session_required")
+        self.assertFalse(result["mongo_authenticated_session_observed"])
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertEqual(FakeEpoch.instances, [])
+
+    async def test_malformed_authenticated_identity_denied(self):
+        for bad in (None, {}, {"authInfo": {}},
+                    {"authInfo": {"authenticatedUsers": [1]}},
+                    {"authInfo": {"authenticatedUsers": [{"user": "", "db": "admin"}]}}):
+            with self.subTest(value=repr(bad)):
+                self.db.auth = bad
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_authenticated_session_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_authentication_probe_failure_redacts_credentials(self):
+        class AuthFailureDB(FakeDB):
+            async def command(self, name):
+                if name == "connectionStatus":
+                    raise RuntimeError("mongodb://user:password@private")
+                return await super().command(name)
+        self.db = AuthFailureDB()
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_authenticated_session_unavailable")
+        self.assertNotIn("password", str(result))
 
     async def test_primary_probe_error_redacted(self):
         self.db.error = RuntimeError("mongo://user:secret@private")
