@@ -93,7 +93,7 @@ def validate_patrol_board(board: Any, source: Any) -> dict[str, Any]:
 
 
 def normalize_patrol_action(raw: Any) -> dict[str, str]:
-    if isinstance(raw, dict) and raw.get("op") in SPECIAL:
+    if isinstance(raw, dict) and type(raw.get("op")) is str and raw["op"] in SPECIAL:
         op = raw["op"]
         if op == "collect":
             _keys(raw, {"op", "objective"}, "patrol collect action")
