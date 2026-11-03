@@ -66,6 +66,7 @@ Commands:
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
     creator     Canonical typed creator command surface (create/edit/test/preview/export)
+    world-laptop Laptop-first typed prompt, reviewed world, builder handoff and replay
     world-canon  Original-world prompt, typed edit, proof and offline playable compile
     world-assets Original asset briefs, reviewed provenance and engine compilation
     world-timeline Source-bound causal chronology and temporal playable handoff
@@ -812,6 +813,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "doctor": return _cmd_doctor(rest)
     if cmd == "creator": return _cmd_creator(rest)
+    if cmd == "world-laptop":
+        from skeleton.jeeves.worlds.laptop_cli import run as world_laptop_cli
+        return world_laptop_cli(rest)
     if cmd == "world-canon":
         from skeleton.jeeves.worlds.cli import run as world_canon_cli
         return world_canon_cli(rest)
