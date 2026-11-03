@@ -364,7 +364,12 @@ class MongoGuardedActivation:
             epoch, auth_identity = await self._probe()
         except BaseException:
             async with self._lock:
-                if self._phase is ActivationPhase.ACTIVE:
+                # A failed or cancelled probe belongs only to its captured
+                # generation. Another task may have already blocked and
+                # explicitly reactivated a newer generation while this probe
+                # was awaiting Mongo or the independent reviewer.
+                if (self._phase is ActivationPhase.ACTIVE
+                        and self._generation == generation):
                     self._phase = ActivationPhase.BLOCKED
                     self._generation += 1
                     self._epoch_at_activation = None
@@ -378,11 +383,12 @@ class MongoGuardedActivation:
                     or auth_identity != auth_at_activation):
                 # A concurrent operator revocation is terminal, not a
                 # recoverable BLOCKED state that activate() may later reset.
-                if self._phase is ActivationPhase.ACTIVE:
+                if (self._phase is ActivationPhase.ACTIVE
+                        and self._generation == generation):
                     self._phase = ActivationPhase.BLOCKED
-                self._generation += 1
-                self._epoch_at_activation = None
-                self._auth_at_activation = None
+                    self._generation += 1
+                    self._epoch_at_activation = None
+                    self._auth_at_activation = None
                 raise ActivationBlocked("canonical authority changed during inference")
             return expected
 

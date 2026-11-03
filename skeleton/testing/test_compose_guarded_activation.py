@@ -394,6 +394,60 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             await pending
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
+    async def test_old_failed_probe_cannot_block_new_activation(self):
+        gate = self.make()
+        await gate.activate()
+        original_probe = gate._probe
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def delayed_failure():
+            entered.set()
+            await release.wait()
+            raise ActivationBlocked("old generation failed")
+
+        gate._probe = delayed_failure
+        stale = asyncio.create_task(gate.assert_active())
+        await entered.wait()
+        await gate.revoke()
+        # An operator must construct a new gate after terminal revocation.
+        # Simulate a new generation only through the explicit BLOCKED state,
+        # never by allowing a revoked gate to reactivate.
+        gate._phase = ActivationPhase.BLOCKED
+        gate._probe = original_probe
+        new_permit = await gate.activate()
+        release.set()
+        with self.assertRaises(ActivationBlocked):
+            await stale
+        self.assertEqual(gate.phase, ActivationPhase.ACTIVE)
+        self.assertEqual(await gate.assert_active(new_permit), new_permit)
+
+    async def test_old_successful_probe_cannot_erase_new_activation(self):
+        gate = self.make()
+        await gate.activate()
+        original_probe = gate._probe
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def delayed_success():
+            entered.set()
+            await release.wait()
+            return await original_probe()
+
+        gate._probe = delayed_success
+        stale = asyncio.create_task(gate.assert_active())
+        await entered.wait()
+        # A concurrent failed authority check blocks the old generation.
+        gate._phase = ActivationPhase.BLOCKED
+        gate._generation += 1
+        gate._probe = original_probe
+        new_permit = await gate.activate()
+        release.set()
+        with self.assertRaisesRegex(ActivationBlocked, "authority changed"):
+            await stale
+        self.assertEqual(gate.phase, ActivationPhase.ACTIVE)
+        self.assertEqual(await gate.assert_active(new_permit), new_permit)
+
     async def test_mismatched_database_denies(self):
         with self.assertRaisesRegex(ActivationBlocked, "canonical epoch database"):
             self.make(database=FakeDatabase())
