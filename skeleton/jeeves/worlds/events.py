@@ -305,6 +305,8 @@ class EventStore:
             try:
                 world = self._world(fd, world_id)
                 candidate = strict_json(canonical(data))
+                if type(candidate) is not dict:
+                    raise CanonError("expected_object")
                 candidate["approved"] = False
                 candidate["review_note"] = "Review required after source publication"
                 prove_events(candidate, world)

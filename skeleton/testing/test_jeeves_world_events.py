@@ -172,3 +172,27 @@ def test_symlink_source_is_rejected(tmp_path):
     name.symlink_to(target)
     with pytest.raises((CanonError, OSError)):
         store.inspect("bells")
+
+
+def test_non_object_source_and_script_breakout(tmp_path):
+    world, store, source = fixture(tmp_path)
+    reject("expected_object", lambda: store.publish("bells", [], create=True))
+    source["events"][0]["description"] = "</script><script>alert(1)</script>"
+    first = store.publish("bells", source, create=True)
+    approved = store.approve("bells", expected_digest=first, review_note="Reviewed")
+    receipt = store.compile("bells", approved)
+    content = (tmp_path / receipt["html_file"]).read_bytes()
+    assert b"</script><script>alert(1)" not in content
+    assert b"\\u003c/script>" in content
+    assert store.verify("bells") == receipt
+
+
+def test_reject_duplicate_json_keys_and_nonfinite_cli(tmp_path, capsys):
+    _, store, _ = fixture(tmp_path)
+    command = ["--store", str(tmp_path), "save", "--world-id", "bells",
+               "--create", "--events-json", '{"schema":"a","schema":"b"}']
+    assert run(command) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "duplicate_json_key"
+    command[-1] = '{"n":1e999}'
+    assert run(command) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "nonfinite_number"

@@ -43,7 +43,7 @@ exportButton.addEventListener("click", () => {
           !Array.isArray(event.grants)) throw Error("invalid event");
       ids.add(event.id);
     }
-    candidate.events.sort((a, b) => a.id.localeCompare(b.id));
+    candidate.events.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     candidate.approved = false;
     candidate.review_note = "Review required after offline editor export";
     output.textContent = JSON.stringify({
