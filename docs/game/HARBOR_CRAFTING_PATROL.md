@@ -43,3 +43,17 @@ authentication or trusted provenance**. Limits apply to actions, turns,
 source, boards, reports and packages. No network or executable payloads.
 This is a terminal first playable, not a qualified graphical/device build.
 Focused tests and required exact-head CI must pass before promotion or release.
+
+## Earned consequences
+
+The source-bound debrief board offers two distinct outcomes after extraction:
+`publish` restores the breakwater watch with higher credits; `protect`
+secures families with higher reputation. Both require replayed objectives,
+score and alert thresholds. No client may invent credits or bypass the earned
+ending by editing the outer digest.
+
+```sh
+python -m scripts.game.harbor_patrol choices --report report.json
+python -m scripts.game.harbor_patrol debrief --report report.json --choice protect > debrief.json
+python -m scripts.game.harbor_patrol verify-debrief --debrief debrief.json
+```

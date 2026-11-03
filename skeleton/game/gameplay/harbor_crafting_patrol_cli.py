@@ -13,6 +13,11 @@ from .harbor_crafting_patrol_authoring import (
     MAX_REVISION_BYTES, edit_patrol_board, verify_patrol_revision,
 )
 from .harbor_crafting_patrol_ui import play_live
+from .harbor_crafting_patrol_debrief import (
+    MAX_BOARD_BYTES as MAX_DEBRIEF_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_DEBRIEF_REPORT_BYTES,
+    build_patrol_debrief, compare_patrol_debriefs, verify_patrol_debrief,
+)
 from .harbor_crafting_patrol_package import (
     MAX_PACKAGE_BYTES, MAX_PLAY_BYTES, build_patrol_package,
     play_patrol_package, verify_patrol_package, verify_patrol_package_play,
@@ -21,7 +26,8 @@ from .harbor_crafting_patrol_package import (
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DEFAULT_SOURCE = FIXTURES / "harbor_lantern_quay.json"
 DEFAULT_BOARD = FIXTURES / "harbor_lantern_quay_patrol.json"
-COMMANDS = ("live", "run", "verify", "resume", "author", "verify-author",
+DEFAULT_DEBRIEF = FIXTURES / "harbor_lantern_quay_patrol_debrief.json"
+COMMANDS = ("choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
             "package", "verify-package", "play", "verify-play")
 
 
@@ -50,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--revision")
     parser.add_argument("--package")
     parser.add_argument("--play")
+    parser.add_argument("--debrief", default=str(DEFAULT_DEBRIEF))
+    parser.add_argument("--choice", default="publish")
     parser.add_argument("--expected-digest")
     parser.add_argument("--preview-actions")
     parser.add_argument("--id", default="lantern_quay_patrol")
@@ -57,7 +65,19 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "live":
+        if command == "verify-debrief":
+            result = verify_patrol_debrief(_read(args.debrief, MAX_DEBRIEF_REPORT_BYTES))
+        elif command == "choices":
+            result = compare_patrol_debriefs(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.debrief, MAX_DEBRIEF_BOARD_BYTES),
+            )
+        elif command == "debrief":
+            result = build_patrol_debrief(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.debrief, MAX_DEBRIEF_BOARD_BYTES), args.choice,
+            )
+        elif command == "live":
             play_live(_read(args.source, MAX_BUNDLE_BYTES),
                       _read(args.board, MAX_BOARD_BYTES),
                       input_stream=sys.stdin, output_stream=sys.stdout,
