@@ -132,8 +132,7 @@ def test_persist_review_compile_verify_and_player(tmp_path):
     first = store.publish("ferry", factions(), create=True)
     with pytest.raises(CanonError, match="faction_review_required"):
         store.compile("ferry", first)
-    second = store.publish("ferry", approve_factions(factions(), world(), "Reviewed."),
-                           expected_digest=first)
+    second = store.approve("ferry", expected_digest=first, note="Reviewed.")
     receipt = store.compile("ferry", second)
     assert receipt == store.verify("ferry")
     assert (root / "ferry.factions.playable.html").exists()
@@ -155,8 +154,7 @@ def test_stale_cas_and_forged_artifacts_fail_closed(tmp_path):
     first = store.publish("ferry", factions(), create=True)
     with pytest.raises(CanonError, match="stale_factions"):
         store.publish("ferry", factions(), expected_digest="0" * 64)
-    second = store.publish("ferry", approve_factions(factions(), world(), "Reviewed."),
-                           expected_digest=first)
+    second = store.approve("ferry", expected_digest=first, note="Reviewed.")
     store.compile("ferry", second)
     (root / "ferry.factions.handoff.json").write_text("{}")
     with pytest.raises(CanonError, match="faction_artifact_mismatch"):
@@ -168,8 +166,8 @@ def test_symlink_artifact_and_world_revisions_fail_closed(tmp_path):
     root = tmp_path / "private"
     WorldStore(root).publish(world(), create=True)
     store = FactionStore(root)
-    reviewed = approve_factions(factions(), world(), "Reviewed.")
-    source_digest = store.publish("ferry", reviewed, create=True)
+    first = store.publish("ferry", factions(), create=True)
+    source_digest = store.approve("ferry", expected_digest=first, note="Reviewed.")
     store.compile("ferry", source_digest)
     path = root / "ferry.factions.receipt.json"
     path.unlink()

@@ -251,6 +251,10 @@ class FactionStore:
                 os.close(lock_fd)
                 world = self._world(fd, world_id)
                 validate_factions(data, world)
+                candidate = strict_json(canonical(data))
+                candidate["approved"] = False
+                candidate["review_note"] = ""
+                validate_factions(candidate, world)
                 try:
                     old = digest(self._data(fd, world_id, world))
                 except CanonError as exc:
@@ -262,8 +266,29 @@ class FactionStore:
                         raise CanonError("already_exists")
                 elif old is None or expected_digest != old:
                     raise CanonError("stale_factions")
-                self.worlds._write(fd, self._name(world_id), canonical(data))
-                return digest(data)
+                self.worlds._write(fd, self._name(world_id), canonical(candidate))
+                return digest(candidate)
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
+    def approve(self, world_id: str, *, expected_digest: str, note: str) -> str:
+        """The sole durable approval transition; checked under the world lease."""
+        _id(world_id, "world_id")
+        _text(note, "review_note", 512)
+        fd = self.worlds._directory()
+        try:
+            lock_fd = self._lock(fd, world_id)
+            try:
+                os.close(lock_fd)
+                world = self._world(fd, world_id)
+                current = self._data(fd, world_id, world)
+                if digest(current) != expected_digest:
+                    raise CanonError("stale_factions")
+                approved = approve_factions(current, world, note)
+                self.worlds._write(fd, self._name(world_id), canonical(approved))
+                return digest(approved)
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:

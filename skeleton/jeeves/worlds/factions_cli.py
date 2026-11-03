@@ -6,7 +6,7 @@ import json
 import sys
 
 from .factions import (
-    FactionStore, approve_factions, edit_factions, propose_factions,
+    FactionStore, edit_factions, propose_factions,
 )
 from .world_canon import CanonError, WorldStore, digest, strict_json
 
@@ -89,13 +89,16 @@ def run(argv: list[str]) -> int:
                 else:
                     if digest(data) != args.expected_digest:
                         raise CanonError("stale_factions")
-                    updated = (edit_factions(
-                        data, world, strict_json(_operation_bytes(args)))
-                        if args.action == "edit" else
-                        approve_factions(data, world, args.note))
-                    result = {"ok": True, "factions_digest": store.publish(
-                        args.world_id, updated, expected_digest=args.expected_digest),
-                        "review_required": not updated["approved"]}
+                    if args.action == "approve":
+                        result = {"ok": True, "factions_digest": store.approve(
+                            args.world_id, expected_digest=args.expected_digest,
+                            note=args.note), "review_required": False}
+                    else:
+                        updated = edit_factions(
+                            data, world, strict_json(_operation_bytes(args)))
+                        result = {"ok": True, "factions_digest": store.publish(
+                            args.world_id, updated, expected_digest=args.expected_digest),
+                            "review_required": True}
     except (CanonError, OSError, UnicodeError) as exc:
         print(json.dumps({"ok": False, "error":
                           exc.code if isinstance(exc, CanonError) else "io_error"},
