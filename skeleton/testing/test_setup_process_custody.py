@@ -270,3 +270,39 @@ def test_example_template_oversize_is_bounded_before_secret_generation(tmp_path)
     with pytest.raises(ValueError, match="256 KiB"):
         ensure_runtime_environment(root)
     assert not (root / ".env").exists()
+
+
+def test_existing_env_permission_repair_is_private_and_idempotent(tmp_path):
+    if os.name == "nt":
+        pytest.skip("POSIX mode bits are not Windows ACL evidence")
+    root = _root(tmp_path)
+    ensure_runtime_environment(root)
+    path = root / ".env"
+    original = path.read_bytes()
+    path.chmod(0o644)
+    second = ensure_runtime_environment(root)
+    assert second.changed and not second.created
+    assert not second.configured_keys
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert path.read_bytes() == original
+    assert any("permissions tightened" in note for note in second.warnings)
+    third = ensure_runtime_environment(root)
+    assert not third.changed
+    assert path.read_bytes() == original
+
+
+def test_existing_env_private_mode_failure_blocks_bootstrap(tmp_path, monkeypatch):
+    if os.name == "nt":
+        pytest.skip("POSIX descriptor permission boundary")
+    root = _root(tmp_path)
+    ensure_runtime_environment(root)
+    path = root / ".env"
+    path.chmod(0o644)
+    original = path.read_bytes()
+    def blocked(*args, **kwargs):
+        raise PermissionError("cannot tighten mode")
+    monkeypatch.setattr(os, "fchmod", blocked)
+    with pytest.raises(PermissionError, match="cannot tighten mode"):
+        ensure_runtime_environment(root)
+    assert path.read_bytes() == original
+    assert stat.S_IMODE(path.stat().st_mode) == 0o644
