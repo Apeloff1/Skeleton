@@ -30,7 +30,8 @@ def test_acceptance_replays_every_ending_and_roundtrips_without_writes(tmp_path)
     before = sorted(p.name for p in tmp_path.iterdir())
     result = flow.acceptance("lighthouse")
     assert result["schema"] == "jeeves.world.laptop_acceptance.v1"
-    assert result["verified_save_restore"] is True
+    assert result["portable_roundtrip_verified"] is True
+    assert result["persisted_slot_verified"] is False
     assert result["existing_session"] is None
     assert result["source_digest"] == digest(flow.worlds.read("lighthouse"))
     assert any(item["ending_scene"] == "resolution" for item in result["ending_witnesses"])
@@ -48,6 +49,7 @@ def test_acceptance_checks_existing_persisted_session_and_cli(tmp_path, capsys):
     assert result["existing_session"]["session_digest"] == chosen["session_digest"]
     assert result["existing_session"]["revision"] == 1
     assert result["existing_session"]["restorable"] is True
+    assert result["persisted_slot_verified"] is True
     assert run(["--store", str(tmp_path), "acceptance", "--world-id",
                 "lighthouse", "--slot", "player"]) == 0
     printed = json.loads(capsys.readouterr().out)

@@ -397,7 +397,8 @@ class LaptopFlow:
             "world_id": world_id, "source_digest": receipt["source_digest"],
             "review_digest": receipt["review_digest"],
             "receipt_digest": digest(receipt),
-            "ending_witnesses": checked, "verified_save_restore": True,
+            "ending_witnesses": checked, "portable_roundtrip_verified": True,
+            "persisted_slot_verified": existing is not None,
             "existing_session": existing,
             "qualification": "offline_source_acceptance_not_engine_or_device_certified",
         }

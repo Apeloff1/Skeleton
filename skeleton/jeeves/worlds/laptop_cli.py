@@ -112,6 +112,8 @@ def run(argv: list[str]) -> int:
             "laptop_source_changed_after_verify": "retry_after_source_edit_and_recompile",
             "laptop_acceptance_budget": "reduce_world_complexity_before_acceptance",
             "laptop_acceptance_session_mismatch": "inspect_session_and_reverify_export",
+            "laptop_acceptance_ending_mismatch": "inspect_canonical_ending_witnesses",
+            "laptop_acceptance_restore_mismatch": "reject_roundtrip_and_inspect_session_contract",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
                           "next_action": recovery.get(code, "inspect_input_and_custody")},
