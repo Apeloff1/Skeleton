@@ -22,4 +22,35 @@ class RestartCases(QueueCase):
         self.assertEqual(self.store.inspect(self.order)["output_sha"],result["output_sha256"])
         self.assertEqual(self.store.audit()["jobs"],1)
 
+    def test_tampered_job_state_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE jobs SET status='committed' WHERE job_id=?",
+                         (self.order.job_id,))
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_tampered_event_payload_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE events SET body=? WHERE sequence=1",
+                         (b'{"forged":true}',))
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_tampered_quota_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        lease=self.store.claim(self.order,expected_revision=1,reservation_tokens=128)
+        self.assertEqual(lease["revision"],2)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE budgets SET reserved=reserved-1 WHERE tenant='local'")
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
 if __name__=="__main__":unittest.main()
