@@ -34,7 +34,10 @@
       "skeleton/ai/mathematics",
       "skeleton/ai/runtime/__init__.py",
       "skeleton/ai/runtime/operational_ai/__init__.py",
-      "skeleton/ai/runtime/operational_ai/authority"
+      "skeleton/ai/runtime/operational_ai/authority",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/__init__.py",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/core",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/policies"
     ],
     "MBW-01": [
       "skeleton/ai/admission_transaction.py",
@@ -94,7 +97,8 @@
       "skeleton/ai/runtime/cortex",
       "skeleton/ai/runtime/learning_foundation",
       "skeleton/ai/runtime/operational_ai/model",
-      "skeleton/ai/runtime/operational_ai/context"
+      "skeleton/ai/runtime/operational_ai/context",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/context"
     ],
     "MBW-03": [
       "skeleton/ai/artifact_review.py",
@@ -117,7 +121,8 @@
       "skeleton/ai/runtime/provenance",
       "skeleton/ai/runtime/artifact_plane",
       "skeleton/ai/runtime/skills",
-      "skeleton/ai/runtime/operational_ai/tools"
+      "skeleton/ai/runtime/operational_ai/tools",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/authorization"
     ],
     "MBW-04": [
       "skeleton/ai/autonomy_control_theory.py",
@@ -150,7 +155,14 @@
       "skeleton/ai/runtime/capability_graph.py",
       "skeleton/ai/runtime/capabilities",
       "skeleton/ai/runtime/workflow_ir.py",
-      "skeleton/ai/runtime/operational_ai/orchestration"
+      "skeleton/ai/runtime/operational_ai/orchestration",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/planning",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/custody",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/execution",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/scheduling",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/operations",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/integration",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/observability"
     ],
     "MBW-05": [
       "skeleton/ai/api_client_generator.py",
@@ -179,7 +191,8 @@
       "skeleton/ai/runtime/objective_normalization.py",
       "skeleton/ai/runtime/objectives.py",
       "skeleton/ai/runtime/extensions",
-      "skeleton/ai/runtime/operational_ai/transport"
+      "skeleton/ai/runtime/operational_ai/transport",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/transport"
     ],
     "MBW-06": [
       "skeleton/ai/research.py",
@@ -194,7 +207,9 @@
       "skeleton/ai/runtime/simulation",
       "skeleton/ai/runtime/p3t2",
       "skeleton/ai/runtime/functional_ai.py",
-      "skeleton/ai/runtime/operational_ai/evaluation"
+      "skeleton/ai/runtime/operational_ai/evaluation",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/evaluation",
+      "skeleton/ai/runtime/operational_ai/agent_fabric/assurance"
     ],
     "MBW-07": [
       "skeleton/ai/topology_placement.py",
@@ -230,7 +245,29 @@
       "scripts/build_ai_ecosystem_bundle.py",
       "docs/ai/ORDERED_1P9GB_ECOSYSTEM_PACKAGE.md",
       "README.md",
-      "docs/ai/OPERATIONAL_AI_CORE_2026_11_02.md"
+      "docs/ai/OPERATIONAL_AI_CORE_2026_11_02.md",
+      "docs/ai/agent_fabric/ARCHITECTURE.md",
+      "docs/ai/agent_fabric/CONTEXT_AND_EVIDENCE.md",
+      "docs/ai/agent_fabric/CONTEXT_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/DEPLOYMENT_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/DURABLE_RECEIPTS.md",
+      "docs/ai/agent_fabric/EVALUATION_LIMITS.md",
+      "docs/ai/agent_fabric/EVALUATION_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/FIRST_BOOT.md",
+      "docs/ai/agent_fabric/LEARNING_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/MODEL_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/NATIVE_MODEL_INTEGRATION.md",
+      "docs/ai/agent_fabric/OPERATIONS.md",
+      "docs/ai/agent_fabric/PERSISTENCE_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/PLANNING_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/QUEUE_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/RESTART_RECOVERY.md",
+      "docs/ai/agent_fabric/RETRIEVAL_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/REVIEW_AND_RELEASE.md",
+      "docs/ai/agent_fabric/SECURITY_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/TOOLING_MEASUREMENT_CONTRACTS.md",
+      "docs/ai/agent_fabric/TOOL_SECURITY.md",
+      "docs/ai/agent_fabric/TRANSPORT_MEASUREMENT_CONTRACTS.md"
     ]
   }
 }
