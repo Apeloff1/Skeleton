@@ -109,6 +109,7 @@ class NativeBatchReceipt:
     tokenizer_sha256: str
     generated_tokens: int
     prompt_tokens: int
+    answer_bytes: int
     replayed: bool
     duration_ms: int
     exact_objective_passed: bool | None
@@ -125,6 +126,7 @@ class NativeBatchReceipt:
             "tokenizer_sha256": self.tokenizer_sha256,
             "generated_tokens": self.generated_tokens,
             "prompt_tokens": self.prompt_tokens,
+            "answer_bytes": self.answer_bytes,
             "replayed": self.replayed,
             "duration_ms": self.duration_ms,
             "exact_objective_passed": self.exact_objective_passed,
@@ -325,6 +327,7 @@ class NativeBatchConveyor:
                 tokenizer_sha256=turn.tokenizer_sha256,
                 generated_tokens=turn.generated_tokens,
                 prompt_tokens=turn.prompt_tokens,
+                answer_bytes=len(turn.text.encode("utf-8", "strict")),
                 replayed=turn.replayed,
                 duration_ms=millis,
                 exact_objective_passed=exact,

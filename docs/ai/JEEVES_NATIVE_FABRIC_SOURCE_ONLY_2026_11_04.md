@@ -82,3 +82,20 @@ queue never silently retries or refunds it. This queue is **in-process**
 and is explicitly NOT the already durable SQLite execution spine. It must
 not be used as the authority for exactly-once inference or automatic
 cross-process supervision.
+
+## Integrated admitted native task execution
+
+`NativeFabricSupervisor` composes a host-owned fair traffic queue,
+conservation-checked resource ledger, hash-linked audit journal and the
+existing `NativeBatchConveyor`. Admission checks happen before the first
+model generation. Each admitted task receives one immutable canonical
+SQLite session/request identity; response and replay verification remain
+in the production `SupervisedAI` and `ExecutionSpine` hierarchy.
+
+Native uncertainty retains queue capacity and the resource reservation.
+A source-only test exercises the true protected SQLite/WAL path using a
+**synthetic** model backend and verifies the final hash receipt, no duplicate
+native call on a cold replay, principal isolation and no unauthorized tools.
+In-memory audit/queue/budget state are intentionally not claimed to survive
+process death; only the independently verified canonical native SQLite
+receipts do. Multi-lane device-pressure qualification remains a release hold.
