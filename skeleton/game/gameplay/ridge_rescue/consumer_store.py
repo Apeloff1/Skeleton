@@ -260,6 +260,48 @@ class SlotStore:
                 os.close(fd)
         return path
 
+    def restore(self, name: str, payload: bytes | str | dict) -> dict:
+        """Create a new save with a complete, replay-derived action ledger.
+
+        Never replace an existing slot, even if its head matches. Validation
+        occurs before opening a transaction, and the whole restored history
+        is inserted atomically under BEGIN IMMEDIATE.
+        """
+        from .consumer_restore import replay_export
+        name = _slot(name)
+        session, history = replay_export(payload, _source())
+        if len(canonical(session)) > MAX_EXPORT_BYTES:
+            raise StoreError("restored session exceeds byte budget")
+        with closing(self._connect()) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                count = conn.execute("SELECT COUNT(*) FROM slots").fetchone()[0]
+                if count >= MAX_SAVE_SLOTS:
+                    raise StoreError("save slot capacity exhausted")
+                conn.execute("INSERT INTO slots VALUES(?,?,?,?)",
+                             (name, session["head"], canonical(session), len(history)))
+                for revision, item in enumerate(history, 1):
+                    conn.execute(
+                        "INSERT INTO actions(slot, revision, prior_head, next_head, action) "
+                        "VALUES(?,?,?,?,?)",
+                        (name, revision, item["prior_head"], item["next_head"],
+                         canonical(item["action"])),
+                    )
+                conn.execute("COMMIT")
+            except sqlite3.IntegrityError as exc:
+                conn.execute("ROLLBACK")
+                raise StoreError("restore destination already exists") from exc
+            except sqlite3.Error as exc:
+                conn.execute("ROLLBACK")
+                raise StoreError("restore transaction refused") from exc
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        audited = self.audit(name)
+        if audited["head"] != session["head"] or audited["revision"] != len(history):
+            raise StoreError("restored save audit mismatch")
+        return self.load(name)
+
     def audit(self, name: str) -> dict:
         name = _slot(name)
         current = self.load(name)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 
 from .campaign import verify_export
 from .consumer_experience import status_panel, navigation_hint, recent_events, action_label
@@ -91,9 +92,25 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
     return store.load(slot)
 
 
+def _portable_input(path: str | None) -> bytes:
+    """Accept bounded stdin on all hosts; arbitrary Windows paths stay held."""
+    if not path:
+        raise StoreError("--file required (use '-' for bounded stdin)")
+    if path == "-":
+        if sys.stdin.isatty():
+            raise StoreError("piped export input required; interactive stdin refused")
+        payload = sys.stdin.buffer.read(MAX_EXPORT_BYTES + 1)
+        if len(payload) > MAX_EXPORT_BYTES:
+            raise StoreError("portable input exceeds byte budget")
+        return payload
+    if os.name == "nt":
+        raise StoreError("arbitrary Windows export paths are unsupported; pipe with --file -")
+    return read_bounded(path, MAX_EXPORT_BYTES)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cinder-ridge-consumer")
-    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "audit", "verify-export", "acceptance", "bundle", "smoke", "portable-smoke"))
+    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "restore", "audit", "verify-export", "acceptance", "bundle", "smoke", "portable-smoke"))
     parser.add_argument("--slot", default="adventure", help="lowercase save name, 1-32 safe characters")
     parser.add_argument("--ascii", action="store_true", help="ASCII-only terminal fallback")
     parser.add_argument("--action", help="canonical JSON action for a noninteractive step")
@@ -111,11 +128,7 @@ def main(argv: list[str] | None = None) -> int:
             from .consumer_smoke import run_portable_smoke
             result = run_portable_smoke()
         elif args.command == "verify-export":
-            if not args.file:
-                raise StoreError("--file required")
-            if os.name == "nt":
-                raise StoreError("external file verification requires descriptor-anchored IO; Windows held")
-            result = verify_export(read_bounded(args.file, MAX_EXPORT_BYTES))
+            result = verify_export(_portable_input(args.file))
             result = {"verified": True, "head": result["head"], "status": result["status"],
                       "chapters": result["index"]}
         else:
@@ -127,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = build_bundle(store)
             elif args.command == "new":
                 result = store.new(args.slot)
+            elif args.command == "restore":
+                result = store.restore(args.slot, _portable_input(args.file))
             elif args.command == "status":
                 result = store.load(args.slot)
             elif args.command == "step":

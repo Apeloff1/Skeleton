@@ -107,6 +107,30 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
     restored = verify_export(payload)
     if restored["head"] != expected_head or restored["status"] != "completed":
         raise SmokeError("portable export failed deterministic verification")
+    # Restore the exported campaign through a new real consumer process and
+    # require an independently replayed, complete transactional audit.
+    restored_slot = json.loads(_invoke(
+        command, ["restore", "--slot", "restored", "--file", "-"],
+        env=env, cwd=root, stdin=payload.decode("utf-8"),
+    ))
+    if restored_slot["head"] != expected_head or restored_slot["revision"] != len(choices):
+        raise SmokeError("portable restore diverged from the earned game")
+    restored_audit = json.loads(_invoke(
+        command, ["audit", "--slot", "restored"], env=env, cwd=root,
+    ))
+    if not restored_audit["verified"] or restored_audit["audit_entries"] != len(choices):
+        raise SmokeError("restored save does not have complete replay custody")
+    rejected_restore = _invoke(
+        command, ["restore", "--slot", "restored", "--file", "-"],
+        env=env, cwd=root, stdin=payload.decode("utf-8"), expect_success=False,
+    )
+    if "already exists" not in rejected_restore:
+        raise SmokeError("restoration did not reject existing slot overwrite")
+    damaged = bytearray(payload)
+    damaged[-2] ^= 1
+    _invoke(command, ["restore", "--slot", "tampered", "--file", "-"],
+            env=env, cwd=root, stdin=damaged.decode("utf-8", errors="replace"),
+            expect_success=False)
     # A rejected mutation must not damage the earned save or append history.
     invalid = _invoke(
         command, ["step", "--slot", "smoke", "--action", '{"verb":"fly"}',
@@ -128,6 +152,9 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         "host_windows": os.name == "nt",
         "real_processes": True,
         "portable_export_verified": True,
+        "portable_restore_audited": True,
+        "restore_overwrite_rejected": True,
+        "tampered_restore_rejected": True,
         "invalid_mutation_rejected": True,
         "portable_zipapp_verified": portable,
         "windows_device_certified": False,
