@@ -74,3 +74,60 @@ def test_closed_action_labels_reject_unknown_verbs():
     import pytest
     with pytest.raises(ValueError, match="unsupported"):
         action_label({"verb": "execute"})
+
+def test_real_python_module_cli_process_quit_restart_ending_export(tmp_path):
+    """Exercise the shipped module entrypoint across independent processes.
+
+    This is a host-Python integration test, not Windows device certification.
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    from skeleton.game.gameplay.ridge_rescue.campaign import (
+        open_campaign, verify_campaign, step_campaign, verify_export,
+    )
+    from skeleton.game.gameplay.ridge_rescue.consumer_store import _source
+
+    env = os.environ.copy()
+    base = tmp_path / "appdata"
+    base.mkdir()
+    if os.name == "nt":
+        env["LOCALAPPDATA"] = str(base)
+    else:
+        env["XDG_DATA_HOME"] = str(base)
+    argv = [
+        sys.executable, "-m", "skeleton.game.gameplay.ridge_rescue",
+        "consumer",
+    ]
+
+    def invoke(command, *, input_text=None):
+        proc = subprocess.run(
+            argv + command, input=input_text, text=True,
+            capture_output=True, env=env, timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        return proc.stdout
+
+    session = open_campaign(_source())
+    numbers = []
+    for action in acceptance_actions("protect") + LAST_SIGNAL:
+        current = verify_campaign(session)
+        assert action in current["actions"]
+        numbers.append(str(current["actions"].index(action)))
+        session = step_campaign(session, action, expected_head=session["head"])
+    split = max(1, len(numbers) // 2)
+    first = invoke(["play", "--slot", "game"], input_text="\\n".join(numbers[:split] + ["q"]) + "\\n")
+    assert "Actions:" in first
+    midway = json.loads(invoke(["status", "--slot", "game"]))
+    assert midway["revision"] == split
+    assert midway["status"] == "playing"
+    second = invoke(["play", "--slot", "game"], input_text="\\n".join(numbers[split:] + ["q"]) + "\\n")
+    assert "Victory:" in second
+    finished = json.loads(invoke(["status", "--slot", "game"]))
+    assert finished["status"] == "completed"
+    assert finished["head"] == session["head"]
+    export = json.loads(invoke(["export", "--slot", "game"]))
+    payload = Path(export["path"]).read_bytes()
+    assert verify_export(payload)["head"] == session["head"]
