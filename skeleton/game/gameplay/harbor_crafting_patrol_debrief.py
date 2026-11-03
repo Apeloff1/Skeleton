@@ -5,12 +5,12 @@ from copy import deepcopy
 from typing import Any
 
 from .harbor_crafting import HarborError, _identifier, _integer, _keys, canonical, digest
-from .harbor_crafting_patrol import MAX_REPORT_BYTES, verify_patrol
+from .harbor_crafting_patrol import MAX_REPORT_BYTES as MAX_PATROL_REPORT_BYTES, verify_patrol
 
 BOARD_SCHEMA = "skeleton.game.harbor.patrol-debrief-board.v1"
 REPORT_SCHEMA = "skeleton.game.harbor.patrol-debrief-report.v1"
 MAX_BOARD_BYTES = 32768
-MAX_REPORT_BYTES = MAX_REPORT_BYTES * 2
+MAX_REPORT_BYTES = MAX_PATROL_REPORT_BYTES * 2
 MAX_CHOICES = 12
 BOARD_KEYS = {"schema", "source_id", "choices"}
 CHOICE_KEYS = {"id", "min_score", "max_alert", "cost", "reputation",

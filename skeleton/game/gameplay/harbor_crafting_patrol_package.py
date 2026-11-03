@@ -48,6 +48,8 @@ def verify_patrol_package(package: Any) -> dict[str, Any]:
     if package["package_digest"] != digest({k: v for k, v in package.items()
                                              if k != "package_digest"}):
         raise HarborError("patrol package digest mismatch")
+    if not isinstance(package["demo"], dict) or not isinstance(package["demo"].get("actions"), list):
+        raise HarborError("patrol package demo must contain an action list")
     rebuilt = build_patrol_package(
         package["source"], package["board"], package["demo"]["actions"],
         package_id=package["id"],
