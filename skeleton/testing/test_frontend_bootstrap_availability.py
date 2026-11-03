@@ -20,13 +20,11 @@ def _services() -> dict:
 
 def test_frontend_setup_is_not_blocked_by_unhealthy_api_or_guarded_engine():
     services = _services()
-    frontend_dependencies = services["frontend"]["depends_on"]
-
-    assert set(frontend_dependencies) == {"backend", "skeleton"}
-    assert {name: dependency["condition"] for name, dependency in frontend_dependencies.items()} == {
-        "backend": "service_started",
-        "skeleton": "service_started",
-    }
+    # A service_started dependency on backend is NOT enough: backend waits
+    # for a healthy engine, which itself waits for a healthy database.
+    # No direct or transitive Compose startup dependency may block setup UI.
+    assert not services["frontend"].get("depends_on")
+    assert not services["frontend"].get("network_mode", "").startswith("service:")
 
 
 def test_relaxing_frontend_startup_does_not_relax_api_and_storage_health_fences():
