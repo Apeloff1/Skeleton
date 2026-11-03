@@ -12,6 +12,7 @@ from .evidence import EvidenceStore, propose_evidence
 from .factions import FactionStore, propose_factions
 from .promises import PromiseStore, propose_promises, prove_promises
 from .context_journal import ContextStore
+from .migration import preview_migration
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
 )
@@ -21,6 +22,7 @@ RESULT_SCHEMA = "jeeves.world.tool_result.v1"
 
 TOOLS = {
     "world.proof": (),
+    "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
     "context.status": (),
     "promises.propose_preview": (
         "prompt", "promise_id", "title", "setup", "payoff",
@@ -65,7 +67,10 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     _id(req["world_id"], "world_id")
     args = _keys(req["args"], set(TOOLS[name]))
     world = WorldStore(root).read(req["world_id"])
-    if name == "world.proof":
+    if name == "world.migration_preview":
+        payload = preview_migration(args["old_world"], args["checkpoint"], world,
+                                    args["choice_map"])
+    elif name == "world.proof":
         payload = prove(world).as_dict()
     elif name == "context.status":
         payload = ContextStore(root).status(req["world_id"])
