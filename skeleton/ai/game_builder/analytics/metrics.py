@@ -223,6 +223,18 @@ class DifficultyHeatmap:
     suppressed: int = 0  # cells hidden for having fewer than ``min_players`` units
     schema: str = HEATMAP_SCHEMA
 
+    def __post_init__(self) -> None:
+        # Never deserialize or publish a heatmap with a disabled privacy
+        # threshold or with nonempty cells smaller than its stated cohort.
+        if type(self.min_players) is not int or not 1 <= self.min_players <= 1_000_000:
+            raise ValueError("min_players must be a positive bounded integer")
+        if type(self.suppressed) is not int or self.suppressed < 0:
+            raise ValueError("suppressed must be a non-negative integer")
+        for cell in self.cells:
+            if (type(cell.players) is not int or cell.players < 0
+                    or 0 < cell.players < self.min_players):
+                raise ValueError("heatmap cell violates minimum player threshold")
+
     def cell(self, level_id: str, encounter_id: str | None = None) -> DifficultyCell | None:
         return next((c for c in self.cells if (c.level_id, c.encounter_id) == (level_id, encounter_id)), None)
 
@@ -237,7 +249,7 @@ class DifficultyHeatmap:
     def from_dict(cls, d: Mapping[str, Any]) -> DifficultyHeatmap:
         if d.get("schema") != HEATMAP_SCHEMA:
             raise ValueError("unsupported heatmap schema")
-        return cls(tuple(DifficultyCell(**c) for c in d["cells"]), int(d["min_players"]), int(d.get("suppressed", 0)))
+        return cls(tuple(DifficultyCell(**c) for c in d["cells"]), d["min_players"], d.get("suppressed", 0))
 
 
 def plan_ids(plan: Mapping[str, Any]) -> list[tuple[str, str | None]]:

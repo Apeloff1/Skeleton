@@ -218,3 +218,24 @@ def test_analytics_unsampled_infinite_batch_stops_at_row_budget(monkeypatch):
         c.ingest_many(repeat(("a", "s", event)))
     assert c.events == []
     assert c.counts["unsampled"] == 3
+
+
+def test_heatmap_privacy_threshold_cannot_be_disabled_or_forged():
+    c = collector()
+    play(c, "single-player", "single-session", [("level_start", "l1", None)])
+    for invalid in (0, -1, True, 1.5, 1_000_001):
+        with pytest.raises(ValueError, match="min_players"):
+            difficulty_heatmap(c.events, PLAN, min_players=invalid)
+
+    valid = difficulty_heatmap(c.events, PLAN, min_players=5).to_dict()
+    assert valid["suppressed"] == 1
+    for invalid in (0, -1, True, "5"):
+        forged = {**valid, "min_players": invalid}
+        with pytest.raises(ValueError, match="min_players"):
+            DifficultyHeatmap.from_dict(forged)
+
+    disclosed = difficulty_heatmap(c.events, PLAN, min_players=1).to_dict()
+    assert disclosed["cells"][0]["players"] == 1
+    disclosed["min_players"] = 5
+    with pytest.raises(ValueError, match="minimum player threshold"):
+        DifficultyHeatmap.from_dict(disclosed)
