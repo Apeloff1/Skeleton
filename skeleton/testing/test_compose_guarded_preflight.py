@@ -69,7 +69,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["canonical_writer_inventory_verified"])
         self.assertFalse(result["writes_performed"])
         self.assertEqual(FakeEpoch.instances[0].calls, 2)
-        self.assertEqual(self.db.calls, 4)
+        self.assertEqual(self.db.calls, 6)
 
     async def test_primary_election_between_reads_denies_stable_epoch(self):
         class RotatingDB(FakeDB):
@@ -124,6 +124,37 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         result = await self.inspect()
         self.assertEqual(result["code"], "mongo_principal_changed_during_preflight")
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+
+    async def test_election_during_final_epoch_read_denies(self):
+        class ElectionAfterEpoch(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "hello" and self.calls == 5:
+                    return {"setName": "rs0", "isWritablePrimary": True,
+                            "electionId": "rotated"}
+                return result
+        self.db = ElectionAfterEpoch()
+        self.db.hello["electionId"] = "original"
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_primary_changed_during_final_epoch_read")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(FakeEpoch.instances[0].calls, 2)
+
+    async def test_principal_rotation_during_final_epoch_read_denies(self):
+        class PrincipalAfterEpoch(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "connectionStatus" and self.calls == 6:
+                    return {"authInfo": {"authenticatedUsers": [
+                        {"user": "rotated", "db": "admin"}]}}
+                return result
+        self.db = PrincipalAfterEpoch()
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_principal_changed_during_final_epoch_read")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(FakeEpoch.instances[0].calls, 2)
 
     async def test_epoch_advance_between_reads_denies(self):
         class AdvancingEpoch(FakeEpoch):
