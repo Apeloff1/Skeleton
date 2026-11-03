@@ -99,6 +99,7 @@ Commands:
     world-puzzles Reviewed original scene riddles and verified choice-gated gameplay
     world-studio-engine Reviewed original worlds to typed engine recipes
     world-studio Reviewed multi-plane original-world playable assembly
+    world-cinematics Reviewed original scene storyboards, engine cues and HTML5 playable
     world-pacing Reviewed dramatic arcs, climax witnesses and playable proof
     world-accessibility Reviewed accessible narration and keyboard gameplay
     world-localization Reviewed original language editions and offline playable
@@ -888,6 +889,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-studio":
         from skeleton.jeeves.worlds.studio_assembly_cli import run as world_studio_cli
         return world_studio_cli(rest)
+    if cmd == "world-cinematics":
+        from skeleton.jeeves.worlds.cinematics_cli import run as world_cinematics_cli
+        return world_cinematics_cli(rest)
     if cmd == "world-pacing":
         from skeleton.jeeves.worlds.pacing_cli import run as world_pacing_cli
         return world_pacing_cli(rest)
