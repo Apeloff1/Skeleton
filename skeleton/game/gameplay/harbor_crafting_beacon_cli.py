@@ -21,6 +21,15 @@ from .harbor_crafting_beacon_package import (
 
 from .harbor_crafting_beacon_ui import play_beacon_live
 from .harbor_crafting_beacon_guidance import legal_beacon_actions, verify_beacon_guidance
+from .harbor_crafting_beacon_quests import (
+    MAX_BOARD_BYTES as MAX_QUEST_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_QUEST_REPORT_BYTES,
+    build_beacon_quest_report, verify_beacon_quest_report,
+)
+from .harbor_crafting_beacon_quest_authoring import (
+    MAX_REVISION_BYTES as MAX_QUEST_REVISION_BYTES,
+    edit_beacon_quests, verify_beacon_quest_revision,
+)
 from .harbor_crafting_beacon_journal import (
     MAX_JOURNAL_BYTES, create_beacon_journal, append_beacon_journal,
     verify_beacon_journal, beacon_journal_at, fork_beacon_journal,
@@ -32,7 +41,8 @@ from .harbor_crafting_beacon_acceptance import (
 COMMANDS = (
     "run", "verify", "resume", "status", "live", "hint", "verify-hint",
     "accept", "verify-accept", "author",
-    "journal-init", "journal-append", "journal-verify", "journal-at", "journal-fork", "verify-author",
+    "journal-init", "journal-append", "journal-verify", "journal-at", "journal-fork",
+    "quest-run", "quest-verify", "quest-author", "quest-verify-author", "verify-author",
     "package", "verify-package", "play", "verify-play", "resume-play",
 )
 
@@ -65,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--guidance")
     parser.add_argument("--acceptance")
     parser.add_argument("--journal")
+    parser.add_argument("--quest-board")
+    parser.add_argument("--quest-report")
+    parser.add_argument("--quest-revision")
     parser.add_argument("--index", type=int)
     parser.add_argument("--id", default="lantern-quay-beacons")
     parser.add_argument("--expected-digest")
@@ -72,7 +85,31 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "journal-init":
+        if command == "quest-run":
+            result = build_beacon_quest_report(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.quest_board, MAX_QUEST_BOARD_BYTES),
+                require_complete=args.require_rescue,
+            )
+        elif command == "quest-verify":
+            result = verify_beacon_quest_report(
+                _read(args.quest_report, MAX_QUEST_REPORT_BYTES),
+                require_complete=args.require_rescue,
+            )
+        elif command == "quest-author":
+            result = edit_beacon_quests(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.quest_board, MAX_QUEST_BOARD_BYTES),
+                _read(args.edits, MAX_QUEST_BOARD_BYTES),
+                expected_board_digest=args.expected_digest or "",
+                preview_report=None if not args.quest_report
+                else _read(args.quest_report, MAX_QUEST_REPORT_BYTES),
+            )
+        elif command == "quest-verify-author":
+            result = verify_beacon_quest_revision(
+                _read(args.quest_revision, MAX_QUEST_REVISION_BYTES),
+            )
+        elif command == "journal-init":
             result = create_beacon_journal(
                 _read(args.source, MAX_BUNDLE_BYTES),
                 _read(args.board, MAX_BOARD_BYTES),
