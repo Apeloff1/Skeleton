@@ -76,3 +76,9 @@ def test_main_cli_scene_events_dispatch_is_real_python():
                 and node.comparators[0].value == "world-events"]
     assert len(branches) == 1
     assert "world_events_cli(rest)" in source
+
+
+def test_event_store_has_real_compile_and_verify_methods():
+    from skeleton.jeeves.worlds.events import EventStore
+    assert callable(EventStore.compile)
+    assert callable(EventStore.verify)

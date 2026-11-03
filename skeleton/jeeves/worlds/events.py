@@ -383,7 +383,8 @@ class EventStore:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
             os.close(fd)
-\n    def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
+
+    def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:
             self._lock(fd, world_id)
