@@ -54,3 +54,30 @@ def test_sbom_component_generator_is_bounded():
     with pytest.raises(DeliveryError, match="component count exceeds"):
         build_sbom("app", "1.0.0", repeat(Component("safe", "1", "pypi"),
                                            MAX_SBOM_COMPONENTS + 1))
+
+
+def test_sbom_rejects_identical_duplicate_component_identities():
+    from skeleton.ai.build.core.delivery import sbom as mirrored
+
+    duplicate = Component("same", "1.0.0", "npm")
+    for build in (build_sbom, mirrored.build_sbom):
+        with pytest.raises(DeliveryError, match="duplicate components"):
+            build("app", "1.0.0", [duplicate, duplicate])
+
+
+def test_sbom_rejects_nontext_metadata_and_oversized_requirements():
+    from skeleton.ai.build.core.delivery import sbom as mirrored
+
+    for module in (None, mirrored):
+        component = Component if module is None else module.Component
+        requirements = parse_requirements if module is None else module.parse_requirements
+        package_lock = parse_package_lock if module is None else module.parse_package_lock
+        for bad in (42, None, True):
+            with pytest.raises(DeliveryError):
+                component("lib", bad, "npm")
+        with pytest.raises(DeliveryError, match="license"):
+            component("lib", "1", "npm", license="bad\nlicense")
+        with pytest.raises(DeliveryError, match="requirements text exceeds"):
+            requirements("x" * (2 * 1024 * 1024 + 1))
+        with pytest.raises(DeliveryError, match="invalid version or license"):
+            package_lock({"packages": {"node_modules/lib": {"version": 123}}})
