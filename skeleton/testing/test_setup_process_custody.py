@@ -212,3 +212,61 @@ def test_installer_fails_closed_and_redacts_lock_timeout(tmp_path, monkeypatch):
     assert "TimeoutError" in receipt.phases[-1].detail
     assert "private operator secret" not in repr(receipt.to_dict())
     assert not (root / ".env").exists()
+
+
+def test_existing_env_fifo_fails_without_waiting_for_a_writer(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO support unavailable")
+    root = _root(tmp_path)
+    os.mkfifo(root / ".env")
+    before = time.monotonic()
+    with pytest.raises(ValueError, match="stable, unaliased regular file"):
+        ensure_runtime_environment(root)
+    assert time.monotonic() - before < 2.0
+    assert not list(root.glob(".env.*.tmp"))
+
+
+def test_existing_env_hardlink_alias_is_rejected_without_mutation(tmp_path):
+    if os.name == "nt":
+        pytest.skip("POSIX inode-link custody contract")
+    root = _root(tmp_path)
+    target = root / "outside-env-alias"
+    target.write_text("JWT_SECRET=original\\n", encoding="utf-8")
+    os.link(target, root / ".env")
+    with pytest.raises(ValueError, match="unaliased regular file"):
+        ensure_runtime_environment(root)
+    assert target.read_text(encoding="utf-8") == "JWT_SECRET=original\\n"
+
+
+def test_example_template_fifo_fails_without_read_or_publication(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO support unavailable")
+    root = tmp_path
+    os.mkfifo(root / ".env.example")
+    before = time.monotonic()
+    with pytest.raises(ValueError, match="stable, unaliased regular file"):
+        ensure_runtime_environment(root)
+    assert time.monotonic() - before < 2.0
+    assert not (root / ".env").exists()
+
+
+def test_example_template_symlink_cannot_import_external_secrets(tmp_path):
+    root = tmp_path
+    target = root / "external-secrets"
+    target.write_text("JWT_SECRET=private-value\\n", encoding="utf-8")
+    try:
+        (root / ".env.example").symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(ValueError, match="symbolic link"):
+        ensure_runtime_environment(root)
+    assert target.read_text(encoding="utf-8") == "JWT_SECRET=private-value\\n"
+    assert not (root / ".env").exists()
+
+
+def test_example_template_oversize_is_bounded_before_secret_generation(tmp_path):
+    root = tmp_path
+    (root / ".env.example").write_bytes(b"A" * (_MAX_ENV_BYTES + 1))
+    with pytest.raises(ValueError, match="256 KiB"):
+        ensure_runtime_environment(root)
+    assert not (root / ".env").exists()
