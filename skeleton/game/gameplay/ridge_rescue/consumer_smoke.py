@@ -166,6 +166,21 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
     _invoke(command, ["restore", "--slot", "tampered", "--file", "-"],
             env=env, cwd=root, stdin=damaged.decode("utf-8", errors="replace"),
             expect_success=False)
+    # Rejected tampered imports must not allocate a save slot or mutate the
+    # already earned campaign. Check through the public consumer CLI rather
+    # than assuming a nonzero exit code proves transactional rollback.
+    tampered_status = _invoke(
+        command, ["status", "--slot", "tampered"], env=env, cwd=root,
+        expect_success=False,
+    )
+    if not tampered_status.strip():
+        raise SmokeError("rejected tampered restore returned no diagnostic")
+    intact_after_tamper = json.loads(_invoke(
+        command, ["audit", "--slot", "smoke"], env=env, cwd=root,
+    ))
+    if (not intact_after_tamper["verified"] or
+            intact_after_tamper["audit_entries"] != len(choices)):
+        raise SmokeError("tampered restore damaged the earned save history")
     # A versioned full-history backup must survive a separate-process restore,
     # including its exact action ledger, without replacing any existing slot.
     backup = json.loads(_invoke(command, ["backup", "--slot", "smoke"], env=env, cwd=root))
