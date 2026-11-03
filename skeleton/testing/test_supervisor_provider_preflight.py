@@ -22,7 +22,7 @@ def test_secretary_requires_model_provider_before_any_worker_dispatch() -> None:
     assert "set -euo pipefail" in secretary[preflight:checkout]
     assert "configuration_required:" in secretary[preflight:checkout]
     for name in ("MODEL_API_URL", "MODEL_NAME", "MODEL_API_KEY"):
-        assert f'-z "${{{name}:-}}"' in secretary[preflight:checkout]
+        assert f'! "${{{name}:-}}" =~ [^[:space:]]' in secretary[preflight:checkout]
 
 
 def test_preflight_does_not_disclose_credentials_or_disable_read_only_plan() -> None:
@@ -44,3 +44,33 @@ def test_automation_model_provider_requires_all_three_fields() -> None:
     for name in ("MODEL_API_URL", "MODEL_NAME", "MODEL_API_KEY"):
         assert name in source
     assert "MODEL_API_URL, MODEL_API_KEY and MODEL_NAME are required" in source
+
+
+def test_whitespace_only_provider_configuration_fails_before_dispatch() -> None:
+    """Whitespace-only Actions variables must not admit a worker."""
+    import os
+    import subprocess
+    import textwrap
+
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    preflight = workflow.split(
+        "- name: Require configured repository automation provider", 1
+    )[1].split("- name: Checkout immutable admitted commit", 1)[0]
+    script = textwrap.dedent(preflight.split("run: |", 1)[1])
+    for empty_name in ("MODEL_API_URL", "MODEL_NAME", "MODEL_API_KEY"):
+        values = {
+            "MODEL_API_URL": "https://example.org/v1/chat/completions",
+            "MODEL_NAME": "test-model",
+            "MODEL_API_KEY": "DO_NOT_PRINT_TEST_KEY",
+        }
+        values[empty_name] = "  \t  "
+        result = subprocess.run(
+            ["bash", "-c", script],
+            env={**os.environ, **values},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode != 0, empty_name
+        assert "configuration_required" in result.stdout
+        assert "DO_NOT_PRINT_TEST_KEY" not in result.stdout + result.stderr

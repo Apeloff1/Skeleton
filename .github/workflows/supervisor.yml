@@ -124,7 +124,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${MODEL_API_URL:-}" || -z "${MODEL_NAME:-}" || -z "${MODEL_API_KEY:-}" ]]; then
+          if [[ ! "${MODEL_API_URL:-}" =~ [^[:space:]] || ! "${MODEL_NAME:-}" =~ [^[:space:]] || ! "${MODEL_API_KEY:-}" =~ [^[:space:]] ]]; then
             echo "::error::configuration_required: Repository Supervisor requires Actions MODEL_API_URL, MODEL_NAME and MODEL_API_KEY before worker dispatch."
             exit 1
           fi
