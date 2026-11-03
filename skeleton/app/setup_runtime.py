@@ -6,10 +6,13 @@ idempotent and never returns secret values in receipts or logs.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import secrets
 import stat
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -108,6 +111,101 @@ def _replace_env_value(text: str, key: str, value: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+
+_MAX_ENV_BYTES = 256 * 1024
+
+
+@contextmanager
+def _setup_process_lock(root: Path, *, timeout: float = 10.0):
+    """Serialize secret bootstrap across independent installer/GUI processes.
+
+    The lock is a stable, non-secret file, never removed on release. Replacing
+    the lock pathname would split coordination, so reject symlinks and verify
+    the opened file still names the same inode. The installation root must be
+    operator-owned; this is not a defense against hostile directory renames.
+    """
+    if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 0 < timeout <= 30:
+        raise ValueError("setup lock timeout must be within (0, 30] seconds")
+    lock_path = root / ".skeleton-setup.lock"
+    if lock_path.is_symlink():
+        raise ValueError("setup lock must not be a symbolic link")
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(lock_path, flags, 0o600)
+    acquired = False
+    try:
+        opened = os.fstat(descriptor)
+        named = os.lstat(lock_path)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise ValueError("setup lock must be a stable regular file")
+        if os.name != "nt":
+            os.fchmod(descriptor, 0o600)
+            import fcntl
+        else:
+            import msvcrt
+            # Windows byte-range locking needs a persistent byte to lock.
+            if opened.st_size == 0:
+                os.write(descriptor, bytes([0]))
+                os.fsync(descriptor)
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                if os.name == "nt":
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("another setup process holds the bootstrap lock") from None
+                time.sleep(0.05)
+        # Reject a lock-path swap that occurred while waiting.
+        named = os.lstat(lock_path)
+        if (
+            not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise ValueError("setup lock identity changed during admission")
+        yield
+    finally:
+        if acquired:
+            if os.name == "nt":
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+def _read_existing_env(path: Path) -> str:
+    """Bound the secret-bearing input and refuse links and special files."""
+    if path.is_symlink():
+        raise ValueError("runtime .env must not be a symbolic link")
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "rb") as handle:
+        opened = os.fstat(handle.fileno())
+        named = os.lstat(path)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise ValueError("runtime .env must be a stable regular file")
+        if opened.st_size > _MAX_ENV_BYTES:
+            raise ValueError("runtime .env exceeds the 256 KiB input limit")
+        raw = handle.read(_MAX_ENV_BYTES + 1)
+    if len(raw) > _MAX_ENV_BYTES:
+        raise ValueError("runtime .env exceeds the 256 KiB input limit")
+    return raw.decode("utf-8")
+
+
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
@@ -129,10 +227,14 @@ def _atomic_write(path: Path, text: str) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
-        try:
-            path.chmod(0o600)
-        except OSError:
-            pass
+        # NamedTemporaryFile is private from creation; never publish a
+        # permissive intermediate file, including on interrupted writes.
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -231,7 +333,7 @@ def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
     return created
 
 
-def ensure_runtime_environment(
+def _ensure_runtime_environment_locked(
     root: Path | None = None,
     *,
     rotate_secrets: bool = False,
@@ -244,11 +346,13 @@ def ensure_runtime_environment(
     operator_admin = _operator_admin(admin_email, admin_password_file)
     env_path = root / ".env"
     example_path = root / ".env.example"
+    if env_path.is_symlink():
+        raise ValueError("runtime .env must not be a symbolic link")
     created = not env_path.exists()
     warnings: list[str] = []
 
     if env_path.exists():
-        text = env_path.read_text(encoding="utf-8")
+        text = _read_existing_env(env_path)
     elif example_path.is_file():
         text = example_path.read_text(encoding="utf-8")
     else:
@@ -436,3 +540,21 @@ def ensure_runtime_environment(
         preserved_keys=tuple(dict.fromkeys(preserved)),
         warnings=tuple(warnings),
     )
+
+
+def ensure_runtime_environment(
+    root: Path | None = None,
+    *,
+    rotate_secrets: bool = False,
+    admin_email: str | None = None,
+    admin_password_file: Path | None = None,
+) -> SetupResult:
+    """Cross-process, fail-closed runtime bootstrap with stable secret custody."""
+    root = (root or find_repo_root()).resolve()
+    with _setup_process_lock(root):
+        return _ensure_runtime_environment_locked(
+            root,
+            rotate_secrets=rotate_secrets,
+            admin_email=admin_email,
+            admin_password_file=admin_password_file,
+        )
