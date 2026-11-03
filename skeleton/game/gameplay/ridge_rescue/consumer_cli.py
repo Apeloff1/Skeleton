@@ -18,7 +18,7 @@ from .render import render_map, legend
 from .schema import parse_world
 
 
-def _view(verified: dict) -> str:
+def _view(verified: dict, *, ascii_mode: bool = False) -> str:
     index = verified["index"]
     campaign = verified["campaign"]
     lines = [
@@ -37,18 +37,23 @@ def _view(verified: dict) -> str:
         lines.append("Actions:")
         for number, action in enumerate(verified["actions"]):
             lines.append(f"  {number}: {json.dumps(action, sort_keys=True)}")
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    if ascii_mode:
+        result = result.translate(str.maketrans({"·": ".", "█": "#", "≈": "~", "▲": "^"}))
+    return result
 
 
-def play(store: SlotStore, slot: str, *, read=input, write=print) -> dict:
+def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bool | None = None) -> dict:
     try:
         current = store.load(slot)
     except StoreError as exc:
         if str(exc) != "save slot does not exist":
             raise
         current = store.new(slot)
+    if ascii_mode is None:
+        ascii_mode = os.name == "nt"
     while True:
-        write(_view(current))
+        write(_view(current, ascii_mode=ascii_mode))
         if current["status"] == "completed":
             write("Campaign complete. Type e to export, or q to quit.")
         elif current["status"] != "playing":
@@ -80,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cinder-ridge-consumer")
     parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "audit", "verify-export", "acceptance", "bundle"))
     parser.add_argument("--slot", default="adventure", help="lowercase save name, 1-32 safe characters")
+    parser.add_argument("--ascii", action="store_true", help="ASCII-only terminal fallback")
     parser.add_argument("--action", help="canonical JSON action for a noninteractive step")
     parser.add_argument("--expected-head", help="exact revision head for a noninteractive mutation")
     parser.add_argument("--file", help="portable campaign export to verify")
@@ -99,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             store = SlotStore()
             if args.command == "play":
-                result = play(store, args.slot)
+                result = play(store, args.slot, ascii_mode=args.ascii or os.name == "nt")
             elif args.command == "bundle":
                 from .consumer_bundle import build_bundle
                 result = build_bundle(store)

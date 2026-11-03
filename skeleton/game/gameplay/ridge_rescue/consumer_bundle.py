@@ -113,19 +113,44 @@ def verify_bytes(data: bytes) -> dict:
             "release_certified": False}
 
 
-def build_bundle(store: SlotStore) -> dict:
-    archive = build_bytes()
-    checked = verify_bytes(archive)
-    directory = _safe_directory(store.root / "exports")
-    destination = directory / ("cinder-ridge-" + checked["sha256"][:16] + ".pyz")
+
+def _windows_launcher(filename: str) -> bytes:
+    if not filename.startswith("cinder-ridge-") or not filename.endswith(".pyz"):
+        raise BundleError("invalid portable launcher filename")
+    if any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-." for ch in filename):
+        raise BundleError("unsafe portable launcher filename")
+    script = (
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "cd /d \"%~dp0\"\r\n"
+        "where py >nul 2>nul\r\n"
+        "if not errorlevel 1 (\r\n"
+        f"  py -3 \"%~dp0{filename}\" play --ascii\r\n"
+        ") else (\r\n"
+        "  where python >nul 2>nul\r\n"
+        "  if errorlevel 1 (\r\n"
+        "    echo Python 3.11 or newer is required.\r\n"
+        "    pause\r\n"
+        "    exit /b 2\r\n"
+        "  )\r\n"
+        f"  python \"%~dp0{filename}\" play --ascii\r\n"
+        ")\r\n"
+        "set \"EXIT_CODE=%ERRORLEVEL%\"\r\n"
+        "if not \"%EXIT_CODE%\"==\"0\" pause\r\n"
+        "exit /b %EXIT_CODE%\r\n"
+    )
+    return script.encode("ascii")
+
+
+def _publish(path: Path, payload: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
     fd = None
     try:
-        fd = os.open(destination, flags, 0o600)
+        fd = os.open(path, flags, 0o600)
         with os.fdopen(fd, "wb") as output:
             fd = None
-            output.write(archive)
+            output.write(payload)
             output.flush()
             os.fsync(output.fileno())
     except OSError as exc:
@@ -133,4 +158,14 @@ def build_bundle(store: SlotStore) -> dict:
     finally:
         if fd is not None:
             os.close(fd)
-    return {**checked, "path": str(destination)}
+
+
+def build_bundle(store: SlotStore) -> dict:
+    archive = build_bytes()
+    checked = verify_bytes(archive)
+    directory = _safe_directory(store.root / "exports")
+    destination = directory / ("cinder-ridge-" + checked["sha256"][:16] + ".pyz")
+    launcher = destination.with_suffix(".cmd")
+    _publish(destination, archive)
+    _publish(launcher, _windows_launcher(destination.name))
+    return {**checked, "path": str(destination), "windows_launcher": str(launcher)}
