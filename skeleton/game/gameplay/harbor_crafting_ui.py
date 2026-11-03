@@ -79,8 +79,15 @@ def parse_command(line: str) -> dict[str, str] | str:
     raise HarborError("unsupported terminal command")
 
 
-def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextIO) -> int:
+def play_live(
+    source: dict[str, Any], input_stream: TextIO, output_stream: TextIO,
+    *, course: Any = None,
+) -> int:
     world = validate_source(source)
+    authored_course = None
+    if course is not None:
+        from .harbor_crafting_time_trials import validate_course
+        authored_course = validate_course(course, world)
     state = initial_state(world)
     actions: list[dict[str, str]] = []
     redo_stack: list[dict[str, str]] = []
@@ -127,6 +134,16 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
                         or action["op"]
                     )
                 output_stream.write("LEGAL NOW " + ", ".join(descriptions) + "\n")
+                if authored_course is not None:
+                    from .harbor_crafting_time_trials import time_trial_report
+                    report = time_trial_report(export_bundle(world, actions), authored_course)
+                    output_stream.write(
+                        "TRIAL_PROGRESS "
+                        + str(len(report["visits"])) + "/"
+                        + str(len(authored_course["checkpoints"]))
+                        + " checkpoints, deadline="
+                        + str(authored_course["deadline"]) + "\n"
+                    )
                 continue
             if command == "help":
                 output_stream.write("Move, gather, craft, trade, deliver and choose an ending. hint lists legal actions; undo/redo replay verified history; save exports a checkpoint.\n")
@@ -151,6 +168,21 @@ def play_live(source: dict[str, Any], input_stream: TextIO, output_stream: TextI
             if verify_bundle(bundle, require_win=True) != state:
                 raise HarborError("interactive replay divergence")
             output_stream.write("VICTORY " + state["ending"] + " " + bundle["terminal_digest"] + "\n")
+            if authored_course is not None:
+                from .harbor_crafting_time_trials import (
+                    time_trial_report, verify_time_trial_report,
+                )
+                report = time_trial_report(bundle, authored_course)
+                verified = verify_time_trial_report(report)
+                output_stream.write(
+                    "TRIAL " + verified["status"] + " "
+                    + (verified["medal"] or "no-medal") + "\n"
+                )
+                output_stream.write(
+                    "TRIAL_REPORT " + canonical(report).decode("utf-8") + "\n"
+                )
+                output_stream.write("CHECKPOINT " + canonical(bundle).decode("utf-8") + "\n")
+                return 0 if verified["status"] == "finished" else 2
             output_stream.write("CHECKPOINT " + canonical(bundle).decode("utf-8") + "\n")
             return 0
     output_stream.write("COMMAND_BUDGET_EXHAUSTED: no victory; checkpoint follows\n")

@@ -47,3 +47,15 @@ reconstruct the edit transaction and its optional gameplay preview.
 Both the original source digest and original course digest are optimistic
 concurrency leases. No authored edit is allowed to rewrite an existing save,
 forge a medal, or silently substitute a different world.
+
+## Interactive time-trial play
+
+Run `python -m skeleton.game.gameplay.harbor_crafting_cli trial-live
+--trial skeleton/game/gameplay/fixtures/harbor_lantern_quay_time_trial.json`.
+The regular terminal controls are available: `north`, `south`, `east`,
+`west`, `gather`, `craft ID`, `trade ID`, `deliver`, `signal`,
+`shelter`, `hint`, `undo`, `redo`, `save`, and `quit`.
+`hint` reports both canonical legal actions and earned checkpoint progress.
+A normal story victory does **not** imply a successful time trial: a missed
+checkpoint or wrong ending returns a nonzero exit status with a replayable
+`TRIAL_REPORT` and `CHECKPOINT`, never a fabricated medal.
