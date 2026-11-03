@@ -11,6 +11,7 @@ import json
 import os
 
 from .campaign import verify_export
+from .consumer_experience import status_panel, navigation_hint, recent_events
 from .consumer_store import SlotStore, StoreError, MAX_EXPORT_BYTES
 from .io import read_bounded
 from .render import render_map, legend
@@ -25,6 +26,7 @@ def _view(verified: dict, *, ascii_mode: bool = False) -> str:
         f"Save: {verified['slot']}  Revision: {verified['revision']}",
         f"Chapter: {index + 1}/{len(campaign['episodes'])}  Status: {verified['status']}",
     ]
+    lines.append(status_panel(verified))
     if verified["status"] == "completed":
         lines.append("Victory: both chapters earned their declared endings.")
         return "\n".join(lines)
@@ -54,17 +56,26 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
     while True:
         write(_view(current, ascii_mode=ascii_mode))
         if current["status"] == "completed":
-            write("Campaign complete. Type e to export, or q to quit.")
+            write("Campaign complete. Type e to export, j for the journal, or q to quit.")
         elif current["status"] != "playing":
-            write("Chapter ended without its required ending. Type r to retry, e to export, q to quit.")
+            write("Chapter ended without its required ending. Type r to retry, e to export, j for journal, q to quit.")
         else:
-            write("Choose an action number, e to export, or q to save and quit.")
+            write("Choose an action number, h for a hint, j for journal, ? for help, e to export, q to save and quit.")
         try:
             answer = read("> ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             answer = "q"
         if answer in ("q", "quit"):
             break
+        if answer in ("?", "help"):
+            write("Numbers perform listed actions and save immediately. h = advisory route, j = recent events, e = replay-verified export, q = quit without losing the last turn. No command besides a numbered action or retry consumes a turn.")
+            continue
+        if answer in ("h", "hint"):
+            write(navigation_hint(current))
+            continue
+        if answer in ("j", "journal"):
+            write(recent_events(current))
+            continue
         if answer == "e":
             write("Exported: " + str(store.export(slot)))
             continue
