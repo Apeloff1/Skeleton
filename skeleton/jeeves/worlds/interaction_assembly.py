@@ -58,6 +58,24 @@ def prove_interaction(world: Any, cast: Any, economy: Any,
     witnesses: dict[str, list[str]] = {}
     while queue:
         (scene, flags, balances), path = queue.popleft()
+        for conversation in dialogue["conversations"]:
+            if conversation["scene"] != scene:
+                continue
+            terminal_choices = {
+                response["world_choice"]
+                for node in conversation["nodes"]
+                for response in node["responses"]
+                if response["world_choice"] is not None
+            }
+            if not any(
+                edge["id"] in terminal_choices and
+                set(edge["requires"]) <= flags and
+                _advance(edge, balances, resource_ids, capacities,
+                         effects) is not None
+                for edge in edges.get(scene, [])
+            ):
+                raise CanonError("interaction_dialogue_unaffordable_state",
+                                 conversation["id"])
         for cid, choice_id in sorted(handoffs):
             conversation = conversations[cid]
             if conversation["scene"] != scene:
