@@ -11,6 +11,7 @@ from skeleton.jeeves.worlds.epilogues import (
     validate_epilogues,
 )
 from skeleton.jeeves.worlds.epilogues_cli import run
+from skeleton.jeeves.worlds.epilogues_editor import render_epilogues_editor
 from skeleton.jeeves.worlds.session import SessionStore, new_session
 from skeleton.jeeves.worlds.tools import SCHEMA, invoke_world_tool
 from skeleton.jeeves.worlds.world_canon import (
@@ -134,3 +135,27 @@ def test_cli_proposal_and_read_only_jeeves_preview(tmp_path, capsys):
     })
     assert response["persisted"] is False
     assert response["result"] == source
+
+
+def test_offline_editor_source_lease_and_csp(tmp_path):
+    world, _, store, source = setup(tmp_path)
+    lease = store.publish("delta", source, create=True)
+    page = render_epilogues_editor(source, world)
+    assert b"Content-Security-Policy" in page
+    assert b"connect-src 'none'" in page
+    assert b"sha256-" in page
+    result = store.editor("delta", lease)
+    assert (tmp_path / result["html_file"]).read_bytes() == page
+    with pytest.raises(CanonError, match="epilogues_stale_source"):
+        store.editor("delta", "0" * 64)
+    store.approve("delta", lease, "Reviewed")
+    with pytest.raises(CanonError, match="epilogues_editor_requires_draft"):
+        store.editor("delta", store.inspect("delta")["source_digest"])
+
+
+def test_offline_editor_escapes_embedded_original_prose(tmp_path):
+    world, _, _, source = setup(tmp_path)
+    source["entries"][0]["text"] = "</script><img src=x onerror=alert(1)>"
+    page = render_epilogues_editor(source, world)
+    assert b"<img src=x" not in page
+    assert b"\\u003c/script>" in page

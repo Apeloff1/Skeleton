@@ -27,3 +27,13 @@ receipt. All source and session reads are descriptor-anchored and bounded.
 Source updates require an exact digest and invalidate prior approval;
 compilation requires current approved source and current player digest.
 A failed, skipped or pending CI gate is never release certification.
+
+## Offline visual authoring
+
+Before approval, run `world-epilogues --store STORE editor --world-id ID
+--expected-digest SOURCE_DIGEST`. The generated private HTML page has a
+hash-constrained script, no network access and original ending-specific
+prose fields. Its JSON export is explicitly **unapproved**. Import the
+export through the normal source-leased `publish` action, re-review the
+content and explicitly `approve` again. The editor cannot grant endings
+or bypass source, session, and approval validation.

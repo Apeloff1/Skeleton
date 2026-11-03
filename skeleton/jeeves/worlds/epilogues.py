@@ -218,6 +218,29 @@ class EpilogueStore:
         finally:
             os.close(fd)
 
+    def editor(self, world_id: str, expected_digest: str) -> dict[str, Any]:
+        """Compile a private offline editor for an exact unapproved source."""
+        from .epilogues_editor import render_epilogues_editor
+        fd = self.worlds._directory()
+        try:
+            self._locked(fd, world_id)
+            try:
+                world, source = self._sources(fd, world_id)
+                if digest(source) != expected_digest:
+                    raise CanonError("epilogues_stale_source")
+                page = render_epilogues_editor(source, world)
+                name = world_id + ".epilogues.editor.html"
+                self.worlds._write(fd, name, page)
+                return {
+                    "schema": "jeeves.world.epilogues_editor.v1",
+                    "html_file": name, "html_sha256": sha256(page).hexdigest(),
+                    "source_digest": digest(source), "review_required": True,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def _player(self, fd: int, world_id: str, slot: str) -> dict[str, Any]:
         world, source = self._sources(fd, world_id)
         session = self.sessions._session(fd, world_id, slot, world)

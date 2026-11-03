@@ -15,14 +15,14 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--store", required=True)
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("propose", "publish", "inspect", "approve",
-                   "player", "compile", "verify"):
+                   "player", "compile", "verify", "editor"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
         if action in {"propose", "publish"}:
             cmd.add_argument("--file", required=True)
         if action == "publish":
             cmd.add_argument("--create", action="store_true")
-        if action in {"publish", "approve", "compile"}:
+        if action in {"publish", "approve", "compile", "editor"}:
             cmd.add_argument("--expected-digest", required=True)
         if action == "approve":
             cmd.add_argument("--note", required=True)
@@ -46,6 +46,8 @@ def run(argv: list[str]) -> int:
         elif args.action == "approve":
             result = {"source_digest": store.approve(
                 args.world_id, args.expected_digest, args.note)}
+        elif args.action == "editor":
+            result = store.editor(args.world_id, args.expected_digest)
         elif args.action == "inspect":
             result = store.inspect(args.world_id)
         elif args.action == "player":
