@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "max_vocab_08",
+  "category": "max_vocab",
+  "overrides": {
+    "max_vocab": 16
+  },
+  "expected": "denied",
+  "reason": "Reject unbounded or invalid max_vocab configuration before allocation"
+}

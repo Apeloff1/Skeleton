@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "license_11",
+  "category": "license",
+  "overrides": {
+    "license_id": ""
+  },
+  "expected": "denied",
+  "reason": "Reject invalid license without reinterpreting training rights"
+}

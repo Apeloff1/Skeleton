@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "model_budget_04",
+  "category": "model_budget",
+  "overrides": {
+    "maximum_model_bytes": 8388608
+  },
+  "expected": "allowed",
+  "reason": "Admit bounded model_budget after explicit model policy validation"
+}

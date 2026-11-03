@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "run_id_11",
+  "category": "run_id",
+  "overrides": {
+    "run_id": "0start"
+  },
+  "expected": "denied",
+  "reason": "Refuse malformed or unapproved run_id configuration without fallback"
+}

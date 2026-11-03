@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "learning_rate_05",
+  "category": "learning_rate",
+  "overrides": {
+    "learning_rate_ppm": 20000
+  },
+  "expected": "allowed",
+  "reason": "Admit bounded learning_rate after explicit model policy validation"
+}

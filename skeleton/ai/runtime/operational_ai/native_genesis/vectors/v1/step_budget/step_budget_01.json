@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "step_budget_01",
+  "category": "step_budget",
+  "overrides": {
+    "max_optimizer_steps": 1
+  },
+  "expected": "allowed",
+  "reason": "Admit bounded step_budget after explicit model policy validation"
+}

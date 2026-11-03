@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "heads_04",
+  "category": "heads",
+  "overrides": {
+    "n_heads": 8
+  },
+  "expected": "allowed",
+  "reason": "Validate accepted heads boundary value in approved candidate-only policy"
+}
