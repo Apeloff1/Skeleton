@@ -36,12 +36,13 @@ class MongoSourceEpochError(RuntimeError):
 
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _BoundWriter:
     tenant_id: str
     actor_id: str
     task: asyncio.Task[Any]
     token: str
+    poisoned: bool = False
 
 
 class MongoCanonicalSourceEpoch:
@@ -266,7 +267,15 @@ class MongoCanonicalSourceEpoch:
             if (active.task is not task or active.tenant_id != tenant_id
                     or active.actor_id != actor_id):
                 raise MongoSourceEpochError("canonical writer scope cannot be inherited")
-            yield
+            # Reentrant writes share the same physical majority epoch.
+            # A nested mutation that raises may have partially committed.
+            # Even if its caller catches that exception, the outer writer
+            # MUST NOT publish a stable epoch after an uncertain mutation.
+            try:
+                yield
+            except BaseException:
+                active.poisoned = True
+                raise
             return
         token = str(uuid4())
         try:
@@ -285,9 +294,14 @@ class MongoCanonicalSourceEpoch:
                 or type(acquired.get("epoch")) is not int
                 or acquired["epoch"] < 3 or acquired["epoch"] % 2 != 1):
             raise MongoSourceEpochError("canonical writer epoch not owned")
-        scope = self._active.set(_BoundWriter(tenant_id, actor_id, task, token))
+        binding = _BoundWriter(tenant_id, actor_id, task, token)
+        scope = self._active.set(binding)
         try:
             yield
+            if binding.poisoned:
+                raise MongoSourceEpochError(
+                    "nested canonical mutation failed; actor epoch quarantined"
+                )
             try:
                 closed = await self._bounded_mutation(self._collection.find_one_and_update(
                     {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from contextvars import ContextVar
 
 from skeleton.persistence.mongo_source_epoch import (
     MongoCanonicalSourceEpoch, MongoSourceEpochError,
@@ -61,6 +62,44 @@ class EpochRevocationTests(unittest.IsolatedAsyncioTestCase):
         )
         options.update(overrides)
         return await self.epoch.revoke_actor(**options)
+
+    async def test_nested_writer_failure_caught_by_caller_still_quarantines(self):
+        self.epoch._active = ContextVar("nested-test-epoch", default=None)
+        with self.assertRaisesRegex(MongoSourceEpochError, "quarantined"):
+            async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                try:
+                    async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                        raise RuntimeError("partial nested write")
+                except RuntimeError:
+                    pass
+                self.epoch.require_actor_writer(tenant_id="tenant", actor_id="owner")
+        self.assertEqual(self.collection.doc["phase"], "writing")
+        self.assertEqual(self.collection.doc["epoch"], 3)
+        self.assertEqual(self.collection.calls, 1)
+        with self.assertRaises(MongoSourceEpochError):
+            async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                self.fail("uncertain nested mutation silently recovered")
+
+    async def test_successful_nested_writer_closes_exactly_once(self):
+        self.epoch._active = ContextVar("nested-test-epoch", default=None)
+        async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+            async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                self.epoch.require_actor_writer(tenant_id="tenant", actor_id="owner")
+        self.assertEqual(self.collection.doc["phase"], "stable")
+        self.assertEqual(self.collection.doc["epoch"], 4)
+        self.assertEqual(self.collection.calls, 2)
+
+    async def test_nested_writer_cancellation_quarantines_even_if_caught(self):
+        import asyncio
+        self.epoch._active = ContextVar("nested-cancel-test-epoch", default=None)
+        with self.assertRaisesRegex(MongoSourceEpochError, "quarantined"):
+            async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                try:
+                    async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                        raise asyncio.CancelledError()
+                except asyncio.CancelledError:
+                    pass
+        self.assertEqual(self.collection.doc["phase"], "writing")
 
     async def test_terminal_revocation_cas(self):
         self.assertEqual(await self.revoke(), 3)
