@@ -170,3 +170,14 @@ Focused test: `python -m unittest skeleton.testing.test_mongo_epoch_migration_gu
 Initial actor epoch provisioning also refuses standalone Mongo, a secondary,
 or a malformed/failed primary probe before requesting operator approval.
 This is a read-only probe and does not modify Compose or initialize a replica set.
+
+## Opt-in real replica-set custody drills
+
+`python -m unittest skeleton.testing.test_mongo_epoch_live_replica` requires
+`SKL_TEST_MONGO_URI` pointing to an operator-provisioned authenticated
+replica-set primary and `SKL_TEST_MONGO_ALLOW_DROP=1`. Tests create unique
+`skeleton_ci_guard_*` logical databases and delete only those newly created
+databases. They cover majority initial epoch, linearizable reads, writer
+collision, WRITING quarantine across restart and terminal revocation.
+Without explicit test authority, tests SKIP and cannot be counted as passes.
+They do not deploy a replica set, migrate Compose, or certify consumers.
