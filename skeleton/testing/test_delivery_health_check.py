@@ -108,7 +108,7 @@ def test_probe_spec_and_config_reject_coerced_security_evidence():
     for module in (None, mirrored):
         spec = ProbeSpec if module is None else module.ProbeSpec
         parse = specs_from_config if module is None else module.specs_from_config
-        for bad in ("//other-host/health", "/../admin", "/health?token=x", "/health#ok"):
+        for bad in ("//other-host/health", "/../admin", "/health?token=x", "/health#ok", "/health\\\\admin"):
             with pytest.raises(DeliveryError, match="unsafe probe path"):
                 spec("probe", bad)
         for bad in (True, 200.0, "200"):

@@ -37,7 +37,7 @@ class ProbeSpec:
         require_id(self.probe_id, field="probe_id")
         if (type(self.path) is not str or not self.path.startswith("/")
                 or self.path.startswith("//") or len(self.path) > MAX_PROBE_PATH_CHARS
-                or any(ch in self.path for ch in ("\\\\", "?", "#"))
+                or any(ch in self.path for ch in ("\\", "?", "#"))
                 or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.path)
                 or ".." in self.path.split("/")):
             raise DeliveryError("unsafe probe path")
