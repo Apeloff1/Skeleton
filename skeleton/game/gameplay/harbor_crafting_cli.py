@@ -64,6 +64,12 @@ from .harbor_crafting_season import (
 from .harbor_crafting_ghost_race import (
     MAX_RACE_BYTES as MAX_GHOST_RACE_BYTES, ghost_race, verify_ghost_race,
 )
+from .harbor_crafting_contracts import (
+    MAX_BOARD_BYTES as MAX_CONTRACT_BOARD_BYTES,
+    MAX_SAVE_BYTES as MAX_CONTRACT_SAVE_BYTES,
+    MAX_EDITS_BYTES as MAX_CONTRACT_EDITS_BYTES,
+    build_save, append_save, play_save, next_order, verify_save, edit_board, verify_edit,
+)
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -92,7 +98,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -135,6 +141,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--season-records", help="JSON array of replay-verified season saves")
     parser.add_argument("--season-board", help="Portable replay-verified season standings JSON")
     parser.add_argument("--expected-season-digest", help="CAS lease for season continuation")
+    parser.add_argument("--contracts", help="Authored source-bound contract board")
+    parser.add_argument("--contract-save", help="Portable replay-verified contract save")
+    parser.add_argument("--contract-edits", help="Transactional contract board edits")
+    parser.add_argument("--contract-revision", help="Replay-verifiable contract edit revision")
+    parser.add_argument("--expected-contract-digest", help="CAS lease for contract save or board")
     parser.add_argument("--ghost-bundle", help="Verified opponent save for ghost racing")
     parser.add_argument("--trial-edits", help="JSON array of transactional time trial edits")
     parser.add_argument("--trial-revision", help="Portable time trial course revision JSON")
@@ -143,7 +154,36 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command in ("season-next", "season-live"):
+        if args.command == "contract-init":
+            output = build_save(load_source(Path(args.source)),
+                _required_json(args.contracts, "contracts", MAX_CONTRACT_BOARD_BYTES), [])
+        elif args.command == "contract-next":
+            output = next_order(_required_json(args.contract_save, "contract-save", MAX_CONTRACT_SAVE_BYTES))
+        elif args.command == "contract-verify":
+            output = {"verified": True, **verify_save(
+                _required_json(args.contract_save, "contract-save", MAX_CONTRACT_SAVE_BYTES))}
+        elif args.command in ("contract-play", "contract-append"):
+            if not args.expected_contract_digest:
+                raise HarborError("--expected-contract-digest is required")
+            save = _required_json(args.contract_save, "contract-save", MAX_CONTRACT_SAVE_BYTES)
+            if args.command == "contract-play":
+                output = play_save(save, _required_json(args.actions, "actions"),
+                    expected_digest=args.expected_contract_digest)
+            else:
+                output = append_save(save, _required_json(args.bundle, "bundle"),
+                    expected_digest=args.expected_contract_digest)
+        elif args.command == "contract-author":
+            if not args.expected_source_digest or not args.expected_contract_digest:
+                raise HarborError("--expected-source-digest and --expected-contract-digest are required")
+            output = edit_board(load_source(Path(args.source)),
+                _required_json(args.contracts, "contracts", MAX_CONTRACT_BOARD_BYTES),
+                _required_json(args.contract_edits, "contract-edits", MAX_CONTRACT_BOARD_BYTES),
+                expected_source_digest=args.expected_source_digest,
+                expected_board_digest=args.expected_contract_digest)
+        elif args.command == "contract-verify-author":
+            output = {"verified": True, **verify_edit(
+                _required_json(args.contract_revision, "contract-revision", MAX_CONTRACT_EDITS_BYTES))}
+        elif args.command in ("season-next", "season-live"):
             next_round = next_season_round(
                 _required_json(args.season_record, "season-record", MAX_SEASON_RECORD_BYTES))
             if args.command == "season-live":
