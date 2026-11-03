@@ -146,13 +146,21 @@ class GameplayStateEnvelope:
 
     @classmethod
     def from_section(cls, section: Mapping[str, Any]) -> "GameplayStateEnvelope":
-        if not isinstance(section, Mapping) or section.get("schema") != ENVELOPE_SCHEMA:
+        # Untrusted serialized saves must be plain JSON dictionaries. Do not
+        # execute custom Mapping iteration/lookup hooks before shape checks.
+        if type(section) is not dict:
+            raise GameplayMigrationError("gameplay save section must be a plain dict")
+        if section.get("schema") != ENVELOPE_SCHEMA:
             raise GameplayMigrationError("unknown gameplay save schema")
-        if set(section) != SECTION_KEYS:
-            missing = SECTION_KEYS - set(section)
+        if len(section) != len(SECTION_KEYS):
+            missing = SECTION_KEYS - section.keys()
             if missing:
                 raise GameplayMigrationError("missing gameplay save field")
             raise GameplayMigrationError("unknown gameplay save field")
+        if set(section) != SECTION_KEYS:
+            raise GameplayMigrationError("unknown gameplay save field")
+        if type(section["payload"]) is not dict:
+            raise GameplayMigrationError("gameplay save payload must be a plain dict")
         try:
             env = cls(section["world_id"], section["schema_version"], section["tick"],
                       section["payload"], section["canon_digest"], section.get("parent_save_digest"))

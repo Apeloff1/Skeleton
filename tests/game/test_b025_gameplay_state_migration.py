@@ -178,3 +178,20 @@ def test_migration_invalid_first_result_does_not_invoke_callback_twice():
     with pytest.raises(GameplayMigrationError, match="collection exceeds bound"):
         registry.load_section(V1_SECTION)
     assert calls == [1]
+
+
+def test_gameplay_save_rejects_hostile_mapping_hooks_before_iteration():
+    """A signed-looking save must not execute arbitrary Mapping methods."""
+    class HostileDict(dict):
+        def __iter__(self):
+            raise AssertionError("hostile mapping iteration executed")
+
+    with pytest.raises(GameplayMigrationError, match="plain dict"):
+        GameplayStateEnvelope.from_section(HostileDict(V1_SECTION))
+    with pytest.raises(GameplayMigrationError, match="plain dict"):
+        GameplayStateEnvelope.from_section(dict(V1_SECTION, payload=HostileDict({"hp": 10})))
+
+    many_fields = dict(V1_SECTION)
+    many_fields.update({f"unknown_{i}": i for i in range(1000)})
+    with pytest.raises(GameplayMigrationError, match="unknown gameplay save field"):
+        GameplayStateEnvelope.from_section(many_fields)
