@@ -140,6 +140,12 @@ class ReleaseHistory:
         for item in items:
             if not isinstance(item, Mapping):
                 raise DeliveryError("release history record must be a mapping")
+            allowed = set(ReleaseRecord.__dataclass_fields__) | {"digest"}
+            if set(item) - allowed:
+                raise DeliveryError("release history record has unknown fields")
+            if "digest" not in item or type(item["digest"]) is not str:
+                raise DeliveryError("release history record digest required")
+            require_sha256(item["digest"], field="record.digest")
             try:
                 body = {k: item[k] for k in ReleaseRecord.__dataclass_fields__}
             except KeyError as exc:
@@ -148,6 +154,6 @@ class ReleaseHistory:
             # Validate before hashing so malformed values cannot trigger
             # unbounded serialization or become trusted history entries.
             history._append_checked(record)
-            if "digest" in item and item["digest"] != record.digest:
+            if item["digest"] != record.digest:
                 raise DeliveryError(f"record {record.sequence} digest mismatch")
         return history

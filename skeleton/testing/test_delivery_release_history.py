@@ -75,3 +75,20 @@ def test_release_history_import_is_bounded_before_materializing():
                            outcome="deployed", recorded_at=20)
     finally:
         module.MAX_RELEASE_RECORDS = original
+
+
+def test_release_history_requires_explicit_digest_and_rejects_extra_fields():
+    from skeleton.ai.build.core.delivery import release_history as mirrored
+
+    items = _history().to_list()
+    for history_type in (ReleaseHistory, mirrored.ReleaseHistory):
+        missing = [dict(items[0])]
+        missing[0].pop("digest")
+        with pytest.raises(DeliveryError, match="digest required"):
+            history_type.from_list("production", missing)
+
+        extra = [dict(items[0], verified=True)]
+        with pytest.raises(DeliveryError, match="unknown fields"):
+            history_type.from_list("production", extra)
+
+        assert history_type.from_list("production", items).head == _history().head
