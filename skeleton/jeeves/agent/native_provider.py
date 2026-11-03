@@ -1,0 +1,164 @@
+"""Native GGUF bridge for the existing Jeeves agent/provider contract.
+
+The only model execution path is the canonical, trusted, installed local model
+through SupervisedAI/ExecutionSpine. It must be constructed from the existing
+activate_checked installation path. No hosted fallback, implicit retries,
+model-originated tool execution, auto-approval, or success fabrication.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+import threading
+import time
+from typing import Any
+
+from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
+from skeleton.ai.runtime.operational_ai.laptop_runtime.turn_bridge import TurnBridge
+from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import Conflict
+
+from .native_prompt_boundary import prepare_native_prompt
+from .native_receipt_boundary import receive_committed_turn
+from .native_schema_boundary import verify_structured_native_output
+from .provider import ModelCapabilities, ProviderError, ProviderRouter, RetryPolicy
+from .types import ModelRequest, ModelResponse
+
+
+class NativeJeevesProvider:
+    """One host-checked native generation per uniquely bound Jeeves model call.
+
+    Request identity maps to a durable single-turn session, preventing a
+    committed response for one input from being mistaken for another. A failed
+    or uncertain native call is not retried; the existing spine retains pending
+    ownership for explicit operator reconciliation. The caller must configure
+    its ProviderRouter with max_attempts=1 and no cross-request cache.
+    """
+
+    name = "jeeves_native"
+
+    def __init__(self, worker: Any) -> None:
+        self._worker = worker
+        self._identity = ActiveModel.from_supervisor(worker)
+        self._bridge = TurnBridge(worker)
+        limits = worker.spine.limits
+        if limits.max_output_tokens >= limits.context_tokens:
+            raise ProviderError("invalid native model limits")
+        self.model = "gguf_" + self._identity.model_sha256[:24]
+        self.capabilities = ModelCapabilities(
+            system_prompt=True,
+            tools=False,
+            structured_output=False,
+            streaming=False,
+            max_context_tokens=limits.context_tokens,
+            max_output_tokens=limits.max_output_tokens,
+        )
+        # Per-process serialization complements the native process/session
+        # locks and avoids races around durable session allocation.
+        self._lock = threading.RLock()
+
+    @property
+    def identity(self) -> ActiveModel:
+        return self._identity
+
+    def available(self) -> bool:
+        try:
+            return ActiveModel.from_supervisor(self._worker) == self._identity
+        except (ValueError, AttributeError):
+            return False
+
+    def _keys(self, request: ModelRequest) -> tuple[str, str]:
+        raw = json.dumps(
+            {"tenant": self._identity.tenant,
+             "subject": self._identity.subject,
+             "model": self._identity.model_sha256,
+             "tokenizer": self._identity.tokenizer_sha256,
+             "request_id": request.request_id},
+            sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True, allow_nan=False,
+        ).encode("ascii")
+        digest = sha256(raw).hexdigest()
+        return "js_" + digest[:40], "jr_" + digest[40:]
+
+    def _ensure_session(self, session: str) -> None:
+        try:
+            self._worker.spine.create(session)
+        except Conflict:
+            # The owner-bound history read independently proves that the
+            # existing session belongs to this exact tenant/model principal.
+            self._worker.spine.history(session)
+
+    def complete(self, request: ModelRequest) -> ModelResponse:
+        if not isinstance(request, ModelRequest):
+            raise ProviderError("Jeeves ModelRequest required")
+        if not self.available():
+            raise ProviderError("active native model principal has changed")
+        limits = self._worker.spine.limits
+        if request.max_tokens < limits.max_output_tokens:
+            raise ProviderError("Jeeves budget smaller than configured native generation ceiling")
+        # The native backend requires >0 sampler temperature. Host-defined
+        # epsilon preserves the deterministic intent of temperature=0 without
+        # claiming a special greedy decoding mode absent from backend proof.
+        temperature = request.temperature if request.temperature > 0 else 0.000000001
+        prompt = prepare_native_prompt(
+            request, maximum_bytes=limits.input_bytes,
+        )
+        session, native_request_id = self._keys(request)
+        started = time.monotonic()
+        with self._lock:
+            self._ensure_session(session)
+            # Read-only replay first. Nothing may re-run an uncertain model
+            # effect merely because Jeeves was restarted or retried.
+            saved = self._worker.spine.replay(
+                session, native_request_id, prompt.text,
+                seed=0, temperature=temperature,
+            )
+            if saved is not None:
+                result = saved
+            else:
+                result = self._bridge.turn(
+                    session, native_request_id, prompt.text,
+                    seed=0, temperature=temperature,
+                )
+        verified = receive_committed_turn(
+            result, active=self._identity,
+            session_id=session, native_request_id=native_request_id,
+            maximum_output_tokens=request.max_tokens,
+        )
+        output = verify_structured_native_output(
+            verified.text, request.response_schema,
+            maximum_bytes=limits.response_bytes,
+        )
+        return ModelResponse(
+            request_id=request.request_id,
+            provider=self.name,
+            model=self.model,
+            content=output,
+            prompt_tokens=verified.prompt_tokens,
+            completion_tokens=verified.generated_tokens,
+            finish_reason=verified.finish_reason,
+            cached=verified.replayed,
+            latency_ms=max(0.0, (time.monotonic() - started) * 1000.0),
+            metadata={
+                "native_output_sha256": verified.output_sha256,
+                "native_model_sha256": verified.model_sha256,
+                "native_tokenizer_sha256": verified.tokenizer_sha256,
+                "native_session": session,
+                "native_request_id": native_request_id,
+                "prompt_envelope_sha256": prompt.sha256,
+                "authoritative_commit": True,
+                "device_qualified": False,
+                "release_certified": False,
+            },
+        )
+
+
+def native_provider_router(worker: Any) -> ProviderRouter:
+    """A single local model with no fallback, retry, or speculative cache."""
+    return ProviderRouter(
+        (NativeJeevesProvider(worker),),
+        retry_policy=RetryPolicy(max_attempts=1, initial_delay_seconds=0.0),
+        cache_ttl_seconds=None,
+    )
+
+
+__all__ = ["NativeJeevesProvider", "native_provider_router"]
