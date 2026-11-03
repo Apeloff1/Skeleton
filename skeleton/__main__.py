@@ -96,6 +96,7 @@ Commands:
     world-portals Reviewed multi-world original portal journeys and playable handoff
     world-npc-schedule Reviewed NPC itineraries, temporal proof and offline playable
     world-inventory Reviewed original item effects and source-bound HTML5 playable
+    world-puzzles Reviewed original scene riddles and verified choice-gated gameplay
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -866,6 +867,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-knowledge":
         from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
         return world_knowledge_cli(rest)
+    if cmd == "world-puzzles":
+        from skeleton.jeeves.worlds.puzzles_cli import run as world_puzzles_cli
+        return world_puzzles_cli(rest)
     if cmd == "world-inventory":
         from skeleton.jeeves.worlds.inventory_cli import run as world_inventory_cli
         return world_inventory_cli(rest)

@@ -25,6 +25,7 @@ from .atlas import AtlasStore
 from .portals import PortalStore
 from .npc_schedule import ScheduleStore
 from .inventory import InventoryStore
+from .puzzles import PuzzleStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -41,6 +42,10 @@ TOOLS = {
     "world.invariants_preview": (),
     "world.assurance_preview": (),
     "world.atlas_preview": (),
+    "world.puzzles_preview": (),
+    "world.puzzles_propose_preview": (
+        "prompt", "puzzle_id", "scene", "question", "answer", "hint", "unlock_choice",
+    ),
     "world.inventory_preview": (),
     "world.inventory_propose_preview": (
         "prompt", "item_id", "name", "description", "pickup_choice",
@@ -115,6 +120,10 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
     elif name == "world.invariants_preview":
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
+    elif name == "world.puzzles_propose_preview":
+        payload = PuzzleStore(root).propose(req["world_id"], **args)
+    elif name == "world.puzzles_preview":
+        payload = PuzzleStore(root).inspect(req["world_id"])
     elif name == "world.inventory_propose_preview":
         payload = InventoryStore(root).propose(req["world_id"], **args)
     elif name == "world.inventory_preview":
