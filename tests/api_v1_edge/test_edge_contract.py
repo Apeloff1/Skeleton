@@ -117,3 +117,32 @@ def test_webhook_ingress(env):
     assert r.status_code == 409
     r = c.post("/api/v1/webhooks/gh", content=body)
     assert r.status_code == 401
+
+
+def test_read_body_rejects_endless_empty_frames_and_invalid_asgi_shapes(monkeypatch):
+    """Bound frame count independently of byte volume and reject malformed events."""
+    import asyncio
+    import pytest
+    import skeleton.api.v1_edge.edge as edge_module
+    from skeleton.api.v1_edge.envelope import EdgeError
+
+    monkeypatch.setattr(edge_module, "MAX_BODY_CHUNKS", 3)
+    frames = iter([{"type": "http.request", "body": b"", "more_body": True}] * 4)
+
+    async def endless():
+        return next(frames)
+
+    with pytest.raises(EdgeError, match="frame count exceeds bound"):
+        asyncio.run(edge_module._read_body(endless, 32))
+
+    for bad in ({"type": "http.response.body", "body": b"abc"},
+                {"type": "http.request", "body": "not bytes"},
+                {"type": "http.request", "body": b"x", "more_body": "false"}):
+        async def malformed():
+            return bad
+        with pytest.raises(EdgeError, match="invalid request body frame"):
+            asyncio.run(edge_module._read_body(malformed, 32))
+
+    async def valid():
+        return {"type": "http.request", "body": b"ok", "more_body": False}
+    assert asyncio.run(edge_module._read_body(valid, 32)) == b"ok"

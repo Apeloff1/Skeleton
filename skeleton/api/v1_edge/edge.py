@@ -23,6 +23,7 @@ from .validation import validate
 from .webhook_ingress import WebhookIngressVerifier
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+MAX_BODY_CHUNKS = 4096
 
 
 @dataclass
@@ -150,17 +151,23 @@ def build_v1_edge(app, cfg: EdgeConfig):
 async def _read_body(receive, limit: int) -> bytes:
     chunks: List[bytes] = []
     size = 0
-    while True:
+    for _ in range(MAX_BODY_CHUNKS):
         msg = await receive()
+        if type(msg) is not dict or msg.get("type") not in ("http.request", "http.disconnect"):
+            raise EdgeError(400, "EDGE.INVALID_BODY_FRAME", "invalid request body frame")
         if msg["type"] == "http.disconnect":
             raise EdgeError(400, "EDGE.CLIENT_DISCONNECT", "client disconnected")
         chunk = msg.get("body", b"")
+        more = msg.get("more_body", False)
+        if type(chunk) is not bytes or type(more) is not bool:
+            raise EdgeError(400, "EDGE.INVALID_BODY_FRAME", "invalid request body frame")
         size += len(chunk)
         if size > limit:
             raise EdgeError(413, "EDGE.BODY_TOO_LARGE", "request body too large", {"limit": limit})
         chunks.append(chunk)
-        if not msg.get("more_body"):
+        if not more:
             return b"".join(chunks)
+    raise EdgeError(413, "EDGE.BODY_FRAME_LIMIT", "request body frame count exceeds bound")
 
 
 async def _idempotent(app, cache: IdempotencyCache, scope, body, send, key, fp):
