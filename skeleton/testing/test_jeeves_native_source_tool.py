@@ -95,6 +95,7 @@ class TestOperatorSignedReadOnlyTool(unittest.TestCase):
         self.assertEqual(specs[0].risk, RiskTier.READ_ONLY)
         self.assertEqual(specs[0].cache_ttl_seconds, None)
         self.assertTrue(specs[0].produces_evidence)
+        self.assertFalse(specs[0].idempotent)
         self.assertFalse(specs[0].allow_extra_arguments)
 
     def test_operator_query_returns_verified_content_and_digest(self):
@@ -132,6 +133,16 @@ class TestOperatorSignedReadOnlyTool(unittest.TestCase):
         self.assertEqual(len(observed.evidence), 1)
         with self.assertRaises(ToolDenied):
             executor.execute(self.call(query="second question"), self.context, grants=(grant,))
+
+    def test_same_query_revalidates_modified_original_file(self):
+        executor = ToolExecutor(self.registry)
+        grant = readonly_source_grant(maximum_calls=2)
+        first = executor.execute(self.call(), self.context, grants=(grant,))
+        self.assertTrue(first.ok)
+        self.original.write_bytes(b"source replaced after first query without an operator signature")
+        second = executor.execute(self.call(), self.context, grants=(grant,))
+        self.assertFalse(second.ok)
+        self.assertEqual(second.evidence, ())
 
     def test_wrong_user_cannot_invoke_bound_source(self):
         foreign = ToolExecutionContext(

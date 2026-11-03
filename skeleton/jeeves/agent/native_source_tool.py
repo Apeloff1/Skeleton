@@ -96,7 +96,9 @@ class BoundSignedSourceTool:
                 ),
             ),
             allow_extra_arguments=False,
-            idempotent=True,
+            # Source files and signed approval can change between two
+            # otherwise identical calls; never serve a stale in-run cache.
+            idempotent=False,
             cache_ttl_seconds=None,
             timeout_seconds=self.policy.timeout_seconds,
             produces_evidence=True,
