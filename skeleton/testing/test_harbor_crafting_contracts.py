@@ -144,3 +144,49 @@ def test_cli_play_and_verify_and_editor(tmp_path):
     revision_file = tmp_path / "revision.json"
     revision_file.write_bytes(canonical(revision))
     assert call("contract-verify-author", "--contract-revision", str(revision_file))["verified"]
+
+def test_terminal_contract_play_reaches_real_earned_save():
+    from io import StringIO
+    from skeleton.game.gameplay.harbor_crafting_ui import play_live, scripted_demo_commands
+    world, board = inputs()
+    root = build_save(world, board, [])
+    output = StringIO()
+    assert play_live(world, StringIO(scripted_demo_commands()), output, contract_save=root) == 0
+    text = output.getvalue()
+    assert "CONTRACT_EARNED beacon_supply" in text
+    line = next(line for line in text.splitlines() if line.startswith("CONTRACT_SAVE "))
+    advanced = decode(line[len("CONTRACT_SAVE "):].encode())
+    assert verify_save(advanced)["next_order"] == 1
+    assert advanced["results"][0]["ending"] == "beacon"
+
+
+def test_terminal_contract_rejects_wrong_earned_consequence():
+    from io import StringIO
+    from skeleton.game.gameplay.harbor_crafting_ui import play_live, scripted_demo_commands
+    world, board = inputs()
+    first = build_save(world, board, [games(world)[0]])
+    output = StringIO()
+    assert play_live(world, StringIO(scripted_demo_commands()), output, contract_save=first) == 2
+    assert "CONTRACT_REJECTED" in output.getvalue()
+    assert "CONTRACT_SAVE " not in output.getvalue()
+
+
+def test_terminal_contract_cli_and_stale_lease(tmp_path):
+    from skeleton.game.gameplay.harbor_crafting_ui import scripted_demo_commands
+    world, board = inputs()
+    root = build_save(world, board, [])
+    path = tmp_path / "contract-save.json"
+    path.write_bytes(canonical(root))
+    ok = subprocess.run(
+        CLI + ["contract-live", "--contract-save", str(path),
+               "--expected-contract-digest", root["save_digest"]],
+        input=scripted_demo_commands().encode(), capture_output=True, check=False,
+    )
+    assert ok.returncode == 0, ok.stderr.decode()
+    assert b"CONTRACT_EARNED beacon_supply" in ok.stdout
+    stale = subprocess.run(
+        CLI + ["contract-live", "--contract-save", str(path),
+               "--expected-contract-digest", "0" * 64],
+        input=scripted_demo_commands().encode(), capture_output=True, check=False,
+    )
+    assert stale.returncode == 2 and stale.stdout == b""

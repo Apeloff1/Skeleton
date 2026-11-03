@@ -81,13 +81,21 @@ def parse_command(line: str) -> dict[str, str] | str:
 
 def play_live(
     source: dict[str, Any], input_stream: TextIO, output_stream: TextIO,
-    *, course: Any = None,
+    *, course: Any = None, contract_save: Any = None,
 ) -> int:
     world = validate_source(source)
     authored_course = None
     if course is not None:
         from .harbor_crafting_time_trials import validate_course
         authored_course = validate_course(course, world)
+    if contract_save is not None:
+        if course is not None:
+            raise HarborError("cannot combine trial and contract live modes")
+        from .harbor_crafting_contracts import next_order, verify_save
+        verify_save(contract_save)
+        pending = next_order(contract_save)
+        if pending["status"] != "ready" or pending["source"] != world:
+            raise HarborError("contract live source mismatch or board complete")
     state = initial_state(world)
     actions: list[dict[str, str]] = []
     redo_stack: list[dict[str, str]] = []
@@ -183,6 +191,17 @@ def play_live(
                 )
                 output_stream.write("CHECKPOINT " + canonical(bundle).decode("utf-8") + "\n")
                 return 0 if verified["status"] == "finished" else 2
+            if contract_save is not None:
+                from .harbor_crafting_contracts import append_save
+                try:
+                    progressed = append_save(
+                        contract_save, bundle, expected_digest=contract_save["save_digest"])
+                except HarborError as exc:
+                    output_stream.write("CONTRACT_REJECTED " + str(exc) + "\n")
+                    output_stream.write("CHECKPOINT " + canonical(bundle).decode("utf-8") + "\n")
+                    return 2
+                output_stream.write("CONTRACT_EARNED " + pending["order"]["id"] + "\n")
+                output_stream.write("CONTRACT_SAVE " + canonical(progressed).decode("utf-8") + "\n")
             output_stream.write("CHECKPOINT " + canonical(bundle).decode("utf-8") + "\n")
             return 0
     output_stream.write("COMMAND_BUDGET_EXHAUSTED: no victory; checkpoint follows\n")

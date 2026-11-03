@@ -22,3 +22,13 @@ SHA` followed by `contract-verify-author --contract-revision REVISION`.
 Allowed edits are bounded order constraints, never executable source code.
 Digests are replay integrity checks, not identity signatures or authentication.
 No device, consumer installer or release certification is asserted.
+
+## Interactive terminal play
+
+`contract-live --contract-save SAVE --expected-contract-digest SHA` opens
+the real movement/crafting/NPC terminal UI with hint, undo/redo and checkpoints.
+On earned victory it emits `CONTRACT_EARNED` and a `CONTRACT_SAVE` JSON line;
+save that line's JSON payload to continue. A victory with the wrong ending,
+insufficient crafting/gathering or missed deadline emits `CONTRACT_REJECTED`
+and the ordinary replay checkpoint, without advancing the contract save.
+The CLI rejects stale leases before accepting terminal input.
