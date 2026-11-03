@@ -57,3 +57,11 @@ python -m scripts.game.harbor_patrol choices --report report.json
 python -m scripts.game.harbor_patrol debrief --report report.json --choice protect > debrief.json
 python -m scripts.game.harbor_patrol verify-debrief --debrief debrief.json
 ```
+
+## Deterministic legal-action hints
+
+`python -m scripts.game.harbor_patrol hint --report report.json`
+replays every bounded candidate against the exact report history. It returns
+legal moves, guard forecasts, next alert/score, per-result digest and a
+conservative suggested action. Hints are advisory, never proof of victory;
+any chosen action still passes through the canonical transition and CAS replay.

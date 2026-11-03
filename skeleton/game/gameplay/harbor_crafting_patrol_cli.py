@@ -13,6 +13,7 @@ from .harbor_crafting_patrol_authoring import (
     MAX_REVISION_BYTES, edit_patrol_board, verify_patrol_revision,
 )
 from .harbor_crafting_patrol_ui import play_live
+from .harbor_crafting_patrol_guidance import patrol_hints
 from .harbor_crafting_patrol_debrief import (
     MAX_BOARD_BYTES as MAX_DEBRIEF_BOARD_BYTES,
     MAX_REPORT_BYTES as MAX_DEBRIEF_REPORT_BYTES,
@@ -27,7 +28,7 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DEFAULT_SOURCE = FIXTURES / "harbor_lantern_quay.json"
 DEFAULT_BOARD = FIXTURES / "harbor_lantern_quay_patrol.json"
 DEFAULT_DEBRIEF = FIXTURES / "harbor_lantern_quay_patrol_debrief.json"
-COMMANDS = ("choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
+COMMANDS = ("hint", "choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
             "package", "verify-package", "play", "verify-play")
 
 
@@ -65,7 +66,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "verify-debrief":
+        if command == "hint":
+            result = patrol_hints(_read(args.report, MAX_REPORT_BYTES))
+        elif command == "verify-debrief":
             result = verify_patrol_debrief(_read(args.debrief, MAX_DEBRIEF_REPORT_BYTES))
         elif command == "choices":
             result = compare_patrol_debriefs(
