@@ -114,3 +114,38 @@ def test_diagnostic_requires_acceptance_before_reporting_handoff(tmp_path, monke
     assert report["checks"]["acceptance"] == {
         "ok": False, "error": "laptop_acceptance_restore_mismatch"}
     assert report["next_action"] == "repair_canonical_replay_or_save_before_engine_handoff"
+
+
+def test_acceptance_persisted_save_uses_one_nonreentrant_world_lease(tmp_path, monkeypatch):
+    """A saved slot must be checked without recursively acquiring its world lock."""
+    flow = ready(tmp_path)
+    created = flow.create_session("lighthouse", "saved")
+    flow.choose("lighthouse", "saved", "rescue", created["session_digest"])
+    observed = []
+    for method in ("inspect", "export", "preflight_import"):
+        original = getattr(flow.sessions, method)
+
+        def guarded(*args, _original=original, _method=method, **kwargs):
+            assert (tmp_path / "lighthouse.lock").exists()
+            assert kwargs["expected_world_digest"] == digest(
+                flow.worlds.read("lighthouse"))
+            observed.append(_method)
+            return _original(*args, **kwargs)
+
+        monkeypatch.setattr(flow.sessions, method, guarded)
+    report = flow.acceptance("lighthouse", "saved")
+    assert report["persisted_slot_verified"] is True
+    assert report["existing_session"]["restorable"] is True
+    assert observed == ["inspect", "export", "preflight_import"]
+    assert not (tmp_path / "lighthouse.lock").exists()
+
+
+def test_laptop_diagnostic_with_saved_slot_reaches_acceptance(tmp_path):
+    flow = ready(tmp_path)
+    flow.create_session("lighthouse", "saved")
+    report = flow.diagnose("lighthouse", "saved")
+    assert report["checks"]["session"]["ok"] is True
+    assert report["checks"]["acceptance"]["ok"] is True
+    assert report["checks"]["acceptance"]["persisted_slot_verified"] is True
+    assert report["next_action"] == "source_playable_handoff_ready_for_engine_validation"
+    assert not (tmp_path / "lighthouse.lock").exists()

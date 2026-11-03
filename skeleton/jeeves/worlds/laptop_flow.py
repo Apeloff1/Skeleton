@@ -401,9 +401,21 @@ class LaptopFlow:
                     })
                 existing = None
                 if slot is not None:
-                    view = self.inspect_session(world_id, slot)
-                    exported = self.export_session(world_id, slot)
-                    preview = self.preflight_restore(world_id, exported)
+                    # The acceptance caller already owns the canonical world
+                    # lease. Re-entering LaptopFlow.inspect_session/export/
+                    # preflight_restore would invoke verify() and deadlock on
+                    # that same non-reentrant lease (lease_busy). Read through
+                    # the SessionStore using the pinned source digest instead.
+                    # Its read-only methods revalidate replay and save checks,
+                    # while the outer lease excludes concurrent world/session
+                    # writers for the entire three-step inspection.
+                    source_lease = receipt["source_digest"]
+                    view = self.sessions.inspect(
+                        world_id, slot, expected_world_digest=source_lease)
+                    exported = self.sessions.export(
+                        world_id, slot, expected_world_digest=source_lease)
+                    preview = self.sessions.preflight_import(
+                        world_id, exported, expected_world_digest=source_lease)
                     if preview["session_digest"] != view["session_digest"]:
                         raise CanonError("laptop_acceptance_session_mismatch")
                     existing = {
