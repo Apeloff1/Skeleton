@@ -42,3 +42,20 @@ def test_relaxing_frontend_startup_does_not_relax_api_and_storage_health_fences(
         str(value).startswith("AI_PROVIDER=")
         for value in services["skeleton"]["environment"]
     )
+
+
+def test_production_setup_route_cannot_be_spa_fallback_false_positive():
+    """The launcher must receive 404, not the root SPA, if /setup was omitted."""
+    root = find_repo_root(Path(__file__))
+    nginx = (root / "frontend/nginx.conf").read_text(encoding="utf-8")
+    route = nginx.split("location = /setup {", 1)
+    assert len(route) == 2, "production ingress must own exact /setup"
+    location_body = route[1].split("}", 1)[0]
+    assert "try_files /setup.html /setup/index.html =404;" in location_body
+    assert "/index.html" not in location_body.replace("/setup/index.html", "")
+    assert 'Cache-Control "no-store"' in location_body
+    assert 'X-Content-Type-Options "nosniff"' in location_body
+
+    dockerfile = (root / "frontend/Dockerfile").read_text(encoding="utf-8")
+    assert "test -f /app/dist/setup.html || test -f /app/dist/setup/index.html" in dockerfile
+    assert (root / "frontend/app/setup.tsx").is_file()
