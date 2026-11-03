@@ -908,3 +908,40 @@ def test_wav_chunk_iteration_is_bounded():
     payload = b"RIFF" + struct.pack("<I", 4 + len(body)) + b"WAVE" + body
     with pytest.raises(AssetImportError, match="chunk count exceeds bound"):
         import_bytes("hostile.wav", payload)
+
+
+@pytest.mark.skipif(not (hasattr(os, "link") and os.name == "posix"),
+                    reason="POSIX hard links required")
+def test_descriptor_import_rejects_hard_linked_sources_and_sidecars(tmp_path):
+    """An in-root hard link must not smuggle an outside inode into an asset manifest."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    root = tmp_path / "assets"
+    root.mkdir()
+    (root / "safe.png").write_bytes(png())
+    outside_asset = outside / "private.png"
+    outside_asset.write_bytes(png(8, 4))
+    os.link(outside_asset, root / "alias.png")
+
+    explicit = import_files(root, ["safe.png", "alias.png"])
+    scanned = import_directory(root)
+    for report in (explicit, scanned):
+        assert not report.ok
+        assert report.imported == [] and report.duplicates == []
+        assert report.manifest.entries == []
+        assert any(issue.path == "alias.png" and issue.code == "unsafe"
+                   and "hard-linked" in issue.detail for issue in report.issues)
+
+    (root / "alias.png").unlink()
+    (root / "mesh.obj").write_bytes(OBJ)
+    outside_sidecar = outside / "cube.mtl"
+    outside_sidecar.write_text("newmtl stone\\n")
+    os.link(outside_sidecar, root / "cube.mtl")
+    explicit = import_files(root, ["safe.png", "mesh.obj"])
+    scanned = import_directory(root)
+    for report in (explicit, scanned):
+        assert not report.ok
+        assert report.imported == [] and report.duplicates == []
+        assert report.manifest.entries == []
+        assert any(issue.path == "mesh.obj" and issue.code == "missing_reference"
+                   and "hard-linked" in issue.detail for issue in report.issues)

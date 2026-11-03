@@ -129,6 +129,10 @@ def _regular(
             before = os.fstat(leaf)
             if not stat.S_ISREG(before.st_mode):
                 raise AssetImportError("asset is not a regular file")
+            # A hard link can alias bytes outside the held package tree.
+            # Descriptor anchoring alone cannot prove hard-link provenance.
+            if before.st_nlink != 1:
+                raise AssetImportError("hard-linked asset source is unsafe")
             if before.st_size > MAX_ASSET_BYTES:
                 raise AssetImportError("asset exceeds size limit")
             if observed is not None:
@@ -256,7 +260,8 @@ def _import_from_fd(
             added = report.manifest.add(asset)
             (report.imported if added else report.duplicates).append(relative)
         except AssetImportError as exc:
-            code = "unsafe" if "unsafe asset path" in str(exc) or "unavailable" in str(exc) else "broken"
+            code = "unsafe" if ("unsafe asset path" in str(exc) or "unavailable" in str(exc)
+                                or "hard-linked" in str(exc)) else "broken"
             report.issues.append(ImportIssue(relative, code, str(exc)))
         except OSError as exc:
             report.issues.append(ImportIssue(relative, _issue_code(exc), str(exc)))
