@@ -118,12 +118,12 @@ def test_real_python_module_cli_process_quit_restart_ending_export(tmp_path):
         numbers.append(str(current["actions"].index(action)))
         session = step_campaign(session, action, expected_head=session["head"])
     split = max(1, len(numbers) // 2)
-    first = invoke(["play", "--slot", "game"], input_text="\\n".join(numbers[:split] + ["q"]) + "\\n")
+    first = invoke(["play", "--slot", "game"], input_text="\n".join(numbers[:split] + ["q"]) + "\n")
     assert "Actions:" in first
     midway = json.loads(invoke(["status", "--slot", "game"]))
     assert midway["revision"] == split
     assert midway["status"] == "playing"
-    second = invoke(["play", "--slot", "game"], input_text="\\n".join(numbers[split:] + ["q"]) + "\\n")
+    second = invoke(["play", "--slot", "game"], input_text="\n".join(numbers[split:] + ["q"]) + "\n")
     assert "Victory:" in second
     finished = json.loads(invoke(["status", "--slot", "game"]))
     assert finished["status"] == "completed"
