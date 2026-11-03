@@ -300,11 +300,11 @@ def render_schedule_html(data: Any, world: Any, cast: Any) -> bytes:
         '<meta http-equiv="Content-Security-Policy" content="default-src '
         "'none'; script-src 'sha256-" + script_hash +
         "'; connect-src 'none'; img-src 'none'; style-src 'none'; "
-        "base-uri 'none'; form-action 'none'" + '">';
+        "base-uri 'none'; form-action 'none'" + '">'
         "<title>Original NPC schedule: " + html.escape(world["id"]) +
         "</title></head><body><main id=\"play\" aria-live=\"polite\"></main>"
         '<script id="schedule-data" type="application/json">' + payload +
-        "</script><script>" + PLAYER_JS + "</script></body></html>\\n"
+        "</script><script>" + PLAYER_JS + "</script></body></html>\n"
     ).encode("utf-8")
     if len(output) > 1572864:
         raise CanonError("npc_schedule_playable_too_large")
