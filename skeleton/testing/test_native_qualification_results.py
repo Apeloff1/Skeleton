@@ -40,7 +40,7 @@ class TestQualificationResults(unittest.TestCase):
 
     def test_release_and_ci_holds_persist_with_perfect_score(self):
         result=report(real=True,complete=True).record()
-        self.assertTrue(result["policy_threshold_met"])
+        self.assertFalse(result["policy_threshold_met"])  # one case cannot impersonate the 480-case corpus
         self.assertFalse(result["release_certified"])
         self.assertFalse(result["merge_certified"])
         self.assertFalse(result["ci_qualified"])

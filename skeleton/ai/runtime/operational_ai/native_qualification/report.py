@@ -42,6 +42,15 @@ class QualificationReport:
             deny("report-boolean")
 
     def record(self) -> dict:
+        from .corpus import iter_cases, TOTAL_CASES
+        # The report independently rechecks original source identities.  A
+        # caller-set complete_corpus flag is not itself trustworthy evidence.
+        source_expected = {c.case_id: c.content_sha256 for c in iter_cases()}
+        source_seen = {c.case_id: c.source_sha256 for c in self.cases}
+        original_corpus_proven = (
+            self.complete_corpus and len(self.cases) == TOTAL_CASES
+            and source_seen == source_expected
+        )
         domains = aggregate(self.cases)
         checks = {
             "cases_total": len(self.cases),
@@ -51,7 +60,7 @@ class QualificationReport:
             "domain_summary": {k: v.record() for k, v in domains.items()},
         }
         qualified = bool(
-            self.checkpoint_verified and self.real_native_execution and self.complete_corpus
+            self.checkpoint_verified and self.real_native_execution and original_corpus_proven
             and self.cases and self.threshold.decide(
                 total=len(self.cases), passed=checks["cases_passed"],
                 failed_calls=checks["failed_calls"],
@@ -66,7 +75,7 @@ class QualificationReport:
             "started_utc": self.started_utc, "finished_utc": self.finished_utc,
             "checkpoint_verified": self.checkpoint_verified,
             "real_native_execution": self.real_native_execution,
-            "complete_corpus": self.complete_corpus,
+            "complete_corpus": original_corpus_proven,
             "policy_threshold_met": qualified,
             "release_certified": False,
             "merge_certified": False,

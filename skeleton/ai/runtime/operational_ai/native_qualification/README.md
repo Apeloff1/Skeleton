@@ -55,7 +55,7 @@ shipped corpus; a substitute or partial inventory cannot count as complete.
 The report contains hashed principal, session and request references, usage,
 latency, output digest, per-check results and an immutable corpus digest,
 **not the model text or prompts**. Optional private SQLite report ledger HMACs
-protect against offline modification, deletion and same-run conflicting
+detect in-chain changes and conflicting run IDs; truncation needs a previously pinned MAC head; and the ledger does not alone certify
 receipts. Its MAC is not a signature or proof of licensing.
 
 A 95% threshold is a policy floor, **not** a frontier-quality claim. A score

@@ -90,7 +90,7 @@ class ReportLedger:
                 self.db.execute("ROLLBACK")
                 raise
 
-    def verify(self, scope: str) -> dict:
+    def verify(self, scope: str, *, expected_head: str | None = None) -> dict:
         identity(scope, "ledger-scope")
         rows = self.db.execute(
             """SELECT sequence,run_id,report_sha256,prev_mac,event_mac,report_bytes
@@ -110,6 +110,11 @@ class ReportLedger:
             if parsed.get("run_id") != run_id or encode(parsed) != data:
                 deny("ledger-identity-tamper")
             prev = event_mac
+        if expected_head is not None:
+            from .canonical import hex64
+            hex64(expected_head, "ledger-expected-head")
+            if not hmac.compare_digest(expected_head, prev):
+                deny("ledger-truncation-or-head-drift")
         return {
             "scope": scope, "entries": len(rows), "head_mac": prev,
             "verified": True, "release_certified": False,
