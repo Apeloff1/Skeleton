@@ -87,6 +87,7 @@ Commands:
     world-promises Reviewed narrative promises, closure proof and playable handoff
     world-context Bounded source-leased author note custody and replay
     world-integrated Verified cast, route, promises and private context playable
+    world-knowledge Reviewed NPC fact provenance, disclosure proof and playable handoff
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -842,6 +843,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-promises":
         from skeleton.jeeves.worlds.promises_cli import run as world_promises_cli
         return world_promises_cli(rest)
+    if cmd == "world-knowledge":
+        from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
+        return world_knowledge_cli(rest)
     if cmd == "world-tools":
         from skeleton.jeeves.worlds.tools_cli import run as world_tools_cli
         return world_tools_cli(rest)

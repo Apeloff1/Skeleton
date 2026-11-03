@@ -12,6 +12,9 @@ from .evidence import EvidenceStore, propose_evidence
 from .factions import FactionStore, propose_factions
 from .promises import PromiseStore, propose_promises, prove_promises
 from .context_journal import ContextStore
+from .knowledge import KnowledgeStore, propose_knowledge, prove_knowledge
+from .cast import CastStore
+from .session import SessionStore
 from .migration import preview_migration
 from .playtest import prove_choice_coverage
 from .revision import analyze_revision
@@ -27,6 +30,12 @@ TOOLS = {
     "world.playtest_preview": (),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
+    "knowledge.propose_preview": (
+        "prompt", "fact_id", "title", "detail", "choice", "speaker", "recipient",
+    ),
+    "knowledge.inspect": (),
+    "knowledge.proof": (),
+    "knowledge.player": ("slot",),
     "context.status": (),
     "promises.propose_preview": (
         "prompt", "promise_id", "title", "setup", "payoff",
@@ -80,6 +89,20 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
                                     args["choice_map"])
     elif name == "world.proof":
         payload = prove(world).as_dict()
+    elif name == "knowledge.propose_preview":
+        cast = CastStore(root).read(req["world_id"])
+        payload = propose_knowledge(world, cast, **args)
+    elif name == "knowledge.inspect":
+        payload = KnowledgeStore(root).read(req["world_id"])
+    elif name == "knowledge.proof":
+        cast = CastStore(root).read(req["world_id"])
+        payload = prove_knowledge(
+            KnowledgeStore(root).read(req["world_id"]), world, cast)
+    elif name == "knowledge.player":
+        _id(args["slot"], "slot")
+        session = SessionStore(root).read(req["world_id"], args["slot"])
+        payload = KnowledgeStore(root).player(
+            req["world_id"], session["choices"])
     elif name == "context.status":
         payload = ContextStore(root).status(req["world_id"])
     elif name == "promises.propose_preview":
