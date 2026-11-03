@@ -93,6 +93,13 @@ class MongoGuardedActivation:
         from .signed_reviewer_client import SignedReviewerClient
         if type(reviewer) is not SignedReviewerClient or reviewer is backend:
             raise ActivationBlocked("signed independent reviewer client required")
+        # The activation challenge and the actual pre-delivery verdict must
+        # verify against one exact app-pinned key, authority and trust domain.
+        # Separate anchors could let a challenge signer attest identity while
+        # an unrelated verdict signer approves the generated text.
+        if (type(reviewer_trust_anchor) is not ReviewerTrustAnchor
+                or getattr(reviewer, "_anchor", None) != reviewer_trust_anchor):
+            raise ActivationBlocked("signed reviewer verdict trust anchor mismatch")
         if (not isinstance(reviewer_authority_id, str)
                 or not 1 <= len(reviewer_authority_id) <= 128
                 or reviewer_authority_id != reviewer_authority_id.strip()

@@ -114,6 +114,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
                 format=serialization.PublicFormat.Raw,
             ),
         )
+        self.reviewer._anchor = self.trust_anchor
         self.native_patch = patch(
             "skeleton.ai.runtime.inference.native_transformer.NativeTransformerModel",
             FakeNative,
@@ -341,6 +342,25 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             self.make(reviewer_authority_id="\nunsafe")
         with self.assertRaises(ActivationBlocked):
             self.make(reviewer_authority_id="")
+
+    async def test_verdict_and_challenge_cannot_use_distinct_trust_anchors(self):
+        alternate = ReviewerTrustAnchor(
+            authority_id="security-reviewer-prod",
+            deployment_domain="separate-reviewer-domain",
+            ed25519_public_key=Ed25519PrivateKey.generate().public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            ),
+        )
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor mismatch"):
+            self.make(reviewer_trust_anchor=alternate)
+        other_domain = ReviewerTrustAnchor(
+            authority_id="security-reviewer-prod",
+            deployment_domain="unrelated-deployment-domain",
+            ed25519_public_key=self.trust_anchor.ed25519_public_key,
+        )
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor mismatch"):
+            self.make(reviewer_trust_anchor=other_domain)
 
     async def test_unsigned_verdict_client_denied_even_with_valid_challenge_signer(self):
         # A challenge signature alone does not authenticate review verdicts.
