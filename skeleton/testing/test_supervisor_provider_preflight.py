@@ -122,3 +122,37 @@ def test_model_client_refuses_redirects_that_could_expose_credentials(
     assert client.chat("safe system", "safe request") == "accepted"
     assert len(observed) == 1
     assert isinstance(observed[0], free_model._RejectRedirects)
+
+
+def test_provider_transport_failure_never_exposes_untrusted_exception_text(
+    monkeypatch,
+) -> None:
+    """Arbitrary provider diagnostics must not reach worker traceback logs."""
+    import traceback
+    import urllib.error
+    import urllib.request
+
+    import pytest
+
+    from skeleton.automation import free_model
+
+    sentinel = "UNREDACTABLE_PROVIDER_CREDENTIAL_SENTINEL"
+
+    class FailingOpener:
+        def open(self, request, timeout):
+            raise urllib.error.URLError(f"provider diagnostic: {sentinel}")
+
+    monkeypatch.setattr(
+        urllib.request, "build_opener", lambda *handlers: FailingOpener()
+    )
+    client = object.__new__(free_model.FreeModelClient)
+    client.url = "https://models.example/v1/chat/completions"
+    client.key = "DO_NOT_PRINT"
+    client.model = "test-model"
+    client.timeout = 5
+
+    with pytest.raises(free_model.ModelError) as raised:
+        client.chat("system", "request")
+    assert str(raised.value) == "model request failed"
+    assert raised.value.__suppress_context__ is True
+    assert sentinel not in "".join(traceback.format_exception(raised.value))
