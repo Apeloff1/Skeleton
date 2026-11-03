@@ -112,3 +112,80 @@ def test_browser_exception_does_not_expose_sensitive_exception_text(tmp_path, mo
     assert "ValueError" in detail
     assert "credential" not in detail
     assert "private" not in detail
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_ok"),
+    [
+        ("setup-available-backend-offline", True),
+        ("setup-missing-root-only", False),
+        ("setup-redirected-to-root", False),
+    ],
+)
+def test_real_loopback_http_setup_probe_does_not_confuse_spa_root_with_setup(
+    tmp_path, monkeypatch, mode, expected_ok,
+):
+    """Real socket acceptance for /setup, not a mocked health verdict.
+
+    The backend is intentionally absent. The frontend's exact route is the
+    only admission condition, and a redirect to the root is never sufficient.
+    This is not a Docker or Windows device qualification.
+    """
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/setup":
+                if mode == "setup-available-backend-offline":
+                    self.send_response(200)
+                    body = b"setup-page"
+                elif mode == "setup-redirected-to-root":
+                    self.send_response(302)
+                    self.send_header("Location", "/index.html")
+                    body = b""
+                else:
+                    self.send_response(404)
+                    body = b"not-found"
+            elif self.path in ("/", "/index.html"):
+                self.send_response(200)
+                body = b"generic-root-is-not-setup"
+            else:
+                self.send_response(503)
+                body = b"backend-unavailable"
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    opened = []
+    try:
+        origin = f"http://127.0.0.1:{server.server_address[1]}"
+        monkeypatch.setattr(
+            launcher, "public_service_urls",
+            lambda root, *, manifest: {"frontend": origin},
+        )
+        monkeypatch.setattr(
+            launcher, "runtime_status",
+            lambda *args, **kwargs: pytest.fail("backend must not gate setup"),
+        )
+        monkeypatch.setattr(
+            launcher.webbrowser, "open",
+            lambda url: opened.append(url) or True,
+        )
+        ok, message = launcher.open_running_application(tmp_path)
+        assert ok is expected_ok
+        assert opened == ([origin + "/setup"] if expected_ok else [])
+        if expected_ok:
+            assert "readiness are NOT established" in message
+        else:
+            assert "Setup UI unavailable" in message
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
