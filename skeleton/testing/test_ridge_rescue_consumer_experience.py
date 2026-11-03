@@ -58,3 +58,19 @@ def test_completed_game_shows_earned_endings_and_no_fake_route(tmp_path):
     assert "won:salvage" in status_panel(state)
     assert "No active route" in navigation_hint(state)
     assert "Victory:" in _view(state)
+
+def test_action_menu_is_readable_without_raw_json(tmp_path):
+    from skeleton.game.gameplay.ridge_rescue.consumer_experience import action_label
+    state = SlotStore(tmp_path / "saves").new("game")
+    labels = [action_label(action) for action in state["actions"]]
+    assert labels
+    assert all(label and not label.startswith("{") for label in labels)
+    assert "Actions:" in _view(state)
+    assert any(label in _view(state) for label in labels)
+
+
+def test_closed_action_labels_reject_unknown_verbs():
+    from skeleton.game.gameplay.ridge_rescue.consumer_experience import action_label
+    import pytest
+    with pytest.raises(ValueError, match="unsupported"):
+        action_label({"verb": "execute"})

@@ -11,7 +11,7 @@ import json
 import os
 
 from .campaign import verify_export
-from .consumer_experience import status_panel, navigation_hint, recent_events
+from .consumer_experience import status_panel, navigation_hint, recent_events, action_label
 from .consumer_store import SlotStore, StoreError, MAX_EXPORT_BYTES
 from .io import read_bounded
 from .render import render_map, legend
@@ -37,7 +37,7 @@ def _view(verified: dict, *, ascii_mode: bool = False) -> str:
         lines.append("Inventory: " + json.dumps(verified["state"]["inventory"], sort_keys=True))
         lines.append("Actions:")
         for number, action in enumerate(verified["actions"]):
-            lines.append(f"  {number}: {json.dumps(action, sort_keys=True)}")
+            lines.append(f"  {number}: {action_label(action)}")
     result = "\n".join(lines)
     if ascii_mode:
         result = result.translate(str.maketrans({"·": ".", "█": "#", "≈": "~", "▲": "^"}))

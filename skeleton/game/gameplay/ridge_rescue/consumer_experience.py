@@ -64,3 +64,28 @@ def recent_events(verified: dict) -> str:
         return "No journal events."
     events = state["events"][-5:]
     return "Recent events: " + (", ".join(events) if events else "(no actions yet)")
+
+def action_label(action: dict) -> str:
+    """Human-readable labels only for actions offered by the canonical engine."""
+    verb = action["verb"]
+    if verb == "move":
+        return "Walk " + action["direction"]
+    if verb == "gather":
+        return "Gather resources at " + action["target"]
+    if verb == "craft":
+        return "Craft " + action["item"]
+    if verb == "attack":
+        return "Defend against " + action["target"]
+    if verb == "rescue":
+        return "Rescue " + action["target"]
+    if verb == "rest":
+        return "Rest and recover stamina (time still advances)"
+    if verb == "signal":
+        return "Light the shelter beacon"
+    if verb == "evacuate":
+        return "Evacuate and choose " + action["choice"] + " ending"
+    if verb == "trade":
+        return "Trade: " + action["side"] + " " + action["item"]
+    # Unknown verbs are not made into commands; the canonical engine decides
+    # which actions exist. Fail closed instead of inventing a display contract.
+    raise ValueError("unsupported canonical action label")
