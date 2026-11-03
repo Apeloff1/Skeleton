@@ -46,7 +46,7 @@ def test_multi_stop_playable_resource_collection_and_return():
     root = _root()
     report = _build(root)
     assert report["result"]["state"]["pos"] == [1, 1]
-    assert report["result"]["state"]["inventory"]["timber"] == 2
+    assert report["result"]["state"]["inventory"]["wood"] == 2
     assert [entry["action"]["op"] for entry in report["segments"][:2]] == [
         "gather", "gather",
     ]

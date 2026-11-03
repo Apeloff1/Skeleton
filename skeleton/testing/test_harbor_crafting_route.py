@@ -10,7 +10,7 @@ import sys
 import pytest
 
 from skeleton.game.gameplay.harbor_crafting import (
-    HarborError, canonical, decode, digest, export_bundle, load_source,
+    HarborError, canonical, decode, demo_actions, digest, export_bundle, load_source,
 )
 from skeleton.game.gameplay.harbor_crafting_route import (
     MAX_ROUTE_NODES, MAX_ROUTE_STEPS, plan_route, verify_route,
@@ -160,3 +160,21 @@ def test_cli_rejects_malformed_goal_and_stale_lease(tmp_path):
         )
         assert result.returncode == 2
         assert not result.stdout
+
+
+def test_npc_collision_requires_wait_before_entering_occupied_tile():
+    world = load_source(WORLD)
+    world["npc"]["route"] = [[2, 1], [3, 1]]
+    root = export_bundle(world, [])
+    route = _plan(root, [2, 1])
+    assert route["actions"] == [
+        {"op": "wait"}, {"op": "move", "direction": "east"},
+    ]
+    assert verify_route(route)["steps"] == 2
+
+
+def test_route_rejects_post_victory_navigation():
+    world = load_source(WORLD)
+    won = export_bundle(world, demo_actions(), require_win=True)
+    with pytest.raises(HarborError, match="after ending"):
+        _plan(won, [2, 1])
