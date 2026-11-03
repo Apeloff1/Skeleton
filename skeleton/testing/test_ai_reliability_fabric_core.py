@@ -17,6 +17,22 @@ class FabricCore(unittest.TestCase):
     def test_surrogate_never_canonical(self):
         with self.assertRaises(Rejected):
             canonical({"x":"\ud800"})
+    def test_escaped_lone_surrogates_refused_in_values_and_keys(self):
+        hostile=(
+            b'{"key":"\\ud800"}',
+            b'{"nested":["\\udfff"]}',
+            b'{"\\ud800":"key"}',
+            b'["safe",{"inner":"\\udc00"}]',
+        )
+        for raw in hostile:
+            with self.subTest(raw=raw):
+                with self.assertRaises(Rejected):
+                    strict_json(raw)
+
+    def test_valid_unicode_surrogate_pair_still_decodes(self):
+        self.assertEqual(strict_json(b'{"emoji":"\\ud83d\\ude00"}'),
+                         {"emoji":"😀"})
+
     def test_full_forty_gate_matrix(self):
         rows=run_all()
         self.assertEqual(sum(x["cases"] for x in rows),880)

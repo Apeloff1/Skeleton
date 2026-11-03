@@ -19,13 +19,31 @@ def _pairs(items):
 def _constant(text):
     fail("nonfinite JSON constant")
 
+def _reject_surrogates(value):
+    """JSON escape decoding must not turn invalid Unicode into authority."""
+    pending=[value]
+    while pending:
+        item=pending.pop()
+        if type(item) is str:
+            try:
+                item.encode("utf-8","strict")
+            except UnicodeError as exc:
+                raise Rejected("unpaired Unicode surrogate") from exc
+        elif type(item) is dict:
+            pending.extend(item.keys())
+            pending.extend(item.values())
+        elif type(item) is list:
+            pending.extend(item)
+    return value
+
 def strict_json(raw,*,maximum=524288):
     if type(raw) is not bytes or type(maximum) is not int or not 1<=maximum<=1048576:
         fail("invalid serialized input ceiling")
     if not 1<=len(raw)<=maximum:fail("JSON byte ceiling")
     try:
-        return json.loads(raw.decode("utf-8","strict"),object_pairs_hook=_pairs,
-                          parse_constant=_constant)
+        decoded=json.loads(raw.decode("utf-8","strict"),object_pairs_hook=_pairs,
+                           parse_constant=_constant)
+        return _reject_surrogates(decoded)
     except (UnicodeError,TypeError,ValueError,RecursionError) as exc:
         raise Rejected("invalid UTF8 or ambiguous JSON") from exc
 
