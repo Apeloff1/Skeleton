@@ -24,6 +24,11 @@ def test_frontend_setup_is_not_blocked_by_unhealthy_api_or_guarded_engine():
     # for a healthy engine, which itself waits for a healthy database.
     # No direct or transitive Compose startup dependency may block setup UI.
     assert not services["frontend"].get("depends_on")
+    # The canonical assembly planner must agree with the actual Compose graph.
+    # Otherwise parity validation and client bootstrap still advertise the
+    # backend/engine as frontend startup prerequisites.
+    from skeleton.app.assembly import load_manifest
+    assert load_manifest().service("frontend").depends_on == ()
     assert not services["frontend"].get("network_mode", "").startswith("service:")
 
 
