@@ -252,8 +252,8 @@ class AtlasStore:
         fd = self.worlds._directory()
         try:
             world = self._world(fd, world_id)
-            return {"atlas": self._atlas(fd, world_id, world),
-                    "report": atlas_report(self._atlas(fd, world_id, world), world)}
+            atlas = self._atlas(fd, world_id, world)
+            return {"atlas": atlas, "report": atlas_report(atlas, world)}
         finally:
             os.close(fd)
 
@@ -268,6 +268,8 @@ class AtlasStore:
                 if digest(world) != expected_world_digest:
                     raise CanonError("atlas_stale_world")
                 validate_atlas(atlas, world)
+                if atlas["approved"]:
+                    raise CanonError("atlas_approval_requires_review")
                 try:
                     existing = self._atlas(fd, world_id, world)
                 except CanonError as exc:

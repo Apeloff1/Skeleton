@@ -35,3 +35,7 @@ network-disabled HTML editor into the private store. Open it offline, edit
 regions, scene placement and travel passages, then export JSON. Submit the
 export through the same optimistic `save` transaction; browser export never
 approves, writes to custody, or bypasses server-side atlas validation.
+
+The `world.atlas_propose_preview` Jeeves tool accepts an original prompt and
+returns a typed draft without writing custody. Only `approve` can change the
+approval bit; `save` rejects any preapproved JSON to prevent review bypass.

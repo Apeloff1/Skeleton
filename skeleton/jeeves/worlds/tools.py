@@ -38,6 +38,7 @@ TOOLS = {
     "world.invariants_preview": (),
     "world.assurance_preview": (),
     "world.atlas_preview": (),
+    "world.atlas_propose_preview": ("prompt",),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
     "knowledge.propose_preview": (
@@ -102,6 +103,8 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
     elif name == "world.atlas_preview":
         payload = AtlasStore(root).inspect(req["world_id"])
+    elif name == "world.atlas_propose_preview":
+        payload = AtlasStore(root).propose(req["world_id"], args["prompt"])
     elif name == "world.assurance_preview":
         payload = AssuranceStore(root).preview(req["world_id"])
     elif name == "world.migration_preview":

@@ -175,3 +175,31 @@ def test_symlink_artifact_never_verified(tmp_path):
     artifact.symlink_to(tmp_path / "voyage.json")
     with pytest.raises((CanonError, OSError)):
         store.verify("voyage")
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored POSIX custody")
+def test_approval_cannot_be_smuggled_through_save(tmp_path):
+    source = world()
+    WorldStore(tmp_path).publish(source, create=True)
+    store = AtlasStore(tmp_path)
+    spec = crossing(source)
+    spec["approved"] = True
+    spec["review_note"] = "Forged operator review."
+    with pytest.raises(CanonError, match="atlas_approval_requires_review"):
+        store.save("voyage", spec, expected_world_digest=digest(source), create=True)
+    assert not (tmp_path / "voyage.atlas.json").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored POSIX custody")
+def test_jeeves_prompt_preview_is_read_only(tmp_path):
+    source = world()
+    WorldStore(tmp_path).publish(source, create=True)
+    tool = invoke_world_tool(str(tmp_path), {
+        "schema": "jeeves.world.tool_request.v1",
+        "tool": "world.atlas_propose_preview", "world_id": "voyage",
+        "args": {"prompt": "Original cliff road and harbor."},
+    })
+    assert tool["persisted"] is False
+    assert tool["review_required"] is True
+    assert tool["result"]["approved"] is False
+    assert tool["result"]["world_digest"] == digest(source)
+    assert not (tmp_path / "voyage.atlas.json").exists()
