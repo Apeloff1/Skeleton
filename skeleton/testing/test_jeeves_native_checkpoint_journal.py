@@ -267,6 +267,16 @@ class TestNativeCheckpointJournal(unittest.TestCase):
         self.assertFalse(result["release_certified"])
         self.assertNotIn(self.inputs.goal.objective, json.dumps(result))
 
+    def test_terminal_result_absent_on_newly_claimed_run(self):
+        store = self._claimed()
+        self.assertIsNone(store.terminal_result(self.inputs.run_id))
+        self.assertFalse(store.inspect(self.inputs.run_id)["terminal_result_saved"])
+
+    def test_terminal_result_for_unknown_run_is_not_disclosed(self):
+        store = NativeSQLiteCheckpointer(self.worker)
+        with self.assertRaises(NativeCheckpointHold):
+            store.terminal_result("unknown_run")
+
     def test_clear_is_denied_because_it_erases_replay_custody(self):
         store = self._claimed()
         with self.assertRaises(NativeCheckpointHold):

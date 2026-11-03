@@ -41,6 +41,7 @@ def admission(**overrides):
         enable_source_tool=False, max_sources=4,
         max_steps=8, max_model_calls=8, max_wall_seconds=120,
         run_id="durable_approved", resume_run=False, inspect_run=False,
+        replay_result=False,
     )
     values.update(overrides)
     return check_operator_admission(**values)
@@ -62,6 +63,30 @@ class TestDurableOperatorAdmission(unittest.TestCase):
         self.assertTrue(approved.inspect_run)
         with self.assertRaises(NativeOperatorHold):
             admission(inspect_run=True, resume_run=True)
+
+    def test_terminal_replay_operator_option_is_explicit(self):
+        approved = admission(replay_result=True)
+        self.assertTrue(approved.replay_result)
+        self.assertTrue(approved.public_receipt()["terminal_replay_requested"])
+
+    def test_inspect_resume_and_replay_are_mutually_exclusive(self):
+        for flags in (
+            dict(resume_run=True, replay_result=True),
+            dict(inspect_run=True, replay_result=True),
+            dict(resume_run=True, inspect_run=True, replay_result=True),
+        ):
+            with self.subTest(flags=flags), self.assertRaises(NativeOperatorHold):
+                admission(**flags)
+
+    def test_replay_option_must_be_exact_boolean(self):
+        for value in ("on", 1, None):
+            with self.subTest(value=value), self.assertRaises(NativeOperatorHold):
+                admission(replay_result=value)
+
+    def test_non_durable_modes_cannot_obtain_terminal_replay(self):
+        for mode in ("chat", "agent", "repl"):
+            with self.subTest(mode=mode), self.assertRaises(NativeOperatorHold):
+                admission(mode=mode, run_id=None, replay_result=True)
 
     def test_run_id_required_and_typed(self):
         for value in (None, "", "has whitespace", False, "foo/../bar"):
@@ -167,6 +192,102 @@ class TestDurableAgentWithRealSqlite(unittest.TestCase):
                 conn.execute("SELECT COUNT(*) FROM jeeves_native_checkpoints").fetchone()[0],
                 3,
             )
+
+    def test_terminal_answer_can_be_replayed_without_any_new_generation(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        result = runner.run(self.inputs())
+        self.assertTrue(result.success)
+        self.assertEqual(self.backend.calls, 3)
+        sealed = runner.replay_terminal(self.inputs())
+        self.assertTrue(sealed["replayed"])
+        self.assertEqual(sealed["answer"], result.answer)
+        self.assertEqual(sealed["trace_fingerprint"], result.trace_fingerprint)
+        self.assertEqual(sealed["reason"], result.reason.value)
+        self.assertEqual(self.backend.calls, 3)
+        self.assertTrue(runner.inspect(self.inputs())["terminal_result_saved"])
+
+    def test_cold_reopen_replays_sealed_answer_without_model_call(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        result = runner.run(self.inputs())
+        self._cold()
+        fresh = NativeDurableJeevesAgent(self.worker)
+        replay = fresh.replay_terminal(self.inputs())
+        self.assertEqual(replay["answer"], result.answer)
+        self.assertEqual(replay["trace_fingerprint"], result.trace_fingerprint)
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_terminal_answer_bytes_corruption_fails_closed(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        runner.run(self.inputs())
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE jeeves_native_terminal_results SET payload=?",
+                (b'{"answer":"forged"}',),
+            )
+        with self.assertRaises(NativeCheckpointHold):
+            runner.replay_terminal(self.inputs())
+        self.assertEqual(self.backend.calls, 3)
+
+    def test_terminal_receipt_checksum_corruption_is_held(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        runner.run(self.inputs())
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE jeeves_native_terminal_results SET payload_sha256=?",
+                ("f" * 64,),
+            )
+        with self.assertRaises(NativeCheckpointHold):
+            runner.replay_terminal(self.inputs())
+
+    def test_terminal_result_cannot_be_overwritten(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        result = runner.run(self.inputs())
+        with self.assertRaises(NativeCheckpointHold):
+            runner.checkpoints.write_terminal_result(result)
+        self.assertEqual(runner.replay_terminal(self.inputs())["answer"], result.answer)
+
+    def test_checkpoint_tip_change_refuses_terminal_replay(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        runner.run(self.inputs())
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE jeeves_native_terminal_results SET checkpoint_tip_hash=?",
+                ("f" * 64,),
+            )
+        with self.assertRaises(NativeCheckpointHold):
+            runner.replay_terminal(self.inputs())
+
+    def test_missing_receipt_does_not_authorize_terminal_regeneration(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        runner.run(self.inputs())
+        with self.db.transaction() as conn:
+            conn.execute("DELETE FROM jeeves_native_terminal_results")
+        self._cold()
+        recovered = NativeDurableJeevesAgent(self.worker)
+        self.assertFalse(recovered.inspect(self.inputs())["terminal_result_saved"])
+        with self.assertRaises(NativeDurableAgentHold):
+            recovered.replay_terminal(self.inputs())
+        with self.assertRaises(NativeDurableAgentHold):
+            recovered.resume_operator_approved(self.inputs())
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_completed_receipt_replay_requires_exact_input_binding(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        runner.run(self.inputs())
+        self._cold()
+        fresh = NativeDurableJeevesAgent(self.worker)
+        with self.assertRaises(NativeCheckpointHold):
+            fresh.replay_terminal(self.inputs(text="forged task"))
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_before_terminal_checkpoint_replay_fails_closed(self):
+        runner = NativeDurableJeevesAgent(self.worker)
+        with mock.patch.object(runner.agent.agent, "_plan", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                runner.run(self.inputs())
+        with self.assertRaises(NativeDurableAgentHold):
+            runner.replay_terminal(self.inputs())
+        self.assertFalse(runner.inspect(self.inputs())["terminal_result_saved"])
 
     def test_successful_run_cannot_be_reissued_with_same_id(self):
         runner = NativeDurableJeevesAgent(self.worker)
