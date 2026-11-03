@@ -77,6 +77,7 @@ Commands:
     world-experience Unified reviewed world, cast and route offline playable
     world-session Source-verified offline play, save, resume and checkpoint replay
     world-migrate Reviewed source-revision save migration with exact replay proof
+    world-scenario Authored gameplay acceptance and source-leased HTML5 proof
     world-choice-impact Source-derived choice consequences and playable proof
     world-playtest Bounded choice-coverage proof and verified playable QA handoff
     world-revision Field-level causal impact review and source-verified HTML5 handoff
@@ -811,6 +812,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-revision":
         from skeleton.jeeves.worlds.revision_cli import run as world_revision_cli
         return world_revision_cli(rest)
+    if cmd == "world-scenario":
+        from skeleton.jeeves.worlds.scenario_cli import run
+        return run(rest)
     if cmd == "world-choice-impact":
         from skeleton.jeeves.worlds.choice_impact_cli import run
         return run(rest)
