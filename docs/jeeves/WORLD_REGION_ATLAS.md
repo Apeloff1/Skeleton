@@ -28,3 +28,10 @@ source digest, reviewed status, region occupancy and ending travel witnesses.
 The operator CLI is the only atlas write authority. Focused regression:
 `python -m pytest skeleton/testing/test_jeeves_world_atlas.py -q`.
 Release/device/engine qualification remains a separate required gate.
+
+For visual authoring, run `world-atlas ... editor --world-id voyage
+--expected-atlas-digest SHA` before approval. The command writes a CSP-hashed,
+network-disabled HTML editor into the private store. Open it offline, edit
+regions, scene placement and travel passages, then export JSON. Submit the
+export through the same optimistic `save` transaction; browser export never
+approves, writes to custody, or bypasses server-side atlas validation.

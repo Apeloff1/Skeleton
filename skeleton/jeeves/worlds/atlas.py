@@ -319,6 +319,27 @@ class AtlasStore:
             raise CanonError("atlas_receipt_too_large")
         return receipt, playable
 
+    def editor(self, world_id: str, *, expected_atlas_digest: str) -> dict[str, str]:
+        """Publish a CSP-bound offline editor for the current unapproved source."""
+        from .atlas_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                world = self._world(fd, world_id)
+                atlas = self._atlas(fd, world_id, world)
+                if digest(atlas) != expected_atlas_digest:
+                    raise CanonError("atlas_stale_edit")
+                output = render_editor(atlas, world)
+                name = world_id + ".atlas.editor.html"
+                self.worlds._write(fd, name, output)
+                return {"html_file": name, "html_sha256": sha256(output).hexdigest(),
+                        "atlas_digest": digest(atlas)}
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def compile(self, world_id: str, *, expected_atlas_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:
