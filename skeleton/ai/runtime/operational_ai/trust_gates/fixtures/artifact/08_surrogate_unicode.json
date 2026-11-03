@@ -1,0 +1,18 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "artifact",
+  "expect": "reject",
+  "reason": "Invalid surrogate must not enter canonical request",
+  "payload": {
+    "model_id": "\ud800",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 200,
+    "shard_bytes": [
+      100,
+      100
+    ],
+    "license": "operator-reviewed-license",
+    "approved": true,
+    "source": "offline-manifest-v1"
+  }
+}

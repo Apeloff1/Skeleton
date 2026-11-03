@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "fields": {
+    "tenant": {
+      "type": "text",
+      "max_bytes": 48,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "source_tenant": {
+      "type": "text",
+      "max_bytes": 48,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "source_id": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "approved": {
+      "type": "bool"
+    },
+    "revision": {
+      "type": "int",
+      "min": 1,
+      "max": 1000000
+    },
+    "expires_at": {
+      "type": "int",
+      "min": 1,
+      "max": 9000000000000000000
+    },
+    "now": {
+      "type": "int",
+      "min": 0,
+      "max": 9000000000000000000
+    }
+  }
+}
