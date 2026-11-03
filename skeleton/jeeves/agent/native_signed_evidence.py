@@ -88,7 +88,7 @@ class NativeSignedEvidenceProvider:
         passage_bytes: int = 1024,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        if type(source_root) not in (str, Path):
+        if not isinstance(source_root, (str, Path)):
             raise SignedEvidenceHold("explicit private source root required")
         path = Path(source_root)
         if not path.is_absolute():

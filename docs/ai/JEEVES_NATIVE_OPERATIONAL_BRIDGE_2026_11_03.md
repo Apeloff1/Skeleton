@@ -148,6 +148,33 @@ GGUF. It never ships model weights or replaces the existing installer.
 Tests for its orchestration use explicitly simulated workers and are never
 accepted as the physical evidence this operator command is designed to collect.
 
+## Deterministic native quality evaluation
+
+The operator-owned quality runner accepts a finite JSON casebook on stdin.
+It uses the existing installed-model custody, canonical native supervisor,
+SQLite receipt and read-only replay; it never adds model weights, synthetic
+model-generated grades, arbitrary host tools or hosted provider fallback.
+
+python -m skeleton.jeeves.agent.native_eval_cli --model-root /private/installed-gguf --state-dir /private/native-state --tenant local --subject operator --approve-native --cases-stdin < /private/jeeves-quality-cases.json
+
+The casebook schema is jeeves.native_evaluation_casebook.v1, with a nonempty
+list of cases. Each case has an operator-assigned case_id, private prompt
+and at least one expected-output predicate: exact_sha256, required_terms
+or forbidden_terms. Each also has optional minimum_generated_tokens and
+maximum_generated_tokens. The runner reserves each case's full configured
+native output ceiling before invoking the model, enforces case count,
+token and wall budgets, and stops on ambiguous native execution.
+
+Scores are explicit exact bytes, literal term checks and token bounds.
+Only input/output digests, model/tokenizer identity, timings, case verdicts
+and noncertification fields are disclosed. This tests selected expectations,
+NOT factual truth, physical device quality, privacy of an actual laptop,
+model licensing or release readiness.
+
+The source tests use simulated workers; real native quality evidence only
+exists after explicitly executing this operator CLI on a separately
+verified and rights-approved installed GGUF model.
+
 ## Required source validation
 
 After the source publication and repairs are complete, run these in order:
@@ -158,13 +185,14 @@ After the source publication and repairs are complete, run these in order:
 4. python -m unittest skeleton.testing.test_jeeves_native_signed_evidence -v
 5. python -m unittest skeleton.testing.test_jeeves_native_repl -v
 6. python -m unittest skeleton.testing.test_jeeves_native_acceptance_cli -v
-7. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_cli.py
-8. python scripts/check_architecture_map.py
-9. python scripts/check_ai_app_construction.py
-10. python scripts/check_capability_interfaces.py
-11. python scripts/check_provider_bootstrap.py
-12. python scripts/check_enterprise_ai_superiority.py --json
-13. python scripts/check_enterprise_ai_implementation_notes.py --json
+7. python -m unittest skeleton.testing.test_jeeves_native_quality_eval -v
+8. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
+9. python scripts/check_architecture_map.py
+10. python scripts/check_ai_app_construction.py
+11. python scripts/check_capability_interfaces.py
+12. python scripts/check_provider_bootstrap.py
+13. python scripts/check_enterprise_ai_superiority.py --json
+14. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,
