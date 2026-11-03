@@ -12,6 +12,43 @@ from .consumer_store import SlotStore
 CONTRACT = "ridge.rescue.consumer.acceptance.v1"
 
 
+
+def _interactive_contract(root: Path, actions: list[dict]) -> dict:
+    """Play the actual numbered terminal interface, quit, reopen and win."""
+    from .consumer_cli import play
+    slot = "interactive-acceptance"
+    split = max(1, len(actions) // 2)
+    positions = iter(actions)
+    prompts = [0]
+    frames = [0]
+
+    def command(*, limit: int):
+        def choose(_: str) -> str:
+            if prompts[0] >= limit:
+                return "q"
+            state = SlotStore(root).load(slot)
+            desired = next(positions)
+            if desired not in state["actions"]:
+                raise ValueError("terminal action not offered by canonical engine")
+            prompts[0] += 1
+            return str(state["actions"].index(desired))
+        return choose
+
+    def screen(message: str) -> None:
+        if "Actions:" in message or "Campaign complete" in message:
+            frames[0] += 1
+
+    halfway = play(SlotStore(root), slot, read=command(limit=split), write=screen)
+    if halfway["revision"] != split or halfway["status"] != "playing":
+        raise ValueError("interactive quit failed to persist last turn")
+    completed = play(SlotStore(root), slot, read=command(limit=len(actions)), write=screen)
+    if completed["status"] != "completed" or completed["revision"] != len(actions):
+        raise ValueError("interactive restart did not reach earned ending")
+    if frames[0] < len(actions):
+        raise ValueError("terminal did not render playable action frames")
+    return {"commands": prompts[0], "frames": frames[0], "head": completed["head"]}
+
+
 def run_acceptance(root: Path | None = None) -> dict:
     if root is None:
         with tempfile.TemporaryDirectory(prefix="cinder-ridge-acceptance-") as temp:
@@ -41,9 +78,14 @@ def run_acceptance(root: Path | None = None) -> dict:
     restored = verify_export(exported.read_bytes())
     if restored["head"] != final["head"] or restored["status"] != "completed":
         raise ValueError("portable campaign export failed replay")
+    terminal = _interactive_contract(root, acceptance_actions("protect") + LAST_SIGNAL)
+    if terminal["head"] != final["head"]:
+        raise ValueError("interactive and API game outcomes diverged")
     return {"schema": CONTRACT, "status": "verified-in-process",
             "chapters": final["index"], "actions": total,
             "restart_count": total, "saved_revision": final["revision"],
             "head": final["head"], "portable_export_verified": True,
+            "terminal_commands": terminal["commands"], "terminal_frames": terminal["frames"],
+            "interactive_quit_restart_verified": True,
             "release_certified": False, "windows_device_certified": False,
             "exact_head_ci_certified": False}
