@@ -14,6 +14,10 @@ from .harbor_crafting_patrol_authoring import (
 )
 from .harbor_crafting_patrol_ui import play_live
 from .harbor_crafting_patrol_guidance import patrol_hints
+from .harbor_crafting_patrol_quest_authoring import (
+    MAX_REVISION_BYTES as MAX_QUEST_REVISION_BYTES,
+    edit_patrol_quests, verify_patrol_quest_revision,
+)
 from .harbor_crafting_patrol_quests import (
     MAX_BOARD_BYTES as MAX_QUEST_BOARD_BYTES,
     MAX_LEDGER_BYTES, build_patrol_quests, verify_patrol_quests,
@@ -33,7 +37,7 @@ DEFAULT_SOURCE = FIXTURES / "harbor_lantern_quay.json"
 DEFAULT_BOARD = FIXTURES / "harbor_lantern_quay_patrol.json"
 DEFAULT_DEBRIEF = FIXTURES / "harbor_lantern_quay_patrol_debrief.json"
 DEFAULT_QUEST_BOARD = FIXTURES / "harbor_lantern_quay_patrol_quests.json"
-COMMANDS = ("quest-run", "quest-verify", "hint", "choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
+COMMANDS = ("quest-author", "quest-verify-author", "quest-run", "quest-verify", "hint", "choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
             "package", "verify-package", "play", "verify-play")
 
 
@@ -66,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--choice", default="publish")
     parser.add_argument("--quest-board", default=str(DEFAULT_QUEST_BOARD))
     parser.add_argument("--quest-ledger")
+    parser.add_argument("--quest-edits")
+    parser.add_argument("--quest-revision")
     parser.add_argument("--require-all", action="store_true")
     parser.add_argument("--expected-digest")
     parser.add_argument("--preview-actions")
@@ -74,7 +80,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "quest-run":
+        if command == "quest-author":
+            result = edit_patrol_quests(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.quest_board, MAX_QUEST_BOARD_BYTES),
+                _read(args.quest_edits, MAX_QUEST_BOARD_BYTES),
+                expected_digest=args.expected_digest or "",
+            )
+        elif command == "quest-verify-author":
+            result = verify_patrol_quest_revision(
+                _read(args.quest_revision, MAX_QUEST_REVISION_BYTES),
+            )
+        elif command == "quest-run":
             result = build_patrol_quests(
                 _read(args.report, MAX_REPORT_BYTES),
                 _read(args.quest_board, MAX_QUEST_BOARD_BYTES),

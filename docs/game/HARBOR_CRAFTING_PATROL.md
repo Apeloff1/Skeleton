@@ -77,3 +77,8 @@ certifies an invented quest reward.
 python -m scripts.game.harbor_patrol quest-run --report report.json --require-all > quests.json
 python -m scripts.game.harbor_patrol quest-verify --quest-ledger quests.json --require-all
 ```
+
+Patrol quest rewards and prerequisites can be edited transactionally with
+`quest-author --report report.json --quest-edits edits.json --expected-digest SHA256`.
+Every accepted edit produces before/after replayed quest ledgers; use
+`quest-verify-author --quest-revision revision.json` to verify custody.
