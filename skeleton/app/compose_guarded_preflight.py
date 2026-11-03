@@ -145,6 +145,28 @@ async def inspect_compose_mongo_epoch(
                 or type(final_epoch) is not int):
             return _result("canonical_actor_epoch_changed_during_preflight",
                            replica_set=True, authenticated=True)
+        # The second linearizable read can itself span an election or a
+        # credential rotation. Recheck both authorities AFTER that await;
+        # a previously matching epoch is not a permit to ignore this race.
+        async with asyncio.timeout(3.0):
+            post_hello = await database.command("hello")
+            post_auth = await database.command("connectionStatus")
+        if (type(post_hello) is not dict
+                or post_hello.get("isWritablePrimary") is not True
+                or tuple(post_hello.get(field) for field in topology_fields)
+                != initial_topology):
+            return _result("mongo_primary_changed_during_final_epoch_read",
+                           replica_set=True, authenticated=False)
+        post_users = (post_auth.get("authInfo", {}).get("authenticatedUsers")
+                      if type(post_auth) is dict
+                      and type(post_auth.get("authInfo")) is dict else None)
+        if (type(post_users) is not list or not post_users
+                or any(type(u) is not dict or type(u.get("user")) is not str
+                       or not u["user"] or type(u.get("db")) is not str
+                       or not u["db"] for u in post_users)
+                or tuple(sorted((u["db"], u["user"]) for u in post_users)) != initial_users):
+            return _result("mongo_principal_changed_during_final_epoch_read",
+                           replica_set=True, authenticated=False)
     except Exception:
         return _result("canonical_actor_epoch_unavailable", replica_set=True, authenticated=True)
     return _result("mongo_epoch_observed_only", replica_set=True, epoch=True, authenticated=True)
