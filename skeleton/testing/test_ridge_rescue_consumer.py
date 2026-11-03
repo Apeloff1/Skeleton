@@ -135,3 +135,26 @@ def test_original_campaign_earned_ending_through_save(tmp_path):
         state = store.step("game", action, expected_head=state["head"])
     assert state["index"] == 1
     assert state["session"]["completed"][0]["state"]["status"] == "won:protect"
+
+def test_tampered_audit_action_rejected_even_with_unchanged_heads(tmp_path):
+    store = SlotStore(tmp_path / "saves")
+    state = store.new("game")
+    store.step("game", state["actions"][0], expected_head=state["head"])
+    with sqlite3.connect(store.database) as conn:
+        conn.execute(
+            "UPDATE actions SET action=? WHERE slot='game' AND revision=1",
+            (json.dumps({"verb": "rest"}).encode(),),
+        )
+    with pytest.raises(StoreError, match="action replay|head mismatch"):
+        store.audit("game")
+
+
+def test_canonical_audit_replays_every_saved_transition(tmp_path):
+    store = SlotStore(tmp_path / "saves")
+    state = store.new("game")
+    for action in acceptance_actions("protect"):
+        state = store.step("game", action, expected_head=state["head"])
+    result = SlotStore(tmp_path / "saves").audit("game")
+    assert result["verified"]
+    assert result["head"] == state["head"]
+    assert result["audit_entries"] == state["revision"]

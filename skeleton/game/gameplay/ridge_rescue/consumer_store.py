@@ -7,6 +7,7 @@ application-owned user data directory; arbitrary save paths are not accepted.
 """
 from __future__ import annotations
 
+import json
 import os
 from contextlib import closing
 from pathlib import Path
@@ -272,14 +273,30 @@ class SlotStore:
                 raise StoreError("save audit refused") from exc
         if len(rows) != current["revision"]:
             raise StoreError("save history is incomplete")
-        previous = None
+        # Verify every stored action against the original campaign and
+        # recompute each intermediate head. A contiguous string-only chain is
+        # insufficient: an attacker could change the action but retain heads.
+        replayed = open_campaign(_source())
+        previous = replayed["head"]
         for position, (revision, prior, nxt, raw) in enumerate(rows, 1):
-            if revision != position or (previous is not None and previous != prior):
+            if revision != position or prior != previous:
                 raise StoreError("save history chain broken")
             if not isinstance(raw, bytes) or len(raw) > 4096:
                 raise StoreError("save history action invalid")
+            try:
+                action = json.loads(raw)
+                if not isinstance(action, dict) or canonical(action) != raw:
+                    raise ValueError("noncanonical audit action")
+                if action == {"verb": "retry"}:
+                    replayed = retry_campaign(replayed, expected_head=previous)
+                else:
+                    replayed = step_campaign(replayed, action, expected_head=previous)
+            except (ValueError, TypeError, KeyError, UnicodeError) as exc:
+                raise StoreError("save history action replay rejected") from exc
+            if replayed["head"] != nxt:
+                raise StoreError("save history head mismatch")
             previous = nxt
-        if previous is not None and previous != current["head"]:
+        if previous != current["head"] or replayed != current["session"]:
             raise StoreError("save history head mismatch")
         return {"schema": SCHEMA, "slot": name, "revision": current["revision"],
                 "head": current["head"], "status": current["status"],
