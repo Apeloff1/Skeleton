@@ -103,7 +103,9 @@ class SimulatedSpine:
         }
         if not self.return_without_commit:
             self.turns[key] = {"request_prompt": prompt, "result": dict(result)}
-        self.pending.remove(key)
+            self.pending.remove(key)
+        # A worker that produces output without a canonical commit leaves
+        # the durable request pending, not safe for another generation.
         return result
 
 
