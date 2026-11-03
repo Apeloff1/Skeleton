@@ -62,3 +62,19 @@ Before persistence, the read-only Jeeves world.laptop_propose_preview tool
 accepts a typed prompt brief and returns canonical source plus ending proof
 without writing or implicitly approving any file. The operator then uses
 world-laptop propose to persist the same deterministic original source.
+
+## Read-only laptop acceptance rehearsal
+
+After compile and verify, run `python -m skeleton world-laptop --store STORE
+acceptance --world-id lighthouse`. To check a previously persisted slot and its
+portable save without overwriting it, add `--slot player`. This operation
+verifies the exact canonical review and both published artifacts, replays each
+proved ending witness, validates a portable session export/import roundtrip,
+and optionally checks the existing slot's restore preflight. It writes no
+worlds, approvals, artifacts or player slots. A changed source, missing slot,
+corrupted HTML/builder or forged session fails closed with a typed error.
+
+Run `python -m pytest skeleton/testing/test_jeeves_world_laptop_acceptance.py
+skeleton/testing/test_jeeves_world_laptop_flow.py -q` on the exact branch
+before promotion. Acceptance is offline source evidence only; it does not
+certify native engines, model inference, Windows installation or consumers.

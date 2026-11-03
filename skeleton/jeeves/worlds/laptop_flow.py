@@ -10,7 +10,8 @@ import os
 from typing import Any
 
 from .bundle import _artifact_read
-from .session import SessionStore
+from .session import (SessionStore, SCHEMA as SESSION_SCHEMA, export_session as portable_export,
+                      import_session as portable_import, replay_choices, validate_session)
 from .studio_engine import StudioEngineStore
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _text, canonical, compile_html,
@@ -344,3 +345,59 @@ class LaptopFlow:
             }
         report["next_action"] = "source_playable_handoff_ready_for_engine_validation"
         return report
+
+    def acceptance(self, world_id: str, slot: str | None = None) -> dict[str, Any]:
+        """Read-only, exact-source acceptance of the playable and save contracts.
+
+        This is a source-level rehearsal, not a native engine or device test.
+        No world, approval, builder artifact or player slot is created.
+        """
+        receipt = self.verify(world_id)
+        world = self.worlds.read(world_id)
+        if digest(world) != receipt["source_digest"]:
+            raise CanonError("laptop_source_changed_after_verify")
+        proof = prove(world).as_dict()
+        witnesses = proof["ending_witnesses"]
+        if len(witnesses) > 128 or sum(map(len, witnesses.values())) > 8192:
+            raise CanonError("laptop_acceptance_budget")
+        checked: list[dict[str, Any]] = []
+        for ending_scene, choices in sorted(witnesses.items()):
+            replay = replay_choices(world, choices)
+            if replay["scene"] != ending_scene or replay["ending"] is None:
+                raise CanonError("laptop_acceptance_ending_mismatch")
+            state = validate_session({
+                "schema": SESSION_SCHEMA, "world_id": world_id,
+                "world_digest": receipt["source_digest"], "choices": list(choices),
+                "scene": replay["scene"], "flags": replay["flags"],
+                "ending": replay["ending"], "revision": len(choices),
+            }, world)
+            restored = portable_import(portable_export(state, world), world)
+            if restored != state:
+                raise CanonError("laptop_acceptance_restore_mismatch")
+            checked.append({
+                "ending_scene": ending_scene, "choice_ids": list(choices),
+                "ending": state["ending"], "session_digest": digest(state),
+            })
+        existing = None
+        if slot is not None:
+            view = self.inspect_session(world_id, slot)
+            exported = self.export_session(world_id, slot)
+            preview = self.preflight_restore(world_id, exported)
+            if preview["session_digest"] != view["session_digest"]:
+                raise CanonError("laptop_acceptance_session_mismatch")
+            existing = {
+                "slot": slot, "session_digest": view["session_digest"],
+                "revision": preview["revision"], "restorable": preview["restorable"],
+            }
+        # Recheck the source lease before returning a source-bound report.
+        if digest(self.worlds.read(world_id)) != receipt["source_digest"]:
+            raise CanonError("laptop_source_changed_after_verify")
+        return {
+            "schema": "jeeves.world.laptop_acceptance.v1",
+            "world_id": world_id, "source_digest": receipt["source_digest"],
+            "review_digest": receipt["review_digest"],
+            "receipt_digest": digest(receipt),
+            "ending_witnesses": checked, "verified_save_restore": True,
+            "existing_session": existing,
+            "qualification": "offline_source_acceptance_not_engine_or_device_certified",
+        }

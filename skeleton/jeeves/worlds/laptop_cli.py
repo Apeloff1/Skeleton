@@ -22,13 +22,13 @@ def run(argv: list[str]) -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     propose = sub.add_parser("propose")
     propose.add_argument("--brief-file", required=True)
-    for name in ("inspect", "review", "approve-current", "compile", "verify", "diagnose",
+    for name in ("inspect", "review", "approve-current", "compile", "verify", "diagnose", "acceptance",
                  "engine-inspect", "engine-compile", "engine-verify",
                  "session-create", "session-choose", "session-inspect",
                  "session-export", "session-restore", "session-restore-check"):
         command = sub.add_parser(name)
         command.add_argument("--world-id", required=True)
-        if name == "diagnose":
+        if name in ("diagnose", "acceptance"):
             command.add_argument("--slot")
         elif name == "review":
             command.add_argument("--expected-digest", required=True)
@@ -60,6 +60,8 @@ def run(argv: list[str]) -> int:
             result = flow.inspect(args.world_id)
         elif args.action == "diagnose":
             result = flow.diagnose(args.world_id, args.slot)
+        elif args.action == "acceptance":
+            result = flow.acceptance(args.world_id, args.slot)
         elif args.action == "review":
             result = flow.review(args.world_id, args.expected_digest,
                                  _file(args.operation_file), args.review_note)
@@ -107,6 +109,9 @@ def run(argv: list[str]) -> int:
             "laptop_html_mismatch": "recompile_and_verify_from_reviewed_source",
             "laptop_receipt_mismatch": "recompile_and_verify_from_reviewed_source",
             "lease_busy": "retry_after_current_writer_finishes",
+            "laptop_source_changed_after_verify": "retry_after_source_edit_and_recompile",
+            "laptop_acceptance_budget": "reduce_world_complexity_before_acceptance",
+            "laptop_acceptance_session_mismatch": "inspect_session_and_reverify_export",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
                           "next_action": recovery.get(code, "inspect_input_and_custody")},
