@@ -65,8 +65,10 @@ def test_weapon_charge_is_earned_not_invented_or_reusable():
     duplicate["encounters"].append({
         "id": "dock_raider", "at_index": 3, "strength": 1, "reward": 1
     })
+    actions = winning_actions()
+    actions.insert(-2, {"op": "strike"})
     with pytest.raises(HarborError, match="weapon charge"):
-        build_convoy(source, duplicate, winning_actions())
+        build_convoy(source, duplicate, actions)
 
 
 def test_encounter_defeat_and_guard_are_real_deterministic_states():

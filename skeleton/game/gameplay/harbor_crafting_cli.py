@@ -133,6 +133,16 @@ from .harbor_crafting_quest_authoring import (
     MAX_REVISION_BYTES as MAX_QUEST_REVISION_BYTES,
     edit_quest_board, verify_quest_edit,
 )
+from .harbor_crafting_convoy import (
+    MAX_BOARD_BYTES as MAX_CONVOY_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_CONVOY_REPORT_BYTES,
+    build_convoy, verify_convoy, resume_convoy, convoy_status,
+)
+from .harbor_crafting_convoy_authoring import (
+    MAX_REVISION_BYTES as MAX_CONVOY_REVISION_BYTES,
+    edit_convoy_board, verify_convoy_revision,
+)
+from .harbor_crafting_convoy_ui import play_convoy_live
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -140,6 +150,7 @@ from .harbor_crafting_sessions import (
 
 DEFAULT_WORLD = Path(__file__).resolve().parent / "fixtures" / "harbor_lantern_quay.json"
 DEFAULT_MISSIONS = Path(__file__).resolve().parent / "fixtures" / "harbor_lantern_quay_missions.json"
+DEFAULT_CONVOY = Path(__file__).resolve().parent / "fixtures" / "harbor_lantern_quay_convoy.json"
 
 
 def _read(path: str, maximum: int = MAX_BUNDLE_BYTES) -> bytes:
@@ -161,7 +172,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author", "weather-run", "weather-verify", "weather-resume", "weather-forecast", "weather-verify-forecast", "weather-author", "weather-verify-author", "dialogue-run", "dialogue-verify", "dialogue-resume", "dialogue-author", "dialogue-verify-author", "expedition-run", "expedition-verify", "expedition-resume", "expedition-status", "expedition-build", "expedition-verify-package", "expedition-play", "expedition-verify-play", "expedition-live", "expedition-journal-init", "expedition-journal-verify", "expedition-journal-append", "expedition-journal-at", "expedition-journal-fork", "expedition-journal-compare", "expedition-journal-verify-comparison", "expedition-journal-fast-forward", "quest-run", "quest-verify", "quest-status", "quest-author", "quest-verify-author"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author", "weather-run", "weather-verify", "weather-resume", "weather-forecast", "weather-verify-forecast", "weather-author", "weather-verify-author", "dialogue-run", "dialogue-verify", "dialogue-resume", "dialogue-author", "dialogue-verify-author", "expedition-run", "expedition-verify", "expedition-resume", "expedition-status", "expedition-build", "expedition-verify-package", "expedition-play", "expedition-verify-play", "expedition-live", "expedition-journal-init", "expedition-journal-verify", "expedition-journal-append", "expedition-journal-at", "expedition-journal-fork", "expedition-journal-compare", "expedition-journal-verify-comparison", "expedition-journal-fast-forward", "quest-run", "quest-verify", "quest-status", "quest-author", "quest-verify-author", "convoy-run", "convoy-verify", "convoy-resume", "convoy-status", "convoy-author", "convoy-verify-author", "convoy-live"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -251,10 +262,66 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trial-revision", help="Portable time trial course revision JSON")
     parser.add_argument("--expected-course-digest", help="CAS lease for time trial course")
     parser.add_argument("--max-steps", type=int, default=64, help="Bounded route search horizon")
+    parser.add_argument("--convoy-board", default=str(DEFAULT_CONVOY), help="Authored escort route and tactical encounter board")
+    parser.add_argument("--convoy-report", help="Portable replay-verified convoy save")
+    parser.add_argument("--convoy-edits", help="Transactional convoy board edits")
+    parser.add_argument("--convoy-revision", help="Portable replay-verified convoy edit revision")
+    parser.add_argument("--expected-convoy-digest", help="CAS lease for convoy continuation")
+    parser.add_argument("--expected-convoy-board-digest", help="CAS lease for convoy authoring")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "quest-run":
+        if args.command == "convoy-run":
+            output = build_convoy(
+                load_source(Path(args.source)),
+                _required_json(args.convoy_board, "convoy-board", MAX_CONVOY_BOARD_BYTES),
+                _required_json(args.actions, "actions"),
+                require_complete=args.require_all,
+            )
+        elif args.command == "convoy-live":
+            output = play_convoy_live(
+                load_source(Path(args.source)),
+                _required_json(args.convoy_board, "convoy-board", MAX_CONVOY_BOARD_BYTES),
+                instream=sys.stdin, outstream=sys.stderr,
+            )
+            if args.require_all:
+                verify_convoy(output, require_complete=True)
+        elif args.command == "convoy-verify":
+            output = {"verified": True, **verify_convoy(
+                _required_json(args.convoy_report, "convoy-report", MAX_CONVOY_REPORT_BYTES),
+                require_complete=args.require_all,
+            )}
+        elif args.command == "convoy-status":
+            output = convoy_status(
+                _required_json(args.convoy_report, "convoy-report", MAX_CONVOY_REPORT_BYTES),
+            )
+        elif args.command == "convoy-resume":
+            if not args.expected_convoy_digest:
+                raise HarborError("--expected-convoy-digest is required")
+            output = resume_convoy(
+                _required_json(args.convoy_report, "convoy-report", MAX_CONVOY_REPORT_BYTES),
+                _required_json(args.actions, "actions"),
+                expected_digest=args.expected_convoy_digest,
+                require_complete=args.require_all,
+            )
+        elif args.command == "convoy-author":
+            if not args.expected_convoy_board_digest:
+                raise HarborError("--expected-convoy-board-digest is required")
+            output = edit_convoy_board(
+                load_source(Path(args.source)),
+                _required_json(args.convoy_board, "convoy-board", MAX_CONVOY_BOARD_BYTES),
+                _required_json(args.convoy_edits, "convoy-edits"),
+                expected_board_digest=args.expected_convoy_board_digest,
+                preview_report=(
+                    _required_json(args.convoy_report, "convoy-report", MAX_CONVOY_REPORT_BYTES)
+                    if args.convoy_report else None
+                ),
+            )
+        elif args.command == "convoy-verify-author":
+            output = verify_convoy_revision(
+                _required_json(args.convoy_revision, "convoy-revision", MAX_CONVOY_REVISION_BYTES),
+            )
+        elif args.command == "quest-run":
             output = build_quest_report(
                 _required_json(args.expedition, "expedition", MAX_EXPEDITION_REPORT_BYTES),
                 _required_json(args.quest_board, "quest-board", MAX_QUEST_BOARD_BYTES),
