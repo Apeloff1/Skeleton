@@ -17,7 +17,8 @@ def _file(path: str):
     """Open bounded JSON without following final symlinks or blocking on FIFOs."""
     flags = (os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) |
              getattr(os, "O_NONBLOCK", 0))
-    if not hasattr(os, "O_NONBLOCK"):\n        raise CanonError("input_nonblock_unavailable")
+    if not hasattr(os, "O_NONBLOCK"):
+        raise CanonError("input_nonblock_unavailable")
     if not hasattr(os, "O_NOFOLLOW"):
         raise CanonError("input_nofollow_unavailable")
     fd = os.open(path, flags | os.O_NOFOLLOW)
