@@ -120,8 +120,12 @@ def build_salvage_story(report: Any, board: Any, *,
         raise HarborError("salvage story replay state divergence")
     if require_all and len(completed) != len(authored["quests"]):
         raise HarborError("salvage story quests not all earned")
+    earned_rescue = next(
+        (quest["story"] for quest in authored["quests"]
+         if quest["kind"] == "rescue" and quest["id"] in completed), None
+    )
     state = {"completed": completed, "reputation": reputation,
-             "ending": events[-1]["story"] if overlay["complete"] and events else None,
+             "ending": earned_rescue if overlay["complete"] else None,
              "tick": overlay["tick"]}
     result = {"schema": REPORT_SCHEMA, "report": deepcopy(report),
               "board": authored, "events": events, "state": state,

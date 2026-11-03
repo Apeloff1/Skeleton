@@ -59,3 +59,12 @@ def test_invalid_prerequisite_and_resealed_story_event_rejected():
                                        if k != "story_digest"})
     with pytest.raises(HarborError):
         verify_salvage_story(damaged)
+
+
+def test_story_without_rescue_quest_cannot_mint_ending():
+    source, board = inputs()
+    report = build_salvage(source, board, actions(), require_complete=True)
+    authored = story_board()
+    authored["quests"] = authored["quests"][:-1]
+    story = build_salvage_story(report, authored, require_all=True)
+    assert verify_salvage_story(story)["ending"] is None
