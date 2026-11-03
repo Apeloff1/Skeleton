@@ -26,7 +26,7 @@ DDL=(
   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
   job_id TEXT NOT NULL REFERENCES jobs(job_id),
   kind TEXT NOT NULL,body BLOB NOT NULL,body_sha TEXT NOT NULL,
-  previous_sha TEXT NOT NULL,event_sha TEXT NOT NULL,
+  previous_sha TEXT NOT NULL,event_sha TEXT NOT NULL UNIQUE,
   state_sha TEXT NOT NULL,created_ns INTEGER NOT NULL) STRICT""",
 """CREATE TABLE IF NOT EXISTS outbox(
   event_sha TEXT PRIMARY KEY REFERENCES events(event_sha),
