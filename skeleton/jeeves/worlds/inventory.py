@@ -366,9 +366,9 @@ class InventoryStore:
 
     def _world(self, fd: int, world_id: str) -> dict[str, Any]:
         source = strict_json(self.worlds._read(fd, world_id + ".json"))
-        if source.get("id") != world_id:
-            raise CanonError("identity_mismatch")
         prove(source)
+        if source["id"] != world_id:
+            raise CanonError("identity_mismatch")
         return source
 
     @staticmethod
@@ -454,6 +454,29 @@ class InventoryStore:
             "qualification": "offline_reviewed_source_leased_item_playable",
         }
         return receipt, playable
+
+    def editor(self, world_id: str, expected_digest: str) -> dict[str, Any]:
+        """Publish an offline unapproved authoring UI under the world lease."""
+        from .inventory_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                world = self._world(fd, world_id)
+                data = self._read(fd, world_id, world)
+                if digest(data) != expected_digest:
+                    raise CanonError("inventory_stale_edit")
+                content = render_editor(data, world)
+                name = world_id + ".inventory.editor.html"
+                self.worlds._write(fd, name, content)
+                return {
+                    "html_file": name, "html_sha256": sha256(content).hexdigest(),
+                    "inventory_digest": digest(data),
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()

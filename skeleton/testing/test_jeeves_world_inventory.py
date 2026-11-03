@@ -247,7 +247,24 @@ def test_symlink_source_is_not_followed(tmp_path):
     target = tmp_path / "outside.json"
     target.write_bytes(canonical(source))
     (tmp_path / "harbor.inventory.json").symlink_to(target)
-    assert_code("unsafe_source_file", lambda: store.inspect("harbor")) if False else None
     with pytest.raises((CanonError, OSError)):
         store.inspect("harbor")
     assert target.read_bytes() == canonical(source)
+
+
+def test_offline_editor_exports_unapproved_source(tmp_path, capsys):
+    _, store, _, source = setup(tmp_path)
+    first = store.publish("harbor", source, create=True)
+    result = store.editor("harbor", first)
+    content = (tmp_path / result["html_file"]).read_bytes()
+    assert hashlib.sha256(content).hexdigest() == result["html_sha256"]
+    assert b"connect-src 'none'" in content
+    assert b"Export unapproved JSON" in content
+    assert b"Review required after offline edit" in content
+    assert b"fetch(" not in content
+    assert_code("inventory_stale_edit",
+                lambda: store.editor("harbor", "0" * 64))
+    status = run(["--store", str(tmp_path), "editor", "--world-id", "harbor",
+                  "--expected-digest", first])
+    assert status == 0
+    assert json.loads(capsys.readouterr().out)["editor"]["inventory_digest"] == first
