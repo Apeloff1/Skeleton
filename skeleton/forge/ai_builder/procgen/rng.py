@@ -10,6 +10,7 @@ consumer does not perturb what existing generators draw.
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from typing import Any
 
@@ -20,13 +21,18 @@ from .errors import ProcgenError
 
 GENERATOR_VERSION = "forge.procgen.v1"
 _NAME = re.compile(r"^[a-z][a-z0-9_.-]{0,47}(/[a-z0-9][a-z0-9_.-]{0,47}){0,7}$")
+MAX_STREAM_NAMES = 4096
+MAX_SEED_BITS = 256
+MAX_SEED_CHARS = 1024
 
 
 def root_digest(seed: int | str) -> str:
     if isinstance(seed, bool) or not isinstance(seed, (int, str)):
         raise ProcgenError("seed must be int or str")
-    if isinstance(seed, str) and not seed:
-        raise ProcgenError("seed must be non-empty")
+    if isinstance(seed, int) and seed.bit_length() > MAX_SEED_BITS:
+        raise ProcgenError("seed integer exceeds bound")
+    if isinstance(seed, str) and not 1 <= len(seed) <= MAX_SEED_CHARS:
+        raise ProcgenError("seed text exceeds bound")
     return hashlib.sha256(f"{type(seed).__name__}:{seed}".encode("utf-8")).hexdigest()
 
 
@@ -49,6 +55,8 @@ class Streams:
     def digest(self, name: str) -> str:
         if not isinstance(name, str) or not _NAME.match(name):
             raise ProcgenError(f"invalid substream name {name!r}")
+        if name not in self._issued and len(self._issued) >= MAX_STREAM_NAMES:
+            raise ProcgenError("issued substream inventory exceeds bound")
         domain, _, identity = name.partition("/")
         d = self.contract.derive(domain, identity or "root")
         self._issued[name] = d
@@ -72,9 +80,19 @@ class Streams:
 
 def gauss(rng: DeterministicRng, mu: float = 0.0, sigma: float = 1.0) -> float:
     """Box-Muller on the deterministic stream (no reliance on :mod:`random`)."""
-    import math
-    u1 = rng.random()
-    while u1 <= 1e-300:
+    if (type(mu) not in (int, float) or type(sigma) not in (int, float)
+            or not math.isfinite(mu) or not math.isfinite(sigma) or sigma < 0):
+        raise ProcgenError("Gaussian parameters must be finite with nonnegative sigma")
+    for _ in range(32):
         u1 = rng.random()
+        if type(u1) in (int, float) and math.isfinite(u1) and 1e-300 < u1 < 1.0:
+            break
+    else:
+        raise ProcgenError("Gaussian entropy retry budget exceeded")
     u2 = rng.random()
-    return mu + sigma * math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+    if type(u2) not in (int, float) or not math.isfinite(u2) or not 0 <= u2 < 1:
+        raise ProcgenError("Gaussian entropy sample invalid")
+    result = mu + sigma * math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+    if not math.isfinite(result):
+        raise ProcgenError("Gaussian result is nonfinite")
+    return result

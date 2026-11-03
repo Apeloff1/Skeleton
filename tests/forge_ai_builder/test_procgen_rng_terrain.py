@@ -93,3 +93,29 @@ def test_terrain_config_validation():
         TerrainConfig(method="perlin")
     with pytest.raises(ProcgenError):
         TerrainConfig(width=4)
+
+
+def test_procgen_stream_inventory_seed_and_gaussian_entropy_budgets(monkeypatch):
+    from skeleton.forge.ai_builder.procgen import rng as rng_module
+
+    monkeypatch.setattr(rng_module, "MAX_STREAM_NAMES", 2)
+    streams = Streams(42)
+    streams.digest("terrain")
+    streams.digest("loot")
+    assert streams.digest("terrain") == streams.digest("terrain")
+    with pytest.raises(ProcgenError, match="substream inventory"):
+        streams.digest("encounters")
+
+    for seed in (10 ** 100, "x" * 1025):
+        with pytest.raises(ProcgenError, match="exceeds bound"):
+            Streams(seed)
+
+    class ZeroEntropy:
+        def random(self):
+            return 0.0
+
+    with pytest.raises(ProcgenError, match="retry budget"):
+        rng_module.gauss(ZeroEntropy())
+    with pytest.raises(ProcgenError, match="Gaussian parameters"):
+        rng_module.gauss(Streams(1).stream("g"), sigma=float("nan"))
+    assert rng_module.gauss(Streams(1).stream("g")) == rng_module.gauss(Streams(1).stream("g"))
