@@ -454,6 +454,27 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ActivationBlocked, "trust anchor"):
             self.make(reviewer_authority_id="untrusted-reviewer")
 
+    async def test_mongo_principal_changes_during_reviewer_challenge(self):
+        async def rotate(_payload):
+            self.database.auth = {"authInfo": {"authenticatedUsers": [
+                {"user": "replacement", "db": "admin"},
+            ]}}
+        self.reviewer.on_challenge = rotate
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "principal changed"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
+    async def test_mongo_election_changes_during_reviewer_challenge(self):
+        self.database.hello["electionId"] = "election-a"
+        async def rotate(_payload):
+            self.database.hello["electionId"] = "election-b"
+        self.reviewer.on_challenge = rotate
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "primary changed"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
     async def test_writer_enters_during_reviewer_challenge(self):
         async def writer_started(_payload):
             self.epoch_value = 3

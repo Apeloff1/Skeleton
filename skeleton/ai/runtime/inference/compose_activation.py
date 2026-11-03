@@ -184,6 +184,8 @@ class MongoGuardedActivation:
                     or not hello["setName"]
                     or hello.get("isWritablePrimary") is not True):
                 raise ActivationBlocked("linearizable Mongo replica-set primary required")
+            topology_fields = ("setName", "me", "primary", "electionId", "setVersion")
+            initial_topology = tuple(hello.get(field) for field in topology_fields)
             # A replica-set primary can be reachable with authentication
             # disabled. A linearizable epoch on an unauthenticated server
             # cannot establish trusted custody for protected local inference.
@@ -249,6 +251,30 @@ class MongoGuardedActivation:
                 tokenizer_digest=self._identity[2],
             )
             self._verify_reviewer_binding()
+            # The reviewer round trip is an await boundary: the Mongo primary
+            # or authenticated connection identity could rotate while a
+            # signature is in flight. A matching epoch alone is insufficient.
+            async with asyncio.timeout(_MAX_PROBE_SECONDS):
+                final_hello = await self._database.command("hello")
+                final_auth = await self._database.command("connectionStatus")
+            if (type(final_hello) is not dict
+                    or final_hello.get("isWritablePrimary") is not True
+                    or tuple(final_hello.get(field) for field in topology_fields)
+                    != initial_topology):
+                raise ActivationBlocked("Mongo primary changed during reviewer attestation")
+            final_users = (
+                final_auth.get("authInfo", {}).get("authenticatedUsers")
+                if type(final_auth) is dict
+                and type(final_auth.get("authInfo")) is dict else None
+            )
+            if (type(final_users) is not list or not final_users
+                    or any(type(user) is not dict
+                           or type(user.get("user")) is not str or not user["user"]
+                           or type(user.get("db")) is not str or not user["db"]
+                           for user in final_users)
+                    or tuple(sorted((user["db"], user["user"]) for user in final_users))
+                    != auth_identity):
+                raise ActivationBlocked("Mongo principal changed during reviewer attestation")
             # A canonical writer may enter WRITING while the reviewer signs.
             # A second linearizable read is required after that await.
             final_epoch = await self._epoch.read_epoch(
