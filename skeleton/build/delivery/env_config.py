@@ -122,7 +122,9 @@ def load_layers(texts: Mapping[str, str]) -> dict[str, dict[str, Any]]:
     if not isinstance(texts, Mapping) or len(texts) > MAX_CONFIG_LAYERS:
         raise DeliveryError("config layer inventory exceeds bound")
     out: dict[str, dict[str, Any]] = {}
-    for name, text in texts.items():
+    for count, (name, text) in enumerate(texts.items(), 1):
+        if count > MAX_CONFIG_LAYERS:
+            raise DeliveryError("config layer inventory exceeds bound")
         require_env_name(name)
         if type(text) is not str or len(text) > MAX_LAYER_JSON_CHARS:
             raise DeliveryError(f"{name}: config JSON text exceeds bound")
@@ -131,6 +133,12 @@ def load_layers(texts: Mapping[str, str]) -> dict[str, dict[str, Any]]:
                               parse_constant=_reject_json_constant)
         except json.JSONDecodeError as exc:
             raise DeliveryError(f"{name}: invalid JSON: {exc}") from exc
+        except DeliveryError:
+            raise
+        except (ValueError, RecursionError) as exc:
+            # JSON nesting and integer-conversion limits must produce a typed
+            # rejection, never an uncaught parser crash or partial layer set.
+            raise DeliveryError(f"{name}: invalid JSON structure") from exc
         if not isinstance(data, dict):
             raise DeliveryError(f"{name}: config must be a JSON object")
         out[name] = data

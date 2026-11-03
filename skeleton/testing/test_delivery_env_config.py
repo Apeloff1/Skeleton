@@ -79,3 +79,25 @@ def test_layer_inventory_and_text_are_bounded(monkeypatch):
     monkeypatch.setattr(module, "MAX_CONFIG_LAYERS", 1)
     with pytest.raises(DeliveryError, match="inventory exceeds"):
         load_layers({"dev": "{}", "staging": "{}"})
+
+
+def test_json_parser_resource_failures_are_typed_and_transactional():
+    from skeleton.ai.build.core.delivery import env_config as mirrored
+
+    nested = '{"x":' * 1200 + '0' + '}' * 1200
+    for load in (load_layers, mirrored.load_layers):
+        with pytest.raises(DeliveryError, match="invalid JSON"):
+            load({"dev": nested})
+
+
+def test_layer_loader_bounds_malicious_mapping_iteration():
+    from itertools import count
+    from skeleton.ai.build.core.delivery import env_config as mirrored
+
+    class UnboundedLayers(dict):
+        def items(self):
+            return ((f"env{i}", "{}") for i in count())
+
+    for load in (load_layers, mirrored.load_layers):
+        with pytest.raises(DeliveryError, match="inventory exceeds bound"):
+            load(UnboundedLayers())
