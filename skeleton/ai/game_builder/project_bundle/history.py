@@ -53,6 +53,11 @@ class ProjectHistory:
     def rollback(self, project_id: str, sequence: int, *, workspace: GameWorkspace | None = None,
                  human_approved: bool = False, authorized: bool = False) -> dict[str, Any]:
         """Make ``sequence`` the new head (history is append-only) and optionally write it back."""
+        # Reject unapproved workspace rollback before publishing a new save
+        # head. Previously the save-plane history advanced before the later
+        # restore_to_workspace approval gate raised PermissionError.
+        if workspace is not None and (not authorized or human_approved is not True):
+            raise PermissionError("workspace rollback needs explicit human approval")
         v = self.saver.load(project_id, sequence=sequence)
         extra = {k: s for k, s in v.sections.items() if k not in ("bundle", "files")}
         head = self.saver.save_files(project_id, v.manifest.genre, v.files,

@@ -26,6 +26,14 @@ def test_rollback_without_approval_does_not_touch_workspace(ws, saver):
     h = ProjectHistory(saver)
     saver.save_project(ws, "hero")
     edit(ws, "hero", "game/readme.md", "# v2\n")
+    before = h.sequences("hero")
     with pytest.raises(PermissionError):
         h.rollback("hero", 1, workspace=ws)
+    assert h.sequences("hero") == before  # No unauthorized head publication.
+    with pytest.raises(PermissionError):
+        h.rollback("hero", 1, workspace=ws, authorized=True, human_approved=False)
+    assert h.sequences("hero") == before
+    with pytest.raises(PermissionError):
+        h.rollback("hero", 1, workspace=ws, authorized=False, human_approved=True)
+    assert h.sequences("hero") == before
     assert ws.read("current", "hero", "game/readme.md")["content"] == "# v2\n"
