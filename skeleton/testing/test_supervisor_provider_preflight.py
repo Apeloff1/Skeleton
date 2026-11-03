@@ -74,3 +74,51 @@ def test_whitespace_only_provider_configuration_fails_before_dispatch() -> None:
         assert result.returncode != 0, empty_name
         assert "configuration_required" in result.stdout
         assert "DO_NOT_PRINT_TEST_KEY" not in result.stdout + result.stderr
+
+
+def test_model_client_refuses_redirects_that_could_expose_credentials(
+    monkeypatch,
+) -> None:
+    """Only the configured HTTPS origin may receive the model bearer token."""
+    import io
+    import urllib.request
+
+    from skeleton.automation import free_model
+
+    handler = free_model._RejectRedirects()
+    request = urllib.request.Request(
+        "https://models.example/v1/chat/completions",
+        data=b"{}",
+        headers={"Authorization": "Bearer DO_NOT_FORWARD"},
+        method="POST",
+    )
+    assert handler.redirect_request(
+        request, None, 302, "Found", {},
+        "https://untrusted.example/collect",
+    ) is None
+    assert handler.redirect_request(
+        request, None, 307, "Temporary Redirect", {},
+        "https://models.example/other-path",
+    ) is None
+
+    observed = []
+
+    class FakeOpener:
+        def open(self, request, timeout):
+            assert timeout == 5
+            assert request.get_header("Authorization") == "Bearer DO_NOT_FORWARD"
+            return io.BytesIO(b'{"choices":[{"message":{"content":"accepted"}}]}')
+
+    def capture_opener(*handlers):
+        observed.extend(handlers)
+        return FakeOpener()
+
+    monkeypatch.setattr(urllib.request, "build_opener", capture_opener)
+    client = object.__new__(free_model.FreeModelClient)
+    client.url = "https://models.example/v1/chat/completions"
+    client.key = "DO_NOT_FORWARD"
+    client.model = "test-model"
+    client.timeout = 5
+    assert client.chat("safe system", "safe request") == "accepted"
+    assert len(observed) == 1
+    assert isinstance(observed[0], free_model._RejectRedirects)
