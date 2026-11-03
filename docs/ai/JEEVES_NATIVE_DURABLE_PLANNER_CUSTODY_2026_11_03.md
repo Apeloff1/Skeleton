@@ -7,8 +7,8 @@ to the canonical protected execution-spine SQLite connection, rather than
 opening an unanchored SQLite file or replacing the existing native request,
 model receipt, source manifest, WAL or outbox authorities.
 
-The additive \`jeeves_native_runs\`, \`jeeves_native_checkpoints\`, and
-\`jeeves_native_inflight\` tables are contained within the same descriptor-
+The additive `jeeves_native_runs`, `jeeves_native_checkpoints`, and
+`jeeves_native_inflight` tables are contained within the same descriptor-
 anchored private database, run under its existing SQLite transactions.
 Records bind tenant, operator, installed model digest, tokenizer digest,
 run ID, goal text, budget and user-scoped metadata. A capped chain of
@@ -24,17 +24,17 @@ committed a post-response checkpoint. A crash between those events leaves an
 intent row that forbids automatic replay even if the next prompt could differ
 because unpersisted working memory changed.
 
-The existing cross-process \`SessionGate\` is held across the complete agent
+The existing cross-process `SessionGate` is held across the complete agent
 run or explicit resume, rather than only across each GGUF request. Native
 SQLite itself still owns per-request serialization and uncertain-effect fences.
 
 ## Operator workflow
 
-\`native_cli\` exposes three **operator-initiated** commands (the provided
-\`task.txt\` is a private local file, not a repository artifact; source proof
+`native_cli` exposes three **operator-initiated** commands (the provided
+`task.txt` is a private local file, not a repository artifact; source proof
 and model installation must already have been independently approved):
 
-\`\`\`bash
+```bash
 python -m skeleton.jeeves.agent.native_cli \
   --mode durable-agent --run-id jeeves_job_001 \
   --model-root /approved/private/model --state-dir /approved/private/state \
@@ -49,7 +49,7 @@ python -m skeleton.jeeves.agent.native_cli \
   --mode durable-agent --run-id jeeves_job_001 --resume-run \
   --model-root /approved/private/model --state-dir /approved/private/state \
   --tenant local --subject operator --task-stdin < /approved/private/task.txt
-\`\`\`
+```
 
 For successful inspection or explicit recovery, repeat the *identical*
 task, budget, principal and installed model identity. A changed source text,
@@ -58,7 +58,7 @@ uncertain runs; inspect the journal, authoritative native request state and
 outbox separately. No implicit startup recovery or supervisor retry exists.
 
 Durable mode intentionally rejects source tools and all ephemeral tool
-grants. The existing non-durable \`agent\` lane supports signed readonly
+grants. The existing non-durable `agent` lane supports signed readonly
 source retrieval; cross-process tool-effect reconciliation is not yet
 qualified for durable restoration. Real user-visible agent answers still
 require the installed local GGUF and independent quality proof.
