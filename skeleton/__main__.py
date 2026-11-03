@@ -77,6 +77,7 @@ Commands:
     world-experience Unified reviewed world, cast and route offline playable
     world-session Source-verified offline play, save, resume and checkpoint replay
     world-migrate Reviewed source-revision save migration with exact replay proof
+    world-assurance Integrated exact-source gameplay assurance and HTML5 handoff
     world-invariants Exhaustive authored world-state proof and playable handoff
     world-scenario Authored gameplay acceptance and source-leased HTML5 proof
     world-choice-impact Source-derived choice consequences and playable proof
@@ -813,6 +814,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-revision":
         from skeleton.jeeves.worlds.revision_cli import run as world_revision_cli
         return world_revision_cli(rest)
+    if cmd == "world-assurance":
+        from skeleton.jeeves.worlds.assurance_cli import run
+        return run(rest)
     if cmd == "world-invariants":
         from skeleton.jeeves.worlds.invariants_cli import run
         return run(rest)
