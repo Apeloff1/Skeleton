@@ -242,7 +242,10 @@ def execute_signed_once(package,index,queue,worker,order,*,expected_revision=1):
             "prompt_sha256":package.prompt_sha256,
             "source_receipt_sha256":package.source_receipt_sha256,
             "source_semantics_independently_proved":False,
-            "actual_native_receipt_seen":True,
+            # Signed SQLite reconciliation proves the contract path; a
+            # test double can satisfy it without any GGUF model installed.
+            "canonical_execution_contract_completed":True,
+            "real_gguf_model_independently_proved":False,
             "device_release_qualified":False}
 
 def reconcile_without_generation(package,index,queue,worker,order):

@@ -239,7 +239,8 @@ class SignedNativeWorkContract(unittest.TestCase):
         result=execute_signed_once(self.pkg,self.index,self.store,
                                     self.worker,self.order)
         self.assertEqual(result["status"],"committed")
-        self.assertTrue(result["actual_native_receipt_seen"])
+        self.assertTrue(result["canonical_execution_contract_completed"])
+        self.assertFalse(result["real_gguf_model_independently_proved"])
         self.assertFalse(result["device_release_qualified"])
         self.assertEqual(self.worker.generation_calls,1)
         self.assertEqual(result["source_receipt_sha256"],
