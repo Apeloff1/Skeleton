@@ -298,3 +298,49 @@ class LaptopFlow:
         lease = self.verify(world_id)["source_digest"]
         return self.sessions.preflight_import(
             world_id, imported, expected_world_digest=lease)
+
+    def diagnose(self, world_id: str, slot: str | None = None) -> dict[str, Any]:
+        """Read-only operator recovery map; never substitutes for verification.
+
+        Every successful stage is proved from the current canonical source.
+        A failed stage prevents downstream claims and gives a bounded error code.
+        No write, auto-approval, or silent source regeneration occurs.
+        """
+        _id(world_id, "world_id")
+        report: dict[str, Any] = {
+            "schema": "jeeves.world.laptop_diagnostic.v1",
+            "world_id": world_id, "checks": {},
+            "qualification": "diagnostic_only_not_consumer_or_device_certified",
+        }
+        try:
+            current = self.inspect(world_id)
+        except CanonError as exc:
+            report["checks"]["source"] = {"ok": False, "error": exc.code}
+            report["next_action"] = "repair_or_restore_canonical_world_source"
+            return report
+        report["source_digest"] = current["source_digest"]
+        report["checks"]["source"] = {"ok": True}
+        report["checks"]["review"] = {"ok": current["reviewed"]}
+        if not current["reviewed"]:
+            report["next_action"] = "review_and_approve_canonical_source"
+            return report
+        try:
+            self.verify(world_id)
+        except CanonError as exc:
+            report["checks"]["builder"] = {"ok": False, "error": exc.code}
+            report["next_action"] = "compile_and_verify_reviewed_source"
+            return report
+        report["checks"]["builder"] = {"ok": True}
+        if slot is not None:
+            try:
+                session = self.inspect_session(world_id, slot)
+            except CanonError as exc:
+                report["checks"]["session"] = {"ok": False, "error": exc.code}
+                report["next_action"] = "inspect_session_or_restore_from_trusted_export"
+                return report
+            report["checks"]["session"] = {
+                "ok": True, "session_digest": session["session_digest"],
+                "revision": session["revision"],
+            }
+        report["next_action"] = "source_playable_handoff_ready_for_engine_validation"
+        return report

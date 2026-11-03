@@ -313,3 +313,43 @@ def test_laptop_cli_restore_preflight_returns_actionable_error(tmp_path, capsys)
     failure = json.loads(capsys.readouterr().out)
     assert failure["error"] == "session_checksum_mismatch"
     assert failure["next_action"] == "reject_export_and_restore_from_trusted_copy"
+
+
+def test_laptop_diagnostic_reports_real_recovery_stages(tmp_path):
+    flow = LaptopFlow(tmp_path)
+    absent = flow.diagnose("lighthouse")
+    assert absent["checks"]["source"]["error"] == "not_found"
+    assert absent["next_action"] == "repair_or_restore_canonical_world_source"
+    proposal = flow.propose(sample("lighthouse_brief.json"))
+    pending = flow.diagnose("lighthouse")
+    assert pending["checks"]["source"]["ok"] is True
+    assert pending["checks"]["review"]["ok"] is False
+    assert pending["next_action"] == "review_and_approve_canonical_source"
+    reviewed = flow.review("lighthouse", proposal["source_digest"],
+                           sample("lighthouse_review.json"),
+                           "Reviewed original lighthouse rescue choices.")
+    not_compiled = flow.diagnose("lighthouse")
+    assert not_compiled["checks"]["builder"]["ok"] is False
+    assert not_compiled["next_action"] == "compile_and_verify_reviewed_source"
+    flow.compile("lighthouse", reviewed["source_digest"])
+    ready_report = flow.diagnose("lighthouse")
+    assert ready_report["checks"]["builder"]["ok"] is True
+    assert ready_report["qualification"] == "diagnostic_only_not_consumer_or_device_certified"
+    assert ready_report["next_action"] == "source_playable_handoff_ready_for_engine_validation"
+    flow.create_session("lighthouse", "player")
+    with_session = flow.diagnose("lighthouse", "player")
+    assert with_session["checks"]["session"]["revision"] == 0
+    (tmp_path / "lighthouse.player.session.json").write_bytes(b"{}")
+    corrupted = flow.diagnose("lighthouse", "player")
+    assert corrupted["checks"]["session"]["ok"] is False
+    assert corrupted["next_action"] == "inspect_session_or_restore_from_trusted_export"
+
+
+def test_laptop_diagnostic_cli_does_not_create_files(tmp_path, capsys):
+    flow, _, _, _ = ready(tmp_path)
+    before = sorted(path.name for path in tmp_path.iterdir())
+    assert run(["--store", str(tmp_path), "diagnose",
+                "--world-id", "lighthouse"]) == 0
+    result = json.loads(capsys.readouterr().out)["result"]
+    assert result["checks"]["builder"]["ok"] is True
+    assert sorted(path.name for path in tmp_path.iterdir()) == before

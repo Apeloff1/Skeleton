@@ -22,13 +22,15 @@ def run(argv: list[str]) -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     propose = sub.add_parser("propose")
     propose.add_argument("--brief-file", required=True)
-    for name in ("inspect", "review", "approve-current", "compile", "verify",
+    for name in ("inspect", "review", "approve-current", "compile", "verify", "diagnose",
                  "engine-inspect", "engine-compile", "engine-verify",
                  "session-create", "session-choose", "session-inspect",
                  "session-export", "session-restore", "session-restore-check"):
         command = sub.add_parser(name)
         command.add_argument("--world-id", required=True)
-        if name == "review":
+        if name == "diagnose":
+            command.add_argument("--slot")
+        elif name == "review":
             command.add_argument("--expected-digest", required=True)
             command.add_argument("--operation-file", required=True)
             command.add_argument("--review-note", required=True)
@@ -56,6 +58,8 @@ def run(argv: list[str]) -> int:
             result = flow.propose(_file(args.brief_file))
         elif args.action == "inspect":
             result = flow.inspect(args.world_id)
+        elif args.action == "diagnose":
+            result = flow.diagnose(args.world_id, args.slot)
         elif args.action == "review":
             result = flow.review(args.world_id, args.expected_digest,
                                  _file(args.operation_file), args.review_note)
