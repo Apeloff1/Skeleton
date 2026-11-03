@@ -45,3 +45,36 @@ def test_freeze_rejects_invalid_timestamp_and_reason_evidence():
                                (1, 2, ""), (1, 2, "forged" + chr(10) + "reason")):
         with pytest.raises(DeliveryError):
             Freeze(start, end, reason)
+
+
+def test_deploy_rejects_unknown_tiers_and_invalid_timestamps():
+    from skeleton.ai.build.core.delivery import maintenance_window as mirrored
+
+    for module in (None, mirrored):
+        deploy = may_deploy if module is None else module.may_deploy
+        for tier in ("production-shadow", "", None):
+            assert deploy(TUE_10, tier=tier, windows=WINDOWS) == (False, "unknown-tier")
+        for ts in (True, -1, 1.0, 253402300800):
+            assert deploy(ts, tier="production", windows=WINDOWS) == (
+                False, "invalid-timestamp"
+            )
+        with pytest.raises(DeliveryError):
+            (Window if module is None else module.Window)("tue", True, 600)
+
+
+def test_deploy_fails_closed_on_unbounded_or_invalid_policy_inventories():
+    from itertools import repeat
+    from skeleton.ai.build.core.delivery import maintenance_window as mirrored
+
+    for module in (None, mirrored):
+        deploy = may_deploy if module is None else module.may_deploy
+        freeze_type = Freeze if module is None else module.Freeze
+        assert deploy(TUE_10, tier="production",
+                      windows=repeat(WINDOWS[0], 257)) == (False, "too-many-windows")
+        with pytest.raises(DeliveryError, match="freeze count exceeds"):
+            deploy(TUE_10, tier="production", windows=WINDOWS,
+                   freezes=repeat(freeze_type(0, 1, "old"), 4097))
+        with pytest.raises(DeliveryError, match="invalid deployment freeze"):
+            deploy(TUE_10, tier="production", windows=WINDOWS, freezes=[object()])
+        with pytest.raises(DeliveryError, match="invalid deployment window"):
+            deploy(TUE_10, tier="production", windows=[object()])
