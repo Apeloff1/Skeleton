@@ -11,6 +11,7 @@ from .guidance import hint
 from .io import read_bounded, write_new\nfrom .acceptance import run_acceptance
 from .quests import progress
 from .economy import BASE, price
+from .render import render_map, legend
 
 DEMO_PATH = Path(__file__).with_name("cinder_ridge.json")
 
@@ -69,7 +70,9 @@ def main(argv: list[str] | None = None) -> int:
                 state = initial_state(world)
                 while state["status"] == "playing":
                     choices = available_actions(world, state)
-                    print(json.dumps({"turn": state["turn"], "position": state["position"], "health": state["health"], "stamina": state["stamina"], "actions": choices}, sort_keys=True))
+                    print(render_map(world, state))
+                    print(legend())
+                    print(json.dumps({"actions": choices}, sort_keys=True))
                     line = input("action index (q to quit)> ").strip()
                     if line == "q":
                         break
