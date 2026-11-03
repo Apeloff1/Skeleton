@@ -85,3 +85,22 @@ def test_delivery_tree_enforces_aggregate_bound(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "MAX_READ", 3)
     with pytest.raises(DeliveryError, match="byte limit"):
         cli._read_tree(root)
+
+
+def test_delivery_tree_rejects_control_and_unicode_alias_member_names(tmp_path):
+    import pytest
+    from skeleton.build.delivery._util import DeliveryError
+    from skeleton.build.delivery.cli import _read_tree
+    from skeleton.ai.build.core.delivery import cli as mirrored
+
+    root = tmp_path / "dist"
+    root.mkdir()
+    (root / "safe.whl").write_bytes(b"ok")
+    for name in ("bad\nname.whl", "cafe\u0301.whl", "bad%2fname.whl"):
+        path = root / name
+        path.write_bytes(b"forged")
+        for read in (_read_tree, mirrored._read_tree):
+            with pytest.raises(DeliveryError, match="member path is unsafe"):
+                read(root)
+        path.unlink()
+    assert _read_tree(root) == {"safe.whl": b"ok"}

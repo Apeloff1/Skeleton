@@ -17,10 +17,11 @@ import json
 import os
 import stat
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Sequence
 
-from skeleton.build.delivery._util import DeliveryError, canonical_json, sha256_bytes
+from skeleton.build.delivery._util import DeliveryError, canonical_json, normalize_relpath, sha256_bytes
 from skeleton.build.delivery.artifact_manifest import ArtifactManifest, build_manifest, verify_files
 from skeleton.build.delivery.deploy_plan import compile_plan
 from skeleton.build.delivery.env_config import load_layers, resolve
@@ -69,6 +70,13 @@ def _read_tree(root: Path) -> dict[str, bytes]:
                     if entries > MAX_READ_ENTRIES:
                         raise DeliveryError("delivery tree entry count exceeds bound")
                     path = prefix + entry.name
+                    if (len(path) > 4096
+                            or unicodedata.normalize("NFC", path) != path
+                            or any(unicodedata.category(ch) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+                                   for ch in path)
+                            or any(ch in path for ch in (":", "%", "?", "#"))
+                            or normalize_relpath(path) != path):
+                        raise DeliveryError("delivery tree member path is unsafe")
                     observed = entry.stat(follow_symlinks=False)
                     if stat.S_ISDIR(observed.st_mode):
                         child_fd = os.open(entry.name, dir_flags, dir_fd=directory_fd)
