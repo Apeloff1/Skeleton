@@ -11,9 +11,10 @@ reachable endings, bounded state count and absence of gameplay dead ends.
 1. Create a world using `world-canon`.
 2. Run `python -m skeleton world-puzzles --store STORE propose --world-id clocktower --prompt "Original bell puzzle" --puzzle-id bell_riddle --scene opening --question "Number after two?" --answer three --hint "Count" --unlock-choice pursue_goal`.
 3. Save the `proposal` JSON with `save --world-id clocktower --create --puzzles-json JSON`.
-4. Edit with `edit --world-id clocktower --expected-digest SHA --operation-json JSON`; actions: add_puzzle, replace_puzzle, remove_puzzle.
-5. Approve with `approve --world-id clocktower --expected-digest SHA --review-note "Author reviewed"`.
-6. Compile with `compile --world-id clocktower --expected-digest APPROVED_SHA` and verify with `verify --world-id clocktower`.
+4. Open the CSP-bound offline editor using `editor --world-id clocktower --expected-digest SHA`; export unapproved typed JSON.
+5. Edit with `edit --world-id clocktower --expected-digest SHA --operation-json JSON`; actions: add_puzzle, replace_puzzle, remove_puzzle.
+6. Approve with `approve --world-id clocktower --expected-digest SHA --review-note "Author reviewed"`.
+7. Compile with `compile --world-id clocktower --expected-digest APPROVED_SHA` and verify with `verify --world-id clocktower`.
 
 The HTML5 handoff has a strict CSP, no network, no external assets, no
 dynamic HTML injection and no executable authored code. Wrong answers show

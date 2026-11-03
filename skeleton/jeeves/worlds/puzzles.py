@@ -93,6 +93,7 @@ def prove_puzzles(data: Any, world: Any) -> dict[str, Any]:
     queue = deque([(initial, ())])
     seen = {initial}
     puzzle_witnesses: dict[str, list[str]] = {}
+    gate_witnesses: dict[str, list[str]] = {}
     ending_witnesses: dict[str, list[str]] = {}
     while queue:
         (scene, flags, solved), path = queue.popleft()
@@ -118,6 +119,8 @@ def prove_puzzles(data: Any, world: Any) -> dict[str, Any]:
             if choice["id"] in by_choice and by_choice[choice["id"]] not in solved:
                 continue
             enabled += 1
+            if choice["id"] in by_choice:
+                gate_witnesses.setdefault(choice["id"], list(path + (choice["id"],)))
             state = (
                 choice["to"],
                 flags | frozenset(choice["grants"]),
@@ -133,6 +136,9 @@ def prove_puzzles(data: Any, world: Any) -> dict[str, Any]:
     missing = endings - set(ending_witnesses)
     if missing:
         raise CanonError("puzzles_unreachable_endings", ",".join(sorted(missing)))
+    missing_gates = set(by_choice) - set(gate_witnesses)
+    if missing_gates:
+        raise CanonError("puzzles_unreachable_gates", ",".join(sorted(missing_gates)))
     missing_puzzles = {puzzle["id"] for puzzle in obj["puzzles"]} - set(puzzle_witnesses)
     if missing_puzzles:
         raise CanonError("puzzles_unreachable", ",".join(sorted(missing_puzzles)))
@@ -143,6 +149,7 @@ def prove_puzzles(data: Any, world: Any) -> dict[str, Any]:
         "puzzles_digest": digest(obj),
         "states_explored": len(seen),
         "puzzle_witnesses": {key: puzzle_witnesses[key] for key in sorted(puzzle_witnesses)},
+        "gate_witnesses": {key: gate_witnesses[key] for key in sorted(gate_witnesses)},
         "ending_witnesses": {key: ending_witnesses[key] for key in sorted(ending_witnesses)},
         "qualification": "bounded_solve_and_travel_reachability",
     }
@@ -394,6 +401,29 @@ class PuzzleStore:
             "qualification": "offline_reviewed_puzzle_gated_playable",
         }
         return receipt, playable
+
+    def editor(self, world_id: str, expected_digest: str) -> dict[str, Any]:
+        """Publish a source-leased, network-disabled editor, not an approval."""
+        from .puzzles_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                world = self._world(fd, world_id)
+                data = self._read(fd, world_id, world)
+                if digest(data) != expected_digest:
+                    raise CanonError("puzzles_stale_edit")
+                content = render_editor(data, world)
+                name = world_id + ".puzzles.editor.html"
+                self.worlds._write(fd, name, content)
+                return {
+                    "html_file": name, "html_sha256": sha256(content).hexdigest(),
+                    "puzzles_digest": digest(data),
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()

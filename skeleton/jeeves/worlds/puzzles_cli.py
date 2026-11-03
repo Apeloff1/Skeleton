@@ -13,14 +13,14 @@ def run(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton world-puzzles")
     parser.add_argument("--store", required=True)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("propose", "inspect", "save", "edit", "approve", "compile", "verify"):
+    for action in ("propose", "inspect", "save", "edit", "editor", "approve", "compile", "verify"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
         if action == "propose":
             for field in ("prompt", "puzzle-id", "scene", "question", "answer",
                           "hint", "unlock-choice"):
                 cmd.add_argument("--" + field, required=True)
-        if action in ("save", "edit", "approve", "compile"):
+        if action in ("save", "edit", "editor", "approve", "compile"):
             cmd.add_argument("--expected-digest")
         if action == "save":
             cmd.add_argument("--puzzles-json", required=True)
@@ -56,6 +56,8 @@ def run(argv: list[str]) -> int:
             result = {"puzzles_digest": store.publish(
                 args.world_id, updated, expected_digest=args.expected_digest,
             ), "review_required": True}
+        elif args.action == "editor":
+            result = {"editor": store.editor(args.world_id, args.expected_digest)}
         elif args.action == "approve":
             result = {"puzzles_digest": store.approve(
                 args.world_id, expected_digest=args.expected_digest,

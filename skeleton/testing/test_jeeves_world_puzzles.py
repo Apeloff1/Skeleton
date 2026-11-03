@@ -45,6 +45,9 @@ def test_proposal_requires_review_and_proves_solve_then_travel(tmp_path):
     _, store, world, source = setup(tmp_path)
     proof = prove_puzzles(source, world)
     assert proof["puzzle_witnesses"]["bell_riddle"] == ["solve:bell_riddle"]
+    assert proof["gate_witnesses"]["pursue_goal"] == [
+        "solve:bell_riddle", "pursue_goal",
+    ]
     assert proof["ending_witnesses"]["resolution"] == [
         "solve:bell_riddle", "pursue_goal",
     ]
@@ -238,3 +241,22 @@ def test_symlink_source_fails_closed(tmp_path):
     with pytest.raises((CanonError, OSError)):
         store.inspect("clocktower")
     assert target.read_bytes() == canonical(source)
+
+
+def test_offline_puzzle_editor_exports_unapproved_json(tmp_path, capsys):
+    _, store, _, source = setup(tmp_path)
+    first = store.publish("clocktower", source, create=True)
+    editor = store.editor("clocktower", first)
+    html_bytes = (tmp_path / editor["html_file"]).read_bytes()
+    assert hashlib.sha256(html_bytes).hexdigest() == editor["html_sha256"]
+    assert b"connect-src 'none'" in html_bytes
+    assert b"Export unapproved puzzle JSON" in html_bytes
+    assert b"Review required after offline puzzle edit" in html_bytes
+    assert_code("puzzles_stale_edit",
+                lambda: store.editor("clocktower", "0" * 64))
+    status = run([
+        "--store", str(tmp_path), "editor", "--world-id", "clocktower",
+        "--expected-digest", first,
+    ])
+    assert status == 0
+    assert json.loads(capsys.readouterr().out)["editor"]["puzzles_digest"] == first
