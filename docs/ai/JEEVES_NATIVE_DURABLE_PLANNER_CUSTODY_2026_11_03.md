@@ -91,3 +91,16 @@ require the installed local GGUF and independent quality proof.
   qualification, model license verification or a release certificate.
 - PR #4700 remains draft and stacked on #4699. Exact-head security, release,
   consumer and native validation gates are still mandatory before promotion.
+
+## Run-scoped working-memory continuity
+
+The durable reasoning lane now uses the existing Jeeves MemoryManager with
+an append/update custody table, `jeeves_native_memories`, in the same private
+SQLite transaction authority. The exact memory ID, namespace, content,
+source, trust, salience, evidence refs, expiration and recall counters are
+stored and validated before cold recovery. No other run or subject can be
+imported into the active planner. A failed durable memory write now stops
+the durable reasoning lane; the ordinary best-effort memory error swallowing
+is deliberately not used here. Unreviewed privacy deletion and silent cache
+eviction are held rather than discarding only the process copy. Durable
+retention/deletion lifecycle remains a separate release hold.
