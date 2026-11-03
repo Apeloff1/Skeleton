@@ -41,6 +41,12 @@ from .harbor_crafting_route import MAX_ROUTE_BYTES, plan_route, verify_route
 from .harbor_crafting_itinerary import (
     MAX_ITINERARY_BYTES, build_itinerary, verify_itinerary,
 )
+from .harbor_crafting_time_trials import (
+    MAX_REPORT_BYTES as MAX_TRIAL_REPORT_BYTES,
+    MAX_BOARD_BYTES as MAX_TRIAL_BOARD_BYTES,
+    resume_time_trial, time_trial_report, verify_time_trial_report,
+    time_trial_leaderboard, verify_time_trial_leaderboard,
+)
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -69,7 +75,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -101,11 +107,41 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--route", help="Portable replay-verified route JSON")
     parser.add_argument("--stops", help="JSON array of route-and-interaction stops")
     parser.add_argument("--itinerary", help="Portable replay-verified itinerary JSON")
+    parser.add_argument("--trial", help="Authored time trial course JSON")
+    parser.add_argument("--reports", help="JSON array of replay-verified time trial reports")
+    parser.add_argument("--board", help="Portable time trial leaderboard JSON")
     parser.add_argument("--max-steps", type=int, default=64, help="Bounded route search horizon")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "itinerary-build":
+        if args.command == "trial-run":
+            output = time_trial_report(
+                _required_json(args.bundle, "bundle"),
+                _required_json(args.trial, "trial"),
+                require_finish=args.require_win,
+            )
+        elif args.command == "trial-verify":
+            output = {"verified": True, **verify_time_trial_report(
+                _required_json(args.report, "report", MAX_TRIAL_REPORT_BYTES),
+                require_finish=args.require_win,
+            )}
+        elif args.command == "trial-resume":
+            if not args.expected_terminal_digest:
+                raise HarborError("--expected-terminal-digest is required")
+            output = resume_time_trial(
+                _required_json(args.bundle, "bundle"),
+                _required_json(args.trial, "trial"),
+                _required_json(args.actions, "actions"),
+                expected_terminal_digest=args.expected_terminal_digest,
+                require_finish=args.require_win,
+            )
+        elif args.command == "trial-leaderboard":
+            output = time_trial_leaderboard(
+                _required_json(args.reports, "reports", MAX_TRIAL_BOARD_BYTES))
+        elif args.command == "trial-verify-leaderboard":
+            output = {"verified": True, "ranking": verify_time_trial_leaderboard(
+                _required_json(args.board, "board", MAX_TRIAL_BOARD_BYTES))}
+        elif args.command == "itinerary-build":
             if not args.expected_terminal_digest:
                 raise HarborError("--expected-terminal-digest is required")
             output = build_itinerary(
