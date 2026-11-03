@@ -72,6 +72,9 @@ class MongoCanonicalSourceEpoch:
                 raise MongoSourceEpochError("durable source epoch collection unavailable")
         if not callable(getattr(reader, "find_one", None)):
             raise MongoSourceEpochError("linearizable source epoch reader unavailable")
+        # Retain the exact database object for fail-closed composition identity.
+        # Same-named collections on distinct clients are not the same witness.
+        self._database = database
         self._collection = collection
         self._reader = reader
         self._active: ContextVar[_BoundWriter | None] = ContextVar(

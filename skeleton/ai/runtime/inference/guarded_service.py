@@ -52,6 +52,7 @@ class CanonicalGuardedLocalService:
     def __init__(
         self, guard: GuardedLocalInference, *, snapshots: TrustedSnapshotReader,
         source_timeout_seconds: float = 5.0,
+        activation_gate: Any | None = None,
     ) -> None:
         if not isinstance(guard, GuardedLocalInference) or not callable(
             getattr(snapshots, "resolve", None)
@@ -65,6 +66,11 @@ class CanonicalGuardedLocalService:
         self.guard = guard
         self.snapshots = snapshots
         self.source_timeout_seconds = float(source_timeout_seconds)
+        if activation_gate is not None:
+            from .compose_activation import MongoGuardedActivation
+            if type(activation_gate) is not MongoGuardedActivation:
+                raise SealedContextBoundaryError("trusted Compose activation gate required")
+        self.activation_gate = activation_gate
 
     async def _read(
         self, *, tenant_scope_id: str, context_id: str, request_digest: str,
@@ -120,12 +126,20 @@ class CanonicalGuardedLocalService:
         digest = getattr(request, "digest", None)
         if not isinstance(digest, str) or not digest:
             raise SealedContextError("request needs a deterministic input digest")
+        # Compose may require an independently verified Mongo activation. The
+        # permit is rechecked across dispatch and before the answer is released.
+        permit = (
+            await self.activation_gate.assert_active()
+            if self.activation_gate is not None else None
+        )
         before = await self._read(
             tenant_scope_id=tenant_scope_id, context_id=context_id,
             request_digest=digest, deadline=engine_options.get("deadline"),
         )
 
         async def check_before_dispatch() -> None:
+            if self.activation_gate is not None:
+                await self.activation_gate.assert_active(permit)
             current = await self._read(
                 tenant_scope_id=tenant_scope_id, context_id=context_id,
                 request_digest=digest, deadline=engine_options.get("deadline"),
@@ -145,4 +159,6 @@ class CanonicalGuardedLocalService:
         )
         if after != before:
             raise SealedContextReplayError("canonical context changed during local inference")
+        if self.activation_gate is not None:
+            await self.activation_gate.assert_active(permit)
         return GuardedGeneration(result, receipt, after.snapshot_version)
