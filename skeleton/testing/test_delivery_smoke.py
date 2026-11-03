@@ -47,3 +47,23 @@ def test_smoke_suite_and_outcome_bounds(monkeypatch):
         evaluate(load_suite(SUITE), repeat(SmokeOutcome("health", 200), 3))
     with pytest.raises(DeliveryError, match="nonzero"):
         evaluate([], [])
+
+
+def test_smoke_suite_rejects_external_path_and_unbounded_key_evidence():
+    from skeleton.ai.build.core.delivery import smoke as mirrored
+
+    for module in (None, mirrored):
+        load = load_suite if module is None else module.load_suite
+        evaluate_fn = evaluate if module is None else module.evaluate
+        outcome_type = SmokeOutcome if module is None else module.SmokeOutcome
+        for path in ("//external/health", "/../admin", "/health?token=x",
+                     "/health#ok", "/health\\admin"):
+            with pytest.raises(DeliveryError, match="unsafe smoke path"):
+                load([{"id": "x", "path": path}])
+        with pytest.raises(DeliveryError, match="JSON keys invalid"):
+            load([{"id": "x", "path": "/x", "expect_json_keys": ["x" * 129]}])
+        cases = load([{"id": "x", "path": "/x"}])
+        with pytest.raises(DeliveryError, match="invalid smoke outcome evidence"):
+            evaluate_fn(cases, [outcome_type("x", 200, ("x" * 129,))])
+        with pytest.raises(DeliveryError, match="invalid smoke case definition"):
+            evaluate_fn([object()], [])

@@ -25,13 +25,19 @@ class SmokeCase:
         require_id(self.case_id, field="case_id")
         if self.method not in METHODS:
             raise DeliveryError(f"smoke case {self.case_id} must use a read-only method")
-        if not isinstance(self.path, str) or not self.path.startswith("/"):
-            raise DeliveryError("smoke path must start with /")
+        if (type(self.path) is not str or not self.path.startswith("/")
+                or self.path.startswith("//") or len(self.path) > 256
+                or any(ch in self.path for ch in ("\\", "?", "#"))
+                or ".." in self.path.split("/")
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.path)):
+            raise DeliveryError("unsafe smoke path")
         if type(self.expect_status) is not int or not 100 <= self.expect_status <= 599:
             raise DeliveryError("smoke expected status must be a valid HTTP integer")
         if (not isinstance(self.expect_json_keys, tuple)
                 or len(self.expect_json_keys) > MAX_SMOKE_JSON_KEYS
-                or any(type(k) is not str or not k for k in self.expect_json_keys)):
+                or any(type(k) is not str or not 1 <= len(k) <= 128
+                       or any(ord(ch) < 32 or ord(ch) == 127 for ch in k)
+                       for k in self.expect_json_keys)):
             raise DeliveryError("smoke expected JSON keys invalid")
 
 
@@ -75,6 +81,8 @@ def load_suite(items: Sequence[Mapping]) -> tuple[SmokeCase, ...]:
 def evaluate(cases: Sequence[SmokeCase], outcomes: Iterable[SmokeOutcome]) -> SmokeReport:
     if not cases or len(cases) > MAX_SMOKE_CASES:
         raise DeliveryError("smoke case count must be bounded and nonzero")
+    if any(type(case) is not SmokeCase for case in cases):
+        raise DeliveryError("invalid smoke case definition")
     ids = [case.case_id for case in cases]
     if len(set(ids)) != len(ids):
         raise DeliveryError("duplicate smoke case ids")
@@ -89,7 +97,9 @@ def evaluate(cases: Sequence[SmokeCase], outcomes: Iterable[SmokeOutcome]) -> Sm
         if (type(outcome.status) is not int or not 100 <= outcome.status <= 599
                 or not isinstance(outcome.json_keys, tuple)
                 or len(outcome.json_keys) > MAX_SMOKE_JSON_KEYS
-                or any(type(k) is not str for k in outcome.json_keys)):
+                or any(type(k) is not str or not 1 <= len(k) <= 128
+                       or any(ord(ch) < 32 or ord(ch) == 127 for ch in k)
+                       for k in outcome.json_keys)):
             raise DeliveryError("invalid smoke outcome evidence")
         by_id[outcome.case_id] = outcome
     passed: list[str] = []
