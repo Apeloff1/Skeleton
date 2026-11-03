@@ -143,3 +143,28 @@ def test_tarball_accepts_portable_epoch_zero_but_zip_requires_1980():
     assert build_tarball("pkg.tar.gz", {"a": b"x"}, epoch=0).file_count == 1
     with pytest.raises(DeliveryError, match="1980"):
         build_zip("pkg.zip", {"a": b"x"}, epoch=0)
+
+
+def test_package_builders_bound_malicious_mapping_iteration():
+    from itertools import count
+    from skeleton.ai.build.core.delivery import packaging as mirrored
+
+    class UnboundedFiles(dict):
+        def items(self):
+            return ((f"file{i}", b"x") for i in count())
+
+    for build, mirror_build in ((build_zip, mirrored.build_zip),
+                                (build_tarball, mirrored.build_tarball)):
+        name = "pkg.zip" if build is build_zip else "pkg.tar.gz"
+        for fn in (build, mirror_build):
+            with pytest.raises(DeliveryError, match="too many files"):
+                fn(name, UnboundedFiles())
+
+
+def test_package_combined_prefix_and_file_path_are_bounded():
+    from skeleton.ai.build.core.delivery import packaging as mirrored
+
+    for build in (build_zip, build_tarball, mirrored.build_zip, mirrored.build_tarball):
+        name = "pkg.zip" if build in (build_zip, mirrored.build_zip) else "pkg.tar.gz"
+        with pytest.raises(DeliveryError):
+            build(name, {"a" * 100: b"x"}, prefix="b" * 4050)
