@@ -16,6 +16,8 @@ def test_source_consumer_process_rejects_mutation_and_keeps_earned_save():
     assert not report["portable_zipapp_verified"]
     assert report["actions"] > 20
     assert report["portable_export_verified"]
+    assert report["partial_restore_resume_verified"]
+    assert report["stdin_export_verification"]
     assert not report["windows_device_certified"]
 
 
@@ -30,6 +32,8 @@ def test_real_zipapp_play_quit_restart_victory_and_export():
     assert report["chapters"] == 2
     assert report["invalid_mutation_rejected"]
     assert report["portable_export_verified"]
+    assert report["partial_restore_resume_verified"]
+    assert report["stdin_export_verification"]
     assert not report["windows_device_certified"]
     assert not report["installer_certified"]
     assert not report["release_certified"]

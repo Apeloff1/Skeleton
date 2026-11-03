@@ -85,6 +85,16 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         raise SmokeError("quit did not persist exactly the accepted turns")
     if midway["head"] == expected_head:
         raise SmokeError("midway save incorrectly claimed completed head")
+    # Restore a mid-campaign checkpoint in a new process, then independently
+    # finish that save to prove portable restoration is playable, not cosmetic.
+    partial = json.loads(_invoke(command, ["export", "--slot", "smoke"], env=env, cwd=root))
+    partial_payload = Path(partial["path"]).read_bytes()
+    resumed_mid = json.loads(_invoke(
+        command, ["restore", "--slot", "recovered-mid", "--file", "-"],
+        env=env, cwd=root, stdin=partial_payload.decode("utf-8"),
+    ))
+    if resumed_mid["head"] != midway["head"] or resumed_mid["revision"] != split:
+        raise SmokeError("partial portable restore lost the playable checkpoint")
     second = _invoke(
         command, ["play", "--slot", "smoke", "--ascii"], env=env, cwd=root,
         stdin="\n".join(choices[split:] + ["q"]) + "\n",
@@ -96,6 +106,22 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         raise SmokeError("restarted campaign diverged from canonical engine")
     if final["revision"] != len(choices):
         raise SmokeError("game saved a different number of accepted turns")
+    resumed_play = _invoke(
+        command, ["play", "--slot", "recovered-mid", "--ascii"], env=env, cwd=root,
+        stdin="\n".join(choices[split:] + ["q"]) + "\n",
+    )
+    if "Victory:" not in resumed_play:
+        raise SmokeError("restored checkpoint did not earn an ending")
+    resumed_final = json.loads(_invoke(
+        command, ["status", "--slot", "recovered-mid"], env=env, cwd=root,
+    ))
+    if resumed_final["head"] != expected_head or resumed_final["revision"] != len(choices):
+        raise SmokeError("restored checkpoint diverged during resumed gameplay")
+    resumed_audit = json.loads(_invoke(
+        command, ["audit", "--slot", "recovered-mid"], env=env, cwd=root,
+    ))
+    if not resumed_audit["verified"] or resumed_audit["audit_entries"] != len(choices):
+        raise SmokeError("restored checkpoint action history failed audit")
     audit = json.loads(_invoke(command, ["audit", "--slot", "smoke"], env=env, cwd=root))
     if not audit["verified"] or audit["audit_entries"] != len(choices):
         raise SmokeError("save audit did not replay all turns")
@@ -107,6 +133,12 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
     restored = verify_export(payload)
     if restored["head"] != expected_head or restored["status"] != "completed":
         raise SmokeError("portable export failed deterministic verification")
+    verified_pipe = json.loads(_invoke(
+        command, ["verify-export", "--file", "-"], env=env, cwd=root,
+        stdin=payload.decode("utf-8"),
+    ))
+    if not verified_pipe["verified"] or verified_pipe["head"] != expected_head:
+        raise SmokeError("bounded cross-platform export verification failed")
     # Restore the exported campaign through a new real consumer process and
     # require an independently replayed, complete transactional audit.
     restored_slot = json.loads(_invoke(
@@ -153,6 +185,8 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         "real_processes": True,
         "portable_export_verified": True,
         "portable_restore_audited": True,
+        "partial_restore_resume_verified": True,
+        "stdin_export_verification": True,
         "restore_overwrite_rejected": True,
         "tampered_restore_rejected": True,
         "invalid_mutation_rejected": True,

@@ -167,6 +167,8 @@ def _consumer_process_contract() -> dict:
         if (report["result"] != "passed-on-current-host" or
             not report["portable_export_verified"] or
             not report["portable_restore_audited"] or
+            not report["partial_restore_resume_verified"] or
+            not report["stdin_export_verification"] or
             not report["restore_overwrite_rejected"] or
             not report["tampered_restore_rejected"] or
             not report["invalid_mutation_rejected"] or
