@@ -78,6 +78,7 @@ Commands:
     world-session Source-verified offline play, save, resume and checkpoint replay
     world-fork    Reviewed alternate save fork, causal replay and HTML5 handoff
     world-epilogues Reviewed original ending closure and replay-verified HTML5 handoff
+    world-weather Reviewed deterministic scene weather and replay handoff
     world-advisories Reviewed scene content notices and masked HTML5 player handoff
     world-field-journal Player-authored source-leased notes and verified HTML5 handoff
     world-migrate Reviewed source-revision save migration with exact replay proof
@@ -862,6 +863,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-field-journal":
         from skeleton.jeeves.worlds.field_journal_cli import run as field_journal_cli
         return field_journal_cli(rest)
+    if cmd == "world-weather":
+        from skeleton.jeeves.worlds.weather_cli import run as world_weather_cli
+        return world_weather_cli(rest)
     if cmd == "world-advisories":
         from skeleton.jeeves.worlds.advisories_cli import run as advisories_cli
         return advisories_cli(rest)

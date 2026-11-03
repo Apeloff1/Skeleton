@@ -13,6 +13,7 @@ from .asset_briefs import compile_assets, validate_briefs
 from .bundle import _artifact_read
 from .chapters import engine_handoff as chapters_handoff, scene_index, validate_chapters
 from .cinematics import engine_handoff as cinematics_handoff, validate_cinematics
+from .weather import engine_handoff as weather_handoff, validate_weather
 from .studio_assembly import StudioAssemblyStore, compile_studio_assembly
 from .timeline import compile_timeline, validate_timeline
 from .world_canon import CanonError, WorldStore, _id, canonical, digest, strict_json
@@ -72,7 +73,7 @@ def compile_studio_engine(sources: tuple[Any, ...], era: str,
     source_digests = {**studio["source_digests"],
                       "assets": digest(assets), "timeline": digest(timeline)}
     optional = optional or {}
-    if set(optional) - {"chapters", "cinematics"}:
+    if set(optional) - {"chapters", "cinematics", "weather"}:
         raise CanonError("studio_engine_unknown_optional_source")
     optional_handoffs: dict[str, Any] = {}
     if "chapters" in optional:
@@ -89,6 +90,13 @@ def compile_studio_engine(sources: tuple[Any, ...], era: str,
         sequences = {item["scene"]: item["beats"] for item in source["sequences"]}
         for node in scene_nodes:
             node["cinematic_beats"] = sequences.get(node["id"], [])
+    if "weather" in optional:
+        weather_source = validate_weather(optional["weather"], world)
+        optional_handoffs["weather"] = weather_handoff(weather_source, world)
+        source_digests["weather"] = digest(weather_source)
+        conditions = {item["scene"]: item for item in weather_source["scenes"]}
+        for node in scene_nodes:
+            node["weather"] = conditions[node["id"]]
     manifest = {
         "schema": SCHEMA, "world_id": world["id"], "engine_era": era,
         "source_digests": source_digests,
@@ -132,7 +140,8 @@ class StudioEngineStore:
         """Read optional approved authoring planes under the SAME world lease."""
         result: dict[str, Any] = {}
         for name, validate in (("chapters", validate_chapters),
-                               ("cinematics", validate_cinematics)):
+                               ("cinematics", validate_cinematics),
+                               ("weather", validate_weather)):
             try:
                 source = strict_json(self.worlds._read(
                     fd, world_id + "." + name + ".json"))
@@ -186,7 +195,7 @@ class StudioEngineStore:
     def compile(self, world_id: str, expected_digests: Any, era: str) -> dict[str, Any]:
         if (type(expected_digests) is not dict or
                 not set(SOURCE_NAMES) <= set(expected_digests) or
-                set(expected_digests) - set(SOURCE_NAMES) - {"chapters", "cinematics"}):
+                set(expected_digests) - set(SOURCE_NAMES) - {"chapters", "cinematics", "weather"}):
             raise CanonError("studio_engine_invalid_lease")
         fd = self.worlds._directory()
         try:
