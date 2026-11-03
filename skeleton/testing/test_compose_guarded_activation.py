@@ -58,6 +58,7 @@ class FakeReviewer:
         self.signer = signer
         self.challenge_count = 0
         self.replayed_signature = None
+        self.last_signature = None
         self.on_challenge = None
 
     def __call__(self, *args):
@@ -69,7 +70,8 @@ class FakeReviewer:
             await self.on_challenge(payload)
         if self.replayed_signature is not None:
             return self.replayed_signature
-        return self.signer.sign(payload)
+        self.last_signature = self.signer.sign(payload)
+        return self.last_signature
 
 
 class ActivationTests(unittest.IsolatedAsyncioTestCase):
@@ -312,10 +314,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
     async def test_replayed_reviewer_signature_blocks(self):
         gate = self.make()
         permit = await gate.activate()
-        async def capture(payload):
-            if self.reviewer.replayed_signature is None:
-                self.reviewer.replayed_signature = self.signer.sign(payload)
-        self.reviewer.on_challenge = capture
+        self.reviewer.replayed_signature = self.reviewer.last_signature
         with self.assertRaisesRegex(ActivationBlocked, "reviewer custody"):
             await gate.assert_active(permit)
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
