@@ -117,3 +117,26 @@ def test_planner_output_and_request_identity_budgets_fail_closed():
     for rid in ("", "x" * 129, "../escape", "req\nforged"):
         with pytest.raises(ValueError, match="request identity"):
             run(ModelPlanner(FakeRouter(), gate=gate, cap=cap).plan(BRIEF, request_id=rid))
+
+
+def test_prompt_normalizer_bounds_before_unicode_expansion_and_router():
+    from skeleton.forge.ai_builder.prompt_normalizer import MAX_RAW_PROMPT_CHARS, normalize_prompt
+    from skeleton.forge.game_design_spec import BRIEF_MAX
+
+    assert normalize_prompt("  hello\\tworld  ", limit=8) == "hello wo"
+    for invalid in (0, -1, True, 1.5, BRIEF_MAX + 1):
+        with pytest.raises(ValueError, match="output limit"):
+            normalize_prompt("hello", limit=invalid)
+    with pytest.raises(ValueError, match="input budget"):
+        normalize_prompt("x" * (MAX_RAW_PROMPT_CHARS + 1))
+    # NFKC may expand compatibility characters, so the post-normalization
+    # budget must also hold before whitespace cleanup and model routing.
+    with pytest.raises(ValueError, match="normalized prompt"):
+        normalize_prompt("\ufb03" * (MAX_RAW_PROMPT_CHARS // 2))
+
+    gate, issuer = gate_and_issuer()
+    router = FakeRouter()
+    with pytest.raises(ValueError, match="input budget"):
+        run(ModelPlanner(router, gate=gate, cap=grant_providers(issuer, ["alpha"]))
+            .plan("x" * (MAX_RAW_PROMPT_CHARS + 1)))
+    assert router.invoked == []
