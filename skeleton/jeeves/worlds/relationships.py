@@ -399,6 +399,26 @@ class RelationshipStore:
                    "qualification": "reviewed_original_npc_trust_not_release_certified"}
         return receipt, playable
 
+    def editor(self, world_id: str, expected_digest: str) -> dict[str, str]:
+        from .relationships_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            self._locked(fd, world_id)
+            try:
+                world, cast = self._sources(fd, world_id)
+                data = self._read(fd, world_id, world, cast)
+                if digest(data) != expected_digest:
+                    raise CanonError("relationships_stale_edit")
+                page = render_editor(data, world, cast)
+                name = world_id + ".relationships.editor.html"
+                self.worlds._write(fd, name, page)
+                return {"html_file": name, "html_sha256": sha256(page).hexdigest(),
+                        "relationships_digest": digest(data)}
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:

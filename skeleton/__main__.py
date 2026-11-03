@@ -97,6 +97,7 @@ Commands:
     world-npc-schedule Reviewed NPC itineraries, temporal proof and offline playable
     world-inventory Reviewed original item effects and source-bound HTML5 playable
     world-puzzles Reviewed original scene riddles and verified choice-gated gameplay
+    world-relationships Reviewed original NPC trust, replay and playable handoff
     world-events Reviewed one-shot world events, flag closure and HTML5 handoff
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
@@ -868,6 +869,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-knowledge":
         from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
         return world_knowledge_cli(rest)
+    if cmd == "world-relationships":
+        from skeleton.jeeves.worlds.relationships_cli import run as relationships_cli
+        return relationships_cli(rest)
     if cmd == "world-events":
         from skeleton.jeeves.worlds.events_cli import run as world_events_cli
         return world_events_cli(rest)
