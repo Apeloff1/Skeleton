@@ -225,6 +225,101 @@ function exportSession() {
   area.focus();
   area.select();
 }
+
+function showSessionImport() {
+  let area = document.getElementById("session-import");
+  if (!area) {
+    area = document.createElement("textarea");
+    area.id = "session-import";
+    area.rows = 10;
+    area.setAttribute("aria-label", "Paste untrusted session JSON to replay locally");
+    root.append(area);
+    button("Restore locally checked session", restoreSession);
+  }
+  area.focus();
+}
+function restoreSession() {
+  const area = document.getElementById("session-import");
+  let error = document.getElementById("session-error");
+  if (!error) {
+    error = element("p", "");
+    error.id = "session-error";
+    root.append(error);
+  }
+  try {
+    if (!area || area.value.length > 524288) throw Error("Session exceeds limit");
+    const data = JSON.parse(area.value);
+    const fields = [
+      "schema", "network_id", "network_digest", "world_digests",
+      "steps", "current_world", "current_scene", "flags"
+    ];
+    if (!data || typeof data !== "object" || Array.isArray(data) ||
+        JSON.stringify(Object.keys(data).sort()) !==
+        JSON.stringify(fields.sort())) throw Error("Session fields invalid");
+    if (data.schema !== "jeeves.world.portal_session.v1" ||
+        data.network_id !== network.id ||
+        data.network_digest !== model.proof.network_digest)
+      throw Error("Session source lease mismatch");
+    const worldIds = Object.keys(worlds).sort();
+    if (!data.world_digests || typeof data.world_digests !== "object" ||
+        JSON.stringify(Object.keys(data.world_digests).sort()) !==
+        JSON.stringify(worldIds) ||
+        worldIds.some(id => data.world_digests[id] !== network.world_digests[id]))
+      throw Error("Session world lease mismatch");
+    if (!Array.isArray(data.steps) || data.steps.length > 256)
+      throw Error("Session move limit exceeded");
+    let wid = network.root_world;
+    let sid = worlds[wid].start;
+    const restoredFlags = new Map(worldIds.map(id => [id, new Set()]));
+    const restoredSteps = [];
+    const restoredTrace = [];
+    for (const step of data.steps) {
+      if (!step || typeof step !== "object" || Array.isArray(step) ||
+          JSON.stringify(Object.keys(step).sort()) !==
+          '["id","kind","world"]' ||
+          step.world !== wid || typeof step.id !== "string")
+        throw Error("Session step invalid");
+      const world = worlds[wid];
+      if (step.kind === "choice") {
+        if (world.endings.some(e => e.scene === sid))
+          throw Error("Choice after ending");
+        const choice = world.choices.find(c => c.id === step.id && c.from === sid);
+        if (!choice || !choice.requires.every(flag => restoredFlags.get(wid).has(flag)))
+          throw Error("Unreachable or unearned choice");
+        choice.grants.forEach(flag => restoredFlags.get(wid).add(flag));
+        restoredTrace.push(wid + ":" + choice.id);
+        sid = choice.to;
+      } else if (step.kind === "portal") {
+        if (!world.endings.some(e => e.scene === sid))
+          throw Error("Portal before ending");
+        const portal = portals.find(p => p.id === step.id &&
+          p.from_world === wid && p.from_ending === sid);
+        if (!portal) throw Error("Invalid portal crossing");
+        restoredTrace.push("portal:" + portal.id);
+        wid = portal.to_world;
+        sid = worlds[wid].start;
+      } else throw Error("Invalid move type");
+      restoredSteps.push({kind: step.kind, world: step.world, id: step.id});
+    }
+    if (data.current_world !== wid || data.current_scene !== sid ||
+        !data.flags || typeof data.flags !== "object" ||
+        JSON.stringify(Object.keys(data.flags).sort()) !== JSON.stringify(worldIds))
+      throw Error("Session position mismatch");
+    for (const id of worldIds) {
+      const declared = data.flags[id];
+      const actual = [...restoredFlags.get(id)].sort();
+      if (!Array.isArray(declared) ||
+          JSON.stringify(declared) !== JSON.stringify(actual))
+        throw Error("Session flags mismatch");
+    }
+    currentWorld = wid; currentScene = sid;
+    flags = restoredFlags; steps = restoredSteps;
+    trace = restoredTrace; moves = steps.length;
+    render();
+  } catch (_) {
+    error.textContent = "Session rejected: invalid, stale or unearned replay.";
+  }
+}
 function render() {
   root.replaceChildren();
   const world = byWorld.get(currentWorld);
@@ -235,6 +330,7 @@ function render() {
   root.append(element("p", "World: " + currentWorld + " | Moves: " + moves));
   root.append(element("p", "Choice/portal history: " + trace.join(", ")));
   button("Export session JSON", exportSession);
+  button("Import session JSON", showSessionImport);
   if (moves >= 256) {
     root.append(element("p", "Bounded play session completed."));
     button("Restart", reset);

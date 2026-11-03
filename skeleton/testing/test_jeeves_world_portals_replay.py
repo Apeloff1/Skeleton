@@ -189,3 +189,13 @@ def test_read_only_jeeves_preview_and_browser_export(tmp_path):
     assert "Export session JSON" in html
     assert "portal_session.v1" in html
     assert "script-src 'sha256-" in html
+
+def test_offline_browser_replay_has_source_bound_import():
+    from skeleton.jeeves.worlds.portals import PLAYER_JS
+    assert "Import session JSON" in PLAYER_JS
+    assert "Restore locally checked session" in PLAYER_JS
+    assert "data.network_digest !== model.proof.network_digest" in PLAYER_JS
+    assert "Unreachable or unearned choice" in PLAYER_JS
+    assert "Portal before ending" in PLAYER_JS
+    assert "Session flags mismatch" in PLAYER_JS
+    assert "data.steps.length > 256" in PLAYER_JS

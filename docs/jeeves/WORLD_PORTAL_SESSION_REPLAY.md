@@ -21,3 +21,9 @@ rather than accepting stale session state.
 Jeeves `world.portals_session_preview` is strictly read-only and never
 records or approves a browser session. A verified browser trace is not
 hardware, device, payment, or release certification.
+
+The player also offers **Import session JSON**. Its bounded local restoration
+replays each step against the embedded reviewed source, rejects fabricated
+flags, source revisions and impossible crossings, and never treats an imported
+JSON object as a trusted receipt. Operator `record-session` and
+`verify-session` remain the authoritative persisted verification path.
