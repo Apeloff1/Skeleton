@@ -8,9 +8,9 @@ apply the attached rollback plan.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
-from skeleton.build.delivery._util import DeliveryError, canonical_json, sha256_json
+from skeleton.build.delivery._util import DeliveryError, canonical_json, require_env_name, sha256_json
 from skeleton.build.delivery.artifact_manifest import ArtifactManifest
 from skeleton.build.delivery.env_config import EnvironmentConfig
 
@@ -85,12 +85,21 @@ def _traffic_stages(strategy: str, rollout: dict[str, Any], replicas: int) -> li
 
 
 def compile_plan(manifest: ArtifactManifest, env: EnvironmentConfig) -> DeployPlan:
+    if type(manifest) is not ArtifactManifest or type(env) is not EnvironmentConfig:
+        raise DeliveryError("deployment plan requires validated manifest and environment")
+    require_env_name(env.name)
+    if not isinstance(env.values, Mapping) or not isinstance(env.values.get("rollout"), Mapping):
+        raise DeliveryError("invalid deployment rollout config")
     rollout = dict(env.values["rollout"])
     strategy = rollout["strategy"]
     if strategy not in ("rolling", "blue-green", "canary"):
         raise DeliveryError("unknown rollout strategy")
     if type(env.replicas) is not int or not 1 <= env.replicas <= 512:
         raise DeliveryError("invalid deployment replica count")
+    if env.tier not in ("dev", "staging", "production"):
+        raise DeliveryError("unknown deployment tier")
+    if type(env.digest) is not str or sha256_json(env.values) != env.digest:
+        raise DeliveryError("deployment config digest mismatch")
     if env.tier == "production" and manifest.version and "-" in manifest.version:
         raise DeliveryError("prerelease versions cannot deploy to production")
     # int(...) silently turns True, negative floats and numeric strings into

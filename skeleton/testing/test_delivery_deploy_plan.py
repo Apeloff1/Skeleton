@@ -70,3 +70,20 @@ def test_deploy_plan_rejects_noncanonical_bake_and_forged_strategy():
     forged = replace(good, values={**good.values, "replicas": True})
     with pytest.raises(DeliveryError, match="replica count"):
         compile_plan(_manifest(), forged)
+
+
+def test_deploy_plan_rejects_forged_config_digest_and_unknown_tier():
+    from dataclasses import replace
+    from skeleton.ai.build.core.delivery import deploy_plan as mirrored
+    from skeleton.build.delivery._util import sha256_json
+
+    good = _env({"strategy": "rolling"})
+    for compile_fn in (compile_plan, mirrored.compile_plan):
+        changed = replace(good, values={**good.values, "replicas": 3})
+        with pytest.raises(DeliveryError, match="config digest mismatch"):
+            compile_fn(_manifest(), changed)
+        unknown_values = {**good.values, "tier": "production-shadow"}
+        unknown = replace(good, values=unknown_values, digest=sha256_json(unknown_values))
+        with pytest.raises(DeliveryError, match="unknown deployment tier"):
+            compile_fn(_manifest(), unknown)
+        assert compile_fn(_manifest(), good).config_digest == good.digest
