@@ -6,7 +6,7 @@ from hashlib import sha256
 import html
 from typing import Any
 
-from .weather import VISIBILITIES, WEATHERS, validate_weather
+from .weather import validate_weather
 from .world_canon import CanonError, canonical
 
 JS = r"""
@@ -104,7 +104,7 @@ exportButton.addEventListener("click", () => {
   draft.overrides = overrideFields.map(field => ({
     choice:field.choice.value, weather:field.weather.value,
     visibility:field.visibility.value,
-  })).sort((a,b) => a.choice.localeCompare(b.choice, "en"));
+  })).sort((a,b) => a.choice < b.choice ? -1 : a.choice > b.choice ? 1 : 0);
   if (new Set(draft.overrides.map(row => row.choice)).size !== draft.overrides.length) {
     status.textContent = "Duplicate choice override; resolve before export.";
     return;
