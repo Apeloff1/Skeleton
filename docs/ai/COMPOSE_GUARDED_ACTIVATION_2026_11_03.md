@@ -140,3 +140,16 @@ inventing an activated model.
 The fake Mongo unit tests prove state transitions and error handling only.
 They do not substitute for real replica-set behavior, independent reviewer
 administration, exact-head CI or a tested laptop install.
+
+## Independent reviewer transport (operator-owned)
+
+`SignedReviewerClient` supplies bounded HTTPS review and challenge calls
+with a trusted-root hostname-validating TLS context. The review service must
+sign its verdict and the activation challenge with the SAME separately held
+Ed25519 key. Review responses bind a fresh nonce and exact untrusted text
+digest. Redirects, ambient proxies, unsigned or oversized responses are
+denied. Operators must separately deploy and audit the actual reviewer
+service, its key custody, policy, mTLS, availability and isolation. This
+client does not make default Compose consumer-ready.
+
+Focused transport test: `python -m unittest skeleton.testing.test_signed_reviewer_client`.
