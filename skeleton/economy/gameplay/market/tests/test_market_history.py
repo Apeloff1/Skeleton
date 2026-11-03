@@ -68,3 +68,16 @@ def test_market_records_history_from_fills(market):
         (1, 3, 10),
     ]
     assert market.quote("ore")["last"] == 10
+
+
+def test_sparse_candle_gap_expansion_is_bounded_before_allocation(monkeypatch):
+    from skeleton.economy.gameplay.market import history as history_module
+
+    monkeypatch.setattr(history_module, "MAX_FILLED_CANDLES", 4)
+    h = PriceHistory(period_ticks=1)
+    h.record("ore", 0, 10, 1)
+    h.record("ore", 1000000, 12, 1)
+    assert [c["period"] for c in h.candles("ore")] == [0, 1000000]
+    with pytest.raises(MarketError, match="output bound"):
+        h.candles("ore", fill_gaps=True)
+    assert len(h.candles("ore")) == 2

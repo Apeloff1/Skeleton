@@ -179,3 +179,17 @@ def test_drain_after_cancel_all_returns_everything():
     assert len(market.book) == 0
     assert market.balance(ESCROW_OWNER) == 0
     assert market.audit()["ok"]
+
+
+def test_market_replay_rejects_unbounded_script_iterators(monkeypatch):
+    from itertools import repeat
+    import pytest
+    from skeleton.economy.gameplay.market import replay as replay_module
+    from skeleton.economy.gameplay.market.errors import MarketError
+
+    monkeypatch.setattr(replay_module, "MAX_SCRIPT_COMMANDS", 3)
+    cmd = {"op": "open", "owner": "ana"}
+    with pytest.raises(MarketError, match="command budget"):
+        replay_module.run(_build, repeat(cmd))
+    with pytest.raises(MarketError, match="command budget"):
+        replay_module.fingerprint(_build, repeat(cmd))

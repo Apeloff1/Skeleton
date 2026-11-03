@@ -14,6 +14,8 @@ from typing import Any
 from skeleton.economy.gameplay.market.errors import MarketError
 from skeleton.simulation.economy.sim import _req_int
 
+MAX_FILLED_CANDLES = 10_000
+
 
 @dataclass
 class Candle:
@@ -103,6 +105,15 @@ class PriceHistory:
             rows = [c for c in rows if c.period >= since_period]
         if not fill_gaps or not rows:
             return [c.to_dict() for c in rows]
+        # Retention bounds recorded candles, not gaps between sparse periods.
+        # Preflight the complete expansion before allocating any gap rows.
+        count = len(rows)
+        for previous, current in zip(rows, rows[1:]):
+            count += max(0, current.period - previous.period - 1)
+            if count > MAX_FILLED_CANDLES:
+                raise MarketError("filled price history exceeds output bound")
+        if count > MAX_FILLED_CANDLES:
+            raise MarketError("filled price history exceeds output bound")
         out: list[dict[str, int]] = []
         prev: Candle | None = None
         for c in rows:
