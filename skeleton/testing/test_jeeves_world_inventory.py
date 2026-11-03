@@ -268,3 +268,25 @@ def test_offline_editor_exports_unapproved_source(tmp_path, capsys):
                   "--expected-digest", first])
     assert status == 0
     assert json.loads(capsys.readouterr().out)["editor"]["inventory_digest"] == first
+
+
+def test_malformed_publish_is_typed_and_cannot_replace_source(tmp_path):
+    _, store, _, source = setup(tmp_path)
+    first = store.publish("harbor", source, create=True)
+    assert_code("expected_object", lambda: store.publish(
+        "harbor", [], expected_digest=first,
+    ))
+    assert store.inspect("harbor")["inventory"]["approved"] is False
+    assert digest(store.inspect("harbor")["inventory"]) == first
+
+
+def test_duplicate_items_and_conflicting_effects(tmp_path):
+    _, _, world, source = setup(tmp_path)
+    duplicate = deepcopy(source)
+    duplicate["items"].append(deepcopy(duplicate["items"][0]))
+    assert_code("inventory_duplicate_item",
+                lambda: validate_inventory(duplicate, world))
+    conflict = deepcopy(source)
+    conflict["effects"][0]["spend"] = [{"item": "lantern", "quantity": 1}]
+    assert_code("inventory_conflicting_effect",
+                lambda: validate_inventory(conflict, world))

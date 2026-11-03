@@ -68,7 +68,7 @@ def validate_inventory(data: Any, world: Any) -> dict[str, Any]:
         raise CanonError("inventory_unsorted_items")
     choice_ids = {choice["id"] for choice in world["choices"]}
     effect_ids = set()
-    for effect in _list(obj["effects"], "effects", len(choice_ids)):
+    for effect in _list(obj["effects"], "effects", len(choice_ids) + 1):
         _keys(effect, {"choice", "spend", "gain"})
         choice = _id(effect["choice"], "effect.choice")
         if choice not in choice_ids or choice in effect_ids:
@@ -401,6 +401,8 @@ class InventoryStore:
             try:
                 world = self._world(fd, world_id)
                 candidate = strict_json(canonical(data))
+                if type(candidate) is not dict:
+                    raise CanonError("expected_object")
                 candidate["approved"] = False
                 candidate["review_note"] = "Review required after source publication"
                 prove_inventory(candidate, world)
