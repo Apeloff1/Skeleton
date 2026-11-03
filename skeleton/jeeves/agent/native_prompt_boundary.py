@@ -65,6 +65,11 @@ def prepare_native_prompt(
     messages = []
     has_user = False
     for message in request.messages:
+        # JSON's ASCII escape mode can encode a lone surrogate, but that
+        # value cannot safely round-trip through the native tokenizer.
+        # Reject it before it crosses the model interface.
+        if any(0xD800 <= ord(character) <= 0xDFFF for character in message.content):
+            raise NativeBoundaryError("unpaired surrogate in model message")
         role = message.role.value
         if role not in {item.value for item in ModelRole}:
             raise NativeBoundaryError("unrecognized model message role")
