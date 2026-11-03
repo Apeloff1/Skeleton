@@ -267,25 +267,31 @@ class LaptopFlow:
             raise CanonError("laptop_engine_stale_source")
         owner = StudioEngineStore(self.worlds.root)
         receipt = owner.compile(world_id, expected_digests, era)
-        if owner.verify(world_id) != receipt:
-            raise CanonError("laptop_engine_verify_mismatch")
-        # The engine owner releases its world lease before this final laptop
-        # verification. A concurrent review/compile may have advanced the
-        # canonical source in that gap. Never return a mixed-generation pair
-        # of individually valid receipts as a single verified handoff.
-        final_laptop = self.verify(world_id)
-        if (final_laptop != preview["laptop"] or
-                receipt["source_digests"] != expected_digests or
-                receipt["source_digests"]["world"] != final_laptop["source_digest"]):
+        # Both receipts must be verified under ONE canonical world lease.
+        # Independent sequential verifiers could accept different revisions.
+        final = self.engine_verify(world_id)
+        if (final["engine"] != receipt or
+                final["engine"]["source_digests"] != expected_digests or
+                final["laptop"] != preview["laptop"]):
             raise CanonError("laptop_engine_source_mismatch")
-        return {"laptop": final_laptop, "engine": receipt}
+        return final
 
     def engine_verify(self, world_id: str) -> dict[str, Any]:
-        laptop = self.verify(world_id)
-        engine = StudioEngineStore(self.worlds.root).verify(world_id)
-        if engine["source_digests"]["world"] != laptop["source_digest"]:
-            raise CanonError("laptop_engine_source_mismatch")
-        return {"laptop": laptop, "engine": engine}
+        """Prove the laptop player and Studio Engine recipe in one snapshot."""
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                laptop, _world = self._verified_snapshot(fd, world_id)
+                engine = StudioEngineStore(self.worlds.root)._verify_snapshot(fd, world_id)
+                if engine["source_digests"]["world"] != laptop["source_digest"]:
+                    raise CanonError("laptop_engine_source_mismatch")
+                return {"laptop": laptop, "engine": engine}
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def create_session(self, world_id: str, slot: str, imported: Any = None) -> dict[str, Any]:
         lease = self.verify(world_id)["source_digest"]

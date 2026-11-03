@@ -1,7 +1,5 @@
-"""The laptop-to-engine bridge must not accept mixed-generation receipts."""
+"""The laptop and engine receipts must share one canonical source lease."""
 from __future__ import annotations
-
-import json
 
 import pytest
 
@@ -26,56 +24,79 @@ def prepared(tmp_path):
 def test_engine_compile_returns_matching_verified_receipts(tmp_path):
     flow = prepared(tmp_path)
     preview = flow.engine_inspect("harbor", ERA)
-    result = flow.engine_compile(
-        "harbor", ERA, preview["engine"]["source_digests"])
+    result = flow.engine_compile("harbor", ERA, preview["engine"]["source_digests"])
     assert result == flow.engine_verify("harbor")
     assert result["engine"]["source_digests"]["world"] == result["laptop"]["source_digest"]
     assert result["laptop"] == preview["laptop"]
 
 
+def test_engine_verify_holds_one_world_lease_across_both_artifacts(tmp_path, monkeypatch):
+    flow = prepared(tmp_path)
+    preview = flow.engine_inspect("harbor", ERA)
+    flow.engine_compile("harbor", ERA, preview["engine"]["source_digests"])
+    original = StudioEngineStore._verify_snapshot
+    attempted = []
+
+    def guarded(self, fd, world_id):
+        assert (tmp_path / "harbor.lock").exists()
+        world = flow.worlds.read(world_id)
+        changed = dict(world, prompt=world["prompt"] + " concurrent edit")
+        with pytest.raises(CanonError) as error:
+            flow.worlds.publish(changed, expected_digest=digest(world))
+        attempted.append(error.value.code)
+        return original(self, fd, world_id)
+
+    monkeypatch.setattr(StudioEngineStore, "_verify_snapshot", guarded)
+    verified = flow.engine_verify("harbor")
+    assert verified["laptop"]["source_digest"] == verified["engine"]["source_digests"]["world"]
+    assert attempted == ["lease_busy"]
+    assert not (tmp_path / "harbor.lock").exists()
+
+
 def test_engine_compile_rejects_interleaved_laptop_revision(tmp_path, monkeypatch):
     flow = prepared(tmp_path)
     preview = flow.engine_inspect("harbor", ERA)
-    original = flow.verify
+    original = flow.engine_verify
     seen = 0
 
     def raced(world_id):
         nonlocal seen
         seen += 1
         result = original(world_id)
-        if seen == 2:
-            # Simulate another writer replacing a valid, reviewed laptop
-            # artifact between engine verification and the final handoff.
-            return {**result, "source_digest": "0" * 64}
-        return result
+        # Simulate a newer laptop publication at the final composite boundary.
+        return {**result, "laptop": {**result["laptop"], "source_digest": "0" * 64}}
 
-    monkeypatch.setattr(flow, "verify", raced)
+    monkeypatch.setattr(flow, "engine_verify", raced)
     with pytest.raises(CanonError) as error:
         flow.engine_compile("harbor", ERA, preview["engine"]["source_digests"])
     assert error.value.code == "laptop_engine_source_mismatch"
-    assert seen == 2
-    # The engine receipt may exist, but the composite handoff is never
-    # advertised as verified. A subsequent fresh verification is required.
-    monkeypatch.setattr(flow, "verify", original)
+    assert seen == 1
+    monkeypatch.setattr(flow, "engine_verify", original)
     assert flow.engine_verify("harbor")["engine"]["source_digests"] == preview["engine"]["source_digests"]
 
 
 def test_engine_compile_rejects_interleaved_review_receipt(tmp_path, monkeypatch):
     flow = prepared(tmp_path)
     preview = flow.engine_inspect("harbor", ERA)
-    original = flow.verify
-    seen = 0
+    original = flow.engine_verify
 
     def raced(world_id):
-        nonlocal seen
-        seen += 1
         result = original(world_id)
-        if seen == 2:
-            return {**result, "review_digest": "f" * 64}
-        return result
+        return {**result, "laptop": {**result["laptop"], "review_digest": "f" * 64}}
 
-    monkeypatch.setattr(flow, "verify", raced)
+    monkeypatch.setattr(flow, "engine_verify", raced)
     with pytest.raises(CanonError) as error:
         flow.engine_compile("harbor", ERA, preview["engine"]["source_digests"])
     assert error.value.code == "laptop_engine_source_mismatch"
-    assert seen == 2
+
+
+def test_engine_verify_rejects_tampered_manifest_under_shared_lease(tmp_path):
+    flow = prepared(tmp_path)
+    preview = flow.engine_inspect("harbor", ERA)
+    receipt = flow.engine_compile("harbor", ERA, preview["engine"]["source_digests"])
+    path = tmp_path / receipt["engine"]["manifest_file"]
+    path.write_bytes(path.read_bytes() + b" ")
+    with pytest.raises(CanonError) as error:
+        flow.engine_verify("harbor")
+    assert error.value.code == "studio_engine_manifest_mismatch"
+    assert not (tmp_path / "harbor.lock").exists()

@@ -215,26 +215,35 @@ class StudioEngineStore:
         finally:
             os.close(fd)
 
+    def _verify_snapshot(self, fd: int, world_id: str) -> dict[str, Any]:
+        """Validate the engine owner receipt under an already-held world lease.
+
+        This is the same verifier used by standalone Studio Engine and by
+        Jeeves laptop acceptance. The caller must own the exclusive world
+        lease; do not re-enter the non-reentrant lock here.
+        """
+        names = self._names(world_id)
+        recorded = strict_json(self.worlds._read(fd, names[1]))
+        if type(recorded) is not dict or recorded.get("schema") != RECEIPT_SCHEMA:
+            raise CanonError("studio_engine_receipt_invalid")
+        era = recorded.get("engine_era")
+        if type(era) is not str or len(era) > 128:
+            raise CanonError("studio_engine_era_invalid")
+        sources = self._sources(fd, world_id)
+        optional = self._optional_sources(fd, world_id, sources[0])
+        receipt, content = self._outputs(sources, era, optional)
+        if recorded != receipt:
+            raise CanonError("studio_engine_receipt_mismatch")
+        if _artifact_read(fd, names[0]) != content:
+            raise CanonError("studio_engine_manifest_mismatch")
+        return receipt
+
     def verify(self, world_id: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:
             self.studio._locked(fd, world_id)
             try:
-                names = self._names(world_id)
-                recorded = strict_json(self.worlds._read(fd, names[1]))
-                if type(recorded) is not dict or recorded.get("schema") != RECEIPT_SCHEMA:
-                    raise CanonError("studio_engine_receipt_invalid")
-                era = recorded.get("engine_era")
-                if type(era) is not str or len(era) > 128:
-                    raise CanonError("studio_engine_era_invalid")
-                sources = self._sources(fd, world_id)
-                optional = self._optional_sources(fd, world_id, sources[0])
-                receipt, content = self._outputs(sources, era, optional)
-                if recorded != receipt:
-                    raise CanonError("studio_engine_receipt_mismatch")
-                if _artifact_read(fd, names[0]) != content:
-                    raise CanonError("studio_engine_manifest_mismatch")
-                return receipt
+                return self._verify_snapshot(fd, world_id)
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
