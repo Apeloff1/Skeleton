@@ -11,6 +11,8 @@ from typing import Any
 
 from .asset_briefs import compile_assets, validate_briefs
 from .bundle import _artifact_read
+from .chapters import engine_handoff as chapters_handoff, scene_index, validate_chapters
+from .cinematics import engine_handoff as cinematics_handoff, validate_cinematics
 from .studio_assembly import StudioAssemblyStore, compile_studio_assembly
 from .timeline import compile_timeline, validate_timeline
 from .world_canon import CanonError, WorldStore, _id, canonical, digest, strict_json
@@ -21,7 +23,8 @@ SOURCE_NAMES = ("world", "cast", "testimony", "rumors", "localization",
                 "accessibility", "pacing", "assets", "timeline")
 
 
-def compile_studio_engine(sources: tuple[Any, ...], era: str) -> dict[str, Any]:
+def compile_studio_engine(sources: tuple[Any, ...], era: str,
+                          optional: dict[str, Any] | None = None) -> dict[str, Any]:
     if type(sources) is not tuple or len(sources) != 9:
         raise CanonError("studio_engine_invalid_sources")
     (world, cast, testimony, rumors, localization,
@@ -68,7 +71,25 @@ def compile_studio_engine(sources: tuple[Any, ...], era: str) -> dict[str, Any]:
     } for ending in sorted(world["endings"], key=lambda item: item["scene"])]
     source_digests = {**studio["source_digests"],
                       "assets": digest(assets), "timeline": digest(timeline)}
-    return {
+    optional = optional or {}
+    if set(optional) - {"chapters", "cinematics"}:
+        raise CanonError("studio_engine_unknown_optional_source")
+    optional_handoffs: dict[str, Any] = {}
+    if "chapters" in optional:
+        source = validate_chapters(optional["chapters"], world)
+        optional_handoffs["chapters"] = chapters_handoff(source, world)
+        source_digests["chapters"] = digest(source)
+        index = scene_index(source)
+        for node in scene_nodes:
+            node["chapter"] = index[node["id"]]
+    if "cinematics" in optional:
+        source = validate_cinematics(optional["cinematics"], world)
+        optional_handoffs["cinematics"] = cinematics_handoff(source, world)
+        source_digests["cinematics"] = digest(source)
+        sequences = {item["scene"]: item["beats"] for item in source["sequences"]}
+        for node in scene_nodes:
+            node["cinematic_beats"] = sequences.get(node["id"], [])
+    manifest = {
         "schema": SCHEMA, "world_id": world["id"], "engine_era": era,
         "source_digests": source_digests,
         "studio_proof_digests": studio["proof_digests"],
@@ -80,6 +101,9 @@ def compile_studio_engine(sources: tuple[Any, ...], era: str) -> dict[str, Any]:
         "engine_assets": engine_assets, "temporal_events": temporal,
         "qualification": "reviewed_engine_recipe_not_built_or_device_certified",
     }
+    if optional_handoffs:
+        manifest["optional_handoffs"] = optional_handoffs
+    return manifest
 
 
 class StudioEngineStore:
@@ -103,8 +127,28 @@ class StudioEngineStore:
         validate_timeline(timeline, world)
         return (*sources, assets, timeline)
 
-    def _outputs(self, sources: tuple[Any, ...], era: str) -> tuple[dict[str, Any], bytes]:
-        manifest = compile_studio_engine(sources, era)
+    def _optional_sources(self, fd: int, world_id: str,
+                          world: Any) -> dict[str, Any]:
+        """Read optional approved authoring planes under the SAME world lease."""
+        result: dict[str, Any] = {}
+        for name, validate in (("chapters", validate_chapters),
+                               ("cinematics", validate_cinematics)):
+            try:
+                source = strict_json(self.worlds._read(
+                    fd, world_id + "." + name + ".json"))
+            except CanonError as exc:
+                if exc.code == "not_found":
+                    continue
+                raise
+            validate(source, world)
+            if not source["approved"]:
+                raise CanonError("studio_engine_optional_review_required", name)
+            result[name] = source
+        return result
+
+    def _outputs(self, sources: tuple[Any, ...], era: str,
+                 optional: dict[str, Any]) -> tuple[dict[str, Any], bytes]:
+        manifest = compile_studio_engine(sources, era, optional)
         content = canonical(manifest)
         if len(content) > 1572864:
             raise CanonError("studio_engine_manifest_too_large")
@@ -123,13 +167,16 @@ class StudioEngineStore:
         try:
             self.studio._locked(fd, world_id)
             try:
-                manifest = compile_studio_engine(self._sources(fd, world_id), era)
+                sources = self._sources(fd, world_id)
+                optional = self._optional_sources(fd, world_id, sources[0])
+                manifest = compile_studio_engine(sources, era, optional)
                 return {"schema": SCHEMA, "world_id": world_id,
                         "engine_era": era, "source_digests": manifest["source_digests"],
                         "studio_proof_digests": manifest["studio_proof_digests"],
                         "scene_count": len(manifest["scene_nodes"]),
                         "choice_count": len(manifest["choice_edges"]),
                         "ending_count": len(manifest["ending_nodes"]),
+                        "optional_planes": sorted(optional),
                         "qualification": manifest["qualification"]}
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
@@ -137,13 +184,17 @@ class StudioEngineStore:
             os.close(fd)
 
     def compile(self, world_id: str, expected_digests: Any, era: str) -> dict[str, Any]:
-        if type(expected_digests) is not dict or set(expected_digests) != set(SOURCE_NAMES):
+        if (type(expected_digests) is not dict or
+                not set(SOURCE_NAMES) <= set(expected_digests) or
+                set(expected_digests) - set(SOURCE_NAMES) - {"chapters", "cinematics"}):
             raise CanonError("studio_engine_invalid_lease")
         fd = self.worlds._directory()
         try:
             self.studio._locked(fd, world_id)
             try:
-                receipt, content = self._outputs(self._sources(fd, world_id), era)
+                sources = self._sources(fd, world_id)
+                optional = self._optional_sources(fd, world_id, sources[0])
+                receipt, content = self._outputs(sources, era, optional)
                 if receipt["source_digests"] != expected_digests:
                     raise CanonError("studio_engine_stale_source")
                 names = self._names(world_id)
@@ -167,7 +218,9 @@ class StudioEngineStore:
                 era = recorded.get("engine_era")
                 if type(era) is not str or len(era) > 128:
                     raise CanonError("studio_engine_era_invalid")
-                receipt, content = self._outputs(self._sources(fd, world_id), era)
+                sources = self._sources(fd, world_id)
+                optional = self._optional_sources(fd, world_id, sources[0])
+                receipt, content = self._outputs(sources, era, optional)
                 if recorded != receipt:
                     raise CanonError("studio_engine_receipt_mismatch")
                 if _artifact_read(fd, names[0]) != content:
