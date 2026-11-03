@@ -156,6 +156,57 @@ class LiveReplicaEpochTests(unittest.IsolatedAsyncioTestCase):
             async with restarted.writer(**self.scope):
                 self.fail("writer recovered odd epoch automatically")
 
+    async def test_live_cancelled_writer_is_quarantined_after_restart(self):
+        entered = asyncio.Event()
+
+        async def interrupted_writer():
+            async with self.epoch.writer(**self.scope):
+                await self.payloads.insert_one(
+                    {"_id": "interrupted", "value": 1}
+                )
+                entered.set()
+                await asyncio.Event().wait()
+
+        task = asyncio.create_task(interrupted_writer())
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=5)
+        finally:
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=5)
+        with self.assertRaises(MongoSourceEpochError):
+            await self.read()
+        restarted = MongoCanonicalSourceEpoch(self.database)
+        with self.assertRaises(MongoSourceEpochError):
+            await self.read(restarted)
+        with self.assertRaises(MongoSourceEpochError):
+            async with restarted.writer(**self.scope):
+                self.fail("cancelled writer silently recovered")
+
+    async def test_live_revocation_cannot_preempt_writer_then_cas_is_terminal(self):
+        async with self.epoch.writer(**self.scope):
+            with self.assertRaises(MongoSourceEpochError):
+                await self.epoch.revoke_actor(
+                    **self.scope, expected_epoch=2,
+                    reason_code="operator-revoke",
+                )
+            await self.payloads.insert_one(
+                {"_id": "writer-before-revoke", "value": 1}
+            )
+        self.assertEqual(await self.read(), 4)
+        self.assertEqual(
+            await self.epoch.revoke_actor(
+                **self.scope, expected_epoch=4,
+                reason_code="operator-revoke",
+            ), 5,
+        )
+        restarted = MongoCanonicalSourceEpoch(self.database)
+        with self.assertRaises(MongoSourceEpochError):
+            await self.read(restarted)
+        with self.assertRaises(MongoSourceEpochError):
+            async with restarted.writer(**self.scope):
+                self.fail("revoked actor accepted a writer")
+
     async def test_operator_revocation_is_terminal_across_restart(self):
         self.assertEqual(await self.read(), 2)
         self.assertEqual(await self.epoch.revoke_actor(

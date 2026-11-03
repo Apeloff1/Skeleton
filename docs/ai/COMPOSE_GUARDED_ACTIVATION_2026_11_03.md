@@ -217,3 +217,12 @@ The same pinned Ed25519 trust anchor verifies the actual signed verdicts
 and the activation challenges. Unit fakes are injected only by tests;
 production reviewer service isolation and policy still require an
 independent operational audit. No guard-disabled fallback is introduced.
+
+## Additional opt-in replica-set crash and revocation drills
+
+The live replica-set test suite now includes a cancelled in-flight writer
+that must remain quarantined after constructing a new epoch instance, and a
+revocation race that must reject revocation during WRITING before allowing a
+fresh, operator-authorized stable-epoch CAS. These tests still require an
+operator-provisioned authenticated replica set and explicit disposable test
+database cleanup authorization; skipped tests provide no qualification.
