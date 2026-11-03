@@ -117,6 +117,52 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
         self.assertNotIn("secret", str(result))
 
+    async def test_database_mismatch_denied_before_any_mongo_connection(self):
+        with patch.dict("os.environ", {
+            "MONGO_URL": "mongodb://secret:secret@mongo:27017",
+            "DB_NAME": "tutolage",
+            "SKL_CANONICAL_MONGO_DATABASE": "skeleton",
+            "SKL_CANONICAL_TENANT_ID": "tenant",
+            "SKL_CANONICAL_ACTOR_ID": "owner",
+            "SKL_CANONICAL_CONTEXT_ID": "context",
+        }):
+            with patch("motor.motor_asyncio.AsyncIOMotorClient") as client:
+                result = await _run_from_environment()
+                client.assert_not_called()
+        self.assertEqual(result["code"], "canonical_database_identity_mismatch")
+        self.assertFalse(result["canonical_database_name_aligned_observed"])
+        self.assertFalse(result["canonical_cluster_identity_verified"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertNotIn("secret", str(result))
+
+    async def test_missing_engine_database_denied_without_mongo(self):
+        with patch.dict("os.environ", {
+            "MONGO_URL": "mongodb://secret:secret@mongo:27017",
+            "DB_NAME": "tutolage",
+            "SKL_CANONICAL_MONGO_DATABASE": "",
+            "SKL_CANONICAL_TENANT_ID": "tenant",
+            "SKL_CANONICAL_ACTOR_ID": "owner",
+            "SKL_CANONICAL_CONTEXT_ID": "context",
+        }):
+            with patch("motor.motor_asyncio.AsyncIOMotorClient") as client:
+                result = await _run_from_environment()
+                client.assert_not_called()
+        self.assertEqual(result["code"], "canonical_engine_database_identity_required")
+
+    async def test_malformed_engine_database_denied(self):
+        for bad in ("mongo/db", "mongo\\db", "mongo:27017", " x", "x" * 64):
+            with self.subTest(value=bad):
+                with patch.dict("os.environ", {
+                    "MONGO_URL": "mongodb://private",
+                    "DB_NAME": "tutolage",
+                    "SKL_CANONICAL_MONGO_DATABASE": bad,
+                    "SKL_CANONICAL_TENANT_ID": "tenant",
+                    "SKL_CANONICAL_ACTOR_ID": "owner",
+                    "SKL_CANONICAL_CONTEXT_ID": "context",
+                }):
+                    result = await _run_from_environment()
+                self.assertEqual(result["code"], "canonical_engine_database_identity_required")
+
     async def test_no_connection_settings_denies_before_client(self):
         with patch.dict("os.environ", {
             "MONGO_URL": "", "DB_NAME": "tutolage",

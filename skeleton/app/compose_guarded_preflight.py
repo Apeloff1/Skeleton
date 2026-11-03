@@ -25,12 +25,24 @@ def _result(code: str, *, replica_set: bool = False, epoch: bool = False) -> dic
         "mongo_replica_set_primary_observed": replica_set,
         "canonical_actor_epoch_stable_observed": epoch,
         "canonical_writer_inventory_verified": False,
+        "canonical_database_name_aligned_observed": False,
+        "canonical_cluster_identity_verified": False,
         "independent_reviewer_verified": False,
         "activated_model_tokenizer_verified": False,
         "guarded_local_ai_ready": False,
         "consumer_or_device_qualified": False,
         "writes_performed": False,
     }
+
+
+def _database_name(value: object) -> bool:
+    """Conservative Mongo database identifier; never accept URI/path syntax."""
+    return (
+        type(value) is str and 1 <= len(value) <= 63
+        and value.isascii()
+        and value[0].isalnum()
+        and all(ch.isalnum() or ch in "_-" for ch in value)
+    )
 
 
 def _scope(value: object) -> bool:
@@ -86,8 +98,17 @@ async def _run_from_environment() -> dict[str, object]:
     context_id = os.environ.get("SKL_CANONICAL_CONTEXT_ID", "")
     if not all(_scope(x) for x in (tenant_id, actor_id, context_id)):
         return _result("operator_actor_scope_required")
-    if not uri or not name or not _scope(name) or len(uri) > 8192:
+    if not uri or not _database_name(name) or len(uri) > 8192:
         return _result("mongo_connection_configuration_required")
+    # Compose backend and engine use distinct logical Mongo databases by
+    # default. An epoch in one database cannot fence writes in the other.
+    # This value is a non-secret, explicitly supplied engine configuration,
+    # NOT an automatic migration or evidence of matching server identities.
+    engine_name = os.environ.get("SKL_CANONICAL_MONGO_DATABASE", "")
+    if not _database_name(engine_name):
+        return _result("canonical_engine_database_identity_required")
+    if name != engine_name:
+        return _result("canonical_database_identity_mismatch")
     client = None
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
@@ -97,10 +118,14 @@ async def _run_from_environment() -> dict[str, object]:
             socketTimeoutMS=2000, retryWrites=False, retryReads=False,
             appname="skeleton-guarded-mongo-readonly-preflight",
         )
-        return await inspect_compose_mongo_epoch(
+        observed = await inspect_compose_mongo_epoch(
             client[name], tenant_id=tenant_id, actor_id=actor_id,
             context_id=context_id,
         )
+        # A matching database NAME alone cannot establish the same cluster,
+        # writer role or physical replica set. Never mark those as verified.
+        observed["canonical_database_name_aligned_observed"] = True
+        return observed
     except Exception:
         return _result("mongo_primary_probe_unavailable")
     finally:

@@ -119,6 +119,9 @@ services:
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
+      # Read-only guard preflight must detect backend/engine DB divergence.
+      # A name match alone is NOT proof of the same Mongo cluster or writer fence.
+      - SKL_CANONICAL_MONGO_DATABASE=skeleton
       - ENVIRONMENT=${ENVIRONMENT:-development}
       # Explicit trusted browser origin; never build share links from Host headers.
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
