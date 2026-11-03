@@ -97,6 +97,7 @@ Commands:
     world-npc-schedule Reviewed NPC itineraries, temporal proof and offline playable
     world-inventory Reviewed original item effects and source-bound HTML5 playable
     world-puzzles Reviewed original scene riddles and verified choice-gated gameplay
+    world-pacing Reviewed dramatic arcs, climax witnesses and playable proof
     world-accessibility Reviewed accessible narration and keyboard gameplay
     world-localization Reviewed original language editions and offline playable
     world-rumors Reviewed causal NPC information flow and playable handoff
@@ -873,6 +874,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-knowledge":
         from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
         return world_knowledge_cli(rest)
+    if cmd == "world-pacing":
+        from skeleton.jeeves.worlds.pacing_cli import run as world_pacing_cli
+        return world_pacing_cli(rest)
     if cmd == "world-accessibility":
         from skeleton.jeeves.worlds.accessibility_cli import run as world_accessibility_cli
         return world_accessibility_cli(rest)
