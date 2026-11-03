@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
+import time
 from pathlib import Path
 import sys
 
@@ -16,6 +17,13 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_c
 from .native_runtime import NativeJeevesRuntime
 from .native_chat import NativeJeevesChat
 from .native_repl import NativeJeevesRepl
+from .native_signed_evidence import (
+    NativeSignedEvidenceProvider, attach_signed_native_evidence,
+)
+from .native_source_tool import (
+    BoundSignedSourceTool, readonly_source_grant,
+)
+from .tools import ToolRegistry
 from .native_readiness import inspect_native_jeeves
 from .runtime import RunInputs
 from .types import Budget, Goal
@@ -36,6 +44,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--capacity-root", type=Path)
     parser.add_argument("--capacity-budget-bytes", type=int, default=8000000000)
     parser.add_argument("--mode", choices=("chat", "agent", "repl"), default="agent")
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--signed-source-manifest", type=Path)
+    parser.add_argument("--max-sources", type=int, default=4)
+    parser.add_argument("--enable-source-tool", action="store_true")
     parser.add_argument("--session")
     parser.add_argument("--request-id")
     parser.add_argument("--max-steps", type=int, default=8)
@@ -73,6 +85,36 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
+            if (args.source_root is None) != (args.signed_source_manifest is None):
+                raise ValueError("private source root and signed manifest must be paired")
+            if args.enable_source_tool and (args.mode != "agent" or args.source_root is None):
+                raise ValueError("source tool requires explicit agent mode and signed source")
+            if args.mode == "agent" and args.source_root is not None and not args.enable_source_tool:
+                raise ValueError("agent source material requires an explicit tool grant")
+            source_provider = None
+            if args.source_root is not None:
+                from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import (
+                    _environment_key, _read_private_manifest,
+                )
+                from skeleton.ai.runtime.operational_ai.offline_cognition.core.contracts import Scope
+                manifest = _read_private_manifest(args.signed_source_manifest)
+                source_provider = NativeSignedEvidenceProvider(
+                    source_root=args.source_root,
+                    raw_manifest=manifest,
+                    operator_key=_environment_key(),
+                    scope=Scope(
+                        args.tenant, args.subject,
+                        worker.spine.identity.model_sha256,
+                        worker.spine.identity.tokenizer_sha256,
+                    ),
+                    maximum_sources=args.max_sources,
+                    clock=time.time,
+                )
+                if args.mode != "agent":
+                    # The native chat prompt is the actual bounded question.
+                    # Agent model prompts are structured envelopes and
+                    # retrieval is instead an explicitly granted host tool.
+                    attach_signed_native_evidence(worker, source_provider)
             if args.mode == "repl":
                 chat = NativeJeevesChat(worker, session_id=args.session)
                 return NativeJeevesRepl(chat).serve(sys.stdin.buffer, sys.stdout)
@@ -86,7 +128,15 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             if args.session or args.request_id:
                 raise ValueError("chat identifiers cannot be supplied in agent mode")
-            run = NativeJeevesRuntime(worker)
+            registry = ToolRegistry()
+            grants = ()
+            if args.enable_source_tool:
+                BoundSignedSourceTool(
+                    source_provider,
+                    worker.spine.identity,
+                ).install(registry)
+                grants = (readonly_source_grant(maximum_calls=3),)
+            run = NativeJeevesRuntime(worker, tools=registry)
             digest = sha256(task.encode("utf-8")).hexdigest()
             result = run.run(RunInputs(
                 goal=Goal(
@@ -102,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
                 budget=Budget(
                     max_steps=args.max_steps,
                     max_model_calls=args.max_model_calls,
-                    max_tool_calls=1,
+                    max_tool_calls=3 if args.enable_source_tool else 1,
                     max_tokens=min(
                         100_000,
                         args.max_output_tokens * args.max_model_calls * 2,
@@ -110,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
                     max_wall_seconds=args.max_wall_seconds,
                 ),
                 preferred_provider="jeeves_native",
+                grants=grants,
             ))
             record = {
                 "schema": "jeeves.native_operator_turn.v1",

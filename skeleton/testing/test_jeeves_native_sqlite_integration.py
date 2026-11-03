@@ -32,6 +32,7 @@ from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor
 )
 from skeleton.jeeves.agent.native_chat import NativeJeevesChat, NativeChatHold
 from skeleton.jeeves.agent.native_provider import NativeJeevesProvider
+from skeleton.jeeves.agent.provider import ProviderError
 from skeleton.jeeves.agent.types import ModelMessage, ModelRequest
 
 
@@ -243,8 +244,12 @@ class TestNativeJeevesRealSqliteBoundary(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             provider.complete(self._request(request_id="model_B"))
         self.assertEqual(self.backend.calls, 1)
-        with self.assertRaises(Busy):
+        # A live adapter refuses an uncertain replay in-process before
+        # touching SQLite; a fresh process remains held by durable custody.
+        with self.assertRaises(ProviderError):
             provider.complete(self._request(request_id="model_B"))
+        with self.assertRaises(Busy):
+            NativeJeevesProvider(self.worker).complete(self._request(request_id="model_B"))
         self.assertEqual(self.backend.calls, 1)
 
     def test_bad_model_digest_fails_identity_gate(self):

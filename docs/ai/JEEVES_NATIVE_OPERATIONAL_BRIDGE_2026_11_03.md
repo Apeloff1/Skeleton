@@ -111,6 +111,37 @@ canonical native commit fence. A source modification or expired authority
 holds the pending operation for explicit reconciliation. Source provenance
 is not semantic entailment or independent legal-rights proof.
 
+### Explicit source tools for Jeeves agent mode
+
+When using agent mode (rather than plain chat or REPL), an operator may
+expose only approved original-source excerpts through the existing Jeeves
+ToolRegistry, ToolExecutor and mandatory epistemic runtime guard.
+
+Supply all three flags:
+
+--source-root /private/approved-sources
+--signed-source-manifest /private/operator/signed-source-manifest.json
+--enable-source-tool
+
+Agent mode refuses a source manifest without this explicit source-tool
+permission. Plain chat and REPL may use the same pair of source flags to
+install an evidence-provider callback in the canonical native spine.
+Their prompts are raw bounded user text; agent prompts are larger structured
+JSON envelopes, so agent source selection is performed through the host tool,
+not by mistakenly treating the JSON envelope as a direct source query.
+
+The signed source tool has exactly one query argument. It does not accept
+model-selected pathnames, shell commands, arbitrary file access, permissions,
+network URLs, writes or new HMAC signatures. Before returning an observation,
+it reopens and re-verifies the signed original source bytes, exact passage SHA,
+principal, approval epoch and source bounds. EvidenceRefs preserve those byte
+digests and are explicitly not semantic-truth or host-authority proofs.
+
+The CLI attaches a maximum-three-call READ_ONLY ToolGrant only after the
+operator explicitly enables the tool. Host policy and epistemic verification
+still independently decide every proposed model-originated tool call.
+No mutating or external grant exists in this composition.
+
 ## Continuous local chat, without reloading the model
 
 The single-process REPL retains one source-approved installed model and one
@@ -206,13 +237,14 @@ After the source publication and repairs are complete, run these in order:
 6. python -m unittest skeleton.testing.test_jeeves_native_acceptance_cli -v
 7. python -m unittest skeleton.testing.test_jeeves_native_quality_eval -v
 8. python -m unittest skeleton.testing.test_jeeves_native_sqlite_integration -v
-9. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
-10. python scripts/check_architecture_map.py
-11. python scripts/check_ai_app_construction.py
-12. python scripts/check_capability_interfaces.py
-13. python scripts/check_provider_bootstrap.py
-14. python scripts/check_enterprise_ai_superiority.py --json
-15. python scripts/check_enterprise_ai_implementation_notes.py --json
+9. python -m unittest skeleton.testing.test_jeeves_native_source_tool -v
+10. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_source_tool.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
+11. python scripts/check_architecture_map.py
+12. python scripts/check_ai_app_construction.py
+13. python scripts/check_capability_interfaces.py
+14. python scripts/check_provider_bootstrap.py
+15. python scripts/check_enterprise_ai_superiority.py --json
+16. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,
