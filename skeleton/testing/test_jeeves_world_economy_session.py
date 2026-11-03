@@ -9,7 +9,7 @@ from skeleton.jeeves.worlds.economy import (
 )
 from skeleton.jeeves.worlds.session import SessionStore
 from skeleton.jeeves.worlds.world_canon import (
-    CanonError, WorldStore, digest, propose,
+    CanonError, WorldStore, propose,
 )
 
 

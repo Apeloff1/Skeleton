@@ -9,7 +9,7 @@ from skeleton.jeeves.worlds.cast import CastStore, approve_cast, propose_cast
 from skeleton.jeeves.worlds.dialogue_graph import DialogueStore, propose_dialogue
 from skeleton.jeeves.worlds.dialogue_transcript import DialogueTranscriptStore
 from skeleton.jeeves.worlds.session import SessionStore
-from skeleton.jeeves.worlds.world_canon import CanonError, WorldStore, digest, propose
+from skeleton.jeeves.worlds.world_canon import CanonError, WorldStore, propose
 
 
 def fixture(tmp_path):

@@ -1,7 +1,6 @@
 """Hash-chained dialogue transcript validation and deterministic replay."""
 from __future__ import annotations
 
-import copy
 import pytest
 
 from skeleton.jeeves.worlds.cast import approve_cast, propose_cast

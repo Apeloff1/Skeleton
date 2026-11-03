@@ -8,7 +8,7 @@ from skeleton.jeeves.worlds.economy import EconomyStore, propose_economy
 from skeleton.jeeves.worlds.economy_session import EconomySessionStore
 from skeleton.jeeves.worlds.session import SessionStore
 from skeleton.jeeves.worlds.world_canon import (
-    CanonError, WorldStore, digest, propose, prove,
+    CanonError, WorldStore, propose, prove,
 )
 
 
