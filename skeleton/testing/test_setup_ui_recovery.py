@@ -11,8 +11,6 @@ from pathlib import Path
 import subprocess
 import sys
 
-import pytest
-
 from skeleton.app import installer
 from skeleton.app.assembly import load_manifest
 from skeleton.app.health import ProbeResult
@@ -23,7 +21,6 @@ from skeleton.app.setup_runtime import SetupResult
 def _run_install(tmp_path: Path, monkeypatch, *, independent: bool, recovery_ok: bool = True,
                  setup_ok: bool = True):
     manifest = load_manifest()
-    frontend = manifest.service("frontend")
     if independent:
         services = tuple(
             replace(item, depends_on=()) if item.name == "frontend" else item
