@@ -69,3 +69,19 @@ def test_remote_bridge_rejects_conflicting_receipts_and_unbounded_evidence():
         entries_from_receipts([replace(original, receipt_digest="bad")])
     with pytest.raises(DeliveryError, match="artifact reference"):
         entries_from_receipts([replace(original, output_artifacts=(object(),))])
+
+
+def test_remote_bridge_rejects_distinct_sources_mapped_to_one_release_path():
+    from dataclasses import replace
+    from skeleton.ai.build.core.delivery import remote_bridge as mirrored
+
+    first = _receipt(artifact="dist/first.whl")
+    second = replace(
+        _receipt(artifact="dist/second.whl"), job_id="job2", runner_id="runner2"
+    )
+    aliases = {"dist/first.whl": "release/shared.whl",
+               "dist/second.whl": "release/shared.whl"}
+    for convert in (entries_from_receipts, mirrored.entries_from_receipts):
+        with pytest.raises(DeliveryError, match="alias collision"):
+            convert([first, second], paths=aliases)
+        assert len(convert([first, first])) == 1

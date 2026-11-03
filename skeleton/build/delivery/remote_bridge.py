@@ -36,6 +36,7 @@ def entries_from_receipts(
     default the artifact id is used as the path.
     """
     out: dict[str, ArtifactEntry] = {}
+    source_by_path: dict[str, str] = {}
     seen_jobs: dict[str, VerifiedRemoteReceipt] = {}
     output_count = 0
     for count, receipt in enumerate(receipts, 1):
@@ -60,9 +61,15 @@ def entries_from_receipts(
             if not isinstance(ref, RemoteArtifactRef):
                 raise DeliveryError("remote artifact reference must be verified")
             path = (paths or {}).get(ref.artifact_id, ref.artifact_id)
+            if type(path) is not str or type(ref.artifact_id) is not str:
+                raise DeliveryError("invalid remote artifact path identity")
             kind = _kind_for(path)
             assert kind in ARTIFACT_KINDS
             entry = ArtifactEntry(path, kind, ref.size_bytes, ref.sha256, platform)
+            source = source_by_path.get(entry.path)
+            if source is not None and source != ref.artifact_id:
+                raise DeliveryError(f"remote artifact alias collision for {entry.path}")
+            source_by_path[entry.path] = ref.artifact_id
             existing = out.get(entry.path)
             if existing is not None and existing != entry:
                 raise DeliveryError(f"conflicting outputs for {entry.path}")
