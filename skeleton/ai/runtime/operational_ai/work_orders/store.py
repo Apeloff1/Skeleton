@@ -18,6 +18,14 @@ class WorkOrderStore:
         if not callable(clock):refuse("trusted monotonic clock required")
         self.db=WorkDatabase(root,readonly=readonly)
         self._clock=clock
+        try:
+            # PRAGMA checks validate SQLite structure, not the durable custody
+            # journal, reservations or signed admission records. Refuse to
+            # expose an existing (or fresh) queue until all are consistent.
+            self.audit()
+        except BaseException:
+            self.db.close()
+            raise
     def close(self):self.db.close()
     def __enter__(self):return self
     def __exit__(self,*_):self.close()
