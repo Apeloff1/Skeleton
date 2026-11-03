@@ -196,3 +196,17 @@ def test_hook_validation_cannot_be_bypassed_by_mutating_caller_owned_ops():
     assert result["levels"][-1] == {"id": "safe", "name": "Safe"}
     assert result["player"]["hp"] == 10
     assert PLAN["levels"][-1]["id"] == "gate"
+
+
+def test_mod_manifest_rejects_unbounded_versions_and_target_scopes():
+    """Hostile mod metadata cannot force unbounded parsing or target scans."""
+    for value in ("1" * 5000 + ".0.0", "1.0.0-" + "a" * 5000):
+        with pytest.raises(ModError, match="semver"):
+            SemVer.parse(value)
+    valid = mm("safe").to_dict()
+    for targets in (["levels"] * 33, ["x" * 257], ["levels\\nother"]):
+        with pytest.raises(ModError, match="targets"):
+            ModManifest.from_dict({**valid, "targets": targets})
+    with pytest.raises(ModError, match="targets"):
+        mm("direct", targets=tuple(["levels"] * 33))
+    assert ModManifest.from_dict({**valid, "targets": ["levels"]}).targets == ("levels",)

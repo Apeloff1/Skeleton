@@ -14,6 +14,8 @@ _ID = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 _SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
 _CMP = re.compile(r"^(\^|~|>=|<=|>|<|=)?\s*(\S+)$")
 MAX_DEPS = 32
+MAX_TARGETS = 32
+MAX_SEMVER_CHARS = 128
 
 
 class ModError(ContractError):
@@ -29,7 +31,10 @@ class SemVer:
 
     @classmethod
     def parse(cls, text: str) -> SemVer:
-        m = _SEMVER.fullmatch(text.strip()) if isinstance(text, str) else None
+        # Bound untrusted version text before regex matching or integer parsing.
+        if type(text) is not str or len(text) > MAX_SEMVER_CHARS:
+            raise ModError("invalid semver length or type")
+        m = _SEMVER.fullmatch(text.strip())
         if not m:
             raise ModError(f"invalid semver {text!r}")
         parts = m.group(4).split(".") if m.group(4) else []
@@ -132,6 +137,11 @@ class ModManifest:
     def __post_init__(self) -> None:
         if not isinstance(self.mod_id, str) or not _ID.fullmatch(self.mod_id):
             raise ModError(f"invalid mod id {self.mod_id!r}")
+        if (type(self.targets) is not tuple or len(self.targets) > MAX_TARGETS
+                or any(type(t) is not str or not 1 <= len(t) <= 256
+                       or any(ord(ch) < 32 or ord(ch) == 127 for ch in t)
+                       for t in self.targets)):
+            raise ModError("targets must be bounded, control-free path prefixes")
         bad = set(self.permissions) - MOD_PERMISSIONS
         if bad:
             raise ModError(f"unknown permissions {sorted(bad)}")
@@ -159,8 +169,8 @@ class ModManifest:
         if not (isinstance(api, list | tuple) and len(api) == 2 and all(isinstance(x, int) for x in api)):
             raise ModError("sdk_api must be [major, minor]")
         targets = data.get("targets", [])
-        if not isinstance(targets, list) or not all(isinstance(t, str) and t for t in targets):
-            raise ModError("targets must be a list of path prefixes")
+        if not isinstance(targets, list) or len(targets) > MAX_TARGETS:
+            raise ModError("targets must be a bounded list of path prefixes")
         return cls(
             mod_id=data.get("mod_id", ""), version=SemVer.parse(data.get("version", "")),
             sdk_api=(api[0], api[1]), permissions=tuple(sorted(set(data.get("permissions", [])))),
