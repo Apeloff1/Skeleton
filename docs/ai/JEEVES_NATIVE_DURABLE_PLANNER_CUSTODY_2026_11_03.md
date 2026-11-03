@@ -104,3 +104,25 @@ the durable reasoning lane; the ordinary best-effort memory error swallowing
 is deliberately not used here. Unreviewed privacy deletion and silent cache
 eviction are held rather than discarding only the process copy. Durable
 retention/deletion lifecycle remains a separate release hold.
+
+
+## Read-only crash inspector without GGUF
+
+When a model cannot activate, a local operator can inspect the private state
+without initializing native inference or mutating SQLite:
+
+```bash
+python -m skeleton.jeeves.agent.native_cold_doctor \
+  --state-dir /approved/private/state --tenant local --subject operator \
+  --model-sha256 ACTUAL_MODEL_DIGEST \
+  --tokenizer-sha256 ACTUAL_TOKENIZER_DIGEST \
+  --run-id jeeves_job_001
+```
+
+The protected read-only SQLite connection checks checkpoint history,
+hash links, terminal-result bytes, scoped memory record integrity, native
+inference-intent status, principal-specific pending/held native requests and
+tool effect counts. The resulting diagnostic has no prompt, response or memory
+body. It never resumes, retries, loads model bytes, relaxes a hold or certifies
+physical GGUF/device readiness. A missing model, stale approval or uncertain
+effect remains a separate explicit release hold.
