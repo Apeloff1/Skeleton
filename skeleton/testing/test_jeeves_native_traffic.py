@@ -10,6 +10,7 @@ from hashlib import sha256
 import threading
 import unittest
 
+from skeleton.jeeves.native_fabric.contracts import ContractHold
 from skeleton.jeeves.native_fabric.traffic import (
     TrafficRequest, TrafficTicket, TrafficHold, FairTrafficQueue,
 )
@@ -200,9 +201,9 @@ class TestNativeTrafficScheduler(unittest.TestCase):
 
     def test_unbounded_output_tokens_or_deadlines_denied(self):
         for value in (0, -1, True, 9000):
-            with self.subTest(value=value), self.assertRaises(TrafficHold):
+            with self.subTest(value=value), self.assertRaises(ContractHold):
                 replace(request(1), output_token_ceiling=value)
-        with self.assertRaises(TrafficHold):
+        with self.assertRaises(ContractHold):
             replace(request(1), deadline_ns=0)
 
     def test_cohort_no_dangling_claims_after_queued_cancellation(self):

@@ -157,3 +157,36 @@ timeout, incorrect objective hash or changed casebook is a hold. Source-only
 CI intentionally substitutes a synthetic generator but exercises the actual
 supervisor, DB, transcript and CLI call path. No physical acceptance is
 claimed until an approved laptop invocation captures real receipts.
+
+
+## Deterministic native batch conveyor
+
+`native_batch_cli` runs finite user-authorized tasks against one source-installed
+GGUF. Each task receives a **stable identity** derived from the tenant, operator,
+actual model/tokenizer and requested batch/task IDs. Repeating an identical
+approved casebook checks the original SQLite request and replays its committed
+answer **without** a second model call. A changed prompt under the same identity
+is rejected by the canonical request digest check. A timed-out or uncertain
+native effect is held, not silently retried.
+
+```json
+{"schema":"jeeves.native_batch_casebook.v1","batch_id":"demo_batch","tasks":[
+  {"task_id":"first","prompt":"Give one bounded answer."},
+  {"task_id":"second","prompt":"Provide a local-only follow-up."}
+]}
+```
+
+```bash
+python -m skeleton.jeeves.agent.native_batch_cli \
+  --model-root /approved/private/model --state-dir /approved/private/state \
+  --tenant local --subject operator --approve-native --batch-stdin \
+  < /approved/private/batch.json
+```
+
+The CLI caps tasks, all prompt bytes, full output-token reservations,
+wall time, model identity and per-job latency before starting new work.
+It emits only hashes, counts and receipt identities, not private source text.
+Its `--maximum-jobs` ceiling reaches 1,000, but this is **bounded serial
+work**, not proof of 1,000 simultaneously executing GPUs or hardware workers.
+The queue and readiness layers do not replace source-attested GGUF activation,
+the existing private SQLite authority or real device qualification.
