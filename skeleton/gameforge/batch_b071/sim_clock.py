@@ -80,7 +80,7 @@ class DeterministicRng:
         if type(name) is not str or not 1 <= len(name) <= 128:
             raise ClockError("RNG stream name must be a bounded string")
         h = hashlib.sha256(f"{self.seed}:{name}".encode()).digest()
-        return DeterministicRng(int.from_bytes(h[:8], "big"))
+        return DeterministicRng(int.from_bytes(h[:8], "big") & MAX_SIM_TICK)
 
     def randint(self, lo: int, hi: int) -> int:
         self.draws += 1
