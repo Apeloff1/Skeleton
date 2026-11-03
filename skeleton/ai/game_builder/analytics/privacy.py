@@ -16,6 +16,7 @@ from typing import Any, Iterable, Mapping
 from .events import EventError, GameplayEvent
 
 ANON = "anon"
+MAX_BATCH_INGEST_ROWS = 100_000
 
 
 class EventCapacityError(EventError):
@@ -106,8 +107,12 @@ class Collector:
         return ev
 
     def ingest_many(self, rows: Iterable[tuple[str, str, Mapping[str, Any]]]) -> int:
+        # Dropped/unsampled rows do not consume event storage, so retention
+        # limits alone cannot bound an infinite or adversarial input stream.
         n = 0
-        for p, s, ev in rows:
+        for index, (p, s, ev) in enumerate(rows):
+            if index >= MAX_BATCH_INGEST_ROWS:
+                raise EventCapacityError("analytics ingest row budget exceeded")
             try:
                 n += self.ingest(p, s, ev) is not None
             except EventCapacityError:

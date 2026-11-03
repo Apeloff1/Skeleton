@@ -170,3 +170,16 @@ def test_heatmap_suppresses_small_cells_and_ignores_unknown_ids():
     hm = difficulty_heatmap(c.events, PLAN, min_players=5)
     assert hm.suppressed == 1 and hm.cell("l2") is None and hm.cell("secret") is None
     assert difficulty_heatmap(c.events, min_players=1).cell("secret").attempts == 1
+
+
+def test_analytics_unsampled_infinite_batch_stops_at_row_budget(monkeypatch):
+    from itertools import repeat
+    from skeleton.ai.game_builder.analytics import privacy as privacy_module
+
+    monkeypatch.setattr(privacy_module, "MAX_BATCH_INGEST_ROWS", 3)
+    c = Collector(PrivacyPolicy(SALT, sample_rate=0.0))
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    with pytest.raises(privacy_module.EventCapacityError, match="row budget"):
+        c.ingest_many(repeat(("a", "s", event)))
+    assert c.events == []
+    assert c.counts["unsampled"] == 3
