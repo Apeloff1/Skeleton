@@ -6,8 +6,6 @@ Windows, Docker, guarded inference, or real-device qualification.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from skeleton.app.health import ProbeResult
@@ -102,3 +100,15 @@ def test_browser_refusal_is_not_misreported_as_application_readiness(
     ok, detail = launcher.open_running_application(tmp_path)
     assert not ok
     assert "no browser accepted" in detail
+
+
+def test_browser_exception_does_not_expose_sensitive_exception_text(tmp_path, monkeypatch):
+    monkeypatch.setattr(launcher, "probe_url", lambda *args, **kwargs: _probe(True))
+    def refused(url):
+        raise ValueError("private operator credential must not appear in diagnostics")
+    monkeypatch.setattr(launcher.webbrowser, "open", refused)
+    ok, detail = launcher.open_running_application(tmp_path)
+    assert not ok
+    assert "ValueError" in detail
+    assert "credential" not in detail
+    assert "private" not in detail
