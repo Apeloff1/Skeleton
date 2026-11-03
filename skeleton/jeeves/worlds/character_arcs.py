@@ -80,7 +80,7 @@ def validate_arcs(source: Any, world: Any, cast: Any) -> dict[str, Any]:
             if (choices[cid]["from"] not in actors[actor]["scenes"] and
                     choices[cid]["to"] not in actors[actor]["scenes"]):
                 raise CanonError("arcs_actor_absent", actor)
-            if beat["stage"] not in STAGES:
+            if type(beat["stage"]) is not str or beat["stage"] not in STAGES:
                 raise CanonError("arcs_invalid_stage", bid)
             _text(beat["text"], "beat.text", 4096)
         if beats != sorted(beats, key=lambda b: b["id"]):
