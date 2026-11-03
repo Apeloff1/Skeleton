@@ -57,3 +57,8 @@ JSON to world-laptop engine-compile --expected-digests-file FILE; finally run
 world-laptop engine-verify. The adapter invokes StudioEngineStore directly,
 preserving its nine-plane review, temporal and original asset requirements.
 A minimal world without those planes fails closed with not_found.
+
+Before persistence, the read-only Jeeves world.laptop_propose_preview tool
+accepts a typed prompt brief and returns canonical source plus ending proof
+without writing or implicitly approving any file. The operator then uses
+world-laptop propose to persist the same deterministic original source.

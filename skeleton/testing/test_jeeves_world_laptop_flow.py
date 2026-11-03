@@ -190,3 +190,19 @@ def test_engine_bridge_never_synthesizes_missing_reviewed_planes(tmp_path):
     flow, _, _, _ = ready(tmp_path)
     reject("not_found", lambda: flow.engine_inspect(
         "lighthouse", "eight_bit_tile_1983"))
+
+
+def test_readonly_prompt_to_typed_jeeves_proposal_never_persists(tmp_path):
+    brief = sample("lighthouse_brief.json")
+    response = invoke_world_tool(str(tmp_path), {
+        "schema": "jeeves.world.tool_request.v1",
+        "tool": "world.laptop_propose_preview",
+        "world_id": brief["id"],
+        "args": {k: brief[k] for k in ("premise", "protagonist", "region", "goal")},
+    })
+    assert response["persisted"] is False
+    assert response["review_required"] is True
+    assert response["result"]["world"]["id"] == "lighthouse"
+    assert response["result"]["proof"]["ending_witnesses"]["resolution"] == ["pursue_goal"]
+    assert not (tmp_path / "lighthouse.json").exists()
+    assert response["world_digest"] == digest(response["result"]["world"])
