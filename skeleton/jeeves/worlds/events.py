@@ -359,7 +359,29 @@ class EventStore:
         }
         return receipt, playable
 
-    def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
+
+    def editor(self, world_id: str, expected_digest: str) -> dict[str, Any]:
+        from .events_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                world = self._world(fd, world_id)
+                obj = self._read(fd, world_id, world)
+                if digest(obj) != expected_digest:
+                    raise CanonError("events_stale_edit")
+                content = render_editor(obj, world)
+                name = world_id + ".events.editor.html"
+                self.worlds._write(fd, name, content)
+                return {
+                    "html_file": name, "html_sha256": sha256(content).hexdigest(),
+                    "events_digest": digest(obj),
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+\n    def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:
             self._lock(fd, world_id)
