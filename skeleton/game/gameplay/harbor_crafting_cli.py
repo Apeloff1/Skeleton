@@ -51,6 +51,12 @@ from .harbor_crafting_time_trial_authoring import (
     MAX_REVISION_BYTES as MAX_TRIAL_REVISION_BYTES,
     author_time_trial_revision, verify_time_trial_revision,
 )
+from .harbor_crafting_season import (
+    MAX_RECORD_BYTES as MAX_SEASON_RECORD_BYTES,
+    MAX_BOARD_BYTES as MAX_SEASON_BOARD_BYTES,
+    MAX_SEASON_BYTES, append_season, build_season, verify_season_record,
+    season_board, verify_season_board,
+)
 from .harbor_crafting_ghost_race import (
     MAX_RACE_BYTES as MAX_GHOST_RACE_BYTES, ghost_race, verify_ghost_race,
 )
@@ -82,7 +88,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -117,6 +123,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trial", help="Authored time trial course JSON")
     parser.add_argument("--reports", help="JSON array of replay-verified time trial reports")
     parser.add_argument("--board", help="Portable time trial leaderboard JSON")
+    parser.add_argument("--season", help="Source-bound authored championship season JSON")
+    parser.add_argument("--season-record", help="Portable replay-verified season save JSON")
+    parser.add_argument("--season-records", help="JSON array of replay-verified season saves")
+    parser.add_argument("--season-board", help="Portable replay-verified season standings JSON")
+    parser.add_argument("--expected-season-digest", help="CAS lease for season continuation")
     parser.add_argument("--ghost-bundle", help="Verified opponent save for ghost racing")
     parser.add_argument("--trial-edits", help="JSON array of transactional time trial edits")
     parser.add_argument("--trial-revision", help="Portable time trial course revision JSON")
@@ -125,7 +136,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "ghost-race":
+        if args.command == "season-init":
+            output = build_season(
+                load_source(Path(args.source)),
+                _required_json(args.season, "season", MAX_SEASON_BYTES), [],
+            )
+        elif args.command == "season-append":
+            if not args.expected_season_digest:
+                raise HarborError("--expected-season-digest is required")
+            output = append_season(
+                _required_json(args.season_record, "season-record", MAX_SEASON_RECORD_BYTES),
+                _required_json(args.bundle, "bundle"),
+                expected_record_digest=args.expected_season_digest,
+            )
+        elif args.command == "season-verify":
+            output = {"verified": True, **verify_season_record(
+                _required_json(args.season_record, "season-record", MAX_SEASON_RECORD_BYTES))}
+        elif args.command == "season-board":
+            output = season_board(
+                _required_json(args.season_records, "season-records", MAX_SEASON_BOARD_BYTES))
+        elif args.command == "season-board-verify":
+            output = {"verified": True, "ranking": verify_season_board(
+                _required_json(args.season_board, "season-board", MAX_SEASON_BOARD_BYTES))}
+        elif args.command == "ghost-race":
             output = ghost_race(
                 _required_json(args.bundle, "bundle"),
                 _required_json(args.ghost_bundle, "ghost-bundle"),
