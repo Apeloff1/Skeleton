@@ -1,0 +1,27 @@
+{
+  "schema": "offline-cognition-integrity-case.v1",
+  "id": "scope_046",
+  "kind": "scope_invariant",
+  "expected": "equal",
+  "query": "model",
+  "local_documents": [
+    {
+      "document_id": "local_a",
+      "text": "model model model verified original source bounded operator"
+    },
+    {
+      "document_id": "local_b",
+      "text": "local private reading model signed evidence source"
+    },
+    {
+      "document_id": "local_c",
+      "text": "document model finite history proof replay"
+    }
+  ],
+  "foreign_documents": [
+    {
+      "document_id": "foreign_x",
+      "text": "model model model foreign confidential vocabulary vector 50"
+    }
+  ]
+}
