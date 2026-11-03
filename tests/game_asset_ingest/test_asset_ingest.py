@@ -961,3 +961,27 @@ def test_descriptor_import_rejects_hard_linked_sources_and_sidecars(tmp_path):
         assert report.manifest.entries == []
         assert any(issue.path == "mesh.obj" and issue.code == "missing_reference"
                    and "hard-linked" in issue.detail for issue in report.issues)
+
+
+def test_mutable_asset_buffer_cannot_change_receipt_after_parse(monkeypatch):
+    """Parser metadata and digest must describe the same immutable input."""
+    from hashlib import sha256
+    from skeleton.game.build.asset_ingest import importers as importer_module
+
+    caller_buffer = bytearray(b"original asset bytes")
+    expected = bytes(caller_buffer)
+    seen = []
+
+    def parsing_hook(payload):
+        assert type(payload) is bytes
+        seen.append(payload)
+        caller_buffer[:] = b"tampered after parsing"
+        return {"verified": True}
+
+    monkeypatch.setitem(importer_module._PARSERS, ".png", parsing_hook)
+    result = importer_module.import_bytes("mutable.png", caller_buffer)
+    assert seen == [expected]
+    assert result.size == len(expected)
+    assert result.sha256 == sha256(expected).hexdigest()
+    assert result.metadata == {"verified": True}
+    assert bytes(caller_buffer) != expected

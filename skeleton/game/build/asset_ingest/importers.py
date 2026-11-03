@@ -458,11 +458,14 @@ def import_bytes(path: str, data: bytes) -> ImportedAsset:
     kind = detect_kind(path)
     if not isinstance(data, bytes | bytearray):
         raise AssetImportError("asset data must be bytes")
-    if not data:
+    # Bind validation, size and receipt digest to one immutable byte snapshot.
+    # Caller-owned bytearrays may otherwise change between parser and hash.
+    payload = bytes(data)
+    if not payload:
         raise AssetImportError("empty asset")
-    if len(data) > MAX_ASSET_BYTES:
+    if len(payload) > MAX_ASSET_BYTES:
         raise AssetImportError("asset exceeds size limit")
     ext = path[path.rfind("."):].lower()
-    meta = _PARSERS[ext](bytes(data))
-    return ImportedAsset(path=path, kind=kind, format=ext[1:].replace("jpeg", "jpg"), size=len(data),
-                         sha256=sha256(data).hexdigest(), metadata=meta)
+    meta = _PARSERS[ext](payload)
+    return ImportedAsset(path=path, kind=kind, format=ext[1:].replace("jpeg", "jpg"), size=len(payload),
+                         sha256=sha256(payload).hexdigest(), metadata=meta)
