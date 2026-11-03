@@ -214,6 +214,15 @@ from .harbor_crafting_convoy_league_guidance import (
     MAX_GUIDANCE_BYTES as MAX_LEAGUE_GUIDANCE_BYTES,
     build_league_guidance, verify_league_guidance,
 )
+from .harbor_crafting_convoy_league_quests import (
+    MAX_BOARD_BYTES as MAX_LEAGUE_QUEST_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_LEAGUE_QUEST_REPORT_BYTES,
+    build_league_quest_report, verify_league_quest_report, league_quest_status,
+)
+from .harbor_crafting_convoy_league_quest_authoring import (
+    MAX_REVISION_BYTES as MAX_LEAGUE_QUEST_REVISION_BYTES,
+    edit_league_quests, verify_league_quest_revision,
+)
 from .harbor_crafting_convoy_league_ui import play_league_live
 from .harbor_crafting_convoy_ui import play_convoy_live
 from .harbor_crafting_ui import play_live
@@ -245,7 +254,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author", "weather-run", "weather-verify", "weather-resume", "weather-forecast", "weather-verify-forecast", "weather-author", "weather-verify-author", "dialogue-run", "dialogue-verify", "dialogue-resume", "dialogue-author", "dialogue-verify-author", "expedition-run", "expedition-verify", "expedition-resume", "expedition-status", "expedition-build", "expedition-verify-package", "expedition-play", "expedition-verify-play", "expedition-live", "expedition-journal-init", "expedition-journal-verify", "expedition-journal-append", "expedition-journal-at", "expedition-journal-fork", "expedition-journal-compare", "expedition-journal-verify-comparison", "expedition-journal-fast-forward", "quest-run", "quest-verify", "quest-status", "quest-author", "quest-verify-author", "convoy-run", "convoy-verify", "convoy-resume", "convoy-status", "convoy-author", "convoy-verify-author", "convoy-live", "convoy-package-build", "convoy-package-verify", "convoy-package-play", "convoy-package-verify-play", "convoy-package-resume", "convoy-journal-init", "convoy-journal-verify", "convoy-journal-append", "convoy-journal-at", "convoy-solve", "convoy-verify-plan", "convoy-contract-run", "convoy-contract-verify", "convoy-contract-status", "convoy-contract-author", "convoy-contract-verify-author", "convoy-accept", "convoy-verify-accept", "league-init", "league-run", "league-verify", "league-status", "league-resume", "league-live", "league-package-build", "league-package-verify", "league-package-play", "league-package-verify-play", "league-package-resume", "league-author", "league-verify-author", "league-solve", "league-verify-plan", "league-journal-init", "league-journal-append", "league-journal-verify", "league-journal-at", "league-journal-compare", "league-journal-fast-forward", "league-board", "league-board-verify", "league-accept", "league-verify-accept", "league-consequences", "league-verify-consequences", "league-choice-compare", "league-choice-package", "league-choice-verify-package", "league-choice-play", "league-choice-verify-play", "league-hint", "league-verify-hint"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author", "weather-run", "weather-verify", "weather-resume", "weather-forecast", "weather-verify-forecast", "weather-author", "weather-verify-author", "dialogue-run", "dialogue-verify", "dialogue-resume", "dialogue-author", "dialogue-verify-author", "expedition-run", "expedition-verify", "expedition-resume", "expedition-status", "expedition-build", "expedition-verify-package", "expedition-play", "expedition-verify-play", "expedition-live", "expedition-journal-init", "expedition-journal-verify", "expedition-journal-append", "expedition-journal-at", "expedition-journal-fork", "expedition-journal-compare", "expedition-journal-verify-comparison", "expedition-journal-fast-forward", "quest-run", "quest-verify", "quest-status", "quest-author", "quest-verify-author", "convoy-run", "convoy-verify", "convoy-resume", "convoy-status", "convoy-author", "convoy-verify-author", "convoy-live", "convoy-package-build", "convoy-package-verify", "convoy-package-play", "convoy-package-verify-play", "convoy-package-resume", "convoy-journal-init", "convoy-journal-verify", "convoy-journal-append", "convoy-journal-at", "convoy-solve", "convoy-verify-plan", "convoy-contract-run", "convoy-contract-verify", "convoy-contract-status", "convoy-contract-author", "convoy-contract-verify-author", "convoy-accept", "convoy-verify-accept", "league-init", "league-run", "league-verify", "league-status", "league-resume", "league-live", "league-package-build", "league-package-verify", "league-package-play", "league-package-verify-play", "league-package-resume", "league-author", "league-verify-author", "league-solve", "league-verify-plan", "league-journal-init", "league-journal-append", "league-journal-verify", "league-journal-at", "league-journal-compare", "league-journal-fast-forward", "league-board", "league-board-verify", "league-accept", "league-verify-accept", "league-consequences", "league-verify-consequences", "league-choice-compare", "league-choice-package", "league-choice-verify-package", "league-choice-play", "league-choice-verify-play", "league-hint", "league-verify-hint", "league-quests", "league-verify-quests", "league-quest-status", "league-quest-author", "league-verify-quest-author"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -381,10 +390,40 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--league-choice-package", help="Portable source-bound choice package")
     parser.add_argument("--league-choice-play", help="Portable replay-verified choice package play")
     parser.add_argument("--league-hint", help="Portable replay-verified league action guidance")
+    parser.add_argument("--league-quest-board", help="Authored cross-round quest DAG")
+    parser.add_argument("--league-quest-report", help="Replay-verified cross-round mission report")
+    parser.add_argument("--league-quest-edits", help="Transactional quest DAG edits")
+    parser.add_argument("--league-quest-revision", help="Portable replay-verified quest revision")
+    parser.add_argument("--expected-league-quest-board-digest", help="CAS lease for quest authoring")
+    parser.add_argument("--league-quest-preview", action="store_true", help="Replay source-bound edit preview")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "league-hint":
+        if args.command == "league-quests":
+            output = build_league_quest_report(
+                _required_json(args.league_save, "league-save", MAX_LEAGUE_SAVE_BYTES),
+                _required_json(args.league_quest_board, "league-quest-board", MAX_LEAGUE_QUEST_BOARD_BYTES),
+                require_all=args.require_all)
+        elif args.command == "league-verify-quests":
+            output = verify_league_quest_report(
+                _required_json(args.league_quest_report, "league-quest-report", MAX_LEAGUE_QUEST_REPORT_BYTES),
+                require_all=args.require_all)
+        elif args.command == "league-quest-status":
+            output = league_quest_status(
+                _required_json(args.league_quest_report, "league-quest-report", MAX_LEAGUE_QUEST_REPORT_BYTES))
+        elif args.command == "league-quest-author":
+            if not args.expected_league_quest_board_digest:
+                raise HarborError("--expected-league-quest-board-digest is required")
+            output = edit_league_quests(
+                _required_json(args.league_save, "league-save", MAX_LEAGUE_SAVE_BYTES),
+                _required_json(args.league_quest_board, "league-quest-board", MAX_LEAGUE_QUEST_BOARD_BYTES),
+                _required_json(args.league_quest_edits, "league-quest-edits", MAX_LEAGUE_QUEST_BOARD_BYTES),
+                expected_digest=args.expected_league_quest_board_digest,
+                preview=args.league_quest_preview)
+        elif args.command == "league-verify-quest-author":
+            output = verify_league_quest_revision(
+                _required_json(args.league_quest_revision, "league-quest-revision", MAX_LEAGUE_QUEST_REVISION_BYTES))
+        elif args.command == "league-hint":
             output = build_league_guidance(
                 _required_json(args.league_save, "league-save", MAX_LEAGUE_SAVE_BYTES))
         elif args.command == "league-verify-hint":
