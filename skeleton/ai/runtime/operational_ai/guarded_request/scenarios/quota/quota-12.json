@@ -1,0 +1,24 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "quota-12",
+  "control": "quota",
+  "phase": "capacity",
+  "kind": "adversarial-denial",
+  "objective": "Verify actual offline AI gate decision at profile 12 for quota",
+  "threat": "Atomic bounded quota type/range and non-escalating context reserve at edge 12",
+  "trust_boundary": "Untrusted caller input must not change authenticated model, scope, authority or budget",
+  "input": {
+    "context_tokens": 1024,
+    "output_tokens": 1024,
+    "input_bytes": 4096,
+    "output_bytes": 16384,
+    "tool_calls": 0,
+    "parallel_requests": 1
+  },
+  "expected_allow": false,
+  "expected_semantics": "The gate refuses the attempted boundary crossing without any model invocation",
+  "evidence_rule": "Execute the real policy_oracle entrypoint; unexpected exceptions fail acceptance",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

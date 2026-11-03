@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "evidence-03",
+  "control": "evidence",
+  "phase": "knowledge",
+  "kind": "permitted-boundary",
+  "objective": "Verify actual offline AI gate decision at profile 03 for evidence",
+  "threat": "Fail closed on source-digest, byte-offset, truncation, or passage mismatch, variation 3",
+  "trust_boundary": "Untrusted caller input must not change authenticated model, scope, authority or budget",
+  "input": {
+    "source": "abc",
+    "begin": 2,
+    "end": 3,
+    "passage": "c",
+    "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  "expected_allow": true,
+  "expected_semantics": "The submitted input remains inside explicitly granted limits",
+  "evidence_rule": "Execute the real policy_oracle entrypoint; unexpected exceptions fail acceptance",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

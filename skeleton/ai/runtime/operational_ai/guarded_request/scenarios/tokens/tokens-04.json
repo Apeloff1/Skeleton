@@ -1,0 +1,25 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "tokens-04",
+  "control": "tokens",
+  "phase": "native-model-capacity",
+  "kind": "permitted-boundary",
+  "objective": "Validate the actual AI tokens control at exact adversarial boundary 04",
+  "threat": "Model/tokenizer identity, native exact count, output reservation and context overflow, case 4",
+  "trust_boundary": "Local inference, principal, evidence and owner-private filesystem custody",
+  "input": {
+    "prompt": "a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a",
+    "max_context": 64,
+    "output_tokens": 32,
+    "system_reserve": 0,
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "bad_counter": false
+  },
+  "expected_allow": true,
+  "expected_semantics": "Accept only verifiably authorized and bounded bytes",
+  "evidence_rule": "Run a real policy_oracle instance and compare with the independently specified result",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

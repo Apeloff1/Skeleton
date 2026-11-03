@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "grant-03",
+  "control": "grant",
+  "phase": "tools",
+  "kind": "permitted-boundary",
+  "objective": "Verify actual offline AI gate decision at profile 03 for grant",
+  "threat": "Caller-only read grant, expiry, effect and principal scope attenuation, case 3",
+  "trust_boundary": "Untrusted caller input must not change authenticated model, scope, authority or budget",
+  "input": {
+    "selected_tenant": "tenant",
+    "tool": "hash_text",
+    "expires_ns": 1,
+    "now_ns": 0,
+    "mutating": false
+  },
+  "expected_allow": true,
+  "expected_semantics": "The submitted input remains inside explicitly granted limits",
+  "evidence_rule": "Execute the real policy_oracle entrypoint; unexpected exceptions fail acceptance",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}
