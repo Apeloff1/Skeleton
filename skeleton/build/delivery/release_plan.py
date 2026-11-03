@@ -60,11 +60,15 @@ def prepare(
     version = next_version(current_version, changes)
     if str(version) == current_version and not allow_empty:
         raise DeliveryError("no releasable changes since current version")
+    # Caller-supplied metadata must never rewrite the release product
+    # identity after the release ID has already been derived from it.
+    if metadata is not None and "product" in metadata and metadata["product"] != product:
+        raise DeliveryError("release product metadata identity mismatch")
     manifest = build_manifest(
         release_id=release_id_for(product, str(version)),
         version=str(version),
         source_commit=source_commit,
         artifacts=artifacts,
-        metadata={"product": product, **(metadata or {})},
+        metadata={**(metadata or {}), "product": product},
     )
     return ReleaseCandidate(str(version), render(version, changes, date=date), manifest, changes)

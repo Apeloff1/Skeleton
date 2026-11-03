@@ -44,3 +44,18 @@ def test_release_commit_provenance_is_unique_and_bounded(monkeypatch):
     with pytest.raises(DeliveryError, match="inventory exceeds"):
         prepare(**kw, commits=[("1" * 40, "feat: one"),
                                ("2" * 40, "fix: two")])
+
+
+def test_release_candidate_rejects_forged_product_metadata():
+    from skeleton.ai.build.core.delivery import release_plan as mirrored
+
+    kw = dict(
+        product="skeleton", current_version="1.0.0", source_commit="e" * 40,
+        commits=[("1" * 40, "feat: source")], artifacts=ART, date="2026-10-31",
+    )
+    for prepare_fn in (prepare, mirrored.prepare):
+        with pytest.raises(DeliveryError, match="product metadata identity mismatch"):
+            prepare_fn(**kw, metadata={"product": "attacker"})
+        accepted = prepare_fn(**kw, metadata={"product": "skeleton", "channel": "stable"})
+        assert dict(accepted.manifest.metadata)["product"] == "skeleton"
+        assert accepted.manifest.release_id == "skeleton-1.1.0"
