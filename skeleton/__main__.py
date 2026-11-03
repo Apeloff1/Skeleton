@@ -93,6 +93,7 @@ Commands:
     world-integrated Verified cast, route, promises and private context playable
     world-knowledge Reviewed NPC fact provenance, disclosure proof and playable handoff
     world-atlas  Reviewed original regions, choice-bound travel and playable handoff
+    world-portals Reviewed multi-world original portal journeys and playable handoff
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -863,6 +864,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-knowledge":
         from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
         return world_knowledge_cli(rest)
+    if cmd == "world-portals":
+        from skeleton.jeeves.worlds.portals_cli import run as world_portals_cli
+        return world_portals_cli(rest)
     if cmd == "world-atlas":
         from skeleton.jeeves.worlds.atlas_cli import run as world_atlas_cli
         return world_atlas_cli(rest)

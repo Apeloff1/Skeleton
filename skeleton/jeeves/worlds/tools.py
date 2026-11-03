@@ -22,6 +22,7 @@ from .scenario import ScenarioStore
 from .invariants import InvariantStore
 from .assurance import AssuranceStore
 from .atlas import AtlasStore
+from .portals import PortalStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -38,6 +39,7 @@ TOOLS = {
     "world.invariants_preview": (),
     "world.assurance_preview": (),
     "world.atlas_preview": (),
+    "world.portals_preview": ("network_id",),
     "world.atlas_propose_preview": ("prompt",),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
@@ -101,6 +103,10 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
     elif name == "world.invariants_preview":
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
+    elif name == "world.portals_preview":
+        payload = PortalStore(root).inspect(args["network_id"])
+        if payload["network"]["root_world"] != req["world_id"]:
+            raise CanonError("portals_root_world_mismatch")
     elif name == "world.atlas_preview":
         payload = AtlasStore(root).inspect(req["world_id"])
     elif name == "world.atlas_propose_preview":
