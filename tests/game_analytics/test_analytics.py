@@ -90,6 +90,41 @@ def test_opt_out_anonymise_unlinkable():
     assert stage_stats(c.events)[("l1", None)].attempts == 2
 
 
+def test_shared_raw_session_is_principal_scoped_even_after_anonymisation():
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    c = collector(opt_out="anonymise")
+    first = c.ingest("player-one", "shared-session", event)
+    second = c.ingest("player-two", "shared-session", event)
+    assert first is not None and second is not None
+    assert first.session_id != second.session_id
+    assert len(build_sessions(c.events)) == 2
+    c.opt_out("player-one")
+    c.opt_out("player-two")
+    assert {e.player for e in c.events} == {"anon"}
+    assert len({e.session_id for e in c.events}) == 2
+    assert len(build_sessions(c.events)) == 2
+
+
+def test_session_pseudonym_tuple_is_unambiguous_with_delimiters():
+    policy = PrivacyPolicy(SALT)
+    assert policy.session_pseudonym("a:b", "c") != policy.session_pseudonym("a", "b:c")
+    assert policy.session_pseudonym("a", "shared") == policy.session_pseudonym("a", "shared")
+
+
+@pytest.mark.parametrize("bad", ["", "x" * 257, "name\\nnewline", "name\\x00nul",
+                                  "name\\u202ehidden", None, 123])
+def test_raw_analytics_identity_rejects_unsafe_inputs(bad):
+    c = collector()
+    event = {"seq": 0, "t": 0, "type": "session_start"}
+    with pytest.raises(EventError):
+        c.ingest(bad, "session", event)
+    with pytest.raises(EventError):
+        c.ingest("player", bad, event)
+    with pytest.raises(EventError):
+        c.opt_out(bad)
+    assert c.events == [] and c.opted_out == set()
+
+
 def test_collector_bounded_retention_and_purge_releases_capacity():
     from skeleton.ai.game_builder.analytics.privacy import EventCapacityError
 
