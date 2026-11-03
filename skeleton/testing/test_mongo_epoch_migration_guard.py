@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
 import unittest
 
 from skeleton.persistence.mongo_source_epoch import (
