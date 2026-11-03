@@ -795,3 +795,39 @@ def test_manifest_rejects_excessive_json_nesting_and_nodes(monkeypatch):
     monkeypatch.setattr(manifest_module, "MAX_MANIFEST_JSON_NODES", 4)
     with pytest.raises(AssetImportError, match="structure exceeds bound"):
         AssetManifest.from_json('{"schema":"skeleton.game.asset_manifest.v1","entries":[1,2,3]}')
+
+def test_path_iterator_failure_never_publishes_partial_assets(tmp_path):
+    (tmp_path / "good.png").write_bytes(png())
+
+    def hostile_paths():
+        yield "good.png"
+        raise RuntimeError("untrusted path producer failed")
+
+    report = import_files(tmp_path, hostile_paths())
+    assert not report.ok
+    assert report.imported == [] and report.duplicates == []
+    assert report.manifest.entries == []
+    assert [(issue.path, issue.code, issue.detail) for issue in report.issues] == [
+        (".", "unsafe", "asset path iterator failed")
+    ]
+
+
+def test_hostile_path_objects_never_run_user_defined_string_hooks(tmp_path):
+    (tmp_path / "good.png").write_bytes(png())
+
+    class HostilePath(str):
+        def __str__(self):
+            raise AssertionError("hostile __str__ executed")
+
+        def __hash__(self):
+            raise AssertionError("hostile __hash__ executed")
+
+        def __lt__(self, other):
+            raise AssertionError("hostile __lt__ executed")
+
+    report = import_files(tmp_path, ["good.png", HostilePath("good.png"), object()])
+    assert not report.ok
+    assert report.imported == [] and report.duplicates == []
+    assert report.manifest.entries == []
+    assert len(report.issues) == 2
+    assert all(issue.path == "<non-text>" and issue.code == "unsafe" for issue in report.issues)

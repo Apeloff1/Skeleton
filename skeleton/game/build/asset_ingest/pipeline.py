@@ -217,7 +217,13 @@ def _import_from_fd(
     report = ImportReport(AssetManifest())
     # Consume only a bounded prefix, then sort for deterministic manifests.
     # Do not materialize an attacker-controlled unbounded path iterator.
-    requested = list(islice(paths, MAX_IMPORT_FILES + 1))
+    try:
+        requested = list(islice(iter(paths), MAX_IMPORT_FILES + 1))
+    except Exception:
+        # An untrusted producer may fail after yielding otherwise valid paths.
+        # Never publish a partial batch or leak arbitrary iterator exceptions.
+        report.issues.append(ImportIssue(".", "unsafe", "asset path iterator failed"))
+        return report
     if len(requested) > MAX_IMPORT_FILES:
         report.issues.append(ImportIssue(".", "broken", "file count exceeds bound"))
         # A global input bound is a transaction boundary: never publish a
@@ -225,8 +231,10 @@ def _import_from_fd(
         return report
     validated: set[str] = set()
     for item in requested:
-        if not isinstance(item, str):
-            report.issues.append(ImportIssue(str(item), "unsafe", "non-text path"))
+        if type(item) is not str:
+            # Do not invoke __str__, __hash__ or comparison hooks on hostile
+            # string subclasses or non-text objects during validation.
+            report.issues.append(ImportIssue("<non-text>", "unsafe", "non-text path"))
         else:
             validated.add(item)
     total = 0
