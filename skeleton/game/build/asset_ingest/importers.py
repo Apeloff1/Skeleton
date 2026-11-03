@@ -302,26 +302,53 @@ def _glb(data: bytes) -> dict[str, Any]:
 
 
 def _wav(data: bytes) -> dict[str, Any]:
+    """Validate the entire RIFF/WAVE envelope before accepting metadata.
+
+    A forged length, truncated ancillary chunk, or duplicate fmt/data chunk
+    cannot hide trailing bytes or change which sample payload a renderer uses.
+    """
     _need(data, 12, "wav")
     if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
         raise AssetImportError("bad wav header")
-    i, fmt, frames = 12, None, None
-    while i + 8 <= len(data):
-        cid, size = struct.unpack("<4sI", data[i:i + 8])
-        body = data[i + 8:i + 8 + size]
+    if struct.unpack_from("<I", data, 4)[0] != len(data) - 8:
+        raise AssetImportError("wav RIFF length mismatch")
+    i, fmt, frames, chunks = 12, None, None, 0
+    while i < len(data):
+        chunks += 1
+        if chunks > 8192:
+            raise AssetImportError("wav chunk count exceeds bound")
+        if len(data) - i < 8:
+            raise AssetImportError("truncated wav chunk header")
+        cid, size = struct.unpack_from("<4sI", data, i)
+        start = i + 8
+        end = start + size
+        next_i = end + (size & 1)
+        if next_i > len(data):
+            raise AssetImportError("truncated wav chunk")
         if cid == b"fmt ":
-            _need(body, 16, "wav fmt chunk")
-            fmt = struct.unpack("<HHIIHH", body[:16])
+            if fmt is not None:
+                raise AssetImportError("duplicate wav fmt chunk")
+            if size < 16:
+                raise AssetImportError("truncated wav fmt chunk")
+            fmt = struct.unpack_from("<HHIIHH", data, start)
         elif cid == b"data":
-            if len(body) < size:
-                raise AssetImportError("truncated wav data chunk")
+            if frames is not None:
+                raise AssetImportError("duplicate wav data chunk")
             frames = size
-        i += 8 + size + (size & 1)
+        i = next_i
     if fmt is None or frames is None:
         raise AssetImportError("wav missing fmt or data chunk")
-    codec, ch, rate, _, align, bits = fmt
-    if ch < 1 or rate < 1 or align < 1:
+    codec, ch, rate, byte_rate, align, bits = fmt
+    if ch < 1 or rate < 1 or byte_rate < 1 or align < 1:
         raise AssetImportError("wav has invalid format")
+    if frames % align:
+        raise AssetImportError("wav data is not block aligned")
+    if codec == 1 and (
+        bits not in (8, 16, 24, 32)
+        or align != ch * (bits // 8)
+        or byte_rate != rate * align
+    ):
+        raise AssetImportError("wav PCM layout mismatch")
     count = frames // align
     return {"codec": "pcm" if codec == 1 else f"wav:{codec}", "channels": ch, "sample_rate": rate,
             "bits_per_sample": bits, "frames": count, "duration_s": round(count / rate, 6)}

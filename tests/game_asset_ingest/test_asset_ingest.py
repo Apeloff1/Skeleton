@@ -831,3 +831,40 @@ def test_hostile_path_objects_never_run_user_defined_string_hooks(tmp_path):
     assert report.manifest.entries == []
     assert len(report.issues) == 2
     assert all(issue.path == "<non-text>" and issue.code == "unsafe" for issue in report.issues)
+
+
+def test_wav_strict_riff_framing_rejects_hidden_or_ambiguous_payloads():
+    """Malformed RIFF envelopes cannot produce trusted source metadata."""
+    good = wav(rate=8000, ch=2, frames=4)
+    assert import_bytes("good.wav", good).metadata["frames"] == 4
+
+    def riff(chunks):
+        return b"RIFF" + struct.pack("<I", 4 + len(chunks)) + b"WAVE" + chunks
+
+    fmt_chunk, data_chunk = good[12:36], good[36:]
+    extra_fmt = riff(fmt_chunk + fmt_chunk + data_chunk)
+    extra_data = riff(fmt_chunk + data_chunk + data_chunk)
+    unknown_truncated = riff(fmt_chunk + data_chunk + b"JUNK" + struct.pack("<I", 9) + b"x")
+    missing_padding = riff(fmt_chunk + data_chunk + b"JUNK" + struct.pack("<I", 1) + b"x")
+    misaligned = riff(fmt_chunk + b"data" + struct.pack("<I", 3) + b"abc" + b"\0")
+    malformed_pcm = bytearray(fmt_chunk)
+    struct.pack_into("<I", malformed_pcm, 16, 123)  # Incorrect byte rate.
+    invalid = (
+        good[:-1], good + b"hidden", good[:4] + struct.pack("<I", 0) + good[8:],
+        extra_fmt, extra_data, unknown_truncated, missing_padding, misaligned,
+        riff(bytes(malformed_pcm) + data_chunk),
+    )
+    for payload in invalid:
+        with pytest.raises(AssetImportError):
+            import_bytes("hostile.wav", payload)
+
+
+def test_wav_chunk_iteration_is_bounded():
+    """A hostile chain of zero-length chunks must not monopolize parsing."""
+    fmt = wav(rate=8000, ch=1, frames=1)[12:36]
+    data = b"data" + struct.pack("<I", 2) + b"\0\0"
+    junk = (b"JUNK" + struct.pack("<I", 0)) * 8193
+    body = fmt + junk + data
+    payload = b"RIFF" + struct.pack("<I", 4 + len(body)) + b"WAVE" + body
+    with pytest.raises(AssetImportError, match="chunk count exceeds bound"):
+        import_bytes("hostile.wav", payload)
