@@ -19,7 +19,7 @@ from skeleton.app.setup_runtime import SetupResult
 
 
 def _run_install(tmp_path: Path, monkeypatch, *, independent: bool, recovery_ok: bool = True,
-                 setup_ok: bool = True):
+                 setup_ok: bool = True, real_bootstrap: bool = False):
     manifest = load_manifest()
     if independent:
         services = tuple(
@@ -40,13 +40,25 @@ def _run_install(tmp_path: Path, monkeypatch, *, independent: bool, recovery_ok:
             root=tmp_path, platform="test", python=sys.executable, checks=()
         ),
     )
-    monkeypatch.setattr(
-        installer, "ensure_runtime_environment",
-        lambda *args, **kwargs: SetupResult(
-            env_path=tmp_path / ".env", created=False, changed=False,
-            configured_keys=(), preserved_keys=(), warnings=()
-        ),
-    )
+    if real_bootstrap:
+        # Exercise the actual secret-bootstrap implementation, not a mocked
+        # setup receipt. Only Compose and HTTP are simulated in this test.
+        (tmp_path / ".env.example").write_text(
+            "MONGO_INITDB_ROOT_USERNAME=admin\n"
+            "MONGO_INITDB_ROOT_PASSWORD=\n"
+            "JWT_SECRET=\n"
+            "AI_PROVIDER=local\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("SKELETON_LOCAL_MODEL_DIR", str(tmp_path / "local-models"))
+    else:
+        monkeypatch.setattr(
+            installer, "ensure_runtime_environment",
+            lambda *args, **kwargs: SetupResult(
+                env_path=tmp_path / ".env", created=False, changed=False,
+                configured_keys=(), preserved_keys=(), warnings=()
+            ),
+        )
     monkeypatch.setattr(installer, "preflight", lambda *args, **kwargs: ())
     monkeypatch.setattr(installer, "runtime_manifest", lambda m, **kwargs: m)
     monkeypatch.setattr(
@@ -128,3 +140,34 @@ def test_recovery_requires_actual_setup_route_probe(tmp_path, monkeypatch):
     phase = next(p for p in receipt.phases if p.name == "setup-ui-availability")
     assert not phase.ok and not phase.required
     assert "unavailable" in phase.detail
+
+
+def test_real_secret_bootstrap_survives_failed_start_and_setup_only_restart(tmp_path, monkeypatch):
+    """Integration acceptance: real setup custody + installer recovery.
+
+    Compose and HTTP are deterministic fakes, not clean-host/device evidence.
+    """
+    first, commands, probes = _run_install(
+        tmp_path, monkeypatch, independent=True, real_bootstrap=True
+    )
+    assert not first.ok
+    assert probes == [("frontend", "http://127.0.0.1:3000", "/setup", 2.0)]
+    assert len([command for command, _ in commands if "up" in command]) == 2
+    env = tmp_path / ".env"
+    initial = env.read_bytes()
+    assert b"SKL_ENGINE_SERVICE_TOKEN=" in initial
+    assert b"SKELETON_MASTER_SECRET=" in initial
+    assert b"GF_KEYHOLDER_SEED=" in initial
+    assert not any(phase.name == "readiness" for phase in first.phases)
+    second, _, second_probes = _run_install(
+        tmp_path, monkeypatch, independent=True, real_bootstrap=True
+    )
+    assert not second.ok and second_probes
+    assert env.read_bytes() == initial
+    for receipt in (first, second):
+        phases = {phase.name: phase for phase in receipt.phases}
+        assert phases["start"].required and not phases["start"].ok
+        assert phases["setup-ui-recovery"].ok and not phases["setup-ui-recovery"].required
+        assert phases["setup-ui-availability"].ok and not phases["setup-ui-availability"].required
+        assert "critical-api-routes" not in phases
+        assert "SKL_ENGINE_SERVICE_TOKEN=" not in repr(receipt.to_dict())
