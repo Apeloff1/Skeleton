@@ -243,7 +243,7 @@ def run_portable_smoke() -> dict:
     metadata = verify_bytes(archive)
     with tempfile.TemporaryDirectory(prefix="cinder-ridge-portable-smoke-") as folder:
         root = Path(folder)
-        artifact = root / "cinder-ridge.pyz"
+        artifact = root / "cinder-ridge-smoke.pyz"
         with artifact.open("xb") as handle:
             handle.write(archive)
             handle.flush()
@@ -267,7 +267,7 @@ def run_portable_smoke() -> dict:
             output = _invoke(
                 ["cmd.exe", "/d", "/c", str(launcher)], [],
                 env=launcher_env, cwd=root,
-                stdin="\\n".join(choices + ["q"]) + "\\n",
+                stdin="\n".join(choices + ["q"]) + "\n",
             )
             if "Victory:" not in output:
                 raise SmokeError("Windows launcher did not earn an ending")
