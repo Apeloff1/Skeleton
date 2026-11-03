@@ -1,0 +1,20 @@
+{
+  "schema": "ridge.rescue.world.v1",
+  "name": "Cinder Ridge - First Evacuation",
+  "rows": [
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    "....."
+  ],
+  "start": [0, 0],
+  "shelter": [2, 2],
+  "civilians": [{"id": "tavi", "at": [1, 0]}],
+  "raiders": [],
+  "resources": [
+    {"id": "kindling", "kind": "wood", "at": [0, 1], "count": 1},
+    {"id": "ridge_ore", "kind": "ore", "at": [1, 1], "count": 2}
+  ],
+  "max_turns": 32
+}

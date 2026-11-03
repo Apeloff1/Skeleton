@@ -1,0 +1,28 @@
+{
+  "schema": "ridge.rescue.world.v1",
+  "name": "Cinder Ridge - Last Signal",
+  "rows": [
+    ".........",
+    "..#......",
+    "....^....",
+    ".........",
+    ".....#...",
+    ".........",
+    "........."
+  ],
+  "start": [0, 0],
+  "shelter": [8, 6],
+  "civilians": [
+    {"id": "mira", "at": [2, 0]},
+    {"id": "orin", "at": [6, 5]}
+  ],
+  "raiders": [
+    {"id": "scout", "at": [8, 1]}
+  ],
+  "resources": [
+    {"id": "pine", "kind": "wood", "at": [1, 1], "count": 4},
+    {"id": "seam", "kind": "ore", "at": [4, 0], "count": 4},
+    {"id": "sage", "kind": "herb", "at": [1, 5], "count": 4}
+  ],
+  "max_turns": 72
+}
