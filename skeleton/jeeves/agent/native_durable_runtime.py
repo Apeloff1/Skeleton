@@ -13,6 +13,8 @@ from typing import Any
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
 from .native_checkpoint_journal import NativeCheckpointHold, NativeSQLiteCheckpointer
+from .native_run_memory import run_memory_manager, NativeRunMemoryStore
+from .types import MemoryKind
 from .native_runtime import NativeJeevesRuntime
 from .strict_runtime import StrictJeevesAgentRuntime
 from .runtime import RunInputs
@@ -25,6 +27,19 @@ class NativeDurableAgentHold(NativeCheckpointHold):
 
 class _JournaledStrictNativeAgent(StrictJeevesAgentRuntime):
     """Fence native inference BEFORE calling the canonical GGUF provider."""
+
+    def _remember_working(
+        self, namespace, content, *, kind=MemoryKind.WORKING,
+        source, tags, trust, salience, evidence=(),
+    ):
+        # The ordinary runtime swallows optional memory errors. This durable
+        # lane must not silently continue with a divergent, unpersisted context.
+        self.memory.remember(
+            namespace, content, kind=kind, salience=salience, trust=trust,
+            source=source, evidence=evidence, tags=tags,
+            ttl_seconds=self.config.working_memory_ttl_seconds,
+            metadata={"automatic": True, "promoted": False},
+        )
 
     def _model_call(self, state, **kwargs):
         self.checkpointer.begin_native_call(state.run_id, state.checkpoint_sequence)
@@ -57,6 +72,7 @@ class NativeDurableJeevesAgent:
         self.worker = worker
         self.identity = ActiveModel.from_supervisor(worker)
         self.checkpoints = NativeSQLiteCheckpointer(worker)
+        self._active_run_id = None
         self.agent = NativeJeevesRuntime(
             worker, checkpointer=self.checkpoints,
             runtime_type=_JournaledStrictNativeAgent,
@@ -80,10 +96,19 @@ class NativeDurableJeevesAgent:
         gate_name = "jeeves_" + sha256(run_id.encode("utf-8")).hexdigest()[:48]
         return self.worker.spine.session_gate.hold(gate_name, deadline_ms=30000)
 
+    def _bind_memory(self, inputs: RunInputs) -> None:
+        # One durable instance owns one run. Do not allow a concurrent caller
+        # to replace another run's memory manager in the same runtime object.
+        if self._active_run_id not in (None, inputs.run_id):
+            raise NativeDurableAgentHold("runtime already owns another durable run")
+        self.agent.agent.memory = run_memory_manager(self.checkpoints, inputs)
+        self._active_run_id = inputs.run_id
+
     def run(self, inputs: RunInputs):
         self._admit(inputs)
         with self._gate(inputs.run_id):
             self.checkpoints.create_run(inputs)
+            self._bind_memory(inputs)
             return self.agent.run(inputs)
 
     def resume_operator_approved(self, inputs: RunInputs):
@@ -91,6 +116,7 @@ class NativeDurableJeevesAgent:
         self._admit(inputs)
         with self._gate(inputs.run_id):
             self.checkpoints.bind_existing(inputs)
+            self._bind_memory(inputs)
             self.checkpoints.assert_no_inflight(inputs.run_id)
             checkpoint = self.checkpoints.latest(inputs.run_id)
             if checkpoint is None:
@@ -131,6 +157,7 @@ class NativeDurableJeevesAgent:
         self._admit(inputs)
         with self._gate(inputs.run_id):
             self.checkpoints.bind_existing(inputs)
+            memories = NativeRunMemoryStore(self.checkpoints, inputs)
             record = self.checkpoints.inspect(inputs.run_id)
             checkpoint = self.checkpoints.latest(inputs.run_id)
             safe = bool(checkpoint is not None and
@@ -141,7 +168,8 @@ class NativeDurableJeevesAgent:
                     step.tool is None and step.status is not StepStatus.RUNNING
                     for step in checkpoint.plan.steps
                 )))
-            return {**record, "operator_resume_structurally_admissible": safe,
+            return {**record, "durable_working_memory_records": memories.persisted_records,
+                    "operator_resume_structurally_admissible": safe,
                     "native_pending_reservation_clear": "unverified",
                     "automatic_resume": False}
 
