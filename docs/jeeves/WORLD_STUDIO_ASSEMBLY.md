@@ -28,3 +28,9 @@ Proof and artifact digests are bound to the exact source versions.
 
 Focused regression: `python -m pytest skeleton/testing/test_jeeves_world_studio_assembly.py -q`.
 No native device, consumer installation or release certification is claimed.
+
+Cross-plane proof also traverses real choices with both testimony and rumor
+knowledge state. If a character's disclosed testimony conflicts with a
+rumor they have learned about the same claim, the entire assembly fails
+closed. Mutually exclusive branch outcomes remain representable. The
+cross-plane proof digest is included in the source-bound receipt.

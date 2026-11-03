@@ -18,6 +18,7 @@ from .rumors import RumorStore, prove_rumors, replay_rumors
 from .localization import LocalizationStore, prove_localization, localized_replay
 from .accessibility import AccessibilityStore, prove_accessibility, accessible_replay
 from .pacing import PacingStore, prove_pacing, replay_pacing
+from .studio_canon import prove_studio_cross_canon
 from .session import SessionStore, replay_choices, validate_session
 from .world_canon import CanonError, WorldStore, _id, canonical, digest, prove, strict_json
 
@@ -38,6 +39,7 @@ def compile_studio_assembly(world: Any, cast: Any, testimony: Any, rumors: Any,
         "localization": prove_localization(localization, world),
         "accessibility": prove_accessibility(accessibility, world),
         "pacing": prove_pacing(pacing, world),
+        "cross_plane": prove_studio_cross_canon(world, cast, testimony, rumors),
     }
     if not all(source["approved"] for source in (
             cast, testimony, rumors, localization, accessibility, pacing)):
