@@ -59,3 +59,17 @@ The regular terminal controls are available: `north`, `south`, `east`,
 A normal story victory does **not** imply a successful time trial: a missed
 checkpoint or wrong ending returns a nonzero exit status with a replayable
 `TRIAL_REPORT` and `CHECKPOINT`, never a fabricated medal.
+
+## Replay ghosts and side-by-side movement
+
+`ghost-race --bundle player.json --ghost-bundle ghost.json --trial COURSE
+--expected-terminal-digest PLAYER_TERMINAL_DIGEST > race.json` compares a
+real player save with a separately verified, **completed** time-trial ghost.
+It exports each participant's canonical position at every tick, ordered
+checkpoint time deltas, finish-time delta, and earned leader. The ghost is
+observational: it never becomes a collision obstacle or changes game state.
+
+`ghost-verify --report race.json` rebuilds both gameplay histories and the
+complete timeline. Partial player runs remain visible but cannot win. Mixed
+worlds, unfinished ghosts, stale player checkpoints and forged positions or
+scores fail closed. These are replay proofs, not signed player identities.

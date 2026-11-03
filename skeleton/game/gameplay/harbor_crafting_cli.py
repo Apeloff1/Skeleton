@@ -51,6 +51,9 @@ from .harbor_crafting_time_trial_authoring import (
     MAX_REVISION_BYTES as MAX_TRIAL_REVISION_BYTES,
     author_time_trial_revision, verify_time_trial_revision,
 )
+from .harbor_crafting_ghost_race import (
+    MAX_RACE_BYTES as MAX_GHOST_RACE_BYTES, ghost_race, verify_ghost_race,
+)
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -79,7 +82,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -114,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trial", help="Authored time trial course JSON")
     parser.add_argument("--reports", help="JSON array of replay-verified time trial reports")
     parser.add_argument("--board", help="Portable time trial leaderboard JSON")
+    parser.add_argument("--ghost-bundle", help="Verified opponent save for ghost racing")
     parser.add_argument("--trial-edits", help="JSON array of transactional time trial edits")
     parser.add_argument("--trial-revision", help="Portable time trial course revision JSON")
     parser.add_argument("--expected-course-digest", help="CAS lease for time trial course")
@@ -121,7 +125,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "trial-author":
+        if args.command == "ghost-race":
+            output = ghost_race(
+                _required_json(args.bundle, "bundle"),
+                _required_json(args.ghost_bundle, "ghost-bundle"),
+                _required_json(args.trial, "trial"),
+                expected_player_terminal_digest=args.expected_terminal_digest,
+            )
+        elif args.command == "ghost-verify":
+            output = {"verified": True, **verify_ghost_race(
+                _required_json(args.report, "report", MAX_GHOST_RACE_BYTES))}
+        elif args.command == "trial-author":
             if not args.expected_course_digest or not args.expected_source_digest:
                 raise HarborError("--expected-course-digest and --expected-source-digest are required")
             output = author_time_trial_revision(
