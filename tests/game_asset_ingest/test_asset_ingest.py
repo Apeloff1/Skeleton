@@ -127,6 +127,22 @@ def test_gltf_rejects_ambiguous_json_nonfinite_and_boolean_accessors():
                 import_bytes("hostile" + extension, payload)
 
 
+def test_gltf_rejects_nonfinite_exponents_and_oversized_number_tokens():
+    # JSON syntax permits huge exponents even when Python's float becomes inf.
+    # A syntactically valid document must not silently admit unrepresentable
+    # numbers in extensions or extras ignored by the metadata extractor.
+    hostile = (b"1e10000", b"-1e10000", b"9" * 129,
+               b"0." + b"1" * 130)
+    for number in hostile:
+        document = b'{"asset":{"version":"2.0"},"extras":{"value":' + number + b'}}'
+        for extension, payload in ((".gltf", document), (".glb", glb(document))):
+            with pytest.raises(AssetImportError, match="nonfinite|exceeds bound"):
+                import_bytes("hostile" + extension, payload)
+
+    finite = b'{"asset":{"version":"2.0"},"extras":{"value":-1.25e4,"count":123}}'
+    assert import_bytes("finite.gltf", finite).metadata["meshes"] == 0
+
+
 def test_glb_valid_bin_chunk_and_rejects_forged_framing():
     valid = glb(GLTF)
     bin_chunk = struct.pack("<I4s", 4, b"BIN\x00") + b"\x00" * 4

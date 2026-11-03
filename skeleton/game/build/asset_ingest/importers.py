@@ -7,6 +7,7 @@ is cheap and needed to validate face indices). Every parser fails closed with
 from __future__ import annotations
 
 import json
+import math
 import struct
 import zlib
 from dataclasses import dataclass, field
@@ -289,11 +290,29 @@ def _gltf_reject_constant(token: str) -> Any:
     raise AssetImportError(f"gltf nonfinite JSON number: {token}")
 
 
+def _gltf_parse_float(token: str) -> float:
+    """Reject unrepresentable JSON numbers before metadata is trusted."""
+    if len(token) > 128:
+        raise AssetImportError("gltf floating-point token exceeds bound")
+    value = float(token)
+    if not math.isfinite(value):
+        raise AssetImportError("gltf nonfinite JSON number")
+    return value
+
+
+def _gltf_parse_int(token: str) -> int:
+    """Cap JSON integer digits independently of Python's process defaults."""
+    if len(token) > 128:
+        raise AssetImportError("gltf integer token exceeds bound")
+    return int(token)
+
+
 def _gltf_json(raw: bytes) -> dict[str, Any]:
     """Decode bounded, unambiguous JSON before interpreting glTF references."""
     try:
         doc = json.loads(raw, object_pairs_hook=_gltf_unique_object,
-                         parse_constant=_gltf_reject_constant)
+                         parse_constant=_gltf_reject_constant,
+                         parse_float=_gltf_parse_float, parse_int=_gltf_parse_int)
     except AssetImportError:
         raise
     except (ValueError, UnicodeError, TypeError, RecursionError) as exc:
