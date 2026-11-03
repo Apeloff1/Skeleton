@@ -191,5 +191,20 @@ def build_bundle(store: SlotStore) -> dict:
     destination = directory / ("cinder-ridge-" + checked["sha256"][:16] + ".pyz")
     launcher = destination.with_suffix(".cmd")
     _publish(destination, archive)
-    _publish(launcher, _windows_launcher(destination.name))
+    published = destination.lstat()
+    try:
+        _publish(launcher, _windows_launcher(destination.name))
+    except BundleError:
+        # Do not leave a seemingly usable orphaned zipapp when the paired
+        # consumer launcher cannot be published. Refuse to remove a file
+        # that another process replaced after our create-only publication.
+        try:
+            current = destination.lstat()
+            if (current.st_dev, current.st_ino) == (published.st_dev, published.st_ino):
+                destination.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+        raise
     return {**checked, "path": str(destination), "windows_launcher": str(launcher)}

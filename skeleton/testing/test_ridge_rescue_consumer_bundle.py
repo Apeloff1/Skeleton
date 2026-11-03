@@ -81,3 +81,21 @@ def test_failed_publication_does_not_remove_preexisting_file(tmp_path):
     with pytest.raises(BundleError, match="create-only"):
         bundle._publish(target, b"new")
     assert target.read_bytes() == b"existing-owner-data"
+
+
+def test_launcher_failure_rolls_back_only_new_archive(tmp_path, monkeypatch):
+    """A preexisting launcher must not leave an orphaned game archive."""
+    from skeleton.game.gameplay.ridge_rescue import consumer_bundle as bundle
+
+    store = SlotStore(tmp_path / "saves")
+    original = bundle._publish
+    def reject_launcher(path, payload):
+        if path.suffix == ".cmd":
+            raise BundleError("portable game create-only publication refused")
+        return original(path, payload)
+    monkeypatch.setattr(bundle, "_publish", reject_launcher)
+    with pytest.raises(BundleError, match="create-only"):
+        bundle.build_bundle(store)
+    exports = store.root / "exports"
+    assert not list(exports.glob("*.pyz"))
+    assert not list(exports.glob("*.cmd"))
