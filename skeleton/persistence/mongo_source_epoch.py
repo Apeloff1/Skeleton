@@ -501,6 +501,22 @@ _MEMORY_INTERNAL_MUTATION_METHODS = (
 )
 
 
+def _require_unshadowed_writer(owner: Any, class_method: Any, name: str) -> None:
+    """Reject instance-level overrides of otherwise decorated source writers.
+
+    Checking only the class method misses a mutable instance attribute that
+    shadows a fenced entrypoint. A protected owner must dispatch the exact
+    class descriptor bound to that owner, including internal memory helpers.
+    """
+    try:
+        bound = getattr(owner, name)
+    except Exception:
+        raise MongoSourceEpochError("canonical writer binding unavailable: " + name) from None
+    if (not callable(class_method) or getattr(bound, "__self__", None) is not owner
+            or getattr(bound, "__func__", None) is not class_method):
+        raise MongoSourceEpochError("canonical writer instance override: " + name)
+
+
 def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, epoch: Any) -> None:
     """Fail closed if an expected production Mongo mutation loses writer custody.
 
@@ -527,15 +543,21 @@ def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, 
         if (active is not expected
                 or getattr(active, "__canonical_source_writer_fence__", None) != "conversation"):
             raise MongoSourceEpochError("unfenced canonical conversation writer: " + name)
+        _require_unshadowed_writer(conversation, expected, name)
     for name, fence in _MEMORY_WRITER_METHODS.items():
         method = getattr(MongoMemoryRepository, name, None)
         if getattr(method, "__canonical_source_writer_fence__", None) != fence:
             raise MongoSourceEpochError("unfenced canonical memory writer: " + name)
+        _require_unshadowed_writer(memory, method, name)
     for name in _MEMORY_INTERNAL_MUTATION_METHODS:
-        if not callable(getattr(MongoMemoryRepository, name, None)):
+        method = getattr(MongoMemoryRepository, name, None)
+        if not callable(method):
             raise MongoSourceEpochError("missing fenced Mongo memory mutation helper: " + name)
-    if not callable(getattr(MongoMemoryRepository, "_require_canonical_writer", None)):
+        _require_unshadowed_writer(memory, method, name)
+    method = getattr(MongoMemoryRepository, "_require_canonical_writer", None)
+    if not callable(method):
         raise MongoSourceEpochError("missing internal Mongo memory writer guard")
+    _require_unshadowed_writer(memory, method, "_require_canonical_writer")
     from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
 
     # The ciphertext sidecar edits the canonical conversation's head and
