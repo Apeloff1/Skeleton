@@ -46,6 +46,7 @@ from .dialogue_transcript import DialogueTranscriptStore
 from .dialogue_localization import DialogueLocaleStore
 from .epilogues import EpilogueStore
 from .advisories import AdvisoryStore
+from .field_journal import FieldJournalStore
 from .branching import ForkStore
 from .revision import analyze_revision
 from .world_canon import (
@@ -145,6 +146,8 @@ TOOLS = {
     "world.portals_session_preview": ("network_id", "session"),
     "world.portals_propose_preview": ("network_id", "prompt", "from_ending", "to_world"),
     "world.atlas_propose_preview": ("prompt",),
+    "world.field_journal_preview": ("slot",),
+    "world.field_journal_propose_preview": ("slot", "note_id", "text"),
     "world.advisories_preview": (),
     "world.advisories_propose_preview": ("prompt", "entries"),
     "world.advisories_player": ("slot",),
@@ -206,7 +209,11 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     _id(req["world_id"], "world_id")
     args = _keys(req["args"], set(TOOLS[name]))
     world = WorldStore(root).read(req["world_id"])
-    if name == "world.advisories_propose_preview":
+    if name == "world.field_journal_propose_preview":
+        payload = FieldJournalStore(root).preview(req["world_id"], **args)
+    elif name == "world.field_journal_preview":
+        payload = FieldJournalStore(root).inspect(req["world_id"], args["slot"])
+    elif name == "world.advisories_propose_preview":
         payload = AdvisoryStore(root).propose(req["world_id"], **args)
     elif name == "world.advisories_preview":
         payload = AdvisoryStore(root).inspect(req["world_id"])
