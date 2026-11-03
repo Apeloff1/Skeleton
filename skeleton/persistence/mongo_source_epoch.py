@@ -45,7 +45,7 @@ class _BoundWriter:
 class MongoCanonicalSourceEpoch:
     """Tenant/actor scoped durable writer fence shared by source owners."""
 
-    def __init__(self, database: Any) -> None:
+    def __init__(self, database: Any, *, revocation_authorizer: Any | None = None) -> None:
         # A memory-only dummy/independently created collection is NOT accepted
         # as the production epoch witness.
         if not callable(getattr(database, "get_collection", None)):
@@ -75,6 +75,9 @@ class MongoCanonicalSourceEpoch:
         # Retain the exact database object for fail-closed composition identity.
         # Same-named collections on distinct clients are not the same witness.
         self._database = database
+        # Only the trusted application root may inject operator authorization.
+        # No environment flag or request field can enable revocation.
+        self._revocation_authorizer = revocation_authorizer
         self._collection = collection
         self._reader = reader
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
@@ -130,6 +133,63 @@ class MongoCanonicalSourceEpoch:
             raise MongoSourceEpochError(
                 "source epoch already initialized or migration unavailable"
             ) from exc
+
+    async def revoke_actor(
+        self, *, tenant_id: str, actor_id: str,
+        expected_epoch: int, reason_code: str,
+    ) -> int:
+        """Operator-authorized, majority-CAS terminal actor quarantine.
+
+        Only a STABLE epoch can be revoked. A currently WRITING actor cannot
+        be preempted safely by this protocol: its mutation may already have
+        reached Mongo. Such attempts fail closed for operator reconciliation.
+        Revocation is never an automatic recovery or migration primitive.
+        """
+        key = self._key(tenant_id, actor_id)
+        if (type(expected_epoch) is not int or expected_epoch < 2
+                or expected_epoch % 2 != 0):
+            raise MongoSourceEpochError("revocation requires a stable expected epoch")
+        if reason_code not in (
+            "operator-revoke", "credential-rotation", "source-integrity",
+            "tenant-deletion",
+        ):
+            raise MongoSourceEpochError("revocation reason is not admitted")
+        authorizer = getattr(self, "_revocation_authorizer", None)
+        if not callable(authorizer):
+            raise MongoSourceEpochError("independent operator revocation authority missing")
+        try:
+            async with asyncio.timeout(3.0):
+                approved = await authorizer(
+                    tenant_id=tenant_id, actor_id=actor_id,
+                    expected_epoch=expected_epoch, reason_code=reason_code,
+                )
+        except Exception:
+            raise MongoSourceEpochError("operator revocation authorization unavailable") from None
+        if approved is not True:
+            raise MongoSourceEpochError("operator revocation not authorized")
+        try:
+            from pymongo import ReturnDocument
+            result = await self._collection.find_one_and_update(
+                {
+                    "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                    "phase": "stable", "writer_token": None,
+                    "epoch": expected_epoch,
+                },
+                {
+                    "$inc": {"epoch": 1},
+                    "$set": {"phase": "revoked", "revoked_reason": reason_code},
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+        except Exception:
+            # A timed-out majority write may have committed. Never retry
+            # blindly or reset the epoch; operator must read/reconcile.
+            raise MongoSourceEpochError("actor revocation outcome uncertain") from None
+        if (type(result) is not dict or result.get("phase") != "revoked"
+                or result.get("epoch") != expected_epoch + 1
+                or result.get("revoked_reason") != reason_code):
+            raise MongoSourceEpochError("actor revocation CAS rejected or unverified")
+        return result["epoch"]
 
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""

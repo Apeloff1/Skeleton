@@ -71,11 +71,15 @@ The epoch is a majority-durable seqlock over known writer entrypoints,
 **not** a distributed transaction or a physical Mongo permission fence.
 A writer that bypasses the registered owner can still mutate canonical
 collections. Operators must restrict database write roles and verify all
-services share the same writer authority. A separate audited Mongo
-revocation protocol is required for cross-process immediate revocation;
-`revoke()` is local and irreversible on that instance. A change to the
-canonical epoch is detected on subsequent guard checks, not a guarantee
-that an already delivered answer can be recalled.
+services share the same writer authority. The opt-in `MongoCanonicalSourceEpoch.revoke_actor` now provides an
+operator-authorized, majority-durable CAS from a known STABLE even epoch
+to a terminal REVOKED odd epoch. It does not preempt a WRITING owner:
+the operator must reconcile that writer before a safe revocation.
+Its authorization callback must be injected by the trusted application
+root, never from a request. `MongoGuardedActivation.revoke()` is a
+separate local irreversible hold. Cross-process revocation is observed
+at the next linearizable epoch check; it is not instantaneous physical
+writer termination, nor can an already delivered answer be recalled.
 
 The guard's final read precedes network delivery; there is no claim of
 atomic publication against an independently racing writer. No automatic
