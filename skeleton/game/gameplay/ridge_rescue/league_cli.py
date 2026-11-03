@@ -26,14 +26,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "verify-export":
             if not args.bundle:
                 raise LeagueError("--bundle required")
-            checked = verify_league_export(read_bounded(args.bundle, 1_000_000))
+            checked = verify_league_export(read_bounded(args.bundle, 2_000_000))
             report = {"valid": True, "head": checked["head"], "ranking": checked["ranking"]}
         else:
             source = parse_league(read_bounded(args.source or SOURCE, 128_000))
             if args.command == "inspect":
                 report = {"source": source, "max_entries": source["max_entries"]}
             else:
-                board = json.loads(read_bounded(args.board, 1_000_000)) if args.board else open_league(source)
+                board = json.loads(read_bounded(args.board, 2_000_000)) if args.board else open_league(source)
                 if args.command == "open":
                     report = board
                 elif args.command == "submit":
@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
                     report = {"valid": True, "head": checked["head"], "entries": checked["entries"],
                               "champion": checked["champion"], "ranking": checked["ranking"]}
         if args.output:
-            write_new(args.output, report, 1_000_000)
+            write_new(args.output, report, 2_000_000)
         else:
             print(json.dumps(report, sort_keys=True, separators=(",", ":")))
         return 0
