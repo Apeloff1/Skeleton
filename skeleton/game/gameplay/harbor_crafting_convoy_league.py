@@ -135,6 +135,8 @@ def verify_league(save: Any, *, require_complete: bool = False) -> dict[str, Any
         key: value for key, value in save.items() if key != "save_digest"
     }):
         raise HarborError("convoy league save digest mismatch")
+    if not isinstance(save["reports"], list) or not isinstance(save["sessions"], list):
+        raise HarborError("invalid league save sessions or reports")
     for report in save["reports"]:
         verify_convoy(report)
     rebuilt = build_league(
