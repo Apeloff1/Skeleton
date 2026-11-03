@@ -55,3 +55,16 @@ def test_log_replays_to_same_state():
 
 def test_different_script_different_digest():
     assert replay.fingerprint(_build, SCRIPT) != replay.fingerprint(_build, SCRIPT[:-1])
+
+
+def test_industry_replay_infinite_script_budget_is_fail_closed(monkeypatch):
+    from itertools import repeat
+    import pytest
+    from skeleton.economy.gameplay.industry.errors import IndustryError
+
+    monkeypatch.setattr(replay, "MAX_SCRIPT_COMMANDS", 3)
+    cmd = {"op": "grant", "faucet": "daily", "owner": "ana", "tick": 0}
+    with pytest.raises(IndustryError, match="command budget"):
+        replay.run(_build, repeat(cmd))
+    with pytest.raises(IndustryError, match="command budget"):
+        replay.fingerprint(_build, repeat(cmd))

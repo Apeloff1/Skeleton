@@ -10,6 +10,9 @@ from __future__ import annotations
 from typing import Any, Callable, Iterable, Mapping
 
 from skeleton.economy.gameplay.industry.engine import IndustrySystem
+from skeleton.economy.gameplay.industry.errors import IndustryError
+
+MAX_SCRIPT_COMMANDS = 100_000
 from skeleton.simulation.economy.sim import EconomySimError
 
 
@@ -56,7 +59,9 @@ def run(
 ) -> tuple[IndustrySystem, list[Any]]:
     system = build()
     results: list[Any] = []
-    for cmd in script:
+    for index, cmd in enumerate(script):
+        if index >= MAX_SCRIPT_COMMANDS:
+            raise IndustryError("industry replay script command budget exceeded")
         try:
             results.append(apply(system, cmd))
         except EconomySimError as exc:
@@ -67,7 +72,7 @@ def run(
 def fingerprint(
     build: Callable[[], IndustrySystem], script: Iterable[Mapping[str, Any]]
 ) -> str:
-    system, _ = run(build, list(script))
+    system, _ = run(build, script)
     return system.digest()
 
 
