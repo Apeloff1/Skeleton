@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import islice
 from typing import Iterable, Mapping
 
 from skeleton.build.delivery._util import DeliveryError
@@ -41,6 +42,15 @@ def evaluate(
     freeze: bool = False,
 ) -> PromotionVerdict:
     reasons: list[str] = []
+    # A missing check policy cannot authorize promotion to protected tiers.
+    required = list(islice(required_checks, 257))
+    if not required:
+        reasons.append("required-check-policy-missing")
+    if (len(required) > 256
+            or any(type(name) is not str or not name or len(name) > 128 for name in required)
+            or len(required) != len(set(name for name in required if type(name) is str))):
+        reasons.append("invalid-required-check-policy")
+        required = []
     if request.source_tier not in PROMOTION_ORDER or request.target_tier not in PROMOTION_ORDER:
         raise DeliveryError("unknown tier")
     src = PROMOTION_ORDER.index(request.source_tier)
@@ -78,7 +88,7 @@ def evaluate(
         if len(names) != len(set(names)):
             reasons.append("duplicate-check-evidence")
         checks = dict(request.checks)
-    for name in required_checks:
+    for name in required:
         status = checks.get(name)
         if status != "success":
             reasons.append(f"check:{name}:{status or 'missing'}")

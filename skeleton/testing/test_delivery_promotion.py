@@ -1,3 +1,4 @@
+import pytest
 from skeleton.build.delivery.promotion import PromotionRequest, evaluate
 from skeleton.build.delivery.release_history import ReleaseHistory
 
@@ -45,3 +46,25 @@ def test_promotion_rejects_duplicate_and_invalid_caller_evidence():
     invalid_checks = _req(checks=(("smoke", "success"), ("invalid",)))
     result = evaluate(invalid_checks, histories=_histories(), required_checks=["smoke"])
     assert not result.allowed and "invalid-check-evidence" in result.reasons
+
+
+def test_promotion_rejects_missing_or_unbounded_required_check_policy():
+    from itertools import repeat
+    from skeleton.ai.build.core.delivery import promotion as mirrored
+
+    for evaluate_fn in (evaluate, mirrored.evaluate):
+        absent = evaluate_fn(_req(), histories=_histories())
+        assert not absent.allowed
+        assert "required-check-policy-missing" in absent.reasons
+
+        duplicated = evaluate_fn(
+            _req(), histories=_histories(), required_checks=["smoke", "smoke"]
+        )
+        assert not duplicated.allowed
+        assert "invalid-required-check-policy" in duplicated.reasons
+
+        unbounded = evaluate_fn(
+            _req(), histories=_histories(), required_checks=repeat("smoke")
+        )
+        assert not unbounded.allowed
+        assert "invalid-required-check-policy" in unbounded.reasons
