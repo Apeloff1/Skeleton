@@ -65,3 +65,15 @@ replays every bounded candidate against the exact report history. It returns
 legal moves, guard forecasts, next alert/score, per-result digest and a
 conservative suggested action. Hints are advisory, never proof of victory;
 any chosen action still passes through the canonical transition and CAS replay.
+
+## Authored mission event chain
+
+Five source-bound quests award points only after replayed objective collection,
+crafting, dock delivery and extraction, in prerequisite order. The authored
+quest board binds to the exact patrol board digest. An outer hash alone never
+certifies an invented quest reward.
+
+```sh
+python -m scripts.game.harbor_patrol quest-run --report report.json --require-all > quests.json
+python -m scripts.game.harbor_patrol quest-verify --quest-ledger quests.json --require-all
+```

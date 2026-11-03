@@ -14,6 +14,10 @@ from .harbor_crafting_patrol_authoring import (
 )
 from .harbor_crafting_patrol_ui import play_live
 from .harbor_crafting_patrol_guidance import patrol_hints
+from .harbor_crafting_patrol_quests import (
+    MAX_BOARD_BYTES as MAX_QUEST_BOARD_BYTES,
+    MAX_LEDGER_BYTES, build_patrol_quests, verify_patrol_quests,
+)
 from .harbor_crafting_patrol_debrief import (
     MAX_BOARD_BYTES as MAX_DEBRIEF_BOARD_BYTES,
     MAX_REPORT_BYTES as MAX_DEBRIEF_REPORT_BYTES,
@@ -28,7 +32,8 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DEFAULT_SOURCE = FIXTURES / "harbor_lantern_quay.json"
 DEFAULT_BOARD = FIXTURES / "harbor_lantern_quay_patrol.json"
 DEFAULT_DEBRIEF = FIXTURES / "harbor_lantern_quay_patrol_debrief.json"
-COMMANDS = ("hint", "choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
+DEFAULT_QUEST_BOARD = FIXTURES / "harbor_lantern_quay_patrol_quests.json"
+COMMANDS = ("quest-run", "quest-verify", "hint", "choices", "debrief", "verify-debrief", "live", "run", "verify", "resume", "author", "verify-author",
             "package", "verify-package", "play", "verify-play")
 
 
@@ -59,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--play")
     parser.add_argument("--debrief", default=str(DEFAULT_DEBRIEF))
     parser.add_argument("--choice", default="publish")
+    parser.add_argument("--quest-board", default=str(DEFAULT_QUEST_BOARD))
+    parser.add_argument("--quest-ledger")
+    parser.add_argument("--require-all", action="store_true")
     parser.add_argument("--expected-digest")
     parser.add_argument("--preview-actions")
     parser.add_argument("--id", default="lantern_quay_patrol")
@@ -66,7 +74,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "hint":
+        if command == "quest-run":
+            result = build_patrol_quests(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.quest_board, MAX_QUEST_BOARD_BYTES),
+                require_all=args.require_all,
+            )
+        elif command == "quest-verify":
+            result = verify_patrol_quests(
+                _read(args.quest_ledger, MAX_LEDGER_BYTES),
+                require_all=args.require_all,
+            )
+        elif command == "hint":
             result = patrol_hints(_read(args.report, MAX_REPORT_BYTES))
         elif command == "verify-debrief":
             result = verify_patrol_debrief(_read(args.debrief, MAX_DEBRIEF_REPORT_BYTES))
