@@ -339,6 +339,17 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             await gate.activate()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
+    async def test_total_authority_probe_timeout_blocks(self):
+        gate = self.make()
+        self.wait_for_epoch = asyncio.Event()
+        with patch(
+            "skeleton.ai.runtime.inference.compose_activation._MAX_TOTAL_AUTHORITY_SECONDS",
+            0.01,
+        ):
+            with self.assertRaisesRegex(ActivationBlocked, "timed out"):
+                await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
     async def test_scope_and_digest_denies(self):
         with self.assertRaises(ActivationBlocked):
             self.make(tenant_id=" tenant ")

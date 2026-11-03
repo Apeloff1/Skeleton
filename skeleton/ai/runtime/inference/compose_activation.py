@@ -24,6 +24,7 @@ from .reviewer_custody import ReviewerCustodyError, ReviewerCustodyVerifier, Rev
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_PROBE_SECONDS = 5.0
+_MAX_TOTAL_AUTHORITY_SECONDS = 10.0
 
 
 class ActivationBlocked(ProviderPolicyError):
@@ -147,6 +148,13 @@ class MongoGuardedActivation:
             raise ActivationBlocked("native model/tokenizer identity unavailable") from None
 
     async def _probe(self) -> int:
+        try:
+            async with asyncio.timeout(_MAX_TOTAL_AUTHORITY_SECONDS):
+                return await self._probe_bounded()
+        except TimeoutError:
+            raise ActivationBlocked("guarded activation authority timed out") from None
+
+    async def _probe_bounded(self) -> int:
         try:
             async with asyncio.timeout(_MAX_PROBE_SECONDS):
                 hello = await self._database.command("hello")
