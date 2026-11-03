@@ -38,7 +38,8 @@ def test_export_failure_does_not_consume_turn_or_exit_play(tmp_path, monkeypatch
         raise StoreError("export device unavailable")
 
     monkeypatch.setattr(store, "export", fail_export)
-    final = play(store, "game", read=iter(["e", "q"]).__next__,
+    answers = iter(["e", "q"])
+    final = play(store, "game", read=lambda _prompt: next(answers),
                  write=lines.append)
     assert final["head"] == initial["head"]
     assert final["revision"] == 0

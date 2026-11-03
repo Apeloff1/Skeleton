@@ -30,7 +30,8 @@ def _view(verified: dict, *, ascii_mode: bool = False) -> str:
     lines.append(status_panel(verified))
     if verified["status"] == "completed":
         lines.append("Victory: both chapters earned their declared endings.")
-        return "\n".join(lines)
+        completed = "\n".join(lines)
+        return completed.encode("ascii", errors="replace").decode("ascii") if ascii_mode else completed
     if verified["state"] is not None:
         world = parse_world(campaign["episodes"][index]["world"])
         lines.append(render_map(world, verified["state"]))
