@@ -312,7 +312,7 @@ def install_application(
                 probe = probe_local_setup(
                     replace(
                         frontend,
-                        public_url=host_urls["frontend"],
+                        public_url=host_urls.get("frontend", frontend.public_url),
                         health_path="/setup",
                     ),
                     timeout=2.0,
