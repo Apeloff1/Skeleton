@@ -67,3 +67,45 @@ def test_secret_scanner_rejects_cycles_and_unbounded_structures():
         assert "oversized-secret-scan-value" in {
             finding.rule for finding in scan({"token": "x" * 9000})
         }
+
+
+def test_secret_scanner_rejects_nontext_credentials_and_oversized_keys():
+    from skeleton.ai.build.core.delivery import secrets_guard as mirrored
+
+    for module in (None, mirrored):
+        scan = scan_mapping if module is None else module.scan_mapping
+        for value in (123456, True, False):
+            assert "sensitive-key-nontext" in {
+                finding.rule for finding in scan({"api_key": value})
+            }
+        with pytest.raises(DeliveryError, match="invalid secret scan mapping key"):
+            scan({object(): "secret"})
+        with pytest.raises(DeliveryError, match="invalid secret scan mapping key"):
+            scan({"x" * 257: "value"})
+
+
+def test_secret_scanner_bounds_mapping_key_inventory_before_sorting():
+    from skeleton.ai.build.core.delivery import secrets_guard as mirrored
+
+    for scan in (scan_mapping, mirrored.scan_mapping):
+        class OversizedMapping(dict):
+            def __iter__(self):
+                from itertools import count
+                return (str(i) for i in count())
+
+        with pytest.raises(DeliveryError, match="structure exceeds bound"):
+            scan(OversizedMapping())
+
+
+def test_secret_scanner_bounds_text_and_finding_streams():
+    from itertools import repeat
+    from skeleton.ai.build.core.delivery import secrets_guard as mirrored
+
+    for module in (None, mirrored):
+        scan = scan_text if module is None else module.scan_text
+        assert {f.rule for f in scan("untrusted.env", "x" * (2 * 1024 * 1024 + 1))} == {
+            "oversized-secret-scan-text"
+        }
+        clean = assert_clean if module is None else module.assert_clean
+        with pytest.raises(DeliveryError, match="secret-like values"):
+            clean(repeat(module.SecretFinding("token", "sensitive-key-literal")))

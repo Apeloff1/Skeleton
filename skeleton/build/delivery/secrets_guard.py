@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any, Iterable, Mapping
 
 SECRET_REF_RE = re.compile(r"^secret://[a-z0-9][a-z0-9._/-]{0,127}$")
@@ -19,6 +20,8 @@ _ENV_PLACEHOLDER_RE = re.compile(r"\$\{[A-Z_][A-Z0-9_]{0,127}\}\Z")
 MAX_SCAN_DEPTH = 32
 MAX_SCAN_NODES = 8192
 MAX_SCAN_VALUE_CHARS = 8192
+MAX_SCAN_TEXT_CHARS = 2 * 1024 * 1024
+MAX_SCAN_KEY_CHARS = 256
 _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("aws-access-key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b")),
@@ -53,7 +56,13 @@ def is_secret_ref(value: Any) -> bool:
 
 def scan_value(location: str, key: str, value: Any) -> list[SecretFinding]:
     findings: list[SecretFinding] = []
-    if not isinstance(value, str) or is_secret_ref(value):
+    if not isinstance(value, str):
+        # Non-text credentials are not safe placeholders. Do not silently
+        # certify numeric, boolean, or object-valued secrets as clean.
+        if value is not None and SENSITIVE_KEY_RE.search(key):
+            return [SecretFinding(location, "sensitive-key-nontext")]
+        return findings
+    if is_secret_ref(value):
         return findings
     if len(value) > MAX_SCAN_VALUE_CHARS:
         return [SecretFinding(location, "oversized-secret-scan-value")]
@@ -95,8 +104,17 @@ def scan_mapping(data: Mapping[str, Any], *, root: str = "$") -> tuple[SecretFin
             active.add(identity)
             try:
                 if isinstance(node, Mapping):
-                    for k in sorted(node, key=str):
-                        walk(node[k], f"{path}.{k}", str(k), depth + 1)
+                    # sorted(mapping) would materialize every hostile key before
+                    # the node budget could stop traversal. Bound first.
+                    remaining = MAX_SCAN_NODES - nodes
+                    keys = list(islice(iter(node), remaining + 1))
+                    if len(keys) > remaining:
+                        raise DeliveryError("secret scan structure exceeds bound")
+                    if any(type(k) is not str or len(k) > MAX_SCAN_KEY_CHARS
+                           or any(ord(ch) < 32 for ch in k) for k in keys):
+                        raise DeliveryError("invalid secret scan mapping key")
+                    for k in sorted(keys):
+                        walk(node[k], f"{path}.{k}", k, depth + 1)
                 else:
                     for i, item in enumerate(node):
                         walk(item, f"{path}[{i}]", key, depth + 1)
@@ -110,6 +128,8 @@ def scan_mapping(data: Mapping[str, Any], *, root: str = "$") -> tuple[SecretFin
 
 
 def scan_text(name: str, text: str) -> tuple[SecretFinding, ...]:
+    if len(text) > MAX_SCAN_TEXT_CHARS:
+        return (SecretFinding(name, "oversized-secret-scan-text"),)
     out: list[SecretFinding] = []
     for lineno, line in enumerate(text.splitlines(), 1):
         for rule, pattern in _PATTERNS:
@@ -119,7 +139,8 @@ def scan_text(name: str, text: str) -> tuple[SecretFinding, ...]:
 
 
 def assert_clean(findings: Iterable[SecretFinding]) -> None:
-    items = list(findings)
+    # Never exhaust an unbounded producer just to reject the first findings.
+    items = list(islice(findings, 11))
     if items:
         from skeleton.build.delivery._util import DeliveryError
 
