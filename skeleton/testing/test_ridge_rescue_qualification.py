@@ -10,7 +10,7 @@ def test_complete_product_matrix_runs_real_game_contracts():
     report = run_matrix()
     assert report["schema"] == CONTRACT
     assert report["passed"] is True, report["checks"]
-    assert report["completed_checks"] == report["expected_checks"] == 6
+    assert report["completed_checks"] == report["expected_checks"] == 8
     assert report["release_certified"] is False
     assert report["ci_certified"] is False
     assert report["device_certified"] is False

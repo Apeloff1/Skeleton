@@ -121,6 +121,31 @@ def _missions_contract() -> dict:
             "ending": checked["state"]["status"], "journal_head": checked["head"]}
 
 
+
+def _challenges_contract() -> dict:
+    from .challenges import list_challenges, play_challenge
+    catalog = list_challenges()
+    if catalog["count"] != 8:
+        raise AcceptanceMatrixError("original challenge catalog incomplete")
+    outcomes = {}
+    for entry in catalog["challenges"]:
+        bundle = play_challenge(entry["id"])
+        state = verify_run(bundle)["state"]
+        if state["status"] != "won:" + entry["ending"]:
+            raise AcceptanceMatrixError("original challenge ending mismatch")
+        outcomes[entry["id"]] = {"ending": state["status"], "turns": state["turn"]}
+    return {"status": "verified-in-process", "count": len(outcomes), "outcomes": outcomes}
+
+
+def _league_contract() -> dict:
+    from .league_acceptance import run_acceptance as league_acceptance
+    from .league import verify_league_export
+    checked = verify_league_export(league_acceptance())
+    if checked["entries"] != 2 or checked["champion"] != "ridge-protectors":
+        raise AcceptanceMatrixError("league standings not earned")
+    return {"status": "verified-in-process", "entries": checked["entries"],
+            "champion": checked["champion"], "head": checked["head"]}
+
 def run_matrix(*, fail_fast: bool = False) -> dict:
     if type(fail_fast) is not bool:
         raise AcceptanceMatrixError("invalid fail_fast")
@@ -131,6 +156,8 @@ def run_matrix(*, fail_fast: bool = False) -> dict:
         ("workbench-editor", _workbench_contract),
         ("tactics-journal", _tactics_contract),
         ("mission-events", _missions_contract),
+        ("original-challenges", _challenges_contract),
+        ("earned-league", _league_contract),
     )
     reports = {}
     for name, check in checks:

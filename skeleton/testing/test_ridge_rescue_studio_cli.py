@@ -11,7 +11,7 @@ def test_catalog_contains_all_real_user_reachable_verticals():
     assert result["release_certified"] is False
     names = {item["id"] for item in result["commands"]}
     assert {"rescue", "campaign", "missions", "journal", "package", "routebook",
-            "tactics", "workbench", "league", "league-demo", "acceptance"} <= names
+            "tactics", "workbench", "league", "league-demo", "acceptance", "challenges"} <= names
     assert len(names) == len(result["commands"])
 
 

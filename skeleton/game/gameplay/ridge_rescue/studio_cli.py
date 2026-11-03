@@ -23,6 +23,7 @@ COMMANDS = {
     "league": ("league_cli", "Replay-derived offline championship"),
     "league-demo": ("league_acceptance", "Real two-entrant earned championship"),
     "acceptance": ("qualification_cli", "Executable source-to-runtime acceptance matrix"),
+    "challenges": ("challenges_cli", "Eight original playable terrain rescue frontiers"),
 }
 
 
