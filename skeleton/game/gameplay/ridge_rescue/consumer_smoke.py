@@ -1,13 +1,15 @@
-"""Source-checkout consumer process smoke: real CLI, restart, ending and export.
+"""Cross-process consumer acceptance for the original Cinder Ridge game.
 
-Run on a target Windows laptop with:
-    py -3 -m skeleton.game.gameplay.ridge_rescue consumer smoke
+Source mode runs the checkout launcher. Portable mode executes a freshly
+verified, self-contained zipapp from a different working directory with no
+PYTHONPATH. Both modes exercise the *same* canonical action sequence and
+persistent SQLite slot through separate Python processes.
 
-This runs in a disposable appdata directory, never the player's real save.
-It produces machine-readable evidence but is not installer or release approval.
+Neither mode certifies a Windows device, installer, or production release.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -25,58 +27,99 @@ class SmokeError(ValueError):
     """The real consumer process did not satisfy its gameplay contract."""
 
 
-def run_smoke() -> dict:
+def _choices() -> tuple[list[str], str]:
+    """Derive numbered inputs from the canonical engine, not a scripted win."""
     session = open_campaign(_source())
-    choices = []
+    choices: list[str] = []
     for action in acceptance_actions("protect") + LAST_SIGNAL:
         current = verify_campaign(session)
         if action not in current["actions"]:
             raise SmokeError("canonical acceptance action not offered")
         choices.append(str(current["actions"].index(action)))
         session = step_campaign(session, action, expected_head=session["head"])
-    expected_head = session["head"]
+    completed = verify_campaign(session)
+    if completed["status"] != "completed" or completed["index"] != 2:
+        raise SmokeError("source campaign did not earn both endings")
+    return choices, session["head"]
+
+
+def _invoke(command: list[str], args: list[str], *, env: dict[str, str],
+            cwd: Path, stdin: str | None = None, expect_success: bool = True) -> str:
+    try:
+        proc = subprocess.run(
+            command + args, input=stdin, capture_output=True, text=True,
+            cwd=str(cwd), env=env, timeout=90,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SmokeError("consumer process could not finish") from exc
+    if expect_success and proc.returncode != 0:
+        raise SmokeError("consumer process failed: " + proc.stderr[-300:])
+    if not expect_success and proc.returncode == 0:
+        raise SmokeError("invalid consumer command unexpectedly succeeded")
+    return proc.stdout if expect_success else proc.stderr
+
+
+def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
+    choices, expected_head = _choices()
     split = max(1, len(choices) // 2)
-    with tempfile.TemporaryDirectory(prefix="cinder-ridge-consumer-smoke-") as root:
-        base = Path(root) / "appdata"
-        base.mkdir()
-        env = os.environ.copy()
-        env["LOCALAPPDATA" if os.name == "nt" else "XDG_DATA_HOME"] = str(base)
-        command = [sys.executable, "-m", "skeleton.game.gameplay.ridge_rescue", "consumer"]
-
-        def invoke(args: list[str], stdin: str | None = None) -> str:
-            try:
-                proc = subprocess.run(
-                    command + args, input=stdin, capture_output=True,
-                    text=True, env=env, timeout=90,
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                raise SmokeError("consumer process could not finish") from exc
-            if proc.returncode != 0:
-                raise SmokeError("consumer process failed: " + proc.stderr[-300:])
-            return proc.stdout
-
-        intro = ["h", "j", "?", "not-a-command"]
-        first = invoke(["play", "--slot", "smoke"], "\n".join(intro + choices[:split] + ["q"]) + "\n")
-        if "Advisory only" not in first or "Unavailable command" not in first:
-            raise SmokeError("interactive controls did not fail safely")
-        midway = json.loads(invoke(["status", "--slot", "smoke"]))
-        if midway["revision"] != split or midway["status"] != "playing":
-            raise SmokeError("quit did not persist exactly the accepted turns")
-        second = invoke(["play", "--slot", "smoke"], "\n".join(choices[split:] + ["q"]) + "\n")
-        if "Victory:" not in second:
-            raise SmokeError("restarted terminal did not show earned victory")
-        final = json.loads(invoke(["status", "--slot", "smoke"]))
-        if final["status"] != "completed" or final["head"] != expected_head:
-            raise SmokeError("restarted campaign diverged from canonical engine")
-        audit = json.loads(invoke(["audit", "--slot", "smoke"]))
-        if not audit["verified"] or audit["audit_entries"] != len(choices):
-            raise SmokeError("save audit did not replay all turns")
-        exported = json.loads(invoke(["export", "--slot", "smoke"]))
-        payload = Path(exported["path"]).read_bytes()
-        if verify_export(payload)["head"] != expected_head:
-            raise SmokeError("portable export failed deterministic verification")
+    base = root / "appdata"
+    base.mkdir()
+    env = os.environ.copy()
+    env["LOCALAPPDATA" if os.name == "nt" else "XDG_DATA_HOME"] = str(base)
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONNOUSERSITE"] = "1"
+    if portable:
+        # A checkout or editable installation must not be needed by the game.
+        env["PYTHONPATH"] = ""
+    else:
+        # The source smoke deliberately runs from a disposable working dir.
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[4])
+    first = _invoke(
+        command, ["play", "--slot", "smoke", "--ascii"], env=env, cwd=root,
+        stdin="\n".join(["h", "j", "?", "not-a-command"] + choices[:split] + ["q"]) + "\n",
+    )
+    if "Advisory only" not in first or "Unavailable command" not in first:
+        raise SmokeError("interactive controls did not fail safely")
+    midway = json.loads(_invoke(command, ["status", "--slot", "smoke"], env=env, cwd=root))
+    if midway["revision"] != split or midway["status"] != "playing":
+        raise SmokeError("quit did not persist exactly the accepted turns")
+    if midway["head"] == expected_head:
+        raise SmokeError("midway save incorrectly claimed completed head")
+    second = _invoke(
+        command, ["play", "--slot", "smoke", "--ascii"], env=env, cwd=root,
+        stdin="\n".join(choices[split:] + ["q"]) + "\n",
+    )
+    if "Victory:" not in second:
+        raise SmokeError("restarted terminal did not show earned victory")
+    final = json.loads(_invoke(command, ["status", "--slot", "smoke"], env=env, cwd=root))
+    if final["status"] != "completed" or final["head"] != expected_head:
+        raise SmokeError("restarted campaign diverged from canonical engine")
+    if final["revision"] != len(choices):
+        raise SmokeError("game saved a different number of accepted turns")
+    audit = json.loads(_invoke(command, ["audit", "--slot", "smoke"], env=env, cwd=root))
+    if not audit["verified"] or audit["audit_entries"] != len(choices):
+        raise SmokeError("save audit did not replay all turns")
+    exported = json.loads(_invoke(command, ["export", "--slot", "smoke"], env=env, cwd=root))
+    export_path = Path(exported["path"])
+    if not export_path.is_file() or not export_path.is_relative_to(base):
+        raise SmokeError("export escaped disposable consumer data directory")
+    payload = export_path.read_bytes()
+    restored = verify_export(payload)
+    if restored["head"] != expected_head or restored["status"] != "completed":
+        raise SmokeError("portable export failed deterministic verification")
+    # A rejected mutation must not damage the earned save or append history.
+    invalid = _invoke(
+        command, ["step", "--slot", "smoke", "--action", '{"verb":"fly"}',
+                  "--expected-head", expected_head], env=env, cwd=root,
+        expect_success=False,
+    )
+    if "completed" not in invalid and "unavailable" not in invalid:
+        raise SmokeError("invalid post-victory transition failed for unexpected reason")
+    stable = json.loads(_invoke(command, ["status", "--slot", "smoke"], env=env, cwd=root))
+    if stable["head"] != expected_head or stable["revision"] != len(choices):
+        raise SmokeError("rejected mutation altered earned game state")
     return {
-        "schema": "ridge.rescue.consumer.process-smoke.v1",
+        "schema": "ridge.rescue.consumer.process-smoke.v2",
         "result": "passed-on-current-host",
         "actions": len(choices),
         "quit_after_actions": split,
@@ -85,7 +128,46 @@ def run_smoke() -> dict:
         "host_windows": os.name == "nt",
         "real_processes": True,
         "portable_export_verified": True,
+        "invalid_mutation_rejected": True,
+        "portable_zipapp_verified": portable,
         "windows_device_certified": False,
         "installer_certified": False,
         "release_certified": False,
+    }
+
+
+def run_smoke() -> dict:
+    """Test the source-checkout consumer entrypoint across real processes."""
+    with tempfile.TemporaryDirectory(prefix="cinder-ridge-source-smoke-") as folder:
+        return _smoke(
+            [sys.executable, "-m", "skeleton.game.gameplay.ridge_rescue",
+             "consumer"], root=Path(folder), portable=False,
+        )
+
+
+def run_portable_smoke() -> dict:
+    """Build and execute the original zipapp outside the source checkout.
+
+    The artifact is created only in an isolated temporary directory. No
+    installed game or user save is modified. Native Windows qualification
+    still requires executing this command on a target Windows laptop.
+    """
+    from .consumer_bundle import build_bytes, verify_bytes
+    archive = build_bytes()
+    metadata = verify_bytes(archive)
+    with tempfile.TemporaryDirectory(prefix="cinder-ridge-portable-smoke-") as folder:
+        root = Path(folder)
+        artifact = root / "cinder-ridge.pyz"
+        with artifact.open("xb") as handle:
+            handle.write(archive)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if hashlib.sha256(artifact.read_bytes()).hexdigest() != metadata["sha256"]:
+            raise SmokeError("portable archive changed during publication")
+        result = _smoke([sys.executable, str(artifact)], root=root, portable=True)
+    return {
+        **result,
+        "archive_sha256": metadata["sha256"],
+        "archive_files": metadata["files"],
+        "source_checkout_dependency": False,
     }

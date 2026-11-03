@@ -93,7 +93,7 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cinder-ridge-consumer")
-    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "audit", "verify-export", "acceptance", "bundle", "smoke"))
+    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "audit", "verify-export", "acceptance", "bundle", "smoke", "portable-smoke"))
     parser.add_argument("--slot", default="adventure", help="lowercase save name, 1-32 safe characters")
     parser.add_argument("--ascii", action="store_true", help="ASCII-only terminal fallback")
     parser.add_argument("--action", help="canonical JSON action for a noninteractive step")
@@ -107,6 +107,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "smoke":
             from .consumer_smoke import run_smoke
             result = run_smoke()
+        elif args.command == "portable-smoke":
+            from .consumer_smoke import run_portable_smoke
+            result = run_portable_smoke()
         elif args.command == "verify-export":
             if not args.file:
                 raise StoreError("--file required")
