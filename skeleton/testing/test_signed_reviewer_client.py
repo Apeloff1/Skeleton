@@ -55,6 +55,20 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
             "reason_code": "approved" if self.mode != "deny" else "unsafe",
         }
         signature = self.key.sign(canonical_verdict(fields))
+        if self.mode == "duplicate":
+            # A syntactically valid JSON object can have two conflicting
+            # policy fields. Never let the parser silently choose the last.
+            encoded = json.dumps(fields, separators=(",", ":"))
+            encoded = encoded[:-1] + ',"allowed":false,"signature":"' + (
+                base64.b64encode(signature).decode()
+            ) + '"}'
+            return httpx.Response(200, content=encoded.encode())
+        if self.mode == "nonfinite":
+            encoded = json.dumps(fields, separators=(",", ":"))
+            encoded = encoded[:-1] + ',"extra":NaN,"signature":"' + (
+                base64.b64encode(signature).decode()
+            ) + '"}'
+            return httpx.Response(200, content=encoded.encode())
         if self.mode == "replay":
             fields["nonce"] = "stale"
         if self.mode == "digest":
@@ -119,7 +133,7 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
         client = self.make()
         text = "source"
         digest = hashlib.sha256(text.encode()).hexdigest()
-        for mode in ("replay", "digest", "unsigned", "oversize", "redirect", "compressed", "declared_oversize"):
+        for mode in ("replay", "digest", "unsigned", "oversize", "redirect", "compressed", "declared_oversize", "duplicate", "nonfinite"):
             with self.subTest(mode=mode):
                 self.mode = mode
                 with self.assertRaises(ReviewerCustodyError):

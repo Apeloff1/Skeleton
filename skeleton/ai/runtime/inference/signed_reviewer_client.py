@@ -41,6 +41,25 @@ def _bounded_headers(response: httpx.Response, limit: int) -> None:
         raise ReviewerCustodyError("reviewer response length invalid")
 
 
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate keys before checking signed canonical fields.
+
+    Python's default JSON parser silently keeps the last occurrence. A
+    signer/verifier pair with different duplicate-key behavior could disagree
+    on the exact security verdict despite a valid signature.
+    """
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate reviewer JSON field")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError("nonfinite reviewer JSON value")
+
+
 def canonical_verdict(fields: dict[str, object]) -> bytes:
     return _DOMAIN + json.dumps(
         fields, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
@@ -132,7 +151,10 @@ class SignedReviewerClient:
         except Exception:
             raise ReviewerCustodyError("reviewer transport unavailable") from None
         try:
-            doc = json.loads(body)
+            doc = json.loads(
+                body, object_pairs_hook=_unique_json_object,
+                parse_constant=_reject_json_constant,
+            )
             required = {
                 "schema", "nonce", "context_sha256", "reviewer_id",
                 "allowed", "reason_code", "signature",
