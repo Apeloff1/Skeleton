@@ -131,7 +131,7 @@ def test_forged_receipt_and_fork_history_rejected(tmp_path):
     receipt = json.loads(original)
     receipt["choice_id"] = "sail"
     path.write_bytes(canonical(receipt))
-    with pytest.raises(CanonError, match="fork_history_mismatch"):
+    with pytest.raises(CanonError, match="fork_receipt_mismatch"):
         forks.inspect("isles", "branch")
     path.write_bytes(original)
     session_path = tmp_path / "isles.branch.session.json"
@@ -207,3 +207,35 @@ def test_compare_rejects_unearned_or_forged_flags():
     right["flags"] = ["unearned"]
     with pytest.raises(CanonError, match="session_replay_mismatch"):
         compare_sessions(source, left, right)
+
+
+def test_forged_review_prompt_and_digest_are_detected(tmp_path):
+    _, _, forks = setup(tmp_path)
+    proposal = forks.preview("isles", parent_slot="primary", target_slot="branch",
+                             prompt="Choose the cliff", at_revision=0, choice_id="climb")
+    forks.publish("isles", proposal, proposal["parent_digest"])
+    receipt_file = tmp_path / "isles.branch.fork.json"
+    original = receipt_file.read_bytes()
+    forged = json.loads(original)
+    forged["prompt"] = "Unreviewed change"
+    receipt_file.write_bytes(canonical(forged))
+    with pytest.raises(CanonError, match="fork_receipt_mismatch"):
+        forks.inspect("isles", "branch")
+    receipt_file.write_bytes(original)
+    forged = json.loads(original)
+    forged["proposal_digest"] = "0" * 64
+    receipt_file.write_bytes(canonical(forged))
+    with pytest.raises(CanonError, match="fork_receipt_mismatch"):
+        forks.inspect("isles", "branch")
+
+
+def test_create_only_publish_rejects_symlink_collision(tmp_path):
+    _, _, forks = setup(tmp_path)
+    proposal = forks.preview("isles", parent_slot="primary", target_slot="branch",
+                             prompt="Alternative", at_revision=0, choice_id="climb")
+    target = tmp_path / "sentinel"
+    target.write_text("untouched")
+    (tmp_path / "isles.branch.session.json").symlink_to(target)
+    with pytest.raises((CanonError, OSError)):
+        forks.publish("isles", proposal, proposal["parent_digest"])
+    assert target.read_text() == "untouched"

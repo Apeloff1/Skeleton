@@ -24,12 +24,14 @@ running the explicit `publish` CLI action with the parent's exact digest.
 
 All files remain under the canonical descriptor-anchored world custody root.
 The parent and child are independently replay-verified; the fork sidecar binds
-the exact parent history, fork point, reviewed prompt digest, original child
+the exact parent history, fork point, reviewed prompt and digest, original child
 session and world digest. Forks are native sessions and are consumed by the
 same story/world builders as ordinary saves. Replays never authorize AI
 content writes. Symlinks, stale parent leases, invalid choices, forged flags,
 changed world revisions and existing target slots fail closed.
 
+New files are published by descriptor-anchored, no-clobber hard links from
+fsynced temporary files, so a racing target name cannot be overwritten.
 A crash between the native session write and provenance sidecar can leave a
 valid but unproven native save. `world-fork inspect` refuses to claim fork
 provenance until the receipt is present and verifies; no automatic overwrite

@@ -7,6 +7,7 @@ The sidecar is evidence, not authority; every read recomputes both histories.
 from __future__ import annotations
 
 import os
+import secrets
 from typing import Any
 
 from .session import SessionStore, _source_session, apply_choice, player_view
@@ -59,6 +60,7 @@ def _receipt(proposal: Any) -> dict[str, Any]:
         "parent_choices": proposal["parent_choices"],
         "at_revision": proposal["at_revision"],
         "choice_id": proposal["choice_id"],
+        "prompt": proposal["prompt"],
         "prompt_digest": digest(proposal["prompt"]),
         "proposal_digest": digest(proposal),
         "initial_session_digest": proposal["initial_session_digest"],
@@ -88,6 +90,33 @@ def compare_sessions(world: Any, left: Any, right: Any) -> dict[str, Any]:
         "right_only_flags": sorted(set(right["flags"]) - set(left["flags"])),
         "qualification": "replay_proven_not_device_certified",
     }
+
+
+def _publish_once(fd: int, name: str, data: bytes) -> None:
+    """Atomically publish a new file without replacing a racing name.
+
+    Hard-linking a private, fsynced temporary file is a no-clobber publish;
+    an attacker cannot swap a symlink into the destination after the check.
+    """
+    if len(data) > 524288:
+        raise CanonError("fork_output_too_large")
+    temp = "." + secrets.token_hex(16) + ".fork.tmp"
+    handle = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                     os.O_NOFOLLOW, 0o600, dir_fd=fd)
+    try:
+        with os.fdopen(handle, "wb", closefd=False) as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temp, name, src_dir_fd=fd, dst_dir_fd=fd,
+                    follow_symlinks=False)
+        except FileExistsError:
+            raise CanonError("fork_slot_exists") from None
+        os.fsync(fd)
+    finally:
+        os.close(handle)
+        os.unlink(temp, dir_fd=fd)
 
 
 class ForkStore:
@@ -162,9 +191,9 @@ class ForkStore:
                 child = apply_choice(seed, world, obj["choice_id"])
                 # The native session is published first. A crash before the
                 # receipt leaves an ordinary playable session, not false proof.
-                self.worlds._write(fd, session_name, canonical(child))
+                _publish_once(fd, session_name, canonical(child))
                 receipt = _receipt(obj)
-                self.worlds._write(fd, receipt_name, canonical(receipt))
+                _publish_once(fd, receipt_name, canonical(receipt))
                 return {"receipt": receipt, "player": player_view(child, world)}
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
@@ -179,7 +208,7 @@ class ForkStore:
             fd, self._name(world_id, target_slot))), {
                 "schema", "world_id", "world_digest", "parent_slot",
                 "target_slot", "parent_digest", "parent_choices",
-                "at_revision", "choice_id", "prompt_digest",
+                "at_revision", "choice_id", "prompt", "prompt_digest",
                 "proposal_digest", "initial_session_digest",
             })
         if (receipt["schema"] != RECEIPT_SCHEMA
@@ -196,6 +225,12 @@ class ForkStore:
         revision = receipt["at_revision"]
         if type(revision) is not int or not 0 <= revision <= len(old_parent["choices"]):
             raise CanonError("fork_receipt_revision_invalid")
+        expected_proposal = propose_fork(
+            world, old_parent, parent_slot=receipt["parent_slot"],
+            target_slot=target_slot, prompt=receipt["prompt"],
+            at_revision=revision, choice_id=receipt["choice_id"])
+        if _receipt(expected_proposal) != receipt:
+            raise CanonError("fork_receipt_mismatch")
         seed = _source_session(world, old_parent["choices"][:revision])
         genesis = apply_choice(seed, world, receipt["choice_id"])
         if (digest(genesis) != receipt["initial_session_digest"]
