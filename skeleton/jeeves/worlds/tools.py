@@ -19,6 +19,7 @@ from .migration import preview_migration
 from .playtest import prove_choice_coverage
 from .choice_impact import analyze_choice_impact
 from .scenario import ScenarioStore
+from .invariants import InvariantStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -32,6 +33,7 @@ TOOLS = {
     "world.playtest_preview": (),
     "world.choice_impact_preview": (),
     "world.scenario_preview": (),
+    "world.invariants_preview": (),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
     "knowledge.propose_preview": (
@@ -92,6 +94,8 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = analyze_choice_impact(world)
     elif name == "world.scenario_preview":
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
+    elif name == "world.invariants_preview":
+        payload = InvariantStore(root).inspect(req["world_id"])["report"]
     elif name == "world.migration_preview":
         payload = preview_migration(args["old_world"], args["checkpoint"], world,
                                     args["choice_map"])
