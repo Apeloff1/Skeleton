@@ -1,7 +1,6 @@
 """Compose preflight is read-only, bounded and never a readiness certificate."""
 from __future__ import annotations
 
-import asyncio
 import unittest
 from unittest.mock import patch
 

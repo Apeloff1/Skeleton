@@ -1,7 +1,6 @@
 """Protected service must not release output across Compose activation drift."""
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from hashlib import sha256
 import unittest

@@ -1,7 +1,6 @@
 """Revocation CAS is terminal and cannot bypass active Mongo writers."""
 from __future__ import annotations
 
-import asyncio
 import unittest
 
 from skeleton.persistence.mongo_source_epoch import (
