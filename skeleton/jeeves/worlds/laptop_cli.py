@@ -114,6 +114,9 @@ def run(argv: list[str]) -> int:
             "laptop_acceptance_session_mismatch": "inspect_session_and_reverify_export",
             "laptop_acceptance_ending_mismatch": "inspect_canonical_ending_witnesses",
             "laptop_acceptance_restore_mismatch": "reject_roundtrip_and_inspect_session_contract",
+            "laptop_engine_source_mismatch": "reinspect_laptop_and_engine_sources_before_retry",
+            "laptop_engine_stale_source": "reinspect_engine_source_digests_before_compile",
+            "laptop_engine_verify_mismatch": "reject_engine_handoff_and_reverify_exact_sources",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
                           "next_action": recovery.get(code, "inspect_input_and_custody")},

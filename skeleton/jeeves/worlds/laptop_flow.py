@@ -269,7 +269,16 @@ class LaptopFlow:
         receipt = owner.compile(world_id, expected_digests, era)
         if owner.verify(world_id) != receipt:
             raise CanonError("laptop_engine_verify_mismatch")
-        return {"laptop": self.verify(world_id), "engine": receipt}
+        # The engine owner releases its world lease before this final laptop
+        # verification. A concurrent review/compile may have advanced the
+        # canonical source in that gap. Never return a mixed-generation pair
+        # of individually valid receipts as a single verified handoff.
+        final_laptop = self.verify(world_id)
+        if (final_laptop != preview["laptop"] or
+                receipt["source_digests"] != expected_digests or
+                receipt["source_digests"]["world"] != final_laptop["source_digest"]):
+            raise CanonError("laptop_engine_source_mismatch")
+        return {"laptop": final_laptop, "engine": receipt}
 
     def engine_verify(self, world_id: str) -> dict[str, Any]:
         laptop = self.verify(world_id)
