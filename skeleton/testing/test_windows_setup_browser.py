@@ -242,3 +242,32 @@ def test_setup_probe_refuses_external_redirect_without_following_it(tmp_path, mo
         target.shutdown()
         target.server_close()
         target_worker.join(timeout=3)
+
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://outside.example:8080",
+        "https://localhost:8080",
+        "http://operator:private@localhost:8080",
+        "http://localhost:8080/other",
+        "http://localhost:8080/?secret=1",
+        "http://localhost:notaport",
+    ],
+)
+def test_direct_setup_probe_rejects_nonlocal_or_credentialed_origin(origin):
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    from skeleton.app.health import probe_local_setup
+
+    frontend = replace(
+        load_manifest().service("frontend"),
+        public_url=origin,
+        health_path="/setup",
+    )
+    result = probe_local_setup(frontend)
+    assert not result.ok
+    assert result.url == ""
+    assert "private" not in repr(result)
+    assert "secret" not in repr(result)

@@ -7,6 +7,7 @@ from typing import Mapping
 import math
 import time
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
@@ -93,7 +94,29 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
 
     if not math.isfinite(timeout) or not 0 < timeout <= 10:
         raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
-    url = service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/")
+    # Reject invalid targets here as well as in the Windows launcher, so a
+    # future caller cannot accidentally turn this local probe into an SSRF.
+    try:
+        parts = urlsplit(service.public_url)
+        local = (
+            parts.scheme == "http"
+            and parts.hostname in {"localhost", "127.0.0.1", "::1"}
+            and parts.port is not None
+            and 1 <= parts.port <= 65535
+            and parts.username is None
+            and parts.password is None
+            and parts.path in {"", "/"}
+            and not parts.query
+            and not parts.fragment
+        )
+    except ValueError:
+        local = False
+    if not local or service.health_path != "/setup":
+        return ProbeResult(
+            service=service.name, url="", ok=False, status=None,
+            detail="setup probe requires a local HTTP origin and exact /setup route",
+        )
+    url = service.public_url.rstrip("/") + "/setup"
 
     class RejectRedirect(HTTPRedirectHandler):
         def redirect_request(self, request, fp, code, msg, headers, newurl):
