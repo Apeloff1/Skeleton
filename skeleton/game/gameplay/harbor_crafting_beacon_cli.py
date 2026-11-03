@@ -21,6 +21,15 @@ from .harbor_crafting_beacon_package import (
 
 from .harbor_crafting_beacon_ui import play_beacon_live
 from .harbor_crafting_beacon_guidance import legal_beacon_actions, verify_beacon_guidance
+from .harbor_crafting_beacon_tides import (
+    MAX_BOARD_BYTES as MAX_TIDE_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_TIDE_REPORT_BYTES,
+    build_beacon_tide_report, verify_beacon_tide_report, resume_beacon_tide_report,
+)
+from .harbor_crafting_beacon_tide_authoring import (
+    MAX_REVISION_BYTES as MAX_TIDE_REVISION_BYTES,
+    edit_beacon_tides, verify_beacon_tide_revision,
+)
 from .harbor_crafting_beacon_quests import (
     MAX_BOARD_BYTES as MAX_QUEST_BOARD_BYTES,
     MAX_REPORT_BYTES as MAX_QUEST_REPORT_BYTES,
@@ -42,7 +51,8 @@ COMMANDS = (
     "run", "verify", "resume", "status", "live", "hint", "verify-hint",
     "accept", "verify-accept", "author",
     "journal-init", "journal-append", "journal-verify", "journal-at", "journal-fork",
-    "quest-run", "quest-verify", "quest-author", "quest-verify-author", "verify-author",
+    "quest-run", "quest-verify", "quest-author", "quest-verify-author",
+    "tide-run", "tide-verify", "tide-resume", "tide-author", "tide-verify-author", "verify-author",
     "package", "verify-package", "play", "verify-play", "resume-play",
 )
 
@@ -75,6 +85,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--guidance")
     parser.add_argument("--acceptance")
     parser.add_argument("--journal")
+    parser.add_argument("--tide-board")
+    parser.add_argument("--tide-report")
+    parser.add_argument("--tide-revision")
     parser.add_argument("--quest-board")
     parser.add_argument("--quest-report")
     parser.add_argument("--quest-revision")
@@ -85,7 +98,41 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "quest-run":
+        if command == "tide-run":
+            result = build_beacon_tide_report(
+                _read(args.source, MAX_BUNDLE_BYTES),
+                _read(args.board, MAX_BOARD_BYTES),
+                _read(args.tide_board, MAX_TIDE_BOARD_BYTES),
+                _read(args.actions, MAX_BUNDLE_BYTES),
+                require_rescue=args.require_rescue,
+            )
+        elif command == "tide-verify":
+            result = verify_beacon_tide_report(
+                _read(args.tide_report, MAX_TIDE_REPORT_BYTES),
+                require_rescue=args.require_rescue,
+            )
+        elif command == "tide-resume":
+            result = resume_beacon_tide_report(
+                _read(args.tide_report, MAX_TIDE_REPORT_BYTES),
+                _read(args.actions, MAX_BUNDLE_BYTES),
+                expected_digest=args.expected_digest or "",
+                require_rescue=args.require_rescue,
+            )
+        elif command == "tide-author":
+            result = edit_beacon_tides(
+                _read(args.source, MAX_BUNDLE_BYTES),
+                _read(args.board, MAX_BOARD_BYTES),
+                _read(args.tide_board, MAX_TIDE_BOARD_BYTES),
+                _read(args.edits, MAX_TIDE_BOARD_BYTES),
+                expected_board_digest=args.expected_digest or "",
+                preview_report=None if not args.tide_report
+                else _read(args.tide_report, MAX_TIDE_REPORT_BYTES),
+            )
+        elif command == "tide-verify-author":
+            result = verify_beacon_tide_revision(
+                _read(args.tide_revision, MAX_TIDE_REVISION_BYTES),
+            )
+        elif command == "quest-run":
             result = build_beacon_quest_report(
                 _read(args.report, MAX_REPORT_BYTES),
                 _read(args.quest_board, MAX_QUEST_BOARD_BYTES),
