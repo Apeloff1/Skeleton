@@ -101,9 +101,29 @@ authenticated Mongo replica-set integration drill, cold-start/restart,
 writer collision/revocation, native tokenizer mismatch and first-run
 Windows/WSL2 evidence. No skipped, stale or pending gate is a pass.
 
+
+## Read-only backend preflight for Studio D
+
+From the backend container, with its existing authenticated `MONGO_URL`
+and `DB_NAME`, set operator-selected `SKL_CANONICAL_TENANT_ID`,
+`SKL_CANONICAL_ACTOR_ID` and `SKL_CANONICAL_CONTEXT_ID` in the private
+process environment. Run:
+
+`python -m skeleton.app.compose_guarded_preflight`
+
+This command only issues Mongo `hello` and a bounded linearizable epoch
+read. It emits a fixed-schema, credential-free JSON result. Exit 0 means
+**only** that the Mongo actor epoch preflight was observed stable; the JSON
+always retains `guarded_local_ai_ready=false` because the command does
+not establish full writer inventory, reviewer trust, model/tokenizer
+activation or device readiness. Exit 2 indicates the Mongo preflight did
+not pass. It never provisions epochs, creates indexes or migrates volumes.
+Studio D can surface the fixed `code` without leaking credentials or
+inventing an activated model.
+
 ## Deterministic focused test
 
-`python -m unittest skeleton.testing.test_compose_guarded_activation`
+`python -m unittest skeleton.testing.test_compose_guarded_activation skeleton.testing.test_compose_guarded_service skeleton.testing.test_mongo_epoch_revocation skeleton.testing.test_compose_guarded_preflight`
 
 The fake Mongo unit tests prove state transitions and error handling only.
 They do not substitute for real replica-set behavior, independent reviewer
