@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 import webbrowser
 
 from skeleton.app.assembly import checks_ok, compose_command, load_manifest, preflight, public_service_urls
-from skeleton.app.health import probe_application, probe_url, probes_ok
+from skeleton.app.health import probe_application, probe_local_setup, probes_ok
 from skeleton.app.installer import InstallReceipt, install_application
 from skeleton.app.preloader import PreloadReport, inspect_host
 
@@ -211,7 +211,7 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             return False, "Setup UI address must be a local HTTP endpoint"
         # Probe the actual exported setup route, not just a generic SPA root
         # that could return 200 while the first-run page is unavailable.
-        frontend_probe = probe_url(
+        frontend_probe = probe_local_setup(
             replace(frontend, public_url=app_url, health_path="/setup"),
             timeout=2.0,
         )

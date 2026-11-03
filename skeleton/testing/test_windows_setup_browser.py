@@ -32,7 +32,7 @@ def test_setup_opens_when_backend_and_guard_are_unavailable(tmp_path, monkeypatc
     def probe(service, *, timeout):
         observed.append((service.name, service.public_url, service.health_path, timeout))
         return _probe(True)
-    monkeypatch.setattr(launcher, "probe_url", probe)
+    monkeypatch.setattr(launcher, "probe_local_setup", probe)
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: observed.append(url) or True)
 
     ok, detail = launcher.open_running_application(tmp_path)
@@ -51,7 +51,7 @@ def test_setup_opens_when_backend_and_guard_are_unavailable(tmp_path, monkeypatc
 def test_setup_never_opens_browser_for_unhealthy_or_redirected_frontend(
     tmp_path, monkeypatch, status, detail,
 ):
-    monkeypatch.setattr(launcher, "probe_url", lambda *args, **kwargs: _probe(False, status=status, detail=detail))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: _probe(False, status=status, detail=detail))
     monkeypatch.setattr(
         launcher.webbrowser, "open",
         lambda url: pytest.fail("unhealthy frontend must never launch browser"),
@@ -79,7 +79,7 @@ def test_setup_rejects_nonlocal_or_credential_bearing_browser_targets(
         lambda root, *, manifest: {"frontend": address},
     )
     monkeypatch.setattr(
-        launcher, "probe_url",
+        launcher, "probe_local_setup",
         lambda *args, **kwargs: pytest.fail("invalid target must not be probed"),
     )
     monkeypatch.setattr(
@@ -95,7 +95,7 @@ def test_setup_rejects_nonlocal_or_credential_bearing_browser_targets(
 def test_browser_refusal_is_not_misreported_as_application_readiness(
     tmp_path, monkeypatch,
 ):
-    monkeypatch.setattr(launcher, "probe_url", lambda *args, **kwargs: _probe(True))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: _probe(True))
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
     ok, detail = launcher.open_running_application(tmp_path)
     assert not ok
@@ -103,7 +103,7 @@ def test_browser_refusal_is_not_misreported_as_application_readiness(
 
 
 def test_browser_exception_does_not_expose_sensitive_exception_text(tmp_path, monkeypatch):
-    monkeypatch.setattr(launcher, "probe_url", lambda *args, **kwargs: _probe(True))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: _probe(True))
     def refused(url):
         raise ValueError("private operator credential must not appear in diagnostics")
     monkeypatch.setattr(launcher.webbrowser, "open", refused)
@@ -189,3 +189,56 @@ def test_real_loopback_http_setup_probe_does_not_confuse_spa_root_with_setup(
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+
+def test_setup_probe_refuses_external_redirect_without_following_it(tmp_path, monkeypatch):
+    """A local /setup 302 must not send any request to its Location target."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    touched = []
+    class External(BaseHTTPRequestHandler):
+        def do_GET(self):
+            touched.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+        def log_message(self, *args):
+            pass
+
+    target = ThreadingHTTPServer(("127.0.0.1", 0), External)
+    target_worker = Thread(target=target.serve_forever, daemon=True)
+    target_worker.start()
+
+    class Redirect(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{target.server_address[1]}/private")
+            self.end_headers()
+        def log_message(self, *args):
+            pass
+
+    source = ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+    source_worker = Thread(target=source.serve_forever, daemon=True)
+    source_worker.start()
+    try:
+        origin = f"http://127.0.0.1:{source.server_address[1]}"
+        monkeypatch.setattr(
+            launcher, "public_service_urls",
+            lambda root, *, manifest: {"frontend": origin},
+        )
+        monkeypatch.setattr(
+            launcher.webbrowser, "open",
+            lambda url: pytest.fail("redirect must not admit browser"),
+        )
+        ok, detail = launcher.open_running_application(tmp_path)
+        assert not ok
+        assert "Setup UI unavailable" in detail
+        assert touched == [], "redirect target must not be contacted"
+    finally:
+        source.shutdown()
+        source.server_close()
+        source_worker.join(timeout=3)
+        target.shutdown()
+        target.server_close()
+        target_worker.join(timeout=3)

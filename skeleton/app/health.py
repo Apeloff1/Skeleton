@@ -81,6 +81,48 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
         )
 
 
+
+def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeResult:
+    """Probe the installed setup route without redirects or ambient proxies.
+
+    Unlike a generic health probe, this is a browser-admission boundary:
+    a local 302 must never cause a second request to an attacker-controlled
+    URL. Only a direct 2xx response from the declared local origin counts.
+    """
+    from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
+
+    if not math.isfinite(timeout) or not 0 < timeout <= 10:
+        raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
+    url = service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/")
+
+    class RejectRedirect(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            return None
+
+    opener = build_opener(ProxyHandler({}), RejectRedirect())
+    request = Request(url, headers={"User-Agent": "skeleton-setup-probe/1"})
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            status = int(getattr(response, "status", 200))
+            effective = response.geturl()
+            response.read(256)
+        ok = 200 <= status < 300 and effective == url
+        return ProbeResult(
+            service=service.name, url=url, ok=ok, status=status,
+            detail="healthy" if ok else "setup endpoint did not answer directly",
+        )
+    except HTTPError as exc:
+        status = int(exc.code)
+        return ProbeResult(
+            service=service.name, url=url, ok=False, status=status,
+            detail="health endpoint redirected" if 300 <= status < 400 else f"HTTP error {status}",
+        )
+    except (URLError, TimeoutError, OSError) as exc:
+        return ProbeResult(
+            service=service.name, url=url, ok=False, status=None,
+            detail=f"{type(exc).__name__}: setup endpoint unreachable",
+        )
+
 def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one declared public HTTP service."""
 
