@@ -69,7 +69,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["canonical_writer_inventory_verified"])
         self.assertFalse(result["writes_performed"])
         self.assertEqual(FakeEpoch.instances[0].calls, 2)
-        self.assertEqual(self.db.calls, 3)
+        self.assertEqual(self.db.calls, 4)
 
     async def test_primary_election_between_reads_denies_stable_epoch(self):
         class RotatingDB(FakeDB):
@@ -97,6 +97,32 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.db = LostPrimary()
         result = await self.inspect()
         self.assertEqual(result["code"], "mongo_primary_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+
+    async def test_principal_rotation_between_epoch_reads_denies(self):
+        class RotatingPrincipal(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "connectionStatus" and self.calls == 4:
+                    return {"authInfo": {"authenticatedUsers": [{"user": "other", "db": "admin"}]}}
+                return result
+        self.db = RotatingPrincipal()
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_principal_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(FakeEpoch.instances[0].calls, 1)
+
+    async def test_principal_loss_between_epoch_reads_denies(self):
+        class LostPrincipal(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "connectionStatus" and self.calls == 4:
+                    return {"authInfo": {"authenticatedUsers": []}}
+                return result
+        self.db = LostPrincipal()
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_principal_changed_during_preflight")
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
 
     async def test_epoch_advance_between_reads_denies(self):
