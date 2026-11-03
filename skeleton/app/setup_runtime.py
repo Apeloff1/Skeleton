@@ -291,15 +291,26 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         or not all(email.split("@"))
     ):
         raise ValueError("operator admin email must be a valid non-empty email address")
+    password_path = Path(password_file).expanduser()
+    # O_NOFOLLOW is not universal. Bind the opened secret to its pathname
+    # before reading, rejecting links and swaps even on platforms without it.
+    if password_path.is_symlink():
+        raise ValueError("admin password input must not be a symbolic link")
     descriptor = os.open(
-        Path(password_file).expanduser(),
+        password_path,
         os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
     )
     with os.fdopen(descriptor, "rb") as handle:
         info = os.fstat(handle.fileno())
-        if (not stat.S_ISREG(info.st_mode) or info.st_size > 4096
-                or (os.name != "nt" and info.st_nlink != 1)):
-            raise ValueError("admin password input must be a single-link regular file of at most 4096 bytes")
+        named = os.lstat(password_path)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+            or info.st_size > 4096
+            or (os.name != "nt" and info.st_nlink != 1)
+        ):
+            raise ValueError("admin password input must be a stable single-link regular file of at most 4096 bytes")
         if os.name != "nt" and info.st_mode & 0o077:
             raise ValueError("admin password file must be private; run chmod 600 on that file")
         raw = handle.read(4097)
