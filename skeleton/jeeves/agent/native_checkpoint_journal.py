@@ -39,6 +39,13 @@ CREATE TABLE IF NOT EXISTS jeeves_native_runs (
     tip_hash TEXT NOT NULL
 )
 """
+_INFLIGHT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS jeeves_native_inflight (
+    run_id TEXT PRIMARY KEY,
+    admitted_after_sequence INTEGER NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES jeeves_native_runs(run_id)
+)
+"""
 _CHECKPOINT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS jeeves_native_checkpoints (
     run_id TEXT NOT NULL,
@@ -132,6 +139,7 @@ class NativeSQLiteCheckpointer:
         with self.db.transaction() as conn:
             conn.execute(_RUN_SCHEMA)
             conn.execute(_CHECKPOINT_SCHEMA)
+            conn.execute(_INFLIGHT_SCHEMA)
 
     def _live(self) -> None:
         if ActiveModel.from_supervisor(self.worker) != self.identity:
@@ -287,6 +295,68 @@ class NativeSQLiteCheckpointer:
                 )
         return checkpoint
 
+    def begin_native_call(self, run_id: str, checkpoint_sequence: int) -> None:
+        """Persist an inference intent BEFORE any potentially irreversible turn.
+
+        This keeps a process death after GGUF execution but before the next
+        checkpoint from generating a new request with changed context.
+        """
+        self._live()
+        require_id("run_id", run_id)
+        with self.db.transaction() as conn:
+            row = self._row(conn, run_id)
+            if row is None or row[8] != checkpoint_sequence:
+                raise NativeCheckpointHold("model intent has no matching durable state")
+            if conn.execute(
+                "SELECT 1 FROM jeeves_native_inflight WHERE run_id=?", (run_id,),
+            ).fetchone() is not None:
+                raise NativeCheckpointHold("previous native intent requires reconciliation")
+            self._read(conn, run_id)
+            conn.execute(
+                "INSERT INTO jeeves_native_inflight VALUES (?,?)",
+                (run_id, checkpoint_sequence),
+            )
+
+    def complete_native_call(self, run_id: str) -> None:
+        """Clear intent only AFTER a new checkpoint and model receipt commit."""
+        self._live()
+        require_id("run_id", run_id)
+        with self.db.transaction() as conn:
+            row = self._row(conn, run_id)
+            intent = conn.execute(
+                "SELECT admitted_after_sequence FROM jeeves_native_inflight "
+                "WHERE run_id=?", (run_id,),
+            ).fetchone()
+            if row is None or intent is None or row[8] <= intent[0]:
+                raise NativeCheckpointHold("native completion lacks post-response checkpoint")
+            self._read(conn, run_id)
+            conn.execute(
+                "DELETE FROM jeeves_native_inflight WHERE run_id=?", (run_id,),
+            )
+            if conn.execute("SELECT changes()").fetchone()[0] != 1:
+                raise NativeCheckpointHold("native intent reconciliation lost")
+
+    def assert_no_inflight(self, run_id: str) -> None:
+        self._live()
+        require_id("run_id", run_id)
+        with self.db.snapshot() as conn:
+            if self._row(conn, run_id) is None:
+                raise NativeCheckpointHold("native run missing")
+            if conn.execute(
+                "SELECT 1 FROM jeeves_native_inflight WHERE run_id=?", (run_id,),
+            ).fetchone() is not None:
+                raise NativeCheckpointHold("unresolved native execution intent; no automatic replay")
+
+    def has_inflight(self, run_id: str) -> bool:
+        self._live()
+        require_id("run_id", run_id)
+        with self.db.snapshot() as conn:
+            if self._row(conn, run_id) is None:
+                raise NativeCheckpointHold("native run missing")
+            return conn.execute(
+                "SELECT 1 FROM jeeves_native_inflight WHERE run_id=?", (run_id,),
+            ).fetchone() is not None
+
     def history(self, run_id: str) -> tuple[RunCheckpoint, ...]:
         require_id("run_id", run_id)
         self._live()
@@ -314,6 +384,7 @@ class NativeSQLiteCheckpointer:
             "phase": latest.phase.value if latest else "admitted",
             "model_sha256": self.identity.model_sha256,
             "tokenizer_sha256": self.identity.tokenizer_sha256,
+            "unresolved_model_intent": self.has_inflight(run_id),
             "source_verified": False,
             "device_qualified": False,
             "release_certified": False,

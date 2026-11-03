@@ -14,12 +14,25 @@ from typing import Any
 from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
 from .native_checkpoint_journal import NativeCheckpointHold, NativeSQLiteCheckpointer
 from .native_runtime import NativeJeevesRuntime
+from .strict_runtime import StrictJeevesAgentRuntime
 from .runtime import RunInputs
 from .types import AgentPhase, StepStatus
 
 
 class NativeDurableAgentHold(NativeCheckpointHold):
     """A restart attempt cannot safely continue this Jeeves run."""
+
+
+class _JournaledStrictNativeAgent(StrictJeevesAgentRuntime):
+    """Fence native inference BEFORE calling the canonical GGUF provider."""
+
+    def _model_call(self, state, **kwargs):
+        self.checkpointer.begin_native_call(state.run_id, state.checkpoint_sequence)
+        # A raised exception leaves the intent held. The surrounding Jeeves
+        # failure checkpoint cannot silently convert uncertainty into replay.
+        response = super()._model_call(state, **kwargs)
+        self.checkpointer.complete_native_call(state.run_id)
+        return response
 
 
 class NativeDurableJeevesAgent:
@@ -33,7 +46,10 @@ class NativeDurableJeevesAgent:
         self.worker = worker
         self.identity = ActiveModel.from_supervisor(worker)
         self.checkpoints = NativeSQLiteCheckpointer(worker)
-        self.agent = NativeJeevesRuntime(worker, checkpointer=self.checkpoints)
+        self.agent = NativeJeevesRuntime(
+            worker, checkpointer=self.checkpoints,
+            runtime_type=_JournaledStrictNativeAgent,
+        )
 
     def _admit(self, inputs: RunInputs) -> None:
         if not isinstance(inputs, RunInputs) or inputs.run_id is None:
@@ -64,6 +80,7 @@ class NativeDurableJeevesAgent:
         self._admit(inputs)
         with self._gate(inputs.run_id):
             self.checkpoints.bind_existing(inputs)
+            self.checkpoints.assert_no_inflight(inputs.run_id)
             checkpoint = self.checkpoints.latest(inputs.run_id)
             if checkpoint is None:
                 raise NativeDurableAgentHold("no checkpoint; inspect admission before recovery")
@@ -98,6 +115,7 @@ class NativeDurableJeevesAgent:
             safe = bool(checkpoint is not None and
                 checkpoint.phase not in (AgentPhase.FAILED, AgentPhase.COMPLETED, AgentPhase.CANCELLED)
                 and checkpoint.usage.tool_calls == 0 and
+                not self.checkpoints.has_inflight(inputs.run_id) and
                 (checkpoint.plan is None or all(
                     step.tool is None and step.status is not StepStatus.RUNNING
                     for step in checkpoint.plan.steps

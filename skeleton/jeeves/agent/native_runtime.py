@@ -28,6 +28,7 @@ def configured_native_agent(
     tool_executor: ToolExecutor | None = None,
     checkpointer: InMemoryCheckpointer | None = None,
     config: AgentConfig | None = None,
+    runtime_type: type[StrictJeevesAgentRuntime] = StrictJeevesAgentRuntime,
 ) -> StrictJeevesAgentRuntime:
     """Construct existing strict Jeeves layers without parallel runtime state.
 
@@ -59,7 +60,9 @@ def configured_native_agent(
             "verifier_max_tokens", "final_max_tokens",
         )):
             raise NativeRuntimeHold("Jeeves config exceeds real native output limit")
-    return StrictJeevesAgentRuntime(
+    if not isinstance(runtime_type, type) or not issubclass(runtime_type, StrictJeevesAgentRuntime):
+        raise NativeRuntimeHold("strict Jeeves runtime subclass required")
+    return runtime_type(
         provider_router=native_provider_router(worker),
         tool_registry=tools or ToolRegistry(),
         tool_executor=tool_executor,
@@ -79,6 +82,7 @@ class NativeJeevesRuntime:
         tool_executor: ToolExecutor | None = None,
         checkpointer: InMemoryCheckpointer | None = None,
         config: AgentConfig | None = None,
+        runtime_type: type[StrictJeevesAgentRuntime] = StrictJeevesAgentRuntime,
     ) -> None:
         self.provider = NativeJeevesProvider(worker)
         self.identity = self.provider.identity
@@ -87,6 +91,7 @@ class NativeJeevesRuntime:
         self.agent = configured_native_agent(
             worker, tools=tools, tool_executor=tool_executor,
             checkpointer=checkpointer, config=config,
+            runtime_type=runtime_type,
         )
 
     def _validate(self, inputs: RunInputs) -> None:
