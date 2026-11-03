@@ -55,12 +55,16 @@ class EvidenceBundle:
             if not required.issubset(self._rows):
                 fail("incomplete evidence controls")
             if self._identity is None:fail("evidence bundle is empty")
+            # Tuples represent the internal immutable identity, but JSON has
+            # only arrays. Encode an explicit copy rather than relaxing the
+            # canonical serializer's rejection of non-JSON input types.
+            identity_json=list(self._identity)
             envelope={"schema":"ai-reliability-bundle.v1",
-                "identity":self._identity,"observed_ns":self._valid_at,
+                "identity":identity_json,"observed_ns":self._valid_at,
                 "receipts":{name:self._rows[name]["receipt"]["record_sha256"]
                     for name in sorted(self._rows)}}
             digest=sha256(canonical(envelope))
-            identity_sha=sha256(canonical(self._identity))
+            identity_sha=sha256(canonical(identity_json))
             self._sealed=True
             return BundleReceipt(tuple(sorted(self._rows)),identity_sha,digest)
 

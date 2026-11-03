@@ -2,7 +2,7 @@
 import unittest
 from skeleton.testing.reliability_fabric_test_support import scenario
 from skeleton.ai.runtime.operational_ai.reliability_fabric.flows.evidence_bundle import EvidenceBundle
-from skeleton.ai.runtime.operational_ai.reliability_fabric.contracts import Rejected
+from skeleton.ai.runtime.operational_ai.reliability_fabric.contracts import Rejected,canonical,sha256
 class BundleTests(unittest.TestCase):
     def test_two_boundaries_share_actor_model_and_time(self):
         item=EvidenceBundle()
@@ -11,6 +11,11 @@ class BundleTests(unittest.TestCase):
         sealed=item.seal(required=("native_identity","tokenizer_custody"))
         self.assertEqual(len(sealed.domains),2)
         self.assertFalse(sealed.release_certified)
+        identity=item.snapshot()["identity"]
+        expected=sha256(canonical(list(identity)))
+        self.assertEqual(sealed.identity_sha256,expected)
+        with self.assertRaises(Rejected):
+            canonical(identity)  # No global tuple coercion / downgrade
     def test_cross_subject_bundle_and_omitted_evidence_refused(self):
         item=EvidenceBundle()
         item.add("native_identity",scenario("native_identity"))
