@@ -3,12 +3,13 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 from .schema import World, RECIPES
+from .economy import STOCK_INITIAL, trades, execute_trade
 
 class RescueError(ValueError):
     pass
 
 DIRECTIONS = {"north": (0, -1), "south": (0, 1), "east": (1, 0), "west": (-1, 0)}
-VERBS = frozenset({"move", "gather", "craft", "attack", "rescue", "rest", "signal", "evacuate"})
+VERBS = frozenset({"move", "gather", "craft", "attack", "rescue", "rest", "signal", "evacuate", "trade"})
 MAX_HISTORY = 8192
 
 def _near(a: tuple[int, int], b: tuple[int, int]) -> bool:
@@ -17,6 +18,7 @@ def _near(a: tuple[int, int], b: tuple[int, int]) -> bool:
 def initial_state(world: World) -> dict:
     return {
         "schema": "ridge.rescue.state.v1", "turn": 0, "position": list(world.start),
+        "credits": 0, "market": dict(STOCK_INITIAL),
         "health": 10, "stamina": 8, "inventory": {"wood": 0, "ore": 0, "herb": 0, "torch": 0, "bandage": 0, "signal": 0},
         "resources": {ident: count for ident, _, _, count in world.resources},
         "civilians": {ident: "waiting" for ident, _ in world.civilians},
@@ -72,6 +74,7 @@ def available_actions(world: World, state: dict) -> list[dict]:
     if here == world.shelter and all(v != "waiting" for v in state["civilians"].values()):
         for choice in (("protect", "salvage") if state["flags"]["beacon"] else ("salvage",)):
             options.append({"verb": "evacuate", "choice": choice})
+    options.extend(trades(state, here == world.shelter))
     options.append({"verb": "rest"})
     return options
 
@@ -107,7 +110,7 @@ def _enemies_advance(state: dict, world: World) -> None:
 
 def apply(world: World, state: dict, action: dict[str, Any]) -> dict:
     _check(state, world)
-    if not isinstance(action, dict) or set(action) - {"verb", "direction", "target", "item", "choice"}:
+    if not isinstance(action, dict) or set(action) - {"verb", "direction", "target", "item", "choice", "side"}:
         raise RescueError("malformed action")
     if action not in available_actions(world, state):
         raise RescueError("unavailable action")
@@ -145,6 +148,9 @@ def apply(world: World, state: dict, action: dict[str, Any]) -> dict:
         ident = action["target"]
         result["civilians"][ident] = "rescued"
         _add_event(result, f"rescue:{ident}")
+    elif verb == "trade":
+        execute_trade(result, action["side"], action["item"])
+        _add_event(result, f"trade:{action['side']}:{action['item']}")
     elif verb == "rest":
         result["stamina"] = min(8, result["stamina"] + 3)
         if result["inventory"]["bandage"] and result["health"] < 10:
