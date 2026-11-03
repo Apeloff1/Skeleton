@@ -59,25 +59,31 @@ class LaptopFlow:
         }
 
     def inspect(self, world_id: str) -> dict[str, Any]:
-        world = self.worlds.read(world_id)
-        source_digest = digest(world)
+        """Inspect source and approval in one canonical writer snapshot."""
+        _id(world_id, "world_id")
         fd = self.worlds._directory()
         try:
+            self._lock(fd, world_id)
             try:
-                review = strict_json(self.worlds._read(fd, self._names(world_id)[0]))
-                reviewed = self._validate_review(review, world)
-            except CanonError as exc:
-                if exc.code in {"not_found", "review_stale_source"}:
-                    reviewed = False
-                else:
-                    raise
+                world = self._world(fd, world_id)
+                source_digest = digest(world)
+                try:
+                    review = strict_json(self.worlds._read(fd, self._names(world_id)[0]))
+                    reviewed = self._validate_review(review, world)
+                except CanonError as exc:
+                    if exc.code in {"not_found", "review_stale_source"}:
+                        reviewed = False
+                    else:
+                        raise
+                return {
+                    "world": world, "source_digest": source_digest,
+                    "proof": prove(world).as_dict(), "reviewed": reviewed,
+                    "qualification": "reviewed_source" if reviewed else "review_required",
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
             os.close(fd)
-        return {
-            "world": world, "source_digest": source_digest,
-            "proof": prove(world).as_dict(), "reviewed": reviewed,
-            "qualification": "reviewed_source" if reviewed else "review_required",
-        }
 
     @staticmethod
     def _validate_review(review: Any, world: Any) -> bool:
@@ -349,7 +355,9 @@ class LaptopFlow:
             current = self.inspect(world_id)
         except CanonError as exc:
             report["checks"]["source"] = {"ok": False, "error": exc.code}
-            report["next_action"] = "repair_or_restore_canonical_world_source"
+            report["next_action"] = (
+                "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                else "repair_or_restore_canonical_world_source")
             return report
         report["source_digest"] = current["source_digest"]
         report["checks"]["source"] = {"ok": True}
@@ -358,7 +366,7 @@ class LaptopFlow:
             report["next_action"] = "review_and_approve_canonical_source"
             return report
         try:
-            self.verify(world_id)
+            verified_receipt = self.verify(world_id)
         except CanonError as exc:
             report["checks"]["builder"] = {"ok": False, "error": exc.code}
             report["next_action"] = (
@@ -386,6 +394,14 @@ class LaptopFlow:
             report["next_action"] = (
                 "retry_after_current_writer_finishes" if exc.code == "lease_busy"
                 else "repair_canonical_replay_or_save_before_engine_handoff")
+            return report
+        # Separate diagnostic stages may observe different approved revisions.
+        # Never report a green handoff by mixing two valid generations.
+        if (acceptance["source_digest"] != current["source_digest"] or
+                acceptance["receipt_digest"] != digest(verified_receipt)):
+            report["checks"]["acceptance"] = {
+                "ok": False, "error": "laptop_diagnostic_source_changed"}
+            report["next_action"] = "restart_diagnostic_after_source_change"
             return report
         report["checks"]["acceptance"] = {
             "ok": True, "ending_witness_count": len(acceptance["ending_witnesses"]),
