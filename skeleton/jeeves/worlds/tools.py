@@ -23,6 +23,7 @@ from .invariants import InvariantStore
 from .assurance import AssuranceStore
 from .atlas import AtlasStore
 from .portals import PortalStore
+from .npc_schedule import ScheduleStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -39,6 +40,10 @@ TOOLS = {
     "world.invariants_preview": (),
     "world.assurance_preview": (),
     "world.atlas_preview": (),
+    "world.npc_schedule_preview": (),
+    "world.npc_schedule_propose_preview": (
+        "prompt", "actor", "scene", "first_tick", "last_tick", "label",
+    ),
     "world.portals_preview": ("network_id",),
     "world.portals_session_preview": ("network_id", "session"),
     "world.portals_propose_preview": ("network_id", "prompt", "from_ending", "to_world"),
@@ -105,6 +110,10 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
     elif name == "world.invariants_preview":
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
+    elif name == "world.npc_schedule_propose_preview":
+        payload = ScheduleStore(root).propose(req["world_id"], **args)
+    elif name == "world.npc_schedule_preview":
+        payload = ScheduleStore(root).inspect(req["world_id"])
     elif name == "world.portals_propose_preview":
         payload = PortalStore(root).propose(
             args["network_id"], args["prompt"], root_world=req["world_id"],
