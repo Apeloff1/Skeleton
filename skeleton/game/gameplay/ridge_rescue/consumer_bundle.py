@@ -13,7 +13,7 @@ from pathlib import Path
 import stat
 import zipfile
 
-from .consumer_store import SlotStore, StoreError, _safe_directory
+from .consumer_store import SlotStore, _safe_directory
 
 MAX_SOURCE_FILES = 128
 MAX_SOURCE_FILE_BYTES = 192_000

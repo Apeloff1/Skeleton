@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 
 from .campaign import verify_export
 from .consumer_store import SlotStore, StoreError, MAX_EXPORT_BYTES

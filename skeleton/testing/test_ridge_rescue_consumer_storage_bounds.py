@@ -1,8 +1,6 @@
 """Bounded consumer save storage and database-failure behavior."""
 from __future__ import annotations
 
-import os
-import sqlite3
 
 import pytest
 
