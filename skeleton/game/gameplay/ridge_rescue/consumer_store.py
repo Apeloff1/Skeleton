@@ -362,15 +362,22 @@ class SlotStore:
 
     def audit(self, name: str) -> dict:
         name = _slot(name)
-        current = self.load(name)
+        # Read the slot and action ledger in one SQLite snapshot. A second
+        # process can commit between two independent reads, falsely making
+        # an intact save look corrupt. Release the lock before replay.
         with closing(self._connect()) as conn:
             try:
+                conn.execute("BEGIN")
+                verified, revision = self._read(conn, name)
                 rows = conn.execute(
                     "SELECT revision, prior_head, next_head, action FROM actions "
                     "WHERE slot=? ORDER BY revision", (name,)
                 ).fetchall()
+                conn.execute("COMMIT")
             except sqlite3.Error as exc:
+                conn.execute("ROLLBACK")
                 raise StoreError("save audit refused") from exc
+        current = {**verified, "slot": name, "revision": revision}
         if len(rows) != current["revision"]:
             raise StoreError("save history is incomplete")
         # Verify every stored action against the original campaign and
