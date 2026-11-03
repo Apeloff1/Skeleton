@@ -35,6 +35,19 @@ Mongo authority outage or local revocation
 blocks release. A stable epoch advance is NOT implicitly accepted: the
 operator must re-establish the binding and explicitly activate again.
 
+The native adapter factory requires three **independent operator-pinned**
+64-character lowercase SHA-256 identities:
+`operator_model_digest`, `operator_runtime_digest`, and
+`operator_tokenizer_digest`. They must be read by the trusted application
+root from an authenticated, reviewed activation manifest, never synthesized
+from the newly loaded model or supplied by a caller. The factory compares
+those pins to the live native backend through `MongoGuardedActivation`.
+Changing weights, runtime architecture or tokenizer after restart therefore
+cannot be accepted merely by constructing a fresh backend and copying its
+own digests into the expected fields. A valid pin is not a model-safety or
+device-qualification certificate; the independent reviewer, writer custody,
+Mongo primary and full guarded pre/postflight remain mandatory.
+
 This is a **guarded native transformer** path, not a generic GGUF or Metal
 attestation. It does not prove any model has been downloaded, that weights
 are suitable, that the machine can execute them, or that an adversarial

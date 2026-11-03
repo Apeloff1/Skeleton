@@ -259,6 +259,18 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ActivationBlocked):
             await self.make().activate()
 
+    async def test_native_factory_requires_independent_operator_pins(self):
+        import inspect
+        from skeleton.ai.runtime.inference.compose_activation import (
+            compose_mongo_guarded_native_adapter,
+        )
+        parameters = inspect.signature(compose_mongo_guarded_native_adapter).parameters
+        for name in ("operator_model_digest", "operator_runtime_digest",
+                     "operator_tokenizer_digest"):
+            self.assertIn(name, parameters)
+            self.assertIs(parameters[name].default, inspect.Parameter.empty)
+            self.assertEqual(parameters[name].kind, inspect.Parameter.KEYWORD_ONLY)
+
     async def test_artifact_binding_denies(self):
         gate_tokenizer = self.make(expected_tokenizer_digest="f" * 64)
         with self.assertRaises(ActivationBlocked):

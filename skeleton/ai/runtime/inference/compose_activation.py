@@ -335,6 +335,9 @@ async def compose_mongo_guarded_native_adapter(
     tenant_id: str,
     actor_id: str,
     context_id: str,
+    operator_model_digest: str,
+    operator_runtime_digest: str,
+    operator_tokenizer_digest: str,
     model_id: str = "skeleton-native-transformer",
     cache_size: int = 128,
     default_seed: int = 0,
@@ -361,9 +364,13 @@ async def compose_mongo_guarded_native_adapter(
         reviewer_authority_id=reviewer_authority_id,
         reviewer_trust_anchor=reviewer_trust_anchor,
         tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
-        expected_model_digest=backend.model_digest,
-        expected_runtime_digest=backend.runtime_digest,
-        expected_tokenizer_digest=backend.runtime.tokenizer.digest,
+        # Operator pins MUST originate from a trusted, independently reviewed
+        # activation manifest. Using backend-derived digests as the expected
+        # values is a self-attestation that silently accepts swapped weights
+        # or a different tokenizer after restart.
+        expected_model_digest=operator_model_digest,
+        expected_runtime_digest=operator_runtime_digest,
+        expected_tokenizer_digest=operator_tokenizer_digest,
     )
     await gate.activate()
     try:
