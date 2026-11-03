@@ -216,3 +216,27 @@ def test_cli_source_to_save_to_package_and_replay(tmp_path):
                     ]), "--expected-league-board-digest", digest(league))
     assert call("league-verify-author",
                 "--league-revision", write("revision", revision))["verified"]
+
+def test_league_editor_replays_real_encounter_and_hull_changes():
+    source, league = setup()
+    actions = winning_actions()
+    preview = build_league(source, league, [actions, actions])
+    edits = [
+        {"kind": "encounter-reward", "target": "canal_relief:canal_raider", "value": 10},
+        {"kind": "convoy-hull", "target": "canal_relief", "value": 4},
+    ]
+    revision = edit_league(
+        source, league, edits, expected_digest=digest(league), preview_save=preview,
+    )
+    assert revision["after_preview"]["standings"][0]["bounty"] == 10
+    assert revision["after_preview"]["standings"][0]["hull"] == 4
+    assert revision["after_preview"]["score"] == preview["score"] + 5
+    assert verify_league_revision(revision)["preview_complete"]
+    with pytest.raises(HarborError):
+        edit_league(source, league, [
+            {"kind": "encounter-strength", "target": "canal_relief:canal_raider", "value": 2}
+        ], expected_digest=digest(league), preview_save=preview)
+    with pytest.raises(HarborError, match="unknown"):
+        edit_league(source, league, [
+            {"kind": "encounter-reward", "target": "canal_relief:unknown", "value": 10}
+        ], expected_digest=digest(league))

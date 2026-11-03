@@ -56,8 +56,9 @@ def validate_league_quests(board: Any, save: Any) -> dict[str, Any]:
         prerequisites = objective["requires"]
         if (not isinstance(prerequisites, list)
                 or len(prerequisites) > MAX_OBJECTIVES
+                or any(type(p) is not str for p in prerequisites)
                 or len(set(prerequisites)) != len(prerequisites)
-                or any(type(p) is not str or p not in seen for p in prerequisites)):
+                or any(p not in seen for p in prerequisites)):
             raise HarborError("invalid or cyclic league objective prerequisites")
         if kind == "round-complete":
             if target != "dock":

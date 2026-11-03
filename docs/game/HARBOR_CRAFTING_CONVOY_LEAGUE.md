@@ -49,3 +49,15 @@ The checked-in example is
 `skeleton/game/gameplay/fixtures/harbor_lantern_quay_convoy_league.json`.
 Run the convoy test suite for source→game→save→replay→package→CLI acceptance.
 Security and device qualification are separate release gates.
+
+## Tactical source authoring
+
+The transactional league editor also supports `encounter-strength` and
+`encounter-reward` edits targeting `round_id:enemy_id`, plus
+`convoy-hull` and `convoy-max-turns` edits targeting `round_id`.
+These change the actual authored combat and escort rules, not just the
+displayed score. Each revision revalidates the complete source-bound league
+and, when a preview save is supplied, replays every prior player action under
+the proposed new rules. If the edited enemy strength makes a previously won
+route unwinnable, preview publication fails closed rather than certifying an
+unearned victory.

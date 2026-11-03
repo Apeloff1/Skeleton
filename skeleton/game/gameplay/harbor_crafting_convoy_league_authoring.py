@@ -16,7 +16,7 @@ FIELDS = {
     "before_preview", "after_preview", "revision_digest",
 }
 EDIT_FIELDS = {"kind", "target", "value"}
-KINDS = {"minimum-bounty", "minimum-hull", "target-score", "max-total-ticks"}
+KINDS = {"minimum-bounty", "minimum-hull", "target-score", "max-total-ticks", "encounter-strength", "encounter-reward", "convoy-hull", "convoy-max-turns"}
 
 
 def edit_league(source: Any, league: Any, edits: Any, *,
@@ -44,11 +44,37 @@ def edit_league(source: Any, league: Any, edits: Any, *,
             _integer(value, 1, 8 * world["max_ticks"] if kind == "max-total-ticks" else 1600, "league edit value")
             after["target_score" if kind == "target-score" else "max_total_ticks"] = value
         else:
-            found = next((round_ for round_ in after["rounds"] if round_["id"] == target), None)
+            parts = target.split(":")
+            if len(parts) not in {1, 2}:
+                raise HarborError("invalid league combat edit target")
+            found = next((round_ for round_ in after["rounds"] if round_["id"] == parts[0]), None)
             if found is None:
                 raise HarborError("unknown league round")
-            _integer(value, 0 if kind == "minimum-bounty" else 1, 1200, "league edit value")
-            found["minimum_bounty" if kind == "minimum-bounty" else "minimum_hull"] = value
+            if kind in {"encounter-strength", "encounter-reward"}:
+                if len(parts) != 2:
+                    raise HarborError("encounter edit requires round:enemy")
+                encounter = next(
+                    (item for item in found["board"]["encounters"] if item["id"] == parts[1]),
+                    None,
+                )
+                if encounter is None:
+                    raise HarborError("unknown league encounter")
+                _integer(value, 1 if kind == "encounter-strength" else 0,
+                         12 if kind == "encounter-strength" else 100, "league combat edit")
+                encounter["strength" if kind == "encounter-strength" else "reward"] = value
+            elif kind in {"convoy-hull", "convoy-max-turns"}:
+                if len(parts) != 1:
+                    raise HarborError("convoy edit requires a round id")
+                _integer(value, 1,
+                         20 if kind == "convoy-hull" else world["max_ticks"],
+                         "league convoy edit")
+                found["board"]["hull" if kind == "convoy-hull" else "max_turns"] = value
+            else:
+                if len(parts) != 1:
+                    raise HarborError("threshold edit requires a round id")
+                _integer(value, 0 if kind == "minimum-bounty" else 1,
+                         1200, "league edit value")
+                found["minimum_bounty" if kind == "minimum-bounty" else "minimum_hull"] = value
     validate_league(after, world)
     preview_sessions = None
     before_preview = None

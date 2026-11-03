@@ -60,6 +60,9 @@ def test_board_dag_rejects_cycles_unknown_enemy_and_bool_points():
     bool_points = deepcopy(board)
     bool_points["objectives"][2]["points"] = True
     variants.append(bool_points)
+    nonhashable = deepcopy(board)
+    nonhashable["objectives"][2]["requires"] = [{"forged": "dependency"}]
+    variants.append(nonhashable)
     for variant in variants:
         with pytest.raises(HarborError):
             validate_league_quests(variant, save)
