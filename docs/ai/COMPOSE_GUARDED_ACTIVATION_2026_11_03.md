@@ -166,3 +166,7 @@ or that a backup has been restored. The operator must independently verify
 those conditions before approving. No Compose startup path provisions epochs.
 
 Focused test: `python -m unittest skeleton.testing.test_mongo_epoch_migration_guard`.
+
+Initial actor epoch provisioning also refuses standalone Mongo, a secondary,
+or a malformed/failed primary probe before requesting operator approval.
+This is a read-only probe and does not modify Compose or initialize a replica set.

@@ -130,6 +130,21 @@ class MongoCanonicalSourceEpoch:
     async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
         """ONLY for an operator-controlled quiescent migration; never on reads."""
         key = self._key(tenant_id, actor_id)
+        # Never create an apparently stable source epoch on standalone Mongo.
+        # This is a read-only capability probe, NOT replica-set migration.
+        database = getattr(self, "_database", None)
+        if not callable(getattr(database, "command", None)):
+            raise MongoSourceEpochError("replica-set primary required for epoch migration")
+        try:
+            async with asyncio.timeout(3.0):
+                hello = await database.command("hello")
+        except Exception:
+            raise MongoSourceEpochError("replica-set primary probe unavailable") from None
+        if (type(hello) is not dict
+                or not isinstance(hello.get("setName"), str)
+                or not hello["setName"]
+                or hello.get("isWritablePrimary") is not True):
+            raise MongoSourceEpochError("replica-set primary required for epoch migration")
         authorizer = getattr(self, "_migration_authorizer", None)
         database_name = getattr(getattr(self, "_database", None), "name", None)
         if (not callable(authorizer) or type(database_name) is not str

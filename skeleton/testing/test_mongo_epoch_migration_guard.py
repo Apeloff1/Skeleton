@@ -25,6 +25,22 @@ class FakeEpochCollection:
         self.docs[doc["_id"]] = dict(doc)
 
 
+class FakeDatabase:
+    name = "canonical"
+
+    def __init__(self):
+        self.hello = {"setName": "rs0", "isWritablePrimary": True}
+        self.error = None
+        self.probes = 0
+
+    async def command(self, name):
+        assert name == "hello"
+        self.probes += 1
+        if self.error is not None:
+            raise self.error
+        return self.hello
+
+
 class MigrationCustodyTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.collection = FakeEpochCollection()
@@ -42,7 +58,8 @@ class MigrationCustodyTests(unittest.IsolatedAsyncioTestCase):
             return self.authorized
 
         self.epoch = object.__new__(MongoCanonicalSourceEpoch)
-        self.epoch._database = SimpleNamespace(name="canonical")
+        self.database = FakeDatabase()
+        self.epoch._database = self.database
         self.epoch._collection = self.collection
         self.epoch._migration_authorizer = authorize
 
@@ -62,6 +79,27 @@ class MigrationCustodyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(doc["epoch"], 2)
         self.assertEqual(doc["phase"], "stable")
         self.assertIsNone(doc["writer_token"])
+
+    async def test_standalone_or_secondary_denied_before_operator_callback(self):
+        for hello in (
+            {"isWritablePrimary": True},
+            {"setName": "rs0", "isWritablePrimary": False},
+            {"setName": "rs0", "isWritablePrimary": 1},
+        ):
+            with self.subTest(hello=hello):
+                self.database.hello = hello
+                with self.assertRaisesRegex(MongoSourceEpochError, "replica-set primary"):
+                    await self.provision()
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.collection.calls, 0)
+
+    async def test_primary_probe_error_redacted(self):
+        self.database.error = RuntimeError("secret mongo credentials")
+        with self.assertRaises(MongoSourceEpochError) as caught:
+            await self.provision()
+        self.assertNotIn("secret", str(caught.exception))
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.collection.calls, 0)
 
     async def test_unconfigured_denied_without_writes(self):
         self.epoch._migration_authorizer = None
