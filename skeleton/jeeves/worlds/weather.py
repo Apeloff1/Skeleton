@@ -41,9 +41,9 @@ def validate_weather(source: Any, world: Any) -> dict[str, Any]:
     for item in scenes:
         row = _keys(item, {"scene", "weather", "visibility", "description"})
         ids.append(_id(row["scene"], "scene"))
-        if row["weather"] not in WEATHERS or type(row["weather"]) is not str:
+        if type(row["weather"]) is not str or row["weather"] not in WEATHERS:
             raise CanonError("weather_unknown_condition")
-        if row["visibility"] not in VISIBILITIES or type(row["visibility"]) is not str:
+        if type(row["visibility"]) is not str or row["visibility"] not in VISIBILITIES:
             raise CanonError("weather_unknown_visibility")
         _text(row["description"], "description", 1024)
     if ids != sorted(set(ids)) or set(ids) != {s["id"] for s in world["scenes"]}:

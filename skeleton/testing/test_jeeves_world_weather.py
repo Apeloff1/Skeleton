@@ -54,6 +54,19 @@ def test_review_replay_and_choice_override(tmp_path):
     assert b"<bright>" not in page
     with pytest.raises(CanonError, match="weather_stale_lease"):
         store.compile("harbor", "slot", approved, "0" * 64)
+    sessions.choose("harbor", "slot", "pursue_goal", digest(session))
+    progressed = store.player("harbor", "slot")
+    assert progressed["scene"] == "resolution"
+    assert progressed["weather"] == "fog"
+    assert progressed["visibility"] == "limited"
+    assert [step["choice"] for step in progressed["timeline"]] == [
+        None, "pursue_goal",
+    ]
+    with pytest.raises(CanonError, match="weather_receipt_mismatch"):
+        store.verify("harbor", "slot")
+    next_session = sessions.read("harbor", "slot")
+    store.compile("harbor", "slot", approved, digest(next_session))
+    assert store.verify("harbor", "slot")["session_digest"] == digest(next_session)
 
 
 def test_rejects_forged_conditions_overrides_and_approval(tmp_path):
@@ -70,6 +83,14 @@ def test_rejects_forged_conditions_overrides_and_approval(tmp_path):
             forged["scenes"][0]["weather"] = "hurricane"
         with pytest.raises(CanonError):
             validate_weather(forged, world)
+    forged = copy.deepcopy(source)
+    forged["scenes"][0]["weather"] = []
+    with pytest.raises(CanonError, match="weather_unknown_condition"):
+        validate_weather(forged, world)
+    forged = copy.deepcopy(source)
+    forged["scenes"][0]["visibility"] = {}
+    with pytest.raises(CanonError, match="weather_unknown_visibility"):
+        validate_weather(forged, world)
     forged = {**source, "approved": True, "review_note": "fake"}
     with pytest.raises(CanonError, match="weather_approval_bypass"):
         store.publish("harbor", forged, create=True)
