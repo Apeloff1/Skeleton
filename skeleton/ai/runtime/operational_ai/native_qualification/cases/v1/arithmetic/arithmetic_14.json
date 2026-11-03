@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "arithmetic_14",
+  "domain": "arithmetic",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 14",
+  "steps": [
+    {
+      "prompt": "Compute 26832 - 258. Return only the integer.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "26574"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

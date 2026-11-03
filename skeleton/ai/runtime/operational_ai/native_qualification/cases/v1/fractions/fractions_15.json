@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "fractions_15",
+  "domain": "fractions",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 15",
+  "steps": [
+    {
+      "prompt": "Compute (119 times 114) / (114 times 2), reduce to lowest terms. Output a/b only.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "119/2"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

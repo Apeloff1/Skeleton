@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "arithmetic_08",
+  "domain": "arithmetic",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 8",
+  "steps": [
+    {
+      "prompt": "Compute (156 + 62) times two, then subtract 156. Reply with the integer only.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "280"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

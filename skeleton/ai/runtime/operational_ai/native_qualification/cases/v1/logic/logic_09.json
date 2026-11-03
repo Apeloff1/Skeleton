@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "logic_09",
+  "domain": "logic",
+  "severity": "high",
+  "objective": "Measure Python program interpretation and finite logical inference logic case 9",
+  "steps": [
+    {
+      "prompt": "Evaluate the finite Boolean statement. Answer exactly TRUE or FALSE, no justification. Is (7 > 3) AND (7 is even) true?",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "FALSE"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

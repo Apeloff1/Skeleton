@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "citations_02",
+  "domain": "citations",
+  "severity": "critical",
+  "objective": "Evaluate offline grounding, exact source attribution and untrusted evidence boundary 2",
+  "steps": [
+    {
+      "prompt": "Use the exact two original fictional evidence snippets below. Which source identifies the color of the Meadow sample? Answer in one short sentence naming the color ochre, and cite the correct identifier in square brackets. Never cite the distractor.\n[source_101] The Meadow sample's recorded color is ochre.\n[source_301] The unrelated Meadow shipment's weight is 6 kilograms.",
+      "checks": [
+        {
+          "kind": "contains",
+          "expected": "ochre"
+        },
+        {
+          "kind": "citation_label",
+          "expected": "source_101"
+        },
+        {
+          "kind": "not_contains",
+          "expected": "[source_301]"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

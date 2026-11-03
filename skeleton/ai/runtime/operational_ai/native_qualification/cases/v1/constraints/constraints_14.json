@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "constraints_14",
+  "domain": "constraints",
+  "severity": "high",
+  "objective": "Measure model instruction and classification robustness, domain constraints task 14",
+  "steps": [
+    {
+      "prompt": "Reverse all letters of \"maple\", without changing case. Reply with only the reversed word.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "elpam"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}
