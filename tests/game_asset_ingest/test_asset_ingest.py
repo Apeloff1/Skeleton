@@ -111,6 +111,46 @@ def test_gltf_and_glb():
         import_bytes("m.gltf", bad)
 
 
+
+def test_gltf_rejects_ambiguous_json_nonfinite_and_boolean_accessors():
+    hostile = (
+        b'{"asset":{"version":"2.0"},"asset":{"version":"2.0"}}',
+        b'{"asset":{"version":"2.0"},"extras":{"bad":NaN}}',
+        b'{"asset":{"version":"2.0"},"accessors":[{}],"meshes":'
+        b'[{"primitives":[{"attributes":{"POSITION":true}}]}]}',
+        b'{"asset":{"version":"2.0"},"meshes":[{"primitives":'
+        b'[{"attributes":{"POSITION":0,"POSITION":1}}]}],"accessors":[{},{}]}',
+    )
+    for document in hostile:
+        for extension, payload in ((".gltf", document), (".glb", glb(document))):
+            with pytest.raises(AssetImportError):
+                import_bytes("hostile" + extension, payload)
+
+
+def test_glb_valid_bin_chunk_and_rejects_forged_framing():
+    valid = glb(GLTF)
+    bin_chunk = struct.pack("<I4s", 4, b"BIN\x00") + b"\x00" * 4
+    with_bin = valid[:8] + struct.pack("<I", len(valid) + len(bin_chunk)) + valid[12:] + bin_chunk
+    assert import_bytes("valid.glb", with_bin).metadata["primitives"] == 1
+
+    def append_chunk(original: bytes, chunk: bytes) -> bytes:
+        return (original[:8] + struct.pack("<I", len(original) + len(chunk))
+                + original[12:] + chunk)
+
+    malformed = (
+        append_chunk(valid, b"\x00" * 4),
+        append_chunk(valid, struct.pack("<I4s", 4, b"JUNK") + b"abcd"),
+        append_chunk(valid, valid[12:]),
+        append_chunk(valid, struct.pack("<I4s", 8, b"BIN\x00") + b"abcd"),
+        valid[:12] + bin_chunk + valid[12:],
+        valid[:8] + struct.pack("<I", len(valid) + 1) + valid[12:] + b"X",
+    )
+    for payload in malformed:
+        with pytest.raises(AssetImportError):
+            import_bytes("forged.glb", payload)
+
+
+
 def test_audio_metadata():
     w = import_bytes("s.wav", wav(8000, 2, 400)).metadata
     assert w == {"codec": "pcm", "channels": 2, "sample_rate": 8000, "bits_per_sample": 16,

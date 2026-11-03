@@ -256,7 +256,8 @@ def _obj(data: bytes) -> dict[str, Any]:
 
 
 def _gltf_doc(doc: Any) -> dict[str, Any]:
-    if not isinstance(doc, dict) or not str(doc.get("asset", {}).get("version", "")).startswith("2"):
+    if (type(doc) is not dict or type(doc.get("asset")) is not dict
+            or doc["asset"].get("version") != "2.0"):
         raise AssetImportError("gltf missing asset.version 2.x")
     meshes = doc.get("meshes", [])
     accessors = doc.get("accessors", [])
@@ -265,7 +266,7 @@ def _gltf_doc(doc: Any) -> dict[str, Any]:
         for p in m.get("primitives", []):
             prims += 1
             for ref in [*p.get("attributes", {}).values(), p.get("indices")]:
-                if ref is not None and not (isinstance(ref, int) and 0 <= ref < len(accessors)):
+                if ref is not None and not (type(ref) is int and 0 <= ref < len(accessors)):
                     raise AssetImportError(f"gltf accessor reference {ref!r} out of range")
     uris = sorted({b["uri"] for b in doc.get("buffers", []) + doc.get("images", [])
                    if isinstance(b, dict) and isinstance(b.get("uri"), str) and not b["uri"].startswith("data:")})
@@ -274,32 +275,84 @@ def _gltf_doc(doc: Any) -> dict[str, Any]:
             "external_refs": uris}
 
 
-def _gltf(data: bytes) -> dict[str, Any]:
+def _gltf_unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous nested JSON keys rather than last-wins data."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise AssetImportError("gltf duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _gltf_reject_constant(token: str) -> Any:
+    raise AssetImportError(f"gltf nonfinite JSON number: {token}")
+
+
+def _gltf_json(raw: bytes) -> dict[str, Any]:
+    """Decode bounded, unambiguous JSON before interpreting glTF references."""
     try:
-        return _gltf_doc(json.loads(data))
+        doc = json.loads(raw, object_pairs_hook=_gltf_unique_object,
+                         parse_constant=_gltf_reject_constant)
+    except AssetImportError:
+        raise
+    except (ValueError, UnicodeError, TypeError, RecursionError) as exc:
+        raise AssetImportError("gltf is not strict JSON") from exc
+
+    pending = [(doc, 0)]
+    visited = 0
+    while pending:
+        value, depth = pending.pop()
+        visited += 1
+        if depth > 64 or visited > 131072:
+            raise AssetImportError("gltf JSON structure exceeds bound")
+        if type(value) is dict or type(value) is list:
+            children = value.values() if type(value) is dict else value
+            if len(value) + len(pending) + visited > 131072:
+                raise AssetImportError("gltf JSON node count exceeds bound")
+            pending.extend((child, depth + 1) for child in children)
+    try:
+        return _gltf_doc(doc)
+    except AssetImportError:
+        raise
     except (ValueError, AttributeError, TypeError, RecursionError) as exc:
-        if isinstance(exc, AssetImportError):
-            raise
-        raise AssetImportError("gltf is not valid json") from exc
+        raise AssetImportError("gltf has invalid structure") from exc
+
+
+def _gltf(data: bytes) -> dict[str, Any]:
+    return _gltf_json(data)
 
 
 def _glb(data: bytes) -> dict[str, Any]:
+    """Validate every GLB chunk boundary, not only the first JSON chunk."""
     _need(data, 20, "glb")
-    magic, version, length = struct.unpack("<4sII", data[:12])
+    magic, version, length = struct.unpack_from("<4sII", data)
     if magic != b"glTF" or version != 2:
         raise AssetImportError("bad glb header")
-    if length != len(data):
-        raise AssetImportError("glb length mismatch (truncated)")
-    clen, ctype = struct.unpack("<I4s", data[12:20])
-    if ctype != b"JSON" or 20 + clen > len(data):
+    if length != len(data) or length % 4:
+        raise AssetImportError("glb length mismatch or misalignment")
+    offset = 12
+    json_chunk: bytes | None = None
+    bin_seen = False
+    while offset < length:
+        if length - offset < 8:
+            raise AssetImportError("truncated glb chunk header")
+        chunk_size, chunk_type = struct.unpack_from("<I4s", data, offset)
+        if chunk_size % 4 or chunk_size > length - offset - 8:
+            raise AssetImportError("invalid glb chunk length or alignment")
+        payload_start = offset + 8
+        if json_chunk is None:
+            if chunk_type != b"JSON":
+                raise AssetImportError("glb must begin with JSON chunk")
+            json_chunk = data[payload_start:payload_start + chunk_size]
+        elif chunk_type == b"BIN\x00" and not bin_seen:
+            bin_seen = True
+        else:
+            raise AssetImportError("duplicate or unsupported glb chunk")
+        offset = payload_start + chunk_size
+    if json_chunk is None:
         raise AssetImportError("glb missing JSON chunk")
-    try:
-        return _gltf_doc(json.loads(data[20:20 + clen]))
-    except (ValueError, AttributeError, TypeError, RecursionError) as exc:
-        if isinstance(exc, AssetImportError):
-            raise
-        raise AssetImportError("glb JSON chunk invalid") from exc
-
+    return _gltf_json(json_chunk)
 
 def _wav(data: bytes) -> dict[str, Any]:
     """Validate the entire RIFF/WAVE envelope before accepting metadata.
