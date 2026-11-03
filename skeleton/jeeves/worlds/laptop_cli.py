@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
 
 from .laptop_flow import LaptopFlow
@@ -12,8 +14,24 @@ MAX_INPUT = 524288
 
 
 def _file(path: str):
-    with open(path, "rb") as handle:
-        return strict_json(handle.read(MAX_INPUT + 1))
+    """Read bounded operator JSON without following a final-component symlink."""
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise CanonError("input_nofollow_unavailable")
+    fd = os.open(path, flags | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise CanonError("input_not_regular")
+        if metadata.st_size > MAX_INPUT:
+            raise CanonError("input_too_large")
+        with os.fdopen(os.dup(fd), "rb") as handle:
+            data = handle.read(MAX_INPUT + 1)
+        if len(data) > MAX_INPUT:
+            raise CanonError("input_too_large")
+        return strict_json(data)
+    finally:
+        os.close(fd)
 
 
 def run(argv: list[str]) -> int:
