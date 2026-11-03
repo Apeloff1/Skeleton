@@ -23,6 +23,8 @@ from .custody import canonical, digest
 
 SLOT = re.compile(r"[a-z][a-z0-9_-]{0,31}\Z")
 MAX_EXPORT_BYTES = 1_000_000
+MAX_DATABASE_BYTES = 16_000_000
+MAX_SAVE_SLOTS = 32
 SCHEMA = "ridge.rescue.consumer.store.v1"
 
 
@@ -114,6 +116,8 @@ class SlotStore:
                 mode = os.lstat(self.database).st_mode
                 if not stat.S_ISREG(mode):
                     raise StoreError("save database must be a regular file")
+                if os.lstat(self.database).st_size > MAX_DATABASE_BYTES:
+                    raise StoreError("save database exceeds bounded storage")
             connection = sqlite3.connect(str(self.database), timeout=5, isolation_level=None)
             connection.execute("PRAGMA busy_timeout=5000")
             connection.execute("PRAGMA synchronous=FULL")
@@ -154,12 +158,18 @@ class SlotStore:
         with closing(self._connect()) as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
+                count = conn.execute("SELECT COUNT(*) FROM slots").fetchone()[0]
+                if count >= MAX_SAVE_SLOTS:
+                    raise StoreError("save slot capacity exhausted")
                 conn.execute("INSERT INTO slots VALUES(?,?,?,?)",
                              (name, session["head"], canonical(session), 0))
                 conn.execute("COMMIT")
             except sqlite3.IntegrityError as exc:
                 conn.execute("ROLLBACK")
                 raise StoreError("save slot already exists") from exc
+            except sqlite3.Error as exc:
+                conn.execute("ROLLBACK")
+                raise StoreError("save transaction refused") from exc
             except BaseException:
                 conn.execute("ROLLBACK")
                 raise
@@ -204,6 +214,9 @@ class SlotStore:
                     (name, revision + 1, expected_head, new_head, canonical(event)),
                 )
                 conn.execute("COMMIT")
+            except sqlite3.Error as exc:
+                conn.execute("ROLLBACK")
+                raise StoreError("save transaction refused") from exc
             except BaseException:
                 conn.execute("ROLLBACK")
                 raise
@@ -250,10 +263,13 @@ class SlotStore:
         name = _slot(name)
         current = self.load(name)
         with closing(self._connect()) as conn:
-            rows = conn.execute(
-                "SELECT revision, prior_head, next_head, action FROM actions "
-                "WHERE slot=? ORDER BY revision", (name,)
-            ).fetchall()
+            try:
+                rows = conn.execute(
+                    "SELECT revision, prior_head, next_head, action FROM actions "
+                    "WHERE slot=? ORDER BY revision", (name,)
+                ).fetchall()
+            except sqlite3.Error as exc:
+                raise StoreError("save audit refused") from exc
         if len(rows) != current["revision"]:
             raise StoreError("save history is incomplete")
         previous = None
