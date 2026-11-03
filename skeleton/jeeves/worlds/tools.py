@@ -21,6 +21,7 @@ from .choice_impact import analyze_choice_impact
 from .scenario import ScenarioStore
 from .invariants import InvariantStore
 from .assurance import AssuranceStore
+from .atlas import AtlasStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -36,6 +37,7 @@ TOOLS = {
     "world.scenario_preview": (),
     "world.invariants_preview": (),
     "world.assurance_preview": (),
+    "world.atlas_preview": (),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
     "knowledge.propose_preview": (
@@ -98,6 +100,8 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
     elif name == "world.invariants_preview":
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
+    elif name == "world.atlas_preview":
+        payload = AtlasStore(root).inspect(req["world_id"])
     elif name == "world.assurance_preview":
         payload = AssuranceStore(root).preview(req["world_id"])
     elif name == "world.migration_preview":
