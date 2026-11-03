@@ -32,6 +32,7 @@ from .testimony import TestimonyStore
 from .rumors import RumorStore
 from .localization import LocalizationStore
 from .accessibility import AccessibilityStore
+from .director import DirectorStore
 from .chapters import ChapterStore
 from .cinematics import CinematicsStore
 from .pacing import PacingStore
@@ -88,6 +89,8 @@ TOOLS = {
     "world.studio_engine_preview": ("era",),
     "world.studio_preview": (),
     "world.studio_player": ("slot", "locale"),
+    "world.director_preview": (),
+    "world.director_player": ("slot",),
     "world.chapters_preview": (),
     "world.chapters_propose_preview": ("prompt", "chapters"),
     "world.chapters_player": ("slot",),
@@ -250,6 +253,11 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = CinematicsStore(root).propose(req["world_id"], **args)
     elif name == "world.chapters_propose_preview":
         payload = ChapterStore(root).propose(req["world_id"], **args)
+    elif name == "world.director_preview":
+        payload = DirectorStore(root).inspect(req["world_id"])
+    elif name == "world.director_player":
+        _id(args["slot"], "slot")
+        payload = DirectorStore(root).player(req["world_id"], args["slot"])
     elif name == "world.chapters_preview":
         payload = ChapterStore(root).inspect(req["world_id"])
     elif name == "world.chapters_player":
