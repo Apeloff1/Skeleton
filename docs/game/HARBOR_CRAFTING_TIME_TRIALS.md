@@ -30,3 +30,20 @@ against included source data, not cryptographic identity, tournament fairness,
 copyright provenance, or device/release qualification. A user can author a
 different valid run; identity-signed competitive submissions require a separate
 trusted server. No scoreboards or medals are used to authorize releases.
+
+## Transactional course editor
+
+Use `trial-author --trial COURSE --trial-edits edits.json
+--expected-course-digest DIGEST --expected-source-digest SOURCE_DIGEST
+--preview-bundle save.json > revision.json` to author a complete course
+transaction. The optional preview replays real player actions against the
+revised course, and can downgrade a previously earned medal. Edit operations
+are `set_deadline`, `set_medals`, `set_choice`, `set_checkpoint`,
+`append_checkpoint`, and `remove_checkpoint`. Each operation has a fixed
+typed shape, and the whole transaction is rejected if the final course is
+invalid. Run `trial-verify-author --trial-revision revision.json` to
+reconstruct the edit transaction and its optional gameplay preview.
+
+Both the original source digest and original course digest are optimistic
+concurrency leases. No authored edit is allowed to rewrite an existing save,
+forge a medal, or silently substitute a different world.
