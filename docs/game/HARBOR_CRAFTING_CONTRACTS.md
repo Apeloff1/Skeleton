@@ -32,3 +32,13 @@ save that line's JSON payload to continue. A victory with the wrong ending,
 insufficient crafting/gathering or missed deadline emits `CONTRACT_REJECTED`
 and the ordinary replay checkpoint, without advancing the contract save.
 The CLI rejects stale leases before accepting terminal input.
+
+## Bounded contract route solver
+
+`contract-plan --contract-save SAVE` uses the existing bounded canonical
+movement, collision, gathering, crafting and delivery solver to propose real
+winning actions for the next contract. It returns an earned, source-bound
+portable plan and next save only when the complete gameplay replay satisfies
+all authored constraints. `contract-verify-plan --contract-plan PLAN`
+rebuilds the route and contract continuation. Impossible or unsupported
+contract constraints fail closed instead of producing a fake victory.

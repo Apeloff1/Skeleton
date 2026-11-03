@@ -175,7 +175,8 @@ def play_live(
             bundle = export_bundle(world, actions, require_win=True)
             if verify_bundle(bundle, require_win=True) != state:
                 raise HarborError("interactive replay divergence")
-            output_stream.write("VICTORY " + state["ending"] + " " + bundle["terminal_digest"] + "\n")
+            label = "GAME_VICTORY" if contract_save is not None else "VICTORY"
+            output_stream.write(label + " " + state["ending"] + " " + bundle["terminal_digest"] + "\n")
             if authored_course is not None:
                 from .harbor_crafting_time_trials import (
                     time_trial_report, verify_time_trial_report,
