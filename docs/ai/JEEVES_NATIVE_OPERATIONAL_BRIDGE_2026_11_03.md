@@ -81,6 +81,51 @@ arguments. It writes only an explicitly successful verified final answer to
 stdout. Errors use type names without path/prompt/credential disclosure.
 A model that cannot produce the required plan or answer JSON fails closed.
 
+## Signed original-source grounding
+
+The operator can elect to attach independently HMAC-authenticated local source
+material through the **existing** offline cognition manifest authority and
+the canonical native ExecutionSpine evidence callback. This is off by default
+and never populated by model-originated text.
+
+Use these explicit options with chat, agent or REPL:
+
+--source-root /private/approved-sources
+--signed-source-manifest /private/operator/signed-source-manifest.json
+
+The external key must be provisioned through the existing
+SKELETON_OFFLINE_OPERATOR_KEY_HEX environment variable. No key value,
+private original-source content, or private manifest is committed to GitHub
+or printed to stderr. Both source options must be present together.
+The original source manifest binds tenant, subject, installed model digest,
+tokenizer digest, original file SHA256 and operator attested source rights.
+The existing descriptor-anchored file reader rejects symlinks, parent path
+swaps, multiple hardlinks, modified source contents, unbounded files,
+foreign owners and stale or invalid HMAC approvals.
+
+The new NativeSignedEvidenceProvider converts only independently verified
+original byte excerpts to the existing native Evidence type, tagged explicitly
+as untrusted source **data**, never as system instructions or tool grants.
+The same original files and signed manifest are checked again inside the
+canonical native commit fence. A source modification or expired authority
+holds the pending operation for explicit reconciliation. Source provenance
+is not semantic entailment or independent legal-rights proof.
+
+## Continuous local chat, without reloading the model
+
+The single-process REPL retains one source-approved installed model and one
+SQLite owner-bound conversation across multiple entered lines:
+
+python -m skeleton.jeeves.agent.native_cli --mode repl --model-root /private/installed-gguf --state-dir /private/native-state --tenant local --subject operator
+
+Input is a bounded UTF-8 line, output one machine-readable JSON record per
+turn. Supported commands are :status, :history (explicit history disclosure
+to the operator's local stdout), :quit (leave the durable session open for
+explicit resume) and :close (close but do not erase the durable session).
+A literal colon-prefixed prompt can be entered by doubling its first colon.
+The REPL makes no hidden retry after ambiguous native execution, and does not
+claim live token streaming or in-flight device cancellation.
+
 ## Required source validation
 
 After the source publication and repairs are complete, run these in order:
@@ -88,13 +133,15 @@ After the source publication and repairs are complete, run these in order:
 1. python -m unittest skeleton.testing.test_jeeves_native_prompt_and_schema -v
 2. python -m unittest skeleton.testing.test_jeeves_native_provider_bridge -v
 3. python -m unittest skeleton.testing.test_jeeves_native_chat -v
-4. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_cli.py
-5. python scripts/check_architecture_map.py
-6. python scripts/check_ai_app_construction.py
-7. python scripts/check_capability_interfaces.py
-8. python scripts/check_provider_bootstrap.py
-9. python scripts/check_enterprise_ai_superiority.py --json
-10. python scripts/check_enterprise_ai_implementation_notes.py --json
+4. python -m unittest skeleton.testing.test_jeeves_native_signed_evidence -v
+5. python -m unittest skeleton.testing.test_jeeves_native_repl -v
+6. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_cli.py
+7. python scripts/check_architecture_map.py
+8. python scripts/check_ai_app_construction.py
+9. python scripts/check_capability_interfaces.py
+10. python scripts/check_provider_bootstrap.py
+11. python scripts/check_enterprise_ai_superiority.py --json
+12. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,

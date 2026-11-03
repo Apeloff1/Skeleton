@@ -15,6 +15,7 @@ import sys
 from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_checked
 from .native_runtime import NativeJeevesRuntime
 from .native_chat import NativeJeevesChat
+from .native_repl import NativeJeevesRepl
 from .native_readiness import inspect_native_jeeves
 from .runtime import RunInputs
 from .types import Budget, Goal
@@ -34,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-layers", type=int, default=0)
     parser.add_argument("--capacity-root", type=Path)
     parser.add_argument("--capacity-budget-bytes", type=int, default=8000000000)
-    parser.add_argument("--mode", choices=("chat", "agent"), default="agent")
+    parser.add_argument("--mode", choices=("chat", "agent", "repl"), default="agent")
     parser.add_argument("--session")
     parser.add_argument("--request-id")
     parser.add_argument("--max-steps", type=int, default=8)
@@ -46,14 +47,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        if not args.task_stdin:
-            raise ValueError("--task-stdin explicitly required")
-        raw = sys.stdin.buffer.read(32769)
-        if not 1 <= len(raw) <= 32768:
-            raise ValueError("task stdin byte limit violated")
-        task = raw.decode("utf-8", "strict").strip()
-        if not task:
-            raise ValueError("task cannot be empty")
+        if args.mode == "repl":
+            if args.task_stdin or args.request_id:
+                raise ValueError("REPL reads lines directly and assigns unique request IDs")
+            task = None
+        else:
+            if not args.task_stdin:
+                raise ValueError("--task-stdin explicitly required")
+            raw = sys.stdin.buffer.read(32769)
+            if not 1 <= len(raw) <= 32768:
+                raise ValueError("task stdin byte limit violated")
+            task = raw.decode("utf-8", "strict").strip()
+            if not task:
+                raise ValueError("task cannot be empty")
         stack, worker, installed = activate_checked(
             model_root=args.model_root, state_dir=args.state_dir,
             tenant=args.tenant, subject=args.subject,
@@ -67,6 +73,9 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
+            if args.mode == "repl":
+                chat = NativeJeevesChat(worker, session_id=args.session)
+                return NativeJeevesRepl(chat).serve(sys.stdin.buffer, sys.stdout)
             if args.mode == "chat":
                 chat = NativeJeevesChat(worker, session_id=args.session)
                 turn = chat.turn(task, request_id=args.request_id)
