@@ -8,6 +8,7 @@ import pytest
 
 from skeleton.jeeves.worlds.laptop_cli import run
 from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+from skeleton.jeeves.worlds.tools import invoke_world_tool, manifest
 from skeleton.jeeves.worlds.world_canon import CanonError, canonical, digest
 
 SAMPLES = Path(__file__).resolve().parents[2] / "examples" / "jeeves"
@@ -141,3 +142,20 @@ def test_cli_end_to_end_and_typed_errors(tmp_path, capsys):
     assert run(["--store", root, "compile", "--world-id", "lighthouse",
                 "--expected-digest", "0" * 64]) == 2
     assert json.loads(capsys.readouterr().out)["error"] == "stale_source"
+
+
+def test_readonly_jeeves_preview_matches_compiled_source(tmp_path):
+    flow, _, reviewed, receipt = ready(tmp_path)
+    names = {item["name"] for item in manifest()["tools"]}
+    assert {"world.laptop_preview", "world.laptop_handoff_preview"} <= names
+    request = {"schema": "jeeves.world.tool_request.v1",
+               "tool": "world.laptop_preview", "world_id": "lighthouse", "args": {}}
+    response = invoke_world_tool(str(tmp_path), request)
+    assert response["persisted"] is False
+    assert response["result"]["source_digest"] == reviewed["source_digest"]
+    assert response["result"]["reviewed"] is True
+    request["tool"] = "world.laptop_handoff_preview"
+    handoff = invoke_world_tool(str(tmp_path), request)
+    assert handoff["persisted"] is False
+    assert handoff["result"] == receipt
+    assert handoff["result_digest"] == digest(receipt)

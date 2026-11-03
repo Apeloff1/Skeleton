@@ -40,3 +40,7 @@ python -m pytest skeleton/testing/test_jeeves_world_laptop_flow.py -q
 Platform limits: source custody requires POSIX descriptor-relative open and
 O_NOFOLLOW; unsupported Windows environments fail closed. The flow makes no
 device, consumer installation, model inference, or release qualification claim.
+
+Jeeves read-only tool names: world.laptop_preview and world.laptop_handoff_preview.
+They inspect the reviewed canonical source and verified handoff without changing
+custody, granting approval or invoking model inference.

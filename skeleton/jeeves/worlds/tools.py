@@ -49,6 +49,7 @@ from .advisories import AdvisoryStore
 from .weather import WeatherStore
 from .field_journal import FieldJournalStore
 from .branching import ForkStore
+from .laptop_flow import LaptopFlow
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -58,6 +59,8 @@ SCHEMA = "jeeves.world.tool_request.v1"
 RESULT_SCHEMA = "jeeves.world.tool_result.v1"
 
 TOOLS = {
+    "world.laptop_preview": (),
+    "world.laptop_handoff_preview": (),
     "world.proof": (),
     "world.playtest_preview": (),
     "world.choice_impact_preview": (),
@@ -213,7 +216,11 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     _id(req["world_id"], "world_id")
     args = _keys(req["args"], set(TOOLS[name]))
     world = WorldStore(root).read(req["world_id"])
-    if name == "world.weather_propose_preview":
+    if name == "world.laptop_preview":
+        payload = LaptopFlow(root).inspect(req["world_id"])
+    elif name == "world.laptop_handoff_preview":
+        payload = LaptopFlow(root).verify(req["world_id"])
+    elif name == "world.weather_propose_preview":
         payload = WeatherStore(root).propose(req["world_id"], **args)
     elif name == "world.weather_preview":
         payload = WeatherStore(root).inspect(req["world_id"])
