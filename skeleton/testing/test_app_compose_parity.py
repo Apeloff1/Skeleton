@@ -4,6 +4,8 @@ from copy import deepcopy
 import json
 from importlib import resources
 
+import pytest
+
 from scripts.check_app_compose_parity import parity_errors
 
 
@@ -124,3 +126,33 @@ def test_frontend_compose_dependency_regression_is_rejected() -> None:
     assert parity_errors(manifest, compose_model) == [
         "frontend: depends_on drift: manifest=[] compose=['backend']"
     ]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "label"),
+    [
+        ("network_mode", "service:backend", "network_mode=service:backend"),
+        ("network_mode", "container:tutolage-backend", "network_mode=container:tutolage-backend"),
+        ("pid", "service:skeleton", "pid=service:skeleton"),
+        ("ipc", "service:backend", "ipc=service:backend"),
+        ("links", ["backend"], "links"),
+        ("volumes_from", ["backend"], "volumes_from"),
+    ],
+)
+def test_frontend_implicit_compose_startup_edges_fail_closed(
+    field: str, value: object, label: str
+) -> None:
+    manifest = _manifest()
+    compose_model = _compose_model_from_manifest(manifest)
+    frontend = compose_model["services"]["frontend"]
+    frontend[field] = value
+
+    assert parity_errors(manifest, compose_model) == [
+        f"frontend: implicit startup dependency forbidden: {label}"
+    ]
+
+
+def test_frontend_independent_startup_allows_no_implicit_edges() -> None:
+    manifest = _manifest()
+    compose_model = _compose_model_from_manifest(manifest)
+    assert parity_errors(manifest, compose_model) == []

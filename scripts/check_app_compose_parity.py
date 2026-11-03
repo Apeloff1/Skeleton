@@ -91,6 +91,25 @@ def compose_topology(model: Mapping[str, object]) -> dict[str, dict[str, tuple[s
     return topology
 
 
+def _frontend_implicit_startup_edges(service: Mapping[str, object]) -> list[str]:
+    """Reject Compose namespace/volume edges that bypass depends_on parity.
+
+    The setup UI must start even when backend, engine, or their data store
+    cannot start. Compose can impose an implicit container dependency through
+    namespace sharing, links, or volumes_from without declaring depends_on.
+    """
+    edges: list[str] = []
+    for field in ("network_mode", "pid", "ipc"):
+        value = service.get(field)
+        if isinstance(value, str) and value.startswith(("service:", "container:")):
+            edges.append(f"{field}={value}")
+    for field in ("links", "volumes_from"):
+        value = service.get(field)
+        if value is not None and value != []:
+            edges.append(field)
+    return edges
+
+
 def parity_errors(
     manifest: Mapping[str, object],
     compose_model: Mapping[str, object],
@@ -124,6 +143,18 @@ def parity_errors(
                 f"{name}: profile drift: manifest={list(expected_profiles)} "
                 f"compose={list(actual_profiles)}"
             )
+
+        if name == "frontend" and not expected_deps:
+            service = _mapping(
+                _mapping(compose_model["services"], label="compose services")[name],
+                label="compose service frontend",
+            )
+            implicit = _frontend_implicit_startup_edges(service)
+            if implicit:
+                errors.append(
+                    "frontend: implicit startup dependency forbidden: "
+                    + ", ".join(implicit)
+                )
 
     return errors
 
