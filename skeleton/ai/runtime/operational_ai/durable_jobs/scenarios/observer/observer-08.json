@@ -1,0 +1,24 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "observer-08",
+  "domain": "observer",
+  "phase": "durability-and-observability",
+  "category": "permitted-boundary",
+  "threat": "Bounded, owner-scoped audit-backed job health projections with no leaked sensitive prompt 8",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 7,
+    "jobs": 1,
+    "tenant": "tenant",
+    "top": 1,
+    "tamper": false
+  },
+  "expected_allow": true,
+  "expected_state": "verified",
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

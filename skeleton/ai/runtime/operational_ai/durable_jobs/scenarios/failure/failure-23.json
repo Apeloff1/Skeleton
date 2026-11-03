@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "failure-23",
+  "domain": "failure",
+  "phase": "native-job-execution",
+  "category": "adversarial-denial",
+  "threat": "Ambiguous or definite native failure must be durably held or terminal, never blindly retried 23",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 22,
+    "code": "native-error",
+    "now_ms": 1500,
+    "ambiguous": 1
+  },
+  "expected_allow": false,
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

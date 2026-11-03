@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "dedup-18",
+  "domain": "dedup",
+  "phase": "admission",
+  "category": "adversarial-denial",
+  "threat": "Reject cross-replay under altered prompts, priorities and request identities 18",
+  "trust_boundary": "Native AI job, principal, model and bounded capacity remain authoritative",
+  "input": {
+    "variant": 17,
+    "job_id": "job_1",
+    "request_id": "job_1",
+    "question": "Explain this text.",
+    "priority": 3
+  },
+  "expected_allow": false,
+  "acceptance": "Execute the actual durable_jobs.case_oracle on private test SQLite and assert exact disposition",
+  "no_hosted_fallback": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

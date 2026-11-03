@@ -1,0 +1,24 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "recovery-10",
+  "domain": "recovery",
+  "phase": "durability-and-observability",
+  "category": "adversarial-denial",
+  "threat": "Operator cannot backdate a held-work recovery before its confirmed ambiguous failure event; replay fence denies clock regression.",
+  "trust_boundary": "Held native inference is never blindly retried even by an approved operator when authoritative event time has regressed",
+  "input": {
+    "variant": 9,
+    "inspect": true,
+    "resume": true,
+    "now_ms": 1000,
+    "proof_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operator_approved": true
+  },
+  "expected_allow": false,
+  "acceptance": "Run live JobStore.manual_resume against an actual held SQLite request",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

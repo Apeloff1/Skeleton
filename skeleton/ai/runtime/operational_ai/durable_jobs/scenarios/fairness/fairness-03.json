@@ -1,0 +1,29 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "fairness-03",
+  "domain": "fairness",
+  "phase": "durability-and-observability",
+  "category": "permitted-boundary",
+  "threat": "Strict per-tenant in-flight isolation and bounded deterministic fair scheduling, case 3",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 2,
+    "tenants": [
+      "a",
+      "b"
+    ],
+    "priorities": [
+      0,
+      0
+    ],
+    "take": 2
+  },
+  "expected_allow": true,
+  "expected_state": "a,b",
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}
