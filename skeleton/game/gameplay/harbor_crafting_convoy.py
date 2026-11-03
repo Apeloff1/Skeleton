@@ -88,7 +88,7 @@ def validate_convoy_board(board: Any, source: Any) -> dict[str, Any]:
 
 
 def normalize_convoy_action(value: Any) -> dict[str, str]:
-    if isinstance(value, dict) and value.get("op") in SPECIAL:
+    if isinstance(value, dict) and type(value.get("op")) is str and value["op"] in SPECIAL:
         _keys(value, {"op"}, "convoy action")
         return {"op": value["op"]}
     return normalize_action(value)
