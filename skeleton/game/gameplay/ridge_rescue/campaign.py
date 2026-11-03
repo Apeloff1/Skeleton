@@ -211,7 +211,10 @@ def retry_campaign(value: dict, *, expected_head: str) -> dict:
 def export_campaign(value: dict) -> dict:
     verified = verify_campaign(value)
     payload = {"schema": EXPORT_SCHEMA, "session": verified["session"]}
-    return {"payload": payload, "sha256": digest(payload)}
+    bundle = {"payload": payload, "sha256": digest(payload)}
+    if len(canonical(bundle)) > MAX_SESSION_BYTES:
+        raise CampaignError("export byte budget exceeded")
+    return bundle
 
 
 def verify_export(value: dict | bytes | str) -> dict:

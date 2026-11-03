@@ -140,3 +140,23 @@ def test_completed_campaign_with_single_chapter():
     assert verified["actions"] == []
     with pytest.raises(CampaignError, match="completed"):
         step_campaign(session, {"verb": "rest"}, expected_head=session["head"])
+
+
+def test_two_original_chapters_reach_earned_ending_and_export():
+    from skeleton.game.gameplay.ridge_rescue.campaign_acceptance import run_acceptance
+    bundle = run_acceptance()
+    result = verify_export(bundle)
+    assert result["index"] == 2
+    assert result["status"] == "completed"
+    assert [entry["state"]["status"] for entry in result["session"]["completed"]] == [
+        "won:protect", "won:salvage"
+    ]
+    assert result["session"]["completed"][1]["state"]["health"] > 0
+
+
+def test_demo_cli_replays_both_chapters(tmp_path):
+    path = tmp_path / "complete.json"
+    assert main(["demo", "--output", str(path)]) == 0
+    result = verify_export(path.read_bytes())
+    assert result["status"] == "completed"
+    assert result["index"] == 2

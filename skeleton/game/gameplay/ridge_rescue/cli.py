@@ -37,7 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "demo":
-            report = run_acceptance("protect")\n        elif args.command == "verify":
+            report = run_acceptance("protect")
+        elif args.command == "verify":
             if not args.bundle:
                 raise ValueError("--bundle required")
             result = verify_run(read_bounded(args.bundle))

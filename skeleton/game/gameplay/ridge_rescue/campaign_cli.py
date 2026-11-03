@@ -16,7 +16,7 @@ DEMO = Path(__file__).with_name("cinder_ridge_campaign.json")
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ridge-rescue-campaign")
-    parser.add_argument("command", choices=("open", "inspect", "step", "retry", "verify", "export", "interactive"))
+    parser.add_argument("command", choices=("open", "inspect", "step", "retry", "verify", "export", "interactive", "demo"))
     parser.add_argument("--source", help="source campaign JSON; default is bundled original campaign")
     parser.add_argument("--session", help="previous session JSON for inspect, step, retry, export, interactive")
     parser.add_argument("--bundle", help="portable export JSON for verify")
@@ -25,7 +25,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", help="create-only output JSON; never overwrites")
     args = parser.parse_args(argv)
     try:
-        if args.command == "open":
+        if args.command == "demo":
+            from .campaign_acceptance import run_acceptance
+            report = run_acceptance()
+        elif args.command == "open":
             report = open_campaign(read_bounded(args.source or DEMO, 96_000))
         elif args.command == "verify":
             if not args.bundle:

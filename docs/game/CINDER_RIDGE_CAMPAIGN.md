@@ -31,3 +31,14 @@ written with restrictive permissions and refuse to overwrite existing files.
 This is local integrity custody, not a signed or multi-user authorization layer.
 Source-to-runtime-to-save-to-export regression tests live in
 `skeleton/testing/test_ridge_rescue_campaign.py`.
+
+## Full campaign acceptance
+
+`python -m skeleton.game.gameplay.ridge_rescue.campaign_cli demo --output full-replay.json`
+plays both original worlds through the actual movement, stamina, rescue, enemy
+movement, weather, and evacuation engine. The first stage earns protection
+after crafting and lighting a beacon. The second earns salvage by rescuing Mira
+and Orin and reaching the shelter under a moving hostile patrol. The returned
+portable export is replay-verified before publication. Use
+`python -m skeleton.game.gameplay.ridge_rescue.campaign_cli verify --bundle full-replay.json`
+to independently validate the source-bound action history and final outcome.
