@@ -6,6 +6,7 @@ import json
 import sys
 
 from .economy import EconomyStore
+from .economy_session import EconomySessionStore
 from .world_canon import CanonError, strict_json
 
 
@@ -14,7 +15,7 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--store", required=True)
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("propose", "inspect", "save", "edit", "approve",
-                   "editor", "compile", "verify", "player"):
+                   "editor", "compile", "verify", "player", "choose"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
         if action == "propose":
@@ -31,8 +32,12 @@ def run(argv: list[str]) -> int:
             cmd.add_argument("--operation-json", required=True)
         if action == "approve":
             cmd.add_argument("--review-note", required=True)
-        if action == "player":
+        if action in ("player", "choose"):
             cmd.add_argument("--slot", required=True)
+        if action == "choose":
+            cmd.add_argument("--choice-id", required=True)
+            cmd.add_argument("--expected-session-digest", required=True)
+            cmd.add_argument("--expected-economy-digest", required=True)
     args = parser.parse_args(argv)
     try:
         store = EconomyStore(args.store)
@@ -61,6 +66,11 @@ def run(argv: list[str]) -> int:
             result = {"receipt": store.compile(args.world_id, args.expected_digest)}
         elif args.action == "player":
             result = store.player(args.world_id, args.slot)
+        elif args.action == "choose":
+            result = {"player": EconomySessionStore(args.store).choose(
+                args.world_id, args.slot, args.choice_id,
+                expected_session_digest=args.expected_session_digest,
+                expected_economy_digest=args.expected_economy_digest)}
         else:
             result = {"receipt": store.verify(args.world_id)}
     except (CanonError, OSError, UnicodeError, ValueError, TypeError) as exc:

@@ -69,7 +69,7 @@ def render_editor(source: Any, world: Any) -> bytes:
         '<meta http-equiv="Content-Security-Policy" content="default-src '
         "'none'; script-src 'sha256-" + policy +
         "'; connect-src 'none'; img-src 'none'; style-src 'none'; "
-        "base-uri 'none'; form-action 'none'; navigate-to 'none'" + '">'
+        "base-uri 'none'; form-action 'none'" + '">'
         "<title>Economy editor " + html.escape(world["id"]) +
         '</title></head><body><main id="editor"></main><p id="lease">' +
         digest(source) + '</p><script id="source" type="application/json">' +

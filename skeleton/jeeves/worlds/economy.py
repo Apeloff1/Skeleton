@@ -384,6 +384,7 @@ class EconomyStore:
 
     @staticmethod
     def _lock(fd: int, world_id: str) -> None:
+        _id(world_id, "world_id")
         try:
             handle = os.open(world_id + ".lock", os.O_WRONLY | os.O_CREAT |
                              os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)
@@ -392,6 +393,7 @@ class EconomyStore:
         os.close(handle)
 
     def _world(self, fd: int, world_id: str) -> Any:
+        _id(world_id, "world_id")
         world = strict_json(self.worlds._read(fd, world_id + ".json"))
         prove(world)
         if world["id"] != world_id:
@@ -540,8 +542,8 @@ class EconomyStore:
                     raise CanonError("economy_review_required")
                 session = validate_session(strict_json(self.worlds._read(
                     fd, SessionStore._name(world_id, slot))), world)
-                return {"slot": slot, "session_digest": digest(session),
-                        "replay": replay_economy(source, world, session["choices"])}
+                from .economy_session import economy_player_view
+                return {"slot": slot, **economy_player_view(source, world, session)}
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
