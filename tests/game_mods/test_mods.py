@@ -199,3 +199,22 @@ def test_resolver_rejects_unbounded_direct_manifest_edges():
         f"mod{i}" for i in range(MAX_RESOLVE_REFERENCES + 1)))
     with pytest.raises(ResolveError, match="dependency graph exceeds"):
         resolve_load_order([direct])
+
+
+def test_resolver_iterator_failure_is_typed_and_never_returns_partial_plan():
+    def broken_inventory():
+        yield mm("good")
+        raise RuntimeError("untrusted inventory stopped")
+
+    with pytest.raises(ResolveError, match="mod inventory iterator failed"):
+        resolve_load_order(broken_inventory())
+
+    class HostileManifest(ModManifest):
+        @property
+        def mod_id(self):
+            raise AssertionError("subclass hook executed")
+
+    # A forged subclass must not be consulted by the graph resolver.
+    forged = object.__new__(HostileManifest)
+    with pytest.raises(ResolveError, match="invalid mod manifest"):
+        resolve_load_order([forged])
