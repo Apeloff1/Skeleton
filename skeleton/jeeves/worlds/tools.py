@@ -44,6 +44,7 @@ from .dialogue_graph import DialogueStore
 from .interaction_assembly import InteractionStore
 from .dialogue_transcript import DialogueTranscriptStore
 from .dialogue_localization import DialogueLocaleStore
+from .branching import ForkStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -142,6 +143,9 @@ TOOLS = {
     "world.portals_session_preview": ("network_id", "session"),
     "world.portals_propose_preview": ("network_id", "prompt", "from_ending", "to_world"),
     "world.atlas_propose_preview": ("prompt",),
+    "world.fork_preview": ("parent_slot", "target_slot", "prompt", "at_revision", "choice_id"),
+    "world.fork_inspect": ("target_slot",),
+    "world.fork_compare": ("target_slot",),
     "world.revision_preview": ("old_world",),
     "world.migration_preview": ("old_world", "checkpoint", "choice_map"),
     "knowledge.propose_preview": (
@@ -194,7 +198,13 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     _id(req["world_id"], "world_id")
     args = _keys(req["args"], set(TOOLS[name]))
     world = WorldStore(root).read(req["world_id"])
-    if name == "world.revision_preview":
+    if name == "world.fork_preview":
+        payload = ForkStore(root).preview(req["world_id"], **args)
+    elif name == "world.fork_inspect":
+        payload = ForkStore(root).inspect(req["world_id"], args["target_slot"])
+    elif name == "world.fork_compare":
+        payload = ForkStore(root).compare(req["world_id"], args["target_slot"])
+    elif name == "world.revision_preview":
         payload = analyze_revision(args["old_world"], world)
     elif name == "world.playtest_preview":
         payload = prove_choice_coverage(world)

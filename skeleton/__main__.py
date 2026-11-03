@@ -76,6 +76,7 @@ Commands:
     world-cast   Original NPC presence, authored dialogue and playable continuity
     world-experience Unified reviewed world, cast and route offline playable
     world-session Source-verified offline play, save, resume and checkpoint replay
+    world-fork    Reviewed alternate save fork, causal replay and HTML5 handoff
     world-migrate Reviewed source-revision save migration with exact replay proof
     world-assurance Integrated exact-source gameplay assurance and HTML5 handoff
     world-invariants Exhaustive authored world-state proof and playable handoff
@@ -855,6 +856,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-migrate":
         from skeleton.jeeves.worlds.migration_cli import run
         return run(rest)
+    if cmd == "world-fork":
+        from skeleton.jeeves.worlds.branching_cli import run as world_fork_cli
+        return world_fork_cli(rest)
     if cmd == "world-session":
         from skeleton.jeeves.worlds.session_cli import run as world_session_cli
         return world_session_cli(rest)
