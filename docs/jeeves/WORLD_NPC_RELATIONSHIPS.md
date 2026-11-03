@@ -25,3 +25,8 @@ No device or release certification is implied.
 The verified playable embeds the approved original cast alongside trust rules, displays
 cast dialogue only when its canonical earned flags are present, and overlays the
 relationship reaction for the same actual scene and player choice trace.
+
+The player-slot CLI command and read-only world.relationships_player Jeeves
+tool load the canonical SessionStore slot, independently replay every stored
+choice and verify the session source lease before deriving NPC trust. Forged
+flags, endings, revisions or cross-world sessions fail closed. No model write.

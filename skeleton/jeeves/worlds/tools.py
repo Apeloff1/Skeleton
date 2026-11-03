@@ -44,6 +44,7 @@ TOOLS = {
     "world.invariants_preview": (),
     "world.assurance_preview": (),
     "world.atlas_preview": (),
+    "world.relationships_player": ("slot",),
     "world.relationships_preview": (),
     "world.relationships_propose_preview": (
         "prompt", "bond_id", "actor", "name", "choice", "delta", "reason",
@@ -133,6 +134,9 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
     elif name == "world.relationships_propose_preview":
         payload = RelationshipStore(root).propose(req["world_id"], **args)
+    elif name == "world.relationships_player":
+        _id(args["slot"], "slot")
+        payload = RelationshipStore(root).player(req["world_id"], args["slot"])
     elif name == "world.relationships_preview":
         payload = RelationshipStore(root).inspect(req["world_id"])
     elif name == "world.events_propose_preview":

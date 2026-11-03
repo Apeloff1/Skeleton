@@ -14,7 +14,7 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--store", required=True)
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("propose", "inspect", "save", "edit", "approve",
-                   "editor", "compile", "verify", "player"):
+                   "editor", "compile", "verify", "player", "player-slot"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--world-id", required=True)
         if action == "propose":
@@ -31,6 +31,8 @@ def run(argv: list[str]) -> int:
             cmd.add_argument("--operation-json", required=True)
         if action == "approve":
             cmd.add_argument("--review-note", required=True)
+        if action == "player-slot":
+            cmd.add_argument("--slot", required=True)
         if action == "player":
             cmd.add_argument("--choices-json", required=True)
     args = parser.parse_args(argv)
@@ -77,6 +79,8 @@ def run(argv: list[str]) -> int:
             result = {"receipt": store.compile(args.world_id, args.expected_digest)}
         elif args.action == "verify":
             result = {"receipt": store.verify(args.world_id)}
+        elif args.action == "player-slot":
+            result = store.player(args.world_id, args.slot)
         else:
             fd = store.worlds._directory()
             try:

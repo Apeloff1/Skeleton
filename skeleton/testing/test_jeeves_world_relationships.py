@@ -162,3 +162,36 @@ def test_script_breakout_is_escaped_in_playable_and_editor(tmp_path):
     assert b"</script><script>alert(1)" not in playable
     assert b"\\u003c/script>" in playable
     assert store.verify("harbor") == receipt
+
+
+def test_persisted_player_slot_replay_and_jeeves_parity(tmp_path, capsys):
+    from skeleton.jeeves.worlds.session import SessionStore
+    _, _, store, source = fixture(tmp_path)
+    first = store.publish("harbor", source, create=True)
+    sessions = SessionStore(tmp_path)
+    sessions.create("harbor", "chapter_one")
+    reject("relationships_review_required",
+           lambda: store.player("harbor", "chapter_one"))
+    store.approve("harbor", expected_digest=first, review_note="Reviewed")
+    initial = sessions.read("harbor", "chapter_one")
+    sessions.choose("harbor", "chapter_one", "pursue_goal", digest(initial))
+    result = store.player("harbor", "chapter_one")
+    assert result["player"]["scores"]["tala_trust"] == 12
+    assert result["session_digest"] == digest(sessions.read("harbor", "chapter_one"))
+    args = ["--store", str(tmp_path), "player-slot", "--world-id", "harbor",
+            "--slot", "chapter_one"]
+    assert run(args) == 0
+    assert json.loads(capsys.readouterr().out)["player"] == result["player"]
+    tool = invoke_world_tool(str(tmp_path), {
+        "schema": "jeeves.world.tool_request.v1",
+        "tool": "world.relationships_player", "world_id": "harbor",
+        "args": {"slot": "chapter_one"},
+    })
+    assert tool["result"] == result
+    assert tool["persisted"] is False
+    session_path = tmp_path / "harbor.chapter_one.session.json"
+    payload = json.loads(session_path.read_text())
+    payload["flags"] = ["forged"]
+    session_path.write_text(json.dumps(payload))
+    reject("session_replay_mismatch",
+           lambda: store.player("harbor", "chapter_one"))

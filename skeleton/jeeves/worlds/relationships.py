@@ -10,7 +10,7 @@ from typing import Any
 
 from .bundle import _artifact_read
 from .cast import CastStore, validate_cast
-from .session import replay_choices
+from .session import SessionStore, replay_choices
 from .world_canon import CanonError, _id, _keys, _list, _text, canonical, digest, prove, strict_json
 
 SCHEMA = "jeeves.world.relationships.v1"
@@ -334,6 +334,22 @@ class RelationshipStore:
             world, cast = self._sources(fd, world_id)
             data = self._read(fd, world_id, world, cast)
             return {"relationships": data, "proof": prove_relationships(data, world, cast)}
+        finally:
+            os.close(fd)
+
+    def player(self, world_id: str, slot: str) -> dict[str, Any]:
+        """Read one persisted, independently replay-verified player session."""
+        _id(slot, "slot")
+        fd = self.worlds._directory()
+        try:
+            world, cast = self._sources(fd, world_id)
+            data = self._read(fd, world_id, world, cast)
+            if not data["approved"] or not cast["approved"]:
+                raise CanonError("relationships_review_required")
+            session = SessionStore(self.worlds.root)._session(fd, world_id, slot, world)
+            result = evaluate_relationships(data, world, cast, session["choices"])
+            return {"session_digest": digest(session), "slot": slot,
+                    "revision": session["revision"], "player": result}
         finally:
             os.close(fd)
 
