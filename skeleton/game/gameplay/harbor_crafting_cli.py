@@ -74,6 +74,19 @@ from .harbor_crafting_contract_solver import (
     MAX_PLAN_BYTES as MAX_CONTRACT_PLAN_BYTES,
     solve_contract, verify_contract_plan,
 )
+from .harbor_crafting_survey import (
+    MAX_BOARD_BYTES as MAX_SURVEY_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_SURVEY_REPORT_BYTES,
+    build_survey, resume_survey, verify_survey,
+)
+from .harbor_crafting_survey_guidance import (
+    MAX_GUIDANCE_BYTES as MAX_SURVEY_HINT_BYTES,
+    survey_hint, verify_survey_hint,
+)
+from .harbor_crafting_survey_authoring import (
+    MAX_REVISION_BYTES as MAX_SURVEY_REVISION_BYTES,
+    edit_survey, verify_survey_edit,
+)
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -102,7 +115,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -151,6 +164,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--contract-plan", help="Portable replay-verified contract solver plan")
     parser.add_argument("--contract-revision", help="Replay-verifiable contract edit revision")
     parser.add_argument("--expected-contract-digest", help="CAS lease for contract save or board")
+    parser.add_argument("--survey-board", help="Authored exploration site board JSON")
+    parser.add_argument("--survey-report", help="Portable replay-verified survey report")
+    parser.add_argument("--survey-hint", help="Portable NPC-aware survey guidance")
+    parser.add_argument("--survey-edits", help="Transactional survey site edits")
+    parser.add_argument("--survey-revision", help="Portable survey authoring revision")
+    parser.add_argument("--expected-survey-digest", help="CAS lease for survey continuation")
+    parser.add_argument("--expected-survey-board-digest", help="CAS lease for survey editor")
     parser.add_argument("--ghost-bundle", help="Verified opponent save for ghost racing")
     parser.add_argument("--trial-edits", help="JSON array of transactional time trial edits")
     parser.add_argument("--trial-revision", help="Portable time trial course revision JSON")
@@ -159,7 +179,52 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "contract-plan":
+        if args.command == "survey-run":
+            output = build_survey(
+                load_source(Path(args.source)),
+                _required_json(args.survey_board, "survey-board", MAX_SURVEY_BOARD_BYTES),
+                _required_json(args.actions, "actions"),
+                require_complete=args.require_all,
+            )
+        elif args.command == "survey-verify":
+            output = {"verified": True, **verify_survey(
+                _required_json(args.survey_report, "survey-report", MAX_SURVEY_REPORT_BYTES),
+                require_complete=args.require_all,
+            )}
+        elif args.command == "survey-resume":
+            if not args.expected_survey_digest:
+                raise HarborError("--expected-survey-digest is required")
+            output = resume_survey(
+                _required_json(args.survey_report, "survey-report", MAX_SURVEY_REPORT_BYTES),
+                _required_json(args.actions, "actions"),
+                expected_digest=args.expected_survey_digest,
+                require_complete=args.require_all,
+            )
+        elif args.command == "survey-hint":
+            output = survey_hint(
+                _required_json(args.survey_report, "survey-report", MAX_SURVEY_REPORT_BYTES),
+                max_steps=args.max_steps,
+            )
+        elif args.command == "survey-verify-hint":
+            output = {"verified": True, **verify_survey_hint(
+                _required_json(args.survey_hint, "survey-hint", MAX_SURVEY_HINT_BYTES))}
+        elif args.command == "survey-author":
+            if not args.expected_source_digest or not args.expected_survey_board_digest:
+                raise HarborError("survey authoring source and board leases required")
+            output = edit_survey(
+                load_source(Path(args.source)),
+                _required_json(args.survey_board, "survey-board", MAX_SURVEY_BOARD_BYTES),
+                _required_json(args.survey_edits, "survey-edits", MAX_SURVEY_BOARD_BYTES),
+                expected_source_digest=args.expected_source_digest,
+                expected_board_digest=args.expected_survey_board_digest,
+                preview_report=_required_json(
+                    args.survey_report, "survey-report", MAX_SURVEY_REPORT_BYTES
+                ) if args.survey_report else None,
+            )
+        elif args.command == "survey-verify-author":
+            output = {"verified": True, **verify_survey_edit(
+                _required_json(args.survey_revision, "survey-revision", MAX_SURVEY_REVISION_BYTES))}
+        elif args.command == "contract-plan":
             output = solve_contract(
                 _required_json(args.contract_save, "contract-save", MAX_CONTRACT_SAVE_BYTES))
         elif args.command == "contract-verify-plan":
