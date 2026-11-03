@@ -167,6 +167,26 @@ class MongoGuardedActivation:
                     or not hello["setName"]
                     or hello.get("isWritablePrimary") is not True):
                 raise ActivationBlocked("linearizable Mongo replica-set primary required")
+            # A replica-set primary can be reachable with authentication
+            # disabled. A linearizable epoch on an unauthenticated server
+            # cannot establish trusted custody for protected local inference.
+            # Inspect the actual connection; never accept an environment
+            # flag, client-supplied username or successful ping as identity.
+            async with asyncio.timeout(_MAX_PROBE_SECONDS):
+                auth = await self._database.command("connectionStatus")
+            users = (
+                auth.get("authInfo", {}).get("authenticatedUsers")
+                if type(auth) is dict and type(auth.get("authInfo")) is dict
+                else None
+            )
+            if (type(users) is not list or not users
+                    or any(
+                        type(user) is not dict
+                        or type(user.get("user")) is not str or not user["user"]
+                        or type(user.get("db")) is not str or not user["db"]
+                        for user in users
+                    )):
+                raise ActivationBlocked("authenticated canonical Mongo session required")
             # The backend and engine may use different logical databases on
             # the same Mongo server. A seqlock in one database does not fence
             # canonical writes in another database or another client.

@@ -22,13 +22,16 @@ class FakeDatabase:
         self.name = "tutolage"
         self.client = object()
         self.hello = {"setName": "rs0", "isWritablePrimary": True}
+        self.auth = {"authInfo": {"authenticatedUsers": [
+            {"user": "guarded-owner", "db": "admin"},
+        ]}}
         self.error = None
 
     async def command(self, command: str):
-        assert command == "hello"
+        assert command in ("hello", "connectionStatus")
         if self.error is not None:
             raise self.error
-        return self.hello
+        return self.hello if command == "hello" else self.auth
 
 
 class FakeTokenizer:
@@ -191,6 +194,35 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ActivationBlocked) as caught:
             await self.make().activate()
         self.assertNotIn("password", str(caught.exception))
+
+    async def test_unauthenticated_replica_set_denies_activation(self):
+        self.database.auth = {"authInfo": {"authenticatedUsers": []}}
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "authenticated canonical"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertEqual(self.inventory.call_count, 0)
+
+    async def test_malformed_auth_session_denies_activation(self):
+        for bad in (None, {}, {"authInfo": {}},
+                    {"authInfo": {"authenticatedUsers": [1]}},
+                    {"authInfo": {"authenticatedUsers": [
+                        {"user": "guarded-owner", "db": ""}]}}):
+            with self.subTest(auth=repr(bad)):
+                self.database.auth = bad
+                gate = self.make()
+                with self.assertRaises(ActivationBlocked):
+                    await gate.activate()
+                self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertEqual(self.inventory.call_count, 0)
+
+    async def test_authentication_loss_blocks_existing_permit(self):
+        gate = self.make()
+        permit = await gate.activate()
+        self.database.auth = {"authInfo": {"authenticatedUsers": []}}
+        with self.assertRaises(ActivationBlocked):
+            await gate.assert_active(permit)
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
     async def test_cross_database_conversation_denies(self):
         self.conversation.threads.database = FakeDatabase()
