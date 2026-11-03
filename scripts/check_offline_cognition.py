@@ -62,6 +62,7 @@ FOCUSED=(
     "skeleton.testing.test_offline_cognition_integrity_matrix",
     "skeleton.testing.test_offline_cognition_manifest_custody",
     "skeleton.testing.test_offline_cognition_manifest_matrix",
+    "skeleton.testing.test_offline_cognition_first_laptop_preflight",
 )
 
 def run_step(name,command,*,timeout):
