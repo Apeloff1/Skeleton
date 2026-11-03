@@ -125,7 +125,7 @@ def _portable_input(path: str | None) -> bytes:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cinder-ridge-consumer")
-    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "restore", "audit", "verify-export", "acceptance", "bundle", "smoke", "portable-smoke"))
+    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "restore", "backup", "restore-backup", "audit", "verify-export", "verify-backup", "acceptance", "bundle", "smoke", "portable-smoke"))
     parser.add_argument("--slot", default="adventure", help="lowercase save name, 1-32 safe characters")
     parser.add_argument("--ascii", action="store_true", help="ASCII-only terminal fallback")
     parser.add_argument("--action", help="canonical JSON action for a noninteractive step")
@@ -146,6 +146,12 @@ def main(argv: list[str] | None = None) -> int:
             result = verify_export(_portable_input(args.file))
             result = {"verified": True, "head": result["head"], "status": result["status"],
                       "chapters": result["index"]}
+        elif args.command == "verify-backup":
+            from .consumer_backup import verify_backup
+            from .consumer_store import _source
+            session, history = verify_backup(_portable_input(args.file), _source())
+            result = {"verified": True, "head": session["head"],
+                      "actions": len(history), "retries": session["retries"]}
         else:
             store = SlotStore()
             if args.command == "play":
@@ -157,6 +163,10 @@ def main(argv: list[str] | None = None) -> int:
                 result = store.new(args.slot)
             elif args.command == "restore":
                 result = store.restore(args.slot, _portable_input(args.file))
+            elif args.command == "restore-backup":
+                result = store.restore_backup(args.slot, _portable_input(args.file))
+            elif args.command == "backup":
+                result = {"path": str(store.backup(args.slot))}
             elif args.command == "status":
                 result = store.load(args.slot)
             elif args.command == "step":

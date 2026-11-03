@@ -261,15 +261,19 @@ class SlotStore:
         return path
 
     def restore(self, name: str, payload: bytes | str | dict) -> dict:
-        """Create a new save with a complete, replay-derived action ledger.
-
-        Never replace an existing slot, even if its head matches. Validation
-        occurs before opening a transaction, and the whole restored history
-        is inserted atomically under BEGIN IMMEDIATE.
-        """
+        """Restore campaign exports without retries into a new audited slot."""
         from .consumer_restore import replay_export
-        name = _slot(name)
         session, history = replay_export(payload, _source())
+        return self._insert_restored(name, session, history)
+
+    def restore_backup(self, name: str, payload: bytes | str | dict) -> dict:
+        """Restore full retry-aware consumer backups into a new audited slot."""
+        from .consumer_backup import verify_backup
+        session, history = verify_backup(payload, _source())
+        return self._insert_restored(name, session, history)
+
+    def _insert_restored(self, name: str, session: dict, history: list[dict]) -> dict:
+        name = _slot(name)
         if len(canonical(session)) > MAX_EXPORT_BYTES:
             raise StoreError("restored session exceeds byte budget")
         with closing(self._connect()) as conn:
@@ -301,6 +305,58 @@ class SlotStore:
         if audited["head"] != session["head"] or audited["revision"] != len(history):
             raise StoreError("restored save audit mismatch")
         return self.load(name)
+
+    def backup(self, name: str) -> Path:
+        """Export a transactionally consistent, fully replayable action history."""
+        from .consumer_backup import build_backup, MAX_BACKUP_BYTES
+        name = _slot(name)
+        with closing(self._connect()) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                verified, revision = self._read(conn, name)
+                rows = conn.execute(
+                    "SELECT revision, prior_head, next_head, action FROM actions "
+                    "WHERE slot=? ORDER BY revision", (name,),
+                ).fetchall()
+                if len(rows) != revision:
+                    raise StoreError("save history is incomplete")
+                history = []
+                for position, (number, prior, nxt, raw) in enumerate(rows, 1):
+                    if number != position or not isinstance(raw, bytes) or len(raw) > 4096:
+                        raise StoreError("save history is malformed")
+                    action = json.loads(raw)
+                    if not isinstance(action, dict) or canonical(action) != raw:
+                        raise StoreError("save history action is not canonical")
+                    history.append({"prior_head": prior, "next_head": nxt, "action": action})
+                bundle = build_backup(verified["session"], history, _source())
+                conn.execute("COMMIT")
+            except sqlite3.Error as exc:
+                conn.execute("ROLLBACK")
+                raise StoreError("backup read transaction refused") from exc
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        payload = canonical(bundle) + b"\n"
+        if len(payload) > MAX_BACKUP_BYTES:
+            raise StoreError("backup exceeds byte budget")
+        directory = _safe_directory(self.root / "exports")
+        path = directory / (name + "-backup-" + verified["head"][:12] + "-" + secrets.token_hex(6) + ".json")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        fd = None
+        try:
+            fd = os.open(path, flags, 0o600)
+            with os.fdopen(fd, "wb") as output:
+                fd = None
+                output.write(payload)
+                output.flush()
+                os.fsync(output.fileno())
+        except OSError as exc:
+            raise StoreError("portable backup write refused") from exc
+        finally:
+            if fd is not None:
+                os.close(fd)
+        return path
 
     def audit(self, name: str) -> dict:
         name = _slot(name)
