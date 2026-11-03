@@ -322,3 +322,35 @@ def test_setup_lock_fifo_is_rejected_without_blocking(tmp_path):
         ensure_runtime_environment(root)
     assert time.monotonic() - before < 2.0
     assert not (root / ".env").exists()
+
+
+def test_admin_password_fifo_fails_without_waiting_for_writer(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO support unavailable")
+    root = _root(tmp_path)
+    password = root / "operator-password"
+    os.mkfifo(password)
+    before = time.monotonic()
+    with pytest.raises(ValueError, match="single-link regular file"):
+        ensure_runtime_environment(
+            root, admin_email="admin@example.test", admin_password_file=password
+        )
+    assert time.monotonic() - before < 2.0
+    assert not (root / ".env").exists()
+
+
+def test_admin_password_hardlink_alias_is_rejected(tmp_path):
+    if os.name == "nt":
+        pytest.skip("POSIX single-link custody boundary")
+    root = _root(tmp_path)
+    original = root / "operator-password-original"
+    original.write_text("strong-password-value-1234", encoding="utf-8")
+    original.chmod(0o600)
+    alias = root / "operator-password-alias"
+    os.link(original, alias)
+    with pytest.raises(ValueError, match="single-link regular file"):
+        ensure_runtime_environment(
+            root, admin_email="admin@example.test", admin_password_file=alias
+        )
+    assert original.read_text(encoding="utf-8") == "strong-password-value-1234"
+    assert not (root / ".env").exists()

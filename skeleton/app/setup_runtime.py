@@ -290,11 +290,15 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         or not all(email.split("@"))
     ):
         raise ValueError("operator admin email must be a valid non-empty email address")
-    descriptor = os.open(Path(password_file).expanduser(), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    descriptor = os.open(
+        Path(password_file).expanduser(),
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+    )
     with os.fdopen(descriptor, "rb") as handle:
         info = os.fstat(handle.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
-            raise ValueError("admin password input must be a regular file of at most 4096 bytes")
+        if (not stat.S_ISREG(info.st_mode) or info.st_size > 4096
+                or (os.name != "nt" and info.st_nlink != 1)):
+            raise ValueError("admin password input must be a single-link regular file of at most 4096 bytes")
         if os.name != "nt" and info.st_mode & 0o077:
             raise ValueError("admin password file must be private; run chmod 600 on that file")
         raw = handle.read(4097)
