@@ -80,8 +80,10 @@ def test_choice_package_source_bound_and_portable():
     play = play_choice_package(package, save, ["relief", "salvage"], require_all=True)
     assert verify_choice_package_play(decode(canonical(play)), require_all=True)["complete"]
     with pytest.raises(HarborError, match="source mismatch"):
-        changed = deepcopy(save)
-        changed["league"]["target_score"] += 1
+        from skeleton.game.gameplay.harbor_crafting_convoy_league import build_league
+        changed_league = deepcopy(league)
+        changed_league["target_score"] += 1
+        changed = build_league(source, changed_league, save["sessions"])
         play_choice_package(package, changed, ["relief", "salvage"])
 
 
