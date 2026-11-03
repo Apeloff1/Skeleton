@@ -284,6 +284,30 @@ class MongoGuardedActivation:
             )
             if final_epoch != first_epoch:
                 raise ActivationBlocked("canonical source changed during reviewer attestation")
+            # The final linearizable read is another await boundary. A primary
+            # election or authenticated principal rotation during that read
+            # must not turn a previously verified reviewer proof into a permit.
+            async with asyncio.timeout(_MAX_PROBE_SECONDS):
+                post_epoch_hello = await self._database.command("hello")
+                post_epoch_auth = await self._database.command("connectionStatus")
+            if (type(post_epoch_hello) is not dict
+                    or post_epoch_hello.get("isWritablePrimary") is not True
+                    or tuple(post_epoch_hello.get(field) for field in topology_fields)
+                    != initial_topology):
+                raise ActivationBlocked("Mongo primary changed during final epoch read")
+            post_users = (
+                post_epoch_auth.get("authInfo", {}).get("authenticatedUsers")
+                if type(post_epoch_auth) is dict
+                and type(post_epoch_auth.get("authInfo")) is dict else None
+            )
+            if (type(post_users) is not list or not post_users
+                    or any(type(user) is not dict
+                           or type(user.get("user")) is not str or not user["user"]
+                           or type(user.get("db")) is not str or not user["db"]
+                           for user in post_users)
+                    or tuple(sorted((user["db"], user["user"]) for user in post_users))
+                    != auth_identity):
+                raise ActivationBlocked("Mongo principal changed during final epoch read")
             self._verify_backend()
             return final_epoch, auth_identity
         except ActivationBlocked:

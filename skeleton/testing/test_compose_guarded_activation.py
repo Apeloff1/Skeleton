@@ -164,6 +164,45 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await gate.assert_active(), permit)
         self.assertEqual(self.inventory.call_count, 3)
 
+
+    async def test_principal_rotation_during_final_epoch_read_denies(self):
+        original = self.epoch.read_epoch
+        calls = 0
+
+        async def rotating_epoch(**kwargs):
+            nonlocal calls
+            calls += 1
+            result = await original(**kwargs)
+            if calls == 2:
+                self.database.auth = {"authInfo": {"authenticatedUsers": [
+                    {"user": "rotated-principal", "db": "admin"},
+                ]}}
+            return result
+
+        self.epoch.read_epoch = rotating_epoch
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "principal changed during final epoch read"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
+    async def test_primary_rotation_during_final_epoch_read_denies(self):
+        original = self.epoch.read_epoch
+        calls = 0
+
+        async def rotating_epoch(**kwargs):
+            nonlocal calls
+            calls += 1
+            result = await original(**kwargs)
+            if calls == 2:
+                self.database.hello = {"setName": "rs0", "isWritablePrimary": False}
+            return result
+
+        self.epoch.read_epoch = rotating_epoch
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "primary changed during final epoch read"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
     async def test_unprovisioned_epoch_denies(self):
         self.epoch_error = MongoSourceEpochError("private db credentials")
         gate = self.make()
