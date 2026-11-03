@@ -12,7 +12,7 @@ from skeleton.jeeves.worlds.branching import (
 )
 from skeleton.jeeves.worlds.branching_cli import run
 from skeleton.jeeves.worlds.branching_editor import render_fork_editor
-from skeleton.jeeves.worlds.session import SessionStore, apply_choice, new_session
+from skeleton.jeeves.worlds.session import SessionStore, _source_session, apply_choice, new_session
 from skeleton.jeeves.worlds.tools import SCHEMA, invoke_world_tool, manifest
 from skeleton.jeeves.worlds.world_canon import (
     CanonError, WorldStore, canonical, digest, propose, prove,
@@ -287,16 +287,19 @@ def test_editor_request_to_cli_preview_then_reviewed_publish(tmp_path, capsys):
 
 def test_editor_revision_budget_fails_closed():
     source = world()
-    # A forged long history must fail native replay before rendering an editor.
-    parent = new_session(source)
-    parent["choices"] = ["sail"] * 129
-    with pytest.raises(CanonError):
+    source["choices"].append({
+        "id": "return", "from": "harbor", "to": "opening",
+        "label": "Return to shore", "requires": [], "grants": [],
+    })
+    prove(source)
+    parent = _source_session(source, ["sail", "return"] * 65)
+    with pytest.raises(CanonError, match="fork_editor_revision_budget"):
         render_fork_editor(source, parent, "primary")
 
 
 def test_editor_embedded_json_escapes_html_payload():
     source = world()
-    source["scenes"][0]["narrative"] = "</script><img src=x onerror=alert(1)>"
+    source["choices"][0]["label"] = "</script><img src=x onerror=alert(1)>"
     prove(source)
     parent = new_session(source)
     page = render_fork_editor(source, parent, "primary")
