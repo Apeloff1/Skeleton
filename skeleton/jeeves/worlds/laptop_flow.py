@@ -224,22 +224,29 @@ class LaptopFlow:
         finally:
             os.close(fd)
 
+    def _verified_snapshot(self, fd: int, world_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Validate the exact compiled artifacts while caller owns world lock."""
+        receipt, builder, html = self._expected(world_id, fd)
+        names = self._names(world_id)
+        stored = strict_json(self.worlds._read(fd, names[3]))
+        if stored != receipt:
+            raise CanonError("laptop_receipt_mismatch")
+        if _artifact_read(fd, names[1]) != builder:
+            raise CanonError("laptop_builder_mismatch")
+        if _artifact_read(fd, names[2]) != html:
+            raise CanonError("laptop_html_mismatch")
+        world = self._world(fd, world_id)
+        if digest(world) != receipt["source_digest"]:
+            raise CanonError("laptop_source_changed_after_verify")
+        return receipt, world
+
     def verify(self, world_id: str) -> dict[str, Any]:
         _id(world_id, "world_id")
         fd = self.worlds._directory()
         try:
             self._lock(fd, world_id)
             try:
-                receipt, builder, html = self._expected(world_id, fd)
-                names = self._names(world_id)
-                stored = strict_json(self.worlds._read(fd, names[3]))
-                if stored != receipt:
-                    raise CanonError("laptop_receipt_mismatch")
-                if _artifact_read(fd, names[1]) != builder:
-                    raise CanonError("laptop_builder_mismatch")
-                if _artifact_read(fd, names[2]) != html:
-                    raise CanonError("laptop_html_mismatch")
-                return receipt
+                return self._verified_snapshot(fd, world_id)[0]
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
@@ -347,58 +354,62 @@ class LaptopFlow:
         return report
 
     def acceptance(self, world_id: str, slot: str | None = None) -> dict[str, Any]:
-        """Read-only, exact-source acceptance of the playable and save contracts.
+        """Read-only source acceptance under one canonical world writer lease.
 
-        This is a source-level rehearsal, not a native engine or device test.
-        No world, approval, builder artifact or player slot is created.
+        Every ending replay and optional persisted save preflight observes the
+        same reviewed world and compiled artifacts. No player slot is created.
+        This does not qualify a native engine, model, device or installation.
         """
-        receipt = self.verify(world_id)
-        world = self.worlds.read(world_id)
-        if digest(world) != receipt["source_digest"]:
-            raise CanonError("laptop_source_changed_after_verify")
-        proof = prove(world).as_dict()
-        witnesses = proof["ending_witnesses"]
-        if len(witnesses) > 128 or sum(map(len, witnesses.values())) > 8192:
-            raise CanonError("laptop_acceptance_budget")
-        checked: list[dict[str, Any]] = []
-        for ending_scene, choices in sorted(witnesses.items()):
-            replay = replay_choices(world, choices)
-            if replay["scene"] != ending_scene or replay["ending"] is None:
-                raise CanonError("laptop_acceptance_ending_mismatch")
-            state = validate_session({
-                "schema": SESSION_SCHEMA, "world_id": world_id,
-                "world_digest": receipt["source_digest"], "choices": list(choices),
-                "scene": replay["scene"], "flags": replay["flags"],
-                "ending": replay["ending"], "revision": len(choices),
-            }, world)
-            restored = portable_import(portable_export(state, world), world)
-            if restored != state:
-                raise CanonError("laptop_acceptance_restore_mismatch")
-            checked.append({
-                "ending_scene": ending_scene, "choice_ids": list(choices),
-                "ending": state["ending"], "session_digest": digest(state),
-            })
-        existing = None
-        if slot is not None:
-            view = self.inspect_session(world_id, slot)
-            exported = self.export_session(world_id, slot)
-            preview = self.preflight_restore(world_id, exported)
-            if preview["session_digest"] != view["session_digest"]:
-                raise CanonError("laptop_acceptance_session_mismatch")
-            existing = {
-                "slot": slot, "session_digest": view["session_digest"],
-                "revision": preview["revision"], "restorable": preview["restorable"],
-            }
-        # Recheck the source lease before returning a source-bound report.
-        if digest(self.worlds.read(world_id)) != receipt["source_digest"]:
-            raise CanonError("laptop_source_changed_after_verify")
-        return {
-            "schema": "jeeves.world.laptop_acceptance.v1",
-            "world_id": world_id, "source_digest": receipt["source_digest"],
-            "review_digest": receipt["review_digest"],
-            "receipt_digest": digest(receipt),
-            "ending_witnesses": checked, "portable_roundtrip_verified": True,
-            "persisted_slot_verified": existing is not None,
-            "existing_session": existing,
-            "qualification": "offline_source_acceptance_not_engine_or_device_certified",
-        }
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                receipt, world = self._verified_snapshot(fd, world_id)
+                proof = prove(world).as_dict()
+                witnesses = proof["ending_witnesses"]
+                if len(witnesses) > 128 or sum(map(len, witnesses.values())) > 8192:
+                    raise CanonError("laptop_acceptance_budget")
+                checked: list[dict[str, Any]] = []
+                for ending_scene, choices in sorted(witnesses.items()):
+                    replay = replay_choices(world, choices)
+                    if replay["scene"] != ending_scene or replay["ending"] is None:
+                        raise CanonError("laptop_acceptance_ending_mismatch")
+                    state = validate_session({
+                        "schema": SESSION_SCHEMA, "world_id": world_id,
+                        "world_digest": receipt["source_digest"], "choices": list(choices),
+                        "scene": replay["scene"], "flags": replay["flags"],
+                        "ending": replay["ending"], "revision": len(choices),
+                    }, world)
+                    restored = portable_import(portable_export(state, world), world)
+                    if restored != state:
+                        raise CanonError("laptop_acceptance_restore_mismatch")
+                    checked.append({
+                        "ending_scene": ending_scene, "choice_ids": list(choices),
+                        "ending": state["ending"], "session_digest": digest(state),
+                    })
+                existing = None
+                if slot is not None:
+                    view = self.inspect_session(world_id, slot)
+                    exported = self.export_session(world_id, slot)
+                    preview = self.preflight_restore(world_id, exported)
+                    if preview["session_digest"] != view["session_digest"]:
+                        raise CanonError("laptop_acceptance_session_mismatch")
+                    existing = {
+                        "slot": slot, "session_digest": view["session_digest"],
+                        "revision": preview["revision"], "restorable": preview["restorable"],
+                    }
+                return {
+                    "schema": "jeeves.world.laptop_acceptance.v1",
+                    "world_id": world_id, "source_digest": receipt["source_digest"],
+                    "review_digest": receipt["review_digest"],
+                    "receipt_digest": digest(receipt),
+                    "ending_witnesses": checked, "portable_roundtrip_verified": True,
+                    "persisted_slot_verified": existing is not None,
+                    "existing_session": existing,
+                    "qualification": "offline_source_acceptance_not_engine_or_device_certified",
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)

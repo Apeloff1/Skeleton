@@ -78,3 +78,22 @@ def test_acceptance_rejects_unreviewed_source_and_missing_slot(tmp_path):
     with pytest.raises(CanonError) as stale:
         flow.acceptance("lighthouse")
     assert stale.value.code == "review_stale_source"
+
+def test_acceptance_holds_world_lease_through_all_ending_replays(tmp_path, monkeypatch):
+    flow = ready(tmp_path)
+    from skeleton.jeeves.worlds import laptop_flow as module
+    original = module.replay_choices
+    attempts = []
+
+    def concurrent_edit(world, choices):
+        altered = dict(world, prompt=world["prompt"] + " conflicting revision")
+        with pytest.raises(CanonError) as error:
+            flow.worlds.publish(altered, expected_digest=digest(world))
+        attempts.append(error.value.code)
+        return original(world, choices)
+
+    monkeypatch.setattr(module, "replay_choices", concurrent_edit)
+    report = flow.acceptance("lighthouse")
+    assert report["ending_witnesses"]
+    assert attempts and set(attempts) == {"lease_busy"}
+    assert flow.verify("lighthouse")["source_digest"] == report["source_digest"]
