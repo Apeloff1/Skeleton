@@ -356,6 +356,38 @@ def _workflow_findings(text: str) -> list[Finding]:
             )
         )
 
+    protection_query = reconcile.find('protected="$(gh api')
+    preflight = reconcile.find(
+        "python scripts/automerge_preflight_receipt.py --state protection-unverified"
+    )
+    if protection_query < 0 or preflight < 0 or preflight > protection_query:
+        findings.append(
+            Finding(
+                "denial-evidence",
+                "write fail-closed preflight evidence before querying branch protection",
+                rel,
+            )
+        )
+    for state in ("protection-disabled", "reconciliation-incomplete"):
+        if f"python scripts/automerge_preflight_receipt.py --state {state}" not in reconcile:
+            findings.append(
+                Finding("denial-evidence", f"missing {state} evidence stage", rel)
+            )
+
+    for required in (
+        'AUTOMERGE_REQUIRED_APPROVALS: "1"',
+        'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"',
+        'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "true"',
+    ):
+        if required not in reconcile:
+            findings.append(
+                Finding(
+                    "review-enforcement",
+                    f"automatic merges must enforce {required}",
+                    rel,
+                )
+            )
+
     return findings
 
 
