@@ -80,9 +80,11 @@ def build_save(source: Any, board: Any, bundles: Any) -> dict[str, Any]:
     results = []
     seen: set[str] = set()
     for index, bundle in enumerate(bundles):
-        earned = _earn(bundle, authored["orders"][index], digest(world))
+        # Verify canonical custody before consulting any untrusted digest field.
+        verify_bundle(bundle, require_win=True)
         if bundle["bundle_digest"] in seen:
             raise HarborError("duplicate contract replay")
+        earned = _earn(bundle, authored["orders"][index], digest(world))
         seen.add(bundle["bundle_digest"])
         results.append(earned)
     save = {"schema": SAVE_SCHEMA, "source": world, "source_digest": digest(world),
