@@ -24,3 +24,21 @@ returns an unpersisted typed proposal; `world.weather_preview` and
 `world.weather_player` inspect custody and replay. Studio Engine may
 include the reviewed weather plane as an optional environment handoff,
 without claiming native engine execution, device qualification or release.
+
+## Interactive playable handoff
+
+After approving the source, `compile-playable --world-id harbor
+--expected-digest APPROVED_DIGEST` emits an offline, CSP-hashed interactive
+HTML5 choice graph with original scene prose, visible conditions, choice-specific
+weather overrides, earned endings, and restart. `verify-playable --world-id
+harbor` independently regenerates the page from approved source and compares
+both its SHA-256 receipt and exact bytes. This is a runnable browser player,
+not a claim that a native engine has been built or that a device is qualified.
+
+Weather authoring is intentionally separate from world-graph transitions:
+conditions never invent a flag, enable an unearned choice, or teleport a player.
+The optional Studio Engine recipe carries scene conditions and choice overrides
+with source digests; it fails closed on unapproved or stale weather custody.
+Node-backed regression fixtures exercise the actual browser JavaScript and
+offline editor when Node is available, while Python tests cover authorization,
+source replay, receipt tampering and the optional engine manifest.
