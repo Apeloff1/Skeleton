@@ -33,6 +33,7 @@ from .rumors import RumorStore
 from .localization import LocalizationStore
 from .accessibility import AccessibilityStore
 from .pacing import PacingStore
+from .studio_assembly import StudioAssemblyStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -50,6 +51,8 @@ TOOLS = {
     "world.assurance_preview": (),
     "world.atlas_preview": (),
     "world.relationships_player": ("slot",),
+    "world.studio_preview": (),
+    "world.studio_player": ("slot", "locale"),
     "world.pacing_preview": (),
     "world.pacing_propose_preview": ("prompt", "beats"),
     "world.pacing_player": ("slot",),
@@ -162,6 +165,11 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     elif name == "world.relationships_player":
         _id(args["slot"], "slot")
         payload = RelationshipStore(root).player(req["world_id"], args["slot"])
+    elif name == "world.studio_preview":
+        payload = StudioAssemblyStore(root).inspect(req["world_id"])
+    elif name == "world.studio_player":
+        _id(args["slot"], "slot")
+        payload = StudioAssemblyStore(root).player(req["world_id"], args["slot"], args["locale"])
     elif name == "world.pacing_propose_preview":
         payload = PacingStore(root).propose(req["world_id"], **args)
     elif name == "world.pacing_preview":
