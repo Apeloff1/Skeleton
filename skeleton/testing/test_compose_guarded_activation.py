@@ -120,6 +120,12 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             "verify_canonical_source_writer_inventory"
         )
         self.native_patch.start()
+        self.reviewer_client_patch = patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client.SignedReviewerClient",
+            FakeReviewer,
+        )
+        self.reviewer_client_patch.start()
+        self.addCleanup(self.reviewer_client_patch.stop)
         self.inventory = self.inventory_patch.start()
         self.addCleanup(self.native_patch.stop)
         self.addCleanup(self.inventory_patch.stop)
@@ -303,6 +309,20 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             self.make(reviewer_authority_id="\nunsafe")
         with self.assertRaises(ActivationBlocked):
             self.make(reviewer_authority_id="")
+
+    async def test_unsigned_verdict_client_denied_even_with_valid_challenge_signer(self):
+        # A challenge signature alone does not authenticate review verdicts.
+        # Production must use the concrete signed transport, not a local
+        # permissive callable that happens to delegate attest_challenge().
+        from skeleton.ai.runtime.inference.signed_reviewer_client import (
+            SignedReviewerClient,
+        )
+        with patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client.SignedReviewerClient",
+            SignedReviewerClient,
+        ):
+            with self.assertRaisesRegex(ActivationBlocked, "signed independent"):
+                self.make()
 
     async def test_fresh_reviewer_attestation_on_each_probe(self):
         gate = self.make()

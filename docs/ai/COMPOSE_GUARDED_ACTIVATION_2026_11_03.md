@@ -206,3 +206,14 @@ consume up to one final configured socket-read timeout beyond that deadline;
 this is a bounded denial, not proof of real reviewer uptime. Redirects,
 unsigned verdicts and stale nonces remain denied. The reviewer must be
 separately administered and audited before consumer activation.
+
+## Signed verdict and challenge must share a concrete trusted client
+
+The production activation constructor now requires the concrete
+`SignedReviewerClient`, not an arbitrary callable with an
+`attest_challenge` method. Signing a fresh activation challenge alone is
+insufficient if pre-delivery review verdicts can be fabricated locally.
+The same pinned Ed25519 trust anchor verifies the actual signed verdicts
+and the activation challenges. Unit fakes are injected only by tests;
+production reviewer service isolation and policy still require an
+independent operational audit. No guard-disabled fallback is introduced.

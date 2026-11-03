@@ -87,8 +87,12 @@ class MongoGuardedActivation:
             raise ActivationBlocked("activation must use the canonical epoch database")
         if type(backend) is not NativeTransformerModel:
             raise ActivationBlocked("exact activated native transformer required")
-        if not callable(reviewer) or reviewer is backend:
-            raise ActivationBlocked("independent reviewer must be injected by application")
+        # A signer-only challenge callback is insufficient: the pre-delivery
+        # reviewer verdict must itself use the pinned Ed25519 transport. A
+        # callable that signs challenges but approves text locally is unsafe.
+        from .signed_reviewer_client import SignedReviewerClient
+        if type(reviewer) is not SignedReviewerClient or reviewer is backend:
+            raise ActivationBlocked("signed independent reviewer client required")
         if (not isinstance(reviewer_authority_id, str)
                 or not 1 <= len(reviewer_authority_id) <= 128
                 or reviewer_authority_id != reviewer_authority_id.strip()
