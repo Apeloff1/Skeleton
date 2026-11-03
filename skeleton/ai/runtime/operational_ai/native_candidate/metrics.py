@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from .strict import number
-from .errors import deny
+
 
 
 @dataclass(frozen=True, slots=True)

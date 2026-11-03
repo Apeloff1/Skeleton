@@ -9,7 +9,7 @@ import hmac
 import sqlite3
 from threading import RLock
 
-from .strict import decode, digest, encode, identity, sha
+from .strict import decode, encode, identity, sha
 from .errors import deny
 
 GENESIS = "0" * 64

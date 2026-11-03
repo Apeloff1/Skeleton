@@ -31,7 +31,7 @@ class ResourceLimits:
             ("examples", examples, self.maximum_examples),
             ("working", estimated_working_bytes, self.maximum_memory_bytes),
         ):
-            if type(value) is not int or not 0 <= value <= bound:
+            if type(value) is not int or not 1 <= value <= bound:
                 deny("resource-" + key)
         return {"admitted": True, "working_bytes": estimated_working_bytes,
                 "model_bytes": model_bytes, "steps": steps, "examples": examples,

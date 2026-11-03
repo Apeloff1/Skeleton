@@ -10,8 +10,8 @@
     "examples": 0,
     "working_bytes": 0
   },
-  "expected_allow": true,
-  "expected_reason": "within_declared_resource_policy",
+  "expected_allow": false,
+  "expected_reason": "empty_native_resources_refused",
   "model_qualified": false,
   "release_certified": false
 }

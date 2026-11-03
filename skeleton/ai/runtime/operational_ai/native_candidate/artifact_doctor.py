@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
-from .strict import bytes_sha, sha
+from .strict import sha
 from .errors import deny
 
 

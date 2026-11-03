@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .catalog import iter_examples, verify_exact
-from .strict import digest
 from .rights import verify_rights
 from .dedup import require_unique
 from .splits import partition

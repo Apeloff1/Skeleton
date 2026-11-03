@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import sys
 
-from .catalog import DOMAINS, inventory
+from .catalog import inventory
 from .errors import CandidateRejected, deny
 from .factory import qualify_preflight, train_native
 from .plan import TrainingPlan

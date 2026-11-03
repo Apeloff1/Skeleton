@@ -7,7 +7,7 @@ from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from .candidate_receipt import CandidateReceipt
 from .checkpoint_writer import publish
 from .plan import TrainingPlan
-from .preflight import admit, TrainingAdmission
+from .preflight import admit
 from .trainer import CandidateTrainer
 from .training_proof import inspect as inspect_training
 from .process_fence import model_training_fence

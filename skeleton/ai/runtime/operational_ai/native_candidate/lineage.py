@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-from skeleton.ai.training.flgb_training_runtime import DatasetRevision, TrainingManifest, digest_json
+from skeleton.ai.training.flgb_training_runtime import DatasetRevision, TrainingManifest
 from .rights import RightsProof
 from .plan import TrainingPlan
 from .splits import Partition

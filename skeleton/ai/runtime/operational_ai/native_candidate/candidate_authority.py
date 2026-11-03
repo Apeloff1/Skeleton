@@ -1,7 +1,7 @@
 """Separation of train, independent evaluation, admission, and release roles."""
 from __future__ import annotations
 from dataclasses import dataclass
-from .strict import identity, sha
+from .strict import identity
 from .errors import deny
 
 ROLES = frozenset({"trainer", "evaluator", "release_authority", "rollback_verifier"})

@@ -4,7 +4,6 @@ from .catalog import iter_examples, verify_exact
 from .rights import verify_rights
 from .splits import partition
 from .plan import TrainingPlan
-from .strict import digest
 from .errors import deny
 
 

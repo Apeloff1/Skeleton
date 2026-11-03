@@ -6,7 +6,6 @@ No weights are silently promoted or routed into the live serving process.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import time
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime

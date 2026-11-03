@@ -6,7 +6,7 @@ checkpoint. No network, hidden third-party books, or gameplay content.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
-from .strict import digest, encode, identity, string
+from .strict import digest, identity, string
 from .errors import deny
 
 SCHEMA = "skeleton.native-candidate.example.v1"

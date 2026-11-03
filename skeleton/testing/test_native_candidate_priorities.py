@@ -9,7 +9,6 @@ from skeleton.ai.runtime.operational_ai.native_candidate.semantic_oracle import 
 )
 from skeleton.ai.runtime.operational_ai.native_candidate.records import TrainingExample
 from skeleton.ai.runtime.operational_ai.native_candidate.dedup import text_digest
-from skeleton.ai.runtime.operational_ai.native_candidate.splits import partition
 
 
 class TestPrioritiesOriginalTraining(unittest.TestCase):

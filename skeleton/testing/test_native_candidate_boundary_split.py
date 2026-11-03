@@ -1,6 +1,5 @@
 """Executable original split admission contract vectors."""
 from __future__ import annotations
-from dataclasses import replace
 import unittest
 
 from skeleton.ai.runtime.operational_ai.native_candidate.vector_catalog import read_cases

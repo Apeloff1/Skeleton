@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-from .strict import digest, encode, sha
+from .strict import digest, sha
 from .errors import deny
 
 

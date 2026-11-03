@@ -10,7 +10,7 @@ from pathlib import Path
 import stat
 
 from .errors import deny
-from .strict import bytes_sha, number
+from .strict import bytes_sha
 from .trainer import CandidateTrainingResult
 
 
@@ -51,6 +51,22 @@ def publish(result: CandidateTrainingResult, directory: Path) -> dict:
     raw = result.checkpoint_json
     if type(raw) is not bytes or not 1 <= len(raw) <= 256000000:
         deny("candidate-output-size")
+    # Independent restore proof before any external file is created.
+    from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+    if result.candidate.status != "candidate":
+        deny("candidate-state")
+    if (result.candidate.base_model_digest != result.champion_digest
+            or result.candidate.weights_digest == result.champion_digest
+            or result.checkpoint_record.weights_digest != result.candidate.weights_digest
+            or result.lineage.manifest.output_kind != "candidate-only"):
+        deny("candidate-lineage-identity")
+    try:
+        restored = NativeLLMRuntime.restore_json(raw.decode("utf-8"))
+    except (ValueError, UnicodeError, RuntimeError, TypeError):
+        deny("candidate-checkpoint-restore")
+    if (restored.model_digest != result.candidate.weights_digest
+            or restored.tokenizer.digest != result.tokenizer_digest):
+        deny("candidate-checkpoint-model-mismatch")
     digest = bytes_sha(raw)
     leaf = digest + ".native.json"
     directory.mkdir(mode=0o700, parents=False, exist_ok=True)
