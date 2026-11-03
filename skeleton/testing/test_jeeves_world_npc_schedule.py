@@ -217,3 +217,19 @@ def test_unreviewed_cast_cannot_approve_schedule():
     draft["cast_digest"] = digest(cast)
     with pytest.raises(CanonError, match="npc_schedule_cast_review_required"):
         approve_schedule(draft, world, cast, "Attempted approval.")
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor anchored custody")
+def test_offline_editor_export_and_stale_lease(tmp_path):
+    store, world, cast = store_fixture(tmp_path)
+    draft = proposal()
+    lease = store.publish("harbor", draft, create=True)
+    result = store.editor("harbor", lease)
+    assert result["schedule_digest"] == lease
+    html = (tmp_path / result["html_file"]).read_text()
+    assert "Content-Security-Policy" in html
+    assert "Export unapproved JSON" in html
+    assert "Add appointment" in html
+    assert "source-digest" in html
+    assert "script-src 'sha256-" in html
+    with pytest.raises(CanonError, match="npc_schedule_stale_edit"):
+        store.editor("harbor", "0" * 64)

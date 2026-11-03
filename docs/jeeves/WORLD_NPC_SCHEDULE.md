@@ -22,3 +22,9 @@ The `world.npc_schedule_propose_preview` and
 CLI may persist, approve and compile. Descriptor-anchored private files and
 optimistic digest leases protect source and artifact publication. Compiled
 source proof is not a native device or release certification.
+
+The `editor --expected-digest DIGEST` command publishes a CSP-hashed,
+network-disabled browser editor. Authors can add/remove appointments, load
+typed JSON, and export an unapproved source document for `save` and
+subsequent explicit `approve`. The editor never writes canonical source or
+self-approves an edit.

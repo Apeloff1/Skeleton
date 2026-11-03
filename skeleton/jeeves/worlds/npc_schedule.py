@@ -434,6 +434,29 @@ class ScheduleStore:
         strict_json(canonical(receipt))
         return receipt, html_bytes
 
+    def editor(self, world_id: str, expected_digest: str) -> dict[str, str]:
+        """Publish a CSP-bound offline authoring UI under the source lease."""
+        from .npc_schedule_editor import render_editor
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                world, cast = self._sources(fd, world_id)
+                data = self._read(fd, world_id, world, cast)
+                if digest(data) != expected_digest:
+                    raise CanonError("npc_schedule_stale_edit")
+                content = render_editor(data, world, cast)
+                name = world_id + ".npc_schedule.editor.html"
+                self.worlds._write(fd, name, content)
+                return {
+                    "html_file": name, "html_sha256": sha256(content).hexdigest(),
+                    "schedule_digest": digest(data),
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def compile(self, world_id: str, expected_digest: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:
