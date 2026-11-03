@@ -260,3 +260,56 @@ def test_session_read_and_export_fail_if_source_changes_after_laptop_proof(tmp_p
     monkeypatch.setattr(flow.sessions, "inspect", concurrent_edit)
     reject("session_world_lease_mismatch",
            lambda: flow.inspect_session("lighthouse", "raced"))
+
+
+def test_laptop_restore_preflight_is_read_only_and_source_bound(tmp_path):
+    flow, _, _, _ = ready(tmp_path)
+    first = flow.create_session("lighthouse", "saved")
+    flow.choose("lighthouse", "saved", "rescue", first["session_digest"])
+    exported = flow.export_session("lighthouse", "saved")
+    before = sorted(path.name for path in tmp_path.iterdir())
+    checked = flow.preflight_restore("lighthouse", exported)
+    assert checked["restorable"] is True
+    assert checked["scene"] == "shelter"
+    assert checked["revision"] == 1
+    assert checked["qualification"] == "verified_preview_not_persisted"
+    assert sorted(path.name for path in tmp_path.iterdir()) == before
+    assert flow.create_session("lighthouse", "restored", imported=exported)["scene"]["id"] == "shelter"
+    reject("session_already_exists", lambda: flow.create_session(
+        "lighthouse", "restored", imported=exported))
+
+
+def test_laptop_restore_preflight_rejects_forgery_and_unreviewed_source(tmp_path):
+    flow, _, _, _ = ready(tmp_path)
+    flow.create_session("lighthouse", "saved")
+    exported = flow.export_session("lighthouse", "saved")
+    forged = json.loads(json.dumps(exported))
+    forged["session"]["scene"] = "resolution"
+    reject("session_checksum_mismatch", lambda: flow.preflight_restore(
+        "lighthouse", forged))
+    world = flow.worlds.read("lighthouse")
+    changed = dict(world)
+    changed["prompt"] = world["prompt"] + " unreviewed"
+    flow.worlds.publish(changed, expected_digest=digest(world))
+    reject("review_stale_source", lambda: flow.preflight_restore(
+        "lighthouse", exported))
+
+
+def test_laptop_cli_restore_preflight_returns_actionable_error(tmp_path, capsys):
+    flow, _, _, _ = ready(tmp_path)
+    flow.create_session("lighthouse", "saved")
+    export_file = tmp_path / "saved.json"
+    export_file.write_bytes(canonical(flow.export_session("lighthouse", "saved")))
+    assert run(["--store", str(tmp_path), "session-restore-check",
+                "--world-id", "lighthouse", "--export-file", str(export_file)]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["result"]["restorable"] is True
+    assert not (tmp_path / "lighthouse.restored.session.json").exists()
+    forged = json.loads(export_file.read_text())
+    forged["session"]["scene"] = "resolution"
+    export_file.write_bytes(canonical(forged))
+    assert run(["--store", str(tmp_path), "session-restore-check",
+                "--world-id", "lighthouse", "--export-file", str(export_file)]) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["error"] == "session_checksum_mismatch"
+    assert failure["next_action"] == "reject_export_and_restore_from_trusted_copy"

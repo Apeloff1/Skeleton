@@ -288,3 +288,13 @@ class LaptopFlow:
     def export_session(self, world_id: str, slot: str) -> dict[str, Any]:
         lease = self.verify(world_id)["source_digest"]
         return self.sessions.export(world_id, slot, expected_world_digest=lease)
+
+    def preflight_restore(self, world_id: str, imported: Any) -> dict[str, Any]:
+        """Check a save against the currently approved, compiled world.
+
+        This never creates a player slot. A subsequent restore revalidates the
+        same source lease under the session writer lock and remains no-clobber.
+        """
+        lease = self.verify(world_id)["source_digest"]
+        return self.sessions.preflight_import(
+            world_id, imported, expected_world_digest=lease)

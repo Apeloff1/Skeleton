@@ -252,3 +252,26 @@ class SessionStore:
             return export_session(data, world)
         finally:
             os.close(fd)
+
+    def preflight_import(self, world_id: str, imported: Any, *,
+                         expected_world_digest: str | None = None) -> dict[str, Any]:
+        """Verify a portable save without creating a slot or approving new canon."""
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            world = self._world(fd, world_id)
+            self._require_world_lease(world, expected_world_digest)
+            data = import_session(imported, world)
+            view = player_view(data, world)
+            return {
+                "world_id": world_id,
+                "world_digest": view["world_digest"],
+                "session_digest": view["session_digest"],
+                "revision": view["revision"],
+                "scene": view["scene"]["id"],
+                "ending": view["ending"],
+                "restorable": True,
+                "qualification": "verified_preview_not_persisted",
+            }
+        finally:
+            os.close(fd)

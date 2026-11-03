@@ -25,7 +25,7 @@ def run(argv: list[str]) -> int:
     for name in ("inspect", "review", "approve-current", "compile", "verify",
                  "engine-inspect", "engine-compile", "engine-verify",
                  "session-create", "session-choose", "session-inspect",
-                 "session-export", "session-restore"):
+                 "session-export", "session-restore", "session-restore-check"):
         command = sub.add_parser(name)
         command.add_argument("--world-id", required=True)
         if name == "review":
@@ -42,11 +42,12 @@ def run(argv: list[str]) -> int:
         elif name == "compile":
             command.add_argument("--expected-digest", required=True)
         elif name.startswith("session-"):
-            command.add_argument("--slot", required=True)
+            if name != "session-restore-check":
+                command.add_argument("--slot", required=True)
             if name == "session-choose":
                 command.add_argument("--choice-id", required=True)
                 command.add_argument("--expected-session-digest", required=True)
-            if name == "session-restore":
+            if name in ("session-restore", "session-restore-check"):
                 command.add_argument("--export-file", required=True)
     args = parser.parse_args(argv)
     try:
@@ -77,6 +78,8 @@ def run(argv: list[str]) -> int:
         elif args.action == "session-restore":
             result = flow.create_session(args.world_id, args.slot,
                                          imported=_file(args.export_file))
+        elif args.action == "session-restore-check":
+            result = flow.preflight_restore(args.world_id, _file(args.export_file))
         elif args.action == "session-choose":
             result = flow.choose(args.world_id, args.slot, args.choice_id,
                                  args.expected_session_digest)
@@ -93,6 +96,9 @@ def run(argv: list[str]) -> int:
             "stale_session": "inspect_session_and_retry_with_latest_digest",
             "session_world_lease_mismatch": "reconcile_source_revision_before_restore",
             "session_checksum_mismatch": "reject_export_and_restore_from_trusted_copy",
+            "session_replay_mismatch": "reject_save_with_invalid_replay_and_use_trusted_copy",
+            "session_export_schema_mismatch": "inspect_export_schema_and_use_trusted_copy",
+            "session_already_exists": "select_an_unused_slot_without_overwriting",
             "laptop_builder_mismatch": "recompile_and_verify_from_reviewed_source",
             "laptop_html_mismatch": "recompile_and_verify_from_reviewed_source",
             "laptop_receipt_mismatch": "recompile_and_verify_from_reviewed_source",
