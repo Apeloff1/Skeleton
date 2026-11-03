@@ -249,7 +249,7 @@ def run_portable_smoke() -> dict:
             os.fsync(handle.fileno())
         if hashlib.sha256(artifact.read_bytes()).hexdigest() != metadata["sha256"]:
             raise SmokeError("portable archive changed during publication")
-        result = _smoke([sys.executable, str(artifact)], root=root, portable=True)
+        # -I excludes PYTHONPATH, user site, and current-directory imports.\n        # The portable archive must run from its own bundled source only.\n        result = _smoke([sys.executable, "-I", str(artifact)], root=root, portable=True)
     return {
         **result,
         "archive_sha256": metadata["sha256"],
