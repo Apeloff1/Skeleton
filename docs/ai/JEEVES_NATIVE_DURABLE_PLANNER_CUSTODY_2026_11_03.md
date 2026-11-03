@@ -24,6 +24,14 @@ committed a post-response checkpoint. A crash between those events leaves an
 intent row that forbids automatic replay even if the next prompt could differ
 because unpersisted working memory changed.
 
+A successful or failed terminal answer is stored as a single bound
+`jeeves_native_terminal_results` receipt **after** a terminal checkpoint.
+This record carries the exact displayed answer, outcome and usage, and is
+replayable without a second generation. A crash in the narrow gap between
+the terminal checkpoint and receipt write leaves the answer unavailable and
+must be investigated; it never licenses a new model call. Terminal replay
+verifies the checkpoint tip, payload bytes, scope and model digests.
+
 The existing cross-process `SessionGate` is held across the complete agent
 run or explicit resume, rather than only across each GGUF request. Native
 SQLite itself still owns per-request serialization and uncertain-effect fences.
@@ -42,6 +50,11 @@ python -m skeleton.jeeves.agent.native_cli \
 
 python -m skeleton.jeeves.agent.native_cli \
   --mode durable-agent --run-id jeeves_job_001 --inspect-run \
+  --model-root /approved/private/model --state-dir /approved/private/state \
+  --tenant local --subject operator --task-stdin < /approved/private/task.txt
+
+python -m skeleton.jeeves.agent.native_cli \
+  --mode durable-agent --run-id jeeves_job_001 --replay-result \
   --model-root /approved/private/model --state-dir /approved/private/state \
   --tenant local --subject operator --task-stdin < /approved/private/task.txt
 

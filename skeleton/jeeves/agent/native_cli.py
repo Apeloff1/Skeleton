@@ -49,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-id", help="Explicit principal-bound durable agent run identifier")
     parser.add_argument("--resume-run", action="store_true", help="Operator-authorized cold checkpoint resume; never automatic")
     parser.add_argument("--inspect-run", action="store_true", help="Inspect private durable checkpoint without inference")
+    parser.add_argument("--replay-result", action="store_true", help="Replay sealed terminal result without new inference")
     parser.add_argument("--source-root", type=Path)
     parser.add_argument("--signed-source-manifest", type=Path)
     parser.add_argument("--max-sources", type=int, default=4)
@@ -81,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             run_id=args.run_id,
             resume_run=args.resume_run,
             inspect_run=args.inspect_run,
+            replay_result=args.replay_result,
         )
         if args.mode == "repl":
             if args.task_stdin or args.request_id:
@@ -194,6 +196,9 @@ def main(argv: list[str] | None = None) -> int:
                 grants=grants,
                 run_id=args.run_id if args.mode == "durable-agent" else None,
             )
+            if args.mode == "durable-agent" and args.replay_result:
+                sys.stdout.write(json.dumps(run.replay_terminal(inputs), sort_keys=True, ensure_ascii=False) + "\n")
+                return 0
             if args.mode == "durable-agent" and args.inspect_run:
                 sys.stdout.write(json.dumps(run.inspect(inputs), sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
