@@ -199,3 +199,22 @@ def verify_season_board(value: Any) -> list[dict[str, Any]]:
     if rebuilt != value:
         raise HarborError("season board replay mismatch")
     return deepcopy(rebuilt["ranking"])
+
+
+def next_season_round(record: Any) -> dict[str, Any]:
+    """Return the next real playable authored course, or a completed-season receipt."""
+    summary = verify_season_record(record)
+    if summary["complete"]:
+        return {
+            "status": "complete", "next_round": summary["next_round"],
+            "total_points": summary["total_points"],
+            "record_digest": summary["record_digest"],
+            "round": None, "source": None,
+        }
+    spec = record["season"]["rounds"][summary["next_round"]]
+    return {
+        "status": "ready", "next_round": summary["next_round"],
+        "total_points": summary["total_points"],
+        "record_digest": summary["record_digest"],
+        "round": deepcopy(spec), "source": deepcopy(record["source"]),
+    }

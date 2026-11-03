@@ -168,3 +168,36 @@ def test_cli_source_to_checkpoint_append_verify_and_board(tmp_path):
     ], capture_output=True, check=False)
     assert stale.returncode == 2
     assert b"stale" in stale.stderr
+
+
+def test_fixture_driven_season_next_and_terminal_play(tmp_path):
+    world = load_source(ROOT / "harbor_lantern_quay.json")
+    season = decode((ROOT / "harbor_lantern_quay_season.json").read_bytes())
+    root = build_season(world, season, [])
+    from skeleton.game.gameplay.harbor_crafting_season import next_season_round
+    ready = next_season_round(root)
+    assert ready["status"] == "ready"
+    assert ready["round"]["id"] == "lantern_sprint"
+    record_path = tmp_path / "season-record.json"
+    record_path.write_bytes(canonical(root))
+    proc = subprocess.run(CLI + [
+        "season-next", "--season-record", str(record_path),
+    ], capture_output=True, check=False)
+    assert proc.returncode == 0, proc.stderr.decode()
+    assert decode(proc.stdout)["round"] == ready["round"]
+    from skeleton.game.gameplay.harbor_crafting_ui import scripted_demo_commands
+    live = subprocess.run(CLI + [
+        "season-live", "--season-record", str(record_path),
+    ], input=scripted_demo_commands().encode(), capture_output=True, check=False)
+    assert live.returncode == 0, live.stderr.decode() + live.stdout.decode()[-800:]
+    assert b"TRIAL finished gold" in live.stdout
+    assert b"CHECKPOINT " in live.stdout
+    first, second = games(world)
+    complete = build_season(world, season, [first, second])
+    assert next_season_round(complete)["status"] == "complete"
+    record_path.write_bytes(canonical(complete))
+    rejected = subprocess.run(CLI + [
+        "season-live", "--season-record", str(record_path),
+    ], capture_output=True, check=False)
+    assert rejected.returncode == 2
+    assert b"already complete" in rejected.stderr

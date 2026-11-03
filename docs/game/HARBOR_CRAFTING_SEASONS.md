@@ -44,3 +44,16 @@ remain the caller's responsibility. Device qualification is not claimed.
 
 Focused acceptance: `pytest -q skeleton/testing/test_harbor_crafting_season.py`.
 Full exact-head CI, security, review and release holds remain required.
+
+## Bundled playable two-round season
+
+The repository includes `skeleton/game/gameplay/fixtures/harbor_lantern_quay_season.json`.
+Initialize it with `season-init --season <fixture>`. Save the output as a
+season record, then use `season-next --season-record <record.json>` to see
+the next unlocked authored course and expected CAS digest. Run
+`season-live --season-record <record.json>` to play that round using the
+existing collision-aware terminal interface. On victory, copy the emitted
+`CHECKPOINT` JSON into a game bundle file and append it with
+`season-append` and the current record digest. Repeat for the next round.
+A completed season returns `status=complete`; attempting to play a
+completed record fails closed.
