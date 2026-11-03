@@ -146,6 +146,10 @@ class CanonicalGuardedLocalService:
             )
             if current != before:
                 raise SealedContextReplayError("canonical context changed before local inference")
+            # An epoch may be revoked while the source reader awaits Mongo.
+            # Recheck after that await, not only before it.
+            if self.activation_gate is not None:
+                await self.activation_gate.assert_active(permit)
 
         result, receipt = await self.guard.generate(
             request, snapshot=before, tenant_scope_id=tenant_scope_id,

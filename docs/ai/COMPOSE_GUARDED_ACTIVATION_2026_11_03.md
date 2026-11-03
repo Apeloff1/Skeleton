@@ -20,9 +20,9 @@ application root rather than from model output, prompts or request metadata.
 `compose_mongo_guarded_native_adapter` constructs the native backend,
 performs explicit activation, and creates the canonical guarded service with
 an activation permit. Each protected generation checks the permit before
-source reads, again immediately before physical dispatch, and again after
+source reads, both before and after the pre-dispatch authority read, and again after
 generation before returning the answer. Any changed epoch, model, tokenizer,
-reviewer-configuration boundary, Mongo authority outage or local revocation
+Mongo authority outage or local revocation
 blocks release. A stable epoch advance is NOT implicitly accepted: the
 operator must re-establish the binding and explicitly activate again.
 
