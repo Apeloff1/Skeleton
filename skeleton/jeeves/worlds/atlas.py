@@ -236,9 +236,9 @@ class AtlasStore:
     def _world(self, fd: int, world_id: str) -> dict[str, Any]:
         _id(world_id, "world_id")
         world = strict_json(self.worlds._read(fd, world_id + ".json"))
-        if world.get("id") != world_id:
-            raise CanonError("atlas_world_identity_mismatch")
         prove(world)
+        if world["id"] != world_id:
+            raise CanonError("atlas_world_identity_mismatch")
         return world
 
     def _atlas(self, fd: int, world_id: str, world: Any) -> dict[str, Any]:

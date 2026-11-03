@@ -173,3 +173,16 @@ def test_lock_and_symlink_artifact_rejected(tmp_path):
     html.symlink_to(tmp_path / "harbor.json")
     with pytest.raises((CanonError, OSError)):
         portals.verify("two_worlds")
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored custody")
+def test_malformed_world_source_is_typed_fail_closed(tmp_path):
+    source = worlds()
+    store = WorldStore(tmp_path)
+    for item in source.values():
+        store.publish(item, create=True)
+    (tmp_path / "forest.json").write_text("[]")
+    with pytest.raises(CanonError, match="expected_object"):
+        PortalStore(tmp_path).propose(
+            "two_worlds", "Original journey.", root_world="harbor",
+            from_ending="resolution", to_world="forest",
+        )

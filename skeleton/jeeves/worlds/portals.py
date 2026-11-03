@@ -317,9 +317,9 @@ class PortalStore:
         worlds: dict[str, Any] = {}
         for wid in ids:
             source = strict_json(self.worlds._read(fd, wid + ".json"))
-            if source.get("id") != wid:
-                raise CanonError("portals_world_identity_mismatch", wid)
             prove(source)
+            if source["id"] != wid:
+                raise CanonError("portals_world_identity_mismatch", wid)
             worlds[wid] = source
         return worlds
 

@@ -203,3 +203,11 @@ def test_jeeves_prompt_preview_is_read_only(tmp_path):
     assert tool["result"]["approved"] is False
     assert tool["result"]["world_digest"] == digest(source)
     assert not (tmp_path / "voyage.atlas.json").exists()
+
+@pytest.mark.skipif(os.name != "posix", reason="descriptor-anchored POSIX custody")
+def test_malformed_canonical_world_fails_as_typed_error(tmp_path):
+    source = world()
+    WorldStore(tmp_path).publish(source, create=True)
+    (tmp_path / "voyage.json").write_text("[]")
+    with pytest.raises(CanonError, match="expected_object"):
+        AtlasStore(tmp_path).propose("voyage", "Map the coast.")
