@@ -50,3 +50,7 @@ to revalidate the exported request against the latest canonical source and
 save the returned typed proposal for explicit review. Only the separate
 `publish` action can create a native session. The browser has no custody
 write access, and all edits are revalidated by Python before publication.
+
+The visual editor bounds its replay revision inventory to 128 saved
+choices. Longer native saves remain valid and playable, but the offline
+editor fails closed instead of constructing an unbounded browser payload.

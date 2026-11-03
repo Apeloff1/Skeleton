@@ -70,6 +70,8 @@ refresh();
 def render_fork_editor(world: Any, parent: Any, parent_slot: str) -> bytes:
     prove(world)
     validate_session(parent, world)
+    if len(parent["choices"]) > 128:
+        raise CanonError("fork_editor_revision_budget")
     revisions = []
     for revision in range(len(parent["choices"]) + 1):
         seed = _source_session(world, parent["choices"][:revision])

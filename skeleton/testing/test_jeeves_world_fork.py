@@ -283,3 +283,22 @@ def test_editor_request_to_cli_preview_then_reviewed_publish(tmp_path, capsys):
     assert run(["--store", str(tmp_path), "preview-file",
                 "--request-file", str(request_path)]) == 2
     assert json.loads(capsys.readouterr().out.splitlines()[-1])["ok"] is False
+
+
+def test_editor_revision_budget_fails_closed():
+    source = world()
+    # A forged long history must fail native replay before rendering an editor.
+    parent = new_session(source)
+    parent["choices"] = ["sail"] * 129
+    with pytest.raises(CanonError):
+        render_fork_editor(source, parent, "primary")
+
+
+def test_editor_embedded_json_escapes_html_payload():
+    source = world()
+    source["scenes"][0]["narrative"] = "</script><img src=x onerror=alert(1)>"
+    prove(source)
+    parent = new_session(source)
+    page = render_fork_editor(source, parent, "primary")
+    assert b"<img src=x" not in page
+    assert b"Content-Security-Policy" in page
