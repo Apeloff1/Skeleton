@@ -32,8 +32,9 @@ def accept_beacon_play(play: Any) -> dict[str, Any]:
     if (not state["rescued"] or not canonical_state["delivered"]
             or canonical_state["ending"] != "beacon"):
         raise HarborError("beacon original-game acceptance not earned")
-    if state["signaled"] != [item["id"] for item in board["beacons"]]:
-        raise HarborError("beacon original-game signal order invalid")
+    if (len(state["signaled"]) != len(board["beacons"])
+            or set(state["signaled"]) != {item["id"] for item in board["beacons"]}):
+        raise HarborError("beacon original-game signal set invalid")
     if not report["events"]:
         raise HarborError("beacon original-game event chain missing")
     proof = {

@@ -86,3 +86,29 @@ def test_acceptance_cli_round_trip_and_rejection(tmp_path):
         capture_output=True, check=False,
     )
     assert rejected.returncode == 2
+
+
+def test_independent_beacons_accept_actual_earned_signal_order():
+    source, board = source_board()
+    board = deepcopy(board)
+    board["beacons"][1]["requires"] = []
+    demo = winning_actions()
+    # The dock signal is earned first; then the player returns to the canal.
+    actions = (
+        demo[:12]
+        + [{"op": "move", "direction": "east"}] * 4
+        + [{"op": "repair", "beacon": "dock_light"},
+           {"op": "signal", "beacon": "dock_light"}]
+        + [{"op": "move", "direction": "west"}] * 4
+        + [{"op": "repair", "beacon": "canal_light"},
+           {"op": "signal", "beacon": "canal_light"}]
+        + [{"op": "move", "direction": "east"}] * 4
+        + [{"op": "deliver"}, {"op": "rescue"}]
+    )
+    play = play_beacon_package(
+        build_beacon_package("lantern-alternate-beacons", source, board),
+        actions, require_rescue=True,
+    )
+    certificate = accept_beacon_play(play)
+    assert certificate["proof"]["ordered_signals"] == ["dock_light", "canal_light"]
+    assert verify_beacon_acceptance(play, certificate)["verified"]
