@@ -26,6 +26,7 @@ class LiveReplicaEpochTests(unittest.IsolatedAsyncioTestCase):
         if len(uri) > 8192:
             self.skipTest("invalid live test Mongo configuration")
         from motor.motor_asyncio import AsyncIOMotorClient
+        from pymongo.write_concern import WriteConcern
         self.client = AsyncIOMotorClient(
             uri, serverSelectionTimeoutMS=3000, connectTimeoutMS=3000,
             socketTimeoutMS=3000, retryWrites=False, retryReads=False,
@@ -33,15 +34,22 @@ class LiveReplicaEpochTests(unittest.IsolatedAsyncioTestCase):
         )
         self.database_name = "skeleton_ci_guard_" + uuid4().hex
         self.database = self.client[self.database_name]
+        self.payloads = self.database.get_collection(
+            "test_payload", write_concern=WriteConcern(w="majority", wtimeout=10000),
+        )
         try:
             async with asyncio.timeout(5):
                 hello = await self.database.command("hello")
             if (type(hello) is not dict
                     or not hello.get("setName")
                     or hello.get("isWritablePrimary") is not True):
+                self.client.close()
+                self.client = None
                 self.skipTest("authenticated replica-set primary not available")
         except Exception:
-            self.client.close()
+            if self.client is not None:
+                self.client.close()
+                self.client = None
             self.skipTest("authenticated test replica-set primary unavailable")
 
         self.migration_calls = 0
@@ -104,7 +112,7 @@ class LiveReplicaEpochTests(unittest.IsolatedAsyncioTestCase):
         async with self.epoch.writer(**self.scope):
             with self.assertRaises(MongoSourceEpochError):
                 await self.read()
-            await self.database.get_collection("test_payload").insert_one(
+            await self.payloads.insert_one(
                 {"_id": "written", "value": 1}
             )
         self.assertEqual(await self.read(), 4)
@@ -135,7 +143,7 @@ class LiveReplicaEpochTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_writer_remains_quarantined_across_restart(self):
         with self.assertRaisesRegex(RuntimeError, "simulated crash"):
             async with self.epoch.writer(**self.scope):
-                await self.database.get_collection("test_payload").insert_one(
+                await self.payloads.insert_one(
                     {"_id": "partial", "value": 1}
                 )
                 raise RuntimeError("simulated crash")
