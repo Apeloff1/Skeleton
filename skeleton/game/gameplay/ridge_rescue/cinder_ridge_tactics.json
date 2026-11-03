@@ -1,0 +1,8 @@
+{
+  "schema": "ridge.rescue.tactics.v1",
+  "title": "Cinder Ridge Field Rescue Priorities",
+  "objective": "protect",
+  "risk": 15,
+  "prefer_crafting": true,
+  "max_steps": 72
+}
