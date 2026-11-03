@@ -325,20 +325,35 @@ def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
     path = Path(raw).expanduser()
     if not path.is_absolute():
         path = root / path
-    if path.is_symlink():
+    # Never chmod an existing model mount: it may contain operator-private
+    # weights or metadata. The previous unconditional chmod(0o755) silently
+    # widened a pre-existing 0700 directory to world-readable on POSIX.
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        before = None
+    if before is not None and not stat.S_ISDIR(before.st_mode):
         raise ValueError("SKELETON_LOCAL_MODEL_DIR must name a real directory, not a symbolic link")
     created = False
+    if before is None:
+        try:
+            path.mkdir(parents=True, mode=0o755, exist_ok=False)
+            created = True
+        except FileExistsError:
+            # Another process may have created the path; verify it below.
+            pass
+        except OSError:
+            raise ValueError(
+                "Cannot prepare SKELETON_LOCAL_MODEL_DIR; choose an operator-owned directory and check parent permissions"
+            ) from None
     try:
-        path.mkdir(parents=True, mode=0o755)
-        path.chmod(0o755)
-        created = True
-    except FileExistsError:
-        if not path.is_dir():
-            raise ValueError("SKELETON_LOCAL_MODEL_DIR exists but is not a directory") from None
+        after = path.lstat()
     except OSError:
-        raise ValueError(
-            "Cannot prepare SKELETON_LOCAL_MODEL_DIR; choose an operator-owned directory and check parent permissions"
-        ) from None
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR disappeared during setup") from None
+    if not stat.S_ISDIR(after.st_mode):
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR must name a real directory, not a symbolic link")
+    if before is not None and (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR identity changed during setup")
     try:
         empty = next(path.iterdir(), None) is None
     except OSError:

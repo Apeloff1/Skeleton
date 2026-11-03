@@ -17,6 +17,7 @@ import pytest
 from skeleton.app.setup_runtime import (
     _MAX_ENV_BYTES,
     _setup_process_lock,
+    _prepare_model_directory,
     ensure_runtime_environment,
 )
 
@@ -354,3 +355,45 @@ def test_admin_password_hardlink_alias_is_rejected(tmp_path):
         )
     assert original.read_text(encoding="utf-8") == "strong-password-value-1234"
     assert not (root / ".env").exists()
+
+
+def test_model_mount_preserves_existing_private_mode_and_contents(tmp_path, monkeypatch):
+    if os.name == "nt":
+        pytest.skip("POSIX permission preservation is not Windows ACL qualification")
+    root = _root(tmp_path)
+    mount = root / "private-models"
+    mount.mkdir(mode=0o700)
+    mount.chmod(0o700)
+    marker = mount / "private-weight.bin"
+    marker.write_bytes(b"private-model-bytes")
+    monkeypatch.setenv("SKELETON_LOCAL_MODEL_DIR", str(mount))
+    assert _prepare_model_directory(root, {}) is False
+    assert stat.S_IMODE(mount.stat().st_mode) == 0o700
+    assert marker.read_bytes() == b"private-model-bytes"
+    ensure_runtime_environment(root)
+    assert stat.S_IMODE(mount.stat().st_mode) == 0o700
+    assert marker.read_bytes() == b"private-model-bytes"
+
+
+def test_model_mount_new_directory_is_only_reported_once(tmp_path, monkeypatch):
+    root = _root(tmp_path)
+    mount = root / "new-models"
+    monkeypatch.setenv("SKELETON_LOCAL_MODEL_DIR", str(mount))
+    assert _prepare_model_directory(root, {}) is True
+    assert mount.is_dir()
+    assert _prepare_model_directory(root, {}) is False
+
+
+def test_model_mount_symlink_cannot_chmod_target(tmp_path, monkeypatch):
+    if os.name == "nt":
+        pytest.skip("POSIX symlink and mode custody contract")
+    root = _root(tmp_path)
+    target = root / "private-target-models"
+    target.mkdir(mode=0o700)
+    target.chmod(0o700)
+    link = root / "linked-models"
+    link.symlink_to(target, target_is_directory=True)
+    monkeypatch.setenv("SKELETON_LOCAL_MODEL_DIR", str(link))
+    with pytest.raises(ValueError, match="real directory"):
+        _prepare_model_directory(root, {})
+    assert stat.S_IMODE(target.stat().st_mode) == 0o700
