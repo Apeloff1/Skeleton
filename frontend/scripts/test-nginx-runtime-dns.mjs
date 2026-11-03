@@ -131,7 +131,7 @@ http {
       const setup = await request('/setup');
       assert.equal(setup.status, 200);
       assertHeaders(setup);
-      assert.equal(setup.headers.get('cache-control'), 'no-cache');
+      assert.equal(setup.headers.get('cache-control'), 'no-store');
       assert.match(await setup.text(), /<!doctype html>/i);
       for (const path of ['/api/dns-probe?phase=missing', '/api/v1/models?phase=missing']) {
         const response = await request(path);

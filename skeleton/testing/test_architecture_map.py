@@ -455,7 +455,7 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "execution_hosts": 4,
         "execution_profiles": 10,
         "plane_execution": 27,
-        "startup_groups": 4,
+        "startup_groups": 3,
         "shutdown_groups": 4,
     }
 
