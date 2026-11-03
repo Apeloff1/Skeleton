@@ -52,6 +52,7 @@ def validate_dialogue_board(board: Any, source: Any) -> dict[str, Any]:
         ids.add(name)
         requires = node["requires"]
         if (not isinstance(requires, list) or len(requires) > 8
+                or any(type(flag) is not str for flag in requires)
                 or len(set(requires)) != len(requires)):
             raise HarborError("invalid dialogue prerequisites")
         for flag in requires:
