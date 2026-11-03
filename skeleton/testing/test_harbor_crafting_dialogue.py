@@ -177,3 +177,19 @@ def test_cli_actual_dialogue_gameplay_replay_and_editor(tmp_path):
         capture_output=True, check=False,
     )
     assert denied.returncode == 2 and not denied.stdout
+
+
+def test_circular_prerequisites_and_unreachable_trust_are_denied():
+    source, board = source_board()
+    circular = deepcopy(board)
+    circular["nodes"][0]["requires"] = ["dock_pass"]
+    with pytest.raises(HarborError, match="unreachable"):
+        validate_dialogue_board(circular, source)
+    impossible = deepcopy(board)
+    impossible["nodes"][0]["min_trust"] = 10
+    with pytest.raises(HarborError, match="unreachable"):
+        validate_dialogue_board(impossible, source)
+    malformed = deepcopy(board)
+    malformed["nodes"][0]["requires"] = [["dock_pass"]]
+    with pytest.raises(HarborError, match="invalid dialogue prerequisites"):
+        validate_dialogue_board(malformed, source)

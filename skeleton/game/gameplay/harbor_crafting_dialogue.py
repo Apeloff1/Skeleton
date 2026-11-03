@@ -8,6 +8,7 @@ flags and legal delivery consequences.
 from __future__ import annotations
 
 from copy import deepcopy
+from collections import deque
 from typing import Any
 
 from .harbor_crafting import (
@@ -74,6 +75,34 @@ def validate_dialogue_board(board: Any, source: Any) -> dict[str, Any]:
         raise HarborError("dialogue delivery permit cannot be earned")
     if any(flag not in granted for node in nodes for flag in node["requires"]):
         raise HarborError("unobtainable dialogue prerequisite")
+    # Prove a legal finite choice sequence can actually earn the dock permit.
+    # Flag-name membership alone would accept circular prerequisites.
+    queue = deque([(0, 0, frozenset())])
+    visited = {(0, 0, frozenset())}
+    reachable = False
+    while queue:
+        mask, trust, flags = queue.popleft()
+        if required in flags:
+            reachable = True
+            break
+        for index, node in enumerate(nodes):
+            if mask & (1 << index) or trust < node["min_trust"]:
+                continue
+            if any(flag not in flags for flag in node["requires"]):
+                continue
+            for choice in node["choices"]:
+                next_trust = trust + choice["trust_delta"]
+                if not -20 <= next_trust <= 20:
+                    continue
+                next_flags = flags | {choice["grant_flag"]}
+                state = (mask | (1 << index), next_trust, frozenset(next_flags))
+                if state not in visited:
+                    if len(visited) >= 4096:
+                        raise HarborError("dialogue reachability budget exceeded")
+                    visited.add(state)
+                    queue.append(state)
+    if not reachable:
+        raise HarborError("dialogue delivery permit is unreachable")
     return deepcopy(board)
 
 
