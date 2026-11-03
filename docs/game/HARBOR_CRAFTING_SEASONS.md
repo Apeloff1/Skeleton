@@ -57,3 +57,12 @@ existing collision-aware terminal interface. On victory, copy the emitted
 `season-append` and the current record digest. Repeat for the next round.
 A completed season returns `status=complete`; attempting to play a
 completed record fails closed.
+
+## Choice consequences across the bundled season
+
+The original authored fixture requires `signal` for round one and
+`shelter` for round two. Both require real delivery and a legal
+player choice. A round-one replay cannot be reused in round two:
+the second course independently checks the earned `safe_harbor`
+ending. A different ending is a valid standalone game outcome but
+**does not** earn the second championship result.
