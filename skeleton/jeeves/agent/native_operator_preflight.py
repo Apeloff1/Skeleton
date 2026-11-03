@@ -32,6 +32,9 @@ class OperatorAdmission:
     max_steps: int
     max_model_calls: int
     max_wall_seconds: float
+    run_id: str | None = None
+    resume_run: bool = False
+    inspect_run: bool = False
 
     @property
     def source_material_enabled(self) -> bool:
@@ -46,6 +49,9 @@ class OperatorAdmission:
         return {
             "schema": "jeeves.native_operator_admission.v1",
             "mode": self.mode,
+            "durable_checkpoint_lane": self.mode == "durable-agent",
+            "operator_resume_requested": self.resume_run,
+            "read_only_inspection": self.inspect_run,
             "may_activate_native": True,
             "signed_source_required": self.source_material_enabled,
             "explicit_readonly_source_tool": self.enable_source_tool,
@@ -72,19 +78,33 @@ def check_operator_admission(
     max_steps: int,
     max_model_calls: int,
     max_wall_seconds: int | float,
+    run_id: str | None = None,
+    resume_run: bool = False,
+    inspect_run: bool = False,
 ) -> OperatorAdmission:
     """Reject structurally unsound operator input before model startup."""
-    if type(mode) is not str or mode not in ("agent", "chat", "repl"):
+    if type(mode) is not str or mode not in ("agent", "chat", "repl", "durable-agent"):
         raise NativeOperatorHold("unsupported Jeeves operator mode")
-    if type(task_stdin) is not bool or type(enable_source_tool) is not bool:
+    if (type(task_stdin) is not bool or type(enable_source_tool) is not bool
+            or type(resume_run) is not bool or type(inspect_run) is not bool):
         raise NativeOperatorHold("explicit boolean operator flags required")
     if mode == "repl":
         if task_stdin or request_id is not None:
             raise NativeOperatorHold("interactive REPL cannot accept one-shot options")
     elif not task_stdin:
         raise NativeOperatorHold("one-shot Jeeves requires bounded task stdin")
-    if mode == "agent" and (session is not None or request_id is not None):
+    if mode in ("agent", "durable-agent") and (session is not None or request_id is not None):
         raise NativeOperatorHold("agent mode cannot borrow chat session or request identities")
+    if mode == "durable-agent":
+        if run_id is None:
+            raise NativeOperatorHold("explicit run ID required for durable Jeeves")
+        identifier(run_id, "run ID")
+        if resume_run and inspect_run:
+            raise NativeOperatorHold("inspect and resume must be separate operations")
+        if enable_source_tool or source_root is not None or signed_source_manifest is not None:
+            raise NativeOperatorHold("durable lane is reasoning-only until tool recovery qualification")
+    elif run_id is not None or resume_run or inspect_run:
+        raise NativeOperatorHold("durable run options require durable-agent mode")
     if session is not None:
         identifier(session, "session")
     if request_id is not None:
@@ -126,6 +146,9 @@ def check_operator_admission(
         max_steps=max_steps,
         max_model_calls=max_model_calls,
         max_wall_seconds=float(max_wall_seconds),
+        run_id=run_id,
+        resume_run=resume_run,
+        inspect_run=inspect_run,
     )
 
 

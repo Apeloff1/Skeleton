@@ -45,7 +45,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-layers", type=int, default=0)
     parser.add_argument("--capacity-root", type=Path)
     parser.add_argument("--capacity-budget-bytes", type=int, default=8000000000)
-    parser.add_argument("--mode", choices=("chat", "agent", "repl"), default="agent")
+    parser.add_argument("--mode", choices=("chat", "agent", "repl", "durable-agent"), default="agent")
+    parser.add_argument("--run-id", help="Explicit principal-bound durable agent run identifier")
+    parser.add_argument("--resume-run", action="store_true", help="Operator-authorized cold checkpoint resume; never automatic")
+    parser.add_argument("--inspect-run", action="store_true", help="Inspect private durable checkpoint without inference")
     parser.add_argument("--source-root", type=Path)
     parser.add_argument("--signed-source-manifest", type=Path)
     parser.add_argument("--max-sources", type=int, default=4)
@@ -75,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
             max_steps=args.max_steps,
             max_model_calls=args.max_model_calls,
             max_wall_seconds=args.max_wall_seconds,
+            run_id=args.run_id,
+            resume_run=args.resume_run,
+            inspect_run=args.inspect_run,
         )
         if args.mode == "repl":
             if args.task_stdin or args.request_id:
@@ -157,9 +163,13 @@ def main(argv: list[str] | None = None) -> int:
                     worker.spine.identity,
                 ).install(registry)
                 grants = (readonly_source_grant(maximum_calls=3),)
-            run = NativeJeevesRuntime(worker, tools=registry)
+            if args.mode == "durable-agent":
+                from .native_durable_runtime import NativeDurableJeevesAgent
+                run = NativeDurableJeevesAgent(worker)
+            else:
+                run = NativeJeevesRuntime(worker, tools=registry)
             digest = sha256(task.encode("utf-8")).hexdigest()
-            result = run.run(RunInputs(
+            inputs = RunInputs(
                 goal=Goal(
                     goal_id="jeeves_native_" + digest[:24],
                     objective=task,
@@ -182,7 +192,15 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 preferred_provider="jeeves_native",
                 grants=grants,
-            ))
+                run_id=args.run_id if args.mode == "durable-agent" else None,
+            )
+            if args.mode == "durable-agent" and args.inspect_run:
+                sys.stdout.write(json.dumps(run.inspect(inputs), sort_keys=True, ensure_ascii=False) + "\n")
+                return 0
+            if args.mode == "durable-agent" and args.resume_run:
+                result = run.resume_operator_approved(inputs)
+            else:
+                result = run.run(inputs)
             record = {
                 "schema": "jeeves.native_operator_turn.v1",
                 "status": "verified-agent-response" if result.success else "held",
