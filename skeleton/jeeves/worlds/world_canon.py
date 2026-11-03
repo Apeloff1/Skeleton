@@ -10,6 +10,7 @@ from collections import deque
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -51,14 +52,26 @@ def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return out
 
 
+def _finite_json_float(token: str) -> float:
+    """Reject JSON exponent overflow before it can bypass typed validation."""
+    value = float(token)
+    if not math.isfinite(value):
+        raise CanonError("nonfinite_number")
+    return value
+
+
 def strict_json(raw: bytes) -> Any:
     if len(raw) > MAX_SOURCE_BYTES:
         raise CanonError("source_too_large")
     try:
         return json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
+                          parse_float=_finite_json_float,
                           parse_constant=lambda _: (_ for _ in ()).throw(
                               CanonError("nonfinite_number")))
-    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+    except CanonError:
+        raise
+    except (UnicodeError, json.JSONDecodeError, RecursionError,
+            ValueError, OverflowError) as exc:
         raise CanonError("invalid_json") from exc
 
 
