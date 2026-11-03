@@ -1,0 +1,270 @@
+{
+  "schema": "ridge.rescue.routebook.v1",
+  "id": "cinder-ridge-field-routes",
+  "title": "Cinder Ridge Field Routes",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge - First Evacuation",
+    "rows": [
+      ".....",
+      ".....",
+      ".....",
+      ".....",
+      "....."
+    ],
+    "start": [
+      0,
+      0
+    ],
+    "shelter": [
+      2,
+      2
+    ],
+    "civilians": [
+      {
+        "id": "tavi",
+        "at": [
+          1,
+          0
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [
+      {
+        "id": "kindling",
+        "kind": "wood",
+        "at": [
+          0,
+          1
+        ],
+        "count": 1
+      },
+      {
+        "id": "ridge_ore",
+        "kind": "ore",
+        "at": [
+          1,
+          1
+        ],
+        "count": 2
+      }
+    ],
+    "max_turns": 32
+  },
+  "tracks": [
+    {
+      "id": "protect-route",
+      "title": "Shelter the survivors under a signal beacon",
+      "ending": "protect",
+      "steps": [
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "rescue",
+            "target": "tavi"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "gather",
+            "target": "kindling"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "east"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "gather",
+            "target": "ridge_ore"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "gather",
+            "target": "ridge_ore"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "craft",
+            "item": "signal"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "east"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "south"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "south"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "signal"
+          }
+        },
+        {
+          "guard": {
+            "kind": "rescued",
+            "value": "tavi"
+          },
+          "action": {
+            "verb": "evacuate",
+            "choice": "protect"
+          }
+        }
+      ]
+    },
+    {
+      "id": "salvage-route",
+      "title": "Evacuate the survivors and salvage the ridge",
+      "ending": "salvage",
+      "steps": [
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "rescue",
+            "target": "tavi"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "gather",
+            "target": "kindling"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "east"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "gather",
+            "target": "ridge_ore"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "gather",
+            "target": "ridge_ore"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "east"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "south"
+          }
+        },
+        {
+          "guard": {
+            "kind": "always",
+            "value": true
+          },
+          "action": {
+            "verb": "move",
+            "direction": "south"
+          }
+        },
+        {
+          "guard": {
+            "kind": "rescued",
+            "value": "tavi"
+          },
+          "action": {
+            "verb": "evacuate",
+            "choice": "salvage"
+          }
+        }
+      ]
+    }
+  ]
+}
