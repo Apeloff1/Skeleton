@@ -53,3 +53,20 @@ def test_changelog_rejects_unbounded_change_stream():
     with pytest.raises(DeliveryError, match="change count exceeds"):
         render("1.0.0", repeat(_c("fix: valid"), MAX_CHANGELOG_CHANGES + 1),
                date="2026-10-31")
+
+
+def test_changelog_rejects_forged_heading_and_direct_control_subjects():
+    import pytest
+    from skeleton.ai.build.core.delivery import changelog as mirrored
+    from skeleton.build.delivery._util import DeliveryError
+    from skeleton.build.delivery.changelog import Change
+
+    for render_fn in (render, mirrored.render):
+        with pytest.raises(DeliveryError):
+            render_fn("1.0.0\n# forged", [], date="2026-10-31")
+        with pytest.raises(DeliveryError, match="subject or scope"):
+            render_fn("1.0.0", [Change("abcdef1234", "feat", None,
+                                       "safe\n# injected", False)], date="2026-10-31")
+        with pytest.raises(DeliveryError, match="subject or scope"):
+            render_fn("1.0.0", [Change("abcdef1234", "feat", None,
+                                       "x" * 513, False)], date="2026-10-31")

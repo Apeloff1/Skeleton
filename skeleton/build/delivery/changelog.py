@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date as calendar_date
 from itertools import islice
 from dataclasses import dataclass
@@ -86,6 +87,12 @@ def group(changes: Iterable[Change]) -> dict[str, list[Change]]:
 
 
 def render(version: Version | str, changes: Iterable[Change], *, date: str) -> str:
+    if type(version) is str:
+        version_text = str(Version.parse(version))
+    elif type(version) is Version:
+        version_text = str(version)
+    else:
+        raise DeliveryError("invalid changelog version")
     if not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
         raise DeliveryError("date must be YYYY-MM-DD")
     try:
@@ -98,8 +105,17 @@ def render(version: Version | str, changes: Iterable[Change], *, date: str) -> s
     if any(not isinstance(c, Change) or not isinstance(c.sha, str)
            or not re.fullmatch(r"[0-9a-f]{7,40}", c.sha) for c in bounded):
         raise DeliveryError("invalid changelog commit evidence")
+    for change in bounded:
+        if (type(change.subject) is not str or not 1 <= len(change.subject) <= 512
+                or type(change.type) is not str or not re.fullmatch(r"[a-z]{1,32}", change.type)
+                or type(change.breaking) is not bool
+                or (change.scope is not None and
+                    (type(change.scope) is not str or not 1 <= len(change.scope) <= 64))
+                or any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"}
+                       for ch in change.subject + (change.scope or ""))):
+            raise DeliveryError("invalid changelog subject or scope evidence")
     grouped = group(bounded)
-    lines = [f"## {version} ({date})", ""]
+    lines = [f"## {version_text} ({date})", ""]
     for key, title in SECTIONS:
         items = grouped[key]
         if not items:
