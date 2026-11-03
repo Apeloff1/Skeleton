@@ -10,7 +10,7 @@ from typing import Any
 
 from .bundle import _artifact_read
 from .cast import CastStore, validate_cast
-from .session import SessionStore, replay_choices
+from .session import SessionStore, replay_choices, validate_session
 from .world_canon import CanonError, _id, _keys, _list, _text, canonical, digest, prove, strict_json
 
 SCHEMA = "jeeves.world.relationships.v1"
@@ -346,7 +346,10 @@ class RelationshipStore:
             data = self._read(fd, world_id, world, cast)
             if not data["approved"] or not cast["approved"]:
                 raise CanonError("relationships_review_required")
-            session = SessionStore(self.worlds.root)._session(fd, world_id, slot, world)
+            session = validate_session(
+                strict_json(self.worlds._read(fd, SessionStore._name(world_id, slot))),
+                world,
+            )
             result = evaluate_relationships(data, world, cast, session["choices"])
             return {"session_digest": digest(session), "slot": slot,
                     "revision": session["revision"], "player": result}
