@@ -44,3 +44,20 @@ def test_cli_json_rejects_nonfinite_number(tmp_path):
     path.write_text('{"count":1e9999}', encoding="utf-8")
     with pytest.raises(CanonError):
         _file(str(path))
+
+
+def test_cli_json_rejects_fifo_without_waiting_for_writer(tmp_path):
+    if not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"):
+        pytest.skip("POSIX FIFO/nonblocking open unavailable")
+    pipe = tmp_path / "untrusted.json"
+    os.mkfifo(pipe)
+    with pytest.raises(CanonError) as error:
+        _file(str(pipe))
+    assert error.value.code == "input_not_regular"
+
+
+def test_cli_json_rejects_empty_regular_file(tmp_path):
+    path = tmp_path / "empty.json"
+    path.touch()
+    with pytest.raises(CanonError):
+        _file(str(path))
