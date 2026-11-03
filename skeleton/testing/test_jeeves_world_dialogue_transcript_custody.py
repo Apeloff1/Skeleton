@@ -54,7 +54,16 @@ def test_resume_and_atomic_commit_with_receipt(tmp_path):
     assert receipt["world_choice"] == "pursue_goal"
     assert session.read("harbor", "saveone")["choices"] == ["pursue_goal"]
     assert store.verify_receipt("harbor", "saveone") == receipt
-    with pytest.raises(CanonError, match="dialogue_transcript_stale_source"):
+    receipt_path = tmp_path / "harbor.saveone.dialogue.transcript.receipt.json"
+    saved = receipt_path.read_text()
+    forged = json.loads(saved)
+    forged["chain_head"] = "0" * 64
+    receipt_path.write_text(json.dumps(forged))
+    with pytest.raises(CanonError, match="dialogue_transcript_receipt_chain_mismatch"):
+        store.verify_receipt("harbor", "saveone")
+    receipt_path.write_text(saved)
+    assert store.verify_receipt("harbor", "saveone") == receipt
+    with pytest.raises(CanonError, match="not_found"):
         store.inspect("harbor", "saveone")
 
 

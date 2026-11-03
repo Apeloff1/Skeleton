@@ -68,5 +68,5 @@ def test_editor_and_stale_dialogue_source(tmp_path):
     changed = copy.deepcopy(cast)
     changed["lines"][0]["text"] = "Revised original cast."
     CastStore(tmp_path).publish("harbor", changed, expected_digest=digest(cast))
-    with pytest.raises(CanonError, match="dialogue_locale_source_lease_mismatch"):
+    with pytest.raises(CanonError, match="dialogue_source_lease_mismatch"):
         store.inspect("harbor")
