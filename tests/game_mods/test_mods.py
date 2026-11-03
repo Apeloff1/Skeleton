@@ -179,3 +179,20 @@ def test_version_specs_reject_empty_or_alternatives(bad):
 def test_semver_rejects_noncanonical_prerelease_identifiers(bad):
     with pytest.raises(ModError, match="invalid semver"):
         SemVer.parse(bad)
+
+
+def test_hook_validation_cannot_be_bypassed_by_mutating_caller_owned_ops():
+    """Directly constructed hooks must execute the validated op snapshot."""
+    m = mm("scoped", permissions=("add_content",), targets=("levels",))
+    original = {"op": "append", "path": "levels",
+                "value": [{"id": "safe", "name": "Safe"}]}
+    h = DeclarativeHook(m, (original,))
+    # A frozen dataclass does not freeze the mutable mappings passed into it.
+    original["op"] = "remove"
+    original["path"] = "player.hp"
+    original["value"][0]["id"] = "tampered"
+    assert h.override_keys(PLAN) == set()
+    result = apply_mods(PLAN, resolve_load_order([m]), {"scoped": h})
+    assert result["levels"][-1] == {"id": "safe", "name": "Safe"}
+    assert result["player"]["hp"] == 10
+    assert PLAN["levels"][-1]["id"] == "gate"

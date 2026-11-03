@@ -18,7 +18,7 @@ import copy
 import json
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from skeleton.gameforge.batch_b09x._helpers import ContractError
@@ -124,13 +124,20 @@ class DeclarativeHook:
 
     manifest: ModManifest
     ops: tuple[Mapping[str, Any], ...]
+    _sealed_ops: tuple[str, ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.ops, tuple) or len(self.ops) > MAX_OPS:
             raise HookError("ops must be a tuple within limit")
         perms = set(self.manifest.permissions)
-        for op in self.ops:
-            if not isinstance(op, Mapping) or op.get("op") not in OVERRIDE_OPS | EXTEND_OPS:
+        sealed: list[str] = []
+        for original in self.ops:
+            if not isinstance(original, Mapping):
+                raise HookError(f"unknown hook op {original!r}"[:200])
+            # Validate a detached JSON snapshot, not caller-owned mutable data.
+            # Once accepted, subsequent edits cannot change permissions or paths.
+            op = _json_value(dict(original))
+            if op.get("op") not in OVERRIDE_OPS | EXTEND_OPS:
                 raise HookError(f"unknown hook op {op!r}"[:200])
             need = "override_content" if op["op"] in OVERRIDE_OPS else "add_content"
             if need not in perms:
@@ -150,6 +157,8 @@ class DeclarativeHook:
                     v = op.get(k, 1 if k == "factor" else None)
                     if v is not None and (isinstance(v, bool) or not isinstance(v, int | float) or not math.isfinite(v)):
                         raise HookError(f"scale {k} must be a finite number")
+            sealed.append(json.dumps(op, sort_keys=True, separators=(",", ":"), allow_nan=False))
+        object.__setattr__(self, "_sealed_ops", tuple(sealed))
 
     @classmethod
     def from_list(cls, manifest: ModManifest, ops: Any) -> DeclarativeHook:
@@ -158,11 +167,13 @@ class DeclarativeHook:
         return cls(manifest, tuple(_json_value(o) for o in ops))
 
     def override_keys(self, plan: Any) -> set[str]:
-        return {_canonical(plan, parse_path(o["path"])) for o in self.ops if o["op"] in OVERRIDE_OPS}
+        return {_canonical(plan, parse_path(o["path"])) for o in (json.loads(raw) for raw in self._sealed_ops)
+                if o["op"] in OVERRIDE_OPS}
 
     def apply(self, payload: dict[str, Any]) -> dict[str, Any]:
         plan = copy.deepcopy(payload["plan"])
-        for op in self.ops:
+        for raw in self._sealed_ops:
+            op = json.loads(raw)
             segs, path = parse_path(op["path"]), op["path"]
             parent = plan
             for seg in segs[:-1]:
