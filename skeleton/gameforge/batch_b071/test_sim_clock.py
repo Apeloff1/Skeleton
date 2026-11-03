@@ -62,3 +62,45 @@ def test_context_hash_deterministic():
         ctx.scheduler.run_until(10)
         return ctx.state_hash()
     assert run() == run()
+
+
+def test_scheduler_zero_delay_reentry_and_queue_are_bounded(monkeypatch):
+    from skeleton.gameforge.batch_b071 import sim_clock as mod
+
+    monkeypatch.setattr(mod, "MAX_EVENTS_PER_RUN", 5)
+    c = SimClock()
+    scheduler = EventScheduler(c)
+    calls = []
+
+    def requeue():
+        calls.append(c.tick)
+        scheduler.schedule(0, "again", requeue)
+
+    scheduler.schedule(0, "again", requeue)
+    with pytest.raises(ClockError, match="run budget"):
+        scheduler.run_until(1)
+    assert calls == [0] * 5
+    assert scheduler.pending() == 1 and c.tick == 0
+    assert len(scheduler.log) == 5
+
+    monkeypatch.setattr(mod, "MAX_QUEUE_EVENTS", 1)
+    with pytest.raises(ClockError, match="queue exceeds bound"):
+        scheduler.schedule(1, "extra", lambda: None)
+
+
+def test_clock_and_scheduler_reject_noninteger_or_overflowing_time():
+    from skeleton.gameforge.batch_b071.sim_clock import MAX_SIM_TICK
+
+    for bad in (True, 1.5, -1, MAX_SIM_TICK + 1):
+        with pytest.raises(ClockError):
+            SimClock(start_tick=bad)
+        with pytest.raises(ClockError):
+            DeterministicRng(bad)
+    c = SimClock(start_tick=MAX_SIM_TICK)
+    with pytest.raises(ClockError, match="exceeds bound"):
+        c.advance(1)
+    scheduler = EventScheduler(c)
+    with pytest.raises(ClockError, match="exceeds bound"):
+        scheduler.schedule(1, "overflow", lambda: None)
+    with pytest.raises(ClockError):
+        scheduler.run_until(True)

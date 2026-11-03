@@ -19,6 +19,12 @@ from dataclasses import dataclass, field
 from typing import Callable, List, Tuple
 
 
+MAX_SIM_TICK = (1 << 63) - 1
+MAX_QUEUE_EVENTS = 100_000
+MAX_EVENTS_PER_RUN = 100_000
+MAX_EVENT_LOG = 100_000
+
+
 class ClockError(ValueError):
     """Raised on illegal clock or scheduler operations."""
 
@@ -27,10 +33,10 @@ class SimClock:
     """Integer-tick clock. ``tick_ns`` converts ticks to nanoseconds."""
 
     def __init__(self, tick_ns: int = 16_666_667, start_tick: int = 0) -> None:
-        if tick_ns <= 0:
-            raise ClockError("tick_ns must be positive")
-        if start_tick < 0:
-            raise ClockError("start_tick must be >= 0")
+        if type(tick_ns) is not int or not 1 <= tick_ns <= 10**12:
+            raise ClockError("tick_ns must be a bounded positive integer")
+        if type(start_tick) is not int or not 0 <= start_tick <= MAX_SIM_TICK:
+            raise ClockError("start_tick must be a bounded nonnegative integer")
         self.tick_ns = tick_ns
         self._tick = start_tick
         self._frozen = False
@@ -46,8 +52,10 @@ class SimClock:
     def advance(self, ticks: int = 1) -> int:
         if self._frozen:
             raise ClockError("clock is frozen")
-        if ticks < 0:
-            raise ClockError("time cannot go backwards")
+        if type(ticks) is not int or ticks < 0:
+            raise ClockError("time advance must be a nonnegative integer")
+        if ticks > MAX_SIM_TICK - self._tick:
+            raise ClockError("simulation tick exceeds bound")
         self._tick += ticks
         return self._tick
 
@@ -62,13 +70,15 @@ class DeterministicRng:
     """Seeded RNG; ``fork(name)`` derives an independent stream from seed+name."""
 
     def __init__(self, seed: int) -> None:
-        if not isinstance(seed, int) or seed < 0:
-            raise ClockError("seed must be a non-negative int")
+        if type(seed) is not int or not 0 <= seed <= MAX_SIM_TICK:
+            raise ClockError("seed must be a bounded nonnegative integer")
         self.seed = seed
         self._rng = random.Random(seed)
         self.draws = 0
 
     def fork(self, name: str) -> "DeterministicRng":
+        if type(name) is not str or not 1 <= len(name) <= 128:
+            raise ClockError("RNG stream name must be a bounded string")
         h = hashlib.sha256(f"{self.seed}:{name}".encode()).digest()
         return DeterministicRng(int.from_bytes(h[:8], "big"))
 
@@ -112,8 +122,14 @@ class EventScheduler:
         self.log: List[Tuple[int, str]] = []
 
     def schedule(self, delay: int, name: str, fn: Callable[[], None], priority: int = 0) -> None:
-        if delay < 0:
-            raise ClockError("cannot schedule in the past")
+        if type(delay) is not int or delay < 0:
+            raise ClockError("delay must be a nonnegative integer")
+        if type(priority) is not int or type(name) is not str or not 1 <= len(name) <= 128 or not callable(fn):
+            raise ClockError("invalid scheduled event")
+        if delay > MAX_SIM_TICK - self.clock.tick:
+            raise ClockError("scheduled tick exceeds bound")
+        if len(self._q) >= MAX_QUEUE_EVENTS:
+            raise ClockError("scheduled event queue exceeds bound")
         heapq.heappush(self._q, _Event(self.clock.tick + delay, priority, self._seq, name, fn))
         self._seq += 1
 
@@ -121,10 +137,12 @@ class EventScheduler:
         return len(self._q)
 
     def run_until(self, tick: int) -> int:
-        if tick < self.clock.tick:
-            raise ClockError("target tick is in the past")
+        if type(tick) is not int or not self.clock.tick <= tick <= MAX_SIM_TICK:
+            raise ClockError("target tick is invalid or in the past")
         ran = 0
         while self._q and self._q[0].tick <= tick:
+            if ran >= MAX_EVENTS_PER_RUN or len(self.log) >= MAX_EVENT_LOG:
+                raise ClockError("simulation event run budget exceeded")
             ev = heapq.heappop(self._q)
             self.clock.advance(ev.tick - self.clock.tick)
             ev.fn()
