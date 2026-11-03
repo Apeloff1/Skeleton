@@ -97,6 +97,7 @@ Commands:
     world-npc-schedule Reviewed NPC itineraries, temporal proof and offline playable
     world-inventory Reviewed original item effects and source-bound HTML5 playable
     world-puzzles Reviewed original scene riddles and verified choice-gated gameplay
+    world-studio-engine Reviewed original worlds to typed engine recipes
     world-studio Reviewed multi-plane original-world playable assembly
     world-pacing Reviewed dramatic arcs, climax witnesses and playable proof
     world-accessibility Reviewed accessible narration and keyboard gameplay
@@ -875,6 +876,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-knowledge":
         from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
         return world_knowledge_cli(rest)
+    if cmd == "world-studio-engine":
+        from skeleton.jeeves.worlds.studio_engine_cli import run as world_studio_engine_cli
+        return world_studio_engine_cli(rest)
     if cmd == "world-studio":
         from skeleton.jeeves.worlds.studio_assembly_cli import run as world_studio_cli
         return world_studio_cli(rest)
