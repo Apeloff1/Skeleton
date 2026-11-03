@@ -21,6 +21,7 @@ from .acceptance import acceptance_actions
 from .campaign import open_campaign, step_campaign, verify_campaign, verify_export
 from .campaign_acceptance import LAST_SIGNAL
 from .consumer_store import _source
+from .consumer_bundle import _windows_launcher
 
 
 class SmokeError(ValueError):
@@ -252,6 +253,24 @@ def run_portable_smoke() -> dict:
         # -I excludes PYTHONPATH, user site, and current-directory imports.
         # The portable archive must run from its own bundled source only.
         result = _smoke([sys.executable, "-I", str(artifact)], root=root, portable=True)
+        launcher = root / "launch-cinder-ridge.cmd"
+        launcher.write_bytes(_windows_launcher(artifact.name))
+        if b" -I " not in launcher.read_bytes():
+            raise SmokeError("Windows launcher did not isolate Python imports")
+        if os.name == "nt":
+            choices, _ = _choices()
+            launcher_env = os.environ.copy()
+            launcher_env["LOCALAPPDATA"] = str(root / "windows-launcher-data")
+            launcher_env["PYTHONPATH"] = str(root / "poisoned-import-path")
+            launcher_env["PYTHONUTF8"] = "1"
+            launcher_env["PYTHONNOUSERSITE"] = "1"
+            output = _invoke(
+                ["cmd.exe", "/d", "/c", str(launcher)], [],
+                env=launcher_env, cwd=root,
+                stdin="\\n".join(choices + ["q"]) + "\\n",
+            )
+            if "Victory:" not in output:
+                raise SmokeError("Windows launcher did not earn an ending")
     return {
         **result,
         "archive_sha256": metadata["sha256"],

@@ -142,7 +142,7 @@ def _windows_launcher(filename: str) -> bytes:
         "  pause\r\n"
         "  exit /b 2\r\n"
         ")\r\n"
-        f"%PY% \"%~dp0{filename}\" play --ascii\r\n"
+        f"%PY% -I \"%~dp0{filename}\" play --ascii\r\n"
         "set \"EXIT_CODE=%ERRORLEVEL%\"\r\n"
         "if not \"%EXIT_CODE%\"==\"0\" pause\r\n"
         "exit /b %EXIT_CODE%\r\n"
