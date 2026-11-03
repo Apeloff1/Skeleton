@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "status_map_02",
+  "domain": "status_map",
+  "ordinal": 2,
+  "arguments": {
+    "index": 2,
+    "a": 114,
+    "b": 4,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 2: Map synthetic worker status failed into pending, active, held or terminal.",
+  "expected": "held",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

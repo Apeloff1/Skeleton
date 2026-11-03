@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "slug_23",
+  "domain": "slug",
+  "ordinal": 23,
+  "arguments": {
+    "index": 23,
+    "a": 261,
+    "b": 12,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 23: Convert 'lumen Review 23' to a lowercase hyphenated slug.",
+  "expected": "lumen-review-23",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

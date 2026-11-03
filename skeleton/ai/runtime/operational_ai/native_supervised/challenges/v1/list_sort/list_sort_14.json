@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_sort_14",
+  "domain": "list_sort",
+  "ordinal": 14,
+  "arguments": {
+    "index": 14,
+    "a": 198,
+    "b": 3,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 14: Sort ascending and join with commas, no spaces: 3,12,22,4.",
+  "expected": "3,4,12,22",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

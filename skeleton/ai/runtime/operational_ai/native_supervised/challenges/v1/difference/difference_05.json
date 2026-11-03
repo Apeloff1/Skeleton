@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "difference_05",
+  "domain": "difference",
+  "ordinal": 5,
+  "arguments": {
+    "index": 5,
+    "a": 135,
+    "b": 7,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 5: Subtract 7 from 135. Return the decimal integer only.",
+  "expected": "128",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

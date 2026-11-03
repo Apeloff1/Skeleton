@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "sum_14",
+  "domain": "sum",
+  "ordinal": 14,
+  "arguments": {
+    "index": 14,
+    "a": 198,
+    "b": 3,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 14: Add 198 and 3. Return the decimal integer only.",
+  "expected": "201",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

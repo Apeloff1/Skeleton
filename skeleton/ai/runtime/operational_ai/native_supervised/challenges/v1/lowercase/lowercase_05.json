@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "lowercase_05",
+  "domain": "lowercase",
+  "ordinal": 5,
+  "arguments": {
+    "index": 5,
+    "a": 135,
+    "b": 7,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 5: Lowercase this identifier exactly: LUMEN_5.",
+  "expected": "lumen_5",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

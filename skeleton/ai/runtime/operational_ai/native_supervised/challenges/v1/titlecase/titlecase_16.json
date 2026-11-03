@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "titlecase_16",
+  "domain": "titlecase",
+  "ordinal": 16,
+  "arguments": {
+    "index": 16,
+    "a": 212,
+    "b": 5,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 16: Title-case these three words: marble offline system.",
+  "expected": "Marble Offline System",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

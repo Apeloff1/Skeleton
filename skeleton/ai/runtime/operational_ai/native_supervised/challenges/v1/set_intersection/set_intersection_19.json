@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "set_intersection_19",
+  "domain": "set_intersection",
+  "ordinal": 19,
+  "arguments": {
+    "index": 19,
+    "a": 233,
+    "b": 8,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 19: Find sorted intersection of sets cedar,green,a19 and green,a19,z19.",
+  "expected": "a19,green",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

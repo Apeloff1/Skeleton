@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "sum_03",
+  "domain": "sum",
+  "ordinal": 3,
+  "arguments": {
+    "index": 3,
+    "a": 121,
+    "b": 5,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 3: Add 121 and 5. Return the decimal integer only.",
+  "expected": "126",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

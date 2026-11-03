@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "csv_row_03",
+  "domain": "csv_row",
+  "ordinal": 3,
+  "arguments": {
+    "index": 3,
+    "a": 121,
+    "b": 5,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 3: Return a CSV row with city then integer count: Tromso and 121.",
+  "expected": "Tromso,121",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_key_11",
+  "domain": "json_key",
+  "ordinal": 11,
+  "arguments": {
+    "index": 11,
+    "a": 177,
+    "b": 13,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 11: Read JSON {\"count\":177,\"kind\":\"lumen\"}. Output only the kind field.",
+  "expected": "lumen",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

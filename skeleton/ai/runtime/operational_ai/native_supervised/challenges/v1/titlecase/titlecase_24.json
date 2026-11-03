@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "titlecase_24",
+  "domain": "titlecase",
+  "ordinal": 24,
+  "arguments": {
+    "index": 24,
+    "a": 268,
+    "b": 13,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 24: Title-case these three words: atlas offline system.",
+  "expected": "Atlas Offline System",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

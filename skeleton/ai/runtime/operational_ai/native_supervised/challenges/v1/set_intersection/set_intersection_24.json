@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "set_intersection_24",
+  "domain": "set_intersection",
+  "ordinal": 24,
+  "arguments": {
+    "index": 24,
+    "a": 268,
+    "b": 13,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 24: Find sorted intersection of sets atlas,green,a24 and green,a24,z24.",
+  "expected": "a24,green",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

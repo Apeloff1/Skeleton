@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_reverse_24",
+  "domain": "list_reverse",
+  "ordinal": 24,
+  "arguments": {
+    "index": 24,
+    "a": 268,
+    "b": 13,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 24: Reverse these three labels, comma-separated: atlas,north,node24.",
+  "expected": "node24,north,atlas",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

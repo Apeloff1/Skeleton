@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_unique_08",
+  "domain": "list_unique",
+  "ordinal": 8,
+  "arguments": {
+    "index": 8,
+    "a": 156,
+    "b": 10,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 8: Deduplicate labels preserving first appearance: harbor,harbor,cyan,cyan,item8.",
+  "expected": "harbor,cyan,item8",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

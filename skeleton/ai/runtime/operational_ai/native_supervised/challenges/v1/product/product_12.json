@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "product_12",
+  "domain": "product",
+  "ordinal": 12,
+  "arguments": {
+    "index": 12,
+    "a": 184,
+    "b": 14,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 12: Multiply 184 by 14. Return the decimal integer only.",
+  "expected": "2576",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

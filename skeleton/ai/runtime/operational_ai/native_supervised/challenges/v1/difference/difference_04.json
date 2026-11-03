@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "difference_04",
+  "domain": "difference",
+  "ordinal": 4,
+  "arguments": {
+    "index": 4,
+    "a": 128,
+    "b": 6,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 4: Subtract 6 from 128. Return the decimal integer only.",
+  "expected": "122",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

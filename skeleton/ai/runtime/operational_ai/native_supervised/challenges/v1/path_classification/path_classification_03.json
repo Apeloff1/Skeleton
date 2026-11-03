@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "path_classification_03",
+  "domain": "path_classification",
+  "ordinal": 3,
+  "arguments": {
+    "index": 3,
+    "a": 121,
+    "b": 5,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 3: Allow only safe workspace/ paths without parent traversal. Classify ../private/secret_3.json: allow or deny.",
+  "expected": "deny",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

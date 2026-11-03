@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "remainder_06",
+  "domain": "remainder",
+  "ordinal": 6,
+  "arguments": {
+    "index": 6,
+    "a": 142,
+    "b": 8,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 6: Compute the remainder when 142 is divided by 8.",
+  "expected": "6",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

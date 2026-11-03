@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "provenance_select_09",
+  "domain": "provenance_select",
+  "ordinal": 9,
+  "arguments": {
+    "index": 9,
+    "a": 163,
+    "b": 11,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 9: Source old revision 1 says quartz; new revision 2 says Tromso. Output the later revision value.",
+  "expected": "Tromso",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

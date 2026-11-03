@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "comparison_16",
+  "domain": "comparison",
+  "ordinal": 16,
+  "arguments": {
+    "index": 16,
+    "a": 212,
+    "b": 5,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 16: Is 212 greater than 207? Answer yes or no.",
+  "expected": "yes",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

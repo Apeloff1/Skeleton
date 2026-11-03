@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "lowercase_18",
+  "domain": "lowercase",
+  "ordinal": 18,
+  "arguments": {
+    "index": 18,
+    "a": 226,
+    "b": 7,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 18: Lowercase this identifier exactly: ATLAS_18.",
+  "expected": "atlas_18",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

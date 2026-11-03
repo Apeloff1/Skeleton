@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_reverse_19",
+  "domain": "list_reverse",
+  "ordinal": 19,
+  "arguments": {
+    "index": 19,
+    "a": 233,
+    "b": 8,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 19: Reverse these three labels, comma-separated: cedar,north,node19.",
+  "expected": "node19,north,cedar",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

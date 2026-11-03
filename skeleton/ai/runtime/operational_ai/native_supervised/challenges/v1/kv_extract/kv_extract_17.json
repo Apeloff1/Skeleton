@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "kv_extract_17",
+  "domain": "kv_extract",
+  "ordinal": 17,
+  "arguments": {
+    "index": 17,
+    "a": 219,
+    "b": 6,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 17: From owner=lumen; state=ready; epoch=17, output owner only.",
+  "expected": "lumen",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

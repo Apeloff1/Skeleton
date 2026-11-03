@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "evidence_match_17",
+  "domain": "evidence_match",
+  "ordinal": 17,
+  "arguments": {
+    "index": 17,
+    "a": 219,
+    "b": 6,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 17: Observed digest prefix 000000db, pinned prefix 000000dc. Reply match or mismatch.",
+  "expected": "mismatch",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

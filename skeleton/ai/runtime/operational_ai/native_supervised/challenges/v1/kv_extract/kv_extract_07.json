@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "kv_extract_07",
+  "domain": "kv_extract",
+  "ordinal": 7,
+  "arguments": {
+    "index": 7,
+    "a": 149,
+    "b": 9,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 7: From owner=cedar; state=ready; epoch=7, output owner only.",
+  "expected": "cedar",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

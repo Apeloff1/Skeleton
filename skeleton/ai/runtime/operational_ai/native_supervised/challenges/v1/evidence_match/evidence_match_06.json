@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "evidence_match_06",
+  "domain": "evidence_match",
+  "ordinal": 6,
+  "arguments": {
+    "index": 6,
+    "a": 142,
+    "b": 8,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 6: Observed digest prefix 0000008e, pinned prefix 0000008e. Reply match or mismatch.",
+  "expected": "match",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

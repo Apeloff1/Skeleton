@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "whitespace_16",
+  "domain": "whitespace",
+  "ordinal": 16,
+  "arguments": {
+    "index": 16,
+    "a": 212,
+    "b": 5,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 16: Collapse repeated spaces in 'marble   test     item16'.",
+  "expected": "marble test item16",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

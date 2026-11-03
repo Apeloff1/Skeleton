@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "remainder_23",
+  "domain": "remainder",
+  "ordinal": 23,
+  "arguments": {
+    "index": 23,
+    "a": 261,
+    "b": 12,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 23: Compute the remainder when 261 is divided by 12.",
+  "expected": "9",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

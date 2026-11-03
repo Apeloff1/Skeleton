@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "minmax_06",
+  "domain": "minmax",
+  "ordinal": 6,
+  "arguments": {
+    "index": 6,
+    "a": 142,
+    "b": 8,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 6: Choose the smaller number from 142, 8, 150. Digits only.",
+  "expected": "8",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
