@@ -9,7 +9,7 @@ from .contracts import (
     Scope, CognitionError, identifier, sha, integer, exact, fingerprint,
     hash_bytes, refuse,
 )
-from .planner import PlanTask, compile_plan
+from .planner import PlanTask, compile_plan, plan_digest
 from .tool_intents import ToolIntent, propose, inspect
 from .admission import Permit, admit
 from .sources import Source
@@ -70,7 +70,7 @@ def plan_ready(plan, scope, *, request_id, source_sha256, now_ns):
     record={field:plan[field] for field in record_fields}
     if record["source_plan_not_authority_to_execute"] is not True:
         refuse("source plan falsely claims execution authority")
-    if fingerprint(record)!=plan["sha256"]:
+    if plan_digest(record)!=plan["sha256"]:
         refuse("task graph projection changed after compile")
     integer(now_ns)
     if now_ns>=claim["deadline_ns"]:
