@@ -299,10 +299,26 @@ def test_existing_env_private_mode_failure_blocks_bootstrap(tmp_path, monkeypatc
     path = root / ".env"
     path.chmod(0o644)
     original = path.read_bytes()
-    def blocked(*args, **kwargs):
-        raise PermissionError("cannot tighten mode")
+    original_fchmod = os.fchmod
+    target_inode = path.stat().st_ino
+    def blocked(descriptor, mode):
+        if os.fstat(descriptor).st_ino == target_inode:
+            raise PermissionError("cannot tighten mode")
+        return original_fchmod(descriptor, mode)
     monkeypatch.setattr(os, "fchmod", blocked)
     with pytest.raises(PermissionError, match="cannot tighten mode"):
         ensure_runtime_environment(root)
     assert path.read_bytes() == original
     assert stat.S_IMODE(path.stat().st_mode) == 0o644
+
+
+def test_setup_lock_fifo_is_rejected_without_blocking(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO support unavailable")
+    root = _root(tmp_path)
+    os.mkfifo(root / ".skeleton-setup.lock")
+    before = time.monotonic()
+    with pytest.raises(ValueError, match="stable regular file"):
+        ensure_runtime_environment(root)
+    assert time.monotonic() - before < 2.0
+    assert not (root / ".env").exists()
