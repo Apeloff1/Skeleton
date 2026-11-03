@@ -59,11 +59,11 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
     while True:
         write(_view(current, ascii_mode=ascii_mode))
         if current["status"] == "completed":
-            write("Campaign complete. Type e to export, j for the journal, or q to quit.")
+            write("Campaign complete. Type e to export, b for full backup, j for journal, or q to quit.")
         elif current["status"] != "playing":
-            write("Chapter ended without its required ending. Type r to retry, e to export, j for journal, q to quit.")
+            write("Chapter ended without its required ending. Type r to retry, b for full backup, e to export, j for journal, q to quit.")
         else:
-            write("Choose an action number, h for a hint, j for journal, ? for help, e to export, q to save and quit.")
+            write("Choose an action number, h for a hint, j for journal, ? for help, e to export, b for full backup, q to save and quit.")
         try:
             answer = read("> ").strip().lower()
         except (EOFError, KeyboardInterrupt):
@@ -71,7 +71,7 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
         if answer in ("q", "quit"):
             break
         if answer in ("?", "help"):
-            write("Numbers perform listed actions and save immediately. h = advisory route, j = recent events, e = replay-verified export, q = quit without losing the last turn. No command besides a numbered action or retry consumes a turn.")
+            write("Numbers perform listed actions and save immediately. h = advisory route, j = recent events, e = replay-verified export, b = retry-aware full backup, q = quit without losing the last turn. No command besides a numbered action or retry consumes a turn.")
             continue
         if answer in ("h", "hint"):
             write(navigation_hint(current))
@@ -84,6 +84,12 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
                 write("Exported: " + str(store.export(slot)))
             except (StoreError, CampaignError, OSError) as exc:
                 write("Export unavailable; saved game unchanged: " + str(exc))
+            continue
+        if answer == "b":
+            try:
+                write("Backup created: " + str(store.backup(slot)))
+            except (StoreError, CampaignError, OSError) as exc:
+                write("Backup unavailable; saved game unchanged: " + str(exc))
             continue
         if answer == "r" and current["status"] not in ("playing", "completed"):
             try:

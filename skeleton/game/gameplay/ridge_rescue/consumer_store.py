@@ -328,7 +328,6 @@ class SlotStore:
                     if not isinstance(action, dict) or canonical(action) != raw:
                         raise StoreError("save history action is not canonical")
                     history.append({"prior_head": prior, "next_head": nxt, "action": action})
-                bundle = build_backup(verified["session"], history, _source())
                 conn.execute("COMMIT")
             except sqlite3.Error as exc:
                 conn.execute("ROLLBACK")
@@ -336,6 +335,9 @@ class SlotStore:
             except BaseException:
                 conn.execute("ROLLBACK")
                 raise
+        # Validate/replay the immutable snapshot AFTER releasing the SQLite
+        # writer lock; another process can continue playing during backup.
+        bundle = build_backup(verified["session"], history, _source())
         payload = canonical(bundle) + b"\n"
         if len(payload) > MAX_BACKUP_BYTES:
             raise StoreError("backup exceeds byte budget")
