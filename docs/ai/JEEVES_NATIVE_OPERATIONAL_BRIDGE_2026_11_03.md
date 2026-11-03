@@ -225,6 +225,22 @@ so it does not prove an installed GGUF, a real tokenizer, native device
 isolation, Windows support or source legal rights. Passing source-only tests
 must never be promoted to a physical device or release certification.
 
+## Pre-activation operator admission
+
+The CLI now validates task/REPL mode, chat-session and request identities,
+the paired source-root/manifest contract, explicit read-only tool intent,
+resource ceilings, absolute canonical source paths and bounded task budgets
+**before** it reads task stdin, opens an operator key, starts an installer
+check or loads the native model.
+
+Invalid source flags, mixed session/agent operation, invalid grant scope,
+relative source paths, unbounded worker budgets and malformed run modes
+are rejected without allocating a model, using the existing fail-closed
+operator CLI error response with no task or private path disclosure.
+This pure-source preflight is not a substitute for model byte/source
+rights verification, descriptor-anchored file admission, native GPU memory
+reservation, SQLite transaction checks or independent device qualification.
+
 ## Required source validation
 
 After the source publication and repairs are complete, run these in order:
@@ -238,13 +254,14 @@ After the source publication and repairs are complete, run these in order:
 7. python -m unittest skeleton.testing.test_jeeves_native_quality_eval -v
 8. python -m unittest skeleton.testing.test_jeeves_native_sqlite_integration -v
 9. python -m unittest skeleton.testing.test_jeeves_native_source_tool -v
-10. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_source_tool.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
-11. python scripts/check_architecture_map.py
-12. python scripts/check_ai_app_construction.py
-13. python scripts/check_capability_interfaces.py
-14. python scripts/check_provider_bootstrap.py
-15. python scripts/check_enterprise_ai_superiority.py --json
-16. python scripts/check_enterprise_ai_implementation_notes.py --json
+10. python -m unittest skeleton.testing.test_jeeves_native_operator_preflight -v
+11. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_source_tool.py skeleton/jeeves/agent/native_operator_preflight.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_quality_eval.py skeleton/jeeves/agent/native_eval_cli.py skeleton/jeeves/agent/native_cli.py
+12. python scripts/check_architecture_map.py
+13. python scripts/check_ai_app_construction.py
+14. python scripts/check_capability_interfaces.py
+15. python scripts/check_provider_bootstrap.py
+16. python scripts/check_enterprise_ai_superiority.py --json
+17. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,

@@ -20,6 +20,7 @@ from .native_repl import NativeJeevesRepl
 from .native_signed_evidence import (
     NativeSignedEvidenceProvider, attach_signed_native_evidence,
 )
+from .native_operator_preflight import check_operator_admission
 from .native_source_tool import (
     BoundSignedSourceTool, readonly_source_grant,
 )
@@ -59,6 +60,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
+        # This pure stage runs before reading private prompt bytes, loading
+        # source keys, validating a model package, or starting native workers.
+        check_operator_admission(
+            mode=args.mode,
+            task_stdin=args.task_stdin,
+            session=args.session,
+            request_id=args.request_id,
+            source_root=args.source_root,
+            signed_source_manifest=args.signed_source_manifest,
+            enable_source_tool=args.enable_source_tool,
+            max_sources=args.max_sources,
+            max_steps=args.max_steps,
+            max_model_calls=args.max_model_calls,
+            max_wall_seconds=args.max_wall_seconds,
+        )
         if args.mode == "repl":
             if args.task_stdin or args.request_id:
                 raise ValueError("REPL reads lines directly and assigns unique request IDs")
@@ -85,12 +101,6 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
-            if (args.source_root is None) != (args.signed_source_manifest is None):
-                raise ValueError("private source root and signed manifest must be paired")
-            if args.enable_source_tool and (args.mode != "agent" or args.source_root is None):
-                raise ValueError("source tool requires explicit agent mode and signed source")
-            if args.mode == "agent" and args.source_root is not None and not args.enable_source_tool:
-                raise ValueError("agent source material requires an explicit tool grant")
             source_provider = None
             if args.source_root is not None:
                 from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import (
