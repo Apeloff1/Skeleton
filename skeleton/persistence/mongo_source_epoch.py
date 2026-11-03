@@ -45,7 +45,10 @@ class _BoundWriter:
 class MongoCanonicalSourceEpoch:
     """Tenant/actor scoped durable writer fence shared by source owners."""
 
-    def __init__(self, database: Any, *, revocation_authorizer: Any | None = None) -> None:
+    def __init__(
+        self, database: Any, *, revocation_authorizer: Any | None = None,
+        migration_authorizer: Any | None = None,
+    ) -> None:
         # A memory-only dummy/independently created collection is NOT accepted
         # as the production epoch witness.
         if not callable(getattr(database, "get_collection", None)):
@@ -78,6 +81,9 @@ class MongoCanonicalSourceEpoch:
         # Only the trusted application root may inject operator authorization.
         # No environment flag or request field can enable revocation.
         self._revocation_authorizer = revocation_authorizer
+        # An unconfigured application cannot silently initialize a stable
+        # actor epoch. Quiescence and backup evidence remain operator duties.
+        self._migration_authorizer = migration_authorizer
         self._collection = collection
         self._reader = reader
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
@@ -124,6 +130,22 @@ class MongoCanonicalSourceEpoch:
     async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
         """ONLY for an operator-controlled quiescent migration; never on reads."""
         key = self._key(tenant_id, actor_id)
+        authorizer = getattr(self, "_migration_authorizer", None)
+        database_name = getattr(getattr(self, "_database", None), "name", None)
+        if (not callable(authorizer) or type(database_name) is not str
+                or not database_name):
+            raise MongoSourceEpochError("operator migration authority required")
+        try:
+            async with asyncio.timeout(3.0):
+                approved = await authorizer(
+                    tenant_id=tenant_id, actor_id=actor_id,
+                    database_name=database_name,
+                    purpose="quiescent-initial-epoch-v1",
+                )
+        except Exception:
+            raise MongoSourceEpochError("operator migration authorization unavailable") from None
+        if approved is not True:
+            raise MongoSourceEpochError("operator migration authorization denied")
         try:
             await self._collection.insert_one({
                 "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,

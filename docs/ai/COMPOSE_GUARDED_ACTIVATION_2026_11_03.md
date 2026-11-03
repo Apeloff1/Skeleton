@@ -153,3 +153,16 @@ service, its key custody, policy, mTLS, availability and isolation. This
 client does not make default Compose consumer-ready.
 
 Focused transport test: `python -m unittest skeleton.testing.test_signed_reviewer_client`.
+
+## Explicit operator migration authorization
+
+`MongoCanonicalSourceEpoch.provision_migration_epoch` now denies all calls
+unless the trusted application root supplies an async `migration_authorizer`
+that explicitly approves the tenant, actor, canonical logical database and
+`quiescent-initial-epoch-v1` purpose. Only a literal `True` is accepted;
+exceptions, timeouts, missing authority, and duplicates fail closed. This
+is an authorization boundary, not a proof that external writers have stopped
+or that a backup has been restored. The operator must independently verify
+those conditions before approving. No Compose startup path provisions epochs.
+
+Focused test: `python -m unittest skeleton.testing.test_mongo_epoch_migration_guard`.
