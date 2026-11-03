@@ -39,6 +39,7 @@ from .economy import EconomyStore
 from .character_arcs import ArcStore
 from .dialogue_graph import DialogueStore
 from .interaction_assembly import InteractionStore
+from .dialogue_transcript import DialogueTranscriptStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -56,6 +57,7 @@ TOOLS = {
     "world.assurance_preview": (),
     "world.atlas_preview": (),
     "world.relationships_player": ("slot",),
+    "world.dialogue_transcript_preview": ("slot",),
     "world.interaction_preview": (),
     "world.dialogue_preview": (),
     "world.dialogue_player": ("slot", "conversation", "responses"),
@@ -190,6 +192,9 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     elif name == "world.relationships_player":
         _id(args["slot"], "slot")
         payload = RelationshipStore(root).player(req["world_id"], args["slot"])
+    elif name == "world.dialogue_transcript_preview":
+        _id(args["slot"], "slot")
+        payload = DialogueTranscriptStore(root).inspect(req["world_id"], args["slot"])
     elif name == "world.interaction_preview":
         payload = InteractionStore(root).inspect(req["world_id"])
     elif name == "world.dialogue_propose_preview":

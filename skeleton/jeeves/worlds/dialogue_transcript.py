@@ -264,6 +264,25 @@ class DialogueTranscriptStore:
                         receipt.get("cast_digest") != digest(cast) or
                         receipt.get("dialogue_digest") != digest(dialogue)):
                     raise CanonError("dialogue_transcript_receipt_source_mismatch")
+                # Reconstruct the exact archived transcript and hash chain.
+                candidate = {
+                    "schema": SCHEMA, "world_id": world_id,
+                    "world_digest": digest(world), "cast_digest": digest(cast),
+                    "dialogue_digest": digest(dialogue),
+                    "session_digest": receipt["session_before"],
+                    "slot": slot, "conversation": receipt["conversation"],
+                    "responses": receipt["responses"],
+                    "chain": [], "revision": len(receipt["responses"]),
+                }
+                candidate["chain"] = _chain(candidate)
+                if (digest(candidate) != receipt["transcript_digest"] or
+                        (candidate["chain"][-1]["sha256"] if candidate["chain"]
+                         else _seed(candidate)) != receipt["chain_head"]):
+                    raise CanonError("dialogue_transcript_receipt_chain_mismatch")
+                from .session import _source_session
+                if not session["choices"] or digest(_source_session(
+                        world, session["choices"][:-1])) != receipt["session_before"]:
+                    raise CanonError("dialogue_transcript_receipt_session_mismatch")
                 replay = replay_dialogue(
                     dialogue, world, cast, receipt["conversation"],
                     receipt["responses"])
