@@ -107,8 +107,12 @@ class MongoCanonicalSourceEpoch:
     @staticmethod
     def _key(tenant_id: str, actor_id: str) -> str:
         try:
-            invalid = any(not isinstance(v, str) or not v or v != v.strip() or "\0" in v
-                          or len(v.encode("utf-8", "strict")) > 512 for v in (tenant_id, actor_id))
+            invalid = any(
+                type(v) is not str or not v or v != v.strip()
+                or len(v.encode("utf-8", "strict")) > 512
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in v)
+                for v in (tenant_id, actor_id)
+            )
         except UnicodeError as exc:
             raise MongoSourceEpochError("canonical source writer identity invalid") from exc
         if invalid:

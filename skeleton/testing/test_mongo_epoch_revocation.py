@@ -107,6 +107,14 @@ class EpochRevocationTests(unittest.IsolatedAsyncioTestCase):
                     pass
         self.assertEqual(self.collection.doc["phase"], "writing")
 
+    async def test_control_character_writer_identity_denied_before_mongo(self):
+        for invalid in ("tenant\\nother", "tenant\\r", "tenant\\x7f",
+                        "tenant\\x00", "\\ud800"):
+            with self.subTest(value=repr(invalid)):
+                with self.assertRaises(MongoSourceEpochError):
+                    await self.revoke(tenant_id=invalid)
+        self.assertEqual(self.collection.calls, 0)
+
     async def test_terminal_revocation_cas(self):
         self.assertEqual(await self.revoke(), 3)
         self.assertEqual(self.collection.doc["phase"], "revoked")
