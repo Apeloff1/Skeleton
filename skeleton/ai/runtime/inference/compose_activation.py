@@ -122,6 +122,7 @@ class MongoGuardedActivation:
         self._backend = backend
         self._reviewer = reviewer
         self._reviewer_authority_id = reviewer_authority_id
+        self._reviewer_trust_anchor = reviewer_trust_anchor
         try:
             self._reviewer_verifier = ReviewerCustodyVerifier(
                 reviewer=reviewer, authority_id=reviewer_authority_id,
@@ -143,6 +144,14 @@ class MongoGuardedActivation:
     @property
     def phase(self) -> ActivationPhase:
         return self._phase
+
+    def _verify_reviewer_binding(self) -> None:
+        # A mutable client reconfigured after startup must not switch verdict
+        # verification to a different signer while activation challenges
+        # continue to be verified against the original pinned public key.
+        if (getattr(self._reviewer, "_anchor", None)
+                != self._reviewer_trust_anchor):
+            raise ActivationBlocked("reviewer trust anchor changed during activation")
 
     def _verify_backend(self) -> None:
         try:
@@ -220,6 +229,7 @@ class MongoGuardedActivation:
                 conversation=self._conversation, memory=self._memory, epoch=self._epoch,
             )
             self._verify_backend()
+            self._verify_reviewer_binding()
             first_epoch = await self._epoch.read_epoch(
                 tenant_id=self._tenant_id,
                 actor_id=self._actor_id,
@@ -232,6 +242,7 @@ class MongoGuardedActivation:
                 runtime_digest=self._identity[1],
                 tokenizer_digest=self._identity[2],
             )
+            self._verify_reviewer_binding()
             # A canonical writer may enter WRITING while the reviewer signs.
             # A second linearizable read is required after that await.
             final_epoch = await self._epoch.read_epoch(

@@ -388,6 +388,34 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ActivationBlocked, "signed independent"):
                 self.make()
 
+    async def test_reviewer_anchor_rotation_after_activation_denies(self):
+        gate = self.make()
+        permit = await gate.activate()
+        self.reviewer._anchor = ReviewerTrustAnchor(
+            authority_id="security-reviewer-prod",
+            deployment_domain="separate-reviewer-domain",
+            ed25519_public_key=Ed25519PrivateKey.generate().public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            ),
+        )
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor changed"):
+            await gate.assert_active(permit)
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
+    async def test_reviewer_anchor_rotation_during_attestation_denies(self):
+        async def rotate(_payload):
+            self.reviewer._anchor = ReviewerTrustAnchor(
+                authority_id="security-reviewer-prod",
+                deployment_domain="different-domain",
+                ed25519_public_key=self.trust_anchor.ed25519_public_key,
+            )
+        self.reviewer.on_challenge = rotate
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor changed"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
     async def test_fresh_reviewer_attestation_on_each_probe(self):
         gate = self.make()
         permit = await gate.activate()
