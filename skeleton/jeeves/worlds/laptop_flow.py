@@ -307,34 +307,30 @@ class LaptopFlow:
         finally:
             os.close(fd)
 
+    def _session_guard(self, fd: int, world_id: str) -> None:
+        """Verify review, playable, builder and receipt under session's lock."""
+        self._verified_snapshot(fd, world_id)
+
     def create_session(self, world_id: str, slot: str, imported: Any = None) -> dict[str, Any]:
-        lease = self.verify(world_id)["source_digest"]
-        return self.sessions.create(world_id, slot, imported=imported,
-                                    expected_world_digest=lease)
+        return self.sessions.create(
+            world_id, slot, imported=imported, source_guard=self._session_guard)
 
     def choose(self, world_id: str, slot: str, choice_id: str,
                expected_session_digest: str) -> dict[str, Any]:
-        lease = self.verify(world_id)["source_digest"]
-        return self.sessions.choose(world_id, slot, choice_id, expected_session_digest,
-                                    expected_world_digest=lease)
+        return self.sessions.choose(
+            world_id, slot, choice_id, expected_session_digest,
+            source_guard=self._session_guard)
 
     def inspect_session(self, world_id: str, slot: str) -> dict[str, Any]:
-        lease = self.verify(world_id)["source_digest"]
-        return self.sessions.inspect(world_id, slot, expected_world_digest=lease)
+        return self.sessions.inspect(world_id, slot, source_guard=self._session_guard)
 
     def export_session(self, world_id: str, slot: str) -> dict[str, Any]:
-        lease = self.verify(world_id)["source_digest"]
-        return self.sessions.export(world_id, slot, expected_world_digest=lease)
+        return self.sessions.export(world_id, slot, source_guard=self._session_guard)
 
     def preflight_restore(self, world_id: str, imported: Any) -> dict[str, Any]:
-        """Check a save against the currently approved, compiled world.
-
-        This never creates a player slot. A subsequent restore revalidates the
-        same source lease under the session writer lock and remains no-clobber.
-        """
-        lease = self.verify(world_id)["source_digest"]
+        """Read-only restore check pinned to the approved playable lease."""
         return self.sessions.preflight_import(
-            world_id, imported, expected_world_digest=lease)
+            world_id, imported, source_guard=self._session_guard)
 
     def diagnose(self, world_id: str, slot: str | None = None) -> dict[str, Any]:
         """Read-only operator recovery map; never substitutes for verification.

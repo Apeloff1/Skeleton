@@ -86,3 +86,16 @@ runs on a laptop. Portable save checksums detect accidental corruption but
 are not cryptographic authentication of an external player history; replay
 validation prevents impossible transitions, not a valid alternative history
 whose checksum was recomputed by its author.
+
+## Atomic player custody
+
+All laptop session create, choose, inspect, export and restore-check operations
+now verify the exact approved source, review digest, playable HTML, builder
+recipe and receipt under the **same world lease** as the player session access.
+The previous separate verification and session lock could accept an approval
+or artifact change without a world digest change. The new guard rejects such
+changes before any session publication. Other SessionStore owners retain their
+original direct API and acceptance's already-locked read path remains safe.
+
+Focused tests: `python -m pytest skeleton/testing/test_jeeves_world_laptop_atomic_session.py skeleton/testing/test_jeeves_world_laptop_acceptance.py skeleton/testing/test_jeeves_world_laptop_flow.py -q`.
+This is source custody only, not a model, Windows or consumer qualification.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import os
-from typing import Any
+from typing import Any, Callable
 
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _list, canonical, digest, prove,
@@ -18,6 +18,7 @@ from .world_canon import (
 SCHEMA = "jeeves.world.session.v1"
 EXPORT_SCHEMA = "jeeves.world.session_export.v1"
 MAX_CHOICES = 512
+SourceGuard = Callable[[int, str], None]
 
 
 def replay_choices(world: Any, choices: Any) -> dict[str, Any]:
@@ -176,7 +177,8 @@ class SessionStore:
 
     def create(self, world_id: str, slot: str, *,
                imported: Any = None,
-               expected_world_digest: str | None = None) -> dict[str, Any]:
+               expected_world_digest: str | None = None,
+               source_guard: SourceGuard | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
@@ -186,6 +188,8 @@ class SessionStore:
                 os.close(lock_fd)
                 world = self._world(fd, world_id)
                 self._require_world_lease(world, expected_world_digest)
+                if source_guard is not None:
+                    source_guard(fd, world_id)
                 data = (import_session(imported, world) if imported is not None
                         else new_session(world))
                 try:
@@ -205,7 +209,8 @@ class SessionStore:
 
     def choose(self, world_id: str, slot: str, choice_id: str,
                expected_digest: str, *,
-               expected_world_digest: str | None = None) -> dict[str, Any]:
+               expected_world_digest: str | None = None,
+               source_guard: SourceGuard | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
@@ -215,6 +220,8 @@ class SessionStore:
                 os.close(lock_fd)
                 world = self._world(fd, world_id)
                 self._require_world_lease(world, expected_world_digest)
+                if source_guard is not None:
+                    source_guard(fd, world_id)
                 data = self._session(fd, world_id, slot, world)
                 if digest(data) != expected_digest:
                     raise CanonError("stale_session")
@@ -227,51 +234,72 @@ class SessionStore:
         finally:
             os.close(fd)
 
+    def _read_guarded(self, fd: int, world_id: str,
+                      source_guard: SourceGuard | None,
+                      operation: Callable[[], Any]) -> Any:
+        """Pin approved artifacts and player reads to one writer lease."""
+        if source_guard is None:
+            return operation()
+        lock_fd = self._lock(fd, world_id)
+        try:
+            os.close(lock_fd)
+            source_guard(fd, world_id)
+            return operation()
+        finally:
+            os.unlink(world_id + ".lock", dir_fd=fd)
+
     def inspect(self, world_id: str, slot: str, *,
-                expected_world_digest: str | None = None) -> dict[str, Any]:
+                expected_world_digest: str | None = None,
+                source_guard: SourceGuard | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
         try:
-            world = self._world(fd, world_id)
-            self._require_world_lease(world, expected_world_digest)
-            data = self._session(fd, world_id, slot, world)
-            return player_view(data, world)
+            def operation() -> dict[str, Any]:
+                world = self._world(fd, world_id)
+                self._require_world_lease(world, expected_world_digest)
+                return player_view(self._session(fd, world_id, slot, world), world)
+            return self._read_guarded(fd, world_id, source_guard, operation)
         finally:
             os.close(fd)
 
     def export(self, world_id: str, slot: str, *,
-               expected_world_digest: str | None = None) -> dict[str, Any]:
+               expected_world_digest: str | None = None,
+               source_guard: SourceGuard | None = None) -> dict[str, Any]:
         _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
         try:
-            world = self._world(fd, world_id)
-            self._require_world_lease(world, expected_world_digest)
-            data = self._session(fd, world_id, slot, world)
-            return export_session(data, world)
+            def operation() -> dict[str, Any]:
+                world = self._world(fd, world_id)
+                self._require_world_lease(world, expected_world_digest)
+                return export_session(self._session(fd, world_id, slot, world), world)
+            return self._read_guarded(fd, world_id, source_guard, operation)
         finally:
             os.close(fd)
 
     def preflight_import(self, world_id: str, imported: Any, *,
-                         expected_world_digest: str | None = None) -> dict[str, Any]:
-        """Verify a portable save without creating a slot or approving new canon."""
+                         expected_world_digest: str | None = None,
+                         source_guard: SourceGuard | None = None) -> dict[str, Any]:
+        """Verify portable save without creating a slot or approving canon."""
         _id(world_id, "world_id")
         fd = self.worlds._directory()
         try:
-            world = self._world(fd, world_id)
-            self._require_world_lease(world, expected_world_digest)
-            data = import_session(imported, world)
-            view = player_view(data, world)
-            return {
-                "world_id": world_id,
-                "world_digest": view["world_digest"],
-                "session_digest": view["session_digest"],
-                "revision": view["revision"],
-                "scene": view["scene"]["id"],
-                "ending": view["ending"],
-                "restorable": True,
-                "qualification": "verified_preview_not_persisted",
-            }
+            def operation() -> dict[str, Any]:
+                world = self._world(fd, world_id)
+                self._require_world_lease(world, expected_world_digest)
+                data = import_session(imported, world)
+                view = player_view(data, world)
+                return {
+                    "world_id": world_id,
+                    "world_digest": view["world_digest"],
+                    "session_digest": view["session_digest"],
+                    "revision": view["revision"],
+                    "scene": view["scene"]["id"],
+                    "ending": view["ending"],
+                    "restorable": True,
+                    "qualification": "verified_preview_not_persisted",
+                }
+            return self._read_guarded(fd, world_id, source_guard, operation)
         finally:
             os.close(fd)
