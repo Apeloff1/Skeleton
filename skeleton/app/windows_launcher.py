@@ -209,8 +209,11 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             or parsed.fragment
         ):
             return False, "Setup UI address must be a local HTTP endpoint"
+        # Probe the actual exported setup route, not just a generic SPA root
+        # that could return 200 while the first-run page is unavailable.
         frontend_probe = probe_url(
-            replace(frontend, public_url=app_url), timeout=2.0
+            replace(frontend, public_url=app_url, health_path="/setup"),
+            timeout=2.0,
         )
     except (OSError, ValueError, KeyError) as exc:
         # Never echo operator environment values or failing URL to the GUI.
@@ -223,13 +226,13 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             "Inspect frontend container logs."
         )
     try:
-        opened = webbrowser.open(app_url)
+        opened = webbrowser.open(app_url.rstrip("/") + "/setup")
     except (OSError, ValueError, webbrowser.Error) as exc:
         return False, f"Setup UI is reachable; browser failed: {type(exc).__name__}"
     if not opened:
         return False, "Setup UI is reachable; no browser accepted the local URL"
     return True, (
-        f"Setup UI opened at {app_url}. "
+        f"Setup UI opened at {app_url.rstrip('/')}/setup. "
         "Backend, storage and guarded AI readiness are NOT established. "
         "Use System Check and runtime diagnostics before attempting gameplay."
     )

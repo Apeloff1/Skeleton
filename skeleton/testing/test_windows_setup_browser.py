@@ -37,8 +37,8 @@ def test_setup_opens_when_backend_and_guard_are_unavailable(tmp_path, monkeypatc
 
     ok, detail = launcher.open_running_application(tmp_path)
     assert ok is True
-    assert observed[0] == ("frontend", "http://localhost:3456", "/", 2.0)
-    assert observed[1] == "http://localhost:3456"
+    assert observed[0] == ("frontend", "http://localhost:3456", "/setup", 2.0)
+    assert observed[1] == "http://localhost:3456/setup"
     assert "NOT established" in detail
 
 
