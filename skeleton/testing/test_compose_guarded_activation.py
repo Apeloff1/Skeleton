@@ -409,11 +409,12 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         gate._probe = delayed_failure
         stale = asyncio.create_task(gate.assert_active())
         await entered.wait()
-        await gate.revoke()
-        # An operator must construct a new gate after terminal revocation.
-        # Simulate a new generation only through the explicit BLOCKED state,
-        # never by allowing a revoked gate to reactivate.
+        # Model an independent authority failure invalidating the old
+        # generation before the stale asynchronous probe completes.
         gate._phase = ActivationPhase.BLOCKED
+        gate._generation += 1
+        gate._epoch_at_activation = None
+        gate._auth_at_activation = None
         gate._probe = original_probe
         new_permit = await gate.activate()
         release.set()
