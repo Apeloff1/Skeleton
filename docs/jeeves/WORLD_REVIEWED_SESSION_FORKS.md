@@ -38,3 +38,15 @@ provenance until the receipt is present and verifies; no automatic overwrite
 or privilege escalation is performed. SHA-256 receipts establish deterministic
 integrity, not external signatures or trusted authorship. HTML5 source
 verification is not device, engine, security or release certification.
+
+## Offline visual editing
+
+Run `world-fork --store STORE editor --world-id ID --parent-slot SLOT
+--expected-parent-digest DIGEST` to produce a CSP-hashed, network-disabled
+HTML editor. The editor offers only choices available at each replayed
+revision and exports an **unapproved request**, never a forged session.
+Use `world-fork --store STORE preview-file --request-file REQUEST.json`
+to revalidate the exported request against the latest canonical source and
+save the returned typed proposal for explicit review. Only the separate
+`publish` action can create a native session. The browser has no custody
+write access, and all edits are revalidated by Python before publication.

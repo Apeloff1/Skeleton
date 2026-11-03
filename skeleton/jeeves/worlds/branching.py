@@ -261,6 +261,35 @@ class ForkStore:
         finally:
             os.close(fd)
 
+    def editor(self, world_id: str, parent_slot: str,
+               expected_parent_digest: str) -> dict[str, Any]:
+        """Compile a private offline editor from the current native save lease."""
+        from .branching_editor import render_fork_editor
+        _id(world_id, "world_id")
+        _id(parent_slot, "parent_slot")
+        fd = self.worlds._directory()
+        try:
+            lock_fd = self.sessions._lock(fd, world_id)
+            try:
+                os.close(lock_fd)
+                world = self._read_source(fd, world_id)
+                parent = self.sessions._session(fd, world_id, parent_slot, world)
+                if digest(parent) != expected_parent_digest:
+                    raise CanonError("fork_stale_parent")
+                page = render_fork_editor(world, parent, parent_slot)
+                name = world_id + "." + parent_slot + ".fork-editor.html"
+                self.worlds._write(fd, name, page)
+                return {
+                    "schema": "jeeves.world.fork_editor.v1",
+                    "html_file": name, "html_sha256": __import__("hashlib").sha256(page).hexdigest(),
+                    "world_digest": digest(world), "parent_digest": digest(parent),
+                    "review_required": True,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def compile(self, world_id: str, target_slot: str,
                 expected_world_digest: str) -> dict[str, Any]:
         inspected = self.inspect(world_id, target_slot)

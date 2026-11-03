@@ -7,7 +7,7 @@ import sys
 
 from .branching import ForkStore
 from .session_cli import _bounded_import
-from .world_canon import CanonError
+from .world_canon import CanonError, _keys
 
 
 def run(argv: list[str]) -> int:
@@ -21,6 +21,12 @@ def run(argv: list[str]) -> int:
     preview.add_argument("--prompt", required=True)
     preview.add_argument("--at-revision", type=int, required=True)
     preview.add_argument("--choice-id", required=True)
+    preview_file = sub.add_parser("preview-file")
+    preview_file.add_argument("--request-file", required=True)
+    editor = sub.add_parser("editor")
+    editor.add_argument("--world-id", required=True)
+    editor.add_argument("--parent-slot", required=True)
+    editor.add_argument("--expected-parent-digest", required=True)
     publish = sub.add_parser("publish")
     publish.add_argument("--world-id", required=True)
     publish.add_argument("--proposal-file", required=True)
@@ -39,6 +45,16 @@ def run(argv: list[str]) -> int:
                 args.world_id, parent_slot=args.parent_slot,
                 target_slot=args.target_slot, prompt=args.prompt,
                 at_revision=args.at_revision, choice_id=args.choice_id)
+        elif args.action == "preview-file":
+            request = _keys(_bounded_import(args.request_file), {
+                "world_id", "parent_slot", "target_slot", "prompt",
+                "at_revision", "choice_id",
+            })
+            payload = store.preview(request["world_id"],
+                                    **{k: v for k, v in request.items() if k != "world_id"})
+        elif args.action == "editor":
+            payload = store.editor(args.world_id, args.parent_slot,
+                                   args.expected_parent_digest)
         elif args.action == "publish":
             payload = store.publish(
                 args.world_id, _bounded_import(args.proposal_file),

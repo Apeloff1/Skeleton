@@ -11,6 +11,7 @@ from skeleton.jeeves.worlds.branching import (
     ForkStore, compare_sessions, propose_fork,
 )
 from skeleton.jeeves.worlds.branching_cli import run
+from skeleton.jeeves.worlds.branching_editor import render_fork_editor
 from skeleton.jeeves.worlds.session import SessionStore, apply_choice, new_session
 from skeleton.jeeves.worlds.tools import SCHEMA, invoke_world_tool, manifest
 from skeleton.jeeves.worlds.world_canon import (
@@ -239,3 +240,46 @@ def test_create_only_publish_rejects_symlink_collision(tmp_path):
     with pytest.raises((CanonError, OSError)):
         forks.publish("isles", proposal, proposal["parent_digest"])
     assert target.read_text() == "untouched"
+
+
+def test_editor_is_offline_csp_bound_and_source_leased(tmp_path):
+    source, sessions, forks = setup(tmp_path)
+    parent = sessions.read("isles", "primary")
+    page = render_fork_editor(source, parent, "primary")
+    assert b"Content-Security-Policy" in page
+    assert b"connect-src 'none'" in page
+    assert b"sha256-" in page
+    assert b"Try the cliff" not in page
+    assert b"fork-request.json" in page
+    result = forks.editor("isles", "primary", digest(parent))
+    assert result["review_required"] is True
+    assert (tmp_path / result["html_file"]).read_bytes() == page
+    with pytest.raises(CanonError, match="fork_stale_parent"):
+        forks.editor("isles", "primary", "0" * 64)
+
+
+def test_editor_request_to_cli_preview_then_reviewed_publish(tmp_path, capsys):
+    _, sessions, forks = setup(tmp_path)
+    request = {
+        "world_id": "isles", "parent_slot": "primary",
+        "target_slot": "from-editor", "prompt": "Ari explores the cliff",
+        "at_revision": 0, "choice_id": "climb",
+    }
+    request_path = tmp_path / "request.json"
+    request_path.write_bytes(canonical(request))
+    assert run(["--store", str(tmp_path), "preview-file",
+                "--request-file", str(request_path)]) == 0
+    proposal = json.loads(capsys.readouterr().out)["result"]
+    assert proposal["preview"]["scene"]["id"] == "cliff"
+    assert proposal["parent_digest"] == digest(sessions.read("isles", "primary"))
+    reviewed = tmp_path / "reviewed.json"
+    reviewed.write_bytes(canonical(proposal))
+    assert run(["--store", str(tmp_path), "publish", "--world-id", "isles",
+                "--proposal-file", str(reviewed),
+                "--expected-parent-digest", proposal["parent_digest"]]) == 0
+    assert forks.inspect("isles", "from-editor")["history_proven"]
+    request["choice_id"] = "missing"
+    request_path.write_bytes(canonical(request))
+    assert run(["--store", str(tmp_path), "preview-file",
+                "--request-file", str(request_path)]) == 2
+    assert json.loads(capsys.readouterr().out.splitlines()[-1])["ok"] is False
