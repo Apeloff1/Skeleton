@@ -78,7 +78,7 @@ def play(store: SlotStore, slot: str, *, read=input, write=print) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cinder-ridge-consumer")
-    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "audit", "verify-export", "acceptance"))
+    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "audit", "verify-export", "acceptance", "bundle"))
     parser.add_argument("--slot", default="adventure", help="lowercase save name, 1-32 safe characters")
     parser.add_argument("--action", help="canonical JSON action for a noninteractive step")
     parser.add_argument("--expected-head", help="exact revision head for a noninteractive mutation")
@@ -100,6 +100,9 @@ def main(argv: list[str] | None = None) -> int:
             store = SlotStore()
             if args.command == "play":
                 result = play(store, args.slot)
+            elif args.command == "bundle":
+                from .consumer_bundle import build_bundle
+                result = build_bundle(store)
             elif args.command == "new":
                 result = store.new(args.slot)
             elif args.command == "status":

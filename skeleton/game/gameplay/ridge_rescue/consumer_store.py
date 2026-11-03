@@ -79,8 +79,8 @@ def _safe_directory(path: Path) -> Path:
 
 
 def _source() -> bytes:
-    source = Path(__file__).with_name("cinder_ridge_campaign.json")
-    data = source.read_bytes()
+    from importlib.resources import files
+    data = files(__package__).joinpath("cinder_ridge_campaign.json").read_bytes()
     if len(data) > 96_000:
         raise StoreError("bundled campaign exceeds source budget")
     return data
