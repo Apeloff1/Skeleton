@@ -121,6 +121,9 @@ def test_editor_and_read_only_typed_preview(tmp_path, capsys):
     assert b"<img src=x>" not in page
     assert b"\\u003c/script>" in page
     assert b"sha256-" in page
+    assert b"Choice weather overrides" in page
+    assert b"Add choice override" in page
+    assert b"Duplicate choice override" in page
     lease = store.publish("harbor", source, create=True)
     assert store.editor("harbor", lease)["source_digest"] == lease
     with pytest.raises(CanonError, match="weather_stale_source"):
