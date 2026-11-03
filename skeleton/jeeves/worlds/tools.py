@@ -27,7 +27,7 @@ from .npc_schedule import ScheduleStore
 from .inventory import InventoryStore
 from .puzzles import PuzzleStore
 from .events import EventStore
-from .relationships import RelationshipStore
+from .relationships import RelationshipStore\nfrom .testimony import TestimonyStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -45,7 +45,7 @@ TOOLS = {
     "world.assurance_preview": (),
     "world.atlas_preview": (),
     "world.relationships_player": ("slot",),
-    "world.relationships_preview": (),
+    "world.testimony_preview": (),\n    "world.testimony_propose_preview": (\n        "prompt", "statement_id", "actor", "scene", "choice", "claim",\n        "stance", "text", "provenance",\n    ),\n    "world.testimony_player": ("slot",),\n    "world.relationships_preview": (),
     "world.relationships_propose_preview": (
         "prompt", "bond_id", "actor", "name", "choice", "delta", "reason",
         "reaction_id", "scene", "min_score", "max_score", "text",
@@ -137,7 +137,7 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     elif name == "world.relationships_player":
         _id(args["slot"], "slot")
         payload = RelationshipStore(root).player(req["world_id"], args["slot"])
-    elif name == "world.relationships_preview":
+    elif name == "world.testimony_propose_preview":\n        payload = TestimonyStore(root).propose(req["world_id"], **args)\n    elif name == "world.testimony_preview":\n        payload = TestimonyStore(root).inspect(req["world_id"])\n    elif name == "world.testimony_player":\n        _id(args["slot"], "slot")\n        payload = TestimonyStore(root).player(req["world_id"], args["slot"])\n    elif name == "world.relationships_preview":
         payload = RelationshipStore(root).inspect(req["world_id"])
     elif name == "world.events_propose_preview":
         payload = EventStore(root).propose(req["world_id"], **args)
