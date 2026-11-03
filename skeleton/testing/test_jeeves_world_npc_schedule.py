@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from skeleton.jeeves.worlds.cast import CastStore, propose_cast
+from skeleton.jeeves.worlds.cast import CastStore, approve_cast, propose_cast
 from skeleton.jeeves.worlds.npc_schedule import (
     ScheduleStore, approve_schedule, edit_schedule, propose_schedule,
     prove_schedule, render_schedule_html,
@@ -29,7 +29,7 @@ def fixtures():
         npc_line="The pier is open to everyone.",
     )
     cast["characters"][0]["scenes"] = ["opening", "resolution"]
-    return world, cast
+    return world, approve_cast(cast, world, "Reviewed original NPC.")
 
 
 def proposal():
@@ -209,3 +209,11 @@ def test_cli_and_read_only_jeeves_preview(tmp_path, capsys):
     assert result["result"]["proof"]["witnesses"]["first_appointment"][
         "tick"
     ] == 0
+
+def test_unreviewed_cast_cannot_approve_schedule():
+    world, cast = fixtures()
+    draft = proposal()
+    cast["approved"] = False
+    draft["cast_digest"] = digest(cast)
+    with pytest.raises(CanonError, match="npc_schedule_cast_review_required"):
+        approve_schedule(draft, world, cast, "Attempted approval.")

@@ -205,6 +205,8 @@ def approve_schedule(data: Any, world: Any, cast: Any,
                      note: str) -> dict[str, Any]:
     prove_schedule(data, world, cast)
     _text(note, "review_note", 512)
+    if cast["approved"] is not True:
+        raise CanonError("npc_schedule_cast_review_required")
     updated = strict_json(canonical(data))
     updated["approved"] = True
     updated["review_note"] = note
@@ -289,6 +291,8 @@ render();
 def render_schedule_html(data: Any, world: Any, cast: Any) -> bytes:
     if data["approved"] is not True:
         raise CanonError("npc_schedule_review_required")
+    if cast["approved"] is not True:
+        raise CanonError("npc_schedule_cast_review_required")
     proof = prove_schedule(data, world, cast)
     payload = canonical({
         "world": world, "cast": cast, "schedule": data, "proof": proof,
