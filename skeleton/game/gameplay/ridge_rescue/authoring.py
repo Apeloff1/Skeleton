@@ -26,7 +26,9 @@ def revise(world: World, *, expected_sha256: str, operation: dict[str, Any]) -> 
     if not isinstance(operation, dict) or set(operation) != {"kind", "target", "value"}:
         raise AuthoringError("malformed authoring operation")
     data = deepcopy(before)
-    kind, target, value = operation["kind"], operation["target"], operation["value"]\n    if not isinstance(kind, str):\n        raise AuthoringError("invalid operation kind")
+    kind, target, value = operation["kind"], operation["target"], operation["value"]
+    if not isinstance(kind, str):
+        raise AuthoringError("invalid operation kind")
     if kind == "rename":
         if target != "world" or not isinstance(value, str):
             raise AuthoringError("invalid rename")

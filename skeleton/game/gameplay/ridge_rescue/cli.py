@@ -8,7 +8,8 @@ from .engine import apply, available_actions, initial_state, RescueError
 from .custody import export_run, verify_run, digest
 from .authoring import revise, verify_revision, validate_reachability
 from .guidance import hint
-from .io import read_bounded, write_new\nfrom .acceptance import run_acceptance
+from .io import read_bounded, write_new
+from .acceptance import run_acceptance
 from .quests import progress
 from .economy import BASE, price
 from .render import render_map, legend
@@ -35,7 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", help="create-only portable output file")
     args = parser.parse_args(argv)
     try:
-        if args.command == "demo":\n            report = run_acceptance("protect")\n        elif args.command == "verify":
+        if args.command == "demo":
+            report = run_acceptance("protect")\n        elif args.command == "verify":
             if not args.bundle:
                 raise ValueError("--bundle required")
             result = verify_run(read_bounded(args.bundle))
