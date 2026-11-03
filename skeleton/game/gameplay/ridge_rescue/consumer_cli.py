@@ -11,7 +11,7 @@ import json
 import os
 import sys
 
-from .campaign import verify_export
+from .campaign import verify_export, CampaignError
 from .consumer_experience import status_panel, navigation_hint, recent_events, action_label
 from .consumer_store import SlotStore, StoreError, MAX_EXPORT_BYTES
 from .io import read_bounded
@@ -25,7 +25,7 @@ def _view(verified: dict, *, ascii_mode: bool = False) -> str:
     lines = [
         campaign["title"],
         f"Save: {verified['slot']}  Revision: {verified['revision']}",
-        f"Chapter: {index + 1}/{len(campaign['episodes'])}  Status: {verified['status']}",
+        f"Chapter: {min(index + 1, len(campaign['episodes']))}/{len(campaign['episodes'])}  Status: {verified['status']}",
     ]
     lines.append(status_panel(verified))
     if verified["status"] == "completed":
@@ -42,6 +42,7 @@ def _view(verified: dict, *, ascii_mode: bool = False) -> str:
     result = "\n".join(lines)
     if ascii_mode:
         result = result.translate(str.maketrans({"·": ".", "█": "#", "≈": "~", "▲": "^"}))
+        result = result.encode("ascii", errors="replace").decode("ascii")
     return result
 
 
@@ -78,15 +79,28 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             write(recent_events(current))
             continue
         if answer == "e":
-            write("Exported: " + str(store.export(slot)))
+            try:
+                write("Exported: " + str(store.export(slot)))
+            except (StoreError, CampaignError, OSError) as exc:
+                write("Export unavailable; saved game unchanged: " + str(exc))
             continue
         if answer == "r" and current["status"] not in ("playing", "completed"):
-            current = store.retry(slot, expected_head=current["head"])
+            try:
+                current = store.retry(slot, expected_head=current["head"])
+            except (StoreError, CampaignError) as exc:
+                write("Retry not saved; refreshing authoritative slot: " + str(exc))
+                current = store.load(slot)
             continue
         if current["status"] == "playing" and answer.isascii() and answer.isdecimal():
             selected = int(answer)
             if 0 <= selected < len(current["actions"]):
-                current = store.step(slot, current["actions"][selected], expected_head=current["head"])
+                try:
+                    current = store.step(slot, current["actions"][selected], expected_head=current["head"])
+                except (StoreError, CampaignError) as exc:
+                    # A second process may have advanced the slot while this
+                    # player was reading the menu. Never replay stale input.
+                    write("Action not saved; refreshing authoritative slot: " + str(exc))
+                    current = store.load(slot)
                 continue
         write("Unavailable command; no turn was consumed.")
     return store.load(slot)
