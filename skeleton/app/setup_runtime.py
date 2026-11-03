@@ -141,7 +141,7 @@ def _setup_process_lock(root: Path, *, timeout: float = 10.0):
             or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
             or (os.name != "nt" and opened.st_nlink != 1)
         ):
-            raise ValueError("setup lock must be a stable, unaliased regular file")
+            raise ValueError("setup lock must be a stable regular file")
         if os.name != "nt":
             os.fchmod(descriptor, 0o600)
             import fcntl

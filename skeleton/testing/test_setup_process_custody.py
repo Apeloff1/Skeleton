@@ -408,7 +408,7 @@ def test_setup_lock_hardlink_alias_rejected_before_chmod(tmp_path):
     target.chmod(0o644)
     os.link(target, root / ".skeleton-setup.lock")
     original = target.read_bytes()
-    with pytest.raises(ValueError, match="stable, unaliased regular file"):
+    with pytest.raises(ValueError, match="stable regular file"):
         ensure_runtime_environment(root)
     assert target.read_bytes() == original
     assert stat.S_IMODE(target.stat().st_mode) == 0o644
