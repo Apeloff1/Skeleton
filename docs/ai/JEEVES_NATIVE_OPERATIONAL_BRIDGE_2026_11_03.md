@@ -126,6 +126,28 @@ A literal colon-prefixed prompt can be entered by doubling its first colon.
 The REPL makes no hidden retry after ambiguous native execution, and does not
 claim live token streaming or in-flight device cancellation.
 
+## Explicit real native acceptance, never source fixture acceptance
+
+A separate controlled operator entry point is available for the required
+real-model, real-SQLite acceptance sequence. It must never run automatically
+in CI or on an unapproved checkpoint. It requires both --approve-native
+and --prompt-stdin. The original private prompt and model response are not
+printed; output contains hashed model, tokenizer, prompt and answer identity.
+
+python -m skeleton.jeeves.agent.native_acceptance_cli --model-root /private/installed-gguf --state-dir /private/native-state --tenant local --subject operator --approve-native --prompt-stdin < /private/acceptance-prompt.txt
+
+The optional --cold-restart flag closes the first supervised runtime, runs
+the existing read-only SQLite restart doctor, reopens the exact approved
+installed model into a fresh supervised stack and verifies that replaying
+the original committed request requires **zero new model generations**.
+This is meaningful cold model reload/replay evidence; it is not in-flight
+native cancellation, memory pressure or clean Windows 11/WSL2 evidence.
+
+This command must only run on the actual trusted and verified source installed
+GGUF. It never ships model weights or replaces the existing installer.
+Tests for its orchestration use explicitly simulated workers and are never
+accepted as the physical evidence this operator command is designed to collect.
+
 ## Required source validation
 
 After the source publication and repairs are complete, run these in order:
@@ -135,13 +157,14 @@ After the source publication and repairs are complete, run these in order:
 3. python -m unittest skeleton.testing.test_jeeves_native_chat -v
 4. python -m unittest skeleton.testing.test_jeeves_native_signed_evidence -v
 5. python -m unittest skeleton.testing.test_jeeves_native_repl -v
-6. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_cli.py
-7. python scripts/check_architecture_map.py
-8. python scripts/check_ai_app_construction.py
-9. python scripts/check_capability_interfaces.py
-10. python scripts/check_provider_bootstrap.py
-11. python scripts/check_enterprise_ai_superiority.py --json
-12. python scripts/check_enterprise_ai_implementation_notes.py --json
+6. python -m unittest skeleton.testing.test_jeeves_native_acceptance_cli -v
+7. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_repl.py skeleton/jeeves/agent/native_signed_evidence.py skeleton/jeeves/agent/native_acceptance_cli.py skeleton/jeeves/agent/native_cli.py
+8. python scripts/check_architecture_map.py
+9. python scripts/check_ai_app_construction.py
+10. python scripts/check_capability_interfaces.py
+11. python scripts/check_provider_bootstrap.py
+12. python scripts/check_enterprise_ai_superiority.py --json
+13. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,
