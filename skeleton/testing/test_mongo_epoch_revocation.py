@@ -72,7 +72,13 @@ class EpochRevocationTests(unittest.IsolatedAsyncioTestCase):
                         raise RuntimeError("partial nested write")
                 except RuntimeError:
                     pass
-                self.epoch.require_actor_writer(tenant_id="tenant", actor_id="owner")
+                with self.assertRaisesRegex(MongoSourceEpochError, "poisoned"):
+                    self.epoch.require_actor_writer(tenant_id="tenant", actor_id="owner")
+                with self.assertRaisesRegex(MongoSourceEpochError, "poisoned"):
+                    self.epoch.require_tenant_writer(tenant_id="tenant")
+                with self.assertRaisesRegex(MongoSourceEpochError, "poisoned"):
+                    async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                        self.fail("poisoned writer entered a new nested mutation")
         self.assertEqual(self.collection.doc["phase"], "writing")
         self.assertEqual(self.collection.doc["epoch"], 3)
         self.assertEqual(self.collection.calls, 1)

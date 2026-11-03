@@ -248,6 +248,8 @@ class MongoCanonicalSourceEpoch:
         if (active is None or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id or active.actor_id != actor_id):
             raise MongoSourceEpochError("canonical write requires owner-scoped epoch")
+        if active.poisoned:
+            raise MongoSourceEpochError("canonical writer is poisoned")
 
     def require_tenant_writer(self, *, tenant_id: str) -> None:
         """Deletion-only boundary; tenant sweeps cannot invent actor custody."""
@@ -255,6 +257,8 @@ class MongoCanonicalSourceEpoch:
         if (active is None or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id):
             raise MongoSourceEpochError("tenant deletion requires canonical actor writer")
+        if active.poisoned:
+            raise MongoSourceEpochError("canonical writer is poisoned")
 
     @asynccontextmanager
     async def writer(self, *, tenant_id: str, actor_id: str):
@@ -267,6 +271,8 @@ class MongoCanonicalSourceEpoch:
             if (active.task is not task or active.tenant_id != tenant_id
                     or active.actor_id != actor_id):
                 raise MongoSourceEpochError("canonical writer scope cannot be inherited")
+            if active.poisoned:
+                raise MongoSourceEpochError("canonical writer is poisoned")
             # Reentrant writes share the same physical majority epoch.
             # A nested mutation that raises may have partially committed.
             # Even if its caller catches that exception, the outer writer
