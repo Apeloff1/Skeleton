@@ -100,3 +100,35 @@ def test_engine_verify_rejects_tampered_manifest_under_shared_lease(tmp_path):
         flow.engine_verify("harbor")
     assert error.value.code == "studio_engine_manifest_mismatch"
     assert not (tmp_path / "harbor.lock").exists()
+
+def test_engine_preview_holds_lease_across_laptop_and_nine_plane_read(
+        tmp_path, monkeypatch):
+    flow = prepared(tmp_path)
+    original = StudioEngineStore._inspect_snapshot
+    attempted = []
+
+    def guarded(self, fd, world_id, era):
+        assert (tmp_path / "harbor.lock").exists()
+        world = flow.worlds.read(world_id)
+        changed = dict(world, prompt=world["prompt"] + " concurrent preview edit")
+        with pytest.raises(CanonError) as error:
+            flow.worlds.publish(changed, expected_digest=digest(world))
+        attempted.append(error.value.code)
+        return original(self, fd, world_id, era)
+
+    monkeypatch.setattr(StudioEngineStore, "_inspect_snapshot", guarded)
+    preview = flow.engine_inspect("harbor", ERA)
+    assert preview["engine"]["source_digests"]["world"] == preview["laptop"]["source_digest"]
+    assert attempted == ["lease_busy"]
+    assert not (tmp_path / "harbor.lock").exists()
+
+
+def test_engine_preview_never_publishes_or_approves_missing_planes(tmp_path):
+    from skeleton.testing.test_jeeves_world_laptop_flow import ready
+    flow, _, _, _ = ready(tmp_path)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    with pytest.raises(CanonError) as error:
+        flow.engine_inspect("lighthouse", ERA)
+    assert error.value.code == "not_found"
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+    assert not (tmp_path / "lighthouse.lock").exists()

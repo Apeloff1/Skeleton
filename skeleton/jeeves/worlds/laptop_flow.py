@@ -253,12 +253,26 @@ class LaptopFlow:
             os.close(fd)
 
     def engine_inspect(self, world_id: str, era: str) -> dict[str, Any]:
-        """Use the existing Studio Engine owner; never invent missing planes."""
-        laptop = self.verify(world_id)
-        engine = StudioEngineStore(self.worlds.root).inspect(world_id, era)
-        if engine["source_digests"]["world"] != laptop["source_digest"]:
-            raise CanonError("laptop_engine_source_mismatch")
-        return {"laptop": laptop, "engine": engine}
+        """Read laptop and Studio Engine previews under one canonical lease.
+
+        The Studio Engine owner still performs all nine-plane validation.
+        Preview never synthesizes missing sources or authorizes compilation.
+        """
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                laptop, _world = self._verified_snapshot(fd, world_id)
+                engine = StudioEngineStore(self.worlds.root)._inspect_snapshot(
+                    fd, world_id, era)
+                if engine["source_digests"]["world"] != laptop["source_digest"]:
+                    raise CanonError("laptop_engine_source_mismatch")
+                return {"laptop": laptop, "engine": engine}
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def engine_compile(self, world_id: str, era: str,
                        expected_digests: Any) -> dict[str, Any]:

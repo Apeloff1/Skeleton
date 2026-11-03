@@ -171,22 +171,26 @@ class StudioEngineStore:
         }
         return receipt, content
 
+    def _inspect_snapshot(self, fd: int, world_id: str, era: str) -> dict[str, Any]:
+        """Preview the engine recipe under the caller's existing world lease."""
+        sources = self._sources(fd, world_id)
+        optional = self._optional_sources(fd, world_id, sources[0])
+        manifest = compile_studio_engine(sources, era, optional)
+        return {"schema": SCHEMA, "world_id": world_id,
+                "engine_era": era, "source_digests": manifest["source_digests"],
+                "studio_proof_digests": manifest["studio_proof_digests"],
+                "scene_count": len(manifest["scene_nodes"]),
+                "choice_count": len(manifest["choice_edges"]),
+                "ending_count": len(manifest["ending_nodes"]),
+                "optional_planes": sorted(optional),
+                "qualification": manifest["qualification"]}
+
     def inspect(self, world_id: str, era: str) -> dict[str, Any]:
         fd = self.worlds._directory()
         try:
             self.studio._locked(fd, world_id)
             try:
-                sources = self._sources(fd, world_id)
-                optional = self._optional_sources(fd, world_id, sources[0])
-                manifest = compile_studio_engine(sources, era, optional)
-                return {"schema": SCHEMA, "world_id": world_id,
-                        "engine_era": era, "source_digests": manifest["source_digests"],
-                        "studio_proof_digests": manifest["studio_proof_digests"],
-                        "scene_count": len(manifest["scene_nodes"]),
-                        "choice_count": len(manifest["choice_edges"]),
-                        "ending_count": len(manifest["ending_nodes"]),
-                        "optional_planes": sorted(optional),
-                        "qualification": manifest["qualification"]}
+                return self._inspect_snapshot(fd, world_id, era)
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
