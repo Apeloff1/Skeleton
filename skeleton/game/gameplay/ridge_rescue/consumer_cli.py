@@ -18,6 +18,19 @@ from .io import read_bounded
 from .render import render_map, legend
 from .schema import parse_world
 
+# Pasted or malformed commands must not crash a consumer or consume a turn.
+MAX_TERMINAL_INPUT = 128
+MAX_MENU_DIGITS = 8
+
+
+def _action_index(answer: str, available: int) -> int | None:
+    """Decode only bounded ASCII menu choices; never parse giant integers."""
+    if (not answer or len(answer) > MAX_MENU_DIGITS or
+            not answer.isascii() or not answer.isdecimal()):
+        return None
+    selected = int(answer)
+    return selected if selected < available else None
+
 
 def _view(verified: dict, *, ascii_mode: bool = False) -> str:
     index = verified["index"]
@@ -65,9 +78,13 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
         else:
             write("Choose an action number, h for a hint, j for journal, ? for help, e to export, b for full backup, q to save and quit.")
         try:
-            answer = read("> ").strip().lower()
+            raw = read("> ")
         except (EOFError, KeyboardInterrupt):
-            answer = "q"
+            raw = "q"
+        if not isinstance(raw, str) or len(raw) > MAX_TERMINAL_INPUT:
+            write("Unavailable command; no turn was consumed.")
+            continue
+        answer = raw.strip().lower()
         if answer in ("q", "quit"):
             break
         if answer in ("?", "help"):
@@ -98,9 +115,9 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
                 write("Retry not saved; refreshing authoritative slot: " + str(exc))
                 current = store.load(slot)
             continue
-        if current["status"] == "playing" and answer.isascii() and answer.isdecimal():
-            selected = int(answer)
-            if 0 <= selected < len(current["actions"]):
+        if current["status"] == "playing":
+            selected = _action_index(answer, len(current["actions"]))
+            if selected is not None:
                 try:
                     current = store.step(slot, current["actions"][selected], expected_head=current["head"])
                 except (StoreError, CampaignError) as exc:

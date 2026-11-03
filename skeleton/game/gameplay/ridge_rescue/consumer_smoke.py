@@ -76,7 +76,8 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         env["PYTHONPATH"] = str(Path(__file__).resolve().parents[4])
     first = _invoke(
         command, ["play", "--slot", "smoke", "--ascii"], env=env, cwd=root,
-        stdin="\n".join(["h", "j", "?", "b", "not-a-command"] + choices[:split] + ["q"]) + "\n",
+        stdin="\n".join(["h", "j", "?", "b", "not-a-command", "9" * 5000,
+                             "1" * 128, "١"] + choices[:split] + ["q"]) + "\n",
     )
     if ("Advisory only" not in first or "Unavailable command" not in first or
         "Backup created:" not in first):
