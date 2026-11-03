@@ -396,9 +396,22 @@ class LaptopFlow:
                 else "repair_canonical_replay_or_save_before_engine_handoff")
             return report
         # Separate diagnostic stages may observe different approved revisions.
-        # Never report a green handoff by mixing two valid generations.
+        # Never report a green handoff by mixing two valid generations, including
+        # a player save changed after the initial session inspection.
+        observed_session = report["checks"].get("session")
+        accepted_session = acceptance.get("existing_session")
+        session_changed = (
+            slot is not None and (
+                not isinstance(accepted_session, dict) or
+                accepted_session.get("slot") != slot or
+                accepted_session.get("session_digest") != observed_session.get("session_digest") or
+                accepted_session.get("revision") != observed_session.get("revision") or
+                accepted_session.get("restorable") is not True
+            )
+        )
         if (acceptance["source_digest"] != current["source_digest"] or
-                acceptance["receipt_digest"] != digest(verified_receipt)):
+                acceptance["receipt_digest"] != digest(verified_receipt) or
+                session_changed):
             report["checks"]["acceptance"] = {
                 "ok": False, "error": "laptop_diagnostic_source_changed"}
             report["next_action"] = "restart_diagnostic_after_source_change"
