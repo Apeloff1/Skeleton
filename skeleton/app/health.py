@@ -135,7 +135,7 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
         # a JSON health response or empty generic success payload.
         html_document = (
             content_type == "text/html"
-            and sample.lstrip(b"\\xef\\xbb\\xbf \\t\\r\\n").lower().startswith(b"<!doctype html")
+            and sample.lstrip().lower().startswith(b"<!doctype html")
         )
         ok = 200 <= status < 300 and effective == url and html_document
         return ProbeResult(
