@@ -106,6 +106,7 @@ Commands:
     world-testimony Reviewed NPC witnesses, contradiction proof and playable handoff
     world-relationships Reviewed original NPC trust, replay and playable handoff
     world-events Reviewed one-shot world events, flag closure and HTML5 handoff
+    world-economy Reviewed bounded resources, deterministic replay and HTML5 handoff
     world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -918,6 +919,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-atlas":
         from skeleton.jeeves.worlds.atlas_cli import run as world_atlas_cli
         return world_atlas_cli(rest)
+    if cmd == "world-economy":
+        from skeleton.jeeves.worlds.economy_cli import run as economy_cli
+        return economy_cli(rest)
     if cmd == "world-tools":
         from skeleton.jeeves.worlds.tools_cli import run as world_tools_cli
         return world_tools_cli(rest)

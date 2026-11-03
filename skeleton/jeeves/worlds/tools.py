@@ -35,6 +35,7 @@ from .accessibility import AccessibilityStore
 from .pacing import PacingStore
 from .studio_assembly import StudioAssemblyStore
 from .studio_engine import StudioEngineStore
+from .economy import EconomyStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -52,6 +53,12 @@ TOOLS = {
     "world.assurance_preview": (),
     "world.atlas_preview": (),
     "world.relationships_player": ("slot",),
+    "world.economy_preview": (),
+    "world.economy_player": ("slot",),
+    "world.economy_propose_preview": (
+        "prompt", "resource_id", "name", "initial", "capacity",
+        "choice_id", "cost", "gain",
+    ),
     "world.studio_engine_preview": ("era",),
     "world.studio_preview": (),
     "world.studio_player": ("slot", "locale"),
@@ -167,6 +174,13 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
     elif name == "world.relationships_player":
         _id(args["slot"], "slot")
         payload = RelationshipStore(root).player(req["world_id"], args["slot"])
+    elif name == "world.economy_propose_preview":
+        payload = EconomyStore(root).propose(req["world_id"], **args)
+    elif name == "world.economy_preview":
+        payload = EconomyStore(root).inspect(req["world_id"])
+    elif name == "world.economy_player":
+        _id(args["slot"], "slot")
+        payload = EconomyStore(root).player(req["world_id"], args["slot"])
     elif name == "world.studio_engine_preview":
         payload = StudioEngineStore(root).inspect(req["world_id"], args["era"])
     elif name == "world.studio_preview":
