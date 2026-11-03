@@ -25,7 +25,8 @@ from .atlas import AtlasStore
 from .portals import PortalStore
 from .npc_schedule import ScheduleStore
 from .inventory import InventoryStore
-from .puzzles import PuzzleStore\nfrom .events import EventStore
+from .puzzles import PuzzleStore
+from .events import EventStore
 from .revision import analyze_revision
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, canonical, digest, prove, strict_json,
@@ -42,7 +43,11 @@ TOOLS = {
     "world.invariants_preview": (),
     "world.assurance_preview": (),
     "world.atlas_preview": (),
-    "world.events_preview": (),\n    "world.events_propose_preview": (\n        "prompt", "event_id", "scene", "description", "requires", "grants",\n    ),\n    "world.puzzles_preview": (),
+    "world.events_preview": (),
+    "world.events_propose_preview": (
+        "prompt", "event_id", "scene", "description", "requires", "grants",
+    ),
+    "world.puzzles_preview": (),
     "world.puzzles_propose_preview": (
         "prompt", "puzzle_id", "scene", "question", "answer", "hint", "unlock_choice",
     ),
@@ -120,7 +125,11 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
         payload = ScenarioStore(root).inspect(req["world_id"])["report"]
     elif name == "world.invariants_preview":
         payload = InvariantStore(root).inspect(req["world_id"])["report"]
-    elif name == "world.events_propose_preview":\n        payload = EventStore(root).propose(req["world_id"], **args)\n    elif name == "world.events_preview":\n        payload = EventStore(root).inspect(req["world_id"])\n    elif name == "world.puzzles_propose_preview":
+    elif name == "world.events_propose_preview":
+        payload = EventStore(root).propose(req["world_id"], **args)
+    elif name == "world.events_preview":
+        payload = EventStore(root).inspect(req["world_id"])
+    elif name == "world.puzzles_propose_preview":
         payload = PuzzleStore(root).propose(req["world_id"], **args)
     elif name == "world.puzzles_preview":
         payload = PuzzleStore(root).inspect(req["world_id"])

@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @pytest.mark.parametrize("path", [
     "skeleton/__main__.py",
+    "skeleton/jeeves/worlds/tools.py",
+    "skeleton/jeeves/worlds/events.py",
+    "skeleton/jeeves/worlds/events_cli.py",
+    "skeleton/jeeves/worlds/events_editor.py",
     "skeleton/jeeves/worlds/route.py",
     "skeleton/jeeves/worlds/cast.py",
     "skeleton/jeeves/worlds/quest.py",
@@ -51,3 +55,24 @@ def test_repaired_world_modules_import_without_syntax_error():
     assert route.SCHEMA and cast.SCHEMA and quest.SCHEMA
     assert counterfactual.SCHEMA and lore.SCHEMA and lore_editor.EDITOR_SCHEMA
     assert lore_player._LORE_JS
+
+
+def test_scene_events_cli_and_typed_tool_dispatch_import():
+    """A literal backslash-n in a Python import/dispatch must fail immediately."""
+    from skeleton.jeeves.worlds import events, events_cli, tools
+    assert callable(events.prove_events)
+    assert callable(events_cli.run)
+    names = {item["name"] for item in tools.manifest()["tools"]}
+    assert {"world.events_preview", "world.events_propose_preview"} <= names
+
+
+def test_main_cli_scene_events_dispatch_is_real_python():
+    source = (ROOT / "skeleton/__main__.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    branches = [node for node in ast.walk(tree)
+                if isinstance(node, ast.Compare)
+                and len(node.comparators) == 1
+                and isinstance(node.comparators[0], ast.Constant)
+                and node.comparators[0].value == "world-events"]
+    assert len(branches) == 1
+    assert "world_events_cli(rest)" in source
