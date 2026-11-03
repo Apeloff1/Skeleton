@@ -11,8 +11,10 @@ TASKS=(
        "skeleton/ai/runtime/operational_ai/laptop_runtime"]),
     ("source-fixtures", [sys.executable,"-m",
        "skeleton.ai.runtime.operational_ai.laptop_runtime.qualification.cli"]),
-    ("focused-unittest", [sys.executable,"-m","unittest","discover",
-       "-s","skeleton/testing","-p","test_laptop_*.py","-q"]),
+    ("runtime-unittest", [sys.executable,"-m","unittest","discover",
+       "-s","skeleton/testing","-p","test_laptop_runtime_*.py","-q"]),
+    ("qualification-unittest", [sys.executable,"-m","unittest","discover",
+       "-s","skeleton/testing","-p","test_laptop_qualification_*.py","-q"]),
 )
 
 def main(argv=None):
