@@ -80,7 +80,7 @@ def verify_bytes(data: bytes) -> dict:
             names = archive.namelist()
             if len(names) != len(set(names)) or len(names) > MAX_SOURCE_FILES + 1:
                 raise BundleError("duplicate or excessive archive entries")
-            if "__main__.py" not in names or archive.read("__main__.py") != ENTRY:
+            if "__main__.py" not in names:
                 raise BundleError("untrusted game entrypoint")
             if not {"ridge_rescue/__init__.py", "ridge_rescue/consumer_cli.py",
                     "ridge_rescue/consumer_store.py", "ridge_rescue/cinder_ridge_campaign.json"}.issubset(names):
@@ -92,13 +92,17 @@ def verify_bytes(data: bytes) -> dict:
                     not item.filename.endswith((".py", ".json"))
                 ):
                     raise BundleError("unexpected archive member")
-                if ".." in item.filename.split("/") or item.is_dir():
+                mode = item.external_attr >> 16
+                if (stat.S_ISLNK(mode) or "\\" in item.filename or
+                    ".." in item.filename.split("/") or item.is_dir()):
                     raise BundleError("unsafe archive member")
                 if item.file_size > MAX_SOURCE_FILE_BYTES:
                     raise BundleError("oversized archive member")
                 total += item.file_size
                 if total > MAX_UNCOMPRESSED_BYTES:
                     raise BundleError("archive decompression budget exceeded")
+            if archive.read("__main__.py") != ENTRY:
+                raise BundleError("untrusted game entrypoint")
             if archive.testzip() is not None:
                 raise BundleError("archive CRC mismatch")
     except (zipfile.BadZipFile, OSError, RuntimeError) as exc:
