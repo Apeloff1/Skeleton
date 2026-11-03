@@ -21,9 +21,13 @@ from .harbor_crafting_beacon_package import (
 
 from .harbor_crafting_beacon_ui import play_beacon_live
 from .harbor_crafting_beacon_guidance import legal_beacon_actions, verify_beacon_guidance
+from .harbor_crafting_beacon_acceptance import (
+    MAX_ACCEPTANCE_BYTES, accept_beacon_play, verify_beacon_acceptance,
+)
 
 COMMANDS = (
-    "run", "verify", "resume", "status", "live", "hint", "verify-hint", "author", "verify-author",
+    "run", "verify", "resume", "status", "live", "hint", "verify-hint",
+    "accept", "verify-accept", "author", "verify-author",
     "package", "verify-package", "play", "verify-play", "resume-play",
 )
 
@@ -54,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--edits")
     parser.add_argument("--revision")
     parser.add_argument("--guidance")
+    parser.add_argument("--acceptance")
     parser.add_argument("--id", default="lantern-quay-beacons")
     parser.add_argument("--expected-digest")
     parser.add_argument("--require-rescue", action="store_true")
@@ -76,6 +81,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             if args.require_rescue:
                 verify_beacon_rescue(result, require_rescue=True)
+        elif command == "accept":
+            result = accept_beacon_play(_read(args.play, MAX_PLAY_BYTES))
+        elif command == "verify-accept":
+            result = verify_beacon_acceptance(
+                _read(args.play, MAX_PLAY_BYTES),
+                _read(args.acceptance, MAX_ACCEPTANCE_BYTES),
+            )
         elif command == "hint":
             result = legal_beacon_actions(_read(args.report, MAX_REPORT_BYTES))
         elif command == "verify-hint":
