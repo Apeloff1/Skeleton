@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from .campaign import verify_export
 from .consumer_store import SlotStore, StoreError, MAX_EXPORT_BYTES
+from .io import read_bounded
 from .render import render_map, legend
 from .schema import parse_world
 
@@ -89,10 +91,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "verify-export":
             if not args.file:
                 raise StoreError("--file required")
-            source = Path(args.file)
-            if source.is_symlink() or not source.is_file() or source.stat().st_size > MAX_EXPORT_BYTES:
-                raise StoreError("export input must be a bounded regular file")
-            result = verify_export(source.read_bytes())
+            if os.name == "nt":
+                raise StoreError("external file verification requires descriptor-anchored IO; Windows held")
+            result = verify_export(read_bounded(args.file, MAX_EXPORT_BYTES))
             result = {"verified": True, "head": result["head"], "status": result["status"],
                       "chapters": result["index"]}
         else:

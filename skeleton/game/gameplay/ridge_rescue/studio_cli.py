@@ -13,6 +13,7 @@ from typing import Callable
 
 COMMANDS = {
     "rescue": ("cli", "Base rescue game: movement, combat, crafting and earned endings"),
+    "consumer": ("consumer_cli", "Persistent original game: play, save, quit, restart and export"),
     "campaign": ("campaign_cli", "Multi-episode original rescue campaign"),
     "missions": ("missions_cli", "Source-bound mission DAG and replay-derived objectives"),
     "journal": ("journal_cli", "CAS-protected deterministic save and recovery"),

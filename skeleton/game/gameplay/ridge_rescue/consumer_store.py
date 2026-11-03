@@ -8,6 +8,7 @@ application-owned user data directory; arbitrary save paths are not accepted.
 from __future__ import annotations
 
 import os
+from contextlib import closing
 from pathlib import Path
 import re
 import secrets
@@ -50,31 +51,30 @@ def _slot(value: str) -> str:
 
 
 def _safe_directory(path: Path) -> Path:
-    """Reject reparse/symlink leafs and enforce private POSIX ownership.
+    """Build only private app-owned directories, rejecting links at each level.
 
-    The base directory is an OS user-profile location, not an untrusted
-    extracted package. A same-user process racing ancestor replacement is
-    outside this adapter's protection and requires device qualification.
+    No arbitrary save path is accepted by the consumer CLI. Device-level
+    hostile same-user races still require native Windows qualification.
     """
     if not path.is_absolute() or ".." in path.parts:
         raise StoreError("save directory must be absolute and normalized")
-    for component in (path.parent, path):
+    cursor = Path(path.anchor)
+    for part in path.parts[1:]:
+        cursor = cursor / part
         try:
-            info = os.lstat(component)
+            info = os.lstat(cursor)
         except FileNotFoundError:
-            if component == path:
-                try:
-                    path.mkdir(mode=0o700)
-                except FileExistsError:
-                    pass
-                info = os.lstat(path)
-            else:
-                raise StoreError("save parent directory does not exist")
-        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+            try:
+                os.mkdir(cursor, mode=0o700)
+            except FileExistsError:
+                pass
+            info = os.lstat(cursor)
+        reparse = bool(getattr(info, "st_file_attributes", 0) & 0x400)
+        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or reparse:
             raise StoreError("save directory must not be a link")
-        if os.name != "nt" and component == path:
-            if info.st_uid != os.getuid() or info.st_mode & 0o077:
-                raise StoreError("save directory is not private")
+    info = os.lstat(path)
+    if os.name != "nt" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
+        raise StoreError("save directory is not private")
     return path
 
 
@@ -151,7 +151,7 @@ class SlotStore:
     def new(self, name: str) -> dict:
         name = _slot(name)
         session = open_campaign(_source())
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 conn.execute("INSERT INTO slots VALUES(?,?,?,?)",
@@ -167,7 +167,7 @@ class SlotStore:
 
     def load(self, name: str) -> dict:
         name = _slot(name)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             try:
                 verified, revision = self._read(conn, name)
             except sqlite3.Error as exc:
@@ -178,7 +178,7 @@ class SlotStore:
         name = _slot(name)
         if not isinstance(expected_head, str) or len(expected_head) != 64:
             raise StoreError("expected 64-character CAS head")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 previous, revision = self._read(conn, name)
@@ -249,7 +249,7 @@ class SlotStore:
     def audit(self, name: str) -> dict:
         name = _slot(name)
         current = self.load(name)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT revision, prior_head, next_head, action FROM actions "
                 "WHERE slot=? ORDER BY revision", (name,)

@@ -146,6 +146,18 @@ def _league_contract() -> dict:
     return {"status": "verified-in-process", "entries": checked["entries"],
             "champion": checked["champion"], "head": checked["head"]}
 
+
+def _consumer_contract() -> dict:
+    from .consumer_acceptance import run_acceptance
+    report = run_acceptance()
+    if report["status"] != "verified-in-process" or report["chapters"] != 2:
+        raise AcceptanceMatrixError("consumer save/restart/export acceptance failed")
+    if not report["portable_export_verified"] or report["restart_count"] != report["actions"]:
+        raise AcceptanceMatrixError("consumer restart or export did not replay")
+    return {"status": "verified-in-process", "chapters": report["chapters"],
+            "actions": report["actions"], "head": report["head"]}
+
+
 def run_matrix(*, fail_fast: bool = False) -> dict:
     if type(fail_fast) is not bool:
         raise AcceptanceMatrixError("invalid fail_fast")
@@ -158,6 +170,7 @@ def run_matrix(*, fail_fast: bool = False) -> dict:
         ("mission-events", _missions_contract),
         ("original-challenges", _challenges_contract),
         ("earned-league", _league_contract),
+        ("consumer-restart-export", _consumer_contract),
     )
     reports = {}
     for name, check in checks:
