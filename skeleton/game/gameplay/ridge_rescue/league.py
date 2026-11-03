@@ -16,7 +16,7 @@ SOURCE_SCHEMA = "ridge.rescue.league.v1"
 BOARD_SCHEMA = "ridge.rescue.league.board.v1"
 EXPORT_SCHEMA = "ridge.rescue.league.export.v1"
 MAX_SOURCE = 128_000
-MAX_BOARD = 2_000_000
+MAX_BOARD = 1_000_000
 MAX_ENTRIES = 32
 HANDLE = re.compile(r"[a-z][a-z0-9_-]{1,31}\Z")
 
