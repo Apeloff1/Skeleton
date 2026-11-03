@@ -71,3 +71,14 @@ acceptance, Windows 11/WSL2 install, isolated in-flight cancellation,
 RAM/VRAM pressure, rights review, exact-head security gates and independent
 production-user qualification. Do not merge or release based on these
 source-only contracts alone.
+
+## Host-side fair native traffic gate
+
+`native_fabric.traffic` provides bounded priority ordering, per-scope
+concurrency ceilings, fair cohort rotation, terminal receipt identity and
+cross-thread synchronization for admission scheduling. An ambiguous model
+call remains held and consumes capacity until independent recovery; the
+queue never silently retries or refunds it. This queue is **in-process**
+and is explicitly NOT the already durable SQLite execution spine. It must
+not be used as the authority for exactly-once inference or automatic
+cross-process supervision.
