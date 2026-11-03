@@ -82,9 +82,11 @@ def require_non_negative_int(value: Any, *, field: str, maximum: int | None = No
 
 def normalize_relpath(value: Any, *, field: str = "path") -> str:
     """Return a bounded relative POSIX path with no invisible control aliases."""
-    if (not isinstance(value, str) or not value or len(value) > 4096
+    if (type(value) is not str or not value or len(value) > 4096
             or "\x00" in value or "\\" in value
-            or any(unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"}
+            or any(char in value for char in (":", "%", "?", "#"))
+            or unicodedata.normalize("NFC", value) != value
+            or any(unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
                    for char in value)):
         raise DeliveryError(f"{field} must be a bounded, printable POSIX path")
     path = PurePosixPath(value)
