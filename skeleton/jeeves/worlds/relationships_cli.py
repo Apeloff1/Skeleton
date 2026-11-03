@@ -82,6 +82,8 @@ def run(argv: list[str]) -> int:
             try:
                 world, cast = store._sources(fd, args.world_id)
                 data = store._read(fd, args.world_id, world, cast)
+                if not data["approved"] or not cast["approved"]:
+                    raise CanonError("relationships_review_required")
                 result = {"player": evaluate_relationships(
                     data, world, cast,
                     strict_json(args.choices_json.encode("utf-8")))}

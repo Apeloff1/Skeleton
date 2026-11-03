@@ -129,3 +129,35 @@ def test_symlink_and_numeric_overflow_fail_closed(tmp_path, capsys):
     assert run(["--store", str(tmp_path), "save", "--world-id", "harbor",
                 "--relationships-json", '{"n":1e999}']) == 2
     assert json.loads(capsys.readouterr().out)["error"] == "nonfinite_number"
+
+
+def test_cli_player_requires_review_then_replays_approved_source(tmp_path, capsys):
+    _, _, store, source = fixture(tmp_path)
+    first = store.publish("harbor", source, create=True)
+    command = ["--store", str(tmp_path), "player", "--world-id", "harbor",
+               "--choices-json", '["pursue_goal"]']
+    assert run(command) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "relationships_review_required"
+    store.approve("harbor", expected_digest=first, review_note="Reviewed")
+    assert run(command) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["player"]["scores"]["tala_trust"] == 12
+    assert result["player"]["reactions"][0]["reaction"] == "treaty_respected"
+    command[-1] = '["forged"]'
+    assert run(command) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "session_invalid_transition"
+
+
+def test_script_breakout_is_escaped_in_playable_and_editor(tmp_path):
+    _, _, store, source = fixture(tmp_path)
+    source["bonds"][0]["reactions"][0]["text"] = "</script><script>alert(1)</script>"
+    first = store.publish("harbor", source, create=True)
+    editor = store.editor("harbor", first)
+    editor_bytes = (tmp_path / editor["html_file"]).read_bytes()
+    assert b"</script><script>alert(1)" not in editor_bytes
+    approved = store.approve("harbor", expected_digest=first, review_note="Reviewed")
+    receipt = store.compile("harbor", approved)
+    playable = (tmp_path / receipt["html_file"]).read_bytes()
+    assert b"</script><script>alert(1)" not in playable
+    assert b"\\u003c/script>" in playable
+    assert store.verify("harbor") == receipt
