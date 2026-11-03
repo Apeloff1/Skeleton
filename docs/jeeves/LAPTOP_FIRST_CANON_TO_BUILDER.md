@@ -78,3 +78,11 @@ Run `python -m pytest skeleton/testing/test_jeeves_world_laptop_acceptance.py
 skeleton/testing/test_jeeves_world_laptop_flow.py -q` on the exact branch
 before promotion. Acceptance is offline source evidence only; it does not
 certify native engines, model inference, Windows installation or consumers.
+
+The read-only `diagnose` command now checks ending replay and portable
+roundtrip acceptance before reporting a builder handoff as ready for engine
+validation. A passing source-level rehearsal is not proof that a native game
+runs on a laptop. Portable save checksums detect accidental corruption but
+are not cryptographic authentication of an external player history; replay
+validation prevents impossible transitions, not a valid alternative history
+whose checksum was recomputed by its author.

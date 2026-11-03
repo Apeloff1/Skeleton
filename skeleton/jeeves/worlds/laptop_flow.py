@@ -350,6 +350,17 @@ class LaptopFlow:
                 "ok": True, "session_digest": session["session_digest"],
                 "revision": session["revision"],
             }
+        try:
+            acceptance = self.acceptance(world_id, slot)
+        except CanonError as exc:
+            report["checks"]["acceptance"] = {"ok": False, "error": exc.code}
+            report["next_action"] = "repair_canonical_replay_or_save_before_engine_handoff"
+            return report
+        report["checks"]["acceptance"] = {
+            "ok": True, "ending_witness_count": len(acceptance["ending_witnesses"]),
+            "portable_roundtrip_verified": acceptance["portable_roundtrip_verified"],
+            "persisted_slot_verified": acceptance["persisted_slot_verified"],
+        }
         report["next_action"] = "source_playable_handoff_ready_for_engine_validation"
         return report
 

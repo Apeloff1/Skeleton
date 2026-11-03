@@ -97,3 +97,20 @@ def test_acceptance_holds_world_lease_through_all_ending_replays(tmp_path, monke
     assert report["ending_witnesses"]
     assert attempts and set(attempts) == {"lease_busy"}
     assert flow.verify("lighthouse")["source_digest"] == report["source_digest"]
+
+def test_diagnostic_requires_acceptance_before_reporting_handoff(tmp_path, monkeypatch):
+    flow = ready(tmp_path)
+    normal = flow.diagnose("lighthouse")
+    assert normal["checks"]["acceptance"]["ok"] is True
+    assert normal["checks"]["acceptance"]["portable_roundtrip_verified"] is True
+    assert normal["checks"]["acceptance"]["persisted_slot_verified"] is False
+
+    def rejected(*_args, **_kwargs):
+        raise CanonError("laptop_acceptance_restore_mismatch")
+
+    monkeypatch.setattr(flow, "acceptance", rejected)
+    report = flow.diagnose("lighthouse")
+    assert report["checks"]["builder"]["ok"] is True
+    assert report["checks"]["acceptance"] == {
+        "ok": False, "error": "laptop_acceptance_restore_mismatch"}
+    assert report["next_action"] == "repair_canonical_replay_or_save_before_engine_handoff"
