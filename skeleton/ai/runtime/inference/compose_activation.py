@@ -146,6 +146,28 @@ class MongoGuardedActivation:
                     or not hello["setName"]
                     or hello.get("isWritablePrimary") is not True):
                 raise ActivationBlocked("linearizable Mongo replica-set primary required")
+            # The backend and engine may use different logical databases on
+            # the same Mongo server. A seqlock in one database does not fence
+            # canonical writes in another database or another client.
+            db_name = getattr(self._database, "name", None)
+            db_client = getattr(self._database, "client", None)
+            if not isinstance(db_name, str) or not db_name or db_client is None:
+                raise ActivationBlocked("canonical Mongo database identity missing")
+            collections = (
+                getattr(self._epoch, "_collection", None),
+                getattr(self._epoch, "_reader", None),
+                getattr(self._conversation, "threads", None),
+                getattr(self._conversation, "messages", None),
+                getattr(self._memory, "records", None),
+                getattr(self._memory, "idempotency", None),
+                getattr(self._memory, "revisions", None),
+                getattr(self._memory, "projection_outbox", None),
+            )
+            for collection in collections:
+                owner = getattr(collection, "database", None)
+                if (getattr(owner, "name", None) != db_name
+                        or getattr(owner, "client", None) is not db_client):
+                    raise ActivationBlocked("canonical source database ownership mismatch")
             verify_canonical_source_writer_inventory(
                 conversation=self._conversation, memory=self._memory, epoch=self._epoch,
             )

@@ -47,9 +47,15 @@ reviewer is actually independent merely because it is callable.
 4. Install the SAME epoch instance on both
    `MongoConversationAuthority` and `MongoMemoryRepository`, and verify
    all known entrypoints with
-   `verify_canonical_source_writer_inventory`. Separately audit other
-   services, direct Mongo clients, backups, migrations and maintenance
-   scripts; in-process inventory cannot fence an unknown external writer.
+   `verify_canonical_source_writer_inventory`. The activation probe now
+   verifies that the epoch collections, conversation threads/messages and
+   memory collections all belong to the SAME Mongo client and logical
+   database. The default Compose backend and engine currently configure
+   different logical database names; merely pointing both at the same
+   Mongo server is not enough. Reconcile the canonical owner deployment
+   explicitly before activation. Separately audit other services, direct
+   Mongo clients, backups, migrations and maintenance scripts; in-process
+   inventory cannot fence an unknown external writer.
 5. Construct an independently administered `BoundedAdversarialReviewer`
    and an authoritative `TrustedSnapshotReader`. Review the reviewer's
    trust domain and isolation from the model. Bind actual loaded native

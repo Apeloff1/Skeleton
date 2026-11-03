@@ -16,6 +16,8 @@ from skeleton.persistence.mongo_source_epoch import (
 
 class FakeDatabase:
     def __init__(self) -> None:
+        self.name = "tutolage"
+        self.client = object()
         self.hello = {"setName": "rs0", "isWritablePrimary": True}
         self.error = None
 
@@ -53,6 +55,8 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         self.database = FakeDatabase()
         self.epoch = object.__new__(MongoCanonicalSourceEpoch)
         self.epoch._database = self.database
+        self.epoch._collection = SimpleNamespace(database=self.database)
+        self.epoch._reader = SimpleNamespace(database=self.database)
         self.epoch_value = 2
         self.epoch_error = None
         self.wait_for_epoch = None
@@ -67,8 +71,12 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
 
         self.epoch.read_epoch = read_epoch
         self.backend = FakeNative()
-        self.conversation = object()
-        self.memory = object()
+        collection = lambda: SimpleNamespace(database=self.database)
+        self.conversation = SimpleNamespace(threads=collection(), messages=collection())
+        self.memory = SimpleNamespace(
+            records=collection(), idempotency=collection(),
+            revisions=collection(), projection_outbox=collection(),
+        )
         self.reviewer = lambda *args: True
         self.native_patch = patch(
             "skeleton.ai.runtime.inference.native_transformer.NativeTransformerModel",
@@ -143,6 +151,22 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ActivationBlocked) as caught:
             await self.make().activate()
         self.assertNotIn("password", str(caught.exception))
+
+    async def test_cross_database_conversation_denies(self):
+        self.conversation.threads.database = FakeDatabase()
+        with self.assertRaisesRegex(ActivationBlocked, "ownership mismatch"):
+            await self.make().activate()
+        self.assertEqual(self.inventory.call_count, 0)
+
+    async def test_cross_client_memory_denies(self):
+        self.memory.records.database = FakeDatabase()
+        with self.assertRaisesRegex(ActivationBlocked, "ownership mismatch"):
+            await self.make().activate()
+
+    async def test_cross_database_epoch_collection_denies(self):
+        self.epoch._reader.database = FakeDatabase()
+        with self.assertRaisesRegex(ActivationBlocked, "ownership mismatch"):
+            await self.make().activate()
 
     async def test_missing_inventory_denies(self):
         self.inventory.side_effect = MongoSourceEpochError("unfenced writer")
