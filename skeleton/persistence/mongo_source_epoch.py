@@ -28,6 +28,8 @@ from typing import Any
 
 _EPOCH_READ_MAX_TIME_MS = 2000
 _EPOCH_READ_DEADLINE_SECONDS = 3.0
+# A Mongo write timeout is AMBIGUOUS: never retry or clear a WRITING epoch.
+_EPOCH_MUTATION_DEADLINE_SECONDS = 6.0
 
 class MongoSourceEpochError(RuntimeError):
     """Canonical source epoch is unavailable or violates write fencing."""
@@ -89,6 +91,17 @@ class MongoCanonicalSourceEpoch:
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
             "skeleton.canonical_source_writer", default=None,
         )
+
+    @staticmethod
+    async def _bounded_mutation(operation: Any) -> Any:
+        """Bound a majority-CAS operation without asserting rollback on timeout.
+
+        The driver may commit a write just before cancellation; callers must
+        treat timeout as uncertain, preserve the durable phase, and require
+        operator reconciliation rather than replaying the mutation.
+        """
+        async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+            return await operation
 
     @staticmethod
     def _key(tenant_id: str, actor_id: str) -> str:
@@ -162,10 +175,10 @@ class MongoCanonicalSourceEpoch:
         if approved is not True:
             raise MongoSourceEpochError("operator migration authorization denied")
         try:
-            await self._collection.insert_one({
+            await self._bounded_mutation(self._collection.insert_one({
                 "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                 "phase": "stable", "epoch": 2, "writer_token": None,
-            })
+            }))
         except Exception as exc:
             raise MongoSourceEpochError(
                 "source epoch already initialized or migration unavailable"
@@ -206,7 +219,7 @@ class MongoCanonicalSourceEpoch:
             raise MongoSourceEpochError("operator revocation not authorized")
         try:
             from pymongo import ReturnDocument
-            result = await self._collection.find_one_and_update(
+            result = await self._bounded_mutation(self._collection.find_one_and_update(
                 {
                     "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                     "phase": "stable", "writer_token": None,
@@ -217,7 +230,7 @@ class MongoCanonicalSourceEpoch:
                     "$set": {"phase": "revoked", "revoked_reason": reason_code},
                 },
                 return_document=ReturnDocument.AFTER,
-            )
+            ))
         except Exception:
             # A timed-out majority write may have committed. Never retry
             # blindly or reset the epoch; operator must read/reconcile.
@@ -258,13 +271,13 @@ class MongoCanonicalSourceEpoch:
         token = str(uuid4())
         try:
             from pymongo import ReturnDocument
-            acquired = await self._collection.find_one_and_update(
+            acquired = await self._bounded_mutation(self._collection.find_one_and_update(
                 {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                  "phase": "stable", "writer_token": None},
                 {"$inc": {"epoch": 1},
                  "$set": {"phase": "writing", "writer_token": token}},
                 return_document=ReturnDocument.AFTER,
-            )
+            ))
         except Exception as exc:
             raise MongoSourceEpochError("canonical writer admission unavailable") from exc
         if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
@@ -276,14 +289,14 @@ class MongoCanonicalSourceEpoch:
         try:
             yield
             try:
-                closed = await self._collection.find_one_and_update(
+                closed = await self._bounded_mutation(self._collection.find_one_and_update(
                     {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                      "phase": "writing", "writer_token": token,
                      "epoch": acquired["epoch"]},
                     {"$inc": {"epoch": 1},
                      "$set": {"phase": "stable", "writer_token": None}},
                     return_document=ReturnDocument.AFTER,
-                )
+                ))
             except Exception as exc:
                 raise MongoSourceEpochError(
                     "canonical writer completion unavailable; epoch remains quarantined"

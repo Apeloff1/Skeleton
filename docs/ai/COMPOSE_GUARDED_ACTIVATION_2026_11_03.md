@@ -181,3 +181,17 @@ databases. They cover majority initial epoch, linearizable reads, writer
 collision, WRITING quarantine across restart and terminal revocation.
 Without explicit test authority, tests SKIP and cannot be counted as passes.
 They do not deploy a replica set, migrate Compose, or certify consumers.
+
+## Majority-CAS mutation deadlines (2026-11-03)
+
+Every canonical epoch mutation (initial provisioning, writer admission,
+writer completion and operator revocation) now has a bounded local wait.
+A deadline is **not** proof that Mongo rolled the operation back: the server
+may have committed just before the caller timed out. No timed-out operation
+is retried automatically. A writer completion timeout leaves the actor
+unavailable unless an independently audited operator reconciles the actual
+majority-durable epoch and source writes. Admission and migration timeouts
+also have ambiguous outcomes and must never be followed by blind replays.
+
+Focused regression: `python -m unittest skeleton.testing.test_mongo_epoch_operation_deadlines`.
+The simulated deadline tests do not prove real replica-set semantics.
