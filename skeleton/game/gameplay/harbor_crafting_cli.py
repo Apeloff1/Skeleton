@@ -37,6 +37,7 @@ from .harbor_crafting_guidance import (
     MAX_REPORT_BYTES as MAX_GUIDANCE_BYTES,
     legal_action_report, verify_legal_action_report,
 )
+from .harbor_crafting_route import MAX_ROUTE_BYTES, plan_route, verify_route
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -65,7 +66,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -93,10 +94,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--other-journal", help="Candidate journal for reconciliation")
     parser.add_argument("--expected-journal-digest", help="CAS journal lease")
     parser.add_argument("--revision-index", type=int, help="Historical journal revision")
+    parser.add_argument("--goal", help="Route destination as x,y")
+    parser.add_argument("--route", help="Portable replay-verified route JSON")
+    parser.add_argument("--max-steps", type=int, default=64, help="Bounded route search horizon")
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "journal-package-play":
+        if args.command == "route-plan":
+            if not args.goal or not args.expected_terminal_digest:
+                raise HarborError("--goal and --expected-terminal-digest are required")
+            coordinates = args.goal.split(",")
+            if len(coordinates) != 2 or any(not part.isdecimal() for part in coordinates):
+                raise HarborError("--goal must be x,y")
+            output = plan_route(
+                _required_json(args.bundle, "bundle"),
+                [int(part) for part in coordinates],
+                expected_terminal_digest=args.expected_terminal_digest,
+                max_steps=args.max_steps,
+            )
+        elif args.command == "route-verify":
+            output = {"verified": True, **verify_route(
+                _required_json(args.route, "route", MAX_ROUTE_BYTES))}
+        elif args.command == "journal-package-play":
             output = export_journal_package_play(
                 _required_json(args.journal, "journal", MAX_JOURNAL_BYTES),
                 _required_json(args.package, "package", MAX_PACKAGE_BYTES),
