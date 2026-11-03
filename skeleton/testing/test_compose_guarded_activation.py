@@ -217,6 +217,18 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
         self.assertEqual(self.inventory.call_count, 0)
 
+    async def test_authenticated_mongo_principal_rotation_blocks_existing_permit(self):
+        gate = self.make()
+        permit = await gate.activate()
+        self.database.auth = {"authInfo": {"authenticatedUsers": [
+            {"user": "different-writer", "db": "admin"},
+        ]}}
+        with self.assertRaisesRegex(ActivationBlocked, "authority changed"):
+            await gate.assert_active(permit)
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertIsNone(gate._auth_at_activation)
+        self.assertNotIn("different-writer", str(gate.phase))
+
     async def test_authentication_loss_blocks_existing_permit(self):
         gate = self.make()
         permit = await gate.activate()

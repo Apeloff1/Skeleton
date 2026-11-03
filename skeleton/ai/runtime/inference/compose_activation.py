@@ -139,6 +139,7 @@ class MongoGuardedActivation:
         self._phase = ActivationPhase.BLOCKED
         self._generation = 0
         self._epoch_at_activation: int | None = None
+        self._auth_at_activation: tuple[tuple[str, str], ...] | None = None
         self._lock = asyncio.Lock()
 
     @property
@@ -167,14 +168,14 @@ class MongoGuardedActivation:
         except Exception:
             raise ActivationBlocked("native model/tokenizer identity unavailable") from None
 
-    async def _probe(self) -> int:
+    async def _probe(self) -> tuple[int, tuple[tuple[str, str], ...]]:
         try:
             async with asyncio.timeout(_MAX_TOTAL_AUTHORITY_SECONDS):
                 return await self._probe_bounded()
         except TimeoutError:
             raise ActivationBlocked("guarded activation authority timed out") from None
 
-    async def _probe_bounded(self) -> int:
+    async def _probe_bounded(self) -> tuple[int, tuple[tuple[str, str], ...]]:
         try:
             async with asyncio.timeout(_MAX_PROBE_SECONDS):
                 hello = await self._database.command("hello")
@@ -203,6 +204,11 @@ class MongoGuardedActivation:
                         for user in users
                     )):
                 raise ActivationBlocked("authenticated canonical Mongo session required")
+            # Pin the exact authenticated Mongo principal set across the
+            # entire activation generation. A silent credential or identity
+            # swap must require explicit operator reactivation, even if the
+            # epoch happens to have the same numeric value.
+            auth_identity = tuple(sorted((user["db"], user["user"]) for user in users))
             # The backend and engine may use different logical databases on
             # the same Mongo server. A seqlock in one database does not fence
             # canonical writes in another database or another client.
@@ -253,7 +259,7 @@ class MongoGuardedActivation:
             if final_epoch != first_epoch:
                 raise ActivationBlocked("canonical source changed during reviewer attestation")
             self._verify_backend()
-            return final_epoch
+            return final_epoch, auth_identity
         except ActivationBlocked:
             raise
         except ReviewerCustodyError:
@@ -272,12 +278,14 @@ class MongoGuardedActivation:
             self._generation += 1
             generation = self._generation
             try:
-                epoch = await self._probe()
+                epoch, auth_identity = await self._probe()
             except BaseException:
                 self._phase = ActivationPhase.BLOCKED
                 self._epoch_at_activation = None
+                self._auth_at_activation = None
                 raise
             self._epoch_at_activation = epoch
+            self._auth_at_activation = auth_identity
             self._phase = ActivationPhase.ACTIVE
             return ActivationPermit(
                 generation, self._tenant_id, self._actor_id, self._context_id,
@@ -295,6 +303,7 @@ class MongoGuardedActivation:
                 raise ActivationBlocked("guarded local inference is not activated")
             generation = self._generation
             epoch_at_activation = self._epoch_at_activation
+            auth_at_activation = self._auth_at_activation
             expected = ActivationPermit(
                 generation, self._tenant_id, self._actor_id, self._context_id,
                 epoch_at_activation, *self._identity,
@@ -302,25 +311,28 @@ class MongoGuardedActivation:
             if permit is not None and (type(permit) is not ActivationPermit or permit != expected):
                 raise ActivationBlocked("activation permit is stale or mismatched")
         try:
-            epoch = await self._probe()
+            epoch, auth_identity = await self._probe()
         except BaseException:
             async with self._lock:
                 if self._phase is ActivationPhase.ACTIVE:
                     self._phase = ActivationPhase.BLOCKED
                     self._generation += 1
                     self._epoch_at_activation = None
+                    self._auth_at_activation = None
             raise
         async with self._lock:
             if (self._phase is not ActivationPhase.ACTIVE
                     or self._generation != generation
                     or self._epoch_at_activation != epoch
-                    or epoch != epoch_at_activation):
+                    or epoch != epoch_at_activation
+                    or auth_identity != auth_at_activation):
                 # A concurrent operator revocation is terminal, not a
                 # recoverable BLOCKED state that activate() may later reset.
                 if self._phase is ActivationPhase.ACTIVE:
                     self._phase = ActivationPhase.BLOCKED
                 self._generation += 1
                 self._epoch_at_activation = None
+                self._auth_at_activation = None
                 raise ActivationBlocked("canonical authority changed during inference")
             return expected
 
@@ -330,6 +342,7 @@ class MongoGuardedActivation:
             self._phase = ActivationPhase.REVOKED
             self._generation += 1
             self._epoch_at_activation = None
+            self._auth_at_activation = None
 
 
 
