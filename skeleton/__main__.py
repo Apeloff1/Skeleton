@@ -78,6 +78,7 @@ Commands:
     world-session Source-verified offline play, save, resume and checkpoint replay
     world-migrate Reviewed source-revision save migration with exact replay proof
     world-playtest Bounded choice-coverage proof and verified playable QA handoff
+    world-revision Field-level causal impact review and source-verified HTML5 handoff
     world-quest  Original objective authoring, earned consequences and quest proof
     world-counterfactual Reviewed alternate endings from actual player choices
     world-lore   Original lore canon, branch contradiction proof and player reveal
@@ -805,6 +806,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "world-experience":
         from skeleton.jeeves.worlds.experience_cli import run as world_experience_cli
         return world_experience_cli(rest)
+    if cmd == "world-revision":
+        from skeleton.jeeves.worlds.revision_cli import run as world_revision_cli
+        return world_revision_cli(rest)
     if cmd == "world-playtest":
         from skeleton.jeeves.worlds.playtest_cli import run as world_playtest_cli
         return world_playtest_cli(rest)
