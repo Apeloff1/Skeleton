@@ -87,6 +87,17 @@ from .harbor_crafting_survey_authoring import (
     MAX_REVISION_BYTES as MAX_SURVEY_REVISION_BYTES,
     edit_survey, verify_survey_edit,
 )
+from .harbor_crafting_weather import (
+    MAX_BOARD_BYTES as MAX_WEATHER_BOARD_BYTES,
+    MAX_REPORT_BYTES as MAX_WEATHER_REPORT_BYTES,
+    MAX_FORECAST_BYTES as MAX_WEATHER_FORECAST_BYTES,
+    build_weather_game, resume_weather_game, verify_weather_game,
+    weather_forecast, verify_weather_forecast,
+)
+from .harbor_crafting_weather_authoring import (
+    MAX_REVISION_BYTES as MAX_WEATHER_REVISION_BYTES,
+    edit_weather, verify_weather_edit,
+)
 from .harbor_crafting_ui import play_live
 from .harbor_crafting_sessions import (
     branch_portfolio, checkpoint, resume_bundle, verify_portfolio,
@@ -115,7 +126,7 @@ def _required_json(path: str | None, name: str, maximum: int = MAX_BUNDLE_BYTES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Play, export, branch and replay-verify Lantern Quay")
     parser.add_argument("command", choices=(
-        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author"
+        "demo", "play", "verify", "checkpoint", "resume", "portfolio", "verify-portfolio", "author", "verify-author", "solve", "verify-plan", "play-live", "mission-report", "verify-mission-report", "solve-missions", "author-missions", "verify-mission-author", "mission-checkpoint", "mission-resume", "mission-portfolio", "verify-mission-portfolio", "compare-mission-revision", "verify-mission-comparison", "package-build", "package-verify", "package-play", "package-verify-play", "market-report", "verify-market", "market-checkpoint", "market-resume", "market-futures", "verify-market-futures", "market-preview", "verify-market-preview", "market-apply", "market-balance", "verify-market-balance", "market-distribution", "verify-market-distribution", "market-distribution-play", "verify-market-distribution-play", "npc-report", "verify-npc-report", "npc-forecast", "verify-npc-forecast", "journal-init", "journal-append", "journal-verify", "journal-export", "journal-at", "journal-rewind", "journal-audit", "journal-compare", "journal-verify-comparison", "journal-fast-forward", "legal-actions", "verify-legal-actions", "journal-package-play", "journal-verify-package-play", "route-plan", "route-verify", "itinerary-build", "itinerary-verify", "trial-run", "trial-verify", "trial-resume", "trial-leaderboard", "trial-verify-leaderboard", "trial-author", "trial-verify-author", "trial-live", "ghost-race", "ghost-verify", "season-init", "season-append", "season-verify", "season-board", "season-board-verify", "season-author", "season-verify-author", "season-next", "season-live", "contract-init", "contract-next", "contract-play", "contract-append", "contract-verify", "contract-author", "contract-verify-author", "contract-live", "contract-plan", "contract-verify-plan", "survey-run", "survey-verify", "survey-resume", "survey-hint", "survey-verify-hint", "survey-author", "survey-verify-author", "weather-run", "weather-verify", "weather-resume", "weather-forecast", "weather-verify-forecast", "weather-author", "weather-verify-author"
     ))
     parser.add_argument("--source", default=str(DEFAULT_WORLD))
     parser.add_argument("--actions", help="JSON array file or '-' for stdin")
@@ -171,6 +182,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--survey-revision", help="Portable survey authoring revision")
     parser.add_argument("--expected-survey-digest", help="CAS lease for survey continuation")
     parser.add_argument("--expected-survey-board-digest", help="CAS lease for survey editor")
+    parser.add_argument("--weather-board", help="Authored weather phase and hazard board")
+    parser.add_argument("--weather-report", help="Portable weather gameplay report")
+    parser.add_argument("--weather-forecast", help="Portable weather forecast")
+    parser.add_argument("--weather-edits", help="Transactional weather board edits")
+    parser.add_argument("--weather-revision", help="Portable weather authoring revision")
+    parser.add_argument("--expected-weather-digest", help="CAS lease for weather continuation")
+    parser.add_argument("--expected-weather-board-digest", help="CAS lease for weather authoring")
+    parser.add_argument("--horizon", type=int, default=12, help="Bounded weather forecast horizon")
     parser.add_argument("--ghost-bundle", help="Verified opponent save for ghost racing")
     parser.add_argument("--trial-edits", help="JSON array of transactional time trial edits")
     parser.add_argument("--trial-revision", help="Portable time trial course revision JSON")
@@ -179,7 +198,52 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-win", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.command == "survey-run":
+        if args.command == "weather-run":
+            output = build_weather_game(
+                load_source(Path(args.source)),
+                _required_json(args.weather_board, "weather-board", MAX_WEATHER_BOARD_BYTES),
+                _required_json(args.actions, "actions"),
+                require_win=args.require_win,
+            )
+        elif args.command == "weather-verify":
+            output = {"verified": True, **verify_weather_game(
+                _required_json(args.weather_report, "weather-report", MAX_WEATHER_REPORT_BYTES),
+                require_win=args.require_win,
+            )}
+        elif args.command == "weather-resume":
+            if not args.expected_weather_digest:
+                raise HarborError("--expected-weather-digest is required")
+            output = resume_weather_game(
+                _required_json(args.weather_report, "weather-report", MAX_WEATHER_REPORT_BYTES),
+                _required_json(args.actions, "actions"),
+                expected_digest=args.expected_weather_digest,
+                require_win=args.require_win,
+            )
+        elif args.command == "weather-forecast":
+            output = weather_forecast(
+                _required_json(args.weather_report, "weather-report", MAX_WEATHER_REPORT_BYTES),
+                horizon=args.horizon,
+            )
+        elif args.command == "weather-verify-forecast":
+            output = {"verified": True, **verify_weather_forecast(
+                _required_json(args.weather_forecast, "weather-forecast", MAX_WEATHER_FORECAST_BYTES))}
+        elif args.command == "weather-author":
+            if not args.expected_source_digest or not args.expected_weather_board_digest:
+                raise HarborError("weather authoring source and board leases required")
+            output = edit_weather(
+                load_source(Path(args.source)),
+                _required_json(args.weather_board, "weather-board", MAX_WEATHER_BOARD_BYTES),
+                _required_json(args.weather_edits, "weather-edits", MAX_WEATHER_BOARD_BYTES),
+                expected_source_digest=args.expected_source_digest,
+                expected_board_digest=args.expected_weather_board_digest,
+                preview_report=_required_json(
+                    args.weather_report, "weather-report", MAX_WEATHER_REPORT_BYTES
+                ) if args.weather_report else None,
+            )
+        elif args.command == "weather-verify-author":
+            output = {"verified": True, **verify_weather_edit(
+                _required_json(args.weather_revision, "weather-revision", MAX_WEATHER_REVISION_BYTES))}
+        elif args.command == "survey-run":
             output = build_survey(
                 load_source(Path(args.source)),
                 _required_json(args.survey_board, "survey-board", MAX_SURVEY_BOARD_BYTES),
