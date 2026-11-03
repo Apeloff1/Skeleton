@@ -29,7 +29,22 @@ for (const entry of source.entries) {
   summary.maxLength = 1024;
   summary.rows = 4; summary.cols = 72;
   label.append(summary); root.append(label);
-  fields.push(summary);
+  const categories = element("fieldset");
+  categories.append(element("legend", "Scene categories"));
+  const checkboxes = [];
+  for (const category of [
+    "conflict", "fear", "flashing", "grief", "loud_audio", "romance", "violence"
+  ]) {
+    const tagLabel = element("label", category);
+    const checkbox = element("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = entry.categories.includes(category);
+    tagLabel.prepend(checkbox);
+    categories.append(tagLabel);
+    checkboxes.push({category, checkbox});
+  }
+  root.append(categories);
+  fields.push({summary, checkboxes});
 }
 const button = element("button", "Export unapproved advisory source");
 button.type = "button";
@@ -41,7 +56,12 @@ button.addEventListener("click", () => {
   const draft = JSON.parse(JSON.stringify(source));
   draft.approved = false;
   draft.review_note = "";
-  fields.forEach((field, i) => draft.entries[i].safe_summary = field.value);
+  fields.forEach((field, i) => {
+    draft.entries[i].safe_summary = field.summary.value;
+    draft.entries[i].categories = field.checkboxes
+      .filter(item => item.checkbox.checked)
+      .map(item => item.category).sort();
+  });
   const body = JSON.stringify(draft, null, 2) + "\n";
   if (new TextEncoder().encode(body).length > 524288) {
     status.textContent = "Source exceeds bounded import size."; return;

@@ -46,6 +46,7 @@ def test_masking_requires_explicit_consent_and_approved_source(tmp_path):
     hidden = store.player("beacon", "player")
     assert hidden["masked"] is True
     assert hidden["narrative"] == "A scene in the harbor."
+    assert hidden["title"] == "Scene content notice"
     shown = store.player("beacon", "player", ["fear"])
     assert shown["masked"] is False
     assert shown["narrative"] == world["scenes"][0]["narrative"]
@@ -137,6 +138,8 @@ def test_editor_source_lease_and_script_injection(tmp_path):
     assert b"<img src=x>" not in page
     assert b"\\u003c/script>" in page
     assert b"sha256-" in page
+    assert b"Scene categories" in page
+    assert b"checkbox" in page
     lease = store.publish("beacon", source, create=True)
     assert store.editor("beacon", lease)["source_digest"] == lease
     with pytest.raises(CanonError, match="advisories_stale_source"):
