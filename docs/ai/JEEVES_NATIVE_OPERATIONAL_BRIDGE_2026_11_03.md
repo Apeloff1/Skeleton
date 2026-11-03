@@ -43,6 +43,29 @@ before promotion. This bridge must remain draft while that stack is held.
     installed-GGUF native execution, model rights, hardware validation,
     enterprise release certification or operational availability.
 
+## Operational plain chat mode
+
+Not every locally installed GGUF model reliably emits Jeeves planning and
+verification JSON. The new `NativeJeevesChat` is a conversational path
+through the *same* private SQLite session, process isolation, model/tokenizer
+identity checks, native receipt custody, and exact replay. It does not
+require untrusted model JSON to answer an ordinary question. The user
+message and assistant response are committed in a single native session.
+Historical context is assembled by the canonical native spine.
+
+To run the plain conversational mode (does not require an agent plan):
+
+`python -m skeleton.jeeves.agent.native_cli --mode chat --model-root /private/installed-gguf --state-dir /private/native-state --tenant local --subject operator --task-stdin < /private/task.txt`
+
+To resume the same explicitly principal-bound conversation, supply
+`--session <existing-private-session-id>`; use a stable `--request-id` to
+read-only replay the exact previous user turn instead of calling the native
+model again. Both are validated by the canonical durable session authority.
+The chat facade independently checks that the worker result matches a
+committed SQLite response and refuses ambiguous native effects. No model
+output triggers privileged tools, external network calls or memory
+inference/admission.
+
 ## Operator invocation
 
 Use a pre-installed, independently approved original GGUF model.
@@ -64,13 +87,14 @@ After the source publication and repairs are complete, run these in order:
 
 1. python -m unittest skeleton.testing.test_jeeves_native_prompt_and_schema -v
 2. python -m unittest skeleton.testing.test_jeeves_native_provider_bridge -v
-3. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_cli.py
-4. python scripts/check_architecture_map.py
-5. python scripts/check_ai_app_construction.py
-6. python scripts/check_capability_interfaces.py
-7. python scripts/check_provider_bootstrap.py
-8. python scripts/check_enterprise_ai_superiority.py --json
-9. python scripts/check_enterprise_ai_implementation_notes.py --json
+3. python -m unittest skeleton.testing.test_jeeves_native_chat -v
+4. python -m compileall -q skeleton/jeeves/agent/native_prompt_boundary.py skeleton/jeeves/agent/native_schema_boundary.py skeleton/jeeves/agent/native_receipt_boundary.py skeleton/jeeves/agent/native_provider.py skeleton/jeeves/agent/native_runtime.py skeleton/jeeves/agent/native_readiness.py skeleton/jeeves/agent/native_chat.py skeleton/jeeves/agent/native_cli.py
+5. python scripts/check_architecture_map.py
+6. python scripts/check_ai_app_construction.py
+7. python scripts/check_capability_interfaces.py
+8. python scripts/check_provider_bootstrap.py
+9. python scripts/check_enterprise_ai_superiority.py --json
+10. python scripts/check_enterprise_ai_implementation_notes.py --json
 
 Also rerun the full mandatory exact-final-head Merge Readiness, Backend
 Quality, App Foundation E2E, Workflow Input Security, Sealed Context Guard,

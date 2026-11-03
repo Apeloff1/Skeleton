@@ -32,6 +32,7 @@ class SimulatedSpine:
             max_output_tokens=128, context_tokens=1024,
         )
         self.sessions = set()
+        self.closed_sessions = set()
         self.turns = {}
         self.pending = set()
         self.generations = 0
@@ -50,7 +51,22 @@ class SimulatedSpine:
     def history(self, session):
         if session not in self.sessions:
             raise Conflict("unknown session")
-        return ()
+        result = []
+        for (stored_session, _), row in self.turns.items():
+            if stored_session == session:
+                result.extend((
+                    {"role": "user", "content": row["request_prompt"]},
+                    {"role": "assistant", "content": row["result"]["text"]},
+                ))
+        return tuple(result)
+
+    def close(self, session):
+        if session not in self.sessions:
+            raise Conflict("unknown session")
+        if session in self.closed_sessions:
+            return False
+        self.closed_sessions.add(session)
+        return True
 
     def replay(self, session, request_id, prompt, *, seed, temperature):
         if session not in self.sessions:
@@ -67,8 +83,8 @@ class SimulatedSpine:
         return result
 
     def turn(self, session, request_id, prompt, *, seed, temperature):
-        if session not in self.sessions:
-            raise Conflict("unknown session")
+        if session not in self.sessions or session in self.closed_sessions:
+            raise Conflict("unknown or closed session")
         key = (session, request_id)
         if key in self.pending:
             raise Conflict("native effect pending and uncertain")

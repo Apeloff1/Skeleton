@@ -14,6 +14,7 @@ import sys
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_checked
 from .native_runtime import NativeJeevesRuntime
+from .native_chat import NativeJeevesChat
 from .native_readiness import inspect_native_jeeves
 from .runtime import RunInputs
 from .types import Budget, Goal
@@ -33,6 +34,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-layers", type=int, default=0)
     parser.add_argument("--capacity-root", type=Path)
     parser.add_argument("--capacity-budget-bytes", type=int, default=8000000000)
+    parser.add_argument("--mode", choices=("chat", "agent"), default="agent")
+    parser.add_argument("--session")
+    parser.add_argument("--request-id")
     parser.add_argument("--max-steps", type=int, default=8)
     parser.add_argument("--max-model-calls", type=int, default=8)
     parser.add_argument("--max-wall-seconds", type=float, default=180)
@@ -63,6 +67,16 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
+            if args.mode == "chat":
+                chat = NativeJeevesChat(worker, session_id=args.session)
+                turn = chat.turn(task, request_id=args.request_id)
+                sys.stdout.write(json.dumps({
+                    "status": "native-chat-committed",
+                    **turn.to_record(),
+                }, sort_keys=True, ensure_ascii=False) + "\n")
+                return 0
+            if args.session or args.request_id:
+                raise ValueError("chat identifiers cannot be supplied in agent mode")
             run = NativeJeevesRuntime(worker)
             digest = sha256(task.encode("utf-8")).hexdigest()
             result = run.run(RunInputs(
