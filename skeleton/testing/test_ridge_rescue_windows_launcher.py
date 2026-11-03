@@ -14,6 +14,8 @@ def test_portable_windows_launcher_is_fixed_and_double_clickable(tmp_path):
     assert Path(report["path"]).name in script
     assert "play --ascii" in script
     assert "py -3" in script
+    assert "sys.version_info >= (3, 11)" in script
+    assert "if not defined PY" in script
     assert "%~dp0" in script
     assert "powershell" not in script.lower()
 
@@ -31,6 +33,7 @@ def test_windows_smoke_launcher_executes_source_and_portable_acceptance():
     script = (Path(__file__).resolve().parents[2] / "scripts" / "windows" /
               "cinder-ridge-smoke.cmd").read_text(encoding="ascii")
     assert "consumer smoke" in script
+    assert "sys.version_info >= (3, 11)" in script
     assert "consumer portable-smoke" in script
     assert script.index("consumer smoke") < script.index("consumer portable-smoke")
     assert "if errorlevel 1 goto :failed" in script
