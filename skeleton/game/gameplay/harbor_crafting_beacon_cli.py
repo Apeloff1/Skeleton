@@ -21,13 +21,18 @@ from .harbor_crafting_beacon_package import (
 
 from .harbor_crafting_beacon_ui import play_beacon_live
 from .harbor_crafting_beacon_guidance import legal_beacon_actions, verify_beacon_guidance
+from .harbor_crafting_beacon_journal import (
+    MAX_JOURNAL_BYTES, create_beacon_journal, append_beacon_journal,
+    verify_beacon_journal, beacon_journal_at, fork_beacon_journal,
+)
 from .harbor_crafting_beacon_acceptance import (
     MAX_ACCEPTANCE_BYTES, accept_beacon_play, verify_beacon_acceptance,
 )
 
 COMMANDS = (
     "run", "verify", "resume", "status", "live", "hint", "verify-hint",
-    "accept", "verify-accept", "author", "verify-author",
+    "accept", "verify-accept", "author",
+    "journal-init", "journal-append", "journal-verify", "journal-at", "journal-fork", "verify-author",
     "package", "verify-package", "play", "verify-play", "resume-play",
 )
 
@@ -59,13 +64,36 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--revision")
     parser.add_argument("--guidance")
     parser.add_argument("--acceptance")
+    parser.add_argument("--journal")
+    parser.add_argument("--index", type=int)
     parser.add_argument("--id", default="lantern-quay-beacons")
     parser.add_argument("--expected-digest")
     parser.add_argument("--require-rescue", action="store_true")
     args = parser.parse_args(argv)
     try:
         command = args.command
-        if command == "run":
+        if command == "journal-init":
+            result = create_beacon_journal(
+                _read(args.source, MAX_BUNDLE_BYTES),
+                _read(args.board, MAX_BOARD_BYTES),
+            )
+        elif command == "journal-append":
+            result = append_beacon_journal(
+                _read(args.journal, MAX_JOURNAL_BYTES),
+                _read(args.actions, MAX_BUNDLE_BYTES),
+                expected_tip=args.expected_digest or "",
+            )
+        elif command == "journal-verify":
+            result = verify_beacon_journal(_read(args.journal, MAX_JOURNAL_BYTES))
+        elif command == "journal-at":
+            result = beacon_journal_at(
+                _read(args.journal, MAX_JOURNAL_BYTES), args.index,
+            )
+        elif command == "journal-fork":
+            result = fork_beacon_journal(
+                _read(args.journal, MAX_JOURNAL_BYTES), args.index,
+            )
+        elif command == "run":
             result = build_beacon_rescue(
                 _read(args.source, MAX_BUNDLE_BYTES),
                 _read(args.board, MAX_BOARD_BYTES),
