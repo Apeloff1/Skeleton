@@ -413,3 +413,47 @@ def test_setup_lock_hardlink_alias_rejected_before_chmod(tmp_path):
     assert target.read_bytes() == original
     assert stat.S_IMODE(target.stat().st_mode) == 0o644
     assert not (root / ".env").exists()
+
+
+def test_admin_password_symlink_rejected_without_secret_import(tmp_path):
+    root = _root(tmp_path)
+    target = root / "operator-secret-target"
+    target.write_text("strong-password-value-1234", encoding="utf-8")
+    if os.name != "nt":
+        target.chmod(0o600)
+    alias = root / "operator-secret-link"
+    try:
+        alias.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(ValueError, match="symbolic link"):
+        ensure_runtime_environment(
+            root, admin_email="admin@example.test", admin_password_file=alias
+        )
+    assert target.read_text(encoding="utf-8") == "strong-password-value-1234"
+    assert not (root / ".env").exists()
+
+
+def test_admin_password_path_swap_rejected_before_read(tmp_path, monkeypatch):
+    root = _root(tmp_path)
+    password = root / "operator-secret"
+    password.write_text("strong-password-value-1234", encoding="utf-8")
+    if os.name != "nt":
+        password.chmod(0o600)
+    replacement = root / "operator-secret-replacement"
+    replacement.write_text("another-strong-password-1234", encoding="utf-8")
+    if os.name != "nt":
+        replacement.chmod(0o600)
+    original_lstat = os.lstat
+
+    def swap_on_lstat(path, *args, **kwargs):
+        if Path(path) == password:
+            os.replace(replacement, password)
+        return original_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "lstat", swap_on_lstat)
+    with pytest.raises(ValueError, match="stable single-link regular file"):
+        ensure_runtime_environment(
+            root, admin_email="admin@example.test", admin_password_file=password
+        )
+    assert not (root / ".env").exists()
