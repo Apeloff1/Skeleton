@@ -5,6 +5,7 @@ import sys
 from typing import Any, TextIO
 
 from .harbor_crafting import HarborError, validate_source
+from .harbor_crafting_beacon_guidance import legal_beacon_actions
 from .harbor_crafting_beacons import (
     beacon_status, build_beacon_rescue, normalize_beacon_action,
     resume_beacon_rescue, validate_beacon_board, verify_beacon_rescue,
@@ -61,6 +62,13 @@ def play_beacon_live(source: Any, board: Any, *,
         attempts += 1
         if raw.strip().lower() in {"quit", "exit"}:
             break
+        if raw.strip().lower() == "hint":
+            guidance = legal_beacon_actions(report)
+            writer.write("Legal: " + ", ".join(
+                " ".join(item["action"].values())
+                for item in guidance["candidates"]
+            ) + "\n")
+            continue
         try:
             action = _parse(raw)
             report = resume_beacon_rescue(

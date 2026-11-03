@@ -14,3 +14,5 @@ Use resume with --expected-digest from report_digest to continue a partial repor
 Focused regression: pytest -q skeleton/testing/test_harbor_crafting_beacons.py. This documentation does not claim tests or required CI have passed.
 
 Interactive terminal: `skeleton-harbor-beacon-rescue live --source <world.json> --board <beacons.json> --require-rescue` (or the equivalent Python module invocation). Commands: move north/south/east/west, gather, craft <recipe>, trade <item>, repair <beacon>, signal <beacon>, deliver, rescue, wait, quit. Rejected commands do not advance state; a partial report is emitted as canonical JSON for later CAS resume. The installed entry point is declared in pyproject.toml.
+
+The optional `hint` command returns only legal, replay-executed next actions and the resulting report digests. `verify-hint --report <report.json> --guidance <guidance.json>` reconstructs each action to reject forged or stale hints. Interactive `hint` prints the same legal actions without consuming a world tick.
