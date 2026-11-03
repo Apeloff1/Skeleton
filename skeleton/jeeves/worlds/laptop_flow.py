@@ -11,6 +11,7 @@ from typing import Any
 
 from .bundle import _artifact_read
 from .session import SessionStore
+from .studio_engine import StudioEngineStore
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _text, canonical, compile_html,
     digest, edit, propose, prove, strict_json,
@@ -102,27 +103,40 @@ class LaptopFlow:
         if digest(revised) == expected_digest:
             raise CanonError("review_requires_change")
         new_digest = self.worlds.publish(revised, expected_digest=expected_digest)
-        review = {
-            "schema": REVIEW_SCHEMA, "world_id": world_id,
-            "source_digest": new_digest, "review_note": review_note,
-        }
+        return self.approve_current(world_id, new_digest, review_note)
+
+    def approve_current(self, world_id: str, expected_digest: str,
+                        review_note: str) -> dict[str, Any]:
+        """Explicitly approve a pre-existing edited canon without rewriting it.
+
+        Required for worlds already authored through the established operator
+        editor; never called by a read-only Jeeves tool.
+        """
+        _id(world_id, "world_id")
+        _text(review_note, "review_note", 512)
+        if len(review_note.strip()) < 8:
+            raise CanonError("review_note_too_short")
         fd = self.worlds._directory()
         try:
             self._lock(fd, world_id)
             try:
                 latest = self._world(fd, world_id)
-                if digest(latest) != new_digest:
-                    raise CanonError("review_stale_source")
+                if digest(latest) != expected_digest:
+                    raise CanonError("stale_source")
+                review = {
+                    "schema": REVIEW_SCHEMA, "world_id": world_id,
+                    "source_digest": expected_digest, "review_note": review_note,
+                }
                 self.worlds._write(fd, self._names(world_id)[0], canonical(review))
+                return {
+                    "world_id": world_id, "source_digest": expected_digest,
+                    "review_digest": digest(review), "proof": prove(latest).as_dict(),
+                    "reviewed": True,
+                }
             finally:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
             os.close(fd)
-        return {
-            "world_id": world_id, "source_digest": new_digest,
-            "review_digest": digest(review), "proof": prove(revised).as_dict(),
-            "reviewed": True,
-        }
 
     @staticmethod
     def _lock(fd: int, world_id: str) -> None:
@@ -229,6 +243,32 @@ class LaptopFlow:
                 os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
             os.close(fd)
+
+    def engine_inspect(self, world_id: str, era: str) -> dict[str, Any]:
+        """Use the existing Studio Engine owner; never invent missing planes."""
+        laptop = self.verify(world_id)
+        engine = StudioEngineStore(self.worlds.root).inspect(world_id, era)
+        if engine["source_digests"]["world"] != laptop["source_digest"]:
+            raise CanonError("laptop_engine_source_mismatch")
+        return {"laptop": laptop, "engine": engine}
+
+    def engine_compile(self, world_id: str, era: str,
+                       expected_digests: Any) -> dict[str, Any]:
+        preview = self.engine_inspect(world_id, era)
+        if expected_digests != preview["engine"]["source_digests"]:
+            raise CanonError("laptop_engine_stale_source")
+        owner = StudioEngineStore(self.worlds.root)
+        receipt = owner.compile(world_id, expected_digests, era)
+        if owner.verify(world_id) != receipt:
+            raise CanonError("laptop_engine_verify_mismatch")
+        return {"laptop": self.verify(world_id), "engine": receipt}
+
+    def engine_verify(self, world_id: str) -> dict[str, Any]:
+        laptop = self.verify(world_id)
+        engine = StudioEngineStore(self.worlds.root).verify(world_id)
+        if engine["source_digests"]["world"] != laptop["source_digest"]:
+            raise CanonError("laptop_engine_source_mismatch")
+        return {"laptop": laptop, "engine": engine}
 
     def create_session(self, world_id: str, slot: str, imported: Any = None) -> dict[str, Any]:
         self.verify(world_id)

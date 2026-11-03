@@ -162,3 +162,31 @@ def test_readonly_jeeves_preview_matches_compiled_source(tmp_path):
     assert handoff["persisted"] is False
     assert handoff["result"] == receipt
     assert handoff["result_digest"] == digest(receipt)
+
+
+def test_existing_nine_plane_studio_engine_owner_bridge(tmp_path):
+    from skeleton.testing.test_jeeves_world_studio_engine import fixture as engine_fixture
+    engine_fixture(tmp_path)
+    flow = LaptopFlow(tmp_path)
+    source = flow.worlds.read("harbor")
+    approved = flow.approve_current(
+        "harbor", digest(source), "Existing canonical world explicitly reviewed.")
+    assert approved["reviewed"] is True
+    flow.compile("harbor", approved["source_digest"])
+    preview = flow.engine_inspect("harbor", "eight_bit_tile_1983")
+    assert preview["engine"]["source_digests"]["world"] == approved["source_digest"]
+    stale = dict(preview["engine"]["source_digests"])
+    stale["assets"] = "0" * 64
+    reject("laptop_engine_stale_source", lambda: flow.engine_compile(
+        "harbor", "eight_bit_tile_1983", stale))
+    result = flow.engine_compile(
+        "harbor", "eight_bit_tile_1983", preview["engine"]["source_digests"])
+    assert flow.engine_verify("harbor") == result
+    assert result["engine"]["qualification"] == (
+        "source_verified_engine_recipe_not_release_certified")
+
+
+def test_engine_bridge_never_synthesizes_missing_reviewed_planes(tmp_path):
+    flow, _, _, _ = ready(tmp_path)
+    reject("not_found", lambda: flow.engine_inspect(
+        "lighthouse", "eight_bit_tile_1983"))

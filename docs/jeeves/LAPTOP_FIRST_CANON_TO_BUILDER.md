@@ -44,3 +44,16 @@ device, consumer installation, model inference, or release qualification claim.
 Jeeves read-only tool names: world.laptop_preview and world.laptop_handoff_preview.
 They inspect the reviewed canonical source and verified handoff without changing
 custody, granting approval or invoking model inference.
+
+## Existing Studio Engine owner integration
+
+A minimal world compiles its typed builder recipe without manufacturing the
+other reviewed planes. For an existing fully authored nine-plane world, run
+world-laptop approve-current --world-id ID --expected-digest DIGEST
+--review-note "I reviewed this already authored canon." followed by
+world-laptop compile, then world-laptop engine-inspect --world-id ID
+--era eight_bit_tile_1983. Supply the exact engine.source_digests object as
+JSON to world-laptop engine-compile --expected-digests-file FILE; finally run
+world-laptop engine-verify. The adapter invokes StudioEngineStore directly,
+preserving its nine-plane review, temporal and original asset requirements.
+A minimal world without those planes fails closed with not_found.

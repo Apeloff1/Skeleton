@@ -22,7 +22,8 @@ def run(argv: list[str]) -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     propose = sub.add_parser("propose")
     propose.add_argument("--brief-file", required=True)
-    for name in ("inspect", "review", "compile", "verify",
+    for name in ("inspect", "review", "approve-current", "compile", "verify",
+                 "engine-inspect", "engine-compile", "engine-verify",
                  "session-create", "session-choose", "session-inspect",
                  "session-export", "session-restore"):
         command = sub.add_parser(name)
@@ -31,6 +32,13 @@ def run(argv: list[str]) -> int:
             command.add_argument("--expected-digest", required=True)
             command.add_argument("--operation-file", required=True)
             command.add_argument("--review-note", required=True)
+        elif name == "approve-current":
+            command.add_argument("--expected-digest", required=True)
+            command.add_argument("--review-note", required=True)
+        elif name in ("engine-inspect", "engine-compile"):
+            command.add_argument("--era", required=True)
+            if name == "engine-compile":
+                command.add_argument("--expected-digests-file", required=True)
         elif name == "compile":
             command.add_argument("--expected-digest", required=True)
         elif name.startswith("session-"):
@@ -50,6 +58,16 @@ def run(argv: list[str]) -> int:
         elif args.action == "review":
             result = flow.review(args.world_id, args.expected_digest,
                                  _file(args.operation_file), args.review_note)
+        elif args.action == "approve-current":
+            result = flow.approve_current(args.world_id, args.expected_digest,
+                                          args.review_note)
+        elif args.action == "engine-inspect":
+            result = flow.engine_inspect(args.world_id, args.era)
+        elif args.action == "engine-compile":
+            result = flow.engine_compile(args.world_id, args.era,
+                                         _file(args.expected_digests_file))
+        elif args.action == "engine-verify":
+            result = flow.engine_verify(args.world_id)
         elif args.action == "compile":
             result = flow.compile(args.world_id, args.expected_digest)
         elif args.action == "verify":
