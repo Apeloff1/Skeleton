@@ -17,7 +17,7 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveMod
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.database import SpineDatabase
 from .durable_runtime import _CheckpointCodec
 from .runtime import RunCheckpoint, RunInputs
-from .types import require_id
+from .types import AgentPhase, AgentResult, require_id
 
 
 class NativeCheckpointHold(RuntimeError):
@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS jeeves_native_runs (
     anchor_hash TEXT NOT NULL,
     tip_sequence INTEGER NOT NULL DEFAULT 0,
     tip_hash TEXT NOT NULL
+)
+"""
+_TERMINAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS jeeves_native_terminal_results (
+    run_id TEXT PRIMARY KEY,
+    checkpoint_sequence INTEGER NOT NULL,
+    checkpoint_fingerprint TEXT NOT NULL,
+    checkpoint_tip_hash TEXT NOT NULL,
+    payload BLOB NOT NULL,
+    payload_sha256 TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES jeeves_native_runs(run_id)
 )
 """
 _INFLIGHT_SCHEMA = """
@@ -140,6 +151,7 @@ class NativeSQLiteCheckpointer:
             conn.execute(_RUN_SCHEMA)
             conn.execute(_CHECKPOINT_SCHEMA)
             conn.execute(_INFLIGHT_SCHEMA)
+            conn.execute(_TERMINAL_SCHEMA)
 
     def _live(self) -> None:
         if ActiveModel.from_supervisor(self.worker) != self.identity:
@@ -357,6 +369,104 @@ class NativeSQLiteCheckpointer:
                 "SELECT 1 FROM jeeves_native_inflight WHERE run_id=?", (run_id,),
             ).fetchone() is not None
 
+    def write_terminal_result(self, result: AgentResult) -> None:
+        """Commit the exact operator-visible terminal answer BEFORE returning.
+
+        A crash after the terminal checkpoint but before this result row
+        results in an inspectable incomplete delivery, never regeneration.
+        """
+        self._live()
+        if not isinstance(result, AgentResult):
+            raise NativeCheckpointHold("typed terminal Jeeves result required")
+        record = {
+            "schema": "jeeves.native_terminal_result.v1",
+            "run_id": result.run_id,
+            "goal_id": result.goal_id,
+            "success": result.success,
+            "reason": result.reason.value,
+            "answer": result.answer,
+            "trace_fingerprint": result.trace_fingerprint,
+            "usage": _CheckpointCodec._usage_to_dict(result.usage),
+            "model_sha256": self.identity.model_sha256,
+            "tokenizer_sha256": self.identity.tokenizer_sha256,
+            "device_qualified": False,
+            "release_certified": False,
+        }
+        payload = _json_bytes(record)
+        if len(payload) > 1048576:
+            raise NativeCheckpointHold("terminal output exceeds private custody limit")
+        with self.db.transaction() as conn:
+            row = self._row(conn, result.run_id)
+            if row is None or row[5] != result.goal_id:
+                raise NativeCheckpointHold("result run or goal identity differs")
+            history = self._read(conn, result.run_id)
+            if not history:
+                raise NativeCheckpointHold("result has no durable terminal checkpoint")
+            latest = history[-1]
+            if (latest.phase not in (
+                    AgentPhase.COMPLETED, AgentPhase.FAILED, AgentPhase.CANCELLED)
+                    or result.success != (latest.phase is AgentPhase.COMPLETED)
+                    or result.usage != latest.usage):
+                raise NativeCheckpointHold("result differs from terminal agent state")
+            if conn.execute(
+                "SELECT 1 FROM jeeves_native_inflight WHERE run_id=?",
+                (result.run_id,),
+            ).fetchone() is not None:
+                raise NativeCheckpointHold("terminal receipt cannot clear uncertain native call")
+            if conn.execute(
+                "SELECT 1 FROM jeeves_native_terminal_results WHERE run_id=?",
+                (result.run_id,),
+            ).fetchone() is not None:
+                raise NativeCheckpointHold("terminal result already sealed")
+            conn.execute(
+                "INSERT INTO jeeves_native_terminal_results VALUES (?,?,?,?,?,?)",
+                (result.run_id, latest.sequence, latest.fingerprint,
+                 row[9], payload, _sha(payload)),
+            )
+
+    def terminal_result(self, run_id: str) -> dict[str, object] | None:
+        """Read-only, authoritatively scoped terminal result replay."""
+        self._live()
+        require_id("run_id", run_id)
+        with self.db.snapshot() as conn:
+            row = self._row(conn, run_id)
+            if row is None:
+                raise NativeCheckpointHold("terminal run is absent")
+            latest = self._read(conn, run_id)
+            result = conn.execute(
+                "SELECT checkpoint_sequence,checkpoint_fingerprint,"
+                "checkpoint_tip_hash,payload,payload_sha256 "
+                "FROM jeeves_native_terminal_results WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if result is None:
+                return None
+            sequence, fingerprint, tip_hash, payload, payload_sha = result
+            if (not latest or latest[-1].sequence != sequence
+                    or latest[-1].fingerprint != fingerprint
+                    or row[9] != tip_hash
+                    or type(payload) is not bytes or len(payload) > 1048576
+                    or _sha(payload) != payload_sha):
+                raise NativeCheckpointHold("terminal result chain or bytes mismatch")
+            try:
+                record = json.loads(payload)
+            except (TypeError, ValueError) as exc:
+                raise NativeCheckpointHold("malformed terminal result encoding") from exc
+            if (type(record) is not dict
+                    or record.get("schema") != "jeeves.native_terminal_result.v1"
+                    or record.get("run_id") != run_id
+                    or record.get("goal_id") != row[5]
+                    or type(record.get("success")) is not bool
+                    or record.get("success") != (latest[-1].phase is AgentPhase.COMPLETED)
+                    or latest[-1].phase not in (
+                        AgentPhase.COMPLETED, AgentPhase.FAILED, AgentPhase.CANCELLED)
+                    or record.get("model_sha256") != self.identity.model_sha256
+                    or record.get("tokenizer_sha256") != self.identity.tokenizer_sha256
+                    or record.get("usage") != _CheckpointCodec._usage_to_dict(latest[-1].usage)
+                    or type(record.get("answer")) is not str):
+                raise NativeCheckpointHold("terminal replay principal or content mismatch")
+            return record
+
     def history(self, run_id: str) -> tuple[RunCheckpoint, ...]:
         require_id("run_id", run_id)
         self._live()
@@ -385,6 +495,7 @@ class NativeSQLiteCheckpointer:
             "model_sha256": self.identity.model_sha256,
             "tokenizer_sha256": self.identity.tokenizer_sha256,
             "unresolved_model_intent": self.has_inflight(run_id),
+            "terminal_result_saved": self.terminal_result(run_id) is not None,
             "source_verified": False,
             "device_qualified": False,
             "release_certified": False,

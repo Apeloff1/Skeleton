@@ -34,6 +34,17 @@ class _JournaledStrictNativeAgent(StrictJeevesAgentRuntime):
         self.checkpointer.complete_native_call(state.run_id)
         return response
 
+    def _finalize(self, state):
+        result = super()._finalize(state)
+        if result.success:
+            self.checkpointer.write_terminal_result(result)
+        return result
+
+    def _finish_failure(self, state, reason, answer, **kwargs):
+        result = super()._finish_failure(state, reason, answer, **kwargs)
+        self.checkpointer.write_terminal_result(result)
+        return result
+
 
 class NativeDurableJeevesAgent:
     """Durable reasoning lane; read-only source tools remain a separate lane.
@@ -105,6 +116,16 @@ class NativeDurableJeevesAgent:
             # before a checkpoint crashed, NativeJeevesProvider replays that
             # exact SQLite result. If pending/unknown, the spine denies it.
             return self.agent.resume_in_process(inputs, inputs.run_id)
+
+    def replay_terminal(self, inputs: RunInputs) -> dict[str, object]:
+        """Return a previously sealed answer without any native generation."""
+        self._admit(inputs)
+        with self._gate(inputs.run_id):
+            self.checkpoints.bind_existing(inputs)
+            sealed = self.checkpoints.terminal_result(inputs.run_id)
+            if sealed is None:
+                raise NativeDurableAgentHold("no committed terminal answer to replay")
+            return {**sealed, "replayed": True}
 
     def inspect(self, inputs: RunInputs) -> dict[str, object]:
         self._admit(inputs)
