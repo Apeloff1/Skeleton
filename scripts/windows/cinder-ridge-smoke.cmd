@@ -1,18 +1,27 @@
 @echo off
 setlocal
-cd /d "%~dp0\..\.."
+cd /d "%~dp0\..\.." || exit /b 2
 where py >nul 2>nul
 if not errorlevel 1 (
-  py -3 -m skeleton.game.gameplay.ridge_rescue consumer smoke
+  set "PY=py -3"
 ) else (
   where python >nul 2>nul
   if errorlevel 1 (
-    echo Python 3 is required for Cinder Ridge smoke acceptance.
+    echo Python 3.11 or newer is required for Cinder Ridge acceptance.
     pause
     exit /b 2
   )
-  python -m skeleton.game.gameplay.ridge_rescue consumer smoke
+  set "PY=python"
 )
-set "RESULT=%ERRORLEVEL%"
-if not "%RESULT%"=="0" pause
-exit /b %RESULT%
+echo [1/2] Cinder Ridge source process save/restart/ending/export acceptance
+%PY% -m skeleton.game.gameplay.ridge_rescue consumer smoke
+if errorlevel 1 goto :failed
+echo [2/2] Cinder Ridge standalone zipapp save/restart/ending/export acceptance
+%PY% -m skeleton.game.gameplay.ridge_rescue consumer portable-smoke
+if errorlevel 1 goto :failed
+echo Cinder Ridge smoke checks passed on this host. This is not release certification.
+exit /b 0
+:failed
+echo Cinder Ridge acceptance FAILED. No release qualification is granted.
+pause
+exit /b 1
