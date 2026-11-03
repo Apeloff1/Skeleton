@@ -25,6 +25,13 @@ from .harbor_crafting_salvage_acceptance import (
     MAX_BYTES as MAX_ACCEPTANCE_BYTES, accept_salvage, verify_salvage_acceptance,
 )
 from .harbor_crafting_salvage_ui import play_salvage_live
+from .harbor_crafting_salvage_guidance import (
+    MAX_BYTES as MAX_GUIDANCE_BYTES, build_salvage_guidance, verify_salvage_guidance,
+)
+from .harbor_crafting_salvage_contracts import (
+    MAX_CONTRACT_BOARD_BYTES, MAX_CONTRACT_REPORT_BYTES,
+    build_salvage_contract_report, verify_salvage_contract_report,
+)
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DEFAULT_SOURCE = FIXTURES / "harbor_lantern_quay.json"
@@ -33,6 +40,7 @@ COMMANDS = (
     "run", "verify", "resume", "status", "live", "author", "verify-author",
     "journal-init", "journal-append", "journal-verify", "journal-at", "journal-fork",
     "package", "verify-package", "play", "verify-play", "accept", "verify-accept",
+    "hint", "verify-hint", "contract-run", "contract-verify",
 )
 
 
@@ -63,6 +71,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--package")
     parser.add_argument("--play")
     parser.add_argument("--acceptance")
+    parser.add_argument("--guidance")
+    parser.add_argument("--contract-board", default=str(FIXTURES / "harbor_lantern_quay_salvage_contracts.json"))
+    parser.add_argument("--contract-report")
+    parser.add_argument("--horizon", type=int, default=16)
+    parser.add_argument("--require-all", action="store_true")
     parser.add_argument("--expected-digest")
     parser.add_argument("--index", type=int)
     parser.add_argument("--id", default="lantern_quay_salvage")
@@ -78,6 +91,22 @@ def main(argv: list[str] | None = None) -> int:
                                         require_complete=args.require_complete)
             else:
                 result = verify_salvage(report, require_complete=args.require_complete)
+        elif command == "verify-hint":
+            result = verify_salvage_guidance(_read(args.guidance, MAX_GUIDANCE_BYTES))
+        elif command == "hint":
+            result = build_salvage_guidance(_read(args.report, MAX_REPORT_BYTES),
+                                             horizon=args.horizon)
+        elif command == "contract-run":
+            result = build_salvage_contract_report(
+                _read(args.report, MAX_REPORT_BYTES),
+                _read(args.contract_board, MAX_CONTRACT_BOARD_BYTES),
+                require_all=args.require_all,
+            )
+        elif command == "contract-verify":
+            result = verify_salvage_contract_report(
+                _read(args.contract_report, MAX_CONTRACT_REPORT_BYTES),
+                require_all=args.require_all,
+            )
         elif command == "verify-author":
             result = verify_salvage_revision(_read(args.revision, MAX_REVISION_BYTES))
         elif command == "verify-play":
@@ -101,6 +130,12 @@ def main(argv: list[str] | None = None) -> int:
                     journal, _read(args.actions, MAX_BUNDLE_BYTES),
                     expected_tip=args.expected_digest or "",
                 )
+        elif command == "play":
+            result = play_salvage_package(
+                _read(args.package, MAX_PACKAGE_BYTES),
+                _read(args.actions, MAX_BUNDLE_BYTES),
+                require_complete=args.require_complete,
+            )
         else:
             source = _read(args.source, MAX_BUNDLE_BYTES)
             board = _read(args.board, MAX_BOARD_BYTES)
@@ -118,12 +153,6 @@ def main(argv: list[str] | None = None) -> int:
                 result = create_salvage_journal(source, board)
             elif command == "package":
                 result = build_salvage_package(source, board, package_id=args.id)
-            elif command == "play":
-                result = play_salvage_package(
-                    _read(args.package, MAX_PACKAGE_BYTES),
-                    _read(args.actions, MAX_BUNDLE_BYTES),
-                    require_complete=args.require_complete,
-                )
             elif command == "accept":
                 result = accept_salvage(source, board, _read(args.actions, MAX_BUNDLE_BYTES))
             else:
