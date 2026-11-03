@@ -179,6 +179,7 @@ let currentWorld = network.root_world;
 let currentScene = worlds[currentWorld].start;
 let flags = new Map(Object.keys(worlds).map(id => [id, new Set()]));
 let trace = [];
+let steps = [];
 let moves = 0;
 const root = document.getElementById("play");
 function element(tag, text) {
@@ -190,13 +191,39 @@ function reset() {
   currentWorld = network.root_world;
   currentScene = worlds[currentWorld].start;
   flags = new Map(Object.keys(worlds).map(id => [id, new Set()]));
-  trace = []; moves = 0; render();
+  trace = []; steps = []; moves = 0; render();
 }
 function button(text, action) {
   const item = element("button", text);
   item.type = "button";
   item.addEventListener("click", action);
   root.append(item);
+}
+function exportSession() {
+  const state = {
+    schema: "jeeves.world.portal_session.v1",
+    network_id: network.id,
+    network_digest: model.proof.network_digest,
+    world_digests: network.world_digests,
+    steps: steps.map(step => ({...step})),
+    current_world: currentWorld,
+    current_scene: currentScene,
+    flags: Object.fromEntries(
+      [...flags.entries()].map(([id, values]) => [id, [...values].sort()])
+    )
+  };
+  let area = document.getElementById("session-export");
+  if (!area) {
+    area = document.createElement("textarea");
+    area.id = "session-export";
+    area.readOnly = true;
+    area.rows = 10;
+    area.setAttribute("aria-label", "Source-bound session JSON for operator review");
+    root.append(area);
+  }
+  area.value = JSON.stringify(state);
+  area.focus();
+  area.select();
 }
 function render() {
   root.replaceChildren();
@@ -207,6 +234,7 @@ function render() {
   root.append(element("p", scene.narrative));
   root.append(element("p", "World: " + currentWorld + " | Moves: " + moves));
   root.append(element("p", "Choice/portal history: " + trace.join(", ")));
+  button("Export session JSON", exportSession);
   if (moves >= 256) {
     root.append(element("p", "Bounded play session completed."));
     button("Restart", reset);
@@ -220,6 +248,7 @@ function render() {
       button("Travel: " + portal.label, () => {
         currentWorld = portal.to_world;
         currentScene = worlds[currentWorld].start;
+        steps.push({kind: "portal", world: portal.from_world, id: portal.id});
         trace.push("portal:" + portal.id);
         moves += 1; render();
       });
@@ -233,6 +262,7 @@ function render() {
     button(choice.label, () => {
       for (const flag of choice.grants) flags.get(currentWorld).add(flag);
       currentScene = choice.to;
+      steps.push({kind: "choice", world: currentWorld, id: choice.id});
       trace.push(currentWorld + ":" + choice.id);
       moves += 1; render();
     });
@@ -471,5 +501,92 @@ class PortalStore:
                 if _artifact_read(fd, names[1]) != playable:
                     raise CanonError("portals_playable_mismatch")
                 return receipt
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _session_name(network_id: str, slot: str) -> str:
+        _id(network_id, "network_id")
+        _id(slot, "slot")
+        return network_id + ".portals.session." + slot + ".json"
+
+    def preview_session(self, network_id: str, session: Any) -> dict[str, Any]:
+        """Read-only, untrusted trace proof for the Jeeves planning interface."""
+        from .portals_replay import replay_session
+        fd = self.worlds._directory()
+        try:
+            network = self._read(fd, network_id)
+            worlds = self._sources(fd, self._world_ids(network))
+            return replay_session(session, network, worlds)
+        finally:
+            os.close(fd)
+
+    def _check_playable(self, fd: int, network: Any,
+                        worlds: dict[str, Any]) -> None:
+        receipt, playable = self._outputs(network, worlds)
+        names = self._names(network["id"])
+        if strict_json(self.worlds._read(fd, names[2])) != receipt:
+            raise CanonError("portals_receipt_mismatch")
+        if _artifact_read(fd, names[1]) != playable:
+            raise CanonError("portals_playable_mismatch")
+
+    def record_session(
+        self, network_id: str, slot: str, session: Any, *,
+        expected_network_digest: str,
+        expected_session_digest: str | None = None,
+        create: bool = False,
+    ) -> dict[str, Any]:
+        """CAS-persist a verified trace, never trusting browser-reported state."""
+        from .portals_replay import STORED_SCHEMA, replay_session
+        name = self._session_name(network_id, slot)
+        fd = self.worlds._directory()
+        try:
+            network = self._read(fd, network_id)
+            ids = self._world_ids(network)
+            with self._locks(fd, [network_id + ".portals", name] + ids):
+                network = self._read(fd, network_id)
+                worlds = self._sources(fd, ids)
+                if digest(network) != expected_network_digest:
+                    raise CanonError("portals_stale_edit")
+                self._check_playable(fd, network, worlds)
+                report = replay_session(session, network, worlds)
+                stored = {"schema": STORED_SCHEMA, "session": session,
+                          "report": report}
+                try:
+                    old = strict_json(self.worlds._read(fd, name))
+                except CanonError as exc:
+                    if exc.code != "not_found":
+                        raise
+                    old = None
+                if create:
+                    if old is not None or expected_session_digest is not None:
+                        raise CanonError("portal_session_already_exists")
+                elif old is None or digest(old) != expected_session_digest:
+                    raise CanonError("portal_session_stale_edit")
+                self.worlds._write(fd, name, canonical(stored))
+                return {"session_digest": digest(stored), "report": report}
+        finally:
+            os.close(fd)
+
+    def verify_session(self, network_id: str, slot: str) -> dict[str, Any]:
+        """Recompute saved source proof; reject stale and forged receipts."""
+        from .portals_replay import STORED_SCHEMA, replay_session
+        name = self._session_name(network_id, slot)
+        fd = self.worlds._directory()
+        try:
+            network = self._read(fd, network_id)
+            ids = self._world_ids(network)
+            with self._locks(fd, [network_id + ".portals", name] + ids):
+                network = self._read(fd, network_id)
+                worlds = self._sources(fd, ids)
+                self._check_playable(fd, network, worlds)
+                stored = strict_json(self.worlds._read(fd, name))
+                _keys(stored, {"schema", "session", "report"})
+                if stored["schema"] != STORED_SCHEMA:
+                    raise CanonError("portal_session_schema_mismatch")
+                report = replay_session(stored["session"], network, worlds)
+                if report != stored["report"]:
+                    raise CanonError("portal_session_receipt_mismatch")
+                return {"session_digest": digest(stored), "report": report}
         finally:
             os.close(fd)

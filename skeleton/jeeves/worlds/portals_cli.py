@@ -13,7 +13,7 @@ def run(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton world-portals")
     parser.add_argument("--store", required=True)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("propose", "inspect", "save", "editor", "approve", "compile", "verify"):
+    for action in ("propose", "inspect", "save", "editor", "approve", "compile", "verify", "record-session", "verify-session"):
         cmd = sub.add_parser(action)
         cmd.add_argument("--network-id", required=True)
         if action == "propose":
@@ -29,6 +29,13 @@ def run(argv: list[str]) -> int:
             cmd.add_argument("--expected-network-digest", required=True)
         if action == "approve":
             cmd.add_argument("--review-note", required=True)
+        if action in ("record-session", "verify-session"):
+            cmd.add_argument("--slot", required=True)
+        if action == "record-session":
+            cmd.add_argument("--session-json", required=True)
+            cmd.add_argument("--expected-network-digest", required=True)
+            cmd.add_argument("--expected-session-digest")
+            cmd.add_argument("--create", action="store_true")
     args = parser.parse_args(argv)
     try:
         store = PortalStore(args.store)
@@ -58,6 +65,16 @@ def run(argv: list[str]) -> int:
             result = {"receipt": store.compile(
                 args.network_id, expected_network_digest=args.expected_network_digest,
             )}
+        elif args.action == "record-session":
+            result = {"result": store.record_session(
+                args.network_id, args.slot,
+                strict_json(args.session_json.encode("utf-8")),
+                expected_network_digest=args.expected_network_digest,
+                expected_session_digest=args.expected_session_digest,
+                create=args.create,
+            )}
+        elif args.action == "verify-session":
+            result = {"result": store.verify_session(args.network_id, args.slot)}
         else:
             result = {"receipt": store.verify(args.network_id)}
     except (CanonError, OSError, UnicodeError) as exc:

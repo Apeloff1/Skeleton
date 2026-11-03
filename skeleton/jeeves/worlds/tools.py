@@ -40,6 +40,7 @@ TOOLS = {
     "world.assurance_preview": (),
     "world.atlas_preview": (),
     "world.portals_preview": ("network_id",),
+    "world.portals_session_preview": ("network_id", "session"),
     "world.portals_propose_preview": ("network_id", "prompt", "from_ending", "to_world"),
     "world.atlas_propose_preview": ("prompt",),
     "world.revision_preview": ("old_world",),
@@ -109,6 +110,12 @@ def invoke_world_tool(root: str, request: Any) -> dict[str, Any]:
             args["network_id"], args["prompt"], root_world=req["world_id"],
             from_ending=args["from_ending"], to_world=args["to_world"],
         )
+    elif name == "world.portals_session_preview":
+        portal_store = PortalStore(root)
+        inspected = portal_store.inspect(args["network_id"])
+        if inspected["network"]["root_world"] != req["world_id"]:
+            raise CanonError("portals_root_world_mismatch")
+        payload = portal_store.preview_session(args["network_id"], args["session"])
     elif name == "world.portals_preview":
         payload = PortalStore(root).inspect(args["network_id"])
         if payload["network"]["root_world"] != req["world_id"]:
