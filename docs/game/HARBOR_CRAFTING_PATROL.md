@@ -9,7 +9,9 @@ craft the delivery goods, deliver to the dock and collect both patrol records.
 
 ## Playable commands
 
-Run from the repository root. Save a JSON list of actions as actions.json.
+Run from the repository root. A fully replayable authored first-playable action list is included at `skeleton/game/gameplay/fixtures/harbor_lantern_quay_patrol_demo.json`.
+For live interactive keyboard gameplay, use `python -m scripts.game.harbor_patrol live`.
+Save a JSON list of actions as actions.json.
 For the authored first-playable sequence, use the 18 canonical demo actions
 from \`harbor_crafting.demo_actions()\`, insert
 \`{"op":"collect","objective":"tide_registry"}\` after the second wood

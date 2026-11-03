@@ -12,6 +12,7 @@ from .harbor_crafting_patrol import (
 from .harbor_crafting_patrol_authoring import (
     MAX_REVISION_BYTES, edit_patrol_board, verify_patrol_revision,
 )
+from .harbor_crafting_patrol_ui import play_live
 from .harbor_crafting_patrol_package import (
     MAX_PACKAGE_BYTES, MAX_PLAY_BYTES, build_patrol_package,
     play_patrol_package, verify_patrol_package, verify_patrol_package_play,
@@ -20,7 +21,7 @@ from .harbor_crafting_patrol_package import (
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DEFAULT_SOURCE = FIXTURES / "harbor_lantern_quay.json"
 DEFAULT_BOARD = FIXTURES / "harbor_lantern_quay_patrol.json"
-COMMANDS = ("run", "verify", "resume", "author", "verify-author",
+COMMANDS = ("live", "run", "verify", "resume", "author", "verify-author",
             "package", "verify-package", "play", "verify-play")
 
 
@@ -56,6 +57,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         command = args.command
+        if command == "live":
+            play_live(_read(args.source, MAX_BUNDLE_BYTES),
+                      _read(args.board, MAX_BOARD_BYTES),
+                      input_stream=sys.stdin, output_stream=sys.stdout,
+                      require_complete=args.require_complete)
+            return 0
         if command == "verify":
             result = verify_patrol(_read(args.report, MAX_REPORT_BYTES),
                                    require_complete=args.require_complete)
