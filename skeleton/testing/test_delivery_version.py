@@ -56,3 +56,14 @@ def test_versions_reject_unbounded_and_direct_invalid_shapes():
         Version.parse("1.0.0").bump("prerelease", pre_label="a" * 100)
     with pytest.raises(DeliveryError, match="inventory exceeds"):
         latest(["1.0.0"] * 8193)
+
+
+def test_direct_versions_cannot_bypass_canonical_prerelease_and_text_bounds():
+    from skeleton.ai.build.core.delivery import version as mirrored
+
+    for version_type in (Version, mirrored.Version):
+        with pytest.raises(DeliveryError, match="leading zeros"):
+            version_type(1, 0, 0, ("01",))
+        with pytest.raises(DeliveryError, match="version text exceeds"):
+            version_type(1, 0, 0, tuple("a" * 64 for _ in range(5)))
+        assert str(version_type(1, 0, 0, ("rc", "1"))) == "1.0.0-rc.1"

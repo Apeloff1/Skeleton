@@ -37,6 +37,11 @@ class Version:
                     or any(type(part) is not str or not 1 <= len(part) <= 64
                            or not re.fullmatch(r"[0-9A-Za-z-]+", part) for part in group)):
                 raise DeliveryError("version identifiers must be bounded and canonical")
+        if any(part.isdigit() and len(part) > 1 and part[0] == "0"
+               for part in self.prerelease):
+            raise DeliveryError("numeric prerelease identifiers must not have leading zeros")
+        if len(str(self)) > MAX_VERSION_CHARS:
+            raise DeliveryError("version text exceeds bound")
 
     @classmethod
     def parse(cls, text: str) -> "Version":
