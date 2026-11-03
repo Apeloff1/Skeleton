@@ -46,9 +46,16 @@ def _read_private_manifest(path):
     if type(path) is not Path or not path.is_absolute():
         refuse("signed source manifest path must be absolute")
     flags=os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.path_policy import open_private_root
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import SpineError
     try:
-        fd=os.open(path,flags)
-    except OSError as exc:
+        parent_fd=open_private_root(path.parent)
+        try:
+            fd=os.open(path.name,flags,dir_fd=parent_fd)
+        except BaseException:
+            os.close(parent_fd)
+            raise
+    except (OSError,ValueError,SpineError) as exc:
         raise CognitionError("private signed source manifest cannot be opened") from exc
     try:
         st=os.fstat(fd)
@@ -66,9 +73,17 @@ def _read_private_manifest(path):
             end.st_dev,end.st_ino,end.st_size,end.st_ctime_ns,end.st_mtime_ns
         ) or len(data)!=st.st_size:
             refuse("signed source manifest modified while read")
+        try:
+            current=os.stat(path.name,dir_fd=parent_fd,follow_symlinks=False)
+        except OSError as exc:
+            raise CognitionError("private manifest path moved during read") from exc
+        for field in ("st_dev","st_ino","st_size","st_mtime_ns","st_ctime_ns","st_mode"):
+            if getattr(end,field)!=getattr(current,field):
+                refuse("private manifest replaced after opening descriptor")
         return bytes(data)
     finally:
         os.close(fd)
+        os.close(parent_fd)
 
 
 def run(argv=None):

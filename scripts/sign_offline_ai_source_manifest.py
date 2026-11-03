@@ -15,12 +15,6 @@ import stat
 import sys
 import time
 
-# python scripts/sign_offline_ai_source_manifest.py sets sys.path[0] to scripts/,
-# not the repository root. Resolve only this trusted local package root.
-ROOT=Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0,str(ROOT))
-
 from skeleton.ai.runtime.operational_ai.offline_cognition.core.contracts import (
     CognitionError,loads,refuse,
 )
@@ -39,11 +33,12 @@ def _publish_private(output,raw):
         refuse("source approval output must be absolute")
     if type(output.name) is not str or _NAME.fullmatch(output.name) is None:
         refuse("output must have a safe basename")
-    flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.path_policy import open_private_root
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import SpineError
     try:
-        directory=os.open(output.parent,flags)
-    except OSError as exc:
-        raise CognitionError("trusted manifest output directory cannot be opened") from exc
+        directory=open_private_root(output.parent)
+    except (OSError,ValueError,SpineError) as exc:
+        raise CognitionError("trusted manifest output directory cannot be safely anchored") from exc
     created=False
     try:
         st=os.fstat(directory)

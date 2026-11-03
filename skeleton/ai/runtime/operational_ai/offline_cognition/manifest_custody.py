@@ -199,11 +199,14 @@ def ingest_authorized_sources(source_root,manifest,*,scope,observed_at):
     path=os.fspath(source_root)
     if not os.path.isabs(path) or "\x00" in path:
         refuse("source root must be an explicit absolute path")
-    flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC
+    # Pin EVERY path component, including intermediate parents. A final-
+    # component O_NOFOLLOW alone would allow a malicious symlink ancestor.
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.path_policy import open_private_root
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import SpineError
     try:
-        root_fd=os.open(path,flags)
-    except OSError as exc:
-        raise CognitionError("operator source directory unavailable") from exc
+        root_fd=open_private_root(path)
+    except (OSError,ValueError,SpineError) as exc:
+        raise CognitionError("operator source directory cannot be safely anchored") from exc
     try:
         directory=os.fstat(root_fd)
         if (not stat.S_ISDIR(directory.st_mode) or

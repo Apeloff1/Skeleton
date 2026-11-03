@@ -36,9 +36,12 @@ and operator authorization artifacts. Illustrative locations:
     /private/sources
     /private/operator
 
-The selected source and operator directories must be operator-owned and
-not group or world writable. Each source is a bounded regular, singly
-linked local file, owned by the execution UID and not group/world writable.
+The selected source and operator directories must be operator-owned,
+private mode 0700 directories on the Linux/WSL2 filesystem. The descriptor
+walker rejects a symlink at *every path component*, including ancestors.
+The private signed manifests use mode 0600. Each source is a bounded regular,
+singly linked local file, owned by the execution UID and not group/world
+writable.
 Symbolic links, FIFOs, devices, relative paths, parent traversal and
 oversized files are refused. No implicit mkdir, model installation or
 automatic repair is attempted by this CLI.
@@ -191,3 +194,26 @@ postcommit replay, native cancellation, cold recovery and privacy/
 retention checks. Skipped, missing, pending, cancelled and superseded
 checks are not passing results. An apparent green source fixture result
 never proves model, device or release acceptance.
+
+## Symlinked-ancestor and path-replacement hardening
+
+All three source-custody boundaries now use the pre-existing canonical
+`open_private_root` descriptor walker, rather than checking only the final
+directory or filename. This applies to: reading original source documents,
+reading a signed operator manifest, and exclusive publication of a signed
+manifest. A symlink in any ancestor component is rejected. The root of
+each operator-approved source or signing directory must be private mode
+0700, even when an intermediate component is under a normal system root.
+
+Open-file inode, size, mode, mtime and ctime checks are repeated after
+content reads, and final-path metadata is compared using `dir_fd` and
+`follow_symlinks=False`; old or modified original bytes are rejected
+against the signed SHA-256. A symlinked parent alias must never be
+silently resolved into an otherwise approved source folder.
+
+Focused regression coverage includes symlink ancestors of each of those
+three boundaries, along with the existing malicious basename, FIFO,
+hardlink, writable directory and filename replacement probes.
+
+Nothing in these source-level guards constitutes a completed target
+Windows 11/WSL2 clean install or any real GGUF model E2E result.

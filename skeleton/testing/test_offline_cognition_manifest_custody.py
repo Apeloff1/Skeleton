@@ -205,6 +205,12 @@ class PrivateSourceFileTests(unittest.TestCase):
         with self.assertRaises(CognitionError):
             self.ingest(root=linked)
 
+    def test_source_symlinked_ancestor_denied(self):
+        linked=Path(self.temp.name)/"alias_source_parent"
+        linked.symlink_to(Path(self.temp.name),target_is_directory=True)
+        with self.assertRaises(CognitionError):
+            self.ingest(root=linked/"sources")
+
     def test_fifo_denied(self):
         self.file.unlink()
         os.mkfifo(self.file)
@@ -213,6 +219,12 @@ class PrivateSourceFileTests(unittest.TestCase):
 
     def test_world_writable_source_denied(self):
         self.file.chmod(0o666)
+        with self.assertRaises(CognitionError):
+            self.ingest()
+
+    def test_source_root_mode_0755_denied(self):
+        # Ordinary non-writable access is not enough; owner-only 0700 required.
+        self.folder.chmod(0o755)
         with self.assertRaises(CognitionError):
             self.ingest()
 
@@ -273,6 +285,14 @@ class PrivateSourceFileTests(unittest.TestCase):
         manifest_file.chmod(0o600)
         self.assertEqual(_read_private_manifest(manifest_file),signed(record()))
 
+    def test_manifest_parent_mode_0755_denied(self):
+        raw=Path(self.temp.name)/"manifest.json"
+        raw.write_bytes(signed(record()))
+        raw.chmod(0o600)
+        Path(self.temp.name).chmod(0o755)
+        with self.assertRaises(CognitionError):
+            _read_private_manifest(raw)
+
     def test_private_manifest_symlink_rejected(self):
         original=Path(self.temp.name)/"manifest.json"
         original.write_bytes(signed(record()))
@@ -280,6 +300,22 @@ class PrivateSourceFileTests(unittest.TestCase):
         alias.symlink_to(original)
         with self.assertRaises(CognitionError):
             _read_private_manifest(alias)
+
+    def test_manifest_symlinked_ancestor_denied(self):
+        raw=Path(self.temp.name)/"manifest_parent.json"
+        raw.write_bytes(signed(record()))
+        raw.chmod(0o600)
+        linked=Path(self.temp.name)/"alias_manifest_parent"
+        linked.symlink_to(Path(self.temp.name),target_is_directory=True)
+        with self.assertRaises(CognitionError):
+            _read_private_manifest(linked/"manifest_parent.json")
+
+    def test_private_output_symlinked_ancestor_denied(self):
+        linked=Path(self.temp.name)/"alias_output_parent"
+        linked.symlink_to(Path(self.temp.name),target_is_directory=True)
+        with self.assertRaises(CognitionError):
+            _publish_private(linked/"signed.json",signed(record()))
+        self.assertFalse((Path(self.temp.name)/"signed.json").exists())
 
     def test_private_output_is_exclusive_and_mode_0600(self):
         out=Path(self.temp.name)/"signed.json"
