@@ -195,3 +195,14 @@ also have ambiguous outcomes and must never be followed by blind replays.
 
 Focused regression: `python -m unittest skeleton.testing.test_mongo_epoch_operation_deadlines`.
 The simulated deadline tests do not prove real replica-set semantics.
+
+## Independent reviewer slow-drip and compression guard
+
+Both signed review and activation challenge responses reject compressed HTTP
+bodies and declared oversized responses before buffering. Raw chunks are
+bounded and the client checks an overall monotonic response deadline, in
+addition to transport read timeouts. A peer that withholds a chunk may still
+consume up to one final configured socket-read timeout beyond that deadline;
+this is a bounded denial, not proof of real reviewer uptime. Redirects,
+unsigned verdicts and stale nonces remain denied. The reviewer must be
+separately administered and audited before consumer activation.

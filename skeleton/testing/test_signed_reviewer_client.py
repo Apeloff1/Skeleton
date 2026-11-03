@@ -65,6 +65,10 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
             return httpx.Response(200, content=b"x" * 8193)
         if self.mode == "redirect":
             return httpx.Response(302, headers={"Location": "https://other.invalid"})
+        if self.mode == "compressed":
+            return httpx.Response(200, content=b"compressed", headers={"Content-Encoding": "gzip"})
+        if self.mode == "declared_oversize":
+            return httpx.Response(200, content=b"{}", headers={"Content-Length": "99999999"})
         fields["signature"] = base64.b64encode(signature).decode()
         return httpx.Response(200, json=fields)
 
@@ -115,11 +119,45 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
         client = self.make()
         text = "source"
         digest = hashlib.sha256(text.encode()).hexdigest()
-        for mode in ("replay", "digest", "unsigned", "oversize", "redirect"):
+        for mode in ("replay", "digest", "unsigned", "oversize", "redirect", "compressed", "declared_oversize"):
             with self.subTest(mode=mode):
                 self.mode = mode
                 with self.assertRaises(ReviewerCustodyError):
                     client(text, digest)
+
+    async def test_total_sync_review_deadline_denies_signed_response(self):
+        client = self.make()
+        digest = hashlib.sha256(b"source").hexdigest()
+        # The signed verdict is valid, but arrives beyond the wall-clock
+        # budget. A valid signature never overrides a timeout.
+        with patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client._now",
+            side_effect=[1.0, 10.0],
+        ):
+            with self.assertRaisesRegex(ReviewerCustodyError, "deadline"):
+                client("source", digest)
+
+    async def test_total_async_attestation_deadline_denies_signature(self):
+        client = self.make()
+        with patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client._now",
+            side_effect=[1.0, 10.0],
+        ):
+            with self.assertRaisesRegex(ReviewerCustodyError, "deadline"):
+                await client.attest_challenge(b"valid challenge")
+
+    async def test_compressed_attestation_response_denied(self):
+        client = self.make()
+        original = client._async
+        async def cannot_produce_signature(request):
+            return httpx.Response(
+                200, content=b"not a signature",
+                headers={"Content-Encoding": "gzip"},
+            )
+        await original.aclose()
+        client._async = httpx.AsyncClient(transport=httpx.MockTransport(cannot_produce_signature))
+        with self.assertRaisesRegex(ReviewerCustodyError, "encoded"):
+            await client.attest_challenge(b"valid challenge")
 
     async def test_input_digest_and_size_bound(self):
         client = self.make()

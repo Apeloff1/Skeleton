@@ -11,6 +11,7 @@ import hashlib
 import json
 import secrets
 import ssl
+import time
 from urllib.parse import urlsplit
 
 import httpx
@@ -23,6 +24,21 @@ from .reviewer_custody import ReviewerCustodyError, ReviewerTrustAnchor
 _MAX_TEXT = 1_048_576
 _MAX_RESPONSE = 8192
 _DOMAIN = b"skeleton.guard.signed-review.v1\x00"
+
+
+def _now() -> float:
+    return time.monotonic()
+
+
+def _bounded_headers(response: httpx.Response, limit: int) -> None:
+    """Reject compression and declared oversize before buffering any payload."""
+    encoding = response.headers.get("content-encoding", "identity").lower()
+    if encoding not in ("", "identity"):
+        raise ReviewerCustodyError("reviewer encoded response denied")
+    length = response.headers.get("content-length")
+    if length is not None and (not length.isascii() or not length.isdecimal()
+                               or len(length) > 12 or int(length) > limit):
+        raise ReviewerCustodyError("reviewer response length invalid")
 
 
 def canonical_verdict(fields: dict[str, object]) -> bytes:
@@ -64,6 +80,7 @@ class SignedReviewerClient:
         if not valid:
             raise ReviewerCustodyError("reviewer HTTPS endpoint required")
         self._base_url = base_url.rstrip("/")
+        self._timeout_seconds = float(timeout_seconds)
         self._anchor = trust_anchor
         self._key = Ed25519PublicKey.from_public_bytes(
             trust_anchor.ed25519_public_key
@@ -92,6 +109,7 @@ class SignedReviewerClient:
             schema="skeleton.guard.review-request.v1", nonce=nonce,
             context_sha256=context_sha256, untrusted_text=untrusted_text,
         )
+        deadline = _now() + self._timeout_seconds
         try:
             with self._sync.stream(
                 "POST", self._base_url + "/v1/review", json=request,
@@ -99,11 +117,16 @@ class SignedReviewerClient:
             ) as response:
                 if response.status_code != 200:
                     raise ReviewerCustodyError("reviewer unavailable")
+                _bounded_headers(response, _MAX_RESPONSE)
                 body = bytearray()
-                for chunk in response.iter_bytes():
+                for chunk in response.iter_raw(chunk_size=4096):
+                    if _now() >= deadline:
+                        raise ReviewerCustodyError("reviewer total deadline elapsed")
                     body.extend(chunk)
                     if len(body) > _MAX_RESPONSE:
                         raise ReviewerCustodyError("reviewer response exceeds bound")
+                if _now() >= deadline:
+                    raise ReviewerCustodyError("reviewer total deadline elapsed")
         except ReviewerCustodyError:
             raise
         except Exception:
@@ -140,6 +163,7 @@ class SignedReviewerClient:
     async def attest_challenge(self, payload: bytes) -> bytes:
         if type(payload) is not bytes or not 1 <= len(payload) <= 4096:
             raise ReviewerCustodyError("reviewer challenge invalid")
+        deadline = _now() + self._timeout_seconds
         try:
             async with self._async.stream(
                 "POST", self._base_url + "/v1/attest", content=payload,
@@ -147,11 +171,16 @@ class SignedReviewerClient:
             ) as response:
                 if response.status_code != 200:
                     raise ReviewerCustodyError("reviewer signer unavailable")
+                _bounded_headers(response, 64)
                 output = bytearray()
-                async for chunk in response.aiter_bytes():
+                async for chunk in response.aiter_raw(chunk_size=64):
+                    if _now() >= deadline:
+                        raise ReviewerCustodyError("reviewer signing deadline elapsed")
                     output.extend(chunk)
                     if len(output) > 64:
                         raise ReviewerCustodyError("reviewer signature exceeds bound")
+                if _now() >= deadline:
+                    raise ReviewerCustodyError("reviewer signing deadline elapsed")
         except ReviewerCustodyError:
             raise
         except Exception:
