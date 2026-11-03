@@ -43,9 +43,9 @@ form.append(submit); root.append(form, output);
 form.addEventListener("submit", event => {
   event.preventDefault();
   const result = JSON.parse(JSON.stringify(source));
-  const byId = new Map(inputs.map(i => [i.beat.id, i]));
+  let cursor = 0;
   for (const sequence of result.sequences) for (const beat of sequence.beats) {
-    const entry = byId.get(beat.id);
+    const entry = inputs[cursor++];
     beat.caption = entry.caption.value;
     beat.duration_ms = Number(entry.duration.value);
   }
