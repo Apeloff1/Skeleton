@@ -1,0 +1,79 @@
+"""First usable laptop AI: verified GGUF -> durable native inference or loopback API.
+
+No model artifact generation, network fallback, credential printing or
+implicit configuration repair. All model installation is an explicit prior step.
+"""
+from __future__ import annotations
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+from .contracts import ContractViolation,token,utf8
+from .dispatcher import LaptopDispatcher
+from .run_once import generate_once
+from .server import LaptopHTTPServer
+from .startup import activate_checked
+
+def main(argv=None):
+    p=argparse.ArgumentParser(description="Real first-usable offline AI laptop runtime")
+    p.add_argument("--model-root",type=Path,required=True)
+    p.add_argument("--state-dir",type=Path,required=True)
+    p.add_argument("--tenant",required=True)
+    p.add_argument("--subject",required=True)
+    p.add_argument("--mode",choices=("once","serve"),required=True)
+    p.add_argument("--session")
+    p.add_argument("--request-id")
+    p.add_argument("--prompt-stdin",action="store_true",
+                   help="Read one bounded local prompt from stdin instead of process arguments")
+    p.add_argument("--port",type=int,default=8765)
+    p.add_argument("--context",type=int,default=2048)
+    p.add_argument("--max-new-tokens",type=int,default=256)
+    p.add_argument("--threads",type=int,default=4)
+    p.add_argument("--gpu-layers",type=int,default=0)
+    p.add_argument("--capacity-root",type=Path)
+    p.add_argument("--capacity-budget-bytes",type=int,default=8000000000)
+    p.add_argument("--capacity-slots",type=int,default=1)
+    args=p.parse_args(argv)
+    try:
+        if args.mode=="once" and not args.prompt_stdin:
+            raise ContractViolation("one-shot CLI requires explicit --prompt-stdin")
+        if args.mode=="serve" and (args.prompt_stdin or args.session or args.request_id):
+            raise ContractViolation("server cannot combine one-shot options")
+        bearer=None
+        if args.mode=="serve":
+            bearer=token(os.environ.get("SKELETON_LOCAL_AI_BEARER",""))
+        if args.mode=="once":
+            raw=sys.stdin.buffer.read(32769)
+            if len(raw)>32768:raise ContractViolation("stdin prompt exceeds byte ceiling")
+            message=utf8(raw.decode("utf-8","strict").strip(),maximum=32768)
+        stack,worker,installed=activate_checked(model_root=args.model_root,state_dir=args.state_dir,
+            tenant=args.tenant,subject=args.subject,n_ctx=args.context,
+            max_new_tokens=args.max_new_tokens,n_threads=args.threads,
+            gpu_layers=args.gpu_layers,isolated=True,
+            capacity_root=args.capacity_root,
+            capacity_slots=args.capacity_slots,
+            capacity_budget_bytes=args.capacity_budget_bytes)
+        with stack:
+            if args.mode=="once":
+                result=generate_once(worker,message,session=args.session,
+                                     request_id=args.request_id)
+                print(json.dumps({"status":"real-offline-turn-committed",
+                                  "output":result},sort_keys=True,ensure_ascii=False))
+                return 0
+            with LaptopHTTPServer(("127.0.0.1",args.port),
+                                  LaptopDispatcher(worker),bearer) as server:
+                print(json.dumps({"status":"native-loopback-listening",
+                    "host":"127.0.0.1","port":server.server_port,
+                    "model_sha256":worker.spine.identity.model_sha256,
+                    "release_certified":False},sort_keys=True),flush=True)
+                server.serve_forever(poll_interval=0.2)
+        return 0
+    except (Exception,KeyboardInterrupt) as exc:
+        # No prompt, token, private paths, traceback or model text in stderr.
+        print(json.dumps({"status":"held","error_class":type(exc).__name__}),
+              file=sys.stderr)
+        return 2
+
+if __name__=="__main__":
+    raise SystemExit(main())

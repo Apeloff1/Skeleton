@@ -1,0 +1,18 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "04_attack",
+  "domain": "native_identity",
+  "expected": "reject",
+  "payload": {
+    "approved": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "runtime": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runtime_tokenizer": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "callable": true
+  },
+  "reason": "Refuse adversarial native_identity variant 4",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational native_identity contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}
