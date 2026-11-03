@@ -5,9 +5,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from .harbor_crafting import HarborError, MAX_BUNDLE_BYTES, canonical, decode, digest
+from .harbor_crafting import HarborError, MAX_BUNDLE_BYTES, canonical, decode
 from .harbor_crafting_beacons import (
-    MAX_BOARD_BYTES, MAX_REPORT_BYTES, beacon_status, build_beacon_rescue,
+    MAX_BOARD_BYTES, MAX_REPORT_BYTES, build_beacon_rescue,
     resume_beacon_rescue, verify_beacon_rescue,
 )
 from .harbor_crafting_beacon_authoring import (
@@ -19,8 +19,10 @@ from .harbor_crafting_beacon_package import (
     resume_beacon_package,
 )
 
+from .harbor_crafting_beacon_ui import play_beacon_live
+
 COMMANDS = (
-    "run", "verify", "resume", "status", "author", "verify-author",
+    "run", "verify", "resume", "status", "live", "author", "verify-author",
     "package", "verify-package", "play", "verify-play", "resume-play",
 )
 
@@ -63,6 +65,15 @@ def main(argv: list[str] | None = None) -> int:
                 _read(args.actions, MAX_BUNDLE_BYTES),
                 require_rescue=args.require_rescue,
             )
+        elif command == "live":
+            result = play_beacon_live(
+                _read(args.source, MAX_BUNDLE_BYTES),
+                _read(args.board, MAX_BOARD_BYTES),
+                instream=sys.stdin, outstream=sys.stderr,
+                initial_report=None if not args.report else _read(args.report, MAX_REPORT_BYTES),
+            )
+            if args.require_rescue:
+                verify_beacon_rescue(result, require_rescue=True)
         elif command == "verify":
             result = verify_beacon_rescue(
                 _read(args.report, MAX_REPORT_BYTES), require_rescue=args.require_rescue,

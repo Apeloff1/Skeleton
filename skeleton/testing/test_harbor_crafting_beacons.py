@@ -68,8 +68,9 @@ def test_canonical_tool_and_prerequisite_cannot_be_bypassed():
     with pytest.raises(HarborError, match="prerequisite"):
         build_beacon_rescue(
             source, board,
-            demo_actions()[:12] + [{"op": "repair", "beacon": "dock_light"},
-                                  {"op": "signal", "beacon": "dock_light"}],
+            demo_actions()[:12] + demo_actions()[12:16]
+            + [{"op": "repair", "beacon": "dock_light"},
+               {"op": "signal", "beacon": "dock_light"}],
         )
     with pytest.raises(HarborError, match="bypasses"):
         build_beacon_rescue(source, board, demo_actions())
@@ -217,3 +218,36 @@ def test_user_reachable_cli_run_verify_package_and_author(tmp_path):
                "--expected-digest", "0" * 64], capture_output=True, check=False,
     )
     assert bad.returncode == 2 and b"stale" in bad.stderr
+
+
+def test_interactive_beacon_terminal_rejects_bad_input_and_saves_victory():
+    from io import StringIO
+    from skeleton.game.gameplay.harbor_crafting_beacon_ui import play_beacon_live
+    source, board = source_board()
+    lines = ["invalid", "repair fake"]
+    for action in winning_actions():
+        op = action["op"]
+        lines.append(
+            op + " " + action.get(
+                "direction", action.get("recipe", action.get("item", action.get("beacon", "")))
+            ) if op in {"move", "craft", "trade", "repair", "signal"} else op
+        )
+    output = StringIO()
+    report = play_beacon_live(
+        source, board, instream=StringIO("\n".join(lines) + "\n"),
+        outstream=output,
+    )
+    assert verify_beacon_rescue(report, require_rescue=True)["rescued"]
+    assert "Rejected:" in output.getvalue()
+    assert "beacon>" in output.getvalue()
+
+
+def test_public_beacon_status_replays_before_exposing_result():
+    from skeleton.game.gameplay.harbor_crafting_beacons import beacon_status
+    source, board = source_board()
+    report = build_beacon_rescue(source, board, winning_actions(), require_rescue=True)
+    assert beacon_status(report)["rescued"]
+    forged = deepcopy(report)
+    forged["state"]["rescued"] = False
+    with pytest.raises(HarborError):
+        beacon_status(forged)

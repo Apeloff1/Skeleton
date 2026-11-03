@@ -207,10 +207,15 @@ def verify_beacon_rescue(report: Any, *, require_rescue: bool = False) -> dict[s
     )
     if rebuilt != report:
         raise HarborError("beacon replay mismatch")
-    return beacon_status(rebuilt)
+    return _beacon_status(rebuilt)
 
 
 def beacon_status(report: Any) -> dict[str, Any]:
+    """Return only independently replay-verified beacon status."""
+    return verify_beacon_rescue(report)
+
+
+def _beacon_status(report: dict[str, Any]) -> dict[str, Any]:
     verify = report["state"]
     return {
         "rescued": verify["rescued"],
