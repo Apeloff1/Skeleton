@@ -158,6 +158,31 @@ def _consumer_contract() -> dict:
             "actions": report["actions"], "head": report["head"]}
 
 
+def _consumer_process_contract() -> dict:
+    """Actually launch source and standalone game across separate processes."""
+    from .consumer_smoke import run_smoke, run_portable_smoke
+    source = run_smoke()
+    portable = run_portable_smoke()
+    for report in (source, portable):
+        if (report["result"] != "passed-on-current-host" or
+            not report["portable_export_verified"] or
+            not report["portable_restore_audited"] or
+            not report["restore_overwrite_rejected"] or
+            not report["tampered_restore_rejected"] or
+            not report["invalid_mutation_rejected"] or
+            not report["real_processes"] or
+            report["windows_device_certified"] or report["release_certified"]):
+            raise AcceptanceMatrixError("consumer cross-process custody contract failed")
+    if not portable["portable_zipapp_verified"] or portable["source_checkout_dependency"]:
+        raise AcceptanceMatrixError("standalone game still depends on source checkout")
+    if portable["earned_head"] != source["earned_head"]:
+        raise AcceptanceMatrixError("source and standalone earned outcomes diverged")
+    return {"status": "verified-in-process", "earned_head": source["earned_head"],
+            "source_actions": source["actions"], "portable_actions": portable["actions"],
+            "portable_sha256": portable["archive_sha256"], "restore_verified": True,
+            "device_certified": False, "release_certified": False}
+
+
 def run_matrix(*, fail_fast: bool = False) -> dict:
     if type(fail_fast) is not bool:
         raise AcceptanceMatrixError("invalid fail_fast")
@@ -171,6 +196,7 @@ def run_matrix(*, fail_fast: bool = False) -> dict:
         ("original-challenges", _challenges_contract),
         ("earned-league", _league_contract),
         ("consumer-restart-export", _consumer_contract),
+        ("consumer-portable-restart-restore", _consumer_process_contract),
     )
     reports = {}
     for name, check in checks:

@@ -10,12 +10,13 @@ def test_complete_product_matrix_runs_real_game_contracts():
     report = run_matrix()
     assert report["schema"] == CONTRACT
     assert report["passed"] is True, report["checks"]
-    assert report["completed_checks"] == report["expected_checks"] == 8
+    assert report["completed_checks"] == report["expected_checks"] == 10
     assert report["release_certified"] is False
     assert report["ci_certified"] is False
     assert report["device_certified"] is False
     assert report["checks"]["routebook-choices"]["routes"]["protect-route"]["ending"] == "won:protect"
     assert report["checks"]["workbench-editor"]["ending"] == "won:protect"
+    assert report["checks"]["consumer-portable-restart-restore"]["restore_verified"] is True
 
 
 def test_failed_contract_cannot_be_hidden(monkeypatch):
@@ -25,7 +26,7 @@ def test_failed_contract_cannot_be_hidden(monkeypatch):
     report = run_matrix()
     assert report["passed"] is False
     assert report["checks"]["world-package"]["status"] == "failed"
-    assert report["completed_checks"] == 6
+    assert report["completed_checks"] == report["expected_checks"] == 10
     fast = run_matrix(fail_fast=True)
     assert fast["passed"] is False
     assert fast["completed_checks"] == 1
