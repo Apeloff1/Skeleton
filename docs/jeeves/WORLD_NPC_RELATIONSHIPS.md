@@ -21,3 +21,7 @@ or approve content. The browser player uses DOM textContent, blocks all
 network access, and embeds escaped canonical JSON. The artifact receipt
 binds the exact world, cast, relationships, proof and playable bytes.
 No device or release certification is implied.
+
+The verified playable embeds the approved original cast alongside trust rules, displays
+cast dialogue only when its canonical earned flags are present, and overlays the
+relationship reaction for the same actual scene and player choice trace.

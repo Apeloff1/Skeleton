@@ -65,6 +65,7 @@ def test_review_compile_receipt_and_tamper(tmp_path):
     playable = tmp_path / receipt["html_file"]
     assert sha256(playable.read_bytes()).hexdigest() == receipt["html_sha256"]
     assert b"connect-src 'none'" in playable.read_bytes()
+    assert b"harbor remembers every promise" in playable.read_bytes()
     playable.write_bytes(playable.read_bytes() + b"<!-- tampered -->")
     reject("relationships_playable_mismatch", lambda: store.verify("harbor"))
 

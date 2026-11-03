@@ -220,7 +220,8 @@ def evaluate_relationships(data: Any, world: Any, cast: Any, choices: Any) -> di
 _PLAYER_JS = r"""
 "use strict";
 const model = JSON.parse(document.getElementById("relationship-data").textContent);
-const world = model.world, bonds = model.relationships.bonds;
+const world = model.world, cast = model.cast, bonds = model.relationships.bonds;
+const actors = new Map(cast.characters.map(a => [a.id, a.name]));
 const scenes = new Map(world.scenes.map(s => [s.id, s]));
 const endings = new Map(world.endings.map(e => [e.scene, e.label]));
 const root = document.getElementById("play");
@@ -233,6 +234,11 @@ function render() {
   root.replaceChildren();
   const current = scenes.get(scene);
   root.append(node("h1", current.title), node("p", current.narrative));
+  const dialogue = cast.lines.filter(line => line.scene === scene &&
+    line.requires_flags.every(flag => flags.has(flag)))
+    .sort((a,b) => a.order - b.order || a.id.localeCompare(b.id));
+  for (const line of dialogue)
+    root.append(node("p", actors.get(line.speaker) + ": " + line.text));
   for (const bond of bonds) {
     const score = scores.get(bond.id);
     root.append(node("p", bond.name + " trust: " + score));
@@ -275,7 +281,7 @@ def render_relationships_html(data: Any, world: Any, cast: Any) -> bytes:
     prove_relationships(data, world, cast)
     if not data["approved"] or not cast["approved"]:
         raise CanonError("relationships_review_required")
-    payload = canonical({"world": world, "relationships": data}).decode("utf-8").replace("<", "\\u003c")
+    payload = canonical({"world": world, "cast": cast, "relationships": data}).decode("utf-8").replace("<", "\\u003c")
     policy = base64.b64encode(sha256(_PLAYER_JS.encode()).digest()).decode("ascii")
     title = html.escape(world["id"], quote=True)
     page = (
