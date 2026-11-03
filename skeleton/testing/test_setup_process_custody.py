@@ -131,3 +131,84 @@ def test_independent_process_cannot_interleave_bootstrap(tmp_path):
         if child.poll() is None:
             child.kill()
             child.wait(timeout=5)
+
+
+def test_two_independent_installers_publish_one_shared_secret_epoch(tmp_path):
+    """Competing first-run processes must not each initialize different keys."""
+    import json
+
+    root = _root(tmp_path)
+    gate = root / "begin-bootstrap"
+    markers = [root / "worker-one-ready", root / "worker-two-ready"]
+    script = "\n".join(
+        [
+            "import json, sys, time",
+            "from pathlib import Path",
+            "from skeleton.app.setup_runtime import ensure_runtime_environment",
+            "root, marker, gate = map(Path, sys.argv[1:4])",
+            "marker.write_text('ready', encoding='utf-8')",
+            "deadline = time.monotonic() + 8",
+            "while not gate.exists() and time.monotonic() < deadline:",
+            "    time.sleep(0.01)",
+            "if not gate.exists(): sys.exit(7)",
+            "result = ensure_runtime_environment(root)",
+            "print(json.dumps({'created': result.created, 'changed': result.changed}))",
+            "",
+        ]
+    )
+    workers = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(root), str(marker), str(gate)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        for marker in markers
+    ]
+    try:
+        deadline = time.monotonic() + 8
+        while not all(marker.exists() for marker in markers) and time.monotonic() < deadline:
+            if any(worker.poll() is not None for worker in workers):
+                break
+            time.sleep(0.02)
+        assert all(marker.exists() for marker in markers), "workers did not reach the admission barrier"
+        gate.write_text("begin", encoding="utf-8")
+        results = []
+        for worker in workers:
+            stdout, stderr = worker.communicate(timeout=20)
+            assert worker.returncode == 0, f"worker exited {worker.returncode}: {stderr[-300:]}"
+            results.append(json.loads(stdout))
+        assert sorted(result["created"] for result in results) == [False, True]
+        assert sorted(result["changed"] for result in results) == [False, True]
+        values = _keys(root / ".env")
+        assert values["SKL_ENGINE_SERVICE_TOKEN"]
+        assert values["GF_KEYHOLDER_SEED"]
+        assert not ensure_runtime_environment(root).changed
+    finally:
+        for worker in workers:
+            if worker.poll() is None:
+                worker.kill()
+                worker.wait(timeout=5)
+
+
+def test_installer_fails_closed_and_redacts_lock_timeout(tmp_path, monkeypatch):
+    from skeleton.app.installer import install_application
+    from skeleton.app.preloader import PreloadReport
+
+    root = _root(tmp_path)
+    monkeypatch.setattr(
+        "skeleton.app.installer.inspect_host",
+        lambda *args, **kwargs: PreloadReport(root=root, platform="test", python=sys.executable, checks=()),
+    )
+
+    def unavailable(*args, **kwargs):
+        raise TimeoutError("private operator secret from blocked bootstrap")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("failed setup must not start installation subprocesses")
+
+    monkeypatch.setattr("skeleton.app.installer.ensure_runtime_environment", unavailable)
+    receipt = install_application(root, install_python=False, runner=forbidden)
+    assert not receipt.ok
+    assert receipt.phases[-1].name == "setup-runtime"
+    assert "TimeoutError" in receipt.phases[-1].detail
+    assert "private operator secret" not in repr(receipt.to_dict())
+    assert not (root / ".env").exists()
