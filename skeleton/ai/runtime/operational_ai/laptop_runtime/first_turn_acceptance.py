@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import secrets
 
-from .contracts import refuse
+from .contracts import refuse, utf8
 from .identity import ActiveModel
 from .session_adapter import create
 from .turn_bridge import TurnBridge
@@ -24,6 +24,12 @@ def run(worker, *, prompt, approved=False) -> dict[str, object]:
     """
     if approved is not True:
         refuse("real end-to-end inference approval required")
+    # Validate the complete operator-supplied prompt before allocating a new
+    # durable SQLite session. An invalid Unicode scalar, NUL, empty prompt
+    # or over-budget request must not create an orphan pending session.
+    verified_prompt = utf8(
+        prompt, maximum=worker.spine.limits.input_bytes,
+    )
     bridge = TurnBridge(worker)
     bound = bridge.identity
     session = create(worker)
@@ -32,7 +38,7 @@ def run(worker, *, prompt, approved=False) -> dict[str, object]:
     # Native call is non-retryable on uncertainty; bridge requires the
     # authoritative committed SQLite text and digest before returning.
     first = bridge.turn(
-        session, request, prompt, seed=17, temperature=0.8,
+        session, request, verified_prompt, seed=17, temperature=0.8,
     )
     if first["replayed"] is not False:
         refuse("first-turn acceptance requires a fresh native generation")
@@ -42,7 +48,7 @@ def run(worker, *, prompt, approved=False) -> dict[str, object]:
     # This is a second, explicitly read-only identity-bound retrieval,
     # not a second native forward pass or synthetic model response.
     replay = inspect_replay(
-        worker, session, request, prompt, seed=17, temperature=0.8,
+        worker, session, request, verified_prompt, seed=17, temperature=0.8,
     )
     if (replay["committed"] is not True
             or replay["no_second_generation"] is not True
