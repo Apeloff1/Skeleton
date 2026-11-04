@@ -213,6 +213,27 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result["code"], "mongo_authenticated_session_required")
                 self.assertFalse(result["guarded_local_ai_ready"])
 
+    async def test_duplicate_authenticated_principal_denied_before_epoch(self):
+        user = {"user": "ci", "db": "admin"}
+        self.db.auth = {"authInfo": {"authenticatedUsers": [user, dict(user)]}}
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_authenticated_identity_ambiguous")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertEqual(FakeEpoch.instances, [])
+
+    async def test_duplicate_principal_during_final_read_denied(self):
+        class DuplicatedFinal(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "connectionStatus" and self.calls == 6:
+                    user = {"user": "ci", "db": "admin"}
+                    return {"authInfo": {"authenticatedUsers": [user, dict(user)]}}
+                return result
+        self.db = DuplicatedFinal()
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_principal_changed_during_final_epoch_read")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_authentication_probe_failure_redacts_credentials(self):
         class AuthFailureDB(FakeDB):
             async def command(self, name):

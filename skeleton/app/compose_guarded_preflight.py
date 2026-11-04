@@ -105,6 +105,8 @@ async def inspect_compose_mongo_epoch(
             )):
         return _result("mongo_authenticated_session_required", replica_set=True)
     initial_users = tuple(sorted((u["db"], u["user"]) for u in auth["authInfo"]["authenticatedUsers"]))
+    if len(set(initial_users)) != len(initial_users):
+        return _result("mongo_authenticated_identity_ambiguous", replica_set=True)
     try:
         epoch = MongoCanonicalSourceEpoch(database)
         async with asyncio.timeout(3.0):
@@ -133,6 +135,7 @@ async def inspect_compose_mongo_epoch(
                 or any(type(u) is not dict or type(u.get("user")) is not str
                        or not u["user"] or type(u.get("db")) is not str
                        or not u["db"] for u in final_users)
+                or len(set((u["db"], u["user"]) for u in final_users)) != len(final_users)
                 or tuple(sorted((u["db"], u["user"]) for u in final_users)) != initial_users):
             return _result("mongo_principal_changed_during_preflight",
                            replica_set=True, authenticated=False)
@@ -164,6 +167,7 @@ async def inspect_compose_mongo_epoch(
                 or any(type(u) is not dict or type(u.get("user")) is not str
                        or not u["user"] or type(u.get("db")) is not str
                        or not u["db"] for u in post_users)
+                or len(set((u["db"], u["user"]) for u in post_users)) != len(post_users)
                 or tuple(sorted((u["db"], u["user"]) for u in post_users)) != initial_users):
             return _result("mongo_principal_changed_during_final_epoch_read",
                            replica_set=True, authenticated=False)
