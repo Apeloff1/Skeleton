@@ -51,13 +51,36 @@ def build_bytes() -> bytes:
             continue
         if path.suffix not in {".py", ".json"}:
             continue
-        info = path.stat()
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_SOURCE_FILE_BYTES:
-            raise BundleError("unsafe or oversized source file")
         relative = path.relative_to(source).as_posix()
         if ".." in Path(relative).parts or relative.startswith("/"):
             raise BundleError("unsafe archive path")
-        entries.append((relative, path.read_bytes()))
+        # Bound the bytes actually read, not merely the pre-open stat size.
+        # Refuse a replaced symlink or a file grown after inventory.
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            before = path.lstat()
+            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_SOURCE_FILE_BYTES:
+                raise BundleError("unsafe or oversized source file")
+            fd = os.open(path, flags)
+            try:
+                opened = os.fstat(fd)
+                if (not stat.S_ISREG(opened.st_mode) or
+                    (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) or
+                    opened.st_size > MAX_SOURCE_FILE_BYTES):
+                    raise BundleError("source changed during packaging")
+                with os.fdopen(fd, "rb", closefd=False) as stream:
+                    data = stream.read(MAX_SOURCE_FILE_BYTES + 1)
+                after = os.fstat(fd)
+                if (len(data) > MAX_SOURCE_FILE_BYTES or
+                    len(data) != opened.st_size or
+                    (after.st_size, after.st_mtime_ns, after.st_ctime_ns) !=
+                    (opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)):
+                    raise BundleError("source changed or exceeded packaging budget")
+            finally:
+                os.close(fd)
+        except OSError as exc:
+            raise BundleError("source unavailable during packaging") from exc
+        entries.append((relative, data))
     entries.sort(key=lambda item: item[0])
     if not 4 <= len(entries) <= MAX_SOURCE_FILES:
         raise BundleError("original game source inventory outside bounds")
