@@ -342,8 +342,11 @@ def _read_dotenv(path: Path) -> dict[str, str]:
         raise ValueError("private runtime environment must be an unlinked regular file")
     try:
         descriptor = os.open(path, flags)
-    except FileNotFoundError:
-        return values
+    except FileNotFoundError as exc:
+        # An absent file before admission is allowed, but disappearance after
+        # lstat is a concurrent replacement and must not silently downgrade
+        # guarded configuration to an empty environment.
+        raise ValueError("private runtime environment changed during admission") from exc
     except OSError as exc:
         raise ValueError("private runtime environment cannot be opened safely") from exc
     try:
