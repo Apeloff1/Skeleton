@@ -1,7 +1,7 @@
 """model_manifest.archive_source_digest: Compare the operator-expected archive hash with the observed hash; cannot attest rights.
 
 This is a source-only diagnostic and cannot start a native worker.
-""" 
+"""
 from __future__ import annotations
 
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import StageVerdict

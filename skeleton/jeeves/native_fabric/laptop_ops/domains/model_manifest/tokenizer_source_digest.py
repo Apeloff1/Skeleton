@@ -1,7 +1,7 @@
 """model_manifest.tokenizer_source_digest: Reject a model/tokenizer source mismatch.
 
 This is a source-only diagnostic and cannot start a native worker.
-""" 
+"""
 from __future__ import annotations
 
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import StageVerdict
