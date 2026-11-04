@@ -256,3 +256,15 @@ separate **Attach selected exact snippet** action before a subsequent chat,
 agent or durable-work prompt can use that text as untrusted reference data.
 No search results are silently uploaded, memorized, executed or written back.
 See `docs/ai/JEEVES_LOCAL_SOURCE_DISCOVERY.md`.
+
+## Reviewed proposals for existing files
+
+The desktop can now request full-replacement edits for existing source files
+using the **Insert existing-edit format** prompt helper, then review the
+committed model answer in **Review existing-file edits**. The proposal must
+carry each original file's full SHA-256. The UI shows exact original-versus-
+replacement diffs and requires a separate full digest confirmation for every
+candidate. Its publication uses no-clobber, descriptor-anchored creation of
+a *new* inert sibling; the existing file is not overwritten by Jeeves.
+The operator must apply reviewed candidates in their own editor/Git workflow.
+See `docs/ai/JEEVES_EXISTING_SOURCE_EDIT_REVIEW.md`.
