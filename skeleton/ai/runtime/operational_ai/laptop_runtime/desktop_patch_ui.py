@@ -8,10 +8,11 @@ create executable files, or silently apply the patch.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from queue import Empty, Queue
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from tkinter.scrolledtext import ScrolledText
 
 from .desktop_existing_edits import SCHEMA as EDIT_SCHEMA
@@ -19,6 +20,9 @@ from .desktop_patch_bundle import (
     PortablePatchPlan, review_patch_bundle, get_reviewed_patch,
 )
 from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
+from .desktop_private_overlay import (
+    stage_reviewed_overlay, verify_staged_overlay,
+)
 from .desktop_source_qualification import qualify_patch_sources
 from .desktop_patch_reconcile import reconcile_reviewed_patch
 from .desktop_project_work import (
@@ -50,6 +54,8 @@ class PortablePatchWindow(tk.Toplevel):
         self._plan: PortablePatchPlan | None = None
         self._reviewed_texts = None
         self._export_receipt = None
+        self._stage_receipt = None
+        self._stage_path = None
         self._qualification = None
         self._queue: Queue = Queue()
         self._build()
@@ -184,7 +190,13 @@ class PortablePatchWindow(tk.Toplevel):
             approvals, text="Export NEW private .patch only",
             command=self._export,
         )
-        self.export_button.grid(row=0, column=2, rowspan=2, padx=(6, 0))
+        self.export_button.grid(row=0, column=2, padx=(6, 0))
+        self.stage_button = ttk.Button(
+            approvals,
+            text="Stage reviewed SOURCE files privately",
+            command=self._stage_sources,
+        )
+        self.stage_button.grid(row=1, column=2, padx=(6, 0), pady=(5, 0))
 
         destination = ttk.Frame(frame)
         destination.grid(row=9, column=0, sticky="ew", pady=(7, 0))
@@ -204,6 +216,19 @@ class PortablePatchWindow(tk.Toplevel):
             command=self._verify_export,
         )
         self.verify_button.grid(row=0, column=3)
+        self.verify_stage_button = ttk.Button(
+            destination, text="Reverify private staged sources",
+            command=self._verify_stage,
+        )
+        self.verify_stage_button.grid(row=1, column=3, pady=(5, 0), sticky="e")
+        ttk.Label(
+            destination, wraplength=880,
+            text=(
+                "Private stage: creates NEW owner-only directory with actual "
+                "changed source files, canonical SHA manifest and final seal. "
+                "It is NOT a runnable whole project and never changes checkout."
+            ),
+        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(5, 0))
 
         ttk.Label(
             frame, textvariable=self.status, wraplength=1130,
@@ -296,6 +321,8 @@ class PortablePatchWindow(tk.Toplevel):
         self._plan = None
         self._reviewed_texts = None
         self._export_receipt = None
+        self._stage_receipt = None
+        self._stage_path = None
         self._qualification = None
         self.expected_manifest.set("")
         self.expected_patch.set("")
@@ -325,6 +352,19 @@ class PortablePatchWindow(tk.Toplevel):
         self.verify_button.configure(
             state="normal" if not self._busy and self._export_receipt is not None
             else "disabled",
+        )
+        self.stage_button.configure(
+            state="normal" if (
+                not self._busy and self._plan is not None
+                and self._qualification is not None
+                and self._qualification.permits_inert_export
+            ) else "disabled",
+        )
+        self.verify_stage_button.configure(
+            state="normal" if (
+                not self._busy and self._stage_receipt is not None
+                and self._stage_path is not None
+            ) else "disabled",
         )
 
     def _review(self):
@@ -435,6 +475,105 @@ class PortablePatchWindow(tk.Toplevel):
                 self._queue.put(("exported", epoch, destination, result))
             except BaseException as exc:
                 self._queue.put(("export-held", epoch, destination, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _stage_sources(self):
+        plan = self._plan
+        if (
+            self._busy or plan is None or self._qualification is None
+            or not self._qualification.permits_inert_export
+        ):
+            return
+        if self._reviewed_texts != self._source_inputs():
+            self._invalidate()
+            return
+        if (
+            self.expected_manifest.get() != plan.manifest_sha256
+            or self.expected_patch.get() != plan.patch_sha256
+        ):
+            self.status.set(
+                "Type BOTH original SHA-256 values before staging source bytes",
+            )
+            return
+        parent = filedialog.askdirectory(
+            parent=self,
+            title="Choose EXISTING owner-private directory OUTSIDE original project",
+        )
+        if not parent:
+            return
+        name = simpledialog.askstring(
+            "New source overlay directory",
+            "Enter a NEW private folder name for the exact changed source files. "
+            "An existing folder will NEVER be used or overwritten.",
+            parent=self,
+        )
+        if not name:
+            return
+        destination = str(Path(parent) / name)
+        if not messagebox.askyesno(
+            "Stage actual revised source files?",
+            "Create a NEW 0700 owner-private preview directory outside the "
+            "source project, with exact reviewed replacement bytes at 0600. "
+            "An incomplete stage can remain if storage fails. NO original "
+            "files, Git index, model tool grants, or executables are changed. "
+            "The new tree is not a runnable complete checkout. Continue?",
+            parent=self,
+        ):
+            return
+        epoch = self._epoch
+        manifest = plan.manifest_sha256
+        patch_digest = plan.patch_sha256
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set(
+            "Staging privately under no-follow descriptors after source "
+            "and syntax recheck; complete seal written LAST…",
+        )
+
+        def work():
+            try:
+                receipt = stage_reviewed_overlay(
+                    plan, destination,
+                    expected_manifest_sha256=manifest,
+                    expected_patch_sha256=patch_digest,
+                    approve_staging=True,
+                )
+                self._queue.put(("staged", epoch, destination, receipt))
+            except BaseException as exc:
+                self._queue.put((
+                    "stage-held", epoch, destination, type(exc).__name__,
+                ))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _verify_stage(self):
+        if (
+            self._busy or self._stage_path is None
+            or self._stage_receipt is None or self._plan is None
+        ):
+            return
+        epoch = self._epoch
+        path = self._stage_path
+        plan = self._plan
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set("Reopening owner-private completed source overlay…")
+
+        def work():
+            try:
+                receipt = verify_staged_overlay(
+                    path, expected_manifest_sha256=plan.manifest_sha256,
+                    expected_patch_sha256=plan.patch_sha256,
+                    workspace_root=plan.root,
+                )
+                self._queue.put(("stage-verified", epoch, path, receipt))
+            except BaseException as exc:
+                self._queue.put((
+                    "stage-held", epoch, path, type(exc).__name__,
+                ))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -583,6 +722,25 @@ class PortablePatchWindow(tk.Toplevel):
                             + ". Apply only after separate Git source-review, "
                             + "git apply --check and operator authorization.",
                         )
+                elif kind == "staged":
+                    self._stage_path = message[2]
+                    self._stage_receipt = message[3]
+                    self.status.set(
+                        "PRIVATE source files STAGED, NOT applied · "
+                        + str(message[3]["file_count"]) + " exact outputs in "
+                        + self._stage_path
+                        + " · seal verified · source SHA "
+                        + str(message[3]["manifest_sha256"])
+                        + " · no code executed or checkout changes. "
+                        + "Inspect the private folder manually.",
+                    )
+                elif kind == "stage-verified":
+                    self.status.set(
+                        "COLD RECHECK: " + str(message[3]["file_count"])
+                        + " staged source files verified at "
+                        + str(message[2])
+                        + " · complete seal and hashes intact · no execution.",
+                    )
                 elif kind == "verified":
                     self.status.set(
                         "Saved patch bytes independently rechecked: "

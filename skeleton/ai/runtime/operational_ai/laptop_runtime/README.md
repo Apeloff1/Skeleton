@@ -249,3 +249,16 @@ existing new-file/edit reviewers, the static parser and a
 fresh operator-approved Git patch export. No direct source
 writes, Git tool grants or automatic publication are added.
 `docs/ai/JEEVES_NATIVE_MIXED_PROJECT_WORK.md`.
+
+## Sealed private source-overlay stage
+
+The Git patch review window now offers an explicit standalone
+**Stage reviewed SOURCE files privately** action. It renders
+the exact final new/edited source into a brand-new owner-private
+`0700` folder with `0600` files and hash manifest, writing
+the complete seal **last**. The original project is revalidated
+before staging and never modified; the product never executes
+model-generated source, runs Git, or grants the model arbitrary
+writes. Incomplete/tampered stages fail verification. The strict
+mixed-work parser now enforces the native 16 KiB reply ceiling.
+`docs/ai/JEEVES_PRIVATE_SOURCE_OVERLAY_STAGING.md`.
