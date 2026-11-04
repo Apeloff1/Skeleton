@@ -30,6 +30,12 @@ def run(
         refuse("real end-to-end inference approval required")
     if type(require_real) is not bool:
         refuse("real acceptance must be an explicit boolean")
+    # Pure private-input validation MUST precede even read-only installed
+    # source/probe activity. Invalid direct-caller prompts are held before
+    # any source inspection, durable allocation or isolated model effect.
+    verified_prompt = utf8(
+        prompt, maximum=worker.spine.limits.input_bytes,
+    )
     # No synthetic or arbitrary worker may claim native GGUF observation.
     # All source evidence comes from the existing verified installer and the
     # canonical supervisor, not from the model's generated text.
@@ -48,12 +54,6 @@ def run(
             refuse("complete installed native source witness required")
     if require_real and source is None:
         refuse("independent installed source proof required")
-    # Validate the complete operator-supplied prompt before allocating a new
-    # durable SQLite session. An invalid Unicode scalar, NUL, empty prompt
-    # or over-budget request must not create an orphan pending session.
-    verified_prompt = utf8(
-        prompt, maximum=worker.spine.limits.input_bytes,
-    )
     bridge = TurnBridge(worker)
     bound = bridge.identity
     session = create(worker)
