@@ -7,6 +7,7 @@ replay proves the same exact committed text and digest.
 from __future__ import annotations
 
 import secrets
+import threading
 
 from .contracts import refuse
 from .identity import ActiveModel
@@ -24,6 +25,10 @@ class LaptopDispatcher:
         self.worker = worker
         self.active = ActiveModel.from_supervisor(worker)
         self.limits = worker.spine.limits
+        # The same loopback server serves concurrent authenticated clients.
+        # One dispatcher permits only one in-flight read OR native effect so a
+        # close, replay, history or outbox ack cannot race an active turn.
+        self._flight = threading.Lock()
 
     def _assert_current(self) -> None:
         """Deny stale model, tokenizer, tenant or subject before private IO."""
@@ -53,8 +58,23 @@ class LaptopDispatcher:
         return verified
 
     def dispatch(self, operation, payload):
-        """Validate shape and active source identity before any native effect."""
+        """Single-flight admission for the actual shared laptop HTTP dispatcher.
+
+        Reject concurrency instead of silently queuing native generations,
+        replay reads or SQLite mutations behind an unbounded request backlog.
+        The lock is released even when generation fails or is uncertain; the
+        canonical ExecutionSpine still owns its persistent pending fence.
+        """
         data = normalize(operation, payload, self.limits)
+        if not self._flight.acquire(blocking=False):
+            refuse("native dispatcher already has an active request")
+        try:
+            return self._dispatch_exclusive(operation, data)
+        finally:
+            self._flight.release()
+
+    def _dispatch_exclusive(self, operation, data):
+        """Only the installed active principal may cross the native boundary."""
         self._assert_current()
         if operation == "create":
             session = "s_" + secrets.token_hex(16)
