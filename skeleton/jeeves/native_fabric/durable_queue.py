@@ -336,10 +336,20 @@ class DurableNativeQueue:
         if sha256(prompt.encode("utf-8","strict")).hexdigest()!=order.prompt_sha256:
             raise DurableQueueHold("operator prompt differs from durably admitted bytes")
         self._live()
-        saved=self.worker.spine.replay(
-          order.session_id,order.request_id,prompt,
-          seed=order.seed,temperature=order.temperature,
+        from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import (
+            Conflict, Busy,
         )
+        try:
+            saved=self.worker.spine.replay(
+              order.session_id,order.request_id,prompt,
+              seed=order.seed,temperature=order.temperature,
+            )
+        except (Conflict, Busy) as exc:
+            # Missing, foreign, closed or still-pending native sessions
+            # cannot prove a committed result. Never reset their claim.
+            raise DurableQueueHold(
+                "native session cannot prove committed orphan receipt"
+            ) from exc
         if saved is None:
             raise DurableQueueHold("no authoritative native commit to reconcile")
         proven=verify_turn_receipt(
