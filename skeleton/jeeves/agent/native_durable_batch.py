@@ -191,10 +191,21 @@ class NativeDurableBatchConveyor:
         if any(not isinstance(x,FabricJob) for x in jobs):
             raise NativeDurableBatchHold("typed approved jobs required")
         tasks=tuple(j.task for j in jobs)
-        _,self_id=self.native._check(batch_id,tasks)
+        _,native_digest=self.native._check(batch_id,tasks)
         if len({x.task_id for x in tasks})!=len(tasks):
             raise NativeDurableBatchHold("duplicate task ID")
-        return jobs,self_id
+        # Priority and cohort are part of the durable operator decision,
+        # not advisory post-admission fields that can change during resume.
+        bound=fingerprint({
+            "schema":"jeeves.native_durable_batch_binding.v1",
+            "native_batch_sha256":native_digest,
+            "jobs":[
+                {"task_id":job.task.task_id,"cohort":job.cohort,
+                 "priority":job.priority,"prompt_sha256":job.task.prompt_sha256}
+                for job in jobs
+            ],
+        })
+        return jobs,bound
 
     def admit(self,batch_id:str,jobs:Sequence[FabricJob]):
         """No native execution; partial admission remains visibly held.
