@@ -8,7 +8,8 @@ from .operations import get
 from .result_protocol import verify_turn_receipt
 
 class LaptopClient:
-    def __init__(self,*,host="127.0.0.1",port=8765,bearer,timeout=15.0,\n                 expected_model_sha256=None,expected_tokenizer_sha256=None):
+    def __init__(self,*,host="127.0.0.1",port=8765,bearer,timeout=15.0,
+                 expected_model_sha256=None,expected_tokenizer_sha256=None):
         if host!="127.0.0.1":
             refuse("only literal IPv4 loopback is supported by this client")
         if type(port) is not int or not 1<=port<=65535:
