@@ -49,7 +49,7 @@ def _database_name(value: object) -> bool:
 def _scope(value: object) -> bool:
     try:
         return (
-            isinstance(value, str) and bool(value)
+            type(value) is str and bool(value)
             and value == value.strip()
             and len(value.encode("utf-8", errors="strict")) <= 512
             and all(ord(ch) >= 32 and ord(ch) != 127 for ch in value)
@@ -113,8 +113,10 @@ async def inspect_compose_mongo_epoch(
     except Exception:
         return _result("mongo_primary_probe_unavailable")
     if (type(hello) is not dict
-            or not isinstance(hello.get("setName"), str)
-            or not hello["setName"]
+            or type(hello.get("setName")) is not str
+            or not 1 <= len(hello["setName"]) <= 128
+            or not hello["setName"].isascii()
+            or any(ord(ch) < 33 or ord(ch) > 126 for ch in hello["setName"])
             or hello.get("isWritablePrimary") is not True):
         return _result("mongo_replica_set_primary_required")
     # These fields are the stable parts of a primary observation. A changed

@@ -199,6 +199,24 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["code"], "canonical_actor_epoch_changed_during_preflight")
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
 
+    async def test_mutable_scope_subclass_rejected_before_mongo(self):
+        class UntrustedScope(str):
+            def __eq__(self, other):
+                raise AssertionError("subclass equality executed")
+        result = await self.inspect(tenant_id=UntrustedScope("tenant"))
+        self.assertEqual(result["code"], "operator_actor_scope_required")
+        self.assertEqual(self.db.calls, 0)
+        self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_malformed_replica_set_name_rejected_before_epoch(self):
+        for name in ("", "rs\\n0", "rs\\x7f0", "r" * 129, "\\ud800"):
+            with self.subTest(name=repr(name)):
+                self.db.hello["setName"] = name
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+                self.assertEqual(FakeEpoch.instances, [])
+
     async def test_standalone_is_unavailable(self):
         self.db.hello = {"isWritablePrimary": True}
         result = await self.inspect()
