@@ -14,6 +14,7 @@ from pathlib import Path
 import sys
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_checked
+from skeleton.ai.runtime.operational_ai.laptop_runtime.publication import emit_native_jsonl
 from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
     identifier, utf8,
@@ -195,10 +196,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 turn = chat.turn(task, request_id=args.request_id)
                 source_fence.assert_live(worker)
-                sys.stdout.write(json.dumps({
-                    "status": "native-chat-committed",
-                    **turn.to_record(),
-                }, sort_keys=True, ensure_ascii=False) + "\n")
+                emit_native_jsonl(
+                    worker, source_fence, {
+                        "status": "native-chat-committed",
+                        **turn.to_record(),
+                    }, sys.stdout,
+                )
                 return 0
             if args.session or args.request_id:
                 raise ValueError("chat identifiers cannot be supplied in agent mode")
@@ -244,12 +247,16 @@ def main(argv: list[str] | None = None) -> int:
             if args.mode == "durable-agent" and args.replay_result:
                 historical = run.replay_terminal(inputs)
                 source_fence.assert_live(worker)
-                sys.stdout.write(json.dumps(historical, sort_keys=True, ensure_ascii=False) + "\n")
+                emit_native_jsonl(
+                    worker, source_fence, historical, sys.stdout,
+                )
                 return 0
             if args.mode == "durable-agent" and args.inspect_run:
                 checkpoint = run.inspect(inputs)
                 source_fence.assert_live(worker)
-                sys.stdout.write(json.dumps(checkpoint, sort_keys=True, ensure_ascii=False) + "\n")
+                emit_native_jsonl(
+                    worker, source_fence, checkpoint, sys.stdout,
+                )
                 return 0
             if args.mode == "durable-agent" and args.resume_run:
                 result = run.resume_operator_approved(inputs)
@@ -277,7 +284,9 @@ def main(argv: list[str] | None = None) -> int:
                 # stdout is an explicit local disclosure to the invoking
                 # operator; model text never enters shell arguments or stderr.
                 record["answer"] = result.answer
-            sys.stdout.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
+            emit_native_jsonl(
+                worker, source_fence, record, sys.stdout,
+            )
             return 0 if result.success else 2
     except (Exception, KeyboardInterrupt) as exc:
         # Keep private task, source paths, installation receipts and native
