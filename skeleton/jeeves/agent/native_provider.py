@@ -184,10 +184,24 @@ class NativeJeevesProvider:
         )
 
 
-def native_provider_router(worker: Any) -> ProviderRouter:
-    """A single local model with no fallback, retry, or speculative cache."""
+def native_provider_router(
+    worker: Any,
+    *,
+    provider: NativeJeevesProvider | None = None,
+) -> ProviderRouter:
+    """One canonical source-checked provider with no retries or cache.
+
+    Reusing the exact provider instance preserves its in-process uncertain
+    inference fence and the immutable principal binding. The SQLite spine
+    remains the durable cross-process replay authority.
+    """
+    native = provider if provider is not None else NativeJeevesProvider(worker)
+    if (type(native) is not NativeJeevesProvider
+            or native._worker is not worker
+            or not native.available()):
+        raise ProviderError("native provider must belong to the active worker")
     return ProviderRouter(
-        (NativeJeevesProvider(worker),),
+        (native,),
         retry_policy=RetryPolicy(max_attempts=1, initial_delay_seconds=0.0),
         cache_ttl_seconds=None,
     )

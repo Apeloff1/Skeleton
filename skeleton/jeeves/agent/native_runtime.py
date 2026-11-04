@@ -29,6 +29,7 @@ def configured_native_agent(
     checkpointer: InMemoryCheckpointer | None = None,
     config: AgentConfig | None = None,
     runtime_type: type[StrictJeevesAgentRuntime] = StrictJeevesAgentRuntime,
+    native_provider: NativeJeevesProvider | None = None,
 ) -> StrictJeevesAgentRuntime:
     """Construct existing strict Jeeves layers without parallel runtime state.
 
@@ -36,7 +37,11 @@ def configured_native_agent(
     may provide stronger budgets, but cannot override the canonical native
     output ceiling without reactivating the installed model.
     """
-    native = NativeJeevesProvider(worker)
+    native = native_provider if native_provider is not None else NativeJeevesProvider(worker)
+    if (type(native) is not NativeJeevesProvider
+            or native._worker is not worker
+            or not native.available()):
+        raise NativeRuntimeHold("runtime requires its own checked native provider")
     ceiling = native.capabilities.max_output_tokens
     if config is None:
         config = AgentConfig(
@@ -63,7 +68,7 @@ def configured_native_agent(
     if not isinstance(runtime_type, type) or not issubclass(runtime_type, StrictJeevesAgentRuntime):
         raise NativeRuntimeHold("strict Jeeves runtime subclass required")
     return runtime_type(
-        provider_router=native_provider_router(worker),
+        provider_router=native_provider_router(worker, provider=native),
         tool_registry=tools or ToolRegistry(),
         tool_executor=tool_executor,
         checkpointer=checkpointer,
@@ -86,12 +91,13 @@ class NativeJeevesRuntime:
     ) -> None:
         self.provider = NativeJeevesProvider(worker)
         self.identity = self.provider.identity
-        # The two instances share the exact same native supervisor. Replays
-        # remain bound by the canonical SQLite authority, not Python identity.
+        # Exactly one bound native provider and one in-process uncertainty
+        # ledger serve both readiness and generation. Canonical SQLite remains
+        # the persistent authority for committed or in-flight model calls.
         self.agent = configured_native_agent(
             worker, tools=tools, tool_executor=tool_executor,
             checkpointer=checkpointer, config=config,
-            runtime_type=runtime_type,
+            runtime_type=runtime_type, native_provider=self.provider,
         )
 
     def _validate(self, inputs: RunInputs) -> None:
