@@ -45,3 +45,22 @@ def test_symlink_archive_refused():
 
 def test_canonical_archive_still_accepted():
     assert verify_bytes(build_bytes())["python_required"]
+
+
+@pytest.mark.parametrize("member", [
+    "ridge_rescue/CON.py",
+    "ridge_rescue/nul.json",
+    "ridge_rescue/LPT9.py",
+    "ridge_rescue/aux.extra.py",
+    "ridge_rescue/scene .py",
+    "ridge_rescue/scene:.py",
+    "ridge_rescue/épisode.py",
+])
+def test_windows_unsafe_member_refused(member):
+    with pytest.raises(BundleError, match="unsafe Windows"):
+        verify_bytes(rewritten(extra=member))
+
+
+def test_windows_case_collision_refused():
+    with pytest.raises(BundleError, match="case-colliding"):
+        verify_bytes(rewritten(extra="RIDGE_RESCUE/CONSUMER_CLI.PY"))
