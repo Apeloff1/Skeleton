@@ -300,3 +300,18 @@ flag permits optional private model source output, but
 no generated code is automatically applied, executed or
 committed. Full instructions:
 `docs/ai/JEEVES_HEADLESS_NATIVE_CODE_GENERATION.md`.
+
+## Private GGUF source proposal handoff (without stdout disclosure)
+
+The separately approved
+`desktop_native_proposal_cli` combines one
+exact-inspected local GGUF/SQLite source work request
+with a new no-clobber owner-private `0600`
+`*.source.json` file under an existing `0700`
+directory. Model code never appears in stdout,
+and the saved source is cold-verifiable by full
+SHA-256, original model/session, exact source
+manifest/patch and current source checks without
+retrying inference. Application to Git/project
+remains separately reviewed and authorized.
+`docs/ai/JEEVES_NATIVE_PRIVATE_SOURCE_ESCROW.md`.

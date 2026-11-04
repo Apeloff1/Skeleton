@@ -221,3 +221,19 @@ build, and all exact-head security/release gates.
 
 The release, device, rights, original model and
 security holds remain in force.
+
+## Private source handoff with no code on stdout
+
+When generated source must be stored for later
+operator review, prefer
+`desktop_native_proposal_cli` rather than the
+`--emit-private-proposal` source-stdout option.
+It requires both `--approve-native-generation` and
+`--approve-private-storage`, checks an existing
+owner-private parent and a brand-new `*.source.json`
+destination **before starting the model**, and
+writes only the independently reviewed original
+proposal as a private `0600` file. Cold verify
+never repeats inference. Its stdout contains hashes,
+not code. Full guide:
+`docs/ai/JEEVES_NATIVE_PRIVATE_SOURCE_ESCROW.md`.
