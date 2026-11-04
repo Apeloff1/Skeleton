@@ -26,7 +26,7 @@ def test_regular_review_file_is_read_without_modification(tmp_path):
 @pytest.mark.parametrize("suffix", ["../review.json", "./review.json", "folder//review.json"])
 def test_rejects_noncanonical_components(tmp_path, suffix):
     with pytest.raises(CanonError, match="operation_invalid_path"):
-        _read_operation_file(str(tmp_path / suffix))
+        _read_operation_file(str(tmp_path) + "/" + suffix)
 
 
 def test_rejects_final_symlink(tmp_path):
@@ -63,6 +63,6 @@ def test_rejects_oversized_review(tmp_path):
 
 
 def test_rejects_embedded_nul_and_empty_path():
-    for path in ("", "bad\\x00path"):
+    for path in ("", "bad\x00path"):
         with pytest.raises(CanonError, match="operation_invalid_path"):
             _read_operation_file(path)
