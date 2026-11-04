@@ -100,3 +100,28 @@ def test_cli_json_rejects_embedded_nul_before_open(tmp_path):
     with pytest.raises(CanonError) as error:
         _file(path)
     assert error.value.code == "input_invalid_path"
+
+
+def test_cli_json_rejects_duplicate_object_keys(tmp_path):
+    path = tmp_path / "duplicate.json"
+    path.write_text('{"world":"one","world":"two"}', encoding="utf-8")
+    with pytest.raises(CanonError):
+        _file(str(path))
+
+
+def test_cli_json_rejects_trailing_payload(tmp_path):
+    path = tmp_path / "trailing.json"
+    path.write_text('{"world":"one"} {"world":"two"}', encoding="utf-8")
+    with pytest.raises(CanonError):
+        _file(str(path))
+
+
+def test_cli_json_rejects_nested_symlinked_parent(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    real = root / "real"
+    real.mkdir()
+    (real / "brief.json").write_text('{"id":"lighthouse"}', encoding="utf-8")
+    (root / "alias").symlink_to(real, target_is_directory=True)
+    with pytest.raises(OSError):
+        _file(str(root / "alias" / "brief.json"))
