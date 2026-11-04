@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -19,6 +20,30 @@ class PortableSourceTraversalBudgetTests(unittest.TestCase):
             with patch.object(consumer_bundle, "__file__", str(root / "consumer_bundle.py")):
                 with self.assertRaisesRegex(consumer_bundle.BundleError, "traversal budget"):
                     consumer_bundle.build_bytes()
+
+
+    def test_source_growth_between_inventory_and_open_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name in ("__init__.py", "consumer_cli.py", "consumer_store.py",
+                         "cinder_ridge_campaign.json"):
+                (root / name).write_bytes(b"ok")
+            original_open = os.open
+            target = root / "consumer_cli.py"
+            changed = [False]
+
+            def grow_before_open(path, flags, *args, **kwargs):
+                if Path(path) == target and not changed[0]:
+                    changed[0] = True
+                    target.write_bytes(b"x" * (consumer_bundle.MAX_SOURCE_FILE_BYTES + 1))
+                return original_open(path, flags, *args, **kwargs)
+
+            with patch.object(consumer_bundle, "__file__", str(root / "consumer_bundle.py")):
+                with patch.object(consumer_bundle.os, "open", side_effect=grow_before_open):
+                    with self.assertRaisesRegex(consumer_bundle.BundleError,
+                                                "source changed during packaging"):
+                        consumer_bundle.build_bytes()
+            self.assertTrue(changed[0])
 
     def test_inventory_cap_exceeds_legitimate_source_limit(self) -> None:
         self.assertGreater(consumer_bundle.MAX_SCANNED_PATHS, consumer_bundle.MAX_SOURCE_FILES)
