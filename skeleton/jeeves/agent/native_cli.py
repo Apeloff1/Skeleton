@@ -31,6 +31,7 @@ from .native_source_tool import (
 )
 from .tools import ToolRegistry
 from .native_readiness import inspect_native_jeeves
+from .native_source_fence import NativeSourceFence
 from .runtime import RunInputs
 from .types import Budget, Goal
 
@@ -162,7 +163,11 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
-            bound = ActiveModel.from_supervisor(worker)
+            source_fence = NativeSourceFence(
+                worker, installed, expected_tenant=args.tenant,
+                expected_subject=args.subject,
+            )
+            bound = source_fence.principal
             source_provider = None
             if source_preflight is not None:
                 source_preflight.verify_active_model(worker.spine.identity)
@@ -181,11 +186,11 @@ def main(argv: list[str] | None = None) -> int:
                     attach_signed_native_evidence(worker, source_provider)
             if args.mode == "repl":
                 chat = NativeJeevesChat(worker, session_id=args.session)
-                return NativeJeevesRepl(chat).serve(sys.stdin.buffer, sys.stdout)
+                return NativeJeevesRepl(chat, source_fence=source_fence).serve(sys.stdin.buffer, sys.stdout)
             if args.mode == "chat":
                 chat = NativeJeevesChat(worker, session_id=args.session)
                 turn = chat.turn(task, request_id=args.request_id)
-                _assert_same_owner(worker, bound)
+                source_fence.assert_live(worker)
                 sys.stdout.write(json.dumps({
                     "status": "native-chat-committed",
                     **turn.to_record(),
@@ -234,19 +239,19 @@ def main(argv: list[str] | None = None) -> int:
             )
             if args.mode == "durable-agent" and args.replay_result:
                 historical = run.replay_terminal(inputs)
-                _assert_same_owner(worker, bound)
+                source_fence.assert_live(worker)
                 sys.stdout.write(json.dumps(historical, sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
             if args.mode == "durable-agent" and args.inspect_run:
                 checkpoint = run.inspect(inputs)
-                _assert_same_owner(worker, bound)
+                source_fence.assert_live(worker)
                 sys.stdout.write(json.dumps(checkpoint, sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
             if args.mode == "durable-agent" and args.resume_run:
                 result = run.resume_operator_approved(inputs)
             else:
                 result = run.run(inputs)
-            _assert_same_owner(worker, bound)
+            source_fence.assert_live(worker)
             record = {
                 "schema": "jeeves.native_operator_turn.v1",
                 "status": "verified-agent-response" if result.success else "held",
