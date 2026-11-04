@@ -98,3 +98,11 @@ reuses the live installed GGUF and source guard, with an empty tool registry,
 zero grants and a finite request/run budget. The UI never treats model output
 as permission to modify the host. The separate durable agent CLI remains the
 explicit restart-safe lane; desktop reasoning does not silently resume work.
+
+## Durable work in the same SQLite owner
+
+Explicit start/inspect/resume/replay actions are available through the
+desktop's native work-order controls. They delegate to the existing
+`NativeDurableJeevesAgent` under one source-fenced GGUF worker and original
+run/task/budget/tenant/model journal identity. No automatic resume or new
+memory database is created; uncertain pending native effects fail closed.
