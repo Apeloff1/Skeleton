@@ -106,12 +106,20 @@ class MongoGuardedActivation:
                 or any(ord(ch) < 33 or ord(ch) > 126 for ch in reviewer_authority_id)):
             raise ActivationBlocked("reviewer authority identity invalid")
         for value in (tenant_id, actor_id, context_id):
-            if (not isinstance(value, str) or not value or value != value.strip()
-                    or len(value.encode("utf-8", errors="strict")) > 512
-                    or any(ord(ch) < 32 for ch in value)):
+            # Strict UTF-8 is part of the persisted Mongo scope contract.
+            # Lone surrogates cannot be serialized and must fail as policy
+            # denial, not escape as a UnicodeEncodeError during first run.
+            if type(value) is not str or not value or value != value.strip():
+                raise ActivationBlocked("activation owner scope invalid")
+            try:
+                encoded = value.encode("utf-8", errors="strict")
+            except UnicodeError:
+                raise ActivationBlocked("activation owner scope invalid") from None
+            if (len(encoded) > 512
+                    or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
                 raise ActivationBlocked("activation owner scope invalid")
         for value in (expected_model_digest, expected_runtime_digest, expected_tokenizer_digest):
-            if not isinstance(value, str) or _HEX64.fullmatch(value) is None:
+            if type(value) is not str or _HEX64.fullmatch(value) is None:
                 raise ActivationBlocked("activated artifact digest invalid")
         if not callable(getattr(database, "command", None)):
             raise ActivationBlocked("Mongo replica-set authority unavailable")

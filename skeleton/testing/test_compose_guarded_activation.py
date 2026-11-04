@@ -631,6 +631,22 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ActivationBlocked):
             self.make(expected_runtime_digest="not-a-digest")
 
+    async def test_owner_scope_rejects_unencodable_and_control_identity(self):
+        for scope in ("tenant_id", "actor_id", "context_id"):
+            for invalid in ("broken\\ud800", "broken\\udfff", "name\\x7f", "x" * 513):
+                with self.subTest(scope=scope, invalid=repr(invalid)):
+                    with self.assertRaisesRegex(ActivationBlocked, "owner scope invalid"):
+                        self.make(**{scope: invalid})
+
+    async def test_owner_scope_rejects_string_subclass_and_digest_subclass(self):
+        class IdentitySubclass(str):
+            pass
+
+        with self.assertRaisesRegex(ActivationBlocked, "owner scope invalid"):
+            self.make(actor_id=IdentitySubclass("owner"))
+        with self.assertRaisesRegex(ActivationBlocked, "artifact digest invalid"):
+            self.make(expected_model_digest=IdentitySubclass("a" * 64))
+
 
 if __name__ == "__main__":
     unittest.main()
