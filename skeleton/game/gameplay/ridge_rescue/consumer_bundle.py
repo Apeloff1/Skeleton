@@ -92,10 +92,19 @@ def verify_bytes(data: bytes) -> dict:
                     not item.filename.endswith((".py", ".json"))
                 ):
                     raise BundleError("unexpected archive member")
+                # A valid CRC does not authorize noncanonical or executable
+                # archive entries. Only deflated, regular source files qualify.
+                parts = item.filename.split("/")
+                if (item.flag_bits & 1 or
+                    item.compress_type != zipfile.ZIP_DEFLATED or
+                    any(part in {"", ".", ".."} for part in parts) or
+                    item.filename.startswith("/") or chr(92) in item.filename):
+                    raise BundleError("unsafe archive encoding or member path")
                 mode = item.external_attr >> 16
-                if (stat.S_ISLNK(mode) or "\\" in item.filename or
-                    ".." in item.filename.split("/") or item.is_dir()):
-                    raise BundleError("unsafe archive member")
+                if item.is_dir() or stat.S_IFMT(mode) not in (0, stat.S_IFREG):
+                    raise BundleError("non-regular archive member")
+                if item.filename == "__main__.py" and item.file_size != len(ENTRY):
+                    raise BundleError("untrusted game entrypoint length")
                 if item.file_size > MAX_SOURCE_FILE_BYTES:
                     raise BundleError("oversized archive member")
                 total += item.file_size
