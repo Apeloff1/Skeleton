@@ -502,7 +502,7 @@ def test_admin_password_path_swap_during_read_is_rejected(tmp_path, monkeypatch)
         nonlocal visits
         if Path(path) == password:
             visits += 1
-            if visits == 2:
+            if visits == 3:
                 os.replace(replacement, password)
         return original_lstat(path, *args, **kwargs)
 
