@@ -323,18 +323,45 @@ def _dotenv_value(raw: str) -> str:
 
 
 def _read_dotenv(path: Path) -> dict[str, str]:
+    """Read private runtime configuration without following hostile file types.
+
+    The installer owns publication of this file. Readers still enforce a
+    bounded regular-file contract so doctor/URL probes cannot hang on FIFOs,
+    follow symlinks, or allocate unbounded input.
+    """
+    import stat
+
     values: dict[str, str] = {}
-    if not path.is_file():
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
         return values
-    for raw in path.read_text(encoding="utf-8").splitlines():
+    except OSError as exc:
+        raise ValueError("private runtime environment cannot be opened safely") from exc
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError("private runtime environment must be an unlinked regular file")
+        limit = 256 * 1024
+        if info.st_size > limit:
+            raise ValueError("private runtime environment exceeds 256 KiB")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            payload = stream.read(limit + 1)
+        if len(payload) > limit:
+            raise ValueError("private runtime environment exceeds 256 KiB")
+        decoded = payload.decode("utf-8")
+    finally:
+        os.close(descriptor)
+    for raw in decoded.splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if not key:
-            continue
-        values[key] = _dotenv_value(value)
+        if key:
+            values[key] = _dotenv_value(value)
     return values
 
 
