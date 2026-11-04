@@ -162,3 +162,15 @@ A serial work batch now holds an **exclusive native bridge lease for its
 entire source-approved manifest**. Other desktop request threads are refused
 before IPC, including other batches; the pressure watchdog retains terminal
 revocation authority. No automatic native retries or source/tool escalation.
+
+## Cold-restart batch recovery
+
+The serial work-batch GUI can explicitly export the **complete original**
+task budget/ID manifest to a *new* descriptor-anchored owner-private `0600`
+file under a pre-existing private `0700` POSIX/WSL2 directory. Imported
+recovery batches cannot be started or resumed; only a selected original
+work order's sealed SQLite checkpoint may be inspected or replayed after
+the operator supplies the exact original manifest digest. Nothing is
+silently reissued. Sensitive task text is present in the private export;
+never put it into Git. See
+`docs/ai/JEEVES_PRIVATE_BATCH_COLD_RECOVERY.md`.

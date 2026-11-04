@@ -126,3 +126,15 @@ run between two individually valid durable tasks and alter model/SQLite
 state before the following task. The lease is in-process and held only by
 the already authenticated desktop bridge; it is **not** a distributed
 scheduler, cross-device lock or hardware qualification.
+
+## Cold-restart batch recovery
+
+The serial work-batch GUI can explicitly export the **complete original**
+task budget/ID manifest to a *new* descriptor-anchored owner-private `0600`
+file under a pre-existing private `0700` POSIX/WSL2 directory. Imported
+recovery batches cannot be started or resumed; only a selected original
+work order's sealed SQLite checkpoint may be inspected or replayed after
+the operator supplies the exact original manifest digest. Nothing is
+silently reissued. Sensitive task text is present in the private export;
+never put it into Git. See
+`docs/ai/JEEVES_PRIVATE_BATCH_COLD_RECOVERY.md`.

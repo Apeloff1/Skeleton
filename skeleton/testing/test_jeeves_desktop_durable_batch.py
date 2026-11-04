@@ -136,7 +136,8 @@ class DurableBatchAdmissionTests(unittest.TestCase):
         self.assertEqual(receipt["provider_count"], 1)
         self.assertFalse(receipt["automatic_resume"])
         self.assertFalse(receipt["automatic_retries"])
-        self.assertNotIn("task", repr(receipt))
+        # Metadata legitimately includes a task *count*, not private text.
+        self.assertNotIn("Build private local feature", repr(receipt))
 
     def test_reject_invalid_schema_duplicate_key_and_model_authority(self):
         bads = (

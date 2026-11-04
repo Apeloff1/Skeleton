@@ -74,6 +74,10 @@ def fixture(reply, *, inference_ms=90000, session=SESSION):
     result._started = True
     result._dead = False
     result._flight = threading.Lock()
+    # Synthetic bridge constructed with __new__ must reproduce the canonical
+    # single-owner batch gate created by DesktopBridge.__init__. Production
+    # requests must NEVER bypass a missing gate.
+    result._batch_gate = threading.RLock()
     result.model_sha256 = MODEL
     result.session_id = session
     result.resume_session = None
