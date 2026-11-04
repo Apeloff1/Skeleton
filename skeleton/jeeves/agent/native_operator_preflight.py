@@ -46,6 +46,7 @@ class OperatorAdmission:
     native_threads: int = 4
     gpu_layers: int = 0
     capacity_budget_bytes: int = 8000000000
+    inference_ms: int = 90000
 
     @property
     def source_material_enabled(self) -> bool:
@@ -85,6 +86,7 @@ def check_native_resource_shape(
     native_threads: int,
     gpu_layers: int,
     capacity_budget_bytes: int,
+    inference_ms: int = 90000,
 ) -> None:
     """Validate finite requested shape before loading any local model.
 
@@ -97,6 +99,7 @@ def check_native_resource_shape(
             n_ctx=context_tokens, max_new_tokens=output_tokens,
             n_threads=native_threads, gpu_layers=gpu_layers,
             capacity_budget_bytes=capacity_budget_bytes,
+            inference_ms=inference_ms,
         )
     except ContractViolation as exc:
         raise NativeOperatorHold("invalid finite native resource request") from exc
@@ -124,6 +127,7 @@ def check_operator_admission(
     native_threads: int = 4,
     gpu_layers: int = 0,
     capacity_budget_bytes: int = 8000000000,
+    inference_ms: int = 90000,
 ) -> OperatorAdmission:
     """Reject structurally unsound operator input before model startup."""
     if type(mode) is not str or mode not in ("agent", "chat", "repl", "durable-agent"):
@@ -180,6 +184,7 @@ def check_operator_admission(
         native_threads=native_threads,
         gpu_layers=gpu_layers,
         capacity_budget_bytes=capacity_budget_bytes,
+        inference_ms=inference_ms,
     )
 
     if enable_source_tool and (mode != "agent" or source_root is None):
@@ -207,6 +212,7 @@ def check_operator_admission(
         native_threads=native_threads,
         gpu_layers=gpu_layers,
         capacity_budget_bytes=capacity_budget_bytes,
+        inference_ms=inference_ms,
     )
 
 
