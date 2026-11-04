@@ -7,6 +7,9 @@ on:
       - "skeleton/jeeves/agent/native_*.py"
       - "skeleton/jeeves/agent/runtime.py"
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/**"
+      - "skeleton/ai/runtime/production_fabric/product/**"
+      - "skeleton/ai/runtime/operational_ai/offline_cognition/families/duplicate_filter/evidence.py"
+      - "skeleton/testing/test_jeeves_architecture_and_evidence_window.py"
       - "skeleton/testing/test_jeeves_native_*.py"
       - "skeleton/testing/test_jeeves_single_provider_*.py"
       - "skeleton/testing/test_laptop_runtime_*.py"
@@ -44,6 +47,8 @@ jobs:
           "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
           "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
           "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Enforce canonical Jeeves tree identity before qualification
+        run: python scripts/check_ai_file_tree.py
       - name: Compile the canonical Jeeves and local inference source
         run: >-
           python -m compileall -q
@@ -85,6 +90,7 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_operator_session.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_architecture_and_evidence_window.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_cli_timeout_and_redaction.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_cli_publication.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_batch_cli_source_custody.py' -v
