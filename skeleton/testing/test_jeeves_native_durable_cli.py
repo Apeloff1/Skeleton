@@ -97,6 +97,22 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
                 "skeleton.jeeves.agent.native_cli.inspect_native_jeeves",
                 return_value=SimpleNamespace(source_bridge_ready=True),
             ),
+            # This one test explicitly owns a synthetic model. Patch only
+            # the live installed-source inspector at the fixture boundary;
+            # production CLI and all independent source/rights gates remain
+            # unchanged and fail closed for actual unverified weights.
+            mock.patch(
+                "skeleton.jeeves.agent.native_source_fence.require_activated_source",
+                return_value={
+                    "model_sha256": MODEL,
+                    "tokenizer_sha256": TOKENIZER,
+                    "manifest_sha256": "c" * 64,
+                    "archive_sha256": "d" * 64,
+                    "source_sha": "e" * 40,
+                    "installed_model_bytes": 4096,
+                    "installed_shard_count": 1,
+                },
+            ),
             mock.patch("sys.stdin", stdin),
             mock.patch("sys.stdout", stdout),
             mock.patch("sys.stderr", stderr),
