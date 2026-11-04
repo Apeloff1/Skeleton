@@ -253,10 +253,12 @@ class NativeDeliveryOutbox:
             if row[7]!="pending":
                 raise NativeDeliveryHold("delivery already claimed or terminal")
             # Recheck source work has not changed since preparation.
-            order=self.queue.inspect(intent.order_id)
-            if (order["state"]!="committed" or
-                order["native_output_sha256"]!=intent.output_sha256 or
-                order["receipt_sha256"]!=intent.work_receipt_sha256):
+            # Reuse the held SQLite write transaction. Opening the queue's
+            # separate snapshot here would nest BEGIN on the same authority.
+            work_order,work_row=self.queue._select(conn,intent.order_id)
+            if (work_row[14]!="committed" or
+                work_row[17]!=intent.output_sha256 or
+                work_row[18]!=intent.work_receipt_sha256):
                 raise NativeDeliveryHold("native source receipt changed before send")
             conn.execute(
               "UPDATE jeeves_native_delivery_intents SET state='claimed',"
