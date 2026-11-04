@@ -108,6 +108,10 @@ class TestDurableOperatorSession(unittest.TestCase):
         self.assertEqual(result["answer"],"Local synthetic reasoning completed.")
         self.assertEqual(result["usage"]["model_calls"],3)
         self.assertEqual(self.backend.calls,3)
+        self.assertEqual(result["native_model_sha256"],MODEL)
+        self.assertEqual(result["native_tokenizer_sha256"],TOKENIZER)
+        self.assertFalse(result["real_hardware_qualified"])
+        self.assertFalse(result["release_certified"])
         with self.db.snapshot() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM turns").fetchone(),(3,))
             self.assertEqual(conn.execute(
