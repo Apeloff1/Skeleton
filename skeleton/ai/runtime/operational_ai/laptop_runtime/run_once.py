@@ -8,21 +8,27 @@ from __future__ import annotations
 
 import secrets
 
-from .contracts import identifier, utf8, nonnegative, number
+from .contracts import identifier, utf8, nonnegative, number, refuse
 from .dispatcher import LaptopDispatcher
+from .source_guard import SourceFencedLaptopDispatcher
 
 
 def generate_once(
     worker, question, *, session=None, request_id=None,
-    seed=0, temperature=0.8,
+    seed=0, temperature=0.8, dispatcher=None,
 ):
     """Admit all caller-supplied fields before creating a durable session.
 
     On approved fresh work, the single dispatcher owns SQLite session
     allocation and independent committed-replay verification. A supplied
-    existing session is *never* implicitly created or repaired.
+    existing session is *never* implicitly created or repaired. The laptop
+    CLI injects its installed-source guard for both create and native turn.
     """
-    dispatcher = LaptopDispatcher(worker)
+    if dispatcher is None:
+        dispatcher = LaptopDispatcher(worker)
+    elif (type(dispatcher) is not SourceFencedLaptopDispatcher
+          or dispatcher.worker is not worker):
+        refuse("one-shot dispatcher must be the same live source-fenced worker")
     # Structural checks are pure. A user error at this point cannot leave a
     # newly created SQLite session or reserve a native GPU/CPU model call.
     request = (identifier(request_id, "request ID") if request_id is not None
