@@ -214,3 +214,14 @@ overlap/conflicts. It creates only a NEW unapproved JSON proposal,
 never a project write or Git apply. The prior SHA authorization is
 invalidated, with complete fresh review required before export.
 `docs/ai/JEEVES_CONSERVATIVE_SOURCE_REBASE.md`.
+
+## Bounded native model self-repair for source proposals
+
+The local installed GGUF can now generate strict source JSON,
+review actual original project bytes, run a static syntax check,
+and take at most three distinct SQLite-committed model turns to
+repair source errors. Operator consent is required before the loop;
+each request has a new visible original ID. Only an unapproved
+inert proposal is produced; no Git, shell or project write tool
+is granted. Full human approval and private no-clobber patch export
+are separate. See `docs/ai/JEEVES_NATIVE_SOURCE_SELF_REPAIR.md`.

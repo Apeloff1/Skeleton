@@ -236,6 +236,10 @@ class JeevesWindow(tk.Tk):
             command=self._patch_delivery,
         ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
         ttk.Button(
+            attachment_bar, text="Generate source with bounded repair",
+            command=self._guided_source_repair,
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Button(
             attachment_bar, text="Clear attached files", command=self._clear_attachments,
         ).grid(row=0, column=2, padx=4)
         ttk.Checkbutton(
@@ -447,6 +451,24 @@ class JeevesWindow(tk.Tk):
         # patch outside the project. No model tool or Git write is granted.
         from .desktop_patch_ui import PortablePatchWindow
         PortablePatchWindow(self, source_text=self._last_answer or "")
+
+    def _guided_source_repair(self):
+        # Same existing installed GGUF + committed SQLite native chat.
+        # This explicit operator workflow only proposes source text; no Git,
+        # shell, project writes, or automatic reruns of uncertain effects.
+        bridge = self._bridge
+        if (
+            self._busy or bridge is None or not bridge.connected
+            or bridge.session_id is None
+        ):
+            self._show(
+                "Native source repair held",
+                "Connect an approved local GGUF and open a durable SQLite session",
+                "warning",
+            )
+            return
+        from .desktop_source_repair_ui import SourceRepairWindow
+        SourceRepairWindow(self, initial_goal=self.prompt.get("1.0", "end-1c"))
 
     def _existing_edit_format(self):
         self.prompt.insert(

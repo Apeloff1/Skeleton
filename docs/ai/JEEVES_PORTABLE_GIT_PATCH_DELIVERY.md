@@ -150,3 +150,15 @@ descriptor-read source files. Overlapping edits and new path collisions
 hold the entire package. Neither source files nor Git are changed,
 and all prior digest approvals are invalidated before a new review.
 `docs/ai/JEEVES_CONSERVATIVE_SOURCE_REBASE.md`.
+
+## Real native source generation and bounded repair
+
+Jeeves can now originate a strict source proposal through the existing
+installed GGUF and principal-bound SQLite conversation, not merely
+process one the user pasted. The **Generate source with bounded repair**
+desktop action executes at most 1–3 unique native turns, feeds only
+sanitized schema/static parser diagnostics back into a distinct
+SQLite-committed repair turn, and stops on uncertainty or exhausted
+budget. A passing proposal must still receive **new independent human
+review** before any source patch export. Details:
+`docs/ai/JEEVES_NATIVE_SOURCE_SELF_REPAIR.md`.
