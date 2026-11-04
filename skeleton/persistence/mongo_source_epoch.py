@@ -267,6 +267,10 @@ class MongoCanonicalSourceEpoch:
 
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""
+        # Lower-level callers may bypass writer() argument validation. Never
+        # compare attacker-controlled string subclasses against the bound
+        # scope: their __eq__ can forge a matching actor or tenant.
+        self._key(tenant_id, actor_id)
         active = self._active.get()
         if (active is None or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id or active.actor_id != actor_id):
@@ -276,6 +280,9 @@ class MongoCanonicalSourceEpoch:
 
     def require_tenant_writer(self, *, tenant_id: str) -> None:
         """Deletion-only boundary; tenant sweeps cannot invent actor custody."""
+        # The deletion path has only a tenant argument; validate its exact
+        # scalar type before comparison with an authenticated writer binding.
+        self._key(tenant_id, tenant_id)
         active = self._active.get()
         if (active is None or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id):
