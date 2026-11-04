@@ -53,5 +53,46 @@ class WriterResultScopeTests(unittest.IsolatedAsyncioTestCase):
                 self.fail("subclass admitted")
 
 
+    async def test_admission_rejects_executable_document_id_subclass(self):
+        original = self.collection.find_one_and_update
+
+        class ForgedId(str):
+            def __eq__(self, other):
+                return True
+
+            __hash__ = str.__hash__
+
+        async def forged(*args, **kwargs):
+            result = await original(*args, **kwargs)
+            result["_id"] = ForgedId("forged-id")
+            return result
+
+        self.collection.find_one_and_update = forged
+        with self.assertRaisesRegex(MongoSourceEpochError, "not owned"):
+            async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                self.fail("forged document id admitted")
+        self.assertEqual(self.collection.doc["phase"], "writing")
+
+    async def test_completion_rejects_executable_document_id_subclass(self):
+        original = self.collection.find_one_and_update
+
+        class ForgedId(str):
+            def __eq__(self, other):
+                return True
+
+            __hash__ = str.__hash__
+
+        async def forged(*args, **kwargs):
+            result = await original(*args, **kwargs)
+            if result["phase"] == "stable":
+                result["_id"] = ForgedId("forged-id")
+            return result
+
+        self.collection.find_one_and_update = forged
+        with self.assertRaisesRegex(MongoSourceEpochError, "quarantined"):
+            async with self.epoch.writer(tenant_id="tenant", actor_id="owner"):
+                self.epoch.require_actor_writer(tenant_id="tenant", actor_id="owner")
+
+
 if __name__ == "__main__":
     unittest.main()
