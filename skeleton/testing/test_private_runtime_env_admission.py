@@ -115,3 +115,43 @@ def test_private_env_rejects_truncation(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.setattr(os, "fstat", truncating_fstat)
     with pytest.raises(ValueError, match="changed during read"):
         _read_dotenv(path)
+
+
+def test_private_env_rejects_atomic_path_replacement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / ".env"
+    path.write_text("BACKEND_PORT=8123\n", encoding="utf-8")
+    replacement = tmp_path / "replacement"
+    replacement.write_text("BACKEND_PORT=8124\n", encoding="utf-8")
+    original_lstat = Path.lstat
+    calls = 0
+
+    def swapping_lstat(candidate: Path, *args: object, **kwargs: object) -> os.stat_result:
+        nonlocal calls
+        if candidate == path:
+            calls += 1
+            if calls == 2:
+                replacement.replace(path)
+        return original_lstat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "lstat", swapping_lstat)
+    with pytest.raises(ValueError, match="changed during read"):
+        _read_dotenv(path)
+
+
+def test_private_env_rejects_unlinked_path_after_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / ".env"
+    path.write_text("BACKEND_PORT=8123\n", encoding="utf-8")
+    original_lstat = Path.lstat
+    calls = 0
+
+    def unlinking_lstat(candidate: Path, *args: object, **kwargs: object) -> os.stat_result:
+        nonlocal calls
+        if candidate == path:
+            calls += 1
+            if calls == 2:
+                path.unlink()
+        return original_lstat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "lstat", unlinking_lstat)
+    with pytest.raises(ValueError, match="changed during read"):
+        _read_dotenv(path)
