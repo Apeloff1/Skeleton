@@ -19,6 +19,7 @@ def test_real_two_chapter_save_restart_export(tmp_path):
     assert result["chapters"] == 2
     assert result["actions"] > 10
     assert result["restart_count"] == result["saved_revision"]
+    assert result["backup_restore_replay_verified"]
     assert result["portable_export_verified"]
     assert not result["windows_device_certified"]
 
