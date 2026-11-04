@@ -142,3 +142,12 @@ SHA-verified source overlay, `original_checkout_modified=false`,
 `git_index_modified=false`, `source_code_executed=false`,
 `model_source_write_authorized=false`, and
 `release_certified=false`.
+
+## Headless offline use
+
+The same reviewed source staging and cold inspection operations
+are now available through a non-inference, no-Git, strict JSON
+stdin CLI. Both original 64-character SHA-256 values and an
+explicit separate flag are needed for any new private write;
+read-only verification does not start a model. See
+`docs/ai/JEEVES_HEADLESS_LOCAL_SOURCE_WORK_CLI.md`.

@@ -262,3 +262,15 @@ model-generated source, runs Git, or grants the model arbitrary
 writes. Incomplete/tampered stages fail verification. The strict
 mixed-work parser now enforces the native 16 KiB reply ceiling.
 `docs/ai/JEEVES_PRIVATE_SOURCE_OVERLAY_STAGING.md`.
+
+## Strict headless local source-work command
+
+Run `python -m skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_work_cli`
+with a bounded strict JSON source-work request on stdin. It can
+review mixed new/edit proposals, report syntax status, inspect
+conservative source conflicts, cold-verify private patch/stage
+artifacts, or—only with **both exact full SHA-256 values plus
+an explicit separate CLI flag**—create a new sealed private
+source overlay or inert Git patch. The model, source checkout
+and Git remain inactive. Documentation:
+`docs/ai/JEEVES_HEADLESS_LOCAL_SOURCE_WORK_CLI.md`.
