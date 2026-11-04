@@ -103,9 +103,19 @@ def run(argv: list[str]) -> int:
                 command.add_argument("--export-file", required=True)
     args = parser.parse_args(argv)
     try:
+        # Validate untrusted JSON before constructing stores. Invalid input must
+        # never initialize or modify canonical custody directories.
+        input_path = {
+            "propose": "brief_file",
+            "review": "operation_file",
+            "engine-compile": "expected_digests_file",
+            "session-restore": "export_file",
+            "session-restore-check": "export_file",
+        }.get(args.action)
+        parsed_input = _file(getattr(args, input_path)) if input_path else None
         flow = LaptopFlow(args.store)
         if args.action == "propose":
-            result = flow.propose(_file(args.brief_file))
+            result = flow.propose(parsed_input)
         elif args.action == "inspect":
             result = flow.inspect(args.world_id)
         elif args.action == "diagnose":
@@ -114,7 +124,7 @@ def run(argv: list[str]) -> int:
             result = flow.acceptance(args.world_id, args.slot)
         elif args.action == "review":
             result = flow.review(args.world_id, args.expected_digest,
-                                 _file(args.operation_file), args.review_note)
+                                 parsed_input, args.review_note)
         elif args.action == "approve-current":
             result = flow.approve_current(args.world_id, args.expected_digest,
                                           args.review_note)
@@ -122,7 +132,7 @@ def run(argv: list[str]) -> int:
             result = flow.engine_inspect(args.world_id, args.era)
         elif args.action == "engine-compile":
             result = flow.engine_compile(args.world_id, args.era,
-                                         _file(args.expected_digests_file))
+                                         parsed_input)
         elif args.action == "engine-verify":
             result = flow.engine_verify(args.world_id)
         elif args.action == "compile":
@@ -133,9 +143,9 @@ def run(argv: list[str]) -> int:
             result = flow.create_session(args.world_id, args.slot)
         elif args.action == "session-restore":
             result = flow.create_session(args.world_id, args.slot,
-                                         imported=_file(args.export_file))
+                                         imported=parsed_input)
         elif args.action == "session-restore-check":
-            result = flow.preflight_restore(args.world_id, _file(args.export_file))
+            result = flow.preflight_restore(args.world_id, parsed_input)
         elif args.action == "session-choose":
             result = flow.choose(args.world_id, args.slot, args.choice_id,
                                  args.expected_session_digest)
