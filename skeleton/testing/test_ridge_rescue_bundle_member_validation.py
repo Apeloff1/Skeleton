@@ -64,3 +64,13 @@ def test_windows_unsafe_member_refused(member):
 def test_windows_case_collision_refused():
     with pytest.raises(BundleError, match="case-colliding"):
         verify_bytes(rewritten(extra="RIDGE_RESCUE/CONSUMER_CLI.PY"))
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda data: b"MZ" + data,
+    lambda data: data + b"hidden-trailing-content",
+    lambda data: data[:-2] + b"\\x01\\x00" + b"X",
+])
+def test_noncanonical_zip_envelope_refused(mutate):
+    with pytest.raises(BundleError, match="noncanonical ZIP envelope"):
+        verify_bytes(mutate(build_bytes()))

@@ -75,8 +75,15 @@ def build_bytes() -> bytes:
 def verify_bytes(data: bytes) -> dict:
     if not isinstance(data, bytes) or not 0 < len(data) <= MAX_ARCHIVE_BYTES:
         raise BundleError("invalid archive byte budget")
+    # ZIP readers tolerate executable prefixes, comments and trailing bytes.
+    # A consumer archive must be exactly one canonical ZIP payload, never a
+    # polyglot container whose unverified bytes differ from executed content.
+    if not data.startswith(b"PK\\x03\\x04") or not data.endswith(b"PK\\x05\\x06" + b"\\x00" * 18):
+        raise BundleError("noncanonical ZIP envelope")
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            if archive.comment:
+                raise BundleError("ZIP comments refused")
             names = archive.namelist()
             if len(names) != len(set(names)) or len(names) > MAX_SOURCE_FILES + 1:
                 raise BundleError("duplicate or excessive archive entries")
