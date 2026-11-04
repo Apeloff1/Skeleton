@@ -201,14 +201,21 @@ async def _run_from_environment() -> dict[str, object]:
             socketTimeoutMS=2000, retryWrites=False, retryReads=False,
             appname="skeleton-guarded-mongo-readonly-preflight",
         )
-        observed = await inspect_compose_mongo_epoch(
-            client[name], tenant_id=tenant_id, actor_id=actor_id,
-            context_id=context_id,
+        # Bound the complete read-only preflight, not just individual Mongo
+        # commands. A slow chain of successful probes must not hang first run.
+        observed = await asyncio.wait_for(
+            inspect_compose_mongo_epoch(
+                client[name], tenant_id=tenant_id, actor_id=actor_id,
+                context_id=context_id,
+            ), timeout=12.0,
         )
         # A matching database NAME alone cannot establish the same cluster,
         # writer role or physical replica set. Never mark those as verified.
         observed["canonical_database_name_aligned_observed"] = True
         return observed
+    except TimeoutError:
+        # Timeout is an unknown custody outcome, never an activation permit.
+        return _result("mongo_preflight_deadline_exceeded")
     except Exception:
         return _result("mongo_primary_probe_unavailable")
     finally:

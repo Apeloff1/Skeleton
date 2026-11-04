@@ -302,6 +302,31 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
                     result = await _run_from_environment()
                 self.assertEqual(result["code"], "canonical_engine_database_identity_required")
 
+    async def test_total_deadline_fails_closed_and_closes_client(self):
+        from unittest.mock import AsyncMock, MagicMock
+        with patch.dict("os.environ", {
+            "MONGO_URL": "mongodb://secret:secret@mongo:27017",
+            "DB_NAME": "skeleton",
+            "SKL_CANONICAL_MONGO_DATABASE": "skeleton",
+            "SKL_CANONICAL_TENANT_ID": "tenant",
+            "SKL_CANONICAL_ACTOR_ID": "owner",
+            "SKL_CANONICAL_CONTEXT_ID": "context",
+        }):
+            client = MagicMock()
+            with patch("motor.motor_asyncio.AsyncIOMotorClient", return_value=client), \
+                 patch("skeleton.app.compose_guarded_preflight.inspect_compose_mongo_epoch",
+                       new_callable=AsyncMock) as inspect, \
+                 patch("skeleton.app.compose_guarded_preflight.asyncio.wait_for",
+                       new_callable=AsyncMock, side_effect=TimeoutError):
+                result = await _run_from_environment()
+                inspect.assert_called_once()
+                client.close.assert_called_once()
+        self.assertEqual(result["code"], "mongo_preflight_deadline_exceeded")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertFalse(result["writes_performed"])
+        self.assertNotIn("secret", str(result))
+
     async def test_no_connection_settings_denies_before_client(self):
         with patch.dict("os.environ", {
             "MONGO_URL": "", "DB_NAME": "tutolage",
