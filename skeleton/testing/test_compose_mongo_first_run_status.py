@@ -10,7 +10,8 @@ from skeleton.app.compose_mongo_first_run_status import (
 class FirstRunObservationTests(unittest.TestCase):
     def valid(self):
         return {
-            "schema_version": SCHEMA,\n            "code": COMPLETE_CODE,
+            "schema_version": SCHEMA,
+            "code": COMPLETE_CODE,
             "writes_performed": False,
             "guarded_local_ai_ready": False,
             **{key: True for key in REQUIRED_FIELDS},
