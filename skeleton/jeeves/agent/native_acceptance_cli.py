@@ -66,6 +66,8 @@ def _positive_source_flags(first: object, active: ActiveModel) -> tuple[str, str
     ):
         if first.get(field) is not True:
             raise NativeAcceptanceHold("real source and SQLite turn proof incomplete")
+    if first.get("device_qualified") is not False:
+        raise NativeAcceptanceHold("device quality is not source-qualified")
     if first.get("release_certified") is not False:
         raise NativeAcceptanceHold("source-only evidence cannot certify release")
     if (first.get("model_sha256") != active.model_sha256
@@ -90,7 +92,8 @@ def _positive_cold_flags(proof: object) -> tuple[str, str, str, str, str]:
     if (proof.get("source_verified_twice") is not True
             or proof.get("sqlite_replay_after_cold_reopen") is not True
             or proof.get("second_generation_attempted") is not False
-            or proof.get("release_certified") is not False):
+            or proof.get("release_certified") is not False
+            or proof.get("physical_device_qualified") is not False):
         raise NativeAcceptanceHold("independent cold GGUF and SQLite replay not proved")
     if (type(proof.get("first_turn_generated_tokens")) is not int
             or not 1 <= proof["first_turn_generated_tokens"] <= 8192):
@@ -193,6 +196,10 @@ def run_acceptance(
         current = ActiveModel.from_supervisor(worker)
         if (current.tenant, current.subject) != (tenant, subject):
             raise NativeAcceptanceHold("installed native worker belongs to another owner")
+        if (getattr(installed, "content_verified", None) is not True
+                or getattr(installed, "rights_approved", None) is not True
+                or getattr(installed, "release_certified", None) is not False):
+            raise NativeAcceptanceHold("installed native rights not approved")
         # Existing first_turn only marks native_model_observed=True when the
         # real InstalledModelReport, isolated child and capacity lease are
         # independently inspected before and AFTER the native model effect.
@@ -242,6 +249,10 @@ def _publish_summary(summary: object) -> None:
         "clean_windows_install_qualified", "release_certified",
     )):
         raise NativeAcceptanceHold("device/release/rights flags must stay false")
+    if (type(summary["restart_db_inspected"]) is not bool
+            or type(summary["cold_model_reload_verified"]) is not bool
+            or summary["restart_db_inspected"] != summary["cold_model_reload_verified"]):
+        raise NativeAcceptanceHold("native cold verification flags inconsistent")
     for field in (
         "prompt_sha256", "model_sha256", "tokenizer_sha256", "output_sha256",
     ):

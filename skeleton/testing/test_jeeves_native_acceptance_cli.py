@@ -39,6 +39,7 @@ FIRST = {
     "installed_source":dict(SOURCE), "native_model_observed":True,
     "installed_source_bound":True, "replayed_without_generation":True,
     "operator_approved_real_inference":True, "release_certified":False,
+    "device_qualified":False,
 }
 COLD = {
     "session_id":"s_synthetic", "request_id":"r_synthetic",
@@ -47,6 +48,7 @@ COLD = {
     "source_verified_twice":True,
     "sqlite_replay_after_cold_reopen":True,
     "second_generation_attempted":False, "release_certified":False,
+    "physical_device_qualified":False,
 }
 
 
@@ -154,14 +156,9 @@ class RealAcceptanceWiringTests(unittest.TestCase):
     def test_fake_rights_receipt_never_starts_generation(self):
         self.receipt=installed(rights_approved=False)
         self.n.return_value=(nullcontext(),self.worker,self.receipt)
-        # The canonical installed witness is the real authority. The
-        # test-stitched first-turn mock cannot be accepted as independent.
-        with mock.patch(
-            "skeleton.jeeves.agent.native_acceptance_cli.run_first_turn",
-            side_effect=genuine_first_turn,
-        ):
-            with self.assertRaises(ContractViolation):
-                run_acceptance(**arguments())
+        with self.assertRaises(NativeAcceptanceHold):
+            run_acceptance(**arguments())
+        self.f.assert_not_called()
         self.assertEqual(self.worker.spine.generations,0)
 
     def test_foreign_owner_refused_without_sqlite_or_native(self):
@@ -230,6 +227,7 @@ class RealAcceptanceWiringTests(unittest.TestCase):
             ("source_verified_twice",False),
             ("sqlite_replay_after_cold_reopen",False),
             ("release_certified",True),
+            ("physical_device_qualified",True),
             ("first_turn_generated_tokens",0),
         ):
             with self.subTest(field=field):
@@ -313,6 +311,7 @@ class DigestOnlyNativeOutputTests(unittest.TestCase):
         for update in (
             {"release_certified":True},
             {"device_pressure_qualified":True},
+            {"restart_db_inspected":True},
             {"model_sha256":"invalid"},
         ):
             with self.subTest(update=update):
