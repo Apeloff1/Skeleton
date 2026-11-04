@@ -8,15 +8,24 @@ import sys
 from .client import LaptopClient
 from .contracts import ContractViolation,identifier,utf8
 
+class _RedactedArguments(argparse.ArgumentParser):
+    """Invalid command options cannot disclose a private user task."""
+
+    def error(self, message: str) -> None:
+        raise ContractViolation("invalid local client arguments")
+
+
 def main(argv=None):
-    p=argparse.ArgumentParser(description="Call a private local offline AI listener")
+    p=_RedactedArguments(description="Call a private local offline AI listener")
     p.add_argument("--port",type=int,default=8765)
     p.add_argument("--action",choices=("create","turn","replay","history","status"),required=True)
     p.add_argument("--session")
     p.add_argument("--request-id")
     p.add_argument("--stdin-prompt",action="store_true")
-    args=p.parse_args(argv)
     try:
+        args=p.parse_args(argv)
+        if type(args.port) is not int or not 1 <= args.port <= 65535:
+            raise ContractViolation("finite loopback client port required")
         secret=os.environ.get("SKELETON_LOCAL_AI_BEARER","")
         client=LaptopClient(port=args.port,bearer=secret)
         if args.action=="create":

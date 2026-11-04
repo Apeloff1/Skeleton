@@ -12,7 +12,12 @@ import math
 from pathlib import Path
 from typing import Any
 
-from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import identifier
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
+    ContractViolation, identifier,
+)
+from skeleton.ai.runtime.operational_ai.laptop_runtime.preflight import (
+    validate_native_shape,
+)
 
 
 class NativeOperatorHold(ValueError):
@@ -87,17 +92,14 @@ def check_native_resource_shape(
     durable operator CLI. These are structural limits, not observed host
     telemetry, model-source rights, installed receipt or native execution proof.
     """
-    for label, value, minimum, maximum in (
-        ("context", context_tokens, 128, 131072),
-        ("output token budget", output_tokens, 1, 8192),
-        ("native threads", native_threads, 1, 64),
-        ("GPU layer limit", gpu_layers, 0, 128),
-        ("capacity budget", capacity_budget_bytes, 1, 20000000000),
-    ):
-        if type(value) is not int or not minimum <= value <= maximum:
-            raise NativeOperatorHold("invalid finite native " + label)
-    if output_tokens >= context_tokens:
-        raise NativeOperatorHold("native output must fit reserved context")
+    try:
+        validate_native_shape(
+            n_ctx=context_tokens, max_new_tokens=output_tokens,
+            n_threads=native_threads, gpu_layers=gpu_layers,
+            capacity_budget_bytes=capacity_budget_bytes,
+        )
+    except ContractViolation as exc:
+        raise NativeOperatorHold("invalid finite native resource request") from exc
 
 
 def check_operator_admission(

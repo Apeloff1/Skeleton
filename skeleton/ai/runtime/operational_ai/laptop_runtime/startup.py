@@ -16,7 +16,14 @@ def activate_checked(*,model_root,state_dir,tenant,subject,
     from skeleton.ai.runtime.operational_ai.deployment.production.startup import activate
     from skeleton.ai.runtime.operational_ai.model.admission.paths import create_default_root
     from .contracts import identifier,nonnegative
+    from .preflight import validate_native_shape
     identifier(tenant,"tenant");identifier(subject,"subject")
+    validate_native_shape(
+        n_ctx=n_ctx, max_new_tokens=max_new_tokens,
+        n_threads=n_threads, gpu_layers=gpu_layers,
+        capacity_budget_bytes=capacity_budget_bytes,
+        capacity_slots=capacity_slots, inference_ms=inference_ms,
+    )
     for name,value,ceiling in (
         ("context",n_ctx,131072),("output tokens",max_new_tokens,8192),
         ("threads",n_threads,64),("gpu layers",gpu_layers,128),
