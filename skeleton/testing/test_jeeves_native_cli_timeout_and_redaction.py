@@ -18,6 +18,7 @@ from skeleton.jeeves.agent.native_operator_preflight import (
     NativeOperatorHold, check_operator_admission, check_native_resource_shape,
 )
 from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL, TOKENIZER
+from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
 
 
 def cli_args(*extra):
@@ -48,6 +49,15 @@ def call_cli(argv, *, prompt=b"  exact user prompt \r\n", worker=None):
         mock.patch(
             "skeleton.jeeves.agent.native_cli.inspect_native_jeeves",
             return_value=SimpleNamespace(source_bridge_ready=True),
+        ),
+        # Source-only CLI tests deliberately replace the *installed* witness.
+        # Production does not admit fake workers or forged rights reports.
+        mock.patch(
+            "skeleton.jeeves.agent.native_cli.NativeSourceEpoch.capture",
+            side_effect=lambda worker,receipt: SimpleNamespace(
+                principal=ActiveModel.from_supervisor(worker),
+                assert_current=lambda:None,
+            ),
         ),
         mock.patch(
             "skeleton.jeeves.agent.native_cli.NativeJeevesChat",
@@ -171,6 +181,13 @@ class JeevesNativeCliBounds(unittest.TestCase):
             mock.patch(
                 "skeleton.jeeves.agent.native_cli.inspect_native_jeeves",
                 return_value=SimpleNamespace(source_bridge_ready=True),
+            ),
+            mock.patch(
+                "skeleton.jeeves.agent.native_cli.NativeSourceEpoch.capture",
+                side_effect=lambda worker,receipt: SimpleNamespace(
+                    principal=ActiveModel.from_supervisor(worker),
+                    assert_current=lambda:None,
+                ),
             ),
             mock.patch(
                 "skeleton.jeeves.agent.native_cli.NativeJeevesChat",

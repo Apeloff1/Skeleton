@@ -28,6 +28,7 @@ from .native_operator_session import (
     NativeOperatorSession,OperatorSessionLimits,NativeOperatorSessionHold,
 )
 from .native_readiness import inspect_native_jeeves
+from .native_source_epoch import NativeSourceEpoch
 from .native_operator_preflight import check_native_resource_shape
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import identifier
 
@@ -113,8 +114,9 @@ def main(argv:list[str]|None=None)->int:
             verified=inspect_native_jeeves(worker,installed)
             if not verified.source_bridge_ready:
                 raise NativeOperatorSessionHold("source-bound native Jeeves activation unverified")
+            epoch=NativeSourceEpoch.capture(worker,installed)
             session=NativeOperatorSession(
-                worker,approved=True,limits=limits,
+                worker,approved=True,limits=limits,source_epoch=epoch,
             )
             # The operator explicitly controls when the process starts new
             # native inference. Merely starting the terminal never generates.

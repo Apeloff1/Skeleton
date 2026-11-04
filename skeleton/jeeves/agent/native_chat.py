@@ -22,6 +22,7 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
 )
 
 from .native_receipt_boundary import receive_committed_turn
+from .native_source_epoch import NativeSourceEpoch
 from .native_schema_boundary import verify_structured_native_output
 
 
@@ -70,7 +71,15 @@ class NativeJeevesChat:
     the existing native SQLite request identity and receipt hash chain.
     """
 
-    def __init__(self, worker: Any, *, session_id: str | None = None) -> None:
+    def __init__(
+        self, worker: Any, *, session_id: str | None = None,
+        source_epoch: NativeSourceEpoch | None = None,
+    ) -> None:
+        if source_epoch is not None:
+            if type(source_epoch) is not NativeSourceEpoch or source_epoch.worker is not worker:
+                raise NativeChatHold("invalid installed native source custody")
+            source_epoch.assert_current()
+        self._source_epoch = source_epoch
         self.worker = worker
         self.identity = ActiveModel.from_supervisor(worker)
         self.bridge = TurnBridge(worker)
@@ -81,6 +90,7 @@ class NativeJeevesChat:
             # This owner-bound read checks the canonical principal and
             # verifies the exact transcript before accepting a replay.
             self.worker.spine.history(self.session_id)
+            self._assert_current()
         self._closed = False
 
     def _assert_current(self) -> None:
@@ -91,10 +101,12 @@ class NativeJeevesChat:
         """
         try:
             active = ActiveModel.from_supervisor(self.worker)
-        except (ValueError, AttributeError) as exc:
-            raise NativeChatHold("native principal unavailable") from exc
-        if active != self.identity:
-            raise NativeChatHold("native model or principal changed")
+            if active != self.identity:
+                raise NativeChatHold("native model or principal changed")
+            if self._source_epoch is not None:
+                self._source_epoch.assert_current()
+        except Exception as exc:
+            raise NativeChatHold("native source or principal unavailable") from exc
 
     def turn(
         self,
@@ -152,6 +164,7 @@ class NativeJeevesChat:
             verified.text, None,
             maximum_bytes=self.worker.spine.limits.response_bytes,
         )
+        self._assert_current()
         return NativeChatTurn(
             self.session_id, id_, answer, verified.output_sha256,
             verified.model_sha256, verified.tokenizer_sha256,
@@ -167,6 +180,7 @@ class NativeJeevesChat:
             raise NativeChatHold("invalid bounded history limit")
         # Source of truth is the native, integrity-checked SQLite transcript.
         records = self.worker.spine.history(self.session_id)
+        self._assert_current()
         if type(records) not in (tuple, list) or len(records) > maximum_messages:
             raise NativeChatHold("history exceeds caller's bound")
         result = []
@@ -175,6 +189,7 @@ class NativeJeevesChat:
                 raise NativeChatHold("native transcript has invalid role")
             value = utf8(item.get("content"), maximum=131072)
             result.append({"role": item["role"], "content": value})
+        self._assert_current()
         return tuple(result)
 
     def close(self) -> bool:
@@ -185,6 +200,7 @@ class NativeJeevesChat:
         if type(closed) is not bool:
             raise NativeChatHold("native close response not boolean")
         self._closed = True
+        self._assert_current()
         return closed
 
 

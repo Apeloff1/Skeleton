@@ -31,6 +31,7 @@ from .native_source_tool import (
 )
 from .tools import ToolRegistry
 from .native_readiness import inspect_native_jeeves
+from .native_source_epoch import NativeSourceEpoch
 from .runtime import RunInputs
 from .types import Budget, Goal
 
@@ -162,7 +163,8 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
-            bound = ActiveModel.from_supervisor(worker)
+            epoch = NativeSourceEpoch.capture(worker, installed)
+            bound = epoch.principal
             source_provider = None
             if source_preflight is not None:
                 source_preflight.verify_active_model(worker.spine.identity)
@@ -180,11 +182,16 @@ def main(argv: list[str] | None = None) -> int:
                     # retrieval is instead an explicitly granted host tool.
                     attach_signed_native_evidence(worker, source_provider)
             if args.mode == "repl":
-                chat = NativeJeevesChat(worker, session_id=args.session)
+                chat = NativeJeevesChat(
+                    worker, session_id=args.session, source_epoch=epoch,
+                )
                 return NativeJeevesRepl(chat).serve(sys.stdin.buffer, sys.stdout)
             if args.mode == "chat":
-                chat = NativeJeevesChat(worker, session_id=args.session)
+                chat = NativeJeevesChat(
+                    worker, session_id=args.session, source_epoch=epoch,
+                )
                 turn = chat.turn(task, request_id=args.request_id)
+                epoch.assert_current()
                 _assert_same_owner(worker, bound)
                 sys.stdout.write(json.dumps({
                     "status": "native-chat-committed",
@@ -234,11 +241,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             if args.mode == "durable-agent" and args.replay_result:
                 historical = run.replay_terminal(inputs)
+                epoch.assert_current()
                 _assert_same_owner(worker, bound)
                 sys.stdout.write(json.dumps(historical, sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
             if args.mode == "durable-agent" and args.inspect_run:
                 checkpoint = run.inspect(inputs)
+                epoch.assert_current()
                 _assert_same_owner(worker, bound)
                 sys.stdout.write(json.dumps(checkpoint, sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
@@ -246,6 +255,7 @@ def main(argv: list[str] | None = None) -> int:
                 result = run.resume_operator_approved(inputs)
             else:
                 result = run.run(inputs)
+            epoch.assert_current()
             _assert_same_owner(worker, bound)
             record = {
                 "schema": "jeeves.native_operator_turn.v1",

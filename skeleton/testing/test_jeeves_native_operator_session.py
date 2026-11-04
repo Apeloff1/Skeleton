@@ -23,6 +23,8 @@ from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.database i
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.lease import SessionGate
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.coordinator import ExecutionSpine
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor import SupervisedAI
+from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
+from skeleton.jeeves.agent.native_source_epoch import NativeSourceEpoch
 from skeleton.jeeves.agent.native_operator_session import (
     NativeOperatorSession,NativeOperatorSessionHold,OperatorCommand,
     OperatorSessionLimits,parse_operator_command,
@@ -334,6 +336,13 @@ class TestDurableOperatorSession(unittest.TestCase):
                 "skeleton.jeeves.agent.native_operator_session_cli.inspect_native_jeeves",
                 return_value=SimpleNamespace(source_bridge_ready=True),
             ),
+            mock.patch(
+                "skeleton.jeeves.agent.native_operator_session_cli.NativeSourceEpoch.capture",
+                return_value=NativeSourceEpoch(
+                    self.worker,object(),ActiveModel.from_supervisor(self.worker),(),
+                ),
+            ),
+            mock.patch.object(NativeSourceEpoch,"assert_current",return_value=None),
             mock.patch("sys.stdin",stdin),mock.patch("sys.stdout",stdout),
             mock.patch("sys.stderr",stderr),
         ):

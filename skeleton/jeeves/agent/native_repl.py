@@ -94,6 +94,7 @@ class NativeJeevesRepl:
         self._terminated = False
 
     def _status(self) -> dict[str, Any]:
+        self.chat._assert_current()
         return {
             "schema": "jeeves.native_repl.status.v1",
             "session_id": self.chat.session_id,

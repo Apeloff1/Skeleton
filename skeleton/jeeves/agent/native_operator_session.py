@@ -26,6 +26,7 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveMod
 from skeleton.ai.runtime.operational_ai.authority.canonical import load_json
 
 from .native_durable_runtime import NativeDurableJeevesAgent
+from .native_source_epoch import NativeSourceEpoch
 from .native_checkpoint_journal import NativeSQLiteCheckpointer
 from .runtime import RunInputs
 from .types import Budget, Goal
@@ -133,11 +134,17 @@ class NativeOperatorSession:
         self, worker: Any,*,approved: bool,
         limits:OperatorSessionLimits|None=None,
         monotonic:Callable[[],float]=time.monotonic,
+        source_epoch:NativeSourceEpoch|None=None,
     ):
         if approved is not True:
             raise NativeOperatorSessionHold("explicit operator native approval required")
         if not callable(monotonic):
             raise NativeOperatorSessionHold("trusted monotonic clock required")
+        if source_epoch is not None:
+            if type(source_epoch) is not NativeSourceEpoch or source_epoch.worker is not worker:
+                raise NativeOperatorSessionHold("invalid installed native source epoch")
+            source_epoch.assert_current()
+        self._source_epoch=source_epoch
         self.identity=ActiveModel.from_supervisor(worker)
         self.worker=worker
         self.limits=limits or OperatorSessionLimits()
@@ -161,6 +168,13 @@ class NativeOperatorSession:
             ) from exc
         if active!=self.identity:
             raise NativeOperatorSessionHold("native model epoch/principal changed")
+        if self._source_epoch is not None:
+            try:
+                self._source_epoch.assert_current()
+            except Exception as exc:
+                raise NativeOperatorSessionHold(
+                    "installed native source epoch changed"
+                ) from exc
         if self._closed:
             raise NativeOperatorSessionHold("session already stopped")
         if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
