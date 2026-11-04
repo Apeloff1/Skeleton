@@ -65,6 +65,20 @@ def _interactive_contract(root: Path, actions: list[dict]) -> dict:
     if (exported["head"] != completed["head"] or backed_up["head"] != completed["head"]
             or len(history) != completed["revision"]):
         raise ValueError("terminal-produced custody artifacts failed replay")
+    # The actual terminal-produced backup must survive a cold restore into
+    # a distinct save slot, including its complete action ledger. Verifying
+    # the backup bytes alone cannot establish the consumer restore path.
+    restored_slot = "terminal-backup-recovered"
+    restored = SlotStore(root).restore_backup(restored_slot, Path(backups[0]).read_bytes())
+    restored_audit = SlotStore(root).audit(restored_slot)
+    if (restored["head"] != completed["head"]
+            or restored["status"] != "completed"
+            or restored["revision"] != completed["revision"]
+            or not restored_audit["verified"]
+            or restored_audit["audit_entries"] != completed["revision"]):
+        raise ValueError("terminal backup cold restore lost earned ending or ledger")
+    if SlotStore(root).load(slot)["head"] != completed["head"]:
+        raise ValueError("terminal backup cold restore changed original save")
     if frames[0] < len(actions):
         raise ValueError("terminal did not render playable action frames")
     return {"commands": prompts[0], "frames": frames[0], "head": completed["head"],

@@ -18,3 +18,14 @@ def test_earned_ending_terminal_export_backup_and_audit(tmp_path: Path):
     assert completed["status"] == "completed"
     assert completed["head"] == result["head"]
     assert SlotStore(root).audit("interactive-acceptance")["verified"] is True
+
+
+def test_terminal_backup_is_cold_restored_without_mutating_earned_ending(tmp_path: Path):
+    root = tmp_path / "saves"
+    result = run_acceptance(root)
+    recovered = SlotStore(root).load("terminal-backup-recovered")
+    original = SlotStore(root).load("interactive-acceptance")
+    assert recovered["status"] == "completed"
+    assert recovered["head"] == original["head"] == result["head"]
+    assert recovered["revision"] == original["revision"] == result["saved_revision"]
+    assert SlotStore(root).audit("terminal-backup-recovered")["audit_entries"] == recovered["revision"]
