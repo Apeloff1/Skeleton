@@ -176,6 +176,10 @@ class NativeOperatorSession:
         self._reserved_calls=0
         self._reserved_output=0
         self._lock=threading.RLock()
+        # A JSONL stream owns this session exclusively until its finally
+        # block returns, even while blocking on untrusted bounded stdin.
+        self._stream_open=False
+        self._stream_thread=None
         self._native_output_ceiling=worker.spine.limits.max_output_tokens
 
     def _elapsed(self) -> float:
@@ -339,6 +343,11 @@ class NativeOperatorSession:
         if not isinstance(cmd,OperatorCommand):
             raise NativeOperatorSessionHold("typed operator command required")
         with self._lock:
+            if (self._stream_open
+                    and self._stream_thread != threading.get_ident()):
+                raise NativeOperatorSessionHold(
+                    "operator command stream exclusively owns native session"
+                )
             self._valid_worker()
             if self._command_count>=self.limits.maximum_commands:
                 raise NativeOperatorSessionHold("finite command inventory exhausted")
@@ -403,6 +412,13 @@ class NativeOperatorSession:
             getattr(destination,"write",None)
         ):
             raise NativeOperatorSessionHold("bounded binary input and text output required")
+        with self._lock:
+            if self._stream_open or self._closed:
+                raise NativeOperatorSessionHold(
+                    "operator command stream already active or stopped"
+                )
+            self._stream_open=True
+            self._stream_thread=threading.get_ident()
         try:
             while not self._closed:
                 self._valid_worker()
@@ -462,6 +478,10 @@ class NativeOperatorSession:
                 "release_certified":False,
             },sort_keys=True)+"\n")
             return 2
+        finally:
+            with self._lock:
+                self._stream_open=False
+                self._stream_thread=None
 
 
 __all__=[
