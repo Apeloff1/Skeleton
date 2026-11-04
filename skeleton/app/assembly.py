@@ -335,6 +335,12 @@ def _read_dotenv(path: Path) -> dict[str, str]:
     flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
     try:
+        before = path.lstat()
+    except FileNotFoundError:
+        return values
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        raise ValueError("private runtime environment must be an unlinked regular file")
+    try:
         descriptor = os.open(path, flags)
     except FileNotFoundError:
         return values
@@ -342,7 +348,8 @@ def _read_dotenv(path: Path) -> dict[str, str]:
         raise ValueError("private runtime environment cannot be opened safely") from exc
     try:
         info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or (info.st_dev, info.st_ino) != (before.st_dev, before.st_ino)):
             raise ValueError("private runtime environment must be an unlinked regular file")
         limit = 256 * 1024
         if info.st_size > limit:
