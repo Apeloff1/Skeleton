@@ -140,12 +140,12 @@ class REPLFiniteOutputTests(unittest.TestCase):
                 self.assertEqual(out.getvalue(),"")
                 self.assertEqual(worker.spine.generations,0)
 
-    def test_completed_native_answer_does_not_bypass_result_byte_limit(self):
+    def test_large_committed_private_history_does_not_bypass_frame_limit(self):
         limits=ReplLimits(
             max_result_frame_bytes=1024,
             max_total_output_bytes=2048,
         )
-        code,out,repl,worker=serve(b"B"*1500+b"\n",limits)
+        code,out,repl,worker=serve(b"B"*1500+b"\n:history\n",limits)
         self.assertEqual(code,2)
         self.assertTrue(repl._terminated)
         self.assertIn('"status": "held"',out.getvalue())
