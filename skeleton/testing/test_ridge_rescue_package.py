@@ -41,3 +41,24 @@ def test_unsupported_and_oversized_packages_fail_closed():
     package["sha256"] = digest(package["payload"])
     with pytest.raises(PackageError):
         verify_package(package)
+
+
+def test_duplicate_json_members_fail_closed_at_every_envelope_level():
+    import json
+    package = build_package(WORLD)
+    serialized = canonical(package).decode("utf-8")
+    envelope = json.loads(serialized)
+    for altered in (
+        '{"payload":' + json.dumps(envelope["payload"]) + ',"payload":' + json.dumps(envelope["payload"]) + ',"sha256":' + json.dumps(envelope["sha256"]) + '}',
+        serialized.replace('"manifest":', '"manifest":{},"manifest":', 1),
+        serialized.replace('"schema":', '"schema":"ridge.rescue.package.v1","schema":', 1),
+    ):
+        with pytest.raises(PackageError):
+            verify_package(altered)
+
+
+def test_nonfinite_json_number_rejected_before_schema_validation():
+    package = build_package(WORLD)
+    serialized = canonical(package).decode("utf-8")
+    with pytest.raises(PackageError):
+        verify_package(serialized.replace('"payload":', '"extra":NaN,"payload":', 1))
