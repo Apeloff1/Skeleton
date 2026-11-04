@@ -143,8 +143,12 @@ def inspect_laptop(
         raise NativeLaptopHold("explicit state root required")
     identifier(tenant,"tenant");identifier(subject,"subject")
     digest(model_sha256);digest(tokenizer_sha256)
-    exact_integer(minimum_available_ram_bytes,minimum=1,maximum=2**53-1)
-    exact_integer(minimum_available_disk_bytes,minimum=1,maximum=2**53-1)
+    for label, floor in (
+        ("available memory floor", minimum_available_ram_bytes),
+        ("state disk floor", minimum_available_disk_bytes),
+    ):
+        if type(floor) is not int or not 1 <= floor <= 2**53 - 1:
+            raise NativeLaptopHold("invalid bounded " + label)
     # Typed identity is checked before any private model or state read.
     Identity(tenant,subject,model_sha256,tokenizer_sha256)
     holds=[]
