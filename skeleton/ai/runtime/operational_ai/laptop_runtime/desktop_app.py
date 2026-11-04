@@ -98,10 +98,17 @@ class JeevesWindow(tk.Tk):
                     row=row_idx, column=3, sticky="ew", padx=4, pady=4,
                 )
 
+        self.profile_button = ttk.Button(
+            settings, text="Suggest measured CPU/RAM profile",
+            command=self._suggest_profile,
+        )
+        self.profile_button.grid(
+            row=6, column=1, columnspan=2, sticky="e", pady=(5, 0),
+        )
         ttk.Button(
             settings, text="Prepare / install approved local model",
             command=self._setup,
-        ).grid(row=6, column=0, columnspan=4, sticky="e", pady=(5, 0))
+        ).grid(row=6, column=3, sticky="e", pady=(5, 0))
 
         bar = ttk.Frame(main)
         bar.grid(row=1, column=0, sticky="ew", pady=(0, 8))
@@ -126,6 +133,10 @@ class JeevesWindow(tk.Tk):
             bar, text="Close session", command=lambda: self._action("close"),
         )
         self.close_button.grid(row=0, column=7, padx=3)
+        self.telemetry_button = ttk.Button(
+            bar, text="Live capacity", command=lambda: self._action("telemetry"),
+        )
+        self.telemetry_button.grid(row=0, column=8, padx=3)
 
         console_frame = ttk.LabelFrame(main, text="Private local conversation", padding=6)
         console_frame.grid(row=2, column=0, sticky="nsew")
@@ -217,7 +228,10 @@ class JeevesWindow(tk.Tk):
         self.disconnect_button.configure(
             state="normal" if connected or self._connecting is not None else "disabled",
         )
-        for button in (self.new_button, self.resume_button):
+        self.profile_button.configure(
+            state="normal" if not connected and not self._busy else "disabled",
+        )
+        for button in (self.new_button, self.resume_button, self.telemetry_button):
             button.configure(state="normal" if active else "disabled")
         has_session = (
             active and self._bridge is not None
@@ -240,6 +254,28 @@ class JeevesWindow(tk.Tk):
     def _setup(self):
         from .desktop_setup_ui import SetupWindow
         SetupWindow(self)
+
+    def _suggest_profile(self):
+        # Read-only model source inspection and host/cgroup measurements can
+        # take time; never block Tk or modify a running native worker.
+        if self._busy or (self._bridge is not None and self._bridge.connected):
+            return
+        model = self.fields["model_root"].get()
+        state = self.fields["state_dir"].get()
+        self._busy = True
+        self.connection_text.set("Inspecting installed source and effective CPU/RAM…")
+        self._controls()
+
+        def work():
+            try:
+                from .desktop_capacity_plan import plan_existing_model
+                result = plan_existing_model(model, state)
+                self._events.put(("capacity-profile", "recommendation", result))
+            except BaseException as exc:
+                # Kernel paths, model roots and exception strings are private.
+                self._events.put(("capacity-error", "held", type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _workspace(self):
         from .desktop_workspace_ui import WorkspaceWindow
@@ -419,6 +455,35 @@ class JeevesWindow(tk.Tk):
                     self._busy = False
                     self.connection_text.set("Native startup held; no fallback provider")
                     self._show("Native startup held", payload, "warning")
+                elif event == "capacity-profile":
+                    self._busy = False
+                    if self._bridge is not None and self._bridge.connected:
+                        continue
+                    recommendation = payload.get("recommendation", {})
+                    for key in (
+                        "context", "max_output_tokens", "threads", "gpu_layers",
+                        "inference_ms", "capacity_budget_bytes",
+                    ):
+                        if type(recommendation.get(key)) is int and key in self.fields:
+                            self.fields[key].set(str(recommendation[key]))
+                    self.connection_text.set(
+                        "Conservative observed profile selected; no model started",
+                    )
+                    self._show(
+                        "Measured device (advisory, not native qualification)",
+                        "Effective memory: "
+                        + str(payload.get("effective_available_bytes", "?"))
+                        + " bytes; model estimate: "
+                        + str(payload.get("estimated_requirement_bytes", "?"))
+                        + " bytes; CPU cores: "
+                        + str(payload.get("effective_cpu_cores", "?"))
+                        + "; cgroup: " + str(payload.get("cgroup_source", "?"))
+                        + ". GPU layers remain zero until independently verified.",
+                    )
+                elif event == "capacity-error":
+                    self._busy = False
+                    self.connection_text.set("Resource profile held — no automatic escalation")
+                    self._show("Device observation held", str(payload), "warning")
                 elif event == "result":
                     self._busy = False
                     result = payload
@@ -430,7 +495,15 @@ class JeevesWindow(tk.Tk):
                         )
                         if bridge.session_id is not None:
                             self.resume_id.set(bridge.session_id)
-                    if name == "turn":
+                    if name == "telemetry":
+                        self._show(
+                            "Native supervised capacity (observation only)",
+                            json.dumps(
+                                result.get("observed", {}),
+                                ensure_ascii=False, sort_keys=True,
+                            ),
+                        )
+                    elif name == "turn":
                         record = result.get("turn", {})
                         answer = record.get("answer", "")
                         self._last_answer = answer if type(answer) is str else None

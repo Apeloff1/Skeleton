@@ -117,6 +117,7 @@ def write_frame(
 
 _ALLOWED: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "status": (frozenset(), frozenset()),
+    "telemetry": (frozenset(), frozenset()),
     "new": (frozenset(), frozenset()),
     "resume": (frozenset({"session_id"}), frozenset()),
     "turn": (frozenset({"request_id", "prompt"}), frozenset({"seed", "temperature", "context"})),
