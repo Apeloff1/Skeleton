@@ -36,3 +36,13 @@ def test_unexpected_archive_member_refused():
             target.writestr("unexpected.sh", b"exit 1")
     with pytest.raises(BundleError, match="unexpected"):
         verify_bytes(buffer.getvalue())
+
+
+def test_local_header_timestamp_disagreement_refused():
+    # Central-directory metadata stays intact; Python's ZIP reader tolerates
+    # local-header timestamp disagreement, but our publisher must not.
+    modified = bytearray(build_bytes())
+    assert modified[:4] == b"PK\\x03\\x04"
+    modified[10] ^= 1
+    with pytest.raises(BundleError, match="noncanonical portable archive bytes"):
+        verify_bytes(bytes(modified))
