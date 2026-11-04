@@ -56,6 +56,28 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         values.update(changes)
         return await inspect_compose_mongo_epoch(self.db, **values)
 
+    async def test_cli_exit_fails_closed_on_epoch_only_observation(self):
+        from skeleton.app.compose_guarded_preflight import main
+        from unittest.mock import AsyncMock
+        from contextlib import redirect_stdout
+        from io import StringIO
+        import json
+
+        for observed, expected_exit in (
+            ({"canonical_actor_epoch_stable_observed": True,
+              "guarded_local_ai_ready": False}, 2),
+            ({"canonical_actor_epoch_stable_observed": False,
+              "guarded_local_ai_ready": False}, 2),
+        ):
+            with self.subTest(observed=observed):
+                output = StringIO()
+                with patch("skeleton.app.compose_guarded_preflight._run_from_environment",
+                           new_callable=AsyncMock, return_value=observed), \\
+                     redirect_stdout(output):
+                    exit_code = main()
+                self.assertEqual(exit_code, expected_exit)
+                self.assertEqual(json.loads(output.getvalue()), observed)
+
     async def test_primary_and_stable_epoch_only_prove_mongo_preflight(self):
         result = await self.inspect()
         self.assertEqual(result["schema_version"], SCHEMA)

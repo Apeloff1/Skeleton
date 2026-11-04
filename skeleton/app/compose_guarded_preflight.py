@@ -233,7 +233,7 @@ def main() -> int:
     except Exception:
         result = _result("mongo_primary_probe_unavailable")
     print(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
-    return 0 if result["canonical_actor_epoch_stable_observed"] is True else 2
+    # This CLI is an observation tool, not an activation permit. A stable\n    # epoch alone cannot establish reviewer, writer or model custody.\n    # Never return a shell-success status that deployment automation could\n    # mistake for guarded inference readiness.\n    return 0 if result["guarded_local_ai_ready"] is True else 2
 
 
 if __name__ == "__main__":
