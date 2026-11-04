@@ -312,7 +312,7 @@ class DesktopBridge:
                     else 0
                 )
                 or report.get("signed_source_tool_active", False) is not getattr(
-                    self.config, "enable_signed_source_tool", False
+                    getattr(self, "config", None), "enable_signed_source_tool", False
                 )
                 or report.get("signed_source_manifest_sha256") != getattr(
                     self, "signed_source_manifest_sha256", None

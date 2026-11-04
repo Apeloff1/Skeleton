@@ -43,7 +43,7 @@ class SignedSourceAdmission:
     def __post_init__(self):
         from skeleton.jeeves.agent.native_source_preflight import NativeSourcePreflight
         if (
-            type(self.root) is not Path
+            not isinstance(self.root, Path)
             or not self.root.is_absolute()
             or ".." in self.root.parts
             or "\x00" in str(self.root)
@@ -104,9 +104,9 @@ def preflight_signed_source(
     identifier(tenant, "source tenant")
     identifier(subject, "source subject")
     if (
-        type(root) is not Path or not root.is_absolute()
+        not isinstance(root, Path) or not root.is_absolute()
         or ".." in root.parts or "\x00" in str(root)
-        or type(manifest_path) is not Path or not manifest_path.is_absolute()
+        or not isinstance(manifest_path, Path) or not manifest_path.is_absolute()
         or ".." in manifest_path.parts or "\x00" in str(manifest_path)
     ):
         raise DesktopSignedSourceHold("canonical absolute signed source locations required")
