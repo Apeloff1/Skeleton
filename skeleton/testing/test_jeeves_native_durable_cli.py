@@ -41,6 +41,7 @@ SOURCE_ONLY_WITNESS = {
     "source_sha": "e" * 40, "installed_model_bytes": 4096,
     "installed_shard_count": 1,
 }
+SOURCE_WITNESS_UNSPECIFIED = object()
 
 
 @unittest.skipUnless(os.name == "posix" and Path("/proc/self/fd").is_dir(),
@@ -93,7 +94,8 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
             "--task-stdin", *extra,
         ]
 
-    def _invoke(self, *extra, task=None, subject="operator", source_witness=None):
+    def _invoke(self, *extra, task=None, subject="operator",
+                source_witness=SOURCE_WITNESS_UNSPECIFIED):
         stdin = TextIOWrapper(BytesIO(
             (self.TASK if task is None else task).encode("utf-8"),
         ), encoding="utf-8")
@@ -110,7 +112,8 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
             mock.patch(
                 "skeleton.jeeves.agent.native_source_fence.require_activated_source",
                 return_value=(
-                    dict(SOURCE_ONLY_WITNESS) if source_witness is None
+                    dict(SOURCE_ONLY_WITNESS)
+                    if source_witness is SOURCE_WITNESS_UNSPECIFIED
                     else source_witness
                 ),
             ),
