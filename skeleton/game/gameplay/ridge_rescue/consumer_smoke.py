@@ -289,13 +289,43 @@ def run_portable_smoke() -> dict:
             launcher_env["PYTHONPATH"] = str(root / "poisoned-import-path")
             launcher_env["PYTHONUTF8"] = "1"
             launcher_env["PYTHONNOUSERSITE"] = "1"
-            output = _invoke(
+            split = max(1, len(choices) // 2)
+            first_launch = _invoke(
                 ["cmd.exe", "/d", "/c", str(launcher)], [],
                 env=launcher_env, cwd=root,
-                stdin="\n".join(choices + ["q"]) + "\n",
+                stdin="\n".join(choices[:split] + ["q"]) + "\n",
             )
-            if "Victory:" not in output:
-                raise SmokeError("Windows launcher did not earn an ending")
+            if "Actions:" not in first_launch:
+                raise SmokeError("Windows launcher did not render playable actions")
+            saved = json.loads(_invoke(
+                [sys.executable, "-I", str(artifact)],
+                ["status", "--slot", "adventure"],
+                env=launcher_env, cwd=root,
+            ))
+            if saved["revision"] != split or saved["status"] != "playing":
+                raise SmokeError("Windows launcher quit did not persist checkpoint")
+            second_launch = _invoke(
+                ["cmd.exe", "/d", "/c", str(launcher)], [],
+                env=launcher_env, cwd=root,
+                stdin="\n".join(choices[split:] + ["q"]) + "\n",
+            )
+            if "Victory:" not in second_launch:
+                raise SmokeError("Windows launcher restart did not earn an ending")
+            final = json.loads(_invoke(
+                [sys.executable, "-I", str(artifact)],
+                ["status", "--slot", "adventure"],
+                env=launcher_env, cwd=root,
+            ))
+            if final["status"] != "completed" or final["revision"] != len(choices):
+                raise SmokeError("Windows launcher completion was not persisted")
+            exported = json.loads(_invoke(
+                [sys.executable, "-I", str(artifact)],
+                ["export", "--slot", "adventure"],
+                env=launcher_env, cwd=root,
+            ))
+            payload = Path(exported["path"]).read_bytes()
+            if verify_export(payload)["head"] != final["head"]:
+                raise SmokeError("Windows launcher export did not replay earned ending")
     return {
         **result,
         "archive_sha256": metadata["sha256"],
