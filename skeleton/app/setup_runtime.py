@@ -215,6 +215,11 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
             os.fchmod(handle.fileno(), 0o600)
             repaired_permissions = True
         raw = handle.read(_MAX_ENV_BYTES + 1)
+        # A concurrent rename during read must not be accepted as the
+        # configuration epoch that was originally admitted.
+        current = os.lstat(path)
+        if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino) or not stat.S_ISREG(current.st_mode):
+            raise ValueError(f"{label} identity changed during read")
     if len(raw) > _MAX_ENV_BYTES:
         raise ValueError("runtime .env exceeds the 256 KiB input limit")
     return raw.decode("utf-8"), repaired_permissions
