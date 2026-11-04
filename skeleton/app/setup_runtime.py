@@ -319,6 +319,11 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         if os.name != "nt" and info.st_mode & 0o077:
             raise ValueError("admin password file must be private; run chmod 600 on that file")
         raw = handle.read(4097)
+        # A pathname replacement after admission must never authorize a
+        # password from an orphaned descriptor as the current operator input.
+        current = os.lstat(password_path)
+        if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+            raise ValueError("admin password input identity changed during read")
     if len(raw) > 4096:
         raise ValueError("admin password file exceeds 4096 bytes")
     try:

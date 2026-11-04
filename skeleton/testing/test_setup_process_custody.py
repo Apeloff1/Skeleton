@@ -483,3 +483,30 @@ def test_existing_env_path_swap_during_read_is_rejected(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="identity changed during read"):
         ensure_runtime_environment(root)
     assert not list(root.glob(".env.*.tmp"))
+
+
+def test_admin_password_path_swap_during_read_is_rejected(tmp_path, monkeypatch):
+    """Do not accept an orphaned password inode after a successful first admission."""
+    root = _root(tmp_path)
+    password = root / "operator-secret"
+    password.write_text("strong-password-value-1234", encoding="utf-8")
+    replacement = root / "replacement-secret"
+    replacement.write_text("another-strong-password-1234", encoding="utf-8")
+    if os.name != "nt":
+        password.chmod(0o600)
+        replacement.chmod(0o600)
+    original_lstat = os.lstat
+    visits = 0
+
+    def swap_after_admission(path, *args, **kwargs):
+        nonlocal visits
+        if Path(path) == password:
+            visits += 1
+            if visits == 2:
+                os.replace(replacement, password)
+        return original_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "lstat", swap_after_admission)
+    with pytest.raises(ValueError, match="identity changed during read"):
+        ensure_runtime_environment(root, admin_email="admin@example.test", admin_password_file=password)
+    assert not (root / ".env").exists()
