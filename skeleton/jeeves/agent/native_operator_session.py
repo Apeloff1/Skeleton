@@ -202,6 +202,7 @@ class NativeOperatorSession:
         try:
             active=ActiveModel.from_supervisor(self.worker)
         except Exception as exc:
+            self._closed=True
             raise NativeOperatorSessionHold(
                 "native source identity unavailable"
             ) from exc
@@ -405,15 +406,25 @@ class NativeOperatorSession:
         try:
             while not self._closed:
                 self._valid_worker()
-                raw=source.readline(self.limits.maximum_line_bytes+2)
-                if not raw:
+                # Reserve one extra byte beyond the maximum JSON payload
+                # plus the optional CRLF framing. A stream returning text,
+                # None or any other sentinel is never a successful EOF.
+                raw=source.readline(self.limits.maximum_line_bytes+3)
+                if raw==b"":
+                    self._before_publication()
                     break
-                if type(raw) is not bytes or len(raw)>self.limits.maximum_line_bytes:
-                    raise NativeOperatorSessionHold("operator command line too long")
-                if not raw.endswith(b"\n"):
+                if type(raw) is not bytes:
+                    raise NativeOperatorSessionHold("binary command stream required")
+                if (len(raw)>self.limits.maximum_line_bytes+2
+                        or not raw.endswith(b"\n")):
                     raise NativeOperatorSessionHold("unterminated or oversized command")
+                payload=raw[:-1]
+                if payload.endswith(b"\r"):
+                    payload=payload[:-1]
+                if len(payload)>self.limits.maximum_line_bytes:
+                    raise NativeOperatorSessionHold("operator command line too long")
                 command=parse_operator_command(
-                    raw.rstrip(b"\r\n"),limit=self.limits.maximum_line_bytes,
+                    payload,limit=self.limits.maximum_line_bytes,
                 )
                 result=self.dispatch(command)
                 output=json.dumps(
@@ -432,7 +443,11 @@ class NativeOperatorSession:
                 # Reserve before attempting output. A partial/unknown write
                 # must never refund bytes and silently resume the stream.
                 self._published_result_bytes+=output_size
-                destination.write(output)
+                written=destination.write(output)
+                if type(written) is not int or written!=len(output):
+                    raise NativeOperatorSessionHold(
+                        "operator disclosure stream did not accept complete frame"
+                    )
                 if callable(getattr(destination,"flush",None)):
                     destination.flush()
             return 0
