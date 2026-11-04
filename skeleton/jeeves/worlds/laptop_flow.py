@@ -154,6 +154,10 @@ class LaptopFlow:
                 0o600, dir_fd=fd)
         except FileExistsError:
             raise CanonError("lease_busy") from None
+        except OSError as exc:
+            # Host filesystem failures must not escape as untyped tracebacks.
+            # Never remove a lock we did not successfully create.
+            raise CanonError("lease_unavailable") from exc
         os.close(handle)
 
     def _world(self, fd: int, world_id: str) -> dict[str, Any]:
