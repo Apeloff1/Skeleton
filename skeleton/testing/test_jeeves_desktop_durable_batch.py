@@ -6,6 +6,7 @@ run identities; they cannot certify physical GGUF or release readiness.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
 from hashlib import sha256
 import json
@@ -13,6 +14,9 @@ import threading
 from unittest import mock
 import unittest
 
+from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_client import (
+    DesktopConfig, DesktopBridge, DesktopBridgeHold,
+)
 from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_batch_work import (
     BatchHold, DurableBatchPlan, BatchRunReceipt, BatchItemReceipt,
     parse_durable_batch, SerialDurableBatchRunner,
@@ -50,11 +54,30 @@ class FakeCommittedNative:
         self.calls = []
         self.connected = True
         self._lock = threading.Lock()
+        self._lease = threading.RLock()
+        self._leased = False
         self._in_flight = False
+
+    @contextmanager
+    def exclusive_batch(self, manifest_sha256):
+        if (
+            type(manifest_sha256) is not str
+            or len(manifest_sha256) != 64
+            or not self._lease.acquire(blocking=False)
+        ):
+            raise BatchHold("original reviewed work lease unavailable")
+        try:
+            self._leased = True
+            yield
+        finally:
+            self._leased = False
+            self._lease.release()
 
     def request(self, op, **fields):
         self._lock.acquire()
         try:
+            if not self._leased:
+                raise RuntimeError("native work does not hold an exclusive lease")
             if self._in_flight:
                 raise RuntimeError("parallel native inference unsafe")
             self._in_flight = True
@@ -86,6 +109,15 @@ class FakeCommittedNative:
         finally:
             self._in_flight = False
             self._lock.release()
+
+
+
+def _can_lease(bridge: DesktopBridge) -> bool:
+    try:
+        with bridge.exclusive_batch("b" * 64):
+            return True
+    except DesktopBridgeHold:
+        return False
 
 
 class DurableBatchAdmissionTests(unittest.TestCase):
@@ -239,6 +271,64 @@ class SerialNativeWorkTests(unittest.TestCase):
         self.assertEqual(receipt.items_started, 0)
         self.assertEqual(receipt.stopped_at_sequence, 1)
         self.assertEqual(worker.calls, [])
+
+
+    def test_unleased_native_worker_cannot_enter_admitted_queue(self):
+        class NoLease:
+            connected = True
+            def request(self, op, **fields):
+                raise AssertionError("never call unleased native inference")
+        selected = plan(2)
+        with self.assertRaises(BatchHold):
+            SerialDurableBatchRunner(
+                NoLease(), selected, approved=True,
+                expected_manifest_sha256=selected.manifest_sha256,
+            )
+
+    def test_another_thread_cannot_interleave_when_native_bridge_is_leased(self):
+        bridge = DesktopBridge(DesktopConfig(
+            model_root="/trusted/model", state_dir="/private/state",
+            tenant="local", subject="owner",
+        ))
+        bridge._started = True
+        class Child:
+            def poll(self):
+                return None
+        bridge._process = Child()
+        outcome = []
+        with bridge.exclusive_batch("a" * 64):
+            def interloper():
+                try:
+                    bridge.request("status")
+                    outcome.append("unsafe")
+                except DesktopBridgeHold:
+                    outcome.append("held")
+            thread = threading.Thread(target=interloper)
+            thread.start()
+            thread.join(timeout=3)
+            self.assertFalse(thread.is_alive())
+        self.assertEqual(outcome, ["held"])
+        self.assertTrue(bridge.connected)
+        # A failed competing request is refused BEFORE writing any IPC data.
+        self.assertIsNone(bridge._pressure_reason)
+
+    def test_two_overlapping_serial_batches_on_one_bridge_cannot_both_start(self):
+        bridge = DesktopBridge(DesktopConfig(
+            model_root="/trusted/model", state_dir="/private/state",
+            tenant="local", subject="owner",
+        ))
+        bridge._started = True
+        bridge._process = type("Child", (), {"poll": lambda self: None})()
+        outcome = []
+        with bridge.exclusive_batch("a" * 64):
+            t = threading.Thread(target=lambda: (
+                outcome.append("unsafe") if _can_lease(bridge)
+                else outcome.append("held")
+            ))
+            t.start()
+            t.join(timeout=3)
+            self.assertFalse(t.is_alive())
+        self.assertEqual(outcome, ["held"])
 
     def test_second_execution_cannot_replay_same_ids(self):
         worker = FakeCommittedNative()

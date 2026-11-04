@@ -6,6 +6,7 @@ errors terminate the bridge; nothing is silently retried.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
 import os
@@ -153,6 +154,10 @@ class DesktopBridge:
         self.resume_session = resume_session
         self._process: subprocess.Popen[bytes] | None = None
         self._flight = threading.Lock()
+        # One foreground-approved multi-task batch may own the *entire*
+        # sequence, not just a single IPC frame. RLock permits that same
+        # executor thread to submit its own individual durable requests.
+        self._batch_gate = threading.RLock()
         self._dead = False
         self._started = False
         self.session_id: str | None = None
@@ -489,55 +494,88 @@ class DesktopBridge:
             self.abort()
             raise
 
+    @contextmanager
+    def exclusive_batch(self, manifest_sha256: str):
+        """Hold this model/SQLite child for one approved finite work sequence.
+
+        Ordinary chat, agent, history and durable work requests from other
+        threads are REFUSED immediately. They cannot interleave between two
+        source-approved durable work orders and cannot become hidden jobs.
+        The lock is never used by pressure abort, avoiding a cancellation
+        deadlock when the native child has been revoked mid-inference.
+        """
+        if (
+            type(manifest_sha256) is not str
+            or len(manifest_sha256) != 64
+            or any(char not in "0123456789abcdef" for char in manifest_sha256)
+        ):
+            raise DesktopBridgeHold("exact reviewed batch manifest SHA-256 required")
+        if not self._batch_gate.acquire(blocking=False):
+            raise DesktopBridgeHold("native model owned by another in-flight request")
+        try:
+            if not self.connected:
+                raise DesktopBridgeHold("single native source-bound worker unavailable")
+            yield
+        finally:
+            self._batch_gate.release()
+
     def request(self, op: str, **fields: object) -> dict[str, Any]:
         if not self.connected:
             raise DesktopBridgeHold("local native model is disconnected")
         payload = command(op, **fields)
-        with self._flight:
-            if not self.connected:
-                raise DesktopBridgeHold("local source worker terminated")
-            process = self._process
-            assert process is not None
-            assert process.stdin is not None
-            assert process.stdout is not None
-            previous_session = self.session_id
-            # Native inference has its own bounded deadline, but a hung
-            # pipe/child teardown must not hold the GUI forever. The timer
-            # revokes the child; a committed uncertain result is not retried.
-            deadline = (
-                min(660.0, self.config.inference_ms / 1000.0 + 45.0)
-                if op == "turn" else (
-                    min(660.0, float(fields.get("maximum_wall_seconds", 180)) + 45.0)
-                    if (
-                        op == "agent" or (
-                            op == "durable" and fields.get("action")
-                            in ("start", "resume")
-                        )
-                    ) else 30.0
-                )
+        if not self._batch_gate.acquire(blocking=False):
+            raise DesktopBridgeHold(
+                "native model is under exclusive work batch or in-flight request",
             )
-            watchdog = threading.Timer(deadline, self.abort)
-            watchdog.daemon = True
-            watchdog.start()
-            try:
+        try:
+            with self._flight:
                 if not self.connected:
-                    raise DesktopBridgeHold("native request source revoked before publication")
-                write_frame(process.stdin, payload, limit=65536)
-                received = read_frame(process.stdout, limit=MAX_OUTBOUND)
-                if received is None:
-                    raise DesktopBridgeHold("native worker exited before reply")
-                result = self._verify(received)
-                self._operation_receipt(op, fields, result, previous_session)
-                if not self.connected:
-                    raise DesktopBridgeHold("native source died before request completed")
-                return result
-            except BaseException:
-                # Once a request has entered the pipe, the SQLite/native
-                # effect may already have committed. No retries of this ID.
-                self.abort()
-                raise
-            finally:
-                watchdog.cancel()
+                    raise DesktopBridgeHold("local source worker terminated")
+                process = self._process
+                assert process is not None
+                assert process.stdin is not None
+                assert process.stdout is not None
+                previous_session = self.session_id
+                # Native inference has its own bounded deadline, but a hung
+                # pipe/child teardown must not hold the GUI forever. The timer
+                # revokes the child; a committed uncertain result is not retried.
+                deadline = (
+                    min(660.0, self.config.inference_ms / 1000.0 + 45.0)
+                    if op == "turn" else (
+                        min(660.0, float(fields.get("maximum_wall_seconds", 180)) + 45.0)
+                        if (
+                            op == "agent" or (
+                                op == "durable" and fields.get("action")
+                                in ("start", "resume")
+                            )
+                        ) else 30.0
+                    )
+                )
+                watchdog = threading.Timer(deadline, self.abort)
+                watchdog.daemon = True
+                watchdog.start()
+                try:
+                    if not self.connected:
+                        raise DesktopBridgeHold("native request source revoked before publication")
+                    write_frame(process.stdin, payload, limit=65536)
+                    received = read_frame(process.stdout, limit=MAX_OUTBOUND)
+                    if received is None:
+                        raise DesktopBridgeHold("native worker exited before reply")
+                    result = self._verify(received)
+                    self._operation_receipt(op, fields, result, previous_session)
+                    if not self.connected:
+                        raise DesktopBridgeHold("native source died before request completed")
+                    return result
+                except BaseException:
+                    # Once a request has entered the pipe, the SQLite/native
+                    # effect may already have committed. No retries of this ID.
+                    self.abort()
+                    raise
+                finally:
+                    watchdog.cancel()
+
+        finally:
+            self._batch_gate.release()
 
     def turn(self, prompt: str, *, request_id: str | None = None) -> dict[str, Any]:
         rid = request_id if request_id is not None else "r_" + secrets.token_hex(16)

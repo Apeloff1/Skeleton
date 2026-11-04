@@ -307,6 +307,7 @@ class BoundNativeWorker(Protocol):
     @property
     def connected(self) -> bool: ...
     def request(self, op: str, **fields: object) -> dict[str, Any]: ...
+    def exclusive_batch(self, manifest_sha256: str): ...
 
 
 class SerialDurableBatchRunner:
@@ -327,8 +328,12 @@ class SerialDurableBatchRunner:
             or expected_manifest_sha256 != plan.manifest_sha256
         ):
             raise BatchHold("full exact operator-approved task manifest digest required")
-        if not hasattr(worker, "connected") or not callable(getattr(worker, "request", None)):
-            raise BatchHold("one live source-fenced native worker required")
+        if (
+            not hasattr(worker, "connected")
+            or not callable(getattr(worker, "request", None))
+            or not callable(getattr(worker, "exclusive_batch", None))
+        ):
+            raise BatchHold("one exclusively leased source-fenced native worker required")
         if progress is not None and not callable(progress):
             raise BatchHold("bounded progress publication callback required")
         self.worker = worker
@@ -348,6 +353,14 @@ class SerialDurableBatchRunner:
             if self._started:
                 raise BatchHold("batch runner cannot execute same native jobs twice")
             self._started = True
+        # This lock is held across the complete approved work manifest.
+        # Without it another UI request could interleave at task boundaries.
+        # The bridge's RLock permits only this executing thread to submit
+        # individual durable requests during the lease.
+        with self.worker.exclusive_batch(self.plan.manifest_sha256):
+            return self._execute_owned()
+
+    def _execute_owned(self) -> BatchRunReceipt:
         records: list[BatchItemReceipt] = []
         committed = 0
         outcome = "completed"
