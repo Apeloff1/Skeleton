@@ -386,6 +386,46 @@ class DurableNativeQueue:
                 raise DurableQueueHold("lost work-order reconciliation CAS")
         return self.inspect(order.order_id)
 
+    def reconcile_orphaned(self,order_id:str,*,prompt:str,
+                           operator_approved:bool):
+        """Cold-process recovery without the vanished volatile claim token.
+
+        A crash destroys a WorkClaim token, but this cannot justify a second
+        model generation. A local operator may supply the exact original
+        prompt and explicitly authorize a read-only lookup of the canonical
+        native receipt. The source of truth is still ExecutionSpine.replay;
+        an absent/pending receipt leaves the queue claimed or held.
+        """
+        if operator_approved is not True:
+            raise DurableQueueHold("explicit independent orphan review required")
+        self._live()
+        with self.db.snapshot() as conn:
+            order,row=self._select(conn,order_id)
+            if row[14] not in ("claimed","held"):
+                raise DurableQueueHold("not an orphaned native claim")
+        verified=self._verified_receipt(order,prompt)
+        output=verified["output_sha256"]
+        receipt_hash=fingerprint({
+          "schema":"jeeves.native_work_order_receipt.v1",
+          "order":order.spec_sha256,"output":output,
+          "model":order.model_sha256,"tokenizer":order.tokenizer_sha256,
+          "request":order.request_id,"session":order.session_id,
+        })
+        with self.db.transaction() as conn:
+            reread,current=self._select(conn,order_id)
+            if reread!=order or current[14] not in ("claimed","held"):
+                raise DurableQueueHold("orphan state changed during reconciliation")
+            conn.execute(
+              "UPDATE jeeves_native_work_orders SET state='committed',"
+              "revision=revision+1,native_output_sha256=?,"
+              "receipt_sha256=?,reason=NULL "
+              "WHERE order_id=? AND revision=? AND state IN ('claimed','held')",
+              (output,receipt_hash,order.order_id,current[15]),
+            )
+            if conn.execute("SELECT changes()").fetchone()[0]!=1:
+                raise DurableQueueHold("orphan reconciliation lost revision CAS")
+        return self.inspect(order_id)
+
     def execute_claimed(self,claim:WorkClaim,*,prompt:str,
                         operator_approved:bool):
         """Exactly one native call on an explicitly claimed work order.

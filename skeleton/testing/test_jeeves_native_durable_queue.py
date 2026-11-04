@@ -150,7 +150,7 @@ class TestNativeDurableWorkOrders(unittest.TestCase):
         self.assertEqual(self.queue.inspect(order.order_id)["state"],"claimed")
         with self.assertRaises(DurableQueueHold):
             self.queue.claim(order.order_id)
-        with self.assertRaises(Busy):
+        with self.assertRaises(DurableQueueHold):
             self.queue.reconcile(claim,prompt=self.PROMPT)
         self.assertEqual(self.backend.calls,0)
 
@@ -163,6 +163,62 @@ class TestNativeDurableWorkOrders(unittest.TestCase):
         self._cold()
         accepted=self.queue.reconcile(claim,prompt=self.PROMPT)
         self.assertEqual(accepted["state"],"committed")
+        self.assertEqual(self.backend.calls,0)
+
+    def test_orphan_claim_cold_recovery_without_volatile_token(self):
+        order=self._create()
+        self.queue.claim(order.order_id)
+        self.worker.turn(order.session_id,order.request_id,self.PROMPT,
+                         seed=order.seed,temperature=order.temperature)
+        self._cold()
+        recovered=self.queue.reconcile_orphaned(
+            order.order_id,prompt=self.PROMPT,operator_approved=True,
+        )
+        self.assertEqual(recovered["state"],"committed")
+        self.assertEqual(self.backend.calls,0)
+
+    def test_orphan_without_committed_receipt_stays_held(self):
+        order=self._create()
+        self.queue.claim(order.order_id)
+        self._cold()
+        with self.assertRaises(DurableQueueHold):
+            self.queue.reconcile_orphaned(
+                order.order_id,prompt=self.PROMPT,operator_approved=True,
+            )
+        self.assertEqual(self.queue.inspect(order.order_id)["state"],"claimed")
+        self.assertEqual(self.backend.calls,0)
+
+    def test_orphan_operator_approval_required_without_native_call(self):
+        order=self._create()
+        self.queue.claim(order.order_id)
+        with self.assertRaises(DurableQueueHold):
+            self.queue.reconcile_orphaned(
+                order.order_id,prompt=self.PROMPT,operator_approved=False,
+            )
+        self.assertEqual(self.backend.calls,0)
+
+    def test_orphan_recovery_cannot_use_changed_prompt(self):
+        order=self._create()
+        self.queue.claim(order.order_id)
+        self.worker.turn(order.session_id,order.request_id,self.PROMPT,
+                         seed=order.seed,temperature=order.temperature)
+        self._cold()
+        with self.assertRaises(DurableQueueHold):
+            self.queue.reconcile_orphaned(
+                order.order_id,prompt="different",operator_approved=True,
+            )
+        self.assertEqual(self.backend.calls,0)
+
+    def test_orphan_recovery_cannot_target_foreign_subject(self):
+        order=self._create()
+        self.queue.claim(order.order_id)
+        self.worker.turn(order.session_id,order.request_id,self.PROMPT,
+                         seed=order.seed,temperature=order.temperature)
+        self._cold(subject="foreign")
+        with self.assertRaises(DurableQueueHold):
+            self.queue.reconcile_orphaned(
+                order.order_id,prompt=self.PROMPT,operator_approved=True,
+            )
         self.assertEqual(self.backend.calls,0)
 
     def test_held_completed_turn_requires_explicit_approval(self):
