@@ -49,8 +49,16 @@ def _file(path: str):
                 raise CanonError("input_too_large")
             with os.fdopen(os.dup(fd), "rb") as handle:
                 data = handle.read(MAX_INPUT + 1)
+            after = os.fstat(fd)
+            if (after.st_dev != metadata.st_dev or after.st_ino != metadata.st_ino
+                    or after.st_size != metadata.st_size
+                    or after.st_mtime_ns != metadata.st_mtime_ns
+                    or after.st_ctime_ns != metadata.st_ctime_ns):
+                raise CanonError("input_changed_during_read")
             if len(data) > MAX_INPUT:
                 raise CanonError("input_too_large")
+            if len(data) != metadata.st_size:
+                raise CanonError("input_changed_during_read")
             return strict_json(data)
         finally:
             os.close(fd)
@@ -178,6 +186,7 @@ def run(argv: list[str]) -> int:
             "input_safe_open_unavailable": "use_a_platform_with_descriptor_anchored_file_open",
             "input_not_regular": "provide_a_regular_json_file_not_a_device_or_pipe",
             "input_too_large": "reduce_json_input_below_524288_bytes",
+            "input_changed_during_read": "retry_with_a_stable_unmodified_json_file",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
                           "next_action": recovery.get(code, "inspect_input_and_custody")},
