@@ -2,11 +2,13 @@
 from __future__ import annotations
 import http.client
 import json
-from .contracts import token,safe_json,canonical,refuse
+import threading
+from .contracts import token,safe_json,canonical,refuse,identifier,identity_hash,exact
 from .operations import get
+from .result_protocol import verify_turn_receipt
 
 class LaptopClient:
-    def __init__(self,*,host="127.0.0.1",port=8765,bearer,timeout=15.0):
+    def __init__(self,*,host="127.0.0.1",port=8765,bearer,timeout=15.0,\n                 expected_model_sha256=None,expected_tokenizer_sha256=None):
         if host!="127.0.0.1":
             refuse("only literal IPv4 loopback is supported by this client")
         if type(port) is not int or not 1<=port<=65535:
@@ -15,6 +17,14 @@ class LaptopClient:
             refuse("invalid request timeout")
         self._host=host;self._port=port
         self._bearer=token(bearer);self._timeout=float(timeout)
+        if (expected_model_sha256 is None)!=(expected_tokenizer_sha256 is None):
+            refuse("model and tokenizer must be pinned together")
+        self._expected=None if expected_model_sha256 is None else (
+            identity_hash(expected_model_sha256),
+            identity_hash(expected_tokenizer_sha256),
+        )
+        self._pinned=None
+        self._custody=threading.RLock()
 
     @property
     def address(self):
@@ -52,18 +62,80 @@ class LaptopClient:
         finally:
             conn.close()
 
+    def _check_identity(self):
+        report=self.request("identity",{})
+        exact(report,("identity","release_certified"))
+        if report["release_certified"] is not False:
+            refuse("native service must not claim a release pass")
+        principal=report["identity"]
+        exact(principal,("tenant","subject","model_sha256","tokenizer_sha256"))
+        record=(identifier(principal["tenant"],"tenant"),
+                identifier(principal["subject"],"subject"),
+                identity_hash(principal["model_sha256"]),
+                identity_hash(principal["tokenizer_sha256"]))
+        if self._expected is not None and record[2:]!=self._expected:
+            refuse("native model differs from independently expected source")
+        if self._pinned is None:self._pinned=record
+        elif self._pinned!=record:refuse("native model or owner changed")
+        return record
+
+    def identity(self):
+        with self._custody:
+            record=self._check_identity()
+            return {"tenant":record[0],"subject":record[1],
+                    "model_sha256":record[2],"tokenizer_sha256":record[3],
+                    "release_certified":False}
+
     def create(self):
-        return self.request("create",{})
+        with self._custody:
+            principal=self._check_identity()
+            result=self.request("create",{})
+            exact(result,("session_id","model_sha256"))
+            identifier(result["session_id"],"session")
+            if identity_hash(result["model_sha256"])!=principal[2]:
+                refuse("created session belongs to another model")
+            self._check_identity()
+            return result
 
     def turn(self,session_id,request_id,prompt,*,seed=0,temperature=0.8):
-        return self.request("turn",{"session_id":session_id,
-                "request_id":request_id,"prompt":prompt,
-                "seed":seed,"temperature":temperature})
+        with self._custody:
+            principal=self._check_identity()
+            result=self.request("turn",{"session_id":session_id,
+                    "request_id":request_id,"prompt":prompt,
+                    "seed":seed,"temperature":temperature})
+            exact(result,("receipt",))
+            verified=verify_turn_receipt(result["receipt"],
+                model_sha256=principal[2],tokenizer_sha256=principal[3])
+            self._check_identity()
+            return {"receipt":verified}
 
     def replay(self,session_id,request_id,prompt,*,seed=0,temperature=0.8):
-        return self.request("replay",{"session_id":session_id,
-                "request_id":request_id,"prompt":prompt,
-                "seed":seed,"temperature":temperature})
+        with self._custody:
+            principal=self._check_identity()
+            result=self.request("replay",{"session_id":session_id,
+                    "request_id":request_id,"prompt":prompt,
+                    "seed":seed,"temperature":temperature})
+            exact(result,("replay","found"))
+            if type(result["found"]) is not bool:refuse("invalid replay status")
+            if result["found"]:
+                verified=verify_turn_receipt(result["replay"],
+                    model_sha256=principal[2],tokenizer_sha256=principal[3])
+                if verified["replayed"] is not True:
+                    refuse("native replay lacks committed receipt marker")
+            elif result["replay"] is not None:
+                refuse("missing replay cannot include native output")
+            self._check_identity()
+            return result
 
     def history(self,session_id):
-        return self.request("history",{"session_id":session_id})
+        session=identifier(session_id,"session")
+        with self._custody:
+            self._check_identity()
+            result=self.request("history",{"session_id":session})
+            exact(result,("session_id","messages"))
+            if result["session_id"]!=session or type(result["messages"]) is not list:
+                refuse("native transcript session identity mismatch")
+            if len(result["messages"])>128:
+                refuse("native transcript exceeds bounded history")
+            self._check_identity()
+            return result
