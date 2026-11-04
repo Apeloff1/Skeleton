@@ -31,7 +31,7 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_conversation impo
     view_history,
 )
 from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_host import (
-    DesktopHost, DesktopHostLimits,
+    DesktopHost, DesktopHostLimits, DesktopHostHold,
 )
 from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
 
@@ -284,6 +284,19 @@ class CanonicalHostRoutingTests(unittest.TestCase):
             frame, ending = self.host.handle(command(operation))
             self.assertFalse(ending)
             self.assertFalse(frame["release_certified"])
+        self.assertEqual(self.chat.turns, 0)
+
+    def test_closed_session_is_not_exposed_as_active_or_reused(self):
+        record, terminal = self.host.handle(command("close"))
+        self.assertFalse(terminal)
+        self.assertEqual(record["status"], "durable-session-closed")
+        self.assertIsNone(record["session_id"])
+        self.assertEqual(record["closed_session_id"], "s_canonical")
+        self.assertIsNone(self.host.chat)
+        with self.assertRaises(DesktopHostHold):
+            self.host.handle(command(
+                "turn", prompt="never generate", request_id="r_closed",
+            ))
         self.assertEqual(self.chat.turns, 0)
 
     def test_exact_prompt_unchanged_when_history_context_is_disabled(self):

@@ -177,7 +177,9 @@ class WorkspaceWindow(tk.Toplevel):
         raw = self.proposal.get("1.0", "end-1c")
         try:
             plan = parse_plan(raw, root)
-        except (WorkspaceDeliveryHold, OSError, ValueError) as exc:
+        except Exception as exc:
+            # Filesystem policy errors from the canonical trusted-root layer
+            # are not necessarily ValueError; never disclose their paths.
             self._reset()
             self.status_text.set(
                 "Proposal held: " + type(exc).__name__
@@ -211,7 +213,7 @@ class WorkspaceWindow(tk.Toplevel):
                 + "SHA-256: " + details["sha256"] + "\n\n"
                 + details["diff"],
             )
-        except (WorkspaceDeliveryHold, OSError) as exc:
+        except Exception as exc:
             self._show_preview("Preview held: " + type(exc).__name__)
         self._buttons()
 

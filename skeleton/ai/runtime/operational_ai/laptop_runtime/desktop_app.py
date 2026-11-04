@@ -217,11 +217,14 @@ class JeevesWindow(tk.Tk):
         self.disconnect_button.configure(
             state="normal" if connected or self._connecting is not None else "disabled",
         )
-        for button in (
-            self.new_button, self.resume_button, self.history_button,
-            self.close_button, self.send_button,
-        ):
+        for button in (self.new_button, self.resume_button):
             button.configure(state="normal" if active else "disabled")
+        has_session = (
+            active and self._bridge is not None
+            and self._bridge.session_id is not None
+        )
+        for button in (self.history_button, self.close_button, self.send_button):
+            button.configure(state="normal" if has_session else "disabled")
 
     def _configuration(self) -> DesktopConfig:
         form = {key: var.get() for key, var in self.fields.items()}
@@ -358,7 +361,8 @@ class JeevesWindow(tk.Tk):
         if len(combined.encode("utf-8", "strict")) > MAX_PROMPT:
             self._show("Prompt held", "Native input exceeds 32768 UTF-8 bytes", "warning")
             return
-        if self._busy or self._bridge is None or not self._bridge.connected:
+        if (self._busy or self._bridge is None or not self._bridge.connected
+                or self._bridge.session_id is None):
             return
         request_id = "r_" + secrets.token_hex(16)
         self._last_request = request_id

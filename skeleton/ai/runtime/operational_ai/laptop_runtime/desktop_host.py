@@ -134,7 +134,8 @@ class DesktopHost:
                 prior = self.chat.session_id
                 self.chat = None
                 return response(
-                    "durable-session-closed", session_id=prior,
+                    "durable-session-closed", session_id=None,
+                    closed_session_id=prior,
                     model_sha256=self.identity.model_sha256, closed=closed,
                     release_certified=False,
                 ), False
