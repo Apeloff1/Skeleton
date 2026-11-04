@@ -359,14 +359,26 @@ class SlotStore:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
         fd = None
+        owned_identity = None
         try:
             fd = os.open(path, flags, 0o600)
+            opened = os.fstat(fd)
+            owned_identity = (opened.st_dev, opened.st_ino)
             with os.fdopen(fd, "wb") as output:
                 fd = None
                 output.write(payload)
                 output.flush()
                 os.fsync(output.fileno())
         except OSError as exc:
+            # A failed backup must not leave an apparently valid artifact.
+            # Do not remove a replacement published by another process.
+            if owned_identity is not None:
+                try:
+                    current = path.lstat()
+                    if (current.st_dev, current.st_ino) == owned_identity:
+                        path.unlink()
+                except OSError:
+                    pass
             raise StoreError("portable backup write refused") from exc
         finally:
             if fd is not None:
