@@ -25,6 +25,7 @@ def run(
     max_new_tokens: int = 256, n_threads: int = 4,
     gpu_layers: int = 0, capacity_root: Path | None = None,
     capacity_slots: int = 1, capacity_budget_bytes: int = 8_000_000_000,
+    inference_ms: int = 90000,
 ) -> dict[str, object]:
     """Witness one native turn, terminate it, then replay after cold startup.
 
@@ -54,6 +55,7 @@ def run(
         n_ctx=n_ctx, max_new_tokens=max_new_tokens, n_threads=n_threads,
         gpu_layers=gpu_layers, capacity_slots=capacity_slots,
         capacity_budget_bytes=capacity_budget_bytes,
+        inference_ms=inference_ms,
     )
     options = {
         "model_root": model_root, "state_dir": state_dir,
@@ -62,6 +64,7 @@ def run(
         "gpu_layers": gpu_layers, "capacity_root": capacity_root,
         "capacity_slots": capacity_slots,
         "capacity_budget_bytes": capacity_budget_bytes, "isolated": True,
+        "inference_ms": inference_ms,
     }
     stack, worker, installed = activate_checked(**options)
     with stack:
