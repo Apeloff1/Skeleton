@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import math
 from typing import Any
 from .schema import parse_world, world_dict, World
 from .engine import replay, RescueError
@@ -20,8 +21,14 @@ def _strict_json(text: str) -> Any:
     def reject_nonfinite(value: str) -> None:
         raise CustodyError("nonfinite bundle JSON number")
 
+    def finite_float(value: str) -> float:
+        number = float(value)
+        if not math.isfinite(number):
+            raise CustodyError("nonfinite bundle JSON number")
+        return number
+
     return json.loads(text, object_pairs_hook=unique_members,
-                      parse_constant=reject_nonfinite)
+                      parse_constant=reject_nonfinite, parse_float=finite_float)
 
 class CustodyError(ValueError):
     pass
