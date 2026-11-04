@@ -63,3 +63,19 @@ def test_invalid_utf8_private_env_fails_closed(tmp_path: Path) -> None:
     (tmp_path / ".env").write_bytes(b"BACKEND_PORT=\xff")
     with pytest.raises(UnicodeDecodeError):
         _read_dotenv(tmp_path / ".env")
+
+
+def test_private_env_disappears_after_lstat_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / ".env"
+    path.write_text("BACKEND_PORT=8123\n", encoding="utf-8")
+    original_open = os.open
+
+    def disappearing_open(candidate: os.PathLike[str] | str, flags: int, *args: object, **kwargs: object) -> int:
+        if os.fspath(candidate) == os.fspath(path):
+            path.unlink()
+            raise FileNotFoundError(os.fspath(path))
+        return original_open(candidate, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", disappearing_open)
+    with pytest.raises(ValueError, match="changed during admission"):
+        _read_dotenv(path)
