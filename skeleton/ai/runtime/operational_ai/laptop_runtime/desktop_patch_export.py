@@ -154,9 +154,16 @@ def export_reviewed_patch(
     path = _selected_target(target, source_root=plan.root)
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         raise PatchExportHold("POSIX/WSL2 descriptor-rooted patch export required")
+    # A supported format with malformed Python/JSON/TOML is a build
+    # blocker, not a legitimate patch that should reach Git. Unsupported
+    # languages remain clearly labeled UNVERIFIED and never become passes.
+    from .desktop_source_qualification import (
+        StaticSourceHold, require_parseable_patch,
+    )
     try:
+        static = require_parseable_patch(plan)
         patch = get_reviewed_patch(plan)
-    except (OSError, ValueError, PatchBundleHold) as exc:
+    except (OSError, ValueError, PatchBundleHold, StaticSourceHold) as exc:
         raise PatchExportHold("original source changed since operator review") from exc
     if (
         len(patch) != plan.patch_bytes
@@ -220,6 +227,14 @@ def export_reviewed_patch(
             "project_files_modified": False,
             "git_index_modified": False,
             "patch_applied": False,
+            "static_source_status": static.status,
+            "parse_clean_count": sum(
+                f.status == "parse-clean" for f in static.files
+            ),
+            "unverified_source_count": sum(
+                f.status == "unverified" for f in static.files
+            ),
+            "source_code_executed": False,
             "model_authorized_file_write": False,
             "release_certified": False,
         }
