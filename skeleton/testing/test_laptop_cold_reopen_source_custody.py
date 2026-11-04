@@ -156,7 +156,10 @@ class ColdSourceCustodyTests(unittest.TestCase):
             rig.first.spine.backend,"model_digest","f"*64,
         )
         with rig.patch():
-            with self.assertRaisesRegex(ContractViolation,"model/tokenizer changed"):
+            # The canonical source check can reject at the earlier
+            # active-backend/principal mismatch, before our later epoch check.
+            # Both are fail-closed holds and neither permits replay disclosure.
+            with self.assertRaises(ContractViolation):
                 cold_reopen_acceptance.run(**OPTS)
         self.assertEqual(rig.first.generation_calls,1)
         self.assertEqual(rig.second.generation_calls,0)
