@@ -138,7 +138,8 @@ class MongoCanonicalSourceEpoch:
             raise
         except Exception as exc:
             raise MongoSourceEpochError("linearizable source epoch read unavailable") from exc
-        if (not isinstance(doc, dict) or doc.get("phase") != "stable"
+        if (type(doc) is not dict or type(doc.get("phase")) is not str
+                or doc["phase"] != "stable"
                 or doc.get("writer_token") is not None
                 or type(doc.get("epoch")) is not int or doc["epoch"] < 2
                 or doc["epoch"] % 2):
