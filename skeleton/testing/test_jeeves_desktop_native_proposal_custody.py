@@ -96,7 +96,9 @@ class EscrowAdmissionTests(unittest.TestCase):
             dict(accepted, action=[]),
             dict(accepted, project_root="../bad"),
             dict(accepted, target="/tmp/bad/../here.source.json"),
-            dict(accepted, target="/relative/file.source.json"),
+            dict(accepted, target="relative/file.source.json"),
+            dict(accepted, target="/private/workspace/inside.source.json"),
+            dict(accepted, target="/private/storage/not-source.sh"),
             dict(accepted, expected_job_sha256="x"),
             dict(accepted, expected_file_sha256="a"*64),
             dict(accepted, expected_file_bytes=16),
@@ -108,8 +110,8 @@ class EscrowAdmissionTests(unittest.TestCase):
                 job_sha256=None,
             )),
         )
-        for item in bads:
-            with self.subTest(value=repr(item)[:90]), self.assertRaises(
+        for case_id, item in enumerate(bads):
+            with self.subTest(case_id=case_id, value=repr(item)[:120]), self.assertRaises(
                 (cli.NativeProposalEscrowCLIHold, ValueError),
             ):
                 cli.parse_escrow_request(json.dumps(item).encode())

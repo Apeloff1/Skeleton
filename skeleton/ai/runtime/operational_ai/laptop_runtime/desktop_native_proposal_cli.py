@@ -99,7 +99,11 @@ def parse_escrow_request(raw: bytes) -> dict:
     ):
         raise NativeProposalEscrowCLIHold("invalid explicit private escrow action")
     _absolute(value["project_root"])
-    _absolute(value["target"])
+    # Validate the same exact canonical private output filename constraints
+    # at strict JSON admission, not only after a model has been requested.
+    # A syntactically absolute path is not necessarily an approved owner
+    # directory; descriptor/ownership checks happen separately pre-start.
+    _target(value["target"], value["project_root"])
     if not _digest(value["expected_job_sha256"]):
         raise NativeProposalEscrowCLIHold("full inspected native job SHA-256 required")
     action = value["action"]
