@@ -14,27 +14,47 @@ MAX_INPUT = 524288
 
 
 def _file(path: str):
-    """Open bounded JSON without following final symlinks or blocking on FIFOs."""
-    flags = (os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) |
-             getattr(os, "O_NONBLOCK", 0))
-    if not hasattr(os, "O_NONBLOCK"):
-        raise CanonError("input_nonblock_unavailable")
-    if not hasattr(os, "O_NOFOLLOW"):
-        raise CanonError("input_nofollow_unavailable")
-    fd = os.open(path, flags | os.O_NOFOLLOW)
+    """Read bounded JSON through descriptor-anchored, no-symlink path traversal.
+
+    Every directory component is opened relative to the previous directory
+    descriptor. A rename of a parent after opening cannot redirect the read.
+    """
+    if not all(hasattr(os, name) for name in ("O_NONBLOCK", "O_NOFOLLOW", "O_DIRECTORY")):
+        raise CanonError("input_safe_open_unavailable")
+    if not isinstance(path, str) or not path or "\\x00" in path:
+        raise CanonError("input_invalid_path")
+    parts = path.split("/")
+    absolute = path.startswith("/")
+    if absolute:
+        parts = parts[1:]
+    if not parts or any(part in ("", ".", "..") for part in parts):
+        raise CanonError("input_invalid_path")
+    directory_flags = (os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW |
+                       getattr(os, "O_CLOEXEC", 0) | os.O_NONBLOCK)
+    file_flags = (os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK |
+                  getattr(os, "O_CLOEXEC", 0))
+    directory = os.open("/" if absolute else ".", directory_flags)
     try:
-        metadata = os.fstat(fd)
-        if not stat.S_ISREG(metadata.st_mode):
-            raise CanonError("input_not_regular")
-        if metadata.st_size > MAX_INPUT:
-            raise CanonError("input_too_large")
-        with os.fdopen(os.dup(fd), "rb") as handle:
-            data = handle.read(MAX_INPUT + 1)
-        if len(data) > MAX_INPUT:
-            raise CanonError("input_too_large")
-        return strict_json(data)
+        for part in parts[:-1]:
+            next_directory = os.open(part, directory_flags, dir_fd=directory)
+            os.close(directory)
+            directory = next_directory
+        fd = os.open(parts[-1], file_flags, dir_fd=directory)
+        try:
+            metadata = os.fstat(fd)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise CanonError("input_not_regular")
+            if metadata.st_size > MAX_INPUT:
+                raise CanonError("input_too_large")
+            with os.fdopen(os.dup(fd), "rb") as handle:
+                data = handle.read(MAX_INPUT + 1)
+            if len(data) > MAX_INPUT:
+                raise CanonError("input_too_large")
+            return strict_json(data)
+        finally:
+            os.close(fd)
     finally:
-        os.close(fd)
+        os.close(directory)
 
 
 def run(argv: list[str]) -> int:

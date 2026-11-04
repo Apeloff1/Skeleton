@@ -61,3 +61,35 @@ def test_cli_json_rejects_empty_regular_file(tmp_path):
     path.touch()
     with pytest.raises(CanonError):
         _file(str(path))
+
+
+def test_cli_json_rejects_symlinked_parent(tmp_path):
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "brief.json").write_text('{"id":"lighthouse"}', encoding="utf-8")
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+    with pytest.raises(OSError):
+        _file(str(alias / "brief.json"))
+
+
+@pytest.mark.parametrize("path", ["", ".", "../brief.json", "a/../brief.json", "a//brief.json"])
+def test_cli_json_rejects_ambiguous_path(path):
+    with pytest.raises(CanonError) as error:
+        _file(path)
+    assert error.value.code == "input_invalid_path"
+
+
+def test_cli_json_accepts_nested_regular_file(tmp_path):
+    directory = tmp_path / "nested"
+    directory.mkdir()
+    (directory / "brief.json").write_text('{"id":"lighthouse"}', encoding="utf-8")
+    assert _file(str(directory / "brief.json")) == {"id": "lighthouse"}
+
+
+def test_cli_json_rejects_parent_fifo_without_blocking(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO unavailable")
+    os.mkfifo(tmp_path / "pipe")
+    with pytest.raises(OSError):
+        _file(str(tmp_path / "pipe" / "brief.json"))
