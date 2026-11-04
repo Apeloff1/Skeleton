@@ -53,6 +53,7 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--max-output-tokens",type=int,default=1024)
     parser.add_argument("--threads",type=int,default=4)
     parser.add_argument("--gpu-layers",type=int,default=0)
+    parser.add_argument("--inference-ms",type=int,default=90000)
     parser.add_argument("--capacity-root",type=Path)
     parser.add_argument("--capacity-budget-bytes",type=int,default=8000000000)
     parser.add_argument("--maximum-commands",type=int,default=128)
@@ -93,6 +94,7 @@ def main(argv:list[str]|None=None)->int:
             native_threads=args.threads,
             gpu_layers=args.gpu_layers,
             capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=args.inference_ms,
         )
         # This structural check never proves installed rights or device capacity.
         # A signed model installer must already have approved all actual
@@ -104,6 +106,7 @@ def main(argv:list[str]|None=None)->int:
             n_threads=args.threads,gpu_layers=args.gpu_layers,
             capacity_root=args.capacity_root,
             capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=args.inference_ms,
             isolated=True,
         )
         with stack:
