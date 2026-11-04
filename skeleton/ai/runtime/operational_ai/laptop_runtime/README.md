@@ -5,6 +5,27 @@ This interface uses the existing canonical `ExecutionSpine` plus
 private principal-bound SQLite state, and the existing hardened bearer HTTP
 server. It does **not** create an alternative text-generation engine.
 
+## First-use graphical workbench
+
+Jeeves now has a local desktop UI backed by the same installed GGUF native
+child and authoritative SQLite session owner. Launch from a trusted checkout
+with Python/Tk and the independently installed model:
+
+```bash
+python scripts/launch_jeeves_desktop.py
+# or ./jeeves-desktop.sh on Linux/WSL2
+```
+
+The workbench offers approved bundle installation, read-only model inspection,
+one private state-root preparation, explicit source/capacity activation,
+multiline source-bound chat, durable new/resume/close/history, finite
+principal-bound SQLite conversational context and deliberately selected
+read-only text/code attachments. No second model, extra memory store, hosted
+fallback, web listener, automatic native retries or auto-applied code edits
+are created. Native source loss is terminal and unqualified physical devices
+remain held. Full operator guide:
+`docs/ai/JEEVES_NATIVE_DESKTOP_WORKBENCH.md`.
+
 ## Source-bound first-install flow
 
 1. Install an operator-approved, digest-pinned GGUF package using the existing
