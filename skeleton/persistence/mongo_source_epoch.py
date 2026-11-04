@@ -205,7 +205,9 @@ class MongoCanonicalSourceEpoch:
         if (type(expected_epoch) is not int or expected_epoch < 2
                 or expected_epoch % 2 != 0):
             raise MongoSourceEpochError("revocation requires a stable expected epoch")
-        if reason_code not in (
+        # Reject hostile scalar subclasses before equality or Mongo encoding.
+        # A string subclass can override __eq__ and falsely claim admission.
+        if type(reason_code) is not str or reason_code not in (
             "operator-revoke", "credential-rotation", "source-integrity",
             "tenant-deletion",
         ):
@@ -241,9 +243,14 @@ class MongoCanonicalSourceEpoch:
             # A timed-out majority write may have committed. Never retry
             # blindly or reset the epoch; operator must read/reconcile.
             raise MongoSourceEpochError("actor revocation outcome uncertain") from None
-        if (type(result) is not dict or result.get("phase") != "revoked"
-                or result.get("epoch") != expected_epoch + 1
-                or result.get("revoked_reason") != reason_code):
+        if (type(result) is not dict
+                or type(result.get("phase")) is not str
+                or result["phase"] != "revoked"
+                or type(result.get("epoch")) is not int
+                or result["epoch"] != expected_epoch + 1
+                or type(result.get("revoked_reason")) is not str
+                or result["revoked_reason"] != reason_code
+                or result.get("writer_token") is not None):
             raise MongoSourceEpochError("actor revocation CAS rejected or unverified")
         return result["epoch"]
 

@@ -151,6 +151,44 @@ class EpochRevocationTests(unittest.IsolatedAsyncioTestCase):
             await self.revoke()
         self.assertEqual(self.collection.calls, 0)
 
+    async def test_hostile_reason_subclass_denied_before_authorizer(self):
+        class ForgedReason(str):
+            def __eq__(self, other):
+                return True
+
+        with self.assertRaisesRegex(MongoSourceEpochError, "reason"):
+            await self.revoke(reason_code=ForgedReason("not-admitted"))
+        self.assertEqual(self.calls, 0)
+        self.assertEqual(self.collection.calls, 0)
+
+    async def test_revocation_result_must_clear_writer_token(self):
+        original = self.collection.find_one_and_update
+
+        async def forged(filter, update, *, return_document):
+            result = await original(filter, update, return_document=return_document)
+            result["writer_token"] = "stale-writer"
+            return result
+
+        self.collection.find_one_and_update = forged
+        with self.assertRaisesRegex(MongoSourceEpochError, "unverified"):
+            await self.revoke()
+        self.assertEqual(self.collection.calls, 1)
+
+    async def test_revocation_result_rejects_scalar_subclasses(self):
+        original = self.collection.find_one_and_update
+
+        class ForgedEpoch(int):
+            pass
+
+        async def forged(filter, update, *, return_document):
+            result = await original(filter, update, return_document=return_document)
+            result["epoch"] = ForgedEpoch(result["epoch"])
+            return result
+
+        self.collection.find_one_and_update = forged
+        with self.assertRaisesRegex(MongoSourceEpochError, "unverified"):
+            await self.revoke()
+
     async def test_invalid_reason_denies_before_authorizer(self):
         with self.assertRaises(MongoSourceEpochError):
             await self.revoke(reason_code="migration")
