@@ -245,6 +245,30 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("credentials", str(caught.exception))
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
+    async def test_executable_replica_set_name_denies_before_reviewer(self):
+        class ForgedSetName(str):
+            def __eq__(self, other):
+                return True
+
+        self.database.hello["setName"] = ForgedSetName("rs0")
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "replica-set primary"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertEqual(self.inventory.call_count, 0)
+
+    async def test_executable_database_name_denies_before_reviewer(self):
+        class ForgedDatabaseName(str):
+            def __eq__(self, other):
+                return True
+
+        self.database.name = ForgedDatabaseName("tutolage")
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "database identity missing"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertEqual(self.inventory.call_count, 0)
+
     async def test_standalone_mongo_denies_without_migration(self):
         self.database.hello = {"isWritablePrimary": True}
         gate = self.make()
