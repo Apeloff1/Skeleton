@@ -21,6 +21,10 @@ from .desktop_patch_bundle import (
 from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
 from .desktop_source_qualification import qualify_patch_sources
 from .desktop_patch_reconcile import reconcile_reviewed_patch
+from .desktop_project_work import (
+    SCHEMA as MIXED_WORK_SCHEMA,
+    MixedWorkHold, parse_mixed_work,
+)
 
 
 class PortablePatchWindow(tk.Toplevel):
@@ -223,6 +227,27 @@ class PortablePatchWindow(tk.Toplevel):
             schema = candidate.get("schema") if type(candidate) is dict else None
         except (ValueError, TypeError):
             schema = None
+        if schema == MIXED_WORK_SCHEMA:
+            try:
+                mixed = parse_mixed_work(text)
+            except (MixedWorkHold, ValueError):
+                # Keep the exact invalid native bytes visible for the
+                # normal strict reviewer; never sanitize and approve them.
+                self.new_text.insert("1.0", text)
+                self.new_text.edit_modified(False)
+                return
+            if mixed.new_plan() is not None:
+                self.new_text.insert("1.0", mixed.new_plan())
+            if mixed.edits_plan() is not None:
+                self.existing_text.insert("1.0", mixed.edits_plan())
+            self.new_text.edit_modified(False)
+            self.existing_text.edit_modified(False)
+            self.status.set(
+                "Mixed native source-work split for INDEPENDENT original "
+                "new-file and existing-file review; NO auto-export or "
+                "model permission to modify source.",
+            )
+            return
         target = self.existing_text if schema == EDIT_SCHEMA else self.new_text
         target.insert("1.0", text)
         target.edit_modified(False)

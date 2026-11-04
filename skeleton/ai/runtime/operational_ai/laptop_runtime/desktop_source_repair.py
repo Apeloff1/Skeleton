@@ -34,6 +34,9 @@ from .desktop_project_context import (
     ProjectSourceContext, SourceContextHold,
     context_prompt_fragment, revalidate_project_context,
 )
+from .desktop_project_work import (
+    SCHEMA as MIXED_WORK_SCHEMA, MixedWorkHold, review_mixed_work,
+)
 
 SCHEMA = "jeeves.desktop.native-source-repair.v1"
 MAX_GOAL_BYTES = 4096
@@ -44,7 +47,8 @@ MAX_FEEDBACK_BYTES = 4096
 
 _NEW = "new-files"
 _EDIT = "existing-edits"
-FORMATS = frozenset((_NEW, _EDIT))
+_MIXED = "mixed-work"
+FORMATS = frozenset((_NEW, _EDIT, _MIXED))
 
 
 class NativeSourceRepairHold(ValueError):
@@ -236,6 +240,25 @@ def _format_instructions(kind: str) -> str:
             "symlinks or binaries. Never add markdown fences, preambles or "
             "unapproved fields. Include syntactically valid source."
         )
+    if kind == _MIXED:
+        return (
+            'Return ONLY one JSON object with "schema": "' + MIXED_WORK_SCHEMA
+            + '" and EXACT keys "new_files" and "existing_edits". '
+            'new_files is an array of {"path": relative_new_path, '
+            '"content": complete_new_utf8_source}; existing_edits is '
+            'an array of {"path": original_existing_relative_path, '
+            '"expected_sha256": full_original_sha256, '
+            '"replacement": complete_new_utf8_text}. '
+            "Use original SHA-256 from the independently verified "
+            "operator-selected source context when available. "
+            "Never invent existing-file digests or pretend to inspect "
+            "unselected paths. An array may be empty but not both. "
+            "All source paths must be under the operator's existing "
+            "project directory. Every destination parent must already "
+            "exist. No markdown fences, prose, extra fields, .git, "
+            "symlinks, executable payloads, shell commands, build claims "
+            "or automatic application."
+        )
     return (
         'Return ONLY a JSON object with "schema": "' + EDIT_SCHEMA
         + '" and "files": an array of {"path": existing_relative_file, '
@@ -284,16 +307,22 @@ def _diagnostics(
     if type(draft) is not str or not draft:
         return None, None, ("empty-model-proposal",)
     try:
-        proposed = review_patch_bundle(
-            request.root,
-            new_files=draft if request.format == _NEW else None,
-            existing_edits=draft if request.format == _EDIT else None,
-        )
+        if request.format == _MIXED:
+            _, proposed = review_mixed_work(draft, request.root)
+        else:
+            proposed = review_patch_bundle(
+                request.root,
+                new_files=draft if request.format == _NEW else None,
+                existing_edits=draft if request.format == _EDIT else None,
+            )
         # Review is read-only; output text is never trusted as a file-write
         # command. Recheck the original project again before any success.
         get_reviewed_patch(proposed)
         static = qualify_patch_sources(proposed)
-    except (PatchBundleHold, StaticSourceHold, OSError, ValueError, UnicodeError):
+    except (
+        PatchBundleHold, MixedWorkHold, StaticSourceHold,
+        OSError, ValueError, UnicodeError,
+    ):
         return None, None, ("proposal-schema-or-source-custody",)
     if not static.permits_inert_export:
         issues = tuple(
