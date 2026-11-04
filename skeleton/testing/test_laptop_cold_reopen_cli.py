@@ -15,6 +15,7 @@ import json
 import unittest
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.cli import main
+from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL, TOKENIZER
 
 
 def command(*extras):
@@ -25,6 +26,12 @@ def command(*extras):
         "--mode","cold-reopen","--prompt-stdin",
         *extras,
     ]
+
+
+def _synthetic_approval(kwargs, report):
+    # Source-only double: the publisher must run while a worker is supplied.
+    kwargs["publisher"](FakeWorker(), object(), dict(report))
+    return dict(report)
 
 
 def invoke(args,*,payload=b"  private multiline task\r\n"):
@@ -52,8 +59,17 @@ def invoke(args,*,payload=b"  private multiline task\r\n"):
             "skeleton.ai.runtime.operational_ai.laptop_runtime.cli.activate_checked"
         ) as single_activation,
         mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
+            return_value={
+                "model_sha256":MODEL,"tokenizer_sha256":TOKENIZER,
+                "manifest_sha256":"c"*64,"archive_sha256":"d"*64,
+                "source_sha":"e"*40,"installed_model_bytes":2048,
+                "installed_shard_count":1,
+            },
+        ),
+        mock.patch(
             "skeleton.ai.runtime.operational_ai.laptop_runtime.cli.run_cold_reopen_acceptance",
-            return_value=report,
+            side_effect=lambda **kwargs:_synthetic_approval(kwargs,report),
         ) as qualify,
         redirect_stdout(stdout),redirect_stderr(stderr),
     ):
