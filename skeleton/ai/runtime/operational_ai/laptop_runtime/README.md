@@ -286,3 +286,17 @@ private stage/export, while external imports remain
 unverified rather than falsely passed. All analysis is
 AST-only and non-executing:
 `docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.
+
+## Real native local GGUF source generation from a headless terminal
+
+`python -m skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_code_cli`
+now closes the Tk-only gap: explicit `inspect` proves the
+original task, resources and selected existing-file SHA-256;
+a separately approved `generate` launches the existing
+real local GGUF/SQLite worker, enforces preload hardware
+admission, executes finite distinct source-repair turns
+and reports SHA-bound review evidence. A second explicit
+flag permits optional private model source output, but
+no generated code is automatically applied, executed or
+committed. Full instructions:
+`docs/ai/JEEVES_HEADLESS_NATIVE_CODE_GENERATION.md`.

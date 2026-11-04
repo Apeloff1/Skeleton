@@ -201,3 +201,14 @@ import depths prevent staging or private patch export;
 observed cycles are informational only. No Python imports
 or generated code are executed. See
 `docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.
+
+## Direct preceding step: real local GGUF source generation
+
+Use `desktop_native_code_cli` to first inspect/hash an
+operator-selected task, then explicitly authorize a real GGUF
+and SQLite-bounded native source-generation session. It can
+return an approved original proposal string for manual
+review in this **separate** source-work CLI. Model-written
+source is never automatically staged or applied; all actual
+source and patch SHA checks here remain independent.
+See `docs/ai/JEEVES_HEADLESS_NATIVE_CODE_GENERATION.md`.
