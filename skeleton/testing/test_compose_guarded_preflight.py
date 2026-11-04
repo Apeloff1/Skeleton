@@ -278,7 +278,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         from contextlib import redirect_stdout
         from io import StringIO
         with patch("skeleton.app.compose_guarded_preflight.asyncio.run",
-                   return_value={"guarded_local_ai_ready": True}), \\
+                   return_value={"guarded_local_ai_ready": True}), \
              redirect_stdout(StringIO()):
             self.assertEqual(main(), 2)
 
