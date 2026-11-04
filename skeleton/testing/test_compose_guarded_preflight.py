@@ -265,6 +265,23 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(result["guarded_local_ai_ready"])
         self.assertEqual(FakeEpoch.instances, [])
 
+    async def test_surrogate_principal_rejected_without_exception_or_epoch_read(self):
+        self.db.auth = {"authInfo": {"authenticatedUsers": [
+            {"user": "\\ud800", "db": "admin"}]}}
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_authenticated_session_required")
+        self.assertEqual(FakeEpoch.instances, [])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_observation_cli_never_exits_success_on_injected_ready_flag(self):
+        from skeleton.app.compose_guarded_preflight import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with patch("skeleton.app.compose_guarded_preflight.asyncio.run",
+                   return_value={"guarded_local_ai_ready": True}), \\
+             redirect_stdout(StringIO()):
+            self.assertEqual(main(), 2)
+
     async def test_unbounded_authenticated_user_list_denied(self):
         self.db.auth = {"authInfo": {"authenticatedUsers": [
             {"user": f"user{i}", "db": "admin"} for i in range(17)]}}
