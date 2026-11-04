@@ -14,6 +14,10 @@ from pathlib import Path
 import sys
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_checked
+from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
+    identifier, utf8,
+)
 from .native_runtime import NativeJeevesRuntime
 from .native_chat import NativeJeevesChat
 from .native_repl import NativeJeevesRepl
@@ -31,8 +35,20 @@ from .runtime import RunInputs
 from .types import Budget, Goal
 
 
+class _RedactedParser(argparse.ArgumentParser):
+    """Never echo a private model path or command token on parse errors."""
+
+    def error(self, message: str) -> None:
+        raise ValueError("invalid local Jeeves operator arguments")
+
+
+def _assert_same_owner(worker, active: ActiveModel) -> None:
+    if ActiveModel.from_supervisor(worker) != active:
+        raise ValueError("native Jeeves model or operator principal changed")
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = _RedactedParser(
         description="Host-guarded Jeeves against a source-verified real local GGUF"
     )
     parser.add_argument("--model-root", type=Path, required=True)
@@ -43,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-output-tokens", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--gpu-layers", type=int, default=0)
+    parser.add_argument("--inference-ms", type=int, default=90000)
     parser.add_argument("--capacity-root", type=Path)
     parser.add_argument("--capacity-budget-bytes", type=int, default=8000000000)
     parser.add_argument("--mode", choices=("chat", "agent", "repl", "durable-agent"), default="agent")
@@ -63,8 +80,20 @@ def main(argv: list[str] | None = None) -> int:
         "--task-stdin", action="store_true",
         help="Read a bounded task from stdin (never place prompts in process args)",
     )
-    args = parser.parse_args(argv)
     try:
+        args = parser.parse_args(argv)
+        identifier(args.tenant, "tenant")
+        identifier(args.subject, "subject")
+        for label, value in (
+            ("model root", args.model_root),
+            ("SQLite state directory", args.state_dir),
+            ("capacity root", args.capacity_root),
+        ):
+            if value is None and label == "capacity root":
+                continue
+            if (not isinstance(value, Path) or not value.is_absolute()
+                    or ".." in value.parts or chr(0) in str(value)):
+                raise ValueError("absolute canonical private " + label + " required")
         # This pure stage runs before reading private prompt bytes, loading
         # source keys, validating a model package, or starting native workers.
         check_operator_admission(
@@ -88,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
             native_threads=args.threads,
             gpu_layers=args.gpu_layers,
             capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=args.inference_ms,
         )
         if args.mode == "repl":
             if args.task_stdin or args.request_id:
@@ -99,9 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             raw = sys.stdin.buffer.read(32769)
             if not 1 <= len(raw) <= 32768:
                 raise ValueError("task stdin byte limit violated")
-            task = raw.decode("utf-8", "strict").strip()
-            if not task:
-                raise ValueError("task cannot be empty")
+            task = utf8(raw.decode("utf-8", "strict"), maximum=32768)
         source_manifest = None
         operator_key = None
         source_preflight = None
@@ -127,12 +155,14 @@ def main(argv: list[str] | None = None) -> int:
             n_threads=args.threads, gpu_layers=args.gpu_layers,
             capacity_root=args.capacity_root,
             capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=args.inference_ms,
             isolated=True,
         )
         with stack:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise ValueError("native Jeeves source preflight blocked")
+            bound = ActiveModel.from_supervisor(worker)
             source_provider = None
             if source_preflight is not None:
                 source_preflight.verify_active_model(worker.spine.identity)
@@ -155,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.mode == "chat":
                 chat = NativeJeevesChat(worker, session_id=args.session)
                 turn = chat.turn(task, request_id=args.request_id)
+                _assert_same_owner(worker, bound)
                 sys.stdout.write(json.dumps({
                     "status": "native-chat-committed",
                     **turn.to_record(),
@@ -202,15 +233,20 @@ def main(argv: list[str] | None = None) -> int:
                 run_id=args.run_id if args.mode == "durable-agent" else None,
             )
             if args.mode == "durable-agent" and args.replay_result:
-                sys.stdout.write(json.dumps(run.replay_terminal(inputs), sort_keys=True, ensure_ascii=False) + "\n")
+                historical = run.replay_terminal(inputs)
+                _assert_same_owner(worker, bound)
+                sys.stdout.write(json.dumps(historical, sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
             if args.mode == "durable-agent" and args.inspect_run:
-                sys.stdout.write(json.dumps(run.inspect(inputs), sort_keys=True, ensure_ascii=False) + "\n")
+                checkpoint = run.inspect(inputs)
+                _assert_same_owner(worker, bound)
+                sys.stdout.write(json.dumps(checkpoint, sort_keys=True, ensure_ascii=False) + "\n")
                 return 0
             if args.mode == "durable-agent" and args.resume_run:
                 result = run.resume_operator_approved(inputs)
             else:
                 result = run.run(inputs)
+            _assert_same_owner(worker, bound)
             record = {
                 "schema": "jeeves.native_operator_turn.v1",
                 "status": "verified-agent-response" if result.success else "held",
