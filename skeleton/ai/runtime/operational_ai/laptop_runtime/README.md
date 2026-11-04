@@ -315,3 +315,17 @@ manifest/patch and current source checks without
 retrying inference. Application to Git/project
 remains separately reviewed and authorized.
 `docs/ai/JEEVES_NATIVE_PRIVATE_SOURCE_ESCROW.md`.
+
+## Cold native escrow to explicit private source/patch delivery
+
+`desktop_native_source_delivery_cli` now connects the
+headless GGUF-to-private-proposal custody directly with
+the same guarded new/edit source staging and Git patch
+export used by the Tk workbench. A cold read rechecks
+the entire private file and current real workspace,
+including full source/patch/graph SHA. A second CLI
+action needs both full operator-approved hashes plus
+`--approve-private-stage` or `--approve-private-patch`.
+Neither operation starts a model, executes source, changes
+the original project or invokes Git.
+`docs/ai/JEEVES_NATIVE_ESCROW_TO_STAGE.md`.

@@ -253,3 +253,15 @@ certify a physical Windows 11/WSL2 laptop, licensed
 third-party model, actual GPU throughput, device
 pressure or consumer release. All required exact-head
 security and device acceptance remain held.
+
+## Direct no-code-stdout delivery after saving
+
+The new `desktop_native_source_delivery_cli` can cold-open
+the saved proposal, recheck all current original source
+files, reproduce exact Python graph/static source and
+source-manifest/Patch SHA values, then—only after a
+second separate full SHA and CLI approval—stage final
+source files or export an inert Git patch directly.
+There is no private code copied through stdout and
+no new GGUF/SQLite inference. Complete flow:
+`docs/ai/JEEVES_NATIVE_ESCROW_TO_STAGE.md`.
