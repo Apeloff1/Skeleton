@@ -8,6 +8,7 @@ on:
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/client.py"
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/client_cli.py"
       - "skeleton/testing/test_laptop_exact_prompt_custody.py"
+      - "skeleton/testing/test_laptop_inference_deadline_fence.py"
       - "skeleton/testing/test_laptop_client_*.py"
       - "skeleton/testing/test_laptop_runtime_http.py"
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/turn_bridge.py"
@@ -67,6 +68,7 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_laptop_replay_probe_*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_client_*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_exact_prompt_custody.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_inference_deadline_fence.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_http.py' -v
       - name: Assert this gate cannot claim laptop or release qualification
         run: |
