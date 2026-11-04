@@ -42,8 +42,18 @@ def verify_package(package: dict | bytes | str) -> dict:
         if len(package.encode("utf-8")) > MAX_PACKAGE_BYTES:
             raise PackageError("package exceeds byte budget")
         import json
+        def unique_members(pairs: list[tuple[str, Any]]) -> dict:
+            result: dict = {}
+            for key, value in pairs:
+                if key in result:
+                    raise PackageError("duplicate package JSON member")
+                result[key] = value
+            return result
+        def reject_nonfinite(value: str) -> None:
+            raise PackageError("nonfinite package JSON number")
         try:
-            package = json.loads(package)
+            package = json.loads(package, object_pairs_hook=unique_members,
+                                 parse_constant=reject_nonfinite)
         except ValueError as exc:
             raise PackageError("invalid package JSON") from exc
     if not isinstance(package, dict) or set(package) != {"payload", "sha256"}:
