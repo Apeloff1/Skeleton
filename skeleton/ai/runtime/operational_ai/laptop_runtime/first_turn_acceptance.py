@@ -14,6 +14,7 @@ from .session_adapter import create
 from .turn_bridge import TurnBridge
 from .replay_probe import inspect_replay
 from .installed_witness import require_activated_source
+from .source_contract import valid_source_snapshot
 
 
 def run(
@@ -44,14 +45,11 @@ def run(
         if installed_receipt is not None else None
     )
     if source is not None:
-        # A substituted partial/boolean source result can never turn a
-        # synthetic generator into a positive installed GGUF witness.
-        if (type(source) is not dict or set(source) != {
-            "model_sha256", "tokenizer_sha256",
-            "manifest_sha256", "archive_sha256", "source_sha",
-            "installed_model_bytes", "installed_shard_count",
-        }):
+        # A partial, bool-valued, upper-case or forged source inventory
+        # must not become real installed GGUF acceptance evidence.
+        if not valid_source_snapshot(source, ActiveModel.from_supervisor(worker)):
             refuse("complete installed native source witness required")
+        source = source.copy()
     if require_real and source is None:
         refuse("independent installed source proof required")
     bridge = TurnBridge(worker)
@@ -90,7 +88,8 @@ def run(
         # This check is read-only. A failed check preserves SQLite custody
         # and MUST NOT trigger a second native forward pass.
         observed = require_activated_source(worker, installed_receipt)
-        if type(observed) is not dict or observed != source:
+        if (not valid_source_snapshot(observed, bound)
+                or observed != source):
             refuse("verified native source changed after model generation")
         if ActiveModel.from_supervisor(worker) != bound:
             refuse("native principal changed after final source verification")

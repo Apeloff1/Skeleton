@@ -94,6 +94,7 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_cli_*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_cumulative_budgets.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_jsonl_transport.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_exclusive_stream.py' -v
       - name: Canonical installed-model startup and local replay foundations
         env:
           PYTHONPATH: "."
@@ -111,6 +112,7 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_laptop_real_acceptance_*.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_cold_reopen_typed_source.py' -v
       - name: Keep source-only tests separate from device and release proof
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'
