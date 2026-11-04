@@ -39,7 +39,9 @@ class ProductionLayeringAndEvidence(unittest.TestCase):
         })
         self.assertEqual(data,{"status":"fixture-only"})
         engine.inspect.assert_called_once_with("session_1")
-        self.assertFalse(hasattr(engine,"generate"))
+        engine.generate.assert_not_called()
+        engine.play.assert_not_called()
+        engine.verify.assert_not_called()
 
     def test_small_default_window_generates_exact_original_byte_spans(self):
         spans=evidence.passages(self.document,window_bytes=32)
