@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/jeeves/agent/native_*.py"
+      - "skeleton/ai/agents/jeeves/**"
       - "skeleton/jeeves/agent/runtime.py"
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/**"
       - "skeleton/testing/test_jeeves_native_*.py"
@@ -44,6 +45,8 @@ jobs:
           "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
           "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
           "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Require exact canonical AI-tree mirror parity
+        run: python scripts/check_ai_file_tree.py
       - name: Compile the canonical Jeeves and local inference source
         run: >-
           python -m compileall -q
