@@ -34,9 +34,38 @@ from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor
 from skeleton.ai.runtime.operational_ai.laptop_runtime import (
     first_turn_acceptance, cold_reopen_acceptance,
 )
-from skeleton.testing.test_jeeves_native_sqlite_integration import (
-    SyntheticallyGenerated, MODEL, TOKENIZER,
-)
+from hashlib import sha256
+from skeleton.ai.runtime.operational_ai.model.native import Generated
+
+MODEL = "a" * 64
+TOKENIZER = "b" * 64
+ANSWER = '{"answer":"synthetic SQLite replay only","confidence":0.5,"claims":[],"unresolved":[],"memory_candidates":[]}'
+
+
+class SyntheticallyGenerated:
+    """TEST ONLY. No installed GGUF or native inference is executed."""
+
+    model_digest = MODEL
+    tokenizer_digest = TOKENIZER
+
+    def __init__(self, *, post_reservation_failure=False):
+        self.calls = 0
+        self.fail = post_reservation_failure
+
+    def count_tokens(self, messages):
+        return 48
+
+    def generate(self, messages, *, max_output_tokens, seed, temperature):
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("synthetic backend aborted after durable reservation")
+        return Generated(
+            text=ANSWER, prompt_tokens=48, generated_tokens=16,
+            output_digest=sha256(ANSWER.encode("utf-8")).hexdigest(),
+            model_digest=self.model_digest,
+            tokenizer_digest=self.tokenizer_digest,
+            finish_reason="stop",
+        )
 
 
 SOURCE = {
