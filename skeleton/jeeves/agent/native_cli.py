@@ -48,6 +48,37 @@ def _assert_same_owner(worker, active: ActiveModel) -> None:
         raise ValueError("native Jeeves model or operator principal changed")
 
 
+def _publish_native_record(
+    worker, source_fence: NativeSourceFence, payload: dict,
+    *, maximum_bytes: int = 1048576,
+) -> None:
+    """Make one bounded, source-fenced local stdout disclosure.
+
+    A partial write, invalid result or failed flush is terminal for this
+    process invocation. Never retry a possibly committed native inference.
+    The caller owns private SQLite custody and emits a redacted stderr hold.
+    """
+    if type(payload) is not dict:
+        raise ValueError("typed Jeeves operator result required")
+    if type(maximum_bytes) is not int or not 1 <= maximum_bytes <= 1048576:
+        raise ValueError("bounded native output disclosure required")
+    wire = json.dumps(
+        payload, sort_keys=True, ensure_ascii=False, allow_nan=False,
+    ) + "\n"
+    byte_count = len(wire.encode("utf-8", "strict"))
+    if byte_count > maximum_bytes:
+        raise ValueError("native operator result exceeds disclosure bound")
+    # A source revocation after generating/reading the private result
+    # denies even the first byte of operator-visible stdout.
+    source_fence.assert_live(worker)
+    written = sys.stdout.write(wire)
+    if type(written) is not int or written != len(wire):
+        raise OSError("native stdout accepted incomplete result")
+    flush = getattr(sys.stdout, "flush", None)
+    if callable(flush):
+        flush()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _RedactedParser(
         description="Host-guarded Jeeves against a source-verified real local GGUF"
@@ -194,11 +225,10 @@ def main(argv: list[str] | None = None) -> int:
                     worker, session_id=args.session, source_fence=source_fence,
                 )
                 turn = chat.turn(task, request_id=args.request_id)
-                source_fence.assert_live(worker)
-                sys.stdout.write(json.dumps({
+                _publish_native_record(worker, source_fence, {
                     "status": "native-chat-committed",
                     **turn.to_record(),
-                }, sort_keys=True, ensure_ascii=False) + "\n")
+                })
                 return 0
             if args.session or args.request_id:
                 raise ValueError("chat identifiers cannot be supplied in agent mode")
@@ -243,19 +273,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             if args.mode == "durable-agent" and args.replay_result:
                 historical = run.replay_terminal(inputs)
-                source_fence.assert_live(worker)
-                sys.stdout.write(json.dumps(historical, sort_keys=True, ensure_ascii=False) + "\n")
+                _publish_native_record(worker, source_fence, historical)
                 return 0
             if args.mode == "durable-agent" and args.inspect_run:
                 checkpoint = run.inspect(inputs)
-                source_fence.assert_live(worker)
-                sys.stdout.write(json.dumps(checkpoint, sort_keys=True, ensure_ascii=False) + "\n")
+                _publish_native_record(worker, source_fence, checkpoint)
                 return 0
             if args.mode == "durable-agent" and args.resume_run:
                 result = run.resume_operator_approved(inputs)
             else:
                 result = run.run(inputs)
-            source_fence.assert_live(worker)
             record = {
                 "schema": "jeeves.native_operator_turn.v1",
                 "status": "verified-agent-response" if result.success else "held",
@@ -277,7 +304,7 @@ def main(argv: list[str] | None = None) -> int:
                 # stdout is an explicit local disclosure to the invoking
                 # operator; model text never enters shell arguments or stderr.
                 record["answer"] = result.answer
-            sys.stdout.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
+            _publish_native_record(worker, source_fence, record)
             return 0 if result.success else 2
     except (Exception, KeyboardInterrupt) as exc:
         # Keep private task, source paths, installation receipts and native
