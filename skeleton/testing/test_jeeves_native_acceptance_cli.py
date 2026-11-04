@@ -233,9 +233,11 @@ class AcceptanceOrchestrationTests(unittest.TestCase):
         self.assertEqual(len(self.inference_calls), 1)
 
     def test_source_principal_change_cannot_publish_receipt(self):
-        self.worker.spine.identity.subject = "foreign"
-        with self.assertRaises(NativeAcceptanceHold):
-            run_acceptance(**arguments())
+        from dataclasses import replace
+        swapped = replace(self.worker.spine.identity, subject="foreign")
+        with mock.patch.object(self.worker.spine, "identity", swapped):
+            with self.assertRaises(NativeAcceptanceHold):
+                run_acceptance(**arguments())
         self.first.assert_not_called()
 
     def test_real_source_evidence_must_be_preserved_through_first_turn(self):
