@@ -80,6 +80,22 @@ def verify_bytes(data: bytes) -> dict:
             names = archive.namelist()
             if len(names) != len(set(names)) or len(names) > MAX_SOURCE_FILES + 1:
                 raise BundleError("duplicate or excessive archive entries")
+            # Windows filesystems may alias names by case or reserved device
+            # components. Refuse ambiguous archives before consumer delivery.
+            folded = set()
+            reserved = {"CON", "PRN", "AUX", "NUL"}
+            reserved.update(f"COM{i}" for i in range(1, 10))
+            reserved.update(f"LPT{i}" for i in range(1, 10))
+            for name in names:
+                for part in name.split("/"):
+                    if (not part.isascii() or part.endswith((".", " ")) or
+                        any(ch in part for ch in ":<>|?*") or
+                        part.split(".")[0].upper() in reserved):
+                        raise BundleError("unsafe Windows archive member name")
+                alias = name.casefold()
+                if alias in folded:
+                    raise BundleError("case-colliding archive members")
+                folded.add(alias)
             if "__main__.py" not in names:
                 raise BundleError("untrusted game entrypoint")
             if not {"ridge_rescue/__init__.py", "ridge_rescue/consumer_cli.py",
