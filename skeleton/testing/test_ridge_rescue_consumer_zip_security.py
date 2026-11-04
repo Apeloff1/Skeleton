@@ -42,7 +42,7 @@ def test_local_header_timestamp_disagreement_refused():
     # Central-directory metadata stays intact; Python's ZIP reader tolerates
     # local-header timestamp disagreement, but our publisher must not.
     modified = bytearray(build_bytes())
-    assert modified[:4] == b"PK\\x03\\x04"
+    assert modified[:4] == bytes.fromhex("504b0304")
     modified[10] ^= 1
     with pytest.raises(BundleError, match="noncanonical portable archive bytes"):
         verify_bytes(bytes(modified))
