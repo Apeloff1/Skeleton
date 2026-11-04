@@ -457,3 +457,29 @@ def test_admin_password_path_swap_rejected_before_read(tmp_path, monkeypatch):
             root, admin_email="admin@example.test", admin_password_file=password
         )
     assert not (root / ".env").exists()
+
+
+def test_existing_env_path_swap_during_read_is_rejected(tmp_path, monkeypatch):
+    """A validated descriptor cannot authorize a different published pathname."""
+    root = _root(tmp_path)
+    ensure_runtime_environment(root)
+    env = root / ".env"
+    replacement = root / "replacement-env"
+    replacement.write_bytes(env.read_bytes())
+    if os.name != "nt":
+        replacement.chmod(0o600)
+    original_lstat = os.lstat
+    visits = 0
+
+    def swap_after_admission(path, *args, **kwargs):
+        nonlocal visits
+        if Path(path) == env:
+            visits += 1
+            if visits == 2:
+                os.replace(replacement, env)
+        return original_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "lstat", swap_after_admission)
+    with pytest.raises(ValueError, match="identity changed during read"):
+        ensure_runtime_environment(root)
+    assert not list(root.glob(".env.*.tmp"))
