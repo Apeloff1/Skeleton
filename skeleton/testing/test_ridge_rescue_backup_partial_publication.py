@@ -22,7 +22,7 @@ def test_backup_fsync_failure_cleans_owned_partial(tmp_path, monkeypatch):
     monkeypatch.setattr(consumer_store.os, "fsync", original)
     backup = store.backup("game")
     assert backup.is_file()
-    assert backup.read_bytes().endswith(b"\\n")
+    assert backup.read_bytes().endswith(b"\n")
 
 
 def test_backup_failure_preserves_concurrent_replacement(tmp_path, monkeypatch):
