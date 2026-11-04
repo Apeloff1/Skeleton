@@ -21,7 +21,7 @@ def _file(path: str):
     """
     if not all(hasattr(os, name) for name in ("O_NONBLOCK", "O_NOFOLLOW", "O_DIRECTORY")):
         raise CanonError("input_safe_open_unavailable")
-    if not isinstance(path, str) or not path or "\\x00" in path:
+    if not isinstance(path, str) or not path or chr(0) in path:
         raise CanonError("input_invalid_path")
     parts = path.split("/")
     absolute = path.startswith("/")
