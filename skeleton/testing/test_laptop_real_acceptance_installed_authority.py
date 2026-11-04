@@ -51,7 +51,7 @@ class TestInstalledProofBoundary(unittest.TestCase):
 
     def test_forged_source_receipt_cannot_qualify_fake_worker(self):
         with self.assertRaisesRegex(
-            ContractViolation, "canonical supervised local inference"
+            ContractViolation, "canonical supervised native worker"
         ):
             require_activated_source(self.worker, synthetic_receipt())
         self.assertEqual(self.worker.generation_calls, 0)
