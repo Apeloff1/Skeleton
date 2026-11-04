@@ -10,6 +10,7 @@ on:
       - "skeleton/testing/test_jeeves_native_*.py"
       - "skeleton/testing/test_jeeves_single_provider_*.py"
       - "skeleton/testing/test_laptop_runtime_*.py"
+      - "skeleton/testing/test_laptop_once_*.py"
       - ".github/workflows/jeeves-native-sqlite-source-qualification.yml"
 
 permissions:
@@ -87,6 +88,11 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_startup.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_replay.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_postcommit.py' -v
+      - name: Preflight new one-shot inference before creating SQLite sessions
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_once_*.py' -v
       - name: Keep source-only tests separate from device and release proof
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'
