@@ -119,7 +119,7 @@ def verify_bytes(data: bytes) -> dict:
                 # A valid CRC does not authorize noncanonical or executable
                 # archive entries. Only deflated, regular source files qualify.
                 parts = item.filename.split("/")
-                if (item.flag_bits & 1 or
+                if (item.flag_bits != 0 or item.extra or item.comment or
                     item.compress_type != zipfile.ZIP_DEFLATED or
                     any(part in {"", ".", ".."} for part in parts) or
                     item.filename.startswith("/") or chr(92) in item.filename):

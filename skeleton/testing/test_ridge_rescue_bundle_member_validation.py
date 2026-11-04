@@ -74,3 +74,33 @@ def test_windows_case_collision_refused():
 def test_noncanonical_zip_envelope_refused(mutate):
     with pytest.raises(BundleError, match="noncanonical ZIP envelope"):
         verify_bytes(mutate(build_bytes()))
+
+
+def test_zip_member_extra_field_refused():
+    archive = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(build_bytes())) as original:
+        with zipfile.ZipFile(archive, "w") as dest:
+            for name in original.namelist():
+                info = zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o100644 << 16
+                if name == "ridge_rescue/consumer_cli.py":
+                    info.extra = b"\x01\x00\x00\x00"
+                dest.writestr(info, original.read(name))
+    with pytest.raises(BundleError, match="unsafe archive encoding"):
+        verify_bytes(archive.getvalue())
+
+
+def test_zip_member_comment_refused():
+    archive = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(build_bytes())) as original:
+        with zipfile.ZipFile(archive, "w") as dest:
+            for name in original.namelist():
+                info = zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o100644 << 16
+                if name == "ridge_rescue/consumer_cli.py":
+                    info.comment = b"hidden metadata"
+                dest.writestr(info, original.read(name))
+    with pytest.raises(BundleError, match="unsafe archive encoding"):
+        verify_bytes(archive.getvalue())
