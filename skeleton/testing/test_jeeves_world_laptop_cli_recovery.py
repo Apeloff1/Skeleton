@@ -32,3 +32,27 @@ def test_laptop_cli_pipe_rejection_is_nonblocking_and_actionable(tmp_path, capsy
     failure = json.loads(capsys.readouterr().out)
     assert failure["error"] == "input_not_regular"
     assert failure["next_action"] == "provide_a_regular_json_file_not_a_device_or_pipe"
+
+
+@pytest.mark.parametrize(("kind", "error", "next_action"), [
+    ("missing", "input_missing", "verify_input_path_exists_before_retry"),
+    ("non_directory", "input_invalid_directory", "replace_non_directory_parent_with_a_real_directory"),
+    ("symlink", "input_symlink_disallowed", "use_a_regular_file_without_symlink_components"),
+])
+def test_laptop_cli_filesystem_errors_are_typed_and_do_not_publish(
+    tmp_path, capsys, kind, error, next_action
+):
+    source = tmp_path / "brief.json"
+    source.write_text('{"id":"original"}', encoding="utf-8")
+    if kind == "missing":
+        target = tmp_path / "missing.json"
+    elif kind == "non_directory":
+        target = source / "child.json"
+    else:
+        target = tmp_path / "alias.json"
+        target.symlink_to(source)
+    assert run(["--store", str(tmp_path), "propose", "--brief-file", str(target)]) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure == {"ok": False, "phase": "propose",
+                       "error": error, "next_action": next_action}
+    assert not any(p.name.endswith(".laptop.review.json") for p in tmp_path.iterdir())
