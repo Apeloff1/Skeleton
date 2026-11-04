@@ -173,6 +173,8 @@ class NoOverwriteWorkspaceTests(unittest.TestCase):
             proposal(("/root/out.py", "x")),
             proposal((".git/config.json", "{}")),
             proposal((".github/workflows/malware.yml", "on: push")),
+            proposal((".github/SECURITY.md", "model instruction")),
+            proposal((".vscode/settings.json", "{}")),
             proposal(("file.exe", "MZ")),
             proposal(("a.py", "bad\x00text")),
             proposal(("a.py", "x" * 99001)),

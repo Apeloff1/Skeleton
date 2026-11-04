@@ -37,6 +37,9 @@ class JeevesWindow(tk.Tk):
         self._events: Queue = Queue()
         self._busy = False
         self._closing = False
+        # Worker/telemetry results belong to one source epoch, never a later
+        # reconnected SQLite conversation.
+        self._epoch = 0
         self._last_request: str | None = None
         self._last_answer: str | None = None  # RAM-only, never an automatic tool grant.
         self._attachments = []  # Explicit immutable source snapshots, never tool grants.
@@ -262,6 +265,7 @@ class JeevesWindow(tk.Tk):
             return
         model = self.fields["model_root"].get()
         state = self.fields["state_dir"].get()
+        epoch = self._epoch
         self._busy = True
         self.connection_text.set("Inspecting installed source and effective CPU/RAM…")
         self._controls()
@@ -270,10 +274,10 @@ class JeevesWindow(tk.Tk):
             try:
                 from .desktop_capacity_plan import plan_existing_model
                 result = plan_existing_model(model, state)
-                self._events.put(("capacity-profile", "recommendation", result))
+                self._events.put(("capacity-profile", epoch, result))
             except BaseException as exc:
                 # Kernel paths, model roots and exception strings are private.
-                self._events.put(("capacity-error", "held", type(exc).__name__))
+                self._events.put(("capacity-error", epoch, type(exc).__name__))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -306,6 +310,7 @@ class JeevesWindow(tk.Tk):
         except (ValueError, DesktopBridgeHold) as exc:
             self._show("Connection held", type(exc).__name__, "warning")
             return
+        self._epoch += 1
         self._busy = True
         self._connecting = bridge
         self.connection_text.set("Loading independently installed native GGUF…")
@@ -322,6 +327,7 @@ class JeevesWindow(tk.Tk):
         threading.Thread(target=run, daemon=True).start()
 
     def _disconnect(self):
+        self._epoch += 1
         current = self._bridge or self._connecting
         if current is not None:
             current.abort()
@@ -341,10 +347,10 @@ class JeevesWindow(tk.Tk):
         def run():
             try:
                 result = bridge.request(action, **values)
-                self._events.put(("result", action, result))
+                self._events.put(("result", (bridge, action), result))
             except BaseException as exc:
                 # Never display private exception messages, prompts or paths.
-                self._events.put(("result-error", action, type(exc).__name__))
+                self._events.put(("result-error", (bridge, action), type(exc).__name__))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -456,6 +462,8 @@ class JeevesWindow(tk.Tk):
                     self.connection_text.set("Native startup held; no fallback provider")
                     self._show("Native startup held", payload, "warning")
                 elif event == "capacity-profile":
+                    if name != self._epoch:
+                        continue
                     self._busy = False
                     if self._bridge is not None and self._bridge.connected:
                         continue
@@ -481,10 +489,15 @@ class JeevesWindow(tk.Tk):
                         + ". GPU layers remain zero until independently verified.",
                     )
                 elif event == "capacity-error":
+                    if name != self._epoch:
+                        continue
                     self._busy = False
                     self.connection_text.set("Resource profile held — no automatic escalation")
                     self._show("Device observation held", str(payload), "warning")
                 elif event == "result":
+                    origin, action = name
+                    if origin is not self._bridge or not origin.connected:
+                        continue
                     self._busy = False
                     result = payload
                     status = result.get("status", "")
@@ -495,7 +508,7 @@ class JeevesWindow(tk.Tk):
                         )
                         if bridge.session_id is not None:
                             self.resume_id.set(bridge.session_id)
-                    if name == "telemetry":
+                    if action == "telemetry":
                         self._show(
                             "Native supervised capacity (observation only)",
                             json.dumps(
@@ -503,7 +516,7 @@ class JeevesWindow(tk.Tk):
                                 ensure_ascii=False, sort_keys=True,
                             ),
                         )
-                    elif name == "turn":
+                    elif action == "turn":
                         record = result.get("turn", {})
                         answer = record.get("answer", "")
                         self._last_answer = answer if type(answer) is str else None
@@ -515,7 +528,7 @@ class JeevesWindow(tk.Tk):
                             + " · SQLite context: "
                             + str(result.get("context_messages", 0)) + " messages",
                         )
-                    elif name == "history":
+                    elif action == "history":
                         records = result.get("messages", [])
                         for row in records:
                             role = str(row.get("role", "message"))
@@ -523,14 +536,17 @@ class JeevesWindow(tk.Tk):
                                        "you" if role == "user" else "jeeves")
                     else:
                         self._show("Jeeves session", status)
-                        if name == "close":
+                        if action == "close":
                             self.session_text.set("No active session; create or resume")
                 elif event == "result-error":
+                    origin, action = name
+                    if origin is not self._bridge:
+                        continue
                     self._busy = False
                     self.connection_text.set("Native request held — disconnect required")
                     self._show(
                         "Native operation held",
-                        name + " (" + str(payload) + "). Outcome may be uncertain. "
+                        action + " (" + str(payload) + "). Outcome may be uncertain. "
                         "No automatic retry. Preserve the displayed request ID.",
                         "warning",
                     )
@@ -542,6 +558,7 @@ class JeevesWindow(tk.Tk):
         self.after(75, self._pump)
 
     def _exit(self):
+        self._epoch += 1
         self._closing = True
         for bridge in (self._bridge, self._connecting):
             if bridge is not None:

@@ -7,6 +7,7 @@ errors terminate the bridge; nothing is silently retried.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import os
 from pathlib import Path
 import secrets
@@ -143,6 +144,73 @@ class DesktopBridge:
         self.session_id = session_id
         return result
 
+    _SUCCESS = {
+        "status": frozenset(("ready", "no-active-session")),
+        "telemetry": frozenset(("observed-runtime-capacity",)),
+        "new": frozenset(("new-durable-session",)),
+        "resume": frozenset(("existing-durable-session-reopened",)),
+        "turn": frozenset(("committed-native-chat-turn",)),
+        "history": frozenset(("durable-history",)),
+        "close": frozenset(("durable-session-closed",)),
+        "quit": frozenset(("session-preserved-for-resume",)),
+    }
+
+    def _operation_receipt(
+        self, op: str, fields: dict[str, object],
+        result: dict[str, Any], old_session: str | None,
+    ) -> None:
+        """Reject spurious, reordered, or cross-session native IPC replies."""
+        if result.get("status") not in self._SUCCESS[op]:
+            raise DesktopBridgeHold("native response operation differs from issued request")
+        session = result["session_id"]
+        if op in ("new", "resume"):
+            if session is None:
+                raise DesktopBridgeHold("new native session missing durable identity")
+            if op == "resume" and session != fields["session_id"]:
+                raise DesktopBridgeHold("native resumed another SQLite session")
+        elif op == "close":
+            if session is not None or result.get("closed_session_id") != old_session:
+                raise DesktopBridgeHold("native close receipt disagrees with requested session")
+        elif session != old_session:
+            raise DesktopBridgeHold("native request crossed SQLite session boundary")
+        if op == "turn":
+            record = result.get("turn")
+            if type(record) is not dict:
+                raise DesktopBridgeHold("canonical committed native answer absent")
+            if (
+                record.get("session_id") != old_session
+                or record.get("request_id") != fields["request_id"]
+                or result.get("request_id") != fields["request_id"]
+                or record.get("authoritative_commit") is not True
+                or record.get("release_certified") is not False
+                or record.get("model_sha256") != self.model_sha256
+            ):
+                raise DesktopBridgeHold("native response receipt or owner not authoritative")
+            text = record.get("answer")
+            digest = record.get("output_sha256")
+            if type(text) is not str or type(digest) is not str:
+                raise DesktopBridgeHold("native receipt lacks exact answer digest")
+            try:
+                actual = sha256(text.encode("utf-8", "strict")).hexdigest()
+            except UnicodeError as exc:
+                raise DesktopBridgeHold("native answer has invalid Unicode") from exc
+            if actual != digest:
+                raise DesktopBridgeHold("native committed answer bytes changed in IPC")
+        if op == "history":
+            if (
+                type(result.get("messages")) is not list
+                or type(result.get("message_count")) is not int
+                or result["message_count"] != len(result["messages"])
+            ):
+                raise DesktopBridgeHold("native history response missing bounded records")
+        if op == "telemetry":
+            observed = result.get("observed")
+            if (
+                type(observed) is not dict
+                or observed.get("native_e2e_certified") is not False
+            ):
+                raise DesktopBridgeHold("untrusted native telemetry qualification")
+
     def open(self) -> dict[str, Any]:
         if self._started or self._process is not None:
             raise DesktopBridgeHold("desktop native child already started")
@@ -189,18 +257,36 @@ class DesktopBridge:
             assert process is not None
             assert process.stdin is not None
             assert process.stdout is not None
+            previous_session = self.session_id
+            # Native inference has its own bounded deadline, but a hung
+            # pipe/child teardown must not hold the GUI forever. The timer
+            # revokes the child; a committed uncertain result is not retried.
+            deadline = (
+                min(660.0, self.config.inference_ms / 1000.0 + 45.0)
+                if op == "turn" else 30.0
+            )
+            watchdog = threading.Timer(deadline, self.abort)
+            watchdog.daemon = True
+            watchdog.start()
             try:
+                if not self.connected:
+                    raise DesktopBridgeHold("native request source revoked before publication")
                 write_frame(process.stdin, payload, limit=65536)
                 received = read_frame(process.stdout, limit=MAX_OUTBOUND)
                 if received is None:
                     raise DesktopBridgeHold("native worker exited before reply")
                 result = self._verify(received)
+                self._operation_receipt(op, fields, result, previous_session)
+                if not self.connected:
+                    raise DesktopBridgeHold("native source died before request completed")
                 return result
             except BaseException:
                 # Once a request has entered the pipe, the SQLite/native
                 # effect may already have committed. No retries of this ID.
                 self.abort()
                 raise
+            finally:
+                watchdog.cancel()
 
     def turn(self, prompt: str, *, request_id: str | None = None) -> dict[str, Any]:
         rid = request_id if request_id is not None else "r_" + secrets.token_hex(16)
