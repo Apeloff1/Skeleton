@@ -7,7 +7,7 @@ from ..contracts.canonical import loads
 from ..contracts.errors import FabricError
 from ..persistence.journal import Journal
 from ..planning.engine import ProductionEngine
-from .api import LocalAPI
+from . import api as product_api
 
 def main(argv: list[str] | None=None) -> int:
     parser = argparse.ArgumentParser(description='Skeleton deterministic offline production fabric')
@@ -21,7 +21,7 @@ def main(argv: list[str] | None=None) -> int:
         raw = args.world.read_bytes()
         world = loads(raw)
         engine = ProductionEngine(world, Journal(args.db))
-        sys.stdout.buffer.write(LocalAPI(engine).json(args.request.encode('utf-8')))
+        sys.stdout.buffer.write(product_api.LocalAPI(engine).json(args.request.encode('utf-8')))
         engine.journal.close()
     except (OSError, FabricError) as exc:
         sys.stderr.write(f'offline production CLI: {exc}\n')
