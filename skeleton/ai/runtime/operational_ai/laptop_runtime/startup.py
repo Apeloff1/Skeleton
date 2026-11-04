@@ -6,6 +6,27 @@ entry point; it does not weaken any existing process isolation or model cap.
 from __future__ import annotations
 from pathlib import Path
 from .contracts import refuse
+from .identity import ActiveModel
+
+
+def _require_private_absolute_path(value: object, label: str) -> None:
+    """Refuse unsafe roots without resolving symlinks or reading any source.
+
+    Descriptor-anchored installation and state ownership remain downstream
+    authorities; this check only prevents misleading path spellings from
+    reaching an installer probe or native startup in the first place.
+    """
+    if not isinstance(value, (str, Path)):
+        refuse("absolute private " + label + " required")
+    try:
+        path = Path(value)
+    except (TypeError, ValueError, OSError) as exc:
+        raise ValueError("invalid private " + label + " type") from exc
+    if (not path.is_absolute() or ".." in path.parts
+            or chr(0) in str(value)):
+        refuse("absolute private " + label + " required")
+
+
 
 def activate_checked(*,model_root,state_dir,tenant,subject,
                      n_ctx=2048,max_new_tokens=256,n_threads=4,
@@ -18,6 +39,10 @@ def activate_checked(*,model_root,state_dir,tenant,subject,
     from .contracts import identifier,nonnegative
     from .preflight import validate_native_shape
     identifier(tenant,"tenant");identifier(subject,"subject")
+    _require_private_absolute_path(model_root, "model root")
+    _require_private_absolute_path(state_dir, "SQLite state root")
+    if capacity_root is not None:
+        _require_private_absolute_path(capacity_root, "capacity root")
     validate_native_shape(
         n_ctx=n_ctx, max_new_tokens=max_new_tokens,
         n_threads=n_threads, gpu_layers=gpu_layers,
@@ -35,15 +60,15 @@ def activate_checked(*,model_root,state_dir,tenant,subject,
         refuse("impossible local native resource configuration")
     if type(isolated) is not bool or not isolated:
         refuse("first-laptop-use requires a killable isolated native backend")
-    if not isinstance(model_root,(str,Path)) or not isinstance(state_dir,(str,Path)):
-        refuse("explicit local model and state paths required")
     # Each hash is read from the *actual installed bytes* in the source-bound
     # installer receipt before any model backend can be activated.
     verified=inspect_installed_model(model_root)
-    if (not verified.content_verified or not verified.rights_approved
+    if (verified.content_verified is not True
+        or verified.rights_approved is not True
         or not verified.archive_sha256 or not verified.source_sha):
         refuse("real installed model source or rights approval absent")
     root=capacity_root if capacity_root is not None else create_default_root()
+    _require_private_absolute_path(root, "effective capacity root")
     stack,worker=activate(model_root=model_root,state_dir=state_dir,
                           tenant=tenant,subject=subject,n_ctx=n_ctx,
                           max_new_tokens=max_new_tokens,n_threads=n_threads,
@@ -53,11 +78,11 @@ def activate_checked(*,model_root,state_dir,tenant,subject,
                           capacity_budget_bytes=capacity_budget_bytes)
     try:
         expected=verified.model_sha256
-        active=worker.spine.identity
-        if active.model_sha256!=expected or worker.spine.backend.model_digest!=expected:
+        active=ActiveModel.from_supervisor(worker)
+        if (active.tenant, active.subject)!=(tenant,subject):
+            refuse("activated native worker belongs to another principal")
+        if active.model_sha256!=expected:
             refuse("activated model differs from trusted installer receipt")
-        if active.tokenizer_sha256!=worker.spine.backend.tokenizer_digest:
-            refuse("activated tokenizer identity changed")
         return stack,worker,verified
     except BaseException:
         stack.close()

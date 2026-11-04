@@ -48,6 +48,7 @@ class OperatorSessionLimits:
     maximum_reserved_output_tokens: int = 131072
     maximum_wall_seconds: float = 3600
     maximum_result_bytes: int = 262144
+    maximum_session_result_bytes: int = 8388608
 
     def __post_init__(self):
         for key, maximum in (
@@ -57,10 +58,22 @@ class OperatorSessionLimits:
             ("maximum_reserved_model_calls", 10000),
             ("maximum_reserved_output_tokens", 10000000),
             ("maximum_result_bytes", 1048576),
+            ("maximum_session_result_bytes", 67108864),
         ):
-            exact_integer(getattr(self,key),minimum=1,maximum=maximum)
+            try:
+                exact_integer(getattr(self,key),minimum=1,maximum=maximum)
+            except ContractHold as exc:
+                # Keep lower-level validation fail-closed, while exposing the
+                # stable public operator admission error class to the CLI.
+                raise NativeOperatorSessionHold(
+                    "invalid bounded operator " + key
+                ) from exc
         if self.maximum_task_bytes >= self.maximum_line_bytes:
             raise NativeOperatorSessionHold("command line must fit task plus envelope")
+        if self.maximum_session_result_bytes < self.maximum_result_bytes:
+            raise NativeOperatorSessionHold(
+                "session disclosure ceiling must cover a single result"
+            )
         if type(self.maximum_wall_seconds) not in (int,float) or (
             not math.isfinite(self.maximum_wall_seconds) or
             not 0 < self.maximum_wall_seconds <= 86400
@@ -154,17 +167,42 @@ class NativeOperatorSession:
             raise NativeOperatorSessionHold("typed session budget required")
         self._monotonic=monotonic
         self._started=monotonic()
+        if (type(self._started) not in (int,float)
+                or not math.isfinite(self._started)):
+            raise NativeOperatorSessionHold("finite monotonic session clock required")
         self._closed=False
         self._command_count=0
+        self._published_result_bytes=0
         self._reserved_calls=0
         self._reserved_output=0
         self._lock=threading.RLock()
         self._native_output_ceiling=worker.spine.limits.max_output_tokens
 
+    def _elapsed(self) -> float:
+        """Finite monotonic wall-time fence, including publication boundaries.
+
+        A clock regression, NaN, Infinity or expired wall budget makes this
+        process-local session terminal rather than extending inference rights.
+        """
+        try:
+            now=self._monotonic()
+            if type(now) not in (int,float) or not math.isfinite(now):
+                raise NativeOperatorSessionHold("native wall clock unavailable")
+            elapsed=now-self._started
+            if not math.isfinite(elapsed) or elapsed < 0:
+                raise NativeOperatorSessionHold("native wall clock regressed")
+            if elapsed >= self.limits.maximum_wall_seconds:
+                raise NativeOperatorSessionHold("operator session time budget exhausted")
+            return elapsed
+        except BaseException:
+            self._closed=True
+            raise
+
     def _valid_worker(self):
         try:
             active=ActiveModel.from_supervisor(self.worker)
         except Exception as exc:
+            self._closed=True
             raise NativeOperatorSessionHold(
                 "native source identity unavailable"
             ) from exc
@@ -173,9 +211,7 @@ class NativeOperatorSession:
             raise NativeOperatorSessionHold("native model epoch/principal changed")
         if self._closed:
             raise NativeOperatorSessionHold("session already stopped")
-        if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
-            self._closed=True
-            raise NativeOperatorSessionHold("operator session time budget exhausted")
+        self._elapsed()
         if self.source_fence is not None:
             try:
                 self.source_fence.assert_live(self.worker)
@@ -207,6 +243,7 @@ class NativeOperatorSession:
         output stream must not publish that stale result.
         """
         try:
+            self._elapsed()
             if ActiveModel.from_supervisor(self.worker)!=self.identity:
                 raise NativeOperatorSessionHold(
                     "native operator identity changed before publication"
@@ -225,6 +262,14 @@ class NativeOperatorSession:
         self._valid_worker()
         if cmd.operation not in ("start","resume"):
             return
+        # The remaining *session* lifetime must cover the entire explicitly
+        # reserved task wall budget. Never launch an inference that cannot
+        # fit inside this operator's remaining authorized time window.
+        remaining=self.limits.maximum_wall_seconds-self._elapsed()
+        if cmd.max_wall_seconds>remaining:
+            raise NativeOperatorSessionHold(
+                "requested native run outlives remaining operator wall budget"
+            )
         output=cmd.max_model_calls*self._native_output_ceiling
         if (self._reserved_calls+cmd.max_model_calls
                 > self.limits.maximum_reserved_model_calls
@@ -317,6 +362,8 @@ class NativeOperatorSession:
                     "maximum_commands":self.limits.maximum_commands,
                     "reserved_model_calls":self._reserved_calls,
                     "reserved_output_tokens":self._reserved_output,
+                    "published_result_bytes":self._published_result_bytes,
+                    "maximum_session_result_bytes":self.limits.maximum_session_result_bytes,
                     "actual_model_forward_pass_by_status":False,
                     "release_certified":False,
                 }
@@ -359,25 +406,48 @@ class NativeOperatorSession:
         try:
             while not self._closed:
                 self._valid_worker()
-                raw=source.readline(self.limits.maximum_line_bytes+2)
-                if not raw:
+                # Reserve one extra byte beyond the maximum JSON payload
+                # plus the optional CRLF framing. A stream returning text,
+                # None or any other sentinel is never a successful EOF.
+                raw=source.readline(self.limits.maximum_line_bytes+3)
+                if raw==b"":
+                    self._before_publication()
                     break
-                if type(raw) is not bytes or len(raw)>self.limits.maximum_line_bytes:
-                    raise NativeOperatorSessionHold("operator command line too long")
-                if not raw.endswith(b"\n"):
+                if type(raw) is not bytes:
+                    raise NativeOperatorSessionHold("binary command stream required")
+                if (len(raw)>self.limits.maximum_line_bytes+2
+                        or not raw.endswith(b"\n")):
                     raise NativeOperatorSessionHold("unterminated or oversized command")
+                payload=raw[:-1]
+                if payload.endswith(b"\r"):
+                    payload=payload[:-1]
+                if len(payload)>self.limits.maximum_line_bytes:
+                    raise NativeOperatorSessionHold("operator command line too long")
                 command=parse_operator_command(
-                    raw.rstrip(b"\r\n"),limit=self.limits.maximum_line_bytes,
+                    payload,limit=self.limits.maximum_line_bytes,
                 )
                 result=self.dispatch(command)
                 output=json.dumps(
                     result,sort_keys=True,ensure_ascii=False,allow_nan=False,
                     separators=(",",":"),
                 )+"\n"
-                if len(output.encode("utf-8","strict"))>self.limits.maximum_result_bytes:
+                output_size=len(output.encode("utf-8","strict"))
+                if output_size>self.limits.maximum_result_bytes:
                     raise NativeOperatorSessionHold("operator disclosure exceeds result ceiling")
+                if (self._published_result_bytes+output_size
+                        > self.limits.maximum_session_result_bytes):
+                    raise NativeOperatorSessionHold(
+                        "cumulative operator disclosure budget exhausted"
+                    )
                 self._before_publication()
-                destination.write(output)
+                # Reserve before attempting output. A partial/unknown write
+                # must never refund bytes and silently resume the stream.
+                self._published_result_bytes+=output_size
+                written=destination.write(output)
+                if type(written) is not int or written!=len(output):
+                    raise NativeOperatorSessionHold(
+                        "operator disclosure stream did not accept complete frame"
+                    )
                 if callable(getattr(destination,"flush",None)):
                     destination.flush()
             return 0
