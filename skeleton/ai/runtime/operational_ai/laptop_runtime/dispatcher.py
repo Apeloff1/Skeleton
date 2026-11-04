@@ -1,64 +1,141 @@
-"""Concrete authenticated operations over the existing real production supervisor.
+"""Source-bound, owner-scoped operations over the canonical native supervisor.
 
-No fake model results, no alternative conversation database, and no automatic
-retry of uncertain inference. Each real turn calls SupervisedAI.turn once.
+No synthetic successful generation, extra database or retry lane exists.
+Native turn output is never published unless independent read-only SQLite
+replay proves the same exact committed text and digest.
 """
 from __future__ import annotations
+
 import secrets
-from .contracts import exact,refuse,canonical
+
+from .contracts import refuse
 from .identity import ActiveModel
 from .inputs import normalize
 from .operations import schema
 from .result_protocol import verify_turn_receipt
 
-class LaptopDispatcher:
-    def __init__(self,worker):
-        if worker is None or not hasattr(worker,"spine") or not hasattr(worker,"turn"):
-            refuse("production supervisor required")
-        self.worker=worker
-        self.active=ActiveModel.from_supervisor(worker)
-        self.limits=worker.spine.limits
 
-    def dispatch(self,operation,payload):
-        data=normalize(operation,payload,self.limits)
-        if operation=="create":
-            session="s_"+secrets.token_hex(16)
-            self.worker.spine.create(session)
-            return {"session_id":session,
-                    "model_sha256":self.active.model_sha256}
-        if operation=="turn":
-            result=self.worker.turn(data["session_id"],data["request_id"],
-                data["prompt"],seed=data.get("seed",0),
-                temperature=data.get("temperature",0.8))
-            result=verify_turn_receipt(result,
+class LaptopDispatcher:
+    """Guard a fixed active principal across all native API operations."""
+
+    def __init__(self, worker):
+        if worker is None or not hasattr(worker, "spine") or not hasattr(worker, "turn"):
+            refuse("production supervisor required")
+        self.worker = worker
+        self.active = ActiveModel.from_supervisor(worker)
+        self.limits = worker.spine.limits
+
+    def _assert_current(self) -> None:
+        """Deny stale model, tokenizer, tenant or subject before private IO."""
+        try:
+            observed = ActiveModel.from_supervisor(self.worker)
+        except (AttributeError, ValueError) as exc:
+            refuse("native supervisor principal unavailable")
+        if observed != self.active:
+            refuse("native supervisor identity changed after binding")
+
+    def _read_committed(self, data: dict[str, object]) -> dict[str, object] | None:
+        """Only the canonical durable replay can prove a committed answer."""
+        saved = self.worker.spine.replay(
+            data["session_id"], data["request_id"], data["prompt"],
+            seed=data.get("seed", 0),
+            temperature=data.get("temperature", 0.8),
+        )
+        if saved is None:
+            return None
+        verified = verify_turn_receipt(
+            saved,
+            model_sha256=self.active.model_sha256,
+            tokenizer_sha256=self.active.tokenizer_sha256,
+        )
+        if verified["replayed"] is not True:
+            refuse("SQLite replay must be explicitly marked replayed")
+        return verified
+
+    def dispatch(self, operation, payload):
+        """Validate shape and active source identity before any native effect."""
+        data = normalize(operation, payload, self.limits)
+        self._assert_current()
+        if operation == "create":
+            session = "s_" + secrets.token_hex(16)
+            allocated = self.worker.spine.create(session)
+            if allocated != session:
+                refuse("native SQLite session allocation disagreed")
+            self._assert_current()
+            return {
+                "session_id": session,
+                "model_sha256": self.active.model_sha256,
+            }
+        if operation == "turn":
+            produced = self.worker.turn(
+                data["session_id"], data["request_id"], data["prompt"],
+                seed=data.get("seed", 0),
+                temperature=data.get("temperature", 0.8),
+            )
+            # Even a signed, schema-valid worker reply is not sufficient:
+            # it may have failed before the transactional SQLite commit.
+            checked = verify_turn_receipt(
+                produced,
                 model_sha256=self.active.model_sha256,
-                tokenizer_sha256=self.active.tokenizer_sha256)
-            # The authoritative receipt comes from the existing SQLite spine;
-            # never fabricate a result if generation failed or timed out.
-            return {"receipt":result}
-        if operation=="history":
-            history=self.worker.spine.history(data["session_id"])
-            if not isinstance(history,(tuple,list)):
-                refuse("invalid authoritative history")
-            return {"session_id":data["session_id"],"messages":list(history)}
-        if operation=="replay":
-            result=self.worker.spine.replay(data["session_id"],data["request_id"],
-                data["prompt"],seed=data.get("seed",0),
-                temperature=data.get("temperature",0.8))
-            return {"replay":result,"found":result is not None}
-        if operation=="close":
-            return {"closed":self.worker.spine.close(data["session_id"])}
-        if operation=="status":
-            return {"status":self.worker.status(),"model_sha256":self.active.model_sha256}
-        if operation=="doctor":
-            return {"doctor":self.worker.spine.health(),"release_certified":False}
-        if operation=="identity":
-            return {"identity":self.active.to_record(),"release_certified":False}
-        if operation=="outbox_pending":
-            return {"events":list(self.worker.spine.pending_events(limit=data.get("limit",16)))}
-        if operation=="outbox_ack":
-            return {"acknowledged":self.worker.spine.acknowledge_event(
-                data["event_key"],data["event_sha256"])}
+                tokenizer_sha256=self.active.tokenizer_sha256,
+            )
+            committed = self._read_committed(data)
+            if committed is None:
+                refuse("native generation is missing a committed SQLite replay")
+            for name in (
+                "text", "output_sha256", "model_sha256", "tokenizer_sha256",
+                "prompt_tokens", "generated_tokens",
+            ):
+                if checked[name] != committed[name]:
+                    refuse("native result differs from committed SQLite replay")
+            self._assert_current()
+            return {"receipt": checked}
+        if operation == "history":
+            result = self.worker.spine.history(data["session_id"])
+            if type(result) not in (tuple, list):
+                refuse("invalid authoritative transcript")
+            self._assert_current()
+            return {"session_id": data["session_id"], "messages": list(result)}
+        if operation == "replay":
+            result = self._read_committed(data)
+            self._assert_current()
+            return {"replay": result, "found": result is not None}
+        if operation == "close":
+            result = self.worker.spine.close(data["session_id"])
+            if type(result) is not bool:
+                refuse("invalid native session closure")
+            self._assert_current()
+            return {"closed": result}
+        if operation == "status":
+            result = self.worker.status()
+            self._assert_current()
+            return {
+                "status": result,
+                "model_sha256": self.active.model_sha256,
+            }
+        if operation == "doctor":
+            result = self.worker.spine.health()
+            self._assert_current()
+            return {"doctor": result, "release_certified": False}
+        if operation == "identity":
+            return {
+                "identity": self.active.to_record(),
+                "release_certified": False,
+            }
+        if operation == "outbox_pending":
+            events = list(
+                self.worker.spine.pending_events(limit=data.get("limit", 16))
+            )
+            self._assert_current()
+            return {"events": events}
+        if operation == "outbox_ack":
+            acknowledged = self.worker.spine.acknowledge_event(
+                data["event_key"], data["event_sha256"]
+            )
+            if type(acknowledged) is not bool:
+                refuse("invalid durable outbox acknowledgment")
+            self._assert_current()
+            return {"acknowledged": acknowledged}
         refuse("unreachable unapproved operation")
 
     def protocol(self):
