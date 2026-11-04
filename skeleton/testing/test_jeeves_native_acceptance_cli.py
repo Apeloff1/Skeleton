@@ -7,6 +7,7 @@ real model weights, source rights, Windows, GPU or consumer release.
 from __future__ import annotations
 
 from contextlib import nullcontext, redirect_stdout, redirect_stderr
+from dataclasses import replace
 from io import BytesIO, StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -162,7 +163,9 @@ class RealAcceptanceWiringTests(unittest.TestCase):
         self.assertEqual(self.worker.spine.generations,0)
 
     def test_foreign_owner_refused_without_sqlite_or_native(self):
-        self.worker.spine.identity.subject="foreign"
+        self.worker.spine.identity=replace(
+            self.worker.spine.identity,subject="foreign",
+        )
         with self.assertRaises(NativeAcceptanceHold):
             run_acceptance(**arguments())
         self.f.assert_not_called()
