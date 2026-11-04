@@ -317,8 +317,24 @@ class DesktopBridge:
                 or report.get("signed_source_manifest_sha256") != getattr(
                     self, "signed_source_manifest_sha256", None
                 )
+                or report.get("reasoning_profile", "guarded") != fields.get(
+                    "profile", "guarded"
+                )
             ):
                 raise DesktopBridgeHold("native strict Jeeves agent result not authorized")
+            policy = report.get("planning_policy")
+            if policy is not None and (
+                type(policy) is not dict
+                or policy.get("schema") != "jeeves.desktop.native-planning-profile.v1"
+                or policy.get("profile") != fields.get("profile", "guarded")
+                or policy.get("persistent_memory_promotion_enabled") is not False
+                or policy.get("tool_grants_changed_by_profile") is not False
+                or policy.get("additional_provider_started") is not False
+                or policy.get("release_certified") is not False
+            ):
+                raise DesktopBridgeHold("native planner profile or permission receipt changed")
+            if fields.get("profile", "guarded") == "advanced" and policy is None:
+                raise DesktopBridgeHold("advanced native planning policy proof absent")
             answer = report.get("answer")
             proof = report.get("output_sha256")
             if type(answer) is not str or type(proof) is not str:

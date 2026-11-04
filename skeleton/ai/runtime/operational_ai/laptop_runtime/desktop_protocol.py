@@ -121,7 +121,7 @@ _ALLOWED: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "source-status": (frozenset(), frozenset()),
     "agent": (
         frozenset({"run_id", "prompt"}),
-        frozenset({"maximum_steps", "maximum_model_calls", "maximum_wall_seconds"}),
+        frozenset({"maximum_steps", "maximum_model_calls", "maximum_wall_seconds", "profile"}),
     ),
     "durable": (
         frozenset({"run_id", "prompt", "action"}),
@@ -150,6 +150,12 @@ def command(op: str, **fields: object) -> dict[str, object]:
         result["session_id"] = identifier(fields["session_id"], "session ID")
     if "run_id" in fields:
         result["run_id"] = identifier(fields["run_id"], "native agent run ID")
+    if "profile" in fields:
+        if type(fields["profile"]) is not str or fields["profile"] not in (
+            "guarded", "advanced",
+        ):
+            raise DesktopProtocolHold("unapproved native planning profile")
+        result["profile"] = fields["profile"]
     if "action" in fields:
         if (
             type(fields["action"]) is not str
@@ -189,7 +195,7 @@ def require_command(value: object) -> dict[str, object]:
     if type(value) is not dict or set(value) - (
         {"schema", "op", "session_id", "request_id", "prompt", "seed", "temperature",
          "context", "run_id", "maximum_steps", "maximum_model_calls",
-         "maximum_wall_seconds", "action"}
+         "maximum_wall_seconds", "action", "profile"}
     ):
         raise DesktopProtocolHold("desktop command envelope has unknown fields")
     if value.get("schema") != SCHEMA_COMMAND:

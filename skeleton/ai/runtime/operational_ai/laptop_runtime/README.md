@@ -140,3 +140,11 @@ pressure or unknown kernel telemetry revokes that same native child
 without automatic inference retry. This is a conservative pressure
 guard, not GPU memory offload. Detailed thresholds and holds:
 `docs/ai/JEEVES_NATIVE_PRESSURE_SUPERVISOR.md`.
+
+## Advanced native reasoning profile
+
+The desktop's explicit `advanced` profile configures bounded planning,
+replanning and model verification using the existing
+`StrictJeevesAgentRuntime` against the same one installed GGUF and SQLite
+owner. It cannot raise tool permissions, start other providers or stage
+persistent memory. `docs/ai/JEEVES_ADVANCED_NATIVE_REASONING.md`.
