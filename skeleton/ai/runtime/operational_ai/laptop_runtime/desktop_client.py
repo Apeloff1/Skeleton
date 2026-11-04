@@ -46,10 +46,26 @@ class DesktopConfig:
     enable_signed_source_tool: bool = False
     max_signed_sources: int = 4
     max_signed_tool_calls: int = 3
+    enable_pressure_guard: bool = False
+    minimum_free_ram_bytes: int = 512 * 1024 * 1024
+    minimum_free_disk_bytes: int = 256 * 1024 * 1024
+    pressure_interval_ms: int = 500
 
     def __post_init__(self) -> None:
         identifier(self.tenant, "tenant")
         identifier(self.subject, "subject")
+        if type(self.enable_pressure_guard) is not bool:
+            raise DesktopBridgeHold("explicit boolean pressure supervision required")
+        from .desktop_pressure import PressurePolicy
+        PressurePolicy(
+            minimum_available_ram_bytes=self.minimum_free_ram_bytes,
+            minimum_state_disk_bytes=self.minimum_free_disk_bytes,
+            sample_interval_ms=self.pressure_interval_ms,
+            maximum_native_rss_bytes=min(
+                20_000_000_000,
+                self.capacity_budget_bytes * 95 // 100,
+            ) if self.enable_pressure_guard else 0,
+        )
         if type(self.enable_signed_source_tool) is not bool:
             raise DesktopBridgeHold("explicit boolean source tool approval required")
         if (
@@ -142,6 +158,27 @@ class DesktopBridge:
         self.session_id: str | None = None
         self.model_sha256: str | None = None
         self.signed_source_manifest_sha256: str | None = None
+        self._pressure_guard = None
+        self._pressure_reason: str | None = None
+
+    @property
+    def pressure_status(self) -> dict[str, Any]:
+        guard = getattr(self, "_pressure_guard", None)
+        return {
+            "schema": "jeeves.desktop.parent-pressure.v1",
+            "enabled": bool(
+                getattr(getattr(self, "config", None), "enable_pressure_guard", False),
+            ),
+            "pressure_hold": getattr(self, "_pressure_reason", None),
+            "sample": guard.latest if guard is not None else None,
+            "native_worker_connected": self.connected,
+            "gpu_pressure_qualified": False,
+            "release_certified": False,
+        }
+
+    def _revoke_on_pressure(self, reason: str) -> None:
+        self._pressure_reason = reason
+        self.abort()
 
     @property
     def connected(self) -> bool:
@@ -410,6 +447,27 @@ class DesktopBridge:
                 raise DesktopBridgeHold("native child never published source-checked ready")
             if process.poll() is not None:
                 raise DesktopBridgeHold("native worker exited during startup")
+            if getattr(self.config, "enable_pressure_guard", False):
+                from .desktop_pressure import (
+                    NativePressureSupervisor, PressurePolicy,
+                )
+                limits = PressurePolicy(
+                    minimum_available_ram_bytes=self.config.minimum_free_ram_bytes,
+                    minimum_state_disk_bytes=self.config.minimum_free_disk_bytes,
+                    maximum_native_rss_bytes=min(
+                        20_000_000_000,
+                        self.config.capacity_budget_bytes * 95 // 100,
+                    ),
+                    sample_interval_ms=self.config.pressure_interval_ms,
+                )
+                guard = NativePressureSupervisor(
+                    process, state_dir=Path(self.config.state_dir),
+                    policy=limits, revoke=self._revoke_on_pressure,
+                )
+                self._pressure_guard = guard
+                guard.start()
+                if not self.connected:
+                    raise DesktopBridgeHold("native startup exceeded resource pressure")
             return result
         except BaseException:
             self.abort()
@@ -472,6 +530,9 @@ class DesktopBridge:
     def abort(self) -> None:
         """Terminally revoke the child. Never launch replacement implicitly."""
         self._dead = True
+        guard = getattr(self, "_pressure_guard", None)
+        if guard is not None:
+            guard.stop()
         process = self._process
         if process is not None:
             try:

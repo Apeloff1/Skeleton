@@ -277,3 +277,15 @@ HMAC, original bytes, tenant/model/tokenizer and expiry before loading
 GGUF, then verifies the same identity at native binding and each run. No
 unsigned source fallback or general file tool is permitted. See
 `docs/ai/JEEVES_DESKTOP_SIGNED_NATIVE_SOURCE_AGENT.md`.
+
+## Live native RAM/cgroup/disk pressure guard
+
+The desktop can arm an operator-configured parent-side resource monitor
+after an independently accepted local GGUF ready frame. It observes
+actual Linux host RAM, cgroup limits, SQLite storage free bytes and
+the native child's process-RSS identity. Persistent low headroom,
+source-process replacement or unavailable telemetry revoke the isolated
+worker without repeating uncertain native work. **Host pressure status**
+displays only the latest bounded measurements. GPU/VRAM and native
+cancellation qualification remain open. See
+`docs/ai/JEEVES_NATIVE_PRESSURE_SUPERVISOR.md`.

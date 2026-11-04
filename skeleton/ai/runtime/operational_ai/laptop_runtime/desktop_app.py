@@ -50,6 +50,8 @@ class JeevesWindow(tk.Tk):
         self.agent_wall = tk.StringVar(value="180")
         self.durable_run_id = tk.StringVar(value="")
         self.enable_signed_source_tool = tk.BooleanVar(value=False)
+        self.enable_pressure_guard = tk.BooleanVar(value=True)
+        self._pressure_notified = False
 
         self.fields: dict[str, tk.StringVar] = {
             "model_root": tk.StringVar(value=""),
@@ -67,6 +69,9 @@ class JeevesWindow(tk.Tk):
             "signed_source_manifest": tk.StringVar(value=""),
             "max_signed_sources": tk.StringVar(value="4"),
             "max_signed_tool_calls": tk.StringVar(value="3"),
+            "minimum_free_ram_bytes": tk.StringVar(value="536870912"),
+            "minimum_free_disk_bytes": tk.StringVar(value="268435456"),
+            "pressure_interval_ms": tk.StringVar(value="500"),
         }
         self.resume_id = tk.StringVar(value="")
         self.session_text = tk.StringVar(value="No native session")
@@ -98,6 +103,9 @@ class JeevesWindow(tk.Tk):
              "Signed source manifest", "signed_source_manifest"),
             ("Signed sources", "max_signed_sources",
              "Read-only lookup calls", "max_signed_tool_calls"),
+            ("Minimum RAM headroom (bytes)", "minimum_free_ram_bytes",
+             "Minimum state disk free (bytes)", "minimum_free_disk_bytes"),
+            ("Pressure sampling interval (ms)", "pressure_interval_ms", None, None),
         ]
         for row_idx, (label_a, key_a, label_b, key_b) in enumerate(rows):
             ttk.Label(settings, text=label_a).grid(
@@ -118,18 +126,26 @@ class JeevesWindow(tk.Tk):
             settings,
             text="I explicitly authorize bounded read-only lookup of operator-signed sources",
             variable=self.enable_signed_source_tool,
-        ).grid(row=8, column=0, columnspan=4, sticky="w", pady=(4, 2))
+        ).grid(row=10, column=0, columnspan=4, sticky="w", pady=(4, 2))
+        ttk.Checkbutton(
+            settings,
+            text="Protect active native GGUF child against observed host/cgroup/disk pressure",
+            variable=self.enable_pressure_guard,
+        ).grid(row=11, column=0, columnspan=4, sticky="w", pady=(4, 2))
+        ttk.Button(
+            settings, text="Host pressure status", command=self._pressure_status,
+        ).grid(row=12, column=0, sticky="w", pady=(4, 0))
         self.profile_button = ttk.Button(
             settings, text="Suggest measured CPU/RAM profile",
             command=self._suggest_profile,
         )
         self.profile_button.grid(
-            row=9, column=1, columnspan=2, sticky="e", pady=(5, 0),
+            row=12, column=1, columnspan=2, sticky="e", pady=(5, 0),
         )
         ttk.Button(
             settings, text="Prepare / install approved local model",
             command=self._setup,
-        ).grid(row=9, column=3, sticky="e", pady=(5, 0))
+        ).grid(row=12, column=3, sticky="e", pady=(5, 0))
 
         bar = ttk.Frame(main)
         bar.grid(row=1, column=0, sticky="ew", pady=(0, 8))
@@ -334,6 +350,8 @@ class JeevesWindow(tk.Tk):
             "context", "max_output_tokens", "threads", "gpu_layers",
             "inference_ms", "capacity_budget_bytes",
             "max_signed_sources", "max_signed_tool_calls",
+            "minimum_free_ram_bytes", "minimum_free_disk_bytes",
+            "pressure_interval_ms",
         )
         for key in fields:
             form[key] = int(form[key])
@@ -342,11 +360,22 @@ class JeevesWindow(tk.Tk):
         ):
             form[optional] = form[optional] or None
         form["enable_signed_source_tool"] = self.enable_signed_source_tool.get()
+        form["enable_pressure_guard"] = self.enable_pressure_guard.get()
         return DesktopConfig(**form)
 
     def _setup(self):
         from .desktop_setup_ui import SetupWindow
         SetupWindow(self)
+
+    def _pressure_status(self):
+        bridge = self._bridge or self._connecting
+        if bridge is None:
+            self._show("Native pressure", "No active local child to observe")
+            return
+        self._show(
+            "Measured native resource pressure",
+            json.dumps(bridge.pressure_status, ensure_ascii=False, sort_keys=True),
+        )
 
     def _suggest_profile(self):
         # Read-only model source inspection and host/cgroup measurements can
@@ -426,6 +455,7 @@ class JeevesWindow(tk.Tk):
             self._show("Connection held", type(exc).__name__, "warning")
             return
         self._epoch += 1
+        self._pressure_notified = False
         self._busy = True
         self._connecting = bridge
         self.connection_text.set("Loading independently installed native GGUF…")
@@ -443,6 +473,7 @@ class JeevesWindow(tk.Tk):
 
     def _disconnect(self):
         self._epoch += 1
+        self._pressure_notified = False
         current = self._bridge or self._connecting
         if current is not None:
             current.abort()
@@ -810,6 +841,23 @@ class JeevesWindow(tk.Tk):
                 self._controls()
         except Empty:
             pass
+        bridge = self._bridge
+        if (
+            bridge is not None and not bridge.connected
+            and not self._pressure_notified
+            and bridge.pressure_status.get("pressure_hold") is not None
+        ):
+            self._pressure_notified = True
+            self.connection_text.set(
+                "Native source held by pressure guard — manually inspect before reopening",
+            )
+            self._show(
+                "Native child revoked under measured pressure",
+                str(bridge.pressure_status.get("pressure_hold"))
+                + ". No automatic replay/retry; preserve any SQLite request IDs.",
+                "warning",
+            )
+            self._controls()
         self.after(75, self._pump)
 
     def _exit(self):

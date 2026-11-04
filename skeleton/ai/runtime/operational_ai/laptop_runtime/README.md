@@ -131,3 +131,12 @@ independent operator HMAC key, installed model/tokenizer identity and finite
 source/call grants. Off by default. Original source bytes are verified
 before native startup and before/after each strict agent run; no tool
 authorizes writes. `docs/ai/JEEVES_DESKTOP_SIGNED_NATIVE_SOURCE_AGENT.md`.
+
+## Adaptive host pressure protection
+
+The GUI may supervise the live GGUF child with measured host RAM,
+effective cgroup memory, local state disk and process RSS. Sustained
+pressure or unknown kernel telemetry revokes that same native child
+without automatic inference retry. This is a conservative pressure
+guard, not GPU memory offload. Detailed thresholds and holds:
+`docs/ai/JEEVES_NATIVE_PRESSURE_SUPERVISOR.md`.
