@@ -419,7 +419,15 @@ def public_service_urls(
         "skeleton": "SKELETON_PORT",
         "chroma": "CHROMA_PORT",
     }
-    return {name: resolved.service(name).public_url for name, key in ports.items() if values.get(key, "")}
+    # Every consumer needs the complete host-facing contract, even when no
+    # operator port overrides are present. Returning only overridden entries
+    # made the installer index a missing backend URL after a healthy start.
+    # runtime_manifest has already validated every supplied port override.
+    return {
+        name: resolved.service(name).public_url
+        for name in ports
+        if resolved.service(name).public_url
+    }
 
 
 def _usable_secret(value: str) -> bool:
