@@ -41,6 +41,23 @@ class MongoEpochDocumentShapeTests(unittest.IsolatedAsyncioTestCase):
             {"phase": "stable", "writer_token": None, "epoch": 2},
         ), 2)
 
+    async def test_stable_document_rejects_executable_phase_and_epoch(self):
+        class ExecutableInt(int):
+            def __eq__(self, other):
+                raise AssertionError("untrusted epoch comparison executed")
+
+        class ExecutableString(str):
+            def __eq__(self, other):
+                raise AssertionError("untrusted phase comparison executed")
+
+        for doc in (
+            {"phase": ExecutableString("stable"), "writer_token": None, "epoch": 2},
+            {"phase": "stable", "writer_token": None, "epoch": ExecutableInt(2)},
+        ):
+            with self.subTest(document=repr(doc)):
+                with self.assertRaises(MongoSourceEpochError):
+                    await self._read(doc)
+
     async def test_noncanonical_phase_and_epoch_fail_closed(self):
         for document in (
             {"phase": "stable", "writer_token": None, "epoch": True},
