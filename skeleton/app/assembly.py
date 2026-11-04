@@ -371,6 +371,17 @@ def _read_dotenv(path: Path) -> dict[str, str]:
             or len(payload) != info.st_size
         ):
             raise ValueError("private runtime environment changed during read")
+        # Detect a pathname replaced after descriptor admission.
+        try:
+            current = path.lstat()
+        except FileNotFoundError as exc:
+            raise ValueError("private runtime environment changed during read") from exc
+        if (
+            not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or (current.st_dev, current.st_ino) != (after.st_dev, after.st_ino)
+        ):
+            raise ValueError("private runtime environment changed during read")
         decoded = payload.decode("utf-8")
     finally:
         os.close(descriptor)
