@@ -112,13 +112,34 @@ class NativeJeevesProvider:
         session, native_request_id = self._keys(request)
         started = time.monotonic()
         with self._lock:
-            self._ensure_session(session)
-            # Read-only replay first. Nothing may re-run an uncertain model
-            # effect merely because Jeeves was restarted or retried.
-            saved = self._worker.spine.replay(
-                session, native_request_id, prompt.text,
-                seed=0, temperature=temperature,
-            )
+            # A process whose finite attempt fence is exhausted may still
+            # inspect an existing committed SQLite result. It must NOT create
+            # a new durable session merely to deny another generation.
+            # This keeps quota refusal a read-only, fail-closed operation.
+            full = (native_request_id not in self._attempted
+                    and len(self._attempted) >= self._maximum_attempts)
+            if full:
+                try:
+                    saved = self._worker.spine.replay(
+                        session, native_request_id, prompt.text,
+                        seed=0, temperature=temperature,
+                    )
+                except Conflict:
+                    # Unknown session or conflicting request identity does
+                    # not authorize the creation of any new durable state.
+                    saved = None
+                if saved is None:
+                    raise ProviderError(
+                        "native process attempt ledger at safe capacity"
+                    )
+            else:
+                self._ensure_session(session)
+                # Read-only replay first. Nothing may rerun an uncertain model
+                # effect merely because Jeeves restarted or was called twice.
+                saved = self._worker.spine.replay(
+                    session, native_request_id, prompt.text,
+                    seed=0, temperature=temperature,
+                )
             if saved is not None:
                 result = saved
             else:
