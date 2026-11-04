@@ -321,3 +321,13 @@ original operator capacity budget, refuses unsafe shapes, and supplies
 an exact typed receipt bound by the parent to the actual activated model.
 It never silently changes threads/context or guesses GPU VRAM. See
 `docs/ai/JEEVES_FRESH_PRELOAD_HARDWARE_ADMISSION.md`.
+
+## Complete Git-native reviewable source changes
+
+The desktop now combines new-file and existing-file Jeeves proposals
+into one SHA-256-bound Git patch, with strict original-source rechecks
+before exporting a brand-new owner-private `0600` source artifact
+outside the project. The operator explicitly approves both original
+manifest and final patch digests. Neither Jeeves nor the export
+runs Git or overwrites live project source. Detailed operator workflow:
+`docs/ai/JEEVES_PORTABLE_GIT_PATCH_DELIVERY.md`.

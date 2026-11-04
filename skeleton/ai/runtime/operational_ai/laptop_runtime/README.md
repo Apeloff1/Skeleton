@@ -184,3 +184,14 @@ working memory before the native loader. A stale advisory profile cannot
 authorize an oversized model. The original resource request stays unchanged,
 and a typed source-bound ready receipt is verified by the UI parent.
 `docs/ai/JEEVES_FRESH_PRELOAD_HARDWARE_ADMISSION.md`.
+
+## Portable reviewed Git patch export
+
+Use **Build reviewed Git patch** to combine exact new-file proposals
+and checked original-file edits into one Git-compatible source artifact.
+An operator reviews the entire unified diff, confirms full source
+and patch SHA-256, then exports a NEW private `0600` patch outside
+the original workspace. The model gains no shell, Git index, or file
+write grant. The exported bytes may be manually checked with
+`git apply --check` before any separate operator-authorized
+application. `docs/ai/JEEVES_PORTABLE_GIT_PATCH_DELIVERY.md`.

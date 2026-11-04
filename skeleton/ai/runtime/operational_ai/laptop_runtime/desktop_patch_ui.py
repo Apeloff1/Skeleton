@@ -1,0 +1,461 @@
+"""Desktop review and export of one original no-clobber offline Git patch.
+
+Two existing Jeeves source interfaces become one coherent operator-approved
+delivery: NEW files and checked existing-file edits. Neither model text nor
+this Tk window may execute Git, stage the repository, overwrite originals,
+create executable files, or silently apply the patch.
+"""
+from __future__ import annotations
+
+import json
+from queue import Empty, Queue
+import threading
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+from tkinter.scrolledtext import ScrolledText
+
+from .desktop_existing_edits import SCHEMA as EDIT_SCHEMA
+from .desktop_patch_bundle import (
+    PortablePatchPlan, review_patch_bundle, get_reviewed_patch,
+)
+from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
+
+
+class PortablePatchWindow(tk.Toplevel):
+    """Human-selected project, exact untrusted sources, private exported diff."""
+
+    def __init__(self, parent, *, source_text: str = ""):
+        super().__init__(parent)
+        self.parent_ui = parent
+        self.title("Jeeves — Review and Export Native Git Patch")
+        self.geometry("1180x850")
+        self.minsize(900, 675)
+        self.protocol("WM_DELETE_WINDOW", self._exit)
+        self.root_path = tk.StringVar()
+        self.export_path = tk.StringVar()
+        self.expected_manifest = tk.StringVar()
+        self.expected_patch = tk.StringVar()
+        self.status = tk.StringVar(
+            value="No source patch reviewed. The model has no Git/file-write tools.",
+        )
+        self._busy = False
+        self._closed = False
+        self._epoch = 0
+        self._plan: PortablePatchPlan | None = None
+        self._reviewed_texts = None
+        self._export_receipt = None
+        self._queue: Queue = Queue()
+        self._build()
+        if source_text:
+            self._seed_model_proposal(source_text)
+        self.after(85, self._poll)
+
+    def _build(self):
+        frame = ttk.Frame(self, padding=11)
+        frame.pack(fill="both", expand=True)
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(3, weight=2)
+        frame.rowconfigure(5, weight=2)
+        frame.rowconfigure(7, weight=3)
+
+        ttk.Label(
+            frame, wraplength=1100,
+            text=(
+                "Jeeves can propose original NEW project files and edits to EXISTING "
+                "files. Combine those two independent strict JSON plans below, "
+                "review the complete Git diff and SHA-256 hashes, then explicitly "
+                "export a patch to a separate owner-private directory. "
+                "No Git command runs, no source file changes, no network use."
+            ),
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        location = ttk.Frame(frame)
+        location.grid(row=1, column=0, sticky="ew")
+        location.columnconfigure(1, weight=1)
+        ttk.Label(location, text="Original local source project root").grid(
+            row=0, column=0, sticky="w",
+        )
+        ttk.Entry(location, textvariable=self.root_path).grid(
+            row=0, column=1, sticky="ew", padx=6,
+        )
+        ttk.Button(
+            location, text="Browse", command=self._browse_root,
+        ).grid(row=0, column=2)
+
+        labels = ttk.Frame(frame)
+        labels.grid(row=2, column=0, sticky="ew", pady=(8, 3))
+        labels.columnconfigure(0, weight=1)
+        labels.columnconfigure(1, weight=1)
+        ttk.Label(
+            labels, text="NEW files (optional): jeeves.workspace.new-files.v1",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            labels, text="EXISTING edits (optional): jeeves.workspace.existing-file-edits.v1",
+        ).grid(row=0, column=1, sticky="w", padx=(8, 0))
+
+        sources = ttk.Frame(frame)
+        sources.grid(row=3, column=0, sticky="nsew")
+        sources.columnconfigure(0, weight=1)
+        sources.columnconfigure(1, weight=1)
+        sources.rowconfigure(0, weight=1)
+        self.new_text = ScrolledText(
+            sources, height=8, wrap="none", undo=True,
+        )
+        self.new_text.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        self.existing_text = ScrolledText(
+            sources, height=8, wrap="none", undo=True,
+        )
+        self.existing_text.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+        for widget in (self.new_text, self.existing_text):
+            widget.bind("<<Modified>>", self._edited)
+
+        controls = ttk.Frame(frame)
+        controls.grid(row=4, column=0, sticky="ew", pady=(9, 4))
+        self.review_button = ttk.Button(
+            controls, text="Review COMPLETE project diff",
+            command=self._review,
+        )
+        self.review_button.pack(side="left")
+        self.reset_button = ttk.Button(
+            controls, text="Invalidate source review",
+            command=self._invalidate,
+        )
+        self.reset_button.pack(side="left", padx=6)
+        ttk.Label(
+            controls, text="A changed original source or proposal invalidates export.",
+        ).pack(side="left", padx=12)
+
+        self.files = ttk.Treeview(
+            frame,
+            columns=("path", "kind", "original", "replacement", "bytes"),
+            show="headings", height=5,
+        )
+        for key, title, width in (
+            ("path", "Relative source path", 330),
+            ("kind", "Change", 85),
+            ("original", "Original SHA-256", 235),
+            ("replacement", "Replacement SHA-256", 235),
+            ("bytes", "New bytes", 88),
+        ):
+            self.files.heading(key, text=title)
+            self.files.column(key, width=width, stretch=key == "path")
+        self.files.grid(row=5, column=0, sticky="nsew", pady=(4, 8))
+
+        ttk.Label(
+            frame, text="FULL patch for review — Git-compatible, inert text",
+        ).grid(row=6, column=0, sticky="w")
+        self.preview = ScrolledText(
+            frame, height=10, wrap="none", state="disabled",
+            font=("TkFixedFont", 10),
+        )
+        self.preview.grid(row=7, column=0, sticky="nsew", pady=(4, 8))
+
+        approvals = ttk.LabelFrame(
+            frame, text="Explicit full SHA-256 approval", padding=7,
+        )
+        approvals.grid(row=8, column=0, sticky="ew")
+        approvals.columnconfigure(1, weight=1)
+        ttk.Label(approvals, text="Source manifest SHA-256").grid(
+            row=0, column=0, sticky="w",
+        )
+        ttk.Entry(
+            approvals, textvariable=self.expected_manifest,
+        ).grid(row=0, column=1, sticky="ew", padx=6)
+        ttk.Label(approvals, text="Final Git patch SHA-256").grid(
+            row=1, column=0, sticky="w",
+        )
+        ttk.Entry(
+            approvals, textvariable=self.expected_patch,
+        ).grid(row=1, column=1, sticky="ew", padx=6)
+        self.export_button = ttk.Button(
+            approvals, text="Export NEW private .patch only",
+            command=self._export,
+        )
+        self.export_button.grid(row=0, column=2, rowspan=2, padx=(6, 0))
+
+        destination = ttk.Frame(frame)
+        destination.grid(row=9, column=0, sticky="ew", pady=(7, 0))
+        destination.columnconfigure(1, weight=1)
+        ttk.Label(destination, text="Export outside project, inside existing 0700 folder").grid(
+            row=0, column=0, sticky="w",
+        )
+        ttk.Entry(destination, textvariable=self.export_path).grid(
+            row=0, column=1, sticky="ew", padx=6,
+        )
+        ttk.Button(
+            destination, text="Choose NEW .patch",
+            command=self._choose_export,
+        ).grid(row=0, column=2, padx=(0, 6))
+        self.verify_button = ttk.Button(
+            destination, text="Verify saved patch",
+            command=self._verify_export,
+        )
+        self.verify_button.grid(row=0, column=3)
+
+        ttk.Label(
+            frame, textvariable=self.status, wraplength=1130,
+        ).grid(row=10, column=0, sticky="ew", pady=(7, 0))
+        self.progress = ttk.Progressbar(frame, mode="indeterminate")
+        self.progress.grid(row=11, column=0, sticky="ew", pady=(7, 0))
+        self._buttons()
+
+    def _source_inputs(self):
+        return (
+            self.root_path.get(),
+            self.new_text.get("1.0", "end-1c"),
+            self.existing_text.get("1.0", "end-1c"),
+        )
+
+    def _seed_model_proposal(self, text: str):
+        # This is only input organization, NOT proof a model is allowed to
+        # write or a shortcut around the verified source proposal parsers.
+        try:
+            candidate = json.loads(text)
+            schema = candidate.get("schema") if type(candidate) is dict else None
+        except (ValueError, TypeError):
+            schema = None
+        target = self.existing_text if schema == EDIT_SCHEMA else self.new_text
+        target.insert("1.0", text)
+        target.edit_modified(False)
+
+    def _browse_root(self):
+        if self._busy:
+            return
+        root = filedialog.askdirectory(
+            parent=self, title="Select trusted original source project",
+        )
+        if root:
+            self.root_path.set(root)
+            self._invalidate()
+
+    def _choose_export(self):
+        if self._busy:
+            return
+        path = filedialog.asksaveasfilename(
+            parent=self, title="Choose NEW owner-private .patch file",
+            defaultextension=".patch",
+            filetypes=[("Inert reviewed Git patch", "*.patch")],
+        )
+        if path:
+            self.export_path.set(path)
+
+    def _preview(self, text: str):
+        self.preview.configure(state="normal")
+        self.preview.delete("1.0", "end")
+        self.preview.insert("1.0", text)
+        self.preview.configure(state="disabled")
+
+    def _edited(self, _event=None):
+        if (
+            self.new_text.edit_modified()
+            or self.existing_text.edit_modified()
+        ):
+            self.new_text.edit_modified(False)
+            self.existing_text.edit_modified(False)
+            if self._plan is not None and not self._busy:
+                self._invalidate()
+
+    def _invalidate(self):
+        if self._busy:
+            return
+        self._epoch += 1
+        self._plan = None
+        self._reviewed_texts = None
+        self._export_receipt = None
+        self.expected_manifest.set("")
+        self.expected_patch.set("")
+        for item in self.files.get_children():
+            self.files.delete(item)
+        self._preview("")
+        self.status.set(
+            "Review invalidated: re-read all original project bytes, then "
+            "confirm both full SHA-256 values again",
+        )
+        self._buttons()
+
+    def _buttons(self):
+        self.review_button.configure(state="disabled" if self._busy else "normal")
+        self.reset_button.configure(state="disabled" if self._busy else "normal")
+        self.export_button.configure(
+            state="normal" if not self._busy and self._plan is not None
+            else "disabled",
+        )
+        self.verify_button.configure(
+            state="normal" if not self._busy and self._export_receipt is not None
+            else "disabled",
+        )
+
+    def _review(self):
+        if self._busy:
+            return
+        self._invalidate()
+        values = self._source_inputs()
+        epoch = self._epoch
+        self._busy = True
+        self.status.set("Reading real source hashes and constructing exact Git patch…")
+        self.progress.start(85)
+        self._buttons()
+
+        def work():
+            try:
+                root, additions, edits = values
+                plan = review_patch_bundle(
+                    root, new_files=additions, existing_edits=edits,
+                )
+                diff = get_reviewed_patch(plan)
+                self._queue.put(("reviewed", epoch, values, plan, diff))
+            except BaseException as exc:
+                self._queue.put(("held", epoch, values, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _export(self):
+        plan = self._plan
+        if self._busy or plan is None:
+            return
+        if self._reviewed_texts != self._source_inputs():
+            self._invalidate()
+            return
+        if (
+            self.expected_manifest.get() != plan.manifest_sha256
+            or self.expected_patch.get() != plan.patch_sha256
+        ):
+            self.status.set("Type BOTH original full SHA-256 digests exactly")
+            return
+        destination = self.export_path.get()
+        if not messagebox.askyesno(
+            "Export original inert patch only?",
+            "This creates a NEW 0600 private Git patch outside your source "
+            "tree. It does NOT apply the patch, run shell commands, or "
+            "commit changes. Never export into .git, a shared folder, "
+            "or any source project. Continue?",
+            parent=self,
+        ):
+            return
+        self._busy = True
+        self.progress.start(85)
+        self.status.set(
+            "Rechecking every original SHA and exporting one no-overwrite patch…",
+        )
+        self._buttons()
+        epoch = self._epoch
+        manifest = plan.manifest_sha256
+        patch_digest = plan.patch_sha256
+
+        def work():
+            try:
+                result = export_reviewed_patch(
+                    plan, destination,
+                    expected_manifest_sha256=manifest,
+                    expected_patch_sha256=patch_digest,
+                    approve_export=True,
+                )
+                self._queue.put(("exported", epoch, destination, result))
+            except BaseException as exc:
+                self._queue.put(("export-held", epoch, destination, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _verify_export(self):
+        receipt = self._export_receipt
+        plan = self._plan
+        if self._busy or receipt is None or plan is None:
+            return
+        source = self.export_path.get()
+        if not source:
+            return
+        self._busy = True
+        epoch = self._epoch
+        self.progress.start(80)
+        self._buttons()
+
+        def work():
+            try:
+                result = verify_saved_patch(
+                    source, expected_patch_sha256=plan.patch_sha256,
+                    expected_bytes=plan.patch_bytes, workspace_root=plan.root,
+                )
+                self._queue.put(("verified", epoch, source, result))
+            except BaseException as exc:
+                self._queue.put(("verify-held", epoch, source, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _poll(self):
+        if self._closed:
+            return
+        try:
+            while True:
+                message = self._queue.get_nowait()
+                kind, epoch = message[0], message[1]
+                if epoch != self._epoch:
+                    continue
+                self._busy = False
+                self.progress.stop()
+                if kind == "reviewed":
+                    _, _, inputs, plan, patch = message
+                    if inputs != self._source_inputs():
+                        self.status.set(
+                            "Source inputs changed during review. Re-review required.",
+                        )
+                        self._buttons()
+                        continue
+                    self._plan = plan
+                    self._reviewed_texts = inputs
+                    for index, item in enumerate(plan.entries):
+                        self.files.insert(
+                            "", "end", iid=str(index),
+                            values=(
+                                item.path, item.kind, item.original_sha256 or "-",
+                                item.replacement_sha256, item.replacement_bytes,
+                            ),
+                        )
+                    self._preview(patch.decode("utf-8", "strict"))
+                    self.status.set(
+                        "FULL diff reviewed: "
+                        + str(len(plan.entries)) + " original changes · "
+                        + str(plan.patch_bytes) + " inert patch bytes · "
+                        + "MANIFEST " + plan.manifest_sha256
+                        + " · PATCH " + plan.patch_sha256,
+                    )
+                elif kind == "exported":
+                    _, _, destination, result = message
+                    if destination != self.export_path.get():
+                        self.status.set("Export destination changed: inspect manually")
+                    else:
+                        self._export_receipt = result
+                        self.status.set(
+                            "NEW private inert patch exported · SHA-256 "
+                            + str(result["patch_sha256"])
+                            + " · " + str(result["file_count"]) + " source changes. "
+                            + "Apply only after separate Git source-review, "
+                            + "git apply --check and operator authorization.",
+                        )
+                elif kind == "verified":
+                    self.status.set(
+                        "Saved patch bytes independently rechecked: "
+                        + str(message[3]["patch_sha256"])
+                        + " · no source modifications or Git execution",
+                    )
+                else:
+                    self.status.set(
+                        "Original source patch held: " + str(message[-1])
+                        + " · no auto-retry, no source changes.",
+                    )
+                self._buttons()
+        except Empty:
+            pass
+        self.after(85, self._poll)
+
+    def _exit(self):
+        if self._busy:
+            self.status.set(
+                "Source/export still in flight; closing now could hide "
+                "an uncertain private file. Inspect the result before closing.",
+            )
+            return
+        self._closed = True
+        self.destroy()
+
+
+__all__ = ["PortablePatchWindow"]
