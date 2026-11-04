@@ -13,6 +13,7 @@ from .contracts import ContractViolation,token,utf8
 from .dispatcher import LaptopDispatcher
 from .run_once import generate_once
 from .first_turn_acceptance import run as run_first_turn_acceptance
+from .cold_reopen_acceptance import run as run_cold_reopen_acceptance
 from .server import LaptopHTTPServer
 from .startup import activate_checked
 from .preflight import validate_native_shape
@@ -31,7 +32,7 @@ def main(argv=None):
     p.add_argument("--state-dir",type=Path,required=True)
     p.add_argument("--tenant",required=True)
     p.add_argument("--subject",required=True)
-    p.add_argument("--mode",choices=("once","serve","acceptance"),required=True)
+    p.add_argument("--mode",choices=("once","serve","acceptance","cold-reopen"),required=True)
     p.add_argument("--approve-real-acceptance",action="store_true",
                    help="Explicitly permit one source-installed native inference acceptance run")
     p.add_argument("--session")
@@ -74,11 +75,11 @@ def main(argv=None):
         )
         if type(args.port) is not int or not 1 <= args.port <= 65535:
             raise ContractViolation("finite loopback port required")
-        if args.mode in ("once","acceptance") and not args.prompt_stdin:
+        if args.mode in ("once","acceptance","cold-reopen") and not args.prompt_stdin:
             raise ContractViolation("native one-shot command requires --prompt-stdin")
         if args.mode=="serve" and (args.prompt_stdin or args.session or args.request_id):
             raise ContractViolation("server cannot combine one-shot options")
-        if args.mode=="acceptance":
+        if args.mode in ("acceptance","cold-reopen"):
             if args.approve_real_acceptance is not True:
                 raise ContractViolation("explicit real native acceptance approval required")
             if args.session is not None or args.request_id is not None:
@@ -88,12 +89,30 @@ def main(argv=None):
         bearer=None
         if args.mode=="serve":
             bearer=token(os.environ.get("SKELETON_LOCAL_AI_BEARER",""))
-        if args.mode in ("once","acceptance"):
+        if args.mode in ("once","acceptance","cold-reopen"):
             raw=sys.stdin.buffer.read(32769)
             if len(raw)>32768:raise ContractViolation("stdin prompt exceeds byte ceiling")
             # Preserve exact private task indentation and trailing line breaks.
             # UTF-8 validation still rejects empty and whitespace-only input.
             message=utf8(raw.decode("utf-8","strict"),maximum=32768)
+        if args.mode=="cold-reopen":
+            # Two canonical, independently source-approved GGUF startups.
+            # First context is closed before reading the same SQLite commit
+            # from the second; no model-generated text or prompt is printed.
+            report=run_cold_reopen_acceptance(
+                model_root=args.model_root, state_dir=args.state_dir,
+                tenant=args.tenant, subject=args.subject, prompt=message,
+                approved=True, n_ctx=args.context,
+                max_new_tokens=args.max_new_tokens, n_threads=args.threads,
+                gpu_layers=args.gpu_layers, capacity_root=args.capacity_root,
+                capacity_slots=args.capacity_slots,
+                capacity_budget_bytes=args.capacity_budget_bytes,
+            )
+            print(json.dumps({
+                "status":"native-cold-reopen-sqlite-verified",
+                "evidence":report,"release_certified":False,
+            },sort_keys=True,ensure_ascii=False))
+            return 0
         stack,worker,installed=activate_checked(model_root=args.model_root,state_dir=args.state_dir,
             tenant=args.tenant,subject=args.subject,n_ctx=args.context,
             max_new_tokens=args.max_new_tokens,n_threads=args.threads,
