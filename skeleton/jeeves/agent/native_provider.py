@@ -112,6 +112,11 @@ class NativeJeevesProvider:
         session, native_request_id = self._keys(request)
         started = time.monotonic()
         with self._lock:
+            # The initial availability check happened before prompt encoding.
+            # Recheck identity inside this provider's serialization fence
+            # before opening SQLite state or attempting any native generation.
+            if not self.available():
+                raise ProviderError("active native principal changed before admission")
             # A process whose finite attempt fence is exhausted may still
             # inspect an existing committed SQLite result. It must NOT create
             # a new durable session merely to deny another generation.
@@ -172,6 +177,11 @@ class NativeJeevesProvider:
                     raise ProviderError("native response differs from durable committed bytes")
                 result = dict(committed)
                 result["replayed"] = False
+            # Do not disclose a committed result as belonging to an active
+            # principal if source/model identity changed during generation.
+            # The durable SQLite receipt remains available for reconciliation.
+            if not self.available():
+                raise ProviderError("active native principal changed during generation")
         verified = receive_committed_turn(
             result, active=self._identity,
             session_id=session, native_request_id=native_request_id,
