@@ -201,24 +201,41 @@ class DurableNativeQueue:
           "device_qualified":False,"release_certified":False,
         }
 
-    def submit(self,order:WorkOrder):
-        if not isinstance(order,WorkOrder):
-            raise DurableQueueHold("typed work order required")
+    def _insert_many(self,conn,orders):
+        """Atomic work-intent insert inside caller's canonical SQLite transaction.
+
+        Partial batch admission must never survive a crash: callers pass
+        the protected SpineDatabase transaction, not an arbitrary connection.
+        No native effect occurs. Existing occupied request IDs remain a hold.
+        """
+        if conn is not self.db._db:
+            raise DurableQueueHold("canonical SQLite transaction required")
         self._live()
-        if (order.scope_sha256!=self.scope_sha256 or
-            (order.tenant,order.subject,order.model_sha256,
-             order.tokenizer_sha256)!=self._scope()):
-            raise DurableQueueHold("foreign work cannot enter queue")
-        if order.expires_ns<=self._now():
-            raise DurableQueueHold("already expired work order")
-        with self.db.transaction() as conn:
-            count=conn.execute(
-              "SELECT COUNT(*) FROM jeeves_native_work_orders WHERE "
-              "tenant=? AND subject=? AND model_sha256=? AND tokenizer_sha256=?",
-              self._scope(),
-            ).fetchone()[0]
-            if count>=self.maximum_orders:
-                raise DurableQueueHold("work-order inventory full")
+        if type(orders) not in (tuple,list) or not 1<=len(orders)<=10000:
+            raise DurableQueueHold("bounded nonempty typed work inventory required")
+        keys=set()
+        for order in orders:
+            if not isinstance(order,WorkOrder):
+                raise DurableQueueHold("typed work order required")
+            if (order.scope_sha256!=self.scope_sha256 or
+                (order.tenant,order.subject,order.model_sha256,
+                 order.tokenizer_sha256)!=self._scope()):
+                raise DurableQueueHold("foreign work cannot enter queue")
+            if order.expires_ns<=self._now():
+                raise DurableQueueHold("already expired work order")
+            key=(order.session_id,order.request_id)
+            if key in keys:
+                raise DurableQueueHold("duplicate native session/request in one admission")
+            keys.add(key)
+        count=conn.execute(
+          "SELECT COUNT(*) FROM jeeves_native_work_orders WHERE "
+          "tenant=? AND subject=? AND model_sha256=? AND tokenizer_sha256=?",
+          self._scope(),
+        ).fetchone()[0]
+        if count+len(orders)>self.maximum_orders:
+            raise DurableQueueHold("work-order inventory full")
+        receipts=[]
+        for order in orders:
             conn.execute(
               "INSERT INTO jeeves_native_work_orders "
               "(order_id,scope_sha256,tenant,subject,model_sha256,tokenizer_sha256,"
@@ -231,7 +248,16 @@ class DurableNativeQueue:
                order.priority,order.admitted_ns,order.expires_ns,
                order.spec_sha256),
             )
-            return self._public(order,self._select(conn,order.order_id)[1])
+            receipts.append(self._public(order,self._select(conn,order.order_id)[1]))
+        return tuple(receipts)
+
+    def submit_many(self,orders):
+        """All-or-nothing new native work, no model activation."""
+        with self.db.transaction() as conn:
+            return self._insert_many(conn,orders)
+
+    def submit(self,order:WorkOrder):
+        return self.submit_many((order,))[0]
 
     def inspect(self,order_id:str)->dict[str,object]:
         self._live()

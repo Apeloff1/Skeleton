@@ -208,31 +208,21 @@ class NativeDurableBatchConveyor:
         return jobs,bound
 
     def admit(self,batch_id:str,jobs:Sequence[FabricJob]):
-        """No native execution; partial admission remains visibly held.
+        """Atomically admit the entire approved batch, without inference.
 
-        The immutable batch header is committed before individual queue rows.
-        A process crash during admission cannot silently restart the batch;
-        the operator must inspect and reconcile manually.
+        The header and ALL queued work orders commit in one canonical
+        SQLite transaction. A crash before COMMIT leaves neither a header
+        nor any task, avoiding partial source catalog ambiguity. Existing
+        historical 'admitting' rows remain held for manual investigation.
         """
         jobs,batch_sha=self._preflight(batch_id,jobs)
         now=exact_integer(self.clock_ns(),maximum=10**30)
-        with self.db.transaction() as conn:
-            if conn.execute(
-                "SELECT 1 FROM jeeves_native_durable_batches WHERE batch_id=?",
-                (batch_id,),
-            ).fetchone() is not None:
-                raise NativeDurableBatchHold("batch ID previously consumed")
-            conn.execute(
-                "INSERT INTO jeeves_native_durable_batches VALUES "
-                "(?,?,?,?,?,?,?,?,'admitting',?)",
-                (batch_id,self.scope.binding,*self._scope(),
-                 batch_sha,len(jobs),now),
-            )
+        orders=[]
         for job in jobs:
             session,request=self.native._session_key(
                 batch_id,job.task.task_id,
             )
-            self.queue.submit(WorkOrder(
+            orders.append(WorkOrder(
                 order_id=self._order_key(batch_id,job.task.task_id),
                 scope_sha256=self.scope.binding,
                 tenant=self.identity.tenant,
@@ -247,9 +237,20 @@ class NativeDurableBatchConveyor:
                 expires_ns=now+self.policy.maximum_single_job_ms*1_000_000*len(jobs),
             ))
         with self.db.transaction() as conn:
-            row=self._batch(batch_id,conn)
-            if row[7]!="admitting":
-                raise NativeDurableBatchHold("batch admission race")
+            if conn.execute(
+                "SELECT 1 FROM jeeves_native_durable_batches WHERE batch_id=?",
+                (batch_id,),
+            ).fetchone() is not None:
+                raise NativeDurableBatchHold("batch ID previously consumed")
+            conn.execute(
+                "INSERT INTO jeeves_native_durable_batches VALUES "
+                "(?,?,?,?,?,?,?,?,'admitting',?)",
+                (batch_id,self.scope.binding,*self._scope(),
+                 batch_sha,len(jobs),now),
+            )
+            # _insert_many reuses this exact private transaction; any
+            # unique-ID collision or capacity hold rolls back header too.
+            self.queue._insert_many(conn,tuple(orders))
             conn.execute(
                 "UPDATE jeeves_native_durable_batches SET state='ready' "
                 "WHERE batch_id=? AND state='admitting'",

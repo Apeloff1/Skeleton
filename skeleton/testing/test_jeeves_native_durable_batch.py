@@ -152,6 +152,46 @@ class TestDurableNativeBatch(unittest.TestCase):
         self.assertEqual(self.backend.calls,1)
         self.assertTrue(self._status().complete)
 
+    def test_atomic_batch_admission_rolls_back_header_and_any_preceding_rows(self):
+        from unittest import mock
+        original=self.conveyor.queue._insert_many
+        def interrupt_after_one(conn,orders):
+            original(conn,orders[:1])
+            raise KeyboardInterrupt()
+        with mock.patch.object(
+            self.conveyor.queue,"_insert_many",
+            side_effect=interrupt_after_one,
+        ):
+            with self.assertRaises(KeyboardInterrupt):
+                self._admit()
+        with self.db.snapshot() as conn:
+            self.assertEqual(conn.execute(
+                "SELECT COUNT(*) FROM jeeves_native_durable_batches",
+            ).fetchone(),(0,))
+            self.assertEqual(conn.execute(
+                "SELECT COUNT(*) FROM jeeves_native_work_orders",
+            ).fetchone(),(0,))
+        self.assertEqual(self.backend.calls,0)
+        # A clean retry can admit precisely the same approved batch because
+        # the failed transaction never published an intent or native effect.
+        fresh=self._admit()
+        self.assertEqual(fresh.ready,2)
+
+    def test_work_order_bulk_admission_has_no_intermediate_committed_header(self):
+        report=self._admit()
+        with self.db.snapshot() as conn:
+            self.assertEqual(
+                conn.execute(
+                    "SELECT state FROM jeeves_native_durable_batches",
+                ).fetchone(),("ready",),
+            )
+            self.assertEqual(
+                conn.execute(
+                    "SELECT COUNT(*) FROM jeeves_native_work_orders",
+                ).fetchone(),(2,),
+            )
+        self.assertEqual(report.total,2)
+
     def test_duplicate_batch_identity_cannot_start_again(self):
         self._admit()
         with self.assertRaises(NativeDurableBatchHold):
