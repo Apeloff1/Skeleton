@@ -121,6 +121,7 @@ class ColdSourceCustodyTests(unittest.TestCase):
             with self.assertRaisesRegex(ContractViolation,"independently activated"):
                 cold_reopen_acceptance.run(**OPTS)
         self.assertEqual(rig.count,2)
+        self.assertIn("closed_2",rig.order)
         self.assertEqual(rig.first.generation_calls,1)
         self.assertEqual(rig.second.generation_calls,0)
 
