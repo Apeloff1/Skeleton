@@ -102,6 +102,7 @@ class NativeOperatorLiveSourceTests(unittest.TestCase):
             with self.assertRaises(ContractViolation):
                 session.dispatch(OperatorCommand("status"))
         journal.assert_not_called()
+        self.assertTrue(session._closed)
         self.assertEqual(self.worker.generation_calls, 0)
 
     def test_private_sqlite_status_with_lease_loss_is_not_disclosed(self):
@@ -157,6 +158,38 @@ class NativeOperatorLiveSourceTests(unittest.TestCase):
             NativeOperatorSession(
                 self.worker, approved=True, source_fence=mock.Mock(),
             )
+        self.assertEqual(self.worker.generation_calls, 0)
+
+    def test_revoked_source_after_serialization_never_reaches_stdout(self):
+        session = self._new_session()
+        command = {
+            "schema": "jeeves.native_operator_command.v1",
+            "operation": "status",
+        }
+        raw = json.dumps(command).encode() + b"\n"
+        journal = mock.Mock()
+        journal.runs.return_value = ("very_private_run",)
+        out = StringIO()
+        with (
+            mock.patch(
+                "skeleton.jeeves.agent.native_source_fence.require_activated_source",
+                side_effect=[
+                    dict(SOURCE), dict(SOURCE), dict(SOURCE),
+                    ContractViolation("source revoked before stdout"),
+                ],
+            ) as witness,
+            mock.patch(
+                "skeleton.jeeves.agent.native_operator_session.NativeSQLiteCheckpointer",
+                return_value=journal,
+            ),
+        ):
+            result = session.serve(BytesIO(raw), out)
+        self.assertEqual(result, 2)
+        self.assertEqual(witness.call_count, 4)
+        self.assertTrue(session._closed)
+        self.assertNotIn("very_private_run", out.getvalue())
+        self.assertNotIn('"status":"active"', out.getvalue())
+        self.assertIn('"status": "held"', out.getvalue())
         self.assertEqual(self.worker.generation_calls, 0)
 
     def test_error_after_private_history_stops_line_stream_without_retry(self):

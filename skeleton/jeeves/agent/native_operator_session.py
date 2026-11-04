@@ -169,13 +169,22 @@ class NativeOperatorSession:
                 "native source identity unavailable"
             ) from exc
         if active!=self.identity:
+            self._closed=True
             raise NativeOperatorSessionHold("native model epoch/principal changed")
         if self._closed:
             raise NativeOperatorSessionHold("session already stopped")
         if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
+            self._closed=True
             raise NativeOperatorSessionHold("operator session time budget exhausted")
         if self.source_fence is not None:
-            self.source_fence.assert_live(self.worker)
+            try:
+                self.source_fence.assert_live(self.worker)
+            except BaseException:
+                # A lost lease, installed archive or owner makes this whole
+                # process-local operator session terminal, even when a caller
+                # invokes dispatch() without the JSONL serve() outer loop.
+                self._closed=True
+                raise
 
     def _post_io(self) -> None:
         """Hold private SQLite or model output after a source/owner change.
@@ -186,6 +195,28 @@ class NativeOperatorSession:
         """
         try:
             self._valid_worker()
+        except BaseException:
+            self._closed=True
+            raise
+
+    def _before_publication(self) -> None:
+        """Last source/owner fence after encoding and before stdout.
+
+        Dispatch checks before/after SQLite I/O; however its caller may
+        serialize a private result after the lease has been revoked. The
+        output stream must not publish that stale result.
+        """
+        try:
+            if ActiveModel.from_supervisor(self.worker)!=self.identity:
+                raise NativeOperatorSessionHold(
+                    "native operator identity changed before publication"
+                )
+            if self.source_fence is not None:
+                self.source_fence.assert_live(self.worker)
+            if ActiveModel.from_supervisor(self.worker)!=self.identity:
+                raise NativeOperatorSessionHold(
+                    "native operator identity changed during publication check"
+                )
         except BaseException:
             self._closed=True
             raise
@@ -345,6 +376,7 @@ class NativeOperatorSession:
                 )+"\n"
                 if len(output.encode("utf-8","strict"))>self.limits.maximum_result_bytes:
                     raise NativeOperatorSessionHold("operator disclosure exceeds result ceiling")
+                self._before_publication()
                 destination.write(output)
                 if callable(getattr(destination,"flush",None)):
                     destination.flush()
