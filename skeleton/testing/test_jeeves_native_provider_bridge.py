@@ -279,7 +279,9 @@ class TestSourceReadiness(unittest.TestCase):
             model_sha256=MODEL,
         )
         result = inspect_native_jeeves(SimulatedWorker(), receipt)
-        self.assertTrue(result.source_bridge_ready)
+        self.assertFalse(result.source_bridge_ready)
+        self.assertFalse(result.source_receipt_bound)
+        self.assertFalse(result.sqlite_spine_present)
         self.assertFalse(result.real_turn_witnessed)
         self.assertFalse(result.device_qualified)
         self.assertFalse(result.release_certified)
