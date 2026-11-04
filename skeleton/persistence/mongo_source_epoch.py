@@ -166,8 +166,10 @@ class MongoCanonicalSourceEpoch:
         except Exception:
             raise MongoSourceEpochError("replica-set primary probe unavailable") from None
         if (type(hello) is not dict
-                or not isinstance(hello.get("setName"), str)
+                or type(hello.get("setName")) is not str
                 or not hello["setName"]
+                or len(hello["setName"]) > 128
+                or any(ord(ch) < 33 or ord(ch) > 126 for ch in hello["setName"])
                 or hello.get("isWritablePrimary") is not True):
             raise MongoSourceEpochError("replica-set primary required for epoch migration")
         authorizer = getattr(self, "_migration_authorizer", None)

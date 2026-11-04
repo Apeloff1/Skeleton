@@ -92,6 +92,22 @@ class MigrationCustodyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.calls, [])
         self.assertEqual(self.collection.calls, 0)
 
+    async def test_untrusted_replica_set_name_rejected_before_operator_authority(self):
+        class ForgedName(str):
+            def __bool__(self):
+                return True
+
+        for set_name in (ForgedName("rs0"), "rs\\x00evil", "rs\\nother",
+                         "r" * 129, "rs\\ud800", ""):
+            with self.subTest(repr=repr(set_name)):
+                self.database.hello = {
+                    "setName": set_name, "isWritablePrimary": True,
+                }
+                with self.assertRaises(MongoSourceEpochError):
+                    await self.provision()
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.collection.calls, 0)
+
     async def test_primary_probe_error_redacted(self):
         self.database.error = RuntimeError("secret mongo credentials")
         with self.assertRaises(MongoSourceEpochError) as caught:
