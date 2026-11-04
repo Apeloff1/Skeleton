@@ -33,6 +33,10 @@ def summarize_observation(observation: object) -> dict[str, object]:
         and observation["schema_version"] == SCHEMA
         and observation.get("writes_performed") is False
         and observation.get("guarded_local_ai_ready") is False
+        and observation.get("activation_permitted", False) is False
+        and observation.get("independent_reviewer_verified", False) is False
+        and observation.get("canonical_writer_inventory_verified", False) is False
+        and observation.get("activated_model_tokenizer_verified", False) is False
         and all(type(key) is str and len(key) <= 128 for key in observation)
         and type(observation.get("code")) is str
         and len(observation["code"]) <= 128
