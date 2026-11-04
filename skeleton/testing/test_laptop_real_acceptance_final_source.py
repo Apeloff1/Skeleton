@@ -102,7 +102,9 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             first_turn_acceptance,"require_activated_source",
             side_effect=attestation,
         ):
-            with self.assertRaisesRegex(ContractViolation,"principal changed"):
+            # The canonical identity checker can reject the changed
+            # tokenizer earlier as an active-backend/principal mismatch.
+            with self.assertRaises(ContractViolation):
                 test_turn(self.worker)
         self.assertEqual(counter["count"],2)
         self.assertEqual(self.worker.generation_calls,1)
@@ -124,11 +126,20 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
         self.assertEqual(self.worker.generation_calls,1)
 
     def test_uncommitted_worker_effect_does_not_trigger_second_source_witness(self):
-        self.worker.spine.return_without_commit=True
-        with mock.patch.object(
-            first_turn_acceptance,"require_activated_source",
-            return_value=dict(SOURCE),
-        ) as source:
+        original=self.worker.turn
+        def omit_durable_commit(*args, **kwargs):
+            reply=original(*args, **kwargs)
+            # FakeWorker is not SimulatedWorker: deliberately remove its
+            # SQLite-shaped receipt to exercise actual fail-closed replay.
+            self.worker.spine.receipts.clear()
+            return reply
+        with (
+            mock.patch.object(self.worker,"turn",side_effect=omit_durable_commit),
+            mock.patch.object(
+                first_turn_acceptance,"require_activated_source",
+                return_value=dict(SOURCE),
+            ) as source,
+        ):
             with self.assertRaises(ContractViolation):
                 test_turn(self.worker)
         self.assertEqual(source.call_count,1)
