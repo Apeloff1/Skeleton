@@ -98,6 +98,16 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
     ))
     if resumed_mid["head"] != midway["head"] or resumed_mid["revision"] != split:
         raise SmokeError("partial portable restore lost the playable checkpoint")
+    # Partial restoration must carry a replayable ledger before any new input.
+    # Matching only the head misses corrupted checkpoint history.
+    recovered_before_play = json.loads(_invoke(
+        command, ["audit", "--slot", "recovered-mid"], env=env, cwd=root,
+    ))
+    if (not recovered_before_play["verified"] or
+            recovered_before_play["revision"] != split or
+            recovered_before_play["audit_entries"] != split or
+            recovered_before_play["head"] != midway["head"]):
+        raise SmokeError("partial restore lacks complete pre-resume custody")
     second = _invoke(
         command, ["play", "--slot", "smoke", "--ascii"], env=env, cwd=root,
         stdin="\n".join(choices[split:] + ["q"]) + "\n",
