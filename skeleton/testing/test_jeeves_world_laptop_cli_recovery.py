@@ -85,3 +85,40 @@ def test_laptop_cli_rejects_input_mutated_during_descriptor_read(tmp_path, monke
     assert failure["error"] == "input_changed_during_read"
     assert failure["next_action"] == "retry_with_a_stable_unmodified_json_file"
     assert not any(p.name.endswith(".laptop.review.json") for p in tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("field", ["st_mtime_ns", "st_ctime_ns"])
+def test_laptop_cli_rejects_same_size_metadata_change(tmp_path, monkeypatch, capsys, field):
+    """Same-length rewrites are unsafe even when the input size is unchanged."""
+    source = tmp_path / "brief.json"
+    source.write_text('{"id":"original"}', encoding="utf-8")
+    original_fstat = os.fstat
+    seen = 0
+    identity = source.stat()
+
+    def modified_fstat(fd):
+        nonlocal seen
+        result = original_fstat(fd)
+        if (result.st_dev, result.st_ino) == (identity.st_dev, identity.st_ino):
+            seen += 1
+            if seen == 2:
+                from types import SimpleNamespace
+                fields = {
+                    "st_mode": result.st_mode,
+                    "st_size": result.st_size,
+                    "st_dev": result.st_dev,
+                    "st_ino": result.st_ino,
+                    "st_mtime_ns": result.st_mtime_ns,
+                    "st_ctime_ns": result.st_ctime_ns,
+                }
+                fields[field] += 1
+                return SimpleNamespace(**fields)
+        return result
+
+    monkeypatch.setattr(os, "fstat", modified_fstat)
+    assert run(["--store", str(tmp_path), "propose", "--brief-file", str(source)]) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["error"] == "input_changed_during_read"
+    assert failure["next_action"] == "retry_with_a_stable_unmodified_json_file"
+    assert not (tmp_path / "original.json").exists()
+    assert not any(p.name.endswith(".laptop.review.json") for p in tmp_path.iterdir())
