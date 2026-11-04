@@ -28,6 +28,7 @@ from .native_operator_session import (
     NativeOperatorSession,OperatorSessionLimits,NativeOperatorSessionHold,
 )
 from .native_readiness import inspect_native_jeeves
+from .native_source_fence import NativeSourceFence
 from .native_operator_preflight import check_native_resource_shape
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import identifier
 
@@ -113,8 +114,16 @@ def main(argv:list[str]|None=None)->int:
             verified=inspect_native_jeeves(worker,installed)
             if not verified.source_bridge_ready:
                 raise NativeOperatorSessionHold("source-bound native Jeeves activation unverified")
+            # A structural readiness summary is NOT a real authorization.
+            # Validate the canonical isolated child, held capacity lease,
+            # installed archive and exact owner before private JSONL I/O.
+            source_fence=NativeSourceFence(
+                worker,installed,expected_tenant=args.tenant,
+                expected_subject=args.subject,
+            )
             session=NativeOperatorSession(
                 worker,approved=True,limits=limits,
+                source_fence=source_fence,
             )
             # The operator explicitly controls when the process starts new
             # native inference. Merely starting the terminal never generates.
