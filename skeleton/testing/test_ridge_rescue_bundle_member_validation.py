@@ -69,7 +69,7 @@ def test_windows_case_collision_refused():
 @pytest.mark.parametrize("mutate", [
     lambda data: b"MZ" + data,
     lambda data: data + b"hidden-trailing-content",
-    lambda data: data[:-2] + b"\\x01\\x00" + b"X",
+    lambda data: data[:-2] + bytes((1, 0)) + b"X",
 ])
 def test_noncanonical_zip_envelope_refused(mutate):
     with pytest.raises(BundleError, match="noncanonical ZIP envelope"):
