@@ -1,14 +1,12 @@
-"""Operator-approved real GGUF Jeeves acceptance with independent cold replay.
+"""Operator-approved GGUF first-turn and cold-reopen acceptance.
 
-Unlike source-only Python fixtures, this CLI only runs through the existing
-verified installer, actual native model activation, canonical supervised
-generation, authoritative SQLite commit, and read-only replay. Its output
-contains digests, never private prompt or response text.
+This CLI delegates real-source verification to the canonical installed
+GGUF witness, isolated supervisor and SQLite acceptance contracts. No
+synthetic model, cached answer, model-provided self-report or fallback
+can satisfy the production real-native acceptance condition.
 
-An optional second source-bound model activation proves a cold *model reload*
-and committed transcript replay without a second generation. It does not
-prove native in-flight interruption, physical Windows qualification, model
-accuracy, independent rights review, or release certification.
+Output is digests and explicit nonqualification flags only: no private
+prompt/answer text, source pathname, tokens, rights grant or device claim.
 """
 from __future__ import annotations
 
@@ -22,19 +20,114 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_c
 from skeleton.ai.runtime.operational_ai.laptop_runtime.first_turn_acceptance import (
     run as run_first_turn,
 )
-from skeleton.ai.runtime.operational_ai.laptop_runtime.replay_probe import (
-    inspect_replay,
+from skeleton.ai.runtime.operational_ai.laptop_runtime.cold_reopen_acceptance import (
+    run as run_cold_reopen,
+)
+from skeleton.ai.runtime.operational_ai.laptop_runtime.installed_witness import (
+    require_activated_source,
+)
+from skeleton.ai.runtime.operational_ai.laptop_runtime.source_contract import (
+    valid_source_snapshot,
+)
+from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
+from skeleton.ai.runtime.operational_ai.laptop_runtime.preflight import (
+    validate_native_shape,
 )
 from skeleton.ai.runtime.operational_ai.laptop_runtime.restart_probe import (
     inspect_restart,
 )
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
-    identifier, utf8,
+    identifier, identity_hash, utf8,
 )
 
 
 class NativeAcceptanceHold(ValueError):
-    """Operator approval, native receipt or cold-restart proof is incomplete."""
+    """A real installed GGUF acceptance receipt cannot be published."""
+
+
+class _RedactedAcceptanceParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise NativeAcceptanceHold("invalid native acceptance arguments")
+
+
+def _absolute_private_root(value: object, label: str) -> None:
+    if (not isinstance(value, Path) or not value.is_absolute()
+            or ".." in value.parts or "\x00" in str(value)):
+        raise NativeAcceptanceHold("absolute private " + label + " required")
+
+
+def _positive_source_flags(first: object, active: ActiveModel) -> tuple[str, str, str]:
+    """Require the existing real-only first-turn and installed witness contract."""
+    if type(first) is not dict:
+        raise NativeAcceptanceHold("canonical native first-turn evidence missing")
+    for field in (
+        "native_model_observed", "installed_source_bound",
+        "replayed_without_generation", "operator_approved_real_inference",
+    ):
+        if first.get(field) is not True:
+            raise NativeAcceptanceHold("real source and SQLite turn proof incomplete")
+    if first.get("release_certified") is not False:
+        raise NativeAcceptanceHold("source-only evidence cannot certify release")
+    if (first.get("model_sha256") != active.model_sha256
+            or first.get("tokenizer_sha256") != active.tokenizer_sha256):
+        raise NativeAcceptanceHold("native model epoch differs from installed source")
+    if not valid_source_snapshot(first.get("installed_source"), active):
+        raise NativeAcceptanceHold("complete installed source custody required")
+    if (type(first.get("generated_tokens")) is not int
+            or not 1 <= first["generated_tokens"] <= 8192):
+        raise NativeAcceptanceHold("real generation token witness missing")
+    return (
+        identifier(first.get("session_id"), "session"),
+        identifier(first.get("request_id"), "request"),
+        identity_hash(first.get("output_sha256")),
+    )
+
+
+def _positive_cold_flags(proof: object) -> tuple[str, str, str, str, str]:
+    """Check canonical cold-reopen proof without inferring a second model call."""
+    if type(proof) is not dict:
+        raise NativeAcceptanceHold("canonical cold source proof missing")
+    if (proof.get("source_verified_twice") is not True
+            or proof.get("sqlite_replay_after_cold_reopen") is not True
+            or proof.get("second_generation_attempted") is not False
+            or proof.get("release_certified") is not False):
+        raise NativeAcceptanceHold("independent cold GGUF and SQLite replay not proved")
+    if (type(proof.get("first_turn_generated_tokens")) is not int
+            or not 1 <= proof["first_turn_generated_tokens"] <= 8192):
+        raise NativeAcceptanceHold("fresh native first turn not witnessed")
+    return (
+        identifier(proof.get("session_id"), "session"),
+        identifier(proof.get("request_id"), "request"),
+        identity_hash(proof.get("model_sha256")),
+        identity_hash(proof.get("tokenizer_sha256")),
+        identity_hash(proof.get("output_sha256")),
+    )
+
+
+def _public_proof(
+    *, prompt: str, model: str, tokenizer: str, digest: str,
+    session: str, request: str, cold: bool,
+) -> dict[str, object]:
+    return {
+        "schema": "jeeves.real_native_acceptance.v1",
+        "status": "native-first-turn-committed-and-replayed",
+        "session_id": session,
+        "request_id": request,
+        "prompt_sha256": sha256(prompt.encode("utf-8", "strict")).hexdigest(),
+        "model_sha256": model,
+        "tokenizer_sha256": tokenizer,
+        "output_sha256": digest,
+        "real_native_inference_completed": True,
+        "sqlite_committed_replay_verified": True,
+        "restart_db_inspected": cold,
+        "cold_model_reload_verified": cold,
+        "second_generation_not_performed": True,
+        "model_rights_independently_approved_here": False,
+        "device_pressure_qualified": False,
+        "inflight_native_cancellation_qualified": False,
+        "clean_windows_install_qualified": False,
+        "release_certified": False,
+    }
 
 
 def run_acceptance(
@@ -53,98 +146,130 @@ def run_acceptance(
     capacity_root: Path | None = None,
     capacity_budget_bytes: int = 8000000000,
 ) -> dict[str, object]:
+    """One independently source-checked real turn, optionally a cold replay."""
     if approved is not True or type(cold_restart) is not bool:
         raise NativeAcceptanceHold("explicit real-model inference permission required")
-    identifier(tenant, "tenant")
-    identifier(subject, "subject")
-    utf8(prompt, maximum=32768)
+    tenant = identifier(tenant, "tenant")
+    subject = identifier(subject, "subject")
+    _absolute_private_root(model_root, "installed model root")
+    _absolute_private_root(state_dir, "SQLite state root")
+    if capacity_root is not None:
+        _absolute_private_root(capacity_root, "capacity root")
+    prompt = utf8(prompt, maximum=32768)
+    validate_native_shape(
+        n_ctx=n_ctx, max_new_tokens=max_new_tokens,
+        n_threads=n_threads, gpu_layers=gpu_layers,
+        capacity_budget_bytes=capacity_budget_bytes,
+        inference_ms=90000,
+    )
     args = {
-        "model_root": model_root,
-        "state_dir": state_dir,
-        "tenant": tenant,
-        "subject": subject,
-        "n_ctx": n_ctx,
-        "max_new_tokens": max_new_tokens,
-        "n_threads": n_threads,
-        "gpu_layers": gpu_layers,
+        "model_root": model_root, "state_dir": state_dir,
+        "tenant": tenant, "subject": subject,
+        "n_ctx": n_ctx, "max_new_tokens": max_new_tokens,
+        "n_threads": n_threads, "gpu_layers": gpu_layers,
         "capacity_root": capacity_root,
         "capacity_budget_bytes": capacity_budget_bytes,
-        "isolated": True,
     }
-    stack, worker, installed = activate_checked(**args)
-    with stack:
-        model_sha256 = worker.spine.identity.model_sha256
-        tokenizer_sha256 = worker.spine.identity.tokenizer_sha256
-        if (not installed.content_verified
-            or not installed.rights_approved
-            or installed.model_sha256 != model_sha256):
-            raise NativeAcceptanceHold("installed model source identity not verified")
-        # This pre-existing acceptance routine owns the one real model turn.
-        first = run_first_turn(worker, prompt=prompt, approved=True)
-        if first.get("native_model_observed") is not True:
-            raise NativeAcceptanceHold("real model turn was not independently witnessed")
-        first_digest = first.get("output_sha256")
-        if type(first_digest) is not str or len(first_digest) != 64:
-            raise NativeAcceptanceHold("real native output commitment digest missing")
-        first_session = first["session_id"]
-        first_request_id = first["request_id"]
-        snapshot = worker.spine.health()
-        if type(snapshot) is not dict:
-            raise NativeAcceptanceHold("canonical SQLite spine health unavailable")
-
-    restart_db_inspected = False
-    cold_model_reload_verified = False
     if cold_restart:
-        # Read-only verification on closed/native process: no new generation.
-        checked = inspect_restart(
-            state_dir=state_dir,
-            tenant=tenant,
-            subject=subject,
-            model_sha256=model_sha256,
-            tokenizer_sha256=tokenizer_sha256,
+        # Canonical cold acceptance separately installs, verifies and closes
+        # both isolated workers, replaying only the *existing* SQLite receipt.
+        cold = run_cold_reopen(**args, prompt=prompt, approved=True)
+        session, request, model, tokenizer, digest = _positive_cold_flags(cold)
+        doctor = inspect_restart(
+            state_dir=state_dir, tenant=tenant, subject=subject,
+            model_sha256=model, tokenizer_sha256=tokenizer,
         )
-        if checked.get("state") != "restart-storage-inspected-not-native-resumed":
-            raise NativeAcceptanceHold("read-only restart state doctor failed")
-        restart_db_inspected = True
-        second_stack, second_worker, second_installed = activate_checked(**args)
-        with second_stack:
-            if (second_installed.model_sha256 != model_sha256
-                or second_worker.spine.identity.tokenizer_sha256 != tokenizer_sha256):
-                raise NativeAcceptanceHold("cold native model epoch mismatch")
-            replay = inspect_replay(
-                second_worker, first_session, first_request_id, prompt,
-                seed=17, temperature=0.8,
-            )
-            if (replay.get("committed") is not True
-                or replay.get("no_second_generation") is not True
-                or replay.get("output_sha256") != first_digest):
-                raise NativeAcceptanceHold("cold model reload lost committed native turn")
-            cold_model_reload_verified = True
+        if (type(doctor) is not dict
+                or doctor.get("state")
+                    != "restart-storage-inspected-not-native-resumed"):
+            raise NativeAcceptanceHold("read-only cold SQLite state doctor failed")
+        return _public_proof(
+            prompt=prompt, model=model, tokenizer=tokenizer,
+            digest=digest, session=session, request=request, cold=True,
+        )
 
-    return {
-        "schema": "jeeves.real_native_acceptance.v1",
-        "status": "native-first-turn-committed-and-replayed",
-        "session_id": first_session,
-        "request_id": first_request_id,
-        "prompt_sha256": sha256(prompt.encode("utf-8", "strict")).hexdigest(),
-        "model_sha256": model_sha256,
-        "tokenizer_sha256": tokenizer_sha256,
-        "output_sha256": first_digest,
-        "real_native_inference_completed": True,
-        "sqlite_committed_replay_verified": True,
-        "restart_db_inspected": restart_db_inspected,
-        "cold_model_reload_verified": cold_model_reload_verified,
-        "second_generation_not_performed": True,
-        "model_rights_independently_approved_here": False,
-        "device_pressure_qualified": False,
-        "inflight_native_cancellation_qualified": False,
-        "clean_windows_install_qualified": False,
-        "release_certified": False,
-    }
+    stack, worker, installed = activate_checked(**args, isolated=True)
+    with stack:
+        current = ActiveModel.from_supervisor(worker)
+        if (current.tenant, current.subject) != (tenant, subject):
+            raise NativeAcceptanceHold("installed native worker belongs to another owner")
+        # Existing first_turn only marks native_model_observed=True when the
+        # real InstalledModelReport, isolated child and capacity lease are
+        # independently inspected before and AFTER the native model effect.
+        first = run_first_turn(
+            worker, prompt=prompt, approved=True,
+            installed_receipt=installed, require_real=True,
+        )
+        session, request, digest = _positive_source_flags(first, current)
+        if type(worker.spine.health()) is not dict:
+            raise NativeAcceptanceHold("canonical SQLite native health unavailable")
+        observed = require_activated_source(worker, installed)
+        if (not valid_source_snapshot(observed, current)
+                or observed != first["installed_source"]
+                or ActiveModel.from_supervisor(worker) != current):
+            raise NativeAcceptanceHold("installed source drift after real first-turn proof")
+    return _public_proof(
+        prompt=prompt, model=current.model_sha256,
+        tokenizer=current.tokenizer_sha256, digest=digest,
+        session=session, request=request, cold=False,
+    )
+
+
+_PUBLIC_FIELDS = frozenset((
+    "schema", "status", "session_id", "request_id", "prompt_sha256",
+    "model_sha256", "tokenizer_sha256", "output_sha256",
+    "real_native_inference_completed", "sqlite_committed_replay_verified",
+    "restart_db_inspected", "cold_model_reload_verified",
+    "second_generation_not_performed", "model_rights_independently_approved_here",
+    "device_pressure_qualified", "inflight_native_cancellation_qualified",
+    "clean_windows_install_qualified", "release_certified",
+))
+
+
+def _publish_summary(summary: object) -> None:
+    """Write a bounded, digest-only historical proof, never native model text."""
+    if type(summary) is not dict or set(summary) != _PUBLIC_FIELDS:
+        raise NativeAcceptanceHold("invalid native acceptance public receipt")
+    if (summary["schema"] != "jeeves.real_native_acceptance.v1"
+            or summary["status"] != "native-first-turn-committed-and-replayed"
+            or summary["real_native_inference_completed"] is not True
+            or summary["sqlite_committed_replay_verified"] is not True
+            or summary["second_generation_not_performed"] is not True):
+        raise NativeAcceptanceHold("native source acceptance not certified")
+    if any(summary[flag] is not False for flag in (
+        "model_rights_independently_approved_here", "device_pressure_qualified",
+        "inflight_native_cancellation_qualified",
+        "clean_windows_install_qualified", "release_certified",
+    )):
+        raise NativeAcceptanceHold("device/release/rights flags must stay false")
+    for field in (
+        "prompt_sha256", "model_sha256", "tokenizer_sha256", "output_sha256",
+    ):
+        identity_hash(summary[field])
+    for field in ("session_id", "request_id"):
+        identifier(summary[field], field)
+    try:
+        result = json.dumps(
+            summary, sort_keys=True, ensure_ascii=False, allow_nan=False,
+            separators=(",", ":"),
+        ) + "\n"
+        size = len(result.encode("utf-8", "strict"))
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise NativeAcceptanceHold("native acceptance receipt not JSON") from exc
+    if size > 8192:
+        raise NativeAcceptanceHold("native acceptance disclosure exceeds bound")
+    written = sys.stdout.write(result)
+    if type(written) is not int or written != len(result):
+        raise NativeAcceptanceHold("incomplete native acceptance disclosure")
+    flush = getattr(sys.stdout, "flush", None)
+    if callable(flush):
+        flush()
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Approved real GGUF Jeeves turn acceptance")
+    parser = _RedactedAcceptanceParser(
+        description="Explicit source-approved native GGUF acceptance"
+    )
     parser.add_argument("--model-root", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--tenant", required=True)
@@ -158,34 +283,40 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-layers", type=int, default=0)
     parser.add_argument("--capacity-root", type=Path)
     parser.add_argument("--capacity-budget-bytes", type=int, default=8000000000)
-    args = parser.parse_args(argv)
     try:
+        args = parser.parse_args(argv)
         if not args.approve_native or not args.prompt_stdin:
             raise NativeAcceptanceHold("explicit approval and stdin prompt required")
+        identifier(args.tenant, "tenant")
+        identifier(args.subject, "subject")
+        _absolute_private_root(args.model_root, "installed model root")
+        _absolute_private_root(args.state_dir, "SQLite state root")
+        if args.capacity_root is not None:
+            _absolute_private_root(args.capacity_root, "capacity root")
+        validate_native_shape(
+            n_ctx=args.context, max_new_tokens=args.max_new_tokens,
+            n_threads=args.threads, gpu_layers=args.gpu_layers,
+            capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=90000,
+        )
+        # Preserve the operator's exact UTF-8 prompt; no .strip() of
+        # meaningful whitespace, Python indentation, CRLF, or final EOF.
         raw = sys.stdin.buffer.read(32769)
         if not 1 <= len(raw) <= 32768:
             raise NativeAcceptanceHold("bounded prompt stdin required")
-        prompt = raw.decode("utf-8", "strict").strip()
+        prompt = utf8(raw.decode("utf-8", "strict"), maximum=32768)
         proof = run_acceptance(
-            model_root=args.model_root,
-            state_dir=args.state_dir,
-            tenant=args.tenant,
-            subject=args.subject,
-            prompt=prompt,
-            approved=True,
-            cold_restart=args.cold_restart,
-            n_ctx=args.context,
-            max_new_tokens=args.max_new_tokens,
-            n_threads=args.threads,
-            gpu_layers=args.gpu_layers,
+            model_root=args.model_root, state_dir=args.state_dir,
+            tenant=args.tenant, subject=args.subject, prompt=prompt,
+            approved=True, cold_restart=args.cold_restart,
+            n_ctx=args.context, max_new_tokens=args.max_new_tokens,
+            n_threads=args.threads, gpu_layers=args.gpu_layers,
             capacity_root=args.capacity_root,
             capacity_budget_bytes=args.capacity_budget_bytes,
         )
-        sys.stdout.write(json.dumps(proof, sort_keys=True, ensure_ascii=False) + "\n")
+        _publish_summary(proof)
         return 0
     except (Exception, KeyboardInterrupt) as exc:
-        # No private prompt, model response, key, source pathname or exception
-        # text is published to CI/operator stderr on a failed native turn.
         sys.stderr.write(json.dumps({
             "schema": "jeeves.real_native_acceptance.v1",
             "status": "held",
@@ -198,3 +329,6 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+__all__ = ["NativeAcceptanceHold", "run_acceptance", "main"]
