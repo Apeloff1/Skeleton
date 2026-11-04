@@ -27,9 +27,9 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveMod
 from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL
 
 
-def choose(name, **replacements):
+def choose(profile_name, **replacements):
     args = dict(
-        name=name,
+        name=profile_name,
         native_max_output_tokens=1024,
         maximum_steps=8,
         maximum_model_calls=8,

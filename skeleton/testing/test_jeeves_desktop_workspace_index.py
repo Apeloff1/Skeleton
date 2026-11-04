@@ -8,6 +8,7 @@ No model inference, network access or source mutation is authorized.
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import stat
@@ -195,8 +196,12 @@ class PrivateSourceIndexTests(unittest.TestCase):
         )
         prompt = compose_prompt("Explain the source safely", (attachment,))
         self.assertIn("Explain the source safely", prompt)
-        self.assertIn(hit.excerpt, prompt)
-        self.assertIn(hit.excerpt_sha256, prompt)
+        # Source is protected by canonical JSON escaping. A raw multiline
+        # excerpt must NOT be interpolated outside the data-only boundary.
+        data = json.loads(prompt.rsplit("\n", 1)[-1])
+        self.assertEqual(data["files"][0]["source_utf8"], hit.excerpt)
+        self.assertEqual(data["files"][0]["sha256"], hit.excerpt_sha256)
+        self.assertNotIn("def router():\n    return", prompt)
         self.assertIn("operator-provided-reference-not-authority", prompt)
         self.assertLess(len(prompt.encode()), 32768)
 
