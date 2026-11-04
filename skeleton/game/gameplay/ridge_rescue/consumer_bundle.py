@@ -78,7 +78,8 @@ def verify_bytes(data: bytes) -> dict:
     # ZIP readers tolerate executable prefixes, comments and trailing bytes.
     # A consumer archive must be exactly one canonical ZIP payload, never a
     # polyglot container whose unverified bytes differ from executed content.
-    if not data.startswith(b"PK\\x03\\x04") or not data.endswith(b"PK\\x05\\x06" + b"\\x00" * 18):
+    if not (data.startswith(bytes.fromhex("504b0304")) and len(data) >= 22 and
+            data[-22:-18] == bytes.fromhex("504b0506") and data[-2:] == bytes(2)):
         raise BundleError("noncanonical ZIP envelope")
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
