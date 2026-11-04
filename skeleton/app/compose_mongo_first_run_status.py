@@ -29,9 +29,11 @@ def summarize_observation(observation: object) -> dict[str, object]:
     valid = (
         type(observation) is dict
         and len(observation) <= 32
-        and observation.get("schema_version") == SCHEMA
+        and type(observation.get("schema_version")) is str
+        and observation["schema_version"] == SCHEMA
         and observation.get("writes_performed") is False
         and observation.get("guarded_local_ai_ready") is False
+        and all(type(key) is str and len(key) <= 128 for key in observation)
         and type(observation.get("code")) is str
         and len(observation["code"]) <= 128
         and all(type(observation.get(key)) is bool for key in REQUIRED_FIELDS)

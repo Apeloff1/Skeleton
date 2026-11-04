@@ -37,6 +37,24 @@ class FirstRunObservationTests(unittest.TestCase):
         payload["code"] = COMPLETE_CODE + "x" * 200
         self.assertFalse(summarize_observation(payload)["observation_valid"])
 
+    def test_schema_object_cannot_execute_equality_callback(self):
+        class HostileSchema:
+            def __eq__(self, other):
+                raise AssertionError("untrusted schema equality executed")
+        payload = self.valid()
+        payload["schema_version"] = HostileSchema()
+        self.assertFalse(summarize_observation(payload)["observation_valid"])
+
+    def test_non_string_mapping_key_denied_without_callback(self):
+        class HostileKey:
+            def __hash__(self):
+                return 42
+            def __eq__(self, other):
+                raise AssertionError("untrusted key equality executed")
+        payload = self.valid()
+        payload[HostileKey()] = "unused"
+        self.assertFalse(summarize_observation(payload)["observation_valid"])
+
     def test_missing_or_malformed_inputs_fail_closed(self):
         for payload in (None, [], {}, {"schema_version": SCHEMA}, "ready"):
             with self.subTest(payload=payload):
