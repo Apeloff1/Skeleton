@@ -78,6 +78,23 @@ def run_acceptance(root: Path | None = None) -> dict:
     restored = verify_export(exported.read_bytes())
     if restored["head"] != final["head"] or restored["status"] != "completed":
         raise ValueError("portable campaign export failed replay")
+    # A consumer backup must preserve the transactional action ledger, not
+    # merely the last rendered scene. Cold-restore and independently replay.
+    backup_path = SlotStore(root).backup("consumer-acceptance")
+    backup_bytes = backup_path.read_bytes()
+    from .consumer_backup import verify_backup
+    from .consumer_store import _source
+    backed_up, history = verify_backup(backup_bytes, _source())
+    if backed_up["head"] != final["head"] or len(history) != total:
+        raise ValueError("full backup did not replay the completed campaign")
+    recovered = SlotStore(root).restore_backup("consumer-recovered", backup_bytes)
+    recovered_audit = SlotStore(root).audit("consumer-recovered")
+    if (recovered["head"] != final["head"] or recovered["status"] != "completed"
+            or recovered_audit["audit_entries"] != total
+            or not recovered_audit["verified"]):
+        raise ValueError("cold-reopened backup restore lost ending or history")
+    if SlotStore(root).load("consumer-acceptance")["head"] != final["head"]:
+        raise ValueError("backup restore mutated the original save")
     terminal = _interactive_contract(root, acceptance_actions("protect") + LAST_SIGNAL)
     if terminal["head"] != final["head"]:
         raise ValueError("interactive and API game outcomes diverged")
@@ -87,5 +104,6 @@ def run_acceptance(root: Path | None = None) -> dict:
             "head": final["head"], "portable_export_verified": True,
             "terminal_commands": terminal["commands"], "terminal_frames": terminal["frames"],
             "interactive_quit_restart_verified": True,
+            "backup_restore_replay_verified": True,
             "release_certified": False, "windows_device_certified": False,
             "exact_head_ci_certified": False}
