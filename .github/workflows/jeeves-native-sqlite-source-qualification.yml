@@ -12,6 +12,7 @@ on:
       - "skeleton/testing/test_jeeves_architecture_and_evidence_window.py"
       - "skeleton/testing/test_jeeves_desktop_*.py"
       - "skeleton/testing/test_jeeves_private_batch_recovery.py"
+      - "skeleton/testing/test_jeeves_native_preload_admission.py"
       - "scripts/launch_jeeves_desktop.py"
       - "jeeves-desktop.sh"
       - "scripts/run_ai_laptop_native_e2e.py"
@@ -146,6 +147,11 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_private_batch_recovery.py' -v
+      - name: Verify fresh installed-source CPU/RAM/cgroup admission before native GGUF startup
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_preload_admission.py' -v
       - name: Keep source-only tests separate from device and release proof
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'

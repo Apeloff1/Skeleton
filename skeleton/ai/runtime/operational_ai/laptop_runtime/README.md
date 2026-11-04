@@ -174,3 +174,13 @@ the operator supplies the exact original manifest digest. Nothing is
 silently reissued. Sensitive task text is present in the private export;
 never put it into Git. See
 `docs/ai/JEEVES_PRIVATE_BATCH_COLD_RECOVERY.md`.
+
+## Fresh pre-load host/CPU/cgroup admission
+
+With protected desktop startup enabled, `desktop_preload_admission.py`
+rereads installed GGUF rights/source and measures current RAM, effective
+cgroup limit/CPU quota, SQLite free disk and conservative context/scratch
+working memory before the native loader. A stale advisory profile cannot
+authorize an oversized model. The original resource request stays unchanged,
+and a typed source-bound ready receipt is verified by the UI parent.
+`docs/ai/JEEVES_FRESH_PRELOAD_HARDWARE_ADMISSION.md`.

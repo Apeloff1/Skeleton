@@ -310,3 +310,14 @@ source-fenced installed GGUF child; no parallel inference, hidden tool,
 background task scheduler, second database or automatic replay is used.
 A failed/uncertain task stops the entire sequence and preserves the
 original run ID. See `docs/ai/JEEVES_SERIAL_DURABLE_WORK_BATCHES.md`.
+
+## Measured preloader resource admission
+
+When protected native startup is enabled, the child verifies real installed
+model source and rights, current host/cgroup RAM, effective CPU quota and
+SQLite free disk **before loading GGUF**. It checks a conservative
+model/context/threads scratch estimate against both measured memory and the
+original operator capacity budget, refuses unsafe shapes, and supplies
+an exact typed receipt bound by the parent to the actual activated model.
+It never silently changes threads/context or guesses GPU VRAM. See
+`docs/ai/JEEVES_FRESH_PRELOAD_HARDWARE_ADMISSION.md`.
