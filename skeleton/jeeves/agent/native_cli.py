@@ -83,6 +83,11 @@ def main(argv: list[str] | None = None) -> int:
             resume_run=args.resume_run,
             inspect_run=args.inspect_run,
             replay_result=args.replay_result,
+            context_tokens=args.context,
+            output_tokens=args.max_output_tokens,
+            native_threads=args.threads,
+            gpu_layers=args.gpu_layers,
+            capacity_budget_bytes=args.capacity_budget_bytes,
         )
         if args.mode == "repl":
             if args.task_stdin or args.request_id:
