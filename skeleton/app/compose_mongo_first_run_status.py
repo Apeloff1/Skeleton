@@ -44,7 +44,9 @@ def summarize_observation(observation: object) -> dict[str, object]:
         "schema_version": "skeleton.app.compose_mongo_first_run_status.v1",
         "observation_valid": bool(valid),
         "checks": checks,
-        "mongo_observation_complete": bool(\n            valid and observation.get("code") == COMPLETE_CODE and all(checks.values())\n        ),
+        "mongo_observation_complete": bool(
+            valid and observation.get("code") == COMPLETE_CODE and all(checks.values())
+        ),
         "guarded_local_ai_ready": False,
         "activation_permitted": False,
         "requires_independent_reviewer": True,
