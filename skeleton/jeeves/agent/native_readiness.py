@@ -1,8 +1,12 @@
-"""Read-only readiness distinctions for a Jeeves native source bridge.
+"""Read-only, fail-closed Jeeves native source readiness.
 
-Structural checks here deliberately do not become a physical laptop or a
-verified model-generation claim. Source identity, real installation receipts
-and independently witnessed native execution have separate evidence levels.
+Do not treat duck-typed worker fields or a self-asserted rights report as a
+real installed GGUF. This bridge can become source-ready only if the SAME
+canonical inspector used by the laptop first-turn path verifies an active,
+isolated GGUF child, checked model archive, capacity lease and principal.
+
+This never infers actual model generation, Windows device qualification,
+source-rights independence or release approval from structural checks.
 """
 from __future__ import annotations
 
@@ -10,6 +14,21 @@ from dataclasses import dataclass
 from typing import Any
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
+from skeleton.ai.runtime.operational_ai.laptop_runtime.installed_witness import (
+    require_activated_source,
+)
+from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.coordinator import (
+    ExecutionSpine,
+)
+from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.database import (
+    SpineDatabase,
+)
+from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.lease import (
+    SessionGate,
+)
+from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor import (
+    SupervisedAI,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,8 +44,10 @@ class JeevesNativeReadiness:
 
     @property
     def source_bridge_ready(self) -> bool:
-        return (self.model_bound and self.tenant_bound and
-                self.sqlite_spine_present and self.source_receipt_bound)
+        return (
+            self.model_bound and self.tenant_bound
+            and self.sqlite_spine_present and self.source_receipt_bound
+        )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -43,34 +64,57 @@ class JeevesNativeReadiness:
         }
 
 
-def inspect_native_jeeves(worker: Any, installed_receipt: Any | None = None) -> JeevesNativeReadiness:
+def inspect_native_jeeves(
+    worker: Any, installed_receipt: Any | None = None,
+) -> JeevesNativeReadiness:
+    """Inspect installed source without making any model or SQLite writes.
+
+    Any missing/uncertain private source evidence is a negative readiness
+    verdict. Do not propagate native exception text or host file paths.
+    """
     holds: list[str] = []
+    model_bound = False
+    tenant_bound = False
+    identity = None
     try:
         identity = ActiveModel.from_supervisor(worker)
         model_bound = True
         tenant_bound = bool(identity.tenant and identity.subject)
-    except (ValueError, AttributeError):
-        model_bound = False
-        tenant_bound = False
-        holds.append("actual GGUF model/tokenizer/principal mismatch")
+    except Exception:
+        holds.append("active GGUF model/tokenizer/principal unavailable")
+
+    spine = getattr(worker, "spine", None)
     sqlite_spine_present = (
-        hasattr(getattr(worker, "spine", None), "db")
-        and callable(getattr(getattr(worker, "spine", None), "replay", None))
-        and callable(getattr(getattr(worker, "spine", None), "turn", None))
+        type(worker) is SupervisedAI
+        and type(spine) is ExecutionSpine
+        and type(getattr(spine, "db", None)) is SpineDatabase
+        and type(getattr(spine, "session_gate", None)) is SessionGate
+        and callable(getattr(spine, "replay", None))
+        and callable(getattr(spine, "turn", None))
     )
     if not sqlite_spine_present:
-        holds.append("authoritative execution spine unavailable")
-    source_receipt_bound = (
-        installed_receipt is not None
-        and getattr(installed_receipt, "content_verified", False) is True
-        and getattr(installed_receipt, "rights_approved", False) is True
-        and bool(getattr(installed_receipt, "source_sha", None))
-        and bool(getattr(installed_receipt, "archive_sha256", None))
-        and model_bound
-        and getattr(installed_receipt, "model_sha256", None) == identity.model_sha256
-    )
+        holds.append("canonical descriptor-backed SQLite spine unavailable")
+
+    source_receipt_bound = False
+    if model_bound and tenant_bound and sqlite_spine_present and installed_receipt is not None:
+        try:
+            installed = require_activated_source(worker, installed_receipt)
+            source_receipt_bound = (
+                type(installed) is dict
+                and installed.get("model_sha256") == identity.model_sha256
+                and installed.get("tokenizer_sha256") == identity.tokenizer_sha256
+                and type(installed.get("installed_model_bytes")) is int
+                and installed["installed_model_bytes"] > 0
+                and type(installed.get("installed_shard_count")) is int
+                and installed["installed_shard_count"] > 0
+            )
+        except Exception:
+            # A native child may fail health checking, expire its capacity
+            # lease, lose source custody or become unreachable during read.
+            # The failure is always a hold; never echo arbitrary error text.
+            source_receipt_bound = False
     if not source_receipt_bound:
-        holds.append("source-bound model installer receipt absent or invalid")
+        holds.append("installed source, rights or live isolated GGUF not verified")
     holds.extend((
         "real native GGUF generation not witnessed by this inspection",
         "clean Windows 11/WSL2 and pressure qualification outstanding",
