@@ -58,6 +58,14 @@ def _scope(value: object) -> bool:
         return False
 
 
+def _valid_principal_utf8(value: str) -> bool:
+    """Reject unpaired surrogates and oversized identities before comparison."""
+    try:
+        return len(value.encode("utf-8", errors="strict")) <= 256
+    except UnicodeError:
+        return False
+
+
 def _authenticated_principals(response: object) -> tuple[tuple[str, str], ...] | None:
     """Bound and normalize Mongo identities without logging their values.
 
@@ -77,7 +85,7 @@ def _authenticated_principals(response: object) -> tuple[tuple[str, str], ...] |
         for key in ("db", "user"):
             value = user.get(key)
             if (type(value) is not str or not value or value != value.strip()
-                    or len(value.encode("utf-8", errors="surrogatepass")) > 256
+                    or not _valid_principal_utf8(value)
                     or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
                 return None
             identity.append(value)
@@ -239,7 +247,7 @@ def main() -> int:
     # epoch alone cannot establish reviewer, writer or model custody.
     # Never return a shell-success status that deployment automation could
     # mistake for guarded inference readiness.
-    return 0 if result["guarded_local_ai_ready"] is True else 2
+    return 2  # Observation-only CLI must never authorize activation.
 
 
 if __name__ == "__main__":
