@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import stat
@@ -135,7 +136,18 @@ def run(argv: list[str]) -> int:
         else:
             result = flow.export_session(args.world_id, args.slot)
     except (CanonError, OSError, ValueError, TypeError, OverflowError) as exc:
-        code = exc.code if isinstance(exc, CanonError) else "invalid_input"
+        if isinstance(exc, CanonError):
+            code = exc.code
+        elif isinstance(exc, OSError):
+            code = {
+                errno.ELOOP: "input_symlink_disallowed",
+                errno.ENOENT: "input_missing",
+                errno.ENOTDIR: "input_invalid_directory",
+                errno.EACCES: "input_permission_denied",
+                errno.EPERM: "input_permission_denied",
+            }.get(exc.errno, "invalid_input")
+        else:
+            code = "invalid_input"
         recovery = {
             "stale_source": "inspect_source_and_repeat_review",
             "review_stale_source": "inspect_source_and_repeat_review",
@@ -159,6 +171,10 @@ def run(argv: list[str]) -> int:
             "laptop_engine_stale_source": "reinspect_engine_source_digests_before_compile",
             "laptop_engine_verify_mismatch": "reject_engine_handoff_and_reverify_exact_sources",
             "input_invalid_path": "provide_a_normalized_existing_json_file_path",
+            "input_symlink_disallowed": "use_a_regular_file_without_symlink_components",
+            "input_missing": "verify_input_path_exists_before_retry",
+            "input_invalid_directory": "replace_non_directory_parent_with_a_real_directory",
+            "input_permission_denied": "request_file_read_permission_without_bypassing_policy",
             "input_safe_open_unavailable": "use_a_platform_with_descriptor_anchored_file_open",
             "input_not_regular": "provide_a_regular_json_file_not_a_device_or_pipe",
             "input_too_large": "reduce_json_input_below_524288_bytes",
