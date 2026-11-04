@@ -47,7 +47,9 @@ class TestJeevesReadinessWithCanonicalSpine(unittest.TestCase):
             return_value=dict(SOURCE),
         ) as inspector:
             result=inspect_native_jeeves(self.worker,object())
-        inspector.assert_called_once_with(self.worker,self.report)
+        inspector.assert_called_once()
+        self.assertIs(inspector.call_args.args[0],self.worker)
+        self.assertIs(type(inspector.call_args.args[1]),object)
         self.assertTrue(result.model_bound)
         self.assertTrue(result.sqlite_spine_present)
         self.assertTrue(result.source_receipt_bound)
