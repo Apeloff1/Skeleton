@@ -45,6 +45,14 @@ class LaptopClient:
             response=conn.getresponse()
             if response.status!=200:
                 refuse("local AI request was not accepted")
+            # Do not let an intermediary or malicious loopback process
+            # smuggle differently framed replies into the native client.
+            for name in ("Content-Length","Content-Type"):
+                if len(response.msg.get_all(name,[]))!=1:
+                    refuse("ambiguous local native response framing")
+            if (response.getheader("Transfer-Encoding") is not None
+                    or response.getheader("Content-Encoding") is not None):
+                refuse("unsupported local native response encoding")
             content_length=response.getheader("Content-Length")
             if content_length is None or not content_length.isdecimal() or not 0<int(content_length)<=262144:
                 refuse("bounded response content length required")
