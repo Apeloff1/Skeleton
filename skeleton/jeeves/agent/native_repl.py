@@ -25,6 +25,8 @@ class ReplLimits:
     max_input_bytes: int = 32768
     max_answer_bytes: int = 262144
     max_history_messages: int = 128
+    max_result_frame_bytes: int = 262144
+    max_total_output_bytes: int = 8388608
 
     def __post_init__(self):
         limits = (
@@ -32,10 +34,16 @@ class ReplLimits:
             ("max_input_bytes", self.max_input_bytes, 1, 1048576),
             ("max_answer_bytes", self.max_answer_bytes, 1, 2097152),
             ("max_history_messages", self.max_history_messages, 1, 4096),
+            ("max_result_frame_bytes", self.max_result_frame_bytes, 1, 4194304),
+            ("max_total_output_bytes", self.max_total_output_bytes, 1, 67108864),
         )
         for name, value, minimum, maximum in limits:
             if type(value) is not int or not minimum <= value <= maximum:
                 raise NativeReplHold("invalid bounded " + name)
+        if self.max_total_output_bytes < self.max_result_frame_bytes:
+            raise NativeReplHold(
+                "REPL total output must cover one complete result frame"
+            )
 
 
 def _write_json(out: TextIO, value: dict[str, Any]) -> None:
@@ -113,17 +121,39 @@ class NativeJeevesRepl:
                     chat.worker.spine.limits.response_bytes,
                 ),
                 max_history_messages=self.limits.max_history_messages,
+                max_result_frame_bytes=self.limits.max_result_frame_bytes,
+                max_total_output_bytes=self.limits.max_total_output_bytes,
             )
         self._turns = 0
         self._terminated = False
+        self._output_bytes = 0
+        self._uncertain_output = False
 
     def _publish(self, target: TextIO, payload: dict[str, Any]) -> None:
         # A native model can disappear or lose its capacity fence during a
         # SQLite history read or a committed inference. Never publish the
         # private result after its source lease or principal has changed.
+        raw = json.dumps(
+            payload, sort_keys=True, ensure_ascii=False, allow_nan=False,
+            separators=(",", ":"),
+        ) + "\n"
+        amount = len(raw.encode("utf-8", "strict"))
+        if amount > self.limits.max_result_frame_bytes:
+            raise NativeReplHold("REPL result exceeds private frame bound")
+        if self._output_bytes + amount > self.limits.max_total_output_bytes:
+            raise NativeReplHold("REPL session disclosure budget exhausted")
         if self.source_fence is not None:
             self.source_fence.assert_live(self.chat.worker)
-        _write_json(target, payload)
+        # Charge bytes before attempting output. Unknown partial writes are
+        # terminal and cannot refund quota or generate another native effect.
+        self._output_bytes += amount
+        self._uncertain_output = True
+        written = target.write(raw)
+        if type(written) is not int or written != len(raw):
+            raise NativeReplHold("REPL output stream accepted incomplete frame")
+        if callable(getattr(target, "flush", None)):
+            target.flush()
+        self._uncertain_output = False
 
     def _status(self) -> dict[str, Any]:
         return {
@@ -146,8 +176,8 @@ class NativeJeevesRepl:
             raise NativeReplHold("bounded binary input stream required")
         if not callable(getattr(target, "write", None)):
             raise NativeReplHold("JSON lines output stream required")
-        self._publish(target, {"status": "jeeves-native-chat-ready", **self._status()})
         try:
+            self._publish(target, {"status": "jeeves-native-chat-ready", **self._status()})
             while self._turns < self.limits.max_turns:
                 if self.source_fence is not None:
                     self.source_fence.assert_live(self.chat.worker)
@@ -213,13 +243,16 @@ class NativeJeevesRepl:
             self._terminated = True
             # Fail-closed. An uncertain native call may already have been
             # executed; never reissue it or emit private prompt text.
-            _write_json(target, {
-                "status": "held",
-                "error_class": type(exc).__name__,
-                "session_id": self.chat.session_id,
-                "device_qualified": False,
-                "release_certified": False,
-            })
+            if not self._uncertain_output:
+                # A broken writer may have emitted a truncated private line.
+                # Never append JSON to such a partial line or claim success.
+                _write_json(target, {
+                    "status": "held",
+                    "error_class": type(exc).__name__,
+                    "session_id": self.chat.session_id,
+                    "device_qualified": False,
+                    "release_certified": False,
+                })
             return 2
 
 
