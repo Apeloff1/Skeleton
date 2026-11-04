@@ -185,6 +185,40 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             await gate.activate()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
+    async def test_duplicate_authenticated_principal_denies(self):
+        self.database.auth = {"authInfo": {"authenticatedUsers": [
+            {"user": "guarded-owner", "db": "admin"},
+            {"user": "guarded-owner", "db": "admin"},
+        ]}}
+        with self.assertRaisesRegex(ActivationBlocked, "duplicated"):
+            await self.make().activate()
+
+    async def test_oversized_or_control_principal_denies(self):
+        for username in ("x" * 129, "bad\\nprincipal", "bad\\u007fprincipal"):
+            with self.subTest(username=repr(username)):
+                self.database.auth = {"authInfo": {"authenticatedUsers": [
+                    {"user": username, "db": "admin"},
+                ]}}
+                with self.assertRaisesRegex(ActivationBlocked, "principal invalid"):
+                    await self.make().activate()
+
+    async def test_duplicate_principal_after_reviewer_denies(self):
+        original = self.epoch.read_epoch
+        calls = 0
+        async def mutate(**kwargs):
+            nonlocal calls
+            calls += 1
+            result = await original(**kwargs)
+            if calls == 1:
+                self.database.auth = {"authInfo": {"authenticatedUsers": [
+                    {"user": "guarded-owner", "db": "admin"},
+                    {"user": "guarded-owner", "db": "admin"},
+                ]}}
+            return result
+        self.epoch.read_epoch = mutate
+        with self.assertRaisesRegex(ActivationBlocked, "principal changed"):
+            await self.make().activate()
+
     async def test_primary_rotation_during_final_epoch_read_denies(self):
         original = self.epoch.read_epoch
         calls = 0

@@ -206,6 +206,17 @@ class MongoGuardedActivation:
                         for user in users
                     )):
                 raise ActivationBlocked("authenticated canonical Mongo session required")
+            # Duplicate principals and unbounded identity material cannot
+            # establish a unique, bounded authenticated authority snapshot.
+            # Reject rather than silently normalizing duplicates by sorting.
+            if (len(users) > 16 or any(
+                    len(user["user"]) > 128 or len(user["db"]) > 128
+                    or any(ord(ch) < 33 or ord(ch) > 126
+                           for ch in user["user"] + user["db"])
+                    for user in users)):
+                raise ActivationBlocked("Mongo authenticated principal invalid")
+            if len({(user["db"], user["user"]) for user in users}) != len(users):
+                raise ActivationBlocked("Mongo authenticated principal duplicated")
             # Pin the exact authenticated Mongo principal set across the
             # entire activation generation. A silent credential or identity
             # swap must require explicit operator reactivation, even if the
@@ -272,6 +283,12 @@ class MongoGuardedActivation:
                            or type(user.get("user")) is not str or not user["user"]
                            or type(user.get("db")) is not str or not user["db"]
                            for user in final_users)
+                    or len(final_users) > 16
+                    or any(len(user["user"]) > 128 or len(user["db"]) > 128
+                           or any(ord(ch) < 33 or ord(ch) > 126
+                                  for ch in user["user"] + user["db"])
+                           for user in final_users)
+                    or len({(user["db"], user["user"]) for user in final_users}) != len(final_users)
                     or tuple(sorted((user["db"], user["user"]) for user in final_users))
                     != auth_identity):
                 raise ActivationBlocked("Mongo principal changed during reviewer attestation")
@@ -305,6 +322,12 @@ class MongoGuardedActivation:
                            or type(user.get("user")) is not str or not user["user"]
                            or type(user.get("db")) is not str or not user["db"]
                            for user in post_users)
+                    or len(post_users) > 16
+                    or any(len(user["user"]) > 128 or len(user["db"]) > 128
+                           or any(ord(ch) < 33 or ord(ch) > 126
+                                  for ch in user["user"] + user["db"])
+                           for user in post_users)
+                    or len({(user["db"], user["user"]) for user in post_users}) != len(post_users)
                     or tuple(sorted((user["db"], user["user"]) for user in post_users))
                     != auth_identity):
                 raise ActivationBlocked("Mongo principal changed during final epoch read")
