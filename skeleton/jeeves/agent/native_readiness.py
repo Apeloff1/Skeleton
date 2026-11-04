@@ -29,6 +29,7 @@ from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.lease impo
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor import (
     SupervisedAI,
 )
+from .native_source_fence import valid_source_snapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,15 +100,7 @@ def inspect_native_jeeves(
     if model_bound and tenant_bound and sqlite_spine_present and installed_receipt is not None:
         try:
             installed = require_activated_source(worker, installed_receipt)
-            source_receipt_bound = (
-                type(installed) is dict
-                and installed.get("model_sha256") == identity.model_sha256
-                and installed.get("tokenizer_sha256") == identity.tokenizer_sha256
-                and type(installed.get("installed_model_bytes")) is int
-                and installed["installed_model_bytes"] > 0
-                and type(installed.get("installed_shard_count")) is int
-                and installed["installed_shard_count"] > 0
-            )
+            source_receipt_bound = valid_source_snapshot(installed, identity)
         except Exception:
             # A native child may fail health checking, expire its capacity
             # lease, lose source custody or become unreachable during read.
