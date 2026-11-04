@@ -32,14 +32,18 @@ class DuplicateFilterEvidenceTests(unittest.TestCase):
             with self.assertRaises(CognitionError):
                 evidence.query(self.catalog,"offline")
 
+    def test_invalid_overlap_still_fails_closed(self):
+        with self.assertRaisesRegex(CognitionError, "overlap"):
+            evidence.passages(self.doc, window_bytes=32, overlap_bytes=128)
+
     def test_attribution_not_semantic_claim(self):
-        span=evidence.passages(self.doc,window_bytes=32)[0]
+        span=evidence.passages(self.doc,window_bytes=32,overlap_bytes=8)[0]
         result=evidence.report(self.catalog,(span,))
         self.assertEqual(result["schema"],"offline-source-attribution.v1")
         self.assertFalse(result["semantic_entailment_proved"])
 
     def test_deterministic_ranking(self):
-        span=evidence.passages(self.doc,window_bytes=32)[0]
+        span=evidence.passages(self.doc,window_bytes=32,overlap_bytes=8)[0]
         self.assertEqual(evidence.rank_candidates(((span,0.8),)),(span,))
 
 if __name__=="__main__":

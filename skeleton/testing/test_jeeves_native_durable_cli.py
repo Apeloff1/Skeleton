@@ -32,6 +32,16 @@ from skeleton.testing.test_jeeves_native_sqlite_integration import (
     MODEL, TOKENIZER, ScriptedAgentBackend,
 )
 
+# SYNTHETIC source fixture: production still requires verified on-disk
+# installer bytes, isolated native child and capacity lease. Patch only the
+# source-inspector dependency in these durable-planner/SQLite tests.
+SOURCE_ONLY_WITNESS = {
+    "model_sha256": MODEL, "tokenizer_sha256": TOKENIZER,
+    "manifest_sha256": "c" * 64, "archive_sha256": "d" * 64,
+    "source_sha": "e" * 40, "installed_model_bytes": 4096,
+    "installed_shard_count": 1,
+}
+
 
 @unittest.skipUnless(os.name == "posix" and Path("/proc/self/fd").is_dir(),
                      "protected native SQLite requires Linux /proc")
@@ -83,7 +93,7 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
             "--task-stdin", *extra,
         ]
 
-    def _invoke(self, *extra, task=None, subject="operator"):
+    def _invoke(self, *extra, task=None, subject="operator", source_witness=None):
         stdin = TextIOWrapper(BytesIO(
             (self.TASK if task is None else task).encode("utf-8"),
         ), encoding="utf-8")
@@ -96,6 +106,13 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
             mock.patch(
                 "skeleton.jeeves.agent.native_cli.inspect_native_jeeves",
                 return_value=SimpleNamespace(source_bridge_ready=True),
+            ),
+            mock.patch(
+                "skeleton.jeeves.agent.native_source_fence.require_activated_source",
+                return_value=(
+                    dict(SOURCE_ONLY_WITNESS) if source_witness is None
+                    else source_witness
+                ),
             ),
             mock.patch("sys.stdin", stdin),
             mock.patch("sys.stdout", stdout),
@@ -124,6 +141,30 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
             ),
             preferred_provider="jeeves_native",
         )
+
+    def test_forged_installed_source_is_held_before_native_effect(self):
+        for source in (
+            None, True, {}, {**SOURCE_ONLY_WITNESS, "installed_shard_count": True},
+            {**SOURCE_ONLY_WITNESS, "manifest_sha256": "Z" * 64},
+            {**SOURCE_ONLY_WITNESS, "tokenizer_sha256": "f" * 64},
+            {**SOURCE_ONLY_WITNESS, "unapproved_lease_claim": True},
+        ):
+            with self.subTest(source=repr(source)):
+                code, result, err, activated = self._invoke(
+                    source_witness=source,
+                )
+                self.assertEqual(code, 2)
+                self.assertIsNone(result)
+                self.assertEqual(activated, 1)
+                self.assertEqual(self.backend.calls, 0)
+                self.assertNotIn(self.TASK, err)
+                self.assertIn('"release_certified": false', err)
+        with self.db.snapshot() as conn:
+            self.assertEqual(
+                conn.execute(
+                    "SELECT COUNT(*) FROM jeeves_native_terminal_results"
+                ).fetchone(), (0,),
+            )
 
     def test_cli_creates_verified_answer_and_terminal_custody(self):
         code, record, err, activated = self._invoke()
