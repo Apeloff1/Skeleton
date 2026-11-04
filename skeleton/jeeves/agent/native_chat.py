@@ -81,6 +81,11 @@ class NativeJeevesChat:
             # This owner-bound read checks the canonical principal and
             # verifies the exact transcript before accepting a replay.
             self.worker.spine.history(self.session_id)
+            # A foreign model may have become active while inspecting the
+            # existing durable session. Hold construction rather than
+            # handing a stale-principal session to the caller.
+            if ActiveModel.from_supervisor(self.worker) != self.identity:
+                raise NativeChatHold("native principal changed during chat reopen")
         self._closed = False
 
     def _assert_current(self) -> None:
@@ -157,6 +162,9 @@ class NativeJeevesChat:
             raise NativeChatHold("invalid bounded history limit")
         # Source of truth is the native, integrity-checked SQLite transcript.
         records = self.worker.spine.history(self.session_id)
+        # Ownership can change between the initial authorization and the
+        # SQLite history read. Do not return stale-principal private bytes.
+        self._assert_current()
         if type(records) not in (tuple, list) or len(records) > maximum_messages:
             raise NativeChatHold("history exceeds caller's bound")
         result = []
@@ -165,6 +173,7 @@ class NativeJeevesChat:
                 raise NativeChatHold("native transcript has invalid role")
             value = utf8(item.get("content"), maximum=131072)
             result.append({"role": item["role"], "content": value})
+        self._assert_current()
         return tuple(result)
 
     def close(self) -> bool:
@@ -174,7 +183,10 @@ class NativeJeevesChat:
         closed = self.worker.spine.close(self.session_id)
         if type(closed) is not bool:
             raise NativeChatHold("native close response not boolean")
+        # A close operation is itself a durable SQLite state transition.
+        # Never attribute that effect to a different live principal.
         self._closed = True
+        self._assert_current()
         return closed
 
 
