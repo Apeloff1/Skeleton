@@ -35,6 +35,19 @@ def test_native_fixture_temp_roots_are_portable_and_private() -> None:
             ):
                 continue
             found += 1
-            assert not any(kw.arg == "dir" for kw in node.keywords), rel
-            assert any(kw.arg == "prefix" for kw in node.keywords) or not node.keywords
+            # Source tests use an existing per-runner home rather than
+            # /tmp: the production descriptor guard rejects group-writable
+            # parents, even when a child has mode 0700.
+            directories = [kw.value for kw in node.keywords if kw.arg == "dir"]
+            assert len(directories) == 1, rel
+            requested = directories[0]
+            assert (
+                isinstance(requested, ast.Call)
+                and isinstance(requested.func, ast.Attribute)
+                and requested.func.attr == "home"
+                and isinstance(requested.func.value, ast.Name)
+                and requested.func.value.id == "Path"
+                and not requested.args and not requested.keywords
+            ), rel
+            assert any(kw.arg == "prefix" for kw in node.keywords), rel
         assert found >= 1, rel
