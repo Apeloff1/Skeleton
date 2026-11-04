@@ -60,7 +60,14 @@ class OperatorSessionLimits:
             ("maximum_result_bytes", 1048576),
             ("maximum_session_result_bytes", 67108864),
         ):
-            exact_integer(getattr(self,key),minimum=1,maximum=maximum)
+            try:
+                exact_integer(getattr(self,key),minimum=1,maximum=maximum)
+            except ContractHold as exc:
+                # Keep lower-level validation fail-closed, while exposing the
+                # stable public operator admission error class to the CLI.
+                raise NativeOperatorSessionHold(
+                    "invalid bounded operator " + key
+                ) from exc
         if self.maximum_task_bytes >= self.maximum_line_bytes:
             raise NativeOperatorSessionHold("command line must fit task plus envelope")
         if self.maximum_session_result_bytes < self.maximum_result_bytes:
