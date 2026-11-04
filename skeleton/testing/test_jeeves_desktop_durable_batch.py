@@ -177,9 +177,10 @@ class SerialNativeWorkTests(unittest.TestCase):
         self.assertEqual(receipt.items_started, 3)
         self.assertEqual(receipt.items_committed, 3)
         self.assertIsNone(receipt.stopped_at_sequence)
-        self.assertEqual([item.run_id for item in observed], [
-            item.run_id for item in selected.items,
-        ])
+        self.assertEqual(
+            [item.run_id for item in observed],
+            [item.run_id for item in selected.items],
+        )
         self.assertEqual([call[0] for call in worker.calls], ["durable"] * 3)
         for n, (_, args) in enumerate(worker.calls):
             self.assertEqual(args["action"], "start")
