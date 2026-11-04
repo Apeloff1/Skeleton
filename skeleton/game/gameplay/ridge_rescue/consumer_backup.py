@@ -20,6 +20,26 @@ class BackupError(ValueError):
     """Portable save backup is incomplete, oversized or not replayable."""
 
 
+def _strict_json(text: str) -> dict:
+    """Reject ambiguous and non-standard backup JSON before replay."""
+    def unique_members(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise BackupError("duplicate backup JSON member")
+            result[key] = value
+        return result
+
+    def invalid_constant(value):
+        raise BackupError("nonfinite backup JSON number")
+
+    try:
+        return json.loads(text, object_pairs_hook=unique_members,
+                          parse_constant=invalid_constant)
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise BackupError("invalid backup JSON") from exc
+
+
 def verify_backup(value: dict | str | bytes, original_source: bytes) -> tuple[dict, list[dict]]:
     if isinstance(value, bytes):
         if len(value) > MAX_BACKUP_BYTES:
@@ -31,10 +51,7 @@ def verify_backup(value: dict | str | bytes, original_source: bytes) -> tuple[di
     if isinstance(value, str):
         if len(value.encode("utf-8")) > MAX_BACKUP_BYTES:
             raise BackupError("backup exceeds byte budget")
-        try:
-            value = json.loads(value)
-        except ValueError as exc:
-            raise BackupError("invalid backup JSON") from exc
+        value = _strict_json(value)
     if not isinstance(value, dict) or set(value) != {"payload", "sha256"}:
         raise BackupError("invalid backup envelope")
     if len(canonical(value)) > MAX_BACKUP_BYTES:
