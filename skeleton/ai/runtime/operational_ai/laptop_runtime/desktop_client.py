@@ -147,6 +147,7 @@ class DesktopBridge:
     _SUCCESS = {
         "status": frozenset(("ready", "no-active-session")),
         "telemetry": frozenset(("observed-runtime-capacity",)),
+        "agent": frozenset(("verified-agent-response",)),
         "new": frozenset(("new-durable-session",)),
         "resume": frozenset(("existing-durable-session-reopened",)),
         "turn": frozenset(("committed-native-chat-turn",)),
@@ -196,6 +197,34 @@ class DesktopBridge:
                 raise DesktopBridgeHold("native answer has invalid Unicode") from exc
             if actual != digest:
                 raise DesktopBridgeHold("native committed answer bytes changed in IPC")
+        if op == "agent":
+            report = result.get("agent")
+            if (
+                type(report) is not dict
+                or report.get("schema") != "jeeves.desktop.strict-agent.v1"
+                or report.get("status") != "verified"
+                or report.get("success") is not True
+                or report.get("run_id") != fields["run_id"]
+                or result.get("run_id") != fields["run_id"]
+                or report.get("model_sha256") != self.model_sha256
+                or report.get("device_qualified") is not False
+                or report.get("release_certified") is not False
+                or report.get("filesystem_write_authorized") is not False
+                or report.get("automatic_retry") is not False
+                or type(report.get("usage")) is not dict
+                or report["usage"].get("tool_calls") != 0
+            ):
+                raise DesktopBridgeHold("native strict Jeeves agent result not authorized")
+            answer = report.get("answer")
+            proof = report.get("output_sha256")
+            if type(answer) is not str or type(proof) is not str:
+                raise DesktopBridgeHold("agent answer or digest missing")
+            try:
+                observed = sha256(answer.encode("utf-8", "strict")).hexdigest()
+            except UnicodeError as exc:
+                raise DesktopBridgeHold("agent answer contains invalid Unicode") from exc
+            if observed != proof:
+                raise DesktopBridgeHold("agent answer differs from source-checked bytes")
         if op == "history":
             if (
                 type(result.get("messages")) is not list
@@ -263,7 +292,10 @@ class DesktopBridge:
             # revokes the child; a committed uncertain result is not retried.
             deadline = (
                 min(660.0, self.config.inference_ms / 1000.0 + 45.0)
-                if op == "turn" else 30.0
+                if op == "turn" else (
+                    min(660.0, float(fields.get("maximum_wall_seconds", 180)) + 45.0)
+                    if op == "agent" else 30.0
+                )
             )
             watchdog = threading.Timer(deadline, self.abort)
             watchdog.daemon = True
