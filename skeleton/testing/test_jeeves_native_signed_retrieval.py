@@ -54,7 +54,7 @@ class TestNativeSignedRetrieval(unittest.TestCase):
             "schema":"offline-signed-source-manifest.v1",
             "tenant":"local","subject":"operator",
             "model_sha256":_MODEL,"tokenizer_sha256":_TOK,
-            "issued_at":self.now[0]-10,"expires_at":self.now[0]+3600,
+            "issued_at":self.now[0]-10,"expires_at":self.now[0]+100,
             "nonce":"a2"*16,
             "sources":[{
                 "source_id":"original","filename":"original.txt",
@@ -119,7 +119,7 @@ class TestNativeSignedRetrieval(unittest.TestCase):
     def test_operator_manifest_expiry_denied_after_selection(self):
         projector=self.projector()
         selected=self.select(projector)
-        self.now[0]+=3601
+        self.now[0]+=101
         with self.assertRaises(ValueError):
             projector.recheck_before_native_use(selected)
 
