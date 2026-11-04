@@ -326,6 +326,24 @@ def run_portable_smoke() -> dict:
             payload = Path(exported["path"]).read_bytes()
             if verify_export(payload)["head"] != final["head"]:
                 raise SmokeError("Windows launcher export did not replay earned ending")
+            # Exercise the actual Windows launcher save through a second
+            # process and a fresh slot, not just an in-process parser.
+            imported = json.loads(_invoke(
+                [sys.executable, "-I", str(artifact)],
+                ["restore", "--slot", "windows-export-restored", "--file", "-"],
+                env=launcher_env, cwd=root, stdin=payload.decode("utf-8"),
+            ))
+            if imported["head"] != final["head"] or imported["revision"] != len(choices):
+                raise SmokeError("Windows launcher exported save cannot be restored")
+            imported_audit = json.loads(_invoke(
+                [sys.executable, "-I", str(artifact)],
+                ["audit", "--slot", "windows-export-restored"],
+                env=launcher_env, cwd=root,
+            ))
+            if (not imported_audit["verified"] or
+                    imported_audit["audit_entries"] != len(choices) or
+                    imported_audit["head"] != final["head"]):
+                raise SmokeError("Windows launcher restored save failed replay audit")
     return {
         **result,
         "archive_sha256": metadata["sha256"],
