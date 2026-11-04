@@ -39,6 +39,9 @@ def cli_args(*extra):
 def invoke(args, *, worker=None, input_data=b"private local AI prompt"):
     """CLI fake installed stack; never bypass source verification in production."""
     fake=FakeWorker() if worker is None else worker
+    # Synthetic CLI fixture must model the requested exact principal; the
+    # production installed-source fence never accepts a foreign operator.
+    fake.spine.identity.subject="operator"
     input_stream=SimpleNamespace(buffer=BytesIO(input_data))
     output=StringIO()
     error=StringIO()
