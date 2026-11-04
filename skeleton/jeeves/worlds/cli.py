@@ -3,9 +3,30 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
 
 from .world_canon import CanonError, WorldStore, digest, edit, propose, prove, strict_json
+
+
+def _read_operation_file(path: str) -> bytes:
+    """Read bounded review input without following symlinks or blocking on FIFOs."""
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise CanonError("operation_not_regular")
+        if info.st_size > 524288:
+            raise CanonError("operation_too_large")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            raw = stream.read(524289)
+        if len(raw) > 524288:
+            raise CanonError("operation_too_large")
+        return raw
+    finally:
+        os.close(fd)
 
 
 def run(argv: list[str]) -> int:
@@ -43,9 +64,7 @@ def run(argv: list[str]) -> int:
         elif args.action == "edit":
             # A user-authored JSON operation is a reviewable typed edit, never
             # arbitrary executable code or an implicit language-model action.
-            with open(args.operation_file, "rb") as stream:
-                raw = stream.read(524289)
-            operation = strict_json(raw)
+            operation = strict_json(_read_operation_file(args.operation_file))
             source = store.read(args.id)
             if digest(source) != args.expected_digest:
                 raise CanonError("stale_source")
