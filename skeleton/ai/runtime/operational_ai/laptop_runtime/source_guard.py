@@ -90,15 +90,20 @@ class SourceFencedLaptopDispatcher(LaptopDispatcher):
 
     def dispatch(self, operation, payload):
         self.source_guard.assert_live(self.worker)
-        result = super().dispatch(operation, payload)
-        self.source_guard.assert_live(self.worker)
-        return result
+        try:
+            return super().dispatch(operation, payload)
+        finally:
+            # The canonical dispatcher itself can fail after detecting a
+            # model-epoch change. Even on that exception, terminate this
+            # source lease rather than leaving a reusable stale guard.
+            self.source_guard.assert_live(self.worker)
 
     def protocol(self):
         self.source_guard.assert_live(self.worker)
-        report = super().protocol()
-        self.source_guard.assert_live(self.worker)
-        return report
+        try:
+            return super().protocol()
+        finally:
+            self.source_guard.assert_live(self.worker)
 
 
 __all__ = ["LocalSourceFence", "SourceFencedLaptopDispatcher"]
