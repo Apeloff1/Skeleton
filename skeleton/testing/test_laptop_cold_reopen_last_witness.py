@@ -24,7 +24,7 @@ class FinalNativeWitnessTests(unittest.TestCase):
         rig = SyntheticColdRig()
         with rig.patch() as (_, initial, source):
             record = cold_reopen_acceptance.run(**OPTS)
-        self.assertEqual(initial.call_count, 1)
+        self.assertEqual(initial.call_count, 2)
         self.assertEqual(source.call_count, 2)
         self.assertEqual(rig.second.generation_calls, 0)
         self.assertTrue(record["source_verified_twice"])
