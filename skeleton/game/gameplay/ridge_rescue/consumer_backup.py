@@ -61,7 +61,13 @@ def verify_backup(value: dict | str | bytes, original_source: bytes) -> tuple[di
         value = _strict_json(value)
     if not isinstance(value, dict) or set(value) != {"payload", "sha256"}:
         raise BackupError("invalid backup envelope")
-    if len(canonical(value)) > MAX_BACKUP_BYTES:
+    # Public callers may pass a Python mapping rather than serialized JSON.
+    # Reject cyclic or excessively nested objects before any replay or slot write.
+    try:
+        envelope_size = len(canonical(value))
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise BackupError("invalid backup object graph") from exc
+    if envelope_size > MAX_BACKUP_BYTES:
         raise BackupError("backup exceeds byte budget")
     payload = value["payload"]
     if not isinstance(payload, dict) or set(payload) != {"schema", "source_sha256", "session", "history"}:
