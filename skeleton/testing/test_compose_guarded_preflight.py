@@ -267,7 +267,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_surrogate_principal_rejected_without_exception_or_epoch_read(self):
         self.db.auth = {"authInfo": {"authenticatedUsers": [
-            {"user": "\\ud800", "db": "admin"}]}}
+            {"user": chr(0xD800), "db": "admin"}]}}
         result = await self.inspect()
         self.assertEqual(result["code"], "mongo_authenticated_session_required")
         self.assertEqual(FakeEpoch.instances, [])
