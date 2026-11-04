@@ -163,11 +163,21 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
                 self.assertNotIn(self.TASK, err)
                 self.assertIn('"release_certified": false', err)
         with self.db.snapshot() as conn:
-            self.assertEqual(
-                conn.execute(
-                    "SELECT COUNT(*) FROM jeeves_native_terminal_results"
-                ).fetchone(), (0,),
-            )
+            # A forged installed source must not initialize the Jeeves
+            # terminal-result table at all. A pre-existing table is also
+            # acceptable, but may not contain a newly committed result.
+            present = conn.execute(
+                "SELECT COUNT(*) FROM sqlite_master "
+                "WHERE type='table' AND name='jeeves_native_terminal_results'"
+            ).fetchone()[0]
+            if present:
+                self.assertEqual(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM jeeves_native_terminal_results"
+                    ).fetchone(), (0,),
+                )
+            else:
+                self.assertEqual(present, 0)
 
     def test_cli_creates_verified_answer_and_terminal_custody(self):
         code, record, err, activated = self._invoke()
