@@ -23,6 +23,20 @@ class FirstRunObservationTests(unittest.TestCase):
         self.assertFalse(status["activation_permitted"])
         self.assertFalse(status["guarded_local_ai_ready"])
 
+    def test_untrusted_mapping_objects_are_not_executed(self):
+        class HostileMapping(dict):
+            def get(self, key, default=None):
+                raise AssertionError("untrusted mapping callback executed")
+        self.assertFalse(summarize_observation(HostileMapping(self.valid()))["observation_valid"])
+
+    def test_unbounded_or_oversized_observations_fail_closed(self):
+        payload = self.valid()
+        payload.update({f"extra_{i}": i for i in range(40)})
+        self.assertFalse(summarize_observation(payload)["observation_valid"])
+        payload = self.valid()
+        payload["code"] = COMPLETE_CODE + "x" * 200
+        self.assertFalse(summarize_observation(payload)["observation_valid"])
+
     def test_missing_or_malformed_inputs_fail_closed(self):
         for payload in (None, [], {}, {"schema_version": SCHEMA}, "ready"):
             with self.subTest(payload=payload):

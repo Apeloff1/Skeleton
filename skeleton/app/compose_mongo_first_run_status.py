@@ -6,8 +6,6 @@ and tokenizer binding before admitting any request.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 # The only successful observation code. Every other code denotes incomplete or
 # indeterminate custody, regardless of optimistic boolean flags.
 COMPLETE_CODE = "mongo_epoch_observed_only"
@@ -29,11 +27,13 @@ def summarize_observation(observation: object) -> dict[str, object]:
     from skeleton.app.compose_guarded_preflight import SCHEMA
 
     valid = (
-        isinstance(observation, Mapping)
+        type(observation) is dict
+        and len(observation) <= 32
         and observation.get("schema_version") == SCHEMA
         and observation.get("writes_performed") is False
         and observation.get("guarded_local_ai_ready") is False
         and type(observation.get("code")) is str
+        and len(observation["code"]) <= 128
         and all(type(observation.get(key)) is bool for key in REQUIRED_FIELDS)
     )
     checks = {
