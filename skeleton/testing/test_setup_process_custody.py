@@ -475,7 +475,7 @@ def test_existing_env_path_swap_during_read_is_rejected(tmp_path, monkeypatch):
         nonlocal visits
         if Path(path) == env:
             visits += 1
-            if visits == 2:
+            if visits == 4:
                 os.replace(replacement, env)
         return original_lstat(path, *args, **kwargs)
 
