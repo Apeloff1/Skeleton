@@ -182,6 +182,7 @@ def run(argv: list[str]) -> int:
             "laptop_html_mismatch": "recompile_and_verify_from_reviewed_source",
             "laptop_receipt_mismatch": "recompile_and_verify_from_reviewed_source",
             "lease_busy": "retry_after_current_writer_finishes",
+            "lease_unavailable": "inspect_custody_permissions_and_retry_without_removing_foreign_locks",
             "laptop_source_changed_after_verify": "retry_after_source_edit_and_recompile",
             "laptop_acceptance_budget": "reduce_world_complexity_before_acceptance",
             "laptop_acceptance_session_mismatch": "inspect_session_and_reverify_export",
