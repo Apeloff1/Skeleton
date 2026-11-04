@@ -155,3 +155,27 @@ def test_private_env_rejects_unlinked_path_after_read(tmp_path: Path, monkeypatc
     monkeypatch.setattr(Path, "lstat", unlinking_lstat)
     with pytest.raises(ValueError, match="changed during read"):
         _read_dotenv(path)
+
+
+def test_private_env_rejects_parent_replacement_after_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    parent = tmp_path / "runtime"
+    parent.mkdir()
+    path = parent / ".env"
+    path.write_text("BACKEND_PORT=8123\n", encoding="utf-8")
+    original_lstat = Path.lstat
+    parent_calls = 0
+
+    def replacing_parent_lstat(candidate: Path, *args: object, **kwargs: object) -> os.stat_result:
+        nonlocal parent_calls
+        if candidate == parent:
+            parent_calls += 1
+            if parent_calls == 2:
+                old_parent = tmp_path / "old-runtime"
+                parent.rename(old_parent)
+                parent.mkdir()
+                (parent / ".env").write_text("BACKEND_PORT=8124\n", encoding="utf-8")
+        return original_lstat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "lstat", replacing_parent_lstat)
+    with pytest.raises(ValueError, match="parent changed"):
+        _read_dotenv(path)

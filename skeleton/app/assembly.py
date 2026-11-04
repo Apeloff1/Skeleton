@@ -332,6 +332,11 @@ def _read_dotenv(path: Path) -> dict[str, str]:
     import stat
 
     values: dict[str, str] = {}
+    # Pin the containing directory as well as the file. An attacker must not
+    # be able to replace the directory while retaining an admitted file inode.
+    parent_before = path.parent.lstat()
+    if not stat.S_ISDIR(parent_before.st_mode):
+        raise ValueError("private runtime environment parent must be a directory")
     flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -382,6 +387,10 @@ def _read_dotenv(path: Path) -> dict[str, str]:
             or (current.st_dev, current.st_ino) != (after.st_dev, after.st_ino)
         ):
             raise ValueError("private runtime environment changed during read")
+        parent_after = path.parent.lstat()
+        if (not stat.S_ISDIR(parent_after.st_mode)
+                or (parent_after.st_dev, parent_after.st_ino) != (parent_before.st_dev, parent_before.st_ino)):
+            raise ValueError("private runtime environment parent changed during read")
         decoded = payload.decode("utf-8")
     finally:
         os.close(descriptor)
