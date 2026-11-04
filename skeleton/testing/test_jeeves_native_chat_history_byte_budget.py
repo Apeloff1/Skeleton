@@ -134,7 +134,9 @@ class NativeChatHistoryByteBudget(unittest.TestCase):
         self.assertEqual(status,2)
         self.assertTrue(repl._terminated)
         self.assertNotIn("A"*100,output.getvalue())
-        self.assertIn('"status": "held"',output.getvalue())
+        self.assertEqual(
+            json.loads(output.getvalue().splitlines()[-1])["status"], "held"
+        )
         self.assertEqual(self.worker.spine.generations,1)
 
     def test_large_direct_sqlite_history_cannot_upgrade_device(self):
