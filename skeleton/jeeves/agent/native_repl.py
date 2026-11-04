@@ -176,8 +176,16 @@ class NativeJeevesRepl:
             raise NativeReplHold("bounded binary input stream required")
         if not callable(getattr(target, "write", None)):
             raise NativeReplHold("JSON lines output stream required")
+        # The first live-source check is an activation/authorization fence.
+        # Preserve the existing public behavior: failures before the ready
+        # frame propagate to the CLI; they are not converted into a healthy
+        # REPL session or a misleading output-status record.
         try:
             self._publish(target, {"status": "jeeves-native-chat-ready", **self._status()})
+        except BaseException:
+            self._terminated = True
+            raise
+        try:
             while self._turns < self.limits.max_turns:
                 if self.source_fence is not None:
                     self.source_fence.assert_live(self.chat.worker)

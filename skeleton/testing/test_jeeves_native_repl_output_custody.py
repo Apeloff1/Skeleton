@@ -105,25 +105,33 @@ class REPLFiniteOutputTests(unittest.TestCase):
         private=b"A"*900
         code,out,repl,worker=serve(private+b"\n:history\n",limits)
         self.assertEqual(code,2)
-        self.assertIn('"status": "held"',out.getvalue())
+        self.assertEqual(
+            json.loads(out.getvalue().splitlines()[-1])["status"], "held"
+        )
         self.assertNotIn("A"*100,out.getvalue())
         self.assertEqual(worker.spine.generations,1)
         self.assertTrue(repl._terminated)
 
-    def test_initial_ready_frame_bound_can_hold_without_generation(self):
+    def test_initial_ready_frame_bound_refuses_before_native_generation(self):
         limits=ReplLimits(
             max_result_frame_bytes=16,
             max_total_output_bytes=16,
         )
-        code,out,repl,worker=serve(b"private\n",limits)
-        self.assertEqual(code,2)
+        worker=SimulatedWorker()
+        repl=NativeJeevesRepl(NativeJeevesChat(worker),limits=limits)
+        out=StringIO()
+        with self.assertRaises(NativeReplHold):
+            repl.serve(BytesIO(b"private\n"),out)
         self.assertTrue(repl._terminated)
-        self.assertIn('"status": "held"',out.getvalue())
+        self.assertFalse(out.getvalue())
         self.assertEqual(worker.spine.generations,0)
 
     def test_short_initial_write_never_gets_appended_hold_record(self):
-        code,out,repl,worker=serve(b"secret\n",target=ShortResult())
-        self.assertEqual(code,2)
+        worker=SimulatedWorker()
+        repl=NativeJeevesRepl(NativeJeevesChat(worker))
+        out=ShortResult()
+        with self.assertRaises(NativeReplHold):
+            repl.serve(BytesIO(b"secret\n"),out)
         self.assertTrue(repl._terminated)
         self.assertEqual(len(out.getvalue()),5)
         self.assertTrue(repl._uncertain_output)
@@ -132,10 +140,12 @@ class REPLFiniteOutputTests(unittest.TestCase):
     def test_untrusted_noninteger_initial_write_count_refused(self):
         for count in (None,True,-1,0,"complete"):
             with self.subTest(count=repr(count)):
-                code,out,repl,worker=serve(
-                    b"secret\n",target=BadWriteCount(count),
-                )
-                self.assertEqual(code,2)
+                worker=SimulatedWorker()
+                repl=NativeJeevesRepl(NativeJeevesChat(worker))
+                out=BadWriteCount(count)
+                with self.assertRaises(NativeReplHold):
+                    repl.serve(BytesIO(b"secret\n"),out)
+                self.assertTrue(repl._terminated)
                 self.assertTrue(repl._uncertain_output)
                 self.assertEqual(out.getvalue(),"")
                 self.assertEqual(worker.spine.generations,0)
@@ -148,7 +158,9 @@ class REPLFiniteOutputTests(unittest.TestCase):
         code,out,repl,worker=serve(b"B"*1500+b"\n:history\n",limits)
         self.assertEqual(code,2)
         self.assertTrue(repl._terminated)
-        self.assertIn('"status": "held"',out.getvalue())
+        self.assertEqual(
+            json.loads(out.getvalue().splitlines()[-1])["status"], "held"
+        )
         self.assertNotIn("B"*128,out.getvalue())
         self.assertEqual(worker.spine.generations,1)
 
@@ -156,7 +168,9 @@ class REPLFiniteOutputTests(unittest.TestCase):
         code,out,repl,worker=serve(b"bad\xff\n")
         self.assertEqual(code,2)
         self.assertEqual(worker.spine.generations,0)
-        self.assertIn('"status": "held"',out.getvalue())
+        self.assertEqual(
+            json.loads(out.getvalue().splitlines()[-1])["status"], "held"
+        )
 
     def test_session_output_limits_cannot_upgrade_release_claim(self):
         code,out,repl,worker=serve(b"hello\n:quit\n")
