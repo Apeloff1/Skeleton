@@ -188,7 +188,7 @@ class MongoGuardedActivation:
             async with asyncio.timeout(_MAX_PROBE_SECONDS):
                 hello = await self._database.command("hello")
             if (type(hello) is not dict
-                    or not isinstance(hello.get("setName"), str)
+                    or type(hello.get("setName")) is not str
                     or not hello["setName"]
                     or hello.get("isWritablePrimary") is not True):
                 raise ActivationBlocked("linearizable Mongo replica-set primary required")
@@ -235,7 +235,7 @@ class MongoGuardedActivation:
             # canonical writes in another database or another client.
             db_name = getattr(self._database, "name", None)
             db_client = getattr(self._database, "client", None)
-            if not isinstance(db_name, str) or not db_name or db_client is None:
+            if type(db_name) is not str or not db_name or db_client is None:
                 raise ActivationBlocked("canonical Mongo database identity missing")
             collections = (
                 getattr(self._epoch, "_collection", None),
