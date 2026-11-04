@@ -295,6 +295,10 @@ class JeevesWindow(tk.Tk):
             )
             button.grid(row=0, column=column, padx=3)
             self.durable_buttons.append(button)
+        self.batch_button = ttk.Button(
+            durable, text="Run serial work batch", command=self._batch_work,
+        )
+        self.batch_button.grid(row=1, column=1, columnspan=3, sticky="e", pady=(6, 0))
 
         footer = ttk.Frame(main)
         footer.grid(row=4, column=0, sticky="ew", pady=(5, 0))
@@ -344,7 +348,7 @@ class JeevesWindow(tk.Tk):
         for button in (
             self.new_button, self.resume_button,
             self.telemetry_button, self.source_status_button, self.agent_button,
-            *self.durable_buttons,
+            self.batch_button, *self.durable_buttons,
         ):
             button.configure(state="normal" if active else "disabled")
         has_session = (
@@ -413,6 +417,17 @@ class JeevesWindow(tk.Tk):
     def _workspace(self):
         from .desktop_workspace_ui import WorkspaceWindow
         WorkspaceWindow(self, source_text=self._last_answer or "")
+
+    def _batch_work(self):
+        if self._bridge is None or not self._bridge.connected or self._busy:
+            self._show(
+                "Serial work held",
+                "Connect a real installed GGUF before approving durable work",
+                "warning",
+            )
+            return
+        from .desktop_batch_ui import DurableBatchWindow
+        DurableBatchWindow(self)
 
     def _search_sources(self):
         from .desktop_source_search_ui import SourceSearchWindow

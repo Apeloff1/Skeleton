@@ -300,3 +300,13 @@ model-call/time/step and source permissions. Unsupported or under-budgeted
 advanced requests are held, not silently downgraded. Profile receipts
 state verification **requested**, never invent its successful execution.
 See `docs/ai/JEEVES_ADVANCED_NATIVE_REASONING.md`.
+
+## Sequential durable work batches
+
+The desktop can accept an operator-reviewed, exact-SHA-256 manifest of
+up to 32 sequential native tasks and run each **once** under a separate
+visible canonical SQLite `wrun_...` work order. All tasks share one
+source-fenced installed GGUF child; no parallel inference, hidden tool,
+background task scheduler, second database or automatic replay is used.
+A failed/uncertain task stops the entire sequence and preserves the
+original run ID. See `docs/ai/JEEVES_SERIAL_DURABLE_WORK_BATCHES.md`.
