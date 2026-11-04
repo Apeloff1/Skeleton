@@ -353,3 +353,32 @@ def test_laptop_diagnostic_cli_does_not_create_files(tmp_path, capsys):
     result = json.loads(capsys.readouterr().out)["result"]
     assert result["checks"]["builder"]["ok"] is True
     assert sorted(path.name for path in tmp_path.iterdir()) == before
+
+
+def test_laptop_lease_filesystem_failure_is_typed_and_never_deletes_foreign_lock(tmp_path, monkeypatch):
+    import errno
+    import os
+
+    flow = LaptopFlow(tmp_path)
+    proposal = flow.propose(sample("lighthouse_brief.json"))
+    lock = tmp_path / "lighthouse.lock"
+    real_open = os.open
+
+    def deny_lock(path, flags, *args, **kwargs):
+        if path == "lighthouse.lock":
+            raise PermissionError(errno.EACCES, "filesystem denied lock")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", deny_lock)
+    reject("lease_unavailable", lambda: flow.inspect("lighthouse"))
+    assert not lock.exists()
+    assert flow.worlds.read("lighthouse")["id"] == proposal["world_id"]
+
+
+def test_laptop_lease_collision_preserves_existing_lock(tmp_path):
+    flow = LaptopFlow(tmp_path)
+    flow.propose(sample("lighthouse_brief.json"))
+    lock = tmp_path / "lighthouse.lock"
+    lock.write_bytes(b"other-writer")
+    reject("lease_busy", lambda: flow.inspect("lighthouse"))
+    assert lock.read_bytes() == b"other-writer"
