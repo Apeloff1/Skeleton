@@ -28,10 +28,19 @@ from .native_operator_session import (
     NativeOperatorSession,OperatorSessionLimits,NativeOperatorSessionHold,
 )
 from .native_readiness import inspect_native_jeeves
+from .native_operator_preflight import check_native_resource_shape
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import identifier
+
+
+class _RedactedParser(argparse.ArgumentParser):
+    """Do not echo untrusted CLI tokens or private paths on argument errors."""
+
+    def error(self, message: str) -> None:
+        raise NativeOperatorSessionHold("invalid operator command-line arguments")
 
 
 def main(argv:list[str]|None=None)->int:
-    parser=argparse.ArgumentParser(
+    parser=_RedactedParser(
         description="Source-bound local durable Jeeves multi-run operator terminal",
     )
     parser.add_argument("--model-root",type=Path,required=True)
@@ -50,14 +59,24 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--maximum-reserved-model-calls",type=int,default=128)
     parser.add_argument("--maximum-reserved-output-tokens",type=int,default=131072)
     parser.add_argument("--maximum-wall-seconds",type=float,default=3600)
-    args=parser.parse_args(argv)
     try:
+        args=parser.parse_args(argv)
         if args.approve_native is not True or args.commands_stdin is not True:
             raise NativeOperatorSessionHold("native approval and explicit command stream required")
-        for name,value in (("model-root",args.model_root),
-                           ("state-dir",args.state_dir)):
-            if not isinstance(value,Path) or not value.is_absolute() or ".." in value.parts:
-                raise NativeOperatorSessionHold("absolute private "+name+" required")
+        # Check identity and paths before private stdin, source bytes or native
+        # worker startup. Do not resolve untrusted paths in pure preflight.
+        identifier(args.tenant, "tenant")
+        identifier(args.subject, "subject")
+        for name,value in (
+            ("model-root",args.model_root),
+            ("state-dir",args.state_dir),
+            ("capacity-root",args.capacity_root),
+        ):
+            if value is None and name == "capacity-root":
+                continue
+            if (not isinstance(value,Path) or not value.is_absolute()
+                    or ".." in value.parts or chr(0) in str(value)):
+                raise NativeOperatorSessionHold("absolute canonical private "+name+" required")
         limits=OperatorSessionLimits(
             maximum_commands=args.maximum_commands,
             maximum_reserved_model_calls=args.maximum_reserved_model_calls,
@@ -68,6 +87,14 @@ def main(argv:list[str]|None=None)->int:
             or not 1<=args.max_output_tokens<=8192
             or args.max_output_tokens>limits.maximum_reserved_output_tokens):
             raise NativeOperatorSessionHold("output reservation exceeds session limits")
+        check_native_resource_shape(
+            context_tokens=args.context,
+            output_tokens=args.max_output_tokens,
+            native_threads=args.threads,
+            gpu_layers=args.gpu_layers,
+            capacity_budget_bytes=args.capacity_budget_bytes,
+        )
+        # This structural check never proves installed rights or device capacity.
         # A signed model installer must already have approved all actual
         # weights. No model installation, network or rights shortcut occurs.
         stack,worker,installed=activate_checked(
