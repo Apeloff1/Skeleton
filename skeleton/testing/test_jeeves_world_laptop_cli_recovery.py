@@ -158,3 +158,28 @@ def test_invalid_review_input_does_not_initialize_custody(tmp_path, capsys):
     failure = json.loads(capsys.readouterr().out)
     assert failure["phase"] == "review"
     assert not store.exists()
+
+
+@pytest.mark.parametrize(("action", "flag"), [
+    ("propose", "--brief-file"),
+    ("session-restore-check", "--export-file"),
+    ("engine-compile", "--expected-digests-file"),
+])
+def test_empty_external_json_is_actionable_and_never_initializes_custody(
+    tmp_path, capsys, action, flag
+):
+    source = tmp_path / "empty.json"
+    source.write_bytes(b"")
+    store = tmp_path / "uncreated-store"
+    args = ["--store", str(store), action]
+    if action != "propose":
+        args += ["--world-id", "original"]
+    if action == "engine-compile":
+        args += ["--era", "classic"]
+    args += [flag, str(source)]
+    assert run(args) == 2
+    assert json.loads(capsys.readouterr().out) == {
+        "ok": False, "phase": action, "error": "input_empty",
+        "next_action": "provide_a_nonempty_valid_json_document",
+    }
+    assert not store.exists()
