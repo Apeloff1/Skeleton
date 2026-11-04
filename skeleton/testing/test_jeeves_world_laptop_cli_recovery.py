@@ -56,3 +56,32 @@ def test_laptop_cli_filesystem_errors_are_typed_and_do_not_publish(
     assert failure == {"ok": False, "phase": "propose",
                        "error": error, "next_action": next_action}
     assert not any(p.name.endswith(".laptop.review.json") for p in tmp_path.iterdir())
+
+
+def test_laptop_cli_rejects_input_mutated_during_descriptor_read(tmp_path, monkeypatch, capsys):
+    """An input changed while read must never reach proposal publication."""
+    source = tmp_path / "brief.json"
+    source.write_text('{"id":"original"}', encoding="utf-8")
+    original_fstat = os.fstat
+    seen = 0
+
+    def changed_fstat(fd):
+        nonlocal seen
+        result = original_fstat(fd)
+        if (result.st_dev, result.st_ino) == (source.stat().st_dev, source.stat().st_ino):
+            seen += 1
+            if seen == 2:
+                from types import SimpleNamespace
+                return SimpleNamespace(
+                    st_mode=result.st_mode, st_size=result.st_size + 1,
+                    st_dev=result.st_dev, st_ino=result.st_ino,
+                    st_mtime_ns=result.st_mtime_ns, st_ctime_ns=result.st_ctime_ns,
+                )
+        return result
+
+    monkeypatch.setattr(os, "fstat", changed_fstat)
+    assert run(["--store", str(tmp_path), "propose", "--brief-file", str(source)]) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["error"] == "input_changed_during_read"
+    assert failure["next_action"] == "retry_with_a_stable_unmodified_json_file"
+    assert not any(p.name.endswith(".laptop.review.json") for p in tmp_path.iterdir())
