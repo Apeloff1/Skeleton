@@ -167,6 +167,14 @@ def verify_bytes(data: bytes) -> dict:
                 raise BundleError("untrusted game entrypoint")
             if archive.testzip() is not None:
                 raise BundleError("archive CRC mismatch")
+            # Refuse overlapping headers, gaps and alternate local metadata.
+            # ZIP readers may otherwise silently accept ambiguous envelopes.
+            canonical_buffer = io.BytesIO()
+            with zipfile.ZipFile(canonical_buffer, mode="w", allowZip64=False) as canonical:
+                for item in archive.infolist():
+                    _entry(item.filename, archive.read(item), canonical)
+            if canonical_buffer.getvalue() != data:
+                raise BundleError("noncanonical portable archive bytes")
     except (zipfile.BadZipFile, OSError, RuntimeError) as exc:
         raise BundleError("invalid portable game archive") from exc
     return {"schema": "ridge.rescue.consumer.zipapp.v1", "files": len(names),
