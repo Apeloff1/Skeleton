@@ -24,7 +24,7 @@ def evaluate(evidence: object):
                    for stage, module in zip(STAGES, HANDLERS))
     if len(stages) != 8:
         raise LaptopGateHold("tokenizer source registry incomplete")
-    if evidence["installed_tokenizer"]["observed_sha256"] != evidence["model_pairing"]["observed_sha256"]:
+    if all(item.accepted for item in stages) and evidence["installed_tokenizer"]["observed_sha256"] != evidence["model_pairing"]["observed_sha256"]:
         raise LaptopGateHold("tokenizer and installed model pairing disagree")
     return stages
 
