@@ -73,3 +73,11 @@ model rights or prove device throughput. Additional real GGUF-first-turn,
 durable restart/replay, cancellation, clean install, exact-head CI/security
 and independent review remain mandatory. No missing/skipped/pending/failing
 workflow is a pass.
+
+## Human-approved new-source delivery
+
+The desktop's separate source-review window can publish one operator-reviewed
+new file at a time with a no-clobber SHA-256 manifest. It never lets model
+output overwrite existing files, execute code, create workflow authority or
+acquire a filesystem tool. Use the complete guide at
+`docs/ai/JEEVES_WORKSPACE_NEW_FILE_DELIVERY.md`.

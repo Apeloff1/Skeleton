@@ -38,6 +38,7 @@ class JeevesWindow(tk.Tk):
         self._busy = False
         self._closing = False
         self._last_request: str | None = None
+        self._last_answer: str | None = None  # RAM-only, never an automatic tool grant.
         self._attachments = []  # Explicit immutable source snapshots, never tool grants.
         self.attachment_text = tk.StringVar(value="No local source attached")
         self.context_enabled = tk.BooleanVar(value=True)
@@ -164,7 +165,15 @@ class JeevesWindow(tk.Tk):
             attachment_bar,
             text="Use recent committed SQLite turns as bounded context",
             variable=self.context_enabled,
-        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+        ttk.Button(
+            attachment_bar, text="Insert source proposal format",
+            command=self._insert_proposal_format,
+        ).grid(row=1, column=1, sticky="e", padx=4, pady=(4, 0))
+        ttk.Button(
+            attachment_bar, text="Review Jeeves file proposal",
+            command=self._workspace,
+        ).grid(row=1, column=2, sticky="e", pady=(4, 0))
 
         footer = ttk.Frame(main)
         footer.grid(row=4, column=0, sticky="ew", pady=(5, 0))
@@ -228,6 +237,25 @@ class JeevesWindow(tk.Tk):
     def _setup(self):
         from .desktop_setup_ui import SetupWindow
         SetupWindow(self)
+
+    def _workspace(self):
+        from .desktop_workspace_ui import WorkspaceWindow
+        WorkspaceWindow(self, source_text=self._last_answer or "")
+
+    def _insert_proposal_format(self):
+        self.prompt.insert(
+            "end",
+            "\n\nReturn only a JSON object with schema "
+            "'jeeves.workspace.new-files.v1' and files: an array of "
+            "objects with path (relative UTF-8 source filename) and content "
+            "(exact complete source UTF-8 text). Propose only NEW files "
+            "under already-existing project directories. Do not include "
+            "Markdown fences, shell commands, binary files, unknown fields "
+            "or an instruction to overwrite existing files. "
+            "An operator will separately review exact hashes and approve "
+            "one publication at a time.",
+        )
+        self.prompt.focus_set()
 
     def _connect(self):
         if self._busy or (self._bridge is not None and self._bridge.connected):
@@ -400,7 +428,9 @@ class JeevesWindow(tk.Tk):
                             self.resume_id.set(bridge.session_id)
                     if name == "turn":
                         record = result.get("turn", {})
-                        self._show("Jeeves (committed SQLite receipt)", str(record.get("answer", "")), "jeeves")
+                        answer = record.get("answer", "")
+                        self._last_answer = answer if type(answer) is str else None
+                        self._show("Jeeves (committed SQLite receipt)", str(answer), "jeeves")
                         self.prompt.delete("1.0", "end")
                         self._clear_attachments()
                         self.request_text.set(
