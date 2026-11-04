@@ -22,6 +22,7 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
     ContractViolation, identifier, nonnegative, number, utf8,
 )
 
+from .native_source_fence import NativeSourceFence
 from .native_receipt_boundary import receive_committed_turn
 from .native_schema_boundary import verify_structured_native_output
 
@@ -71,9 +72,19 @@ class NativeJeevesChat:
     the existing native SQLite request identity and receipt hash chain.
     """
 
-    def __init__(self, worker: Any, *, session_id: str | None = None) -> None:
+    def __init__(
+        self, worker: Any, *, session_id: str | None = None,
+        source_fence: NativeSourceFence | None = None,
+    ) -> None:
         self.worker = worker
         self.identity = ActiveModel.from_supervisor(worker)
+        if source_fence is not None:
+            if type(source_fence) is not NativeSourceFence:
+                raise NativeChatHold("canonical source fence required")
+            if source_fence.principal != self.identity:
+                raise NativeChatHold("source fence principal differs from chat")
+            source_fence.assert_live(worker)
+        self.source_fence = source_fence
         self.bridge = TurnBridge(worker)
         if session_id is None:
             self.session_id = create(worker)
@@ -85,6 +96,8 @@ class NativeJeevesChat:
             if ActiveModel.from_supervisor(self.worker) != self.identity:
                 raise NativeChatHold("native principal changed during chat reopen")
         self._closed = False
+        if self.source_fence is not None:
+            self.source_fence.assert_live(self.worker)
         # Per-chat ordering: turn, SQLite transcript read and close are one
         # process-local critical section. Cross-process ownership stays in
         # the canonical ExecutionSpine and SessionGate.
@@ -102,6 +115,10 @@ class NativeJeevesChat:
             raise NativeChatHold("native principal unavailable") from exc
         if active != self.identity:
             raise NativeChatHold("native model or principal changed")
+        if self.source_fence is not None:
+            self.source_fence.assert_live(self.worker)
+            if ActiveModel.from_supervisor(self.worker) != self.identity:
+                raise NativeChatHold("native owner changed after source check")
 
     def turn(
         self,
@@ -124,6 +141,7 @@ class NativeJeevesChat:
                 self.session_id, id_, prompt, seed=seed, temperature=temperature,
             )
             was_replayed = committed is not None
+            self._assert_current()
             if committed is None:
                 # Native exceptions retain their uncertain SQLite pending lease.
                 # Never reissue that request automatically after a crash.
@@ -140,9 +158,11 @@ class NativeJeevesChat:
                     raise NativeChatHold(
                         "native chat turn lacks an approved durable receipt"
                     ) from exc
+                self._assert_current()
                 committed = self.worker.spine.replay(
                     self.session_id, id_, prompt, seed=seed, temperature=temperature,
                 )
+                self._assert_current()
                 if committed is None:
                     raise NativeChatHold("native chat lacks authoritative commit")
                 if (fresh.get("text") != committed.get("text")
