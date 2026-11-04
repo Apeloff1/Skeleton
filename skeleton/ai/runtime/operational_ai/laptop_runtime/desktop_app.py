@@ -184,6 +184,10 @@ class JeevesWindow(tk.Tk):
             attachment_bar, text="Attach text/code file", command=self._attach,
         ).grid(row=0, column=1, padx=4)
         ttk.Button(
+            attachment_bar, text="Search project sources",
+            command=self._search_sources,
+        ).grid(row=2, column=0, sticky="w", pady=(4, 0))
+        ttk.Button(
             attachment_bar, text="Clear attached files", command=self._clear_attachments,
         ).grid(row=0, column=2, padx=4)
         ttk.Checkbutton(
@@ -338,6 +342,10 @@ class JeevesWindow(tk.Tk):
     def _workspace(self):
         from .desktop_workspace_ui import WorkspaceWindow
         WorkspaceWindow(self, source_text=self._last_answer or "")
+
+    def _search_sources(self):
+        from .desktop_source_search_ui import SourceSearchWindow
+        SourceSearchWindow(self)
 
     def _insert_proposal_format(self):
         self.prompt.insert(
