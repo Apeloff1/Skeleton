@@ -10,6 +10,9 @@ on:
       - "skeleton/ai/runtime/production_fabric/product/**"
       - "skeleton/ai/runtime/operational_ai/offline_cognition/families/duplicate_filter/evidence.py"
       - "skeleton/testing/test_jeeves_architecture_and_evidence_window.py"
+      - "skeleton/testing/test_jeeves_desktop_*.py"
+      - "scripts/launch_jeeves_desktop.py"
+      - "jeeves-desktop.sh"
       - "scripts/run_ai_laptop_native_e2e.py"
       - "skeleton/testing/test_laptop_real_device_harness.py"
       - "skeleton/testing/test_jeeves_native_*.py"
@@ -132,6 +135,11 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_laptop_real_device_harness.py' -v
+      - name: Validate the completed real desktop source contracts
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_desktop_*.py' -v
       - name: Keep source-only tests separate from device and release proof
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'
