@@ -11,23 +11,40 @@ from .world_canon import CanonError, WorldStore, digest, edit, propose, prove, s
 
 
 def _read_operation_file(path: str) -> bytes:
-    """Read bounded review input without following symlinks or blocking on FIFOs."""
-    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(path, flags)
+    """Bounded descriptor-relative review read; reject symlinks in every component."""
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise CanonError("operation_secure_open_unavailable")
+    if not path or "\\x00" in path:
+        raise CanonError("operation_invalid_path")
+    absolute = os.path.isabs(path)
+    parts = path.split(os.sep)
+    if absolute:
+        parts = parts[1:]
+    if not parts or any(part in ("", ".", "..") for part in parts):
+        raise CanonError("operation_invalid_path")
+    directory = os.open(os.sep if absolute else ".", os.O_RDONLY | os.O_DIRECTORY)
     try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise CanonError("operation_not_regular")
-        if info.st_size > 524288:
-            raise CanonError("operation_too_large")
-        with os.fdopen(os.dup(fd), "rb") as stream:
-            raw = stream.read(524289)
-        if len(raw) > 524288:
-            raise CanonError("operation_too_large")
-        return raw
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+        fd = os.open(parts[-1], flags, dir_fd=directory)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise CanonError("operation_not_regular")
+            if info.st_size > 524288:
+                raise CanonError("operation_too_large")
+            with os.fdopen(os.dup(fd), "rb") as stream:
+                raw = stream.read(524289)
+            if len(raw) > 524288:
+                raise CanonError("operation_too_large")
+            return raw
+        finally:
+            os.close(fd)
     finally:
-        os.close(fd)
-
+        os.close(directory)
 
 def run(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton world-canon")
