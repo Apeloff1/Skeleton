@@ -195,23 +195,36 @@ class NativeJeevesChat:
                 verified.finish_reason, was_replayed,
             )
 
-    def history(self, *, maximum_messages: int = 256) -> tuple[dict, ...]:
+    def history(
+        self, *, maximum_messages: int = 256,
+        maximum_total_bytes: int = 8388608,
+    ) -> tuple[dict, ...]:
         with self._lock:
             if self._closed:
                 raise NativeChatHold("closed chat session")
             self._assert_current()
             if type(maximum_messages) is not int or not 1 <= maximum_messages <= 8192:
                 raise NativeChatHold("invalid bounded history limit")
+            if (type(maximum_total_bytes) is not int
+                    or not 1 <= maximum_total_bytes <= 33554432):
+                raise NativeChatHold("invalid bounded history byte ceiling")
             # Source of truth is the native, integrity-checked SQLite transcript.
             records = self.worker.spine.history(self.session_id)
             self._assert_current()
             if type(records) not in (tuple, list) or len(records) > maximum_messages:
                 raise NativeChatHold("history exceeds caller's bound")
             result = []
+            used_bytes = 0
             for item in records:
                 if type(item) is not dict or item.get("role") not in ("user", "assistant"):
                     raise NativeChatHold("native transcript has invalid role")
                 value = utf8(item.get("content"), maximum=131072)
+                # Count actual UTF-8 content, never Unicode code points.
+                # This is a whole-history privacy limit in addition to
+                # per-message and caller-supplied message-count ceilings.
+                used_bytes += len(value.encode("utf-8", "strict"))
+                if used_bytes > maximum_total_bytes:
+                    raise NativeChatHold("private SQLite history byte ceiling exhausted")
                 result.append({"role": item["role"], "content": value})
             self._assert_current()
             return tuple(result)
