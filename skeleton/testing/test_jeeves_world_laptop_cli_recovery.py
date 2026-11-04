@@ -122,3 +122,39 @@ def test_laptop_cli_rejects_same_size_metadata_change(tmp_path, monkeypatch, cap
     assert failure["next_action"] == "retry_with_a_stable_unmodified_json_file"
     assert not (tmp_path / "original.json").exists()
     assert not any(p.name.endswith(".laptop.review.json") for p in tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(("action", "argument"), [
+    ("propose", "--brief-file"),
+    ("session-restore-check", "--export-file"),
+])
+def test_invalid_external_json_never_initializes_canonical_store(
+    tmp_path, capsys, action, argument
+):
+    """Reject untrusted input before even constructing canonical custody."""
+    store = tmp_path / "not_created"
+    source = tmp_path / "invalid.json"
+    source.write_text('{"incomplete":', encoding="utf-8")
+    args = ["--store", str(store), action]
+    if action != "propose":
+        args += ["--world-id", "original"]
+    args += [argument, str(source)]
+    assert run(args) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["ok"] is False
+    assert failure["phase"] == action
+    assert not store.exists()
+
+
+def test_invalid_review_input_does_not_initialize_custody(tmp_path, capsys):
+    store = tmp_path / "not_created"
+    source = tmp_path / "invalid.json"
+    source.write_text('{"duplicate":1,"duplicate":2}', encoding="utf-8")
+    assert run([
+        "--store", str(store), "review", "--world-id", "original",
+        "--expected-digest", "0" * 64, "--operation-file", str(source),
+        "--review-note", "Operator reviewed original world",
+    ]) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["phase"] == "review"
+    assert not store.exists()
