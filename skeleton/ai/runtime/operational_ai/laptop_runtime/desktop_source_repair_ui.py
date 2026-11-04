@@ -18,6 +18,10 @@ from .desktop_source_repair import (
     NativeSourceRepairHold, SourceRepairRequest,
     NativeSourceRepairRunner,
 )
+from .desktop_project_context import (
+    SourceContextHold, ProjectSourceContext,
+    snapshot_project_context, revalidate_project_context,
+)
 
 
 class SourceRepairWindow(tk.Toplevel):
@@ -42,6 +46,8 @@ class SourceRepairWindow(tk.Toplevel):
         self._runner = None
         self._result = None
         self._origin_request = None
+        self._source_context: ProjectSourceContext | None = None
+        self._source_review_inputs: tuple[str, str] | None = None
         self._events: Queue = Queue()
         self._build()
         if initial_goal:
@@ -81,6 +87,32 @@ class SourceRepairWindow(tk.Toplevel):
             workspace, text="Choose directory",
             command=self._browse,
         ).grid(row=0, column=2)
+        ttk.Label(
+            workspace,
+            text="Optional exact EXISTING source paths (one relative file per line)",
+        ).grid(row=1, column=0, sticky="w", pady=(7, 0))
+        self.source_paths = ScrolledText(
+            workspace, height=3, width=55, wrap="none", undo=True,
+        )
+        self.source_paths.grid(
+            row=1, column=1, sticky="ew", padx=7, pady=(7, 0),
+        )
+        self.review_sources_button = ttk.Button(
+            workspace, text="Review original SHA + full text",
+            command=self._review_sources,
+        )
+        self.review_sources_button.grid(
+            row=1, column=2, sticky="e", pady=(7, 0),
+        )
+        ttk.Label(
+            workspace, wraplength=1000,
+            text=(
+                "Select at most four owned UTF-8 source files (8 KiB total). "
+                "The exact original SHA-256 and complete text are sent "
+                "as UNTRUSTED read-only reference data to the same GGUF. "
+                "No discovery or filesystem tools are granted to the model."
+            ),
+        ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
         heading = ttk.Frame(root)
         heading.grid(row=2, column=0, sticky="ew", pady=(7, 4))
@@ -189,6 +221,9 @@ class SourceRepairWindow(tk.Toplevel):
             state="normal" if self._busy and self._runner is not None
             else "disabled",
         )
+        self.review_sources_button.configure(
+            state="normal" if not self._busy else "disabled",
+        )
         self.review_button.configure(
             state="normal" if not self._busy
             and self._result is not None
@@ -205,7 +240,63 @@ class SourceRepairWindow(tk.Toplevel):
         if selected:
             self.root_path.set(selected)
             self._result = None
+            self._source_context = None
+            self._source_review_inputs = None
             self._buttons()
+
+    def _context_inputs(self) -> tuple[str, str]:
+        return (
+            self.root_path.get(),
+            self.source_paths.get("1.0", "end-1c"),
+        )
+
+    def _review_sources(self):
+        if self._busy:
+            return
+        root, selected = self._context_inputs()
+        if not selected.strip():
+            self._source_context = None
+            self._source_review_inputs = None
+            self.status.set("No project source selected; original goal-only workflow")
+            return
+        try:
+            context = snapshot_project_context(root, selected)
+        except (SourceContextHold, OSError, ValueError) as exc:
+            self._source_context = None
+            self._source_review_inputs = None
+            self.status.set(
+                "Exact source context refused: " + type(exc).__name__
+                + " · no native model request started",
+            )
+            return
+        self._source_context = context
+        self._source_review_inputs = (root, selected)
+        detail = (
+            "REVIEW ORIGINAL SOURCE — No native work, no source file write.\n"
+            + "Manifest SHA-256: " + context.manifest_sha256 + "\n"
+            + "Original project file count: " + str(len(context.files)) + "\n\n"
+        )
+        for file in context.files:
+            detail += (
+                "EXACT SOURCE: " + file.path + "\n"
+                + "SHA-256: " + file.sha256 + "\n"
+                + "UTF-8 bytes: " + str(file.bytes)
+                + "\n--- BEGIN READ-ONLY ORIGINAL ---\n"
+                + file.text + "\n--- END READ-ONLY ORIGINAL ---\n\n"
+            )
+        preview = tk.Toplevel(self)
+        preview.title("Reviewed exact local project source — data, not tool grants")
+        preview.geometry("980x650")
+        textbox = ScrolledText(preview, wrap="none", state="normal")
+        textbox.pack(fill="both", expand=True)
+        textbox.insert("1.0", detail)
+        textbox.configure(state="disabled")
+        self.status.set(
+            "Reviewed " + str(len(context.files)) + " selected source files / "
+            + str(context.total_bytes) + " bytes · SHA-256 "
+            + context.manifest_sha256
+            + ". Start still requires explicit approval; files rechecked each turn.",
+        )
 
     def _start(self):
         if self._busy:
@@ -219,13 +310,26 @@ class SourceRepairWindow(tk.Toplevel):
             self.status.set("A real installed native GGUF/SQLite session is required")
             return
         try:
+            context_raw = self._context_inputs()
+            source_context = None
+            if context_raw[1].strip():
+                if (
+                    self._source_context is None
+                    or context_raw != self._source_review_inputs
+                ):
+                    raise NativeSourceRepairHold(
+                        "review exact selected source paths before native inference",
+                    )
+                revalidate_project_context(self._source_context)
+                source_context = self._source_context
             selected = SourceRepairRequest(
                 root=self.root_path.get(),
                 goal=self.goal.get("1.0", "end-1c"),
                 format=self.source_format.get(),
                 maximum_attempts=int(self.maximum_attempts.get()),
+                source_context=source_context,
             )
-        except (ValueError, NativeSourceRepairHold) as exc:
+        except (ValueError, NativeSourceRepairHold, SourceContextHold, OSError) as exc:
             self.status.set("Source work held: " + type(exc).__name__)
             return
         if not messagebox.askyesno(
@@ -234,6 +338,8 @@ class SourceRepairWindow(tk.Toplevel):
             + " UNIQUE, durably committed local GGUF source attempts "
             + "on the currently active SQLite session? "
             + "No Git, shell, file write or unknown model tool is allowed. "
+            + "Any separately reviewed original file text + SHA-256 will "
+            + "be sent as task DATA on every native attempt (never a tool grant). "
             + "Each syntax-repair attempt is a distinct visible native "
             + "request; an uncertain request is NEVER automatically retried.",
             parent=self,
@@ -353,6 +459,8 @@ class SourceRepairWindow(tk.Toplevel):
                             + " · " + str(receipt["static_source_status"])
                             + " · patch SHA-256 "
                             + str(receipt["source_patch_sha256"])
+                            + " · reviewed original source context "
+                            + str(receipt["operator_source_context_sha256"])
                             + ". Human review and approval are STILL required.",
                         )
                     else:

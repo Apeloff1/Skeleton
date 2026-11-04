@@ -225,3 +225,15 @@ each request has a new visible original ID. Only an unapproved
 inert proposal is produced; no Git, shell or project write tool
 is granted. Full human approval and private no-clobber patch export
 are separate. See `docs/ai/JEEVES_NATIVE_SOURCE_SELF_REPAIR.md`.
+
+## Operator-reviewed original project source context
+
+The native source-generation/repair window now lets the operator select
+up to four exact trusted original files (8 KiB total), inspect their
+complete contents and SHA-256, and provide that snapshot as
+JSON-escaped reference DATA to the same installed GGUF. Every native
+turn rechecks the original bytes, inode, ctime and ownership before
+accepting source work; stale or untrusted source holds instead of
+being retried. Existing-file edits can now use independently verified
+original SHA-256 values without a manual hash-entry prerequisite.
+`docs/ai/JEEVES_OPERATOR_PROJECT_SOURCE_CONTEXT.md`.
