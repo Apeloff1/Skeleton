@@ -100,7 +100,7 @@ class ColdSourceCustodyTests(unittest.TestCase):
         ])
         self.assertEqual(activated.call_count,2)
         self.assertEqual(initial.call_count,1)
-        self.assertEqual(reopened.call_count,1)
+        self.assertEqual(reopened.call_count,2)
         self.assertEqual(rig.first.generation_calls,1)
         self.assertEqual(rig.second.generation_calls,0)
         self.assertEqual(len(rig.first.spine.receipts),1)
