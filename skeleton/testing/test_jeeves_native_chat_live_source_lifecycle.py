@@ -133,6 +133,19 @@ class LiveSourceChatTests(unittest.TestCase):
         self.assertTrue(chat._closed)
         self.assertIn(chat.session_id, self.worker.spine.closed_sessions)
 
+
+    def test_revoked_chat_fence_cannot_resurrect_same_session(self):
+        chat = self.chat()
+        self.state["live"] = False
+        with self.guarded(), self.assertRaises(ContractViolation):
+            chat.history()
+        self.state["live"] = True
+        with self.guarded(), self.assertRaisesRegex(
+            ContractViolation, "permanently revoked",
+        ):
+            chat.turn("new request", request_id="after")
+        self.assertEqual(self.worker.spine.generations, 0)
+
     def test_model_swap_denied_without_touching_source_witness(self):
         chat = self.chat()
         self.worker.spine.backend.model_digest = "f" * 64
