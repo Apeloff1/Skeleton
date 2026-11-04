@@ -7,6 +7,7 @@ replayed before any new save is admitted. No signature or release claim.
 from __future__ import annotations
 
 import json
+import math
 from .campaign import open_campaign, parse_campaign, step_campaign, retry_campaign, verify_campaign
 from .custody import canonical, digest
 
@@ -33,9 +34,15 @@ def _strict_json(text: str) -> dict:
     def invalid_constant(value):
         raise BackupError("nonfinite backup JSON number")
 
+    def finite_float(value):
+        number = float(value)
+        if not math.isfinite(number):
+            raise BackupError("nonfinite backup JSON number")
+        return number
+
     try:
         return json.loads(text, object_pairs_hook=unique_members,
-                          parse_constant=invalid_constant)
+                          parse_constant=invalid_constant, parse_float=finite_float)
     except (ValueError, TypeError, RecursionError) as exc:
         raise BackupError("invalid backup JSON") from exc
 
