@@ -361,6 +361,16 @@ def _read_dotenv(path: Path) -> dict[str, str]:
             payload = stream.read(limit + 1)
         if len(payload) > limit:
             raise ValueError("private runtime environment exceeds 256 KiB")
+        # Detect in-place modification of an admitted inode during reading.
+        after = os.fstat(descriptor)
+        if (
+            (after.st_dev, after.st_ino) != (info.st_dev, info.st_ino)
+            or after.st_size != info.st_size
+            or after.st_mtime_ns != info.st_mtime_ns
+            or after.st_ctime_ns != info.st_ctime_ns
+            or len(payload) != info.st_size
+        ):
+            raise ValueError("private runtime environment changed during read")
         decoded = payload.decode("utf-8")
     finally:
         os.close(descriptor)

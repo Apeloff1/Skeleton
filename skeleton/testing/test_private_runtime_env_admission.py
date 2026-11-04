@@ -79,3 +79,39 @@ def test_private_env_disappears_after_lstat_fails_closed(tmp_path: Path, monkeyp
     monkeypatch.setattr(os, "open", disappearing_open)
     with pytest.raises(ValueError, match="changed during admission"):
         _read_dotenv(path)
+
+def test_private_env_rejects_in_place_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / ".env"
+    path.write_text("BACKEND_PORT=8123\n", encoding="utf-8")
+    original_fstat = os.fstat
+    calls = 0
+
+    def changing_fstat(fd: int) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            with path.open("ab") as writer:
+                writer.write(b"FRONTEND_PORT=9999\n")
+        return original_fstat(fd)
+
+    monkeypatch.setattr(os, "fstat", changing_fstat)
+    with pytest.raises(ValueError, match="changed during read"):
+        _read_dotenv(path)
+
+
+def test_private_env_rejects_truncation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / ".env"
+    path.write_text("BACKEND_PORT=8123\n", encoding="utf-8")
+    original_fstat = os.fstat
+    calls = 0
+
+    def truncating_fstat(fd: int) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            path.write_bytes(b"")
+        return original_fstat(fd)
+
+    monkeypatch.setattr(os, "fstat", truncating_fstat)
+    with pytest.raises(ValueError, match="changed during read"):
+        _read_dotenv(path)
