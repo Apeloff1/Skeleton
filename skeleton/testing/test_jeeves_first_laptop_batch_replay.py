@@ -36,7 +36,7 @@ class TestBundleReplay(unittest.TestCase):
 
     def test_positive_and_negative_receipts_keep_release_holds(self):
         positive = evaluate_bundle(successful_bundle()).to_record()
-        negative = evaluate_bundle(negative_bundle("bootstrap", "source_manifest")).to_record()
+        negative = evaluate_bundle(negative_bundle("bootstrap", "model_archive")).to_record()
         self.assertTrue(positive["accepted_source_only"])
         self.assertFalse(negative["accepted_source_only"])
         self.assertEqual(positive["holds"], negative["holds"])
@@ -47,7 +47,7 @@ class TestBundleReplay(unittest.TestCase):
         source = successful_bundle()
         original = evaluate_bundle(source).to_record()
         clone = deepcopy(source)
-        clone["bootstrap"]["source_manifest"]["expected_sha256"] = "b" * 64
+        clone["bootstrap"]["model_archive"]["expected_sha256"] = "b" * 64
         mutated = evaluate_bundle(clone)
         self.assertNotEqual(mutated.evidence_sha256, original["evidence_sha256"])
         self.assertFalse(mutated.accepted_source_only)

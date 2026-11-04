@@ -68,7 +68,7 @@ class TestBundleCoherence(unittest.TestCase):
             evaluate_bundle(source)
 
     def test_bad_region_never_partially_passes_other_regions(self):
-        source = negative_bundle("bootstrap", "source_manifest")
+        source = negative_bundle("bootstrap", "model_archive")
         if source is None:
             self.fail("all negative fixtures must be explicitly generated")
         self.assertFalse(evaluate_bundle(source).accepted_source_only)

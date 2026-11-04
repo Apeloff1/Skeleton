@@ -49,8 +49,7 @@ class TestAll160NegativeMutations(unittest.TestCase):
     def test_denial_fingerprint_differs_from_complete_source_case(self):
         baseline = evaluate_bundle(successful_bundle())
         for domain in list_domains():
-            first_stage = next(iter(negative_bundle(domain, "") if False else
-                successful_bundle()[domain]))
+            first_stage = next(iter(successful_bundle()[domain]))
             changed = evaluate_bundle(negative_bundle(domain, first_stage))
             with self.subTest(domain=domain):
                 self.assertNotEqual(changed.evidence_sha256, baseline.evidence_sha256)

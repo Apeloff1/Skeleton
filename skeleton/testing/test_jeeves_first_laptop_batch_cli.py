@@ -53,7 +53,7 @@ class TestBatchOperatorCli(unittest.TestCase):
 
     def test_one_negative_stage_returns_hold_not_a_success(self):
         payload = encode_bundle(
-            negative_bundle("bootstrap", "source_manifest")
+            negative_bundle("bootstrap", "model_archive")
         )
         code,out,errors = self._invoke(["--json-stdin"],payload)
         self.assertEqual(code,2)
