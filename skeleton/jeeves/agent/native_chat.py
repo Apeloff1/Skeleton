@@ -93,7 +93,13 @@ class NativeJeevesChat:
             # This owner-bound read checks the canonical principal and
             # verifies the exact transcript before accepting a replay.
             self.worker.spine.history(self.session_id)
-            if ActiveModel.from_supervisor(self.worker) != self.identity:
+            try:
+                reopened_identity = ActiveModel.from_supervisor(self.worker)
+            except (ContractViolation, ValueError, AttributeError) as exc:
+                raise NativeChatHold(
+                    "native principal changed during chat reopen"
+                ) from exc
+            if reopened_identity != self.identity:
                 raise NativeChatHold("native principal changed during chat reopen")
         self._closed = False
         if self.source_fence is not None:
