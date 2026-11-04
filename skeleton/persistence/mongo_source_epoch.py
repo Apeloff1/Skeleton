@@ -138,7 +138,13 @@ class MongoCanonicalSourceEpoch:
             raise
         except Exception as exc:
             raise MongoSourceEpochError("linearizable source epoch read unavailable") from exc
-        if (type(doc) is not dict or type(doc.get("phase")) is not str
+        if (type(doc) is not dict or type(doc.get("_id")) is not str
+                or doc["_id"] != self._key(tenant_id, actor_id)
+                or type(doc.get("tenant_id")) is not str
+                or doc["tenant_id"] != tenant_id
+                or type(doc.get("actor_id")) is not str
+                or doc["actor_id"] != actor_id
+                or type(doc.get("phase")) is not str
                 or doc["phase"] != "stable"
                 or doc.get("writer_token") is not None
                 or type(doc.get("epoch")) is not int or doc["epoch"] < 2
@@ -244,6 +250,11 @@ class MongoCanonicalSourceEpoch:
             # blindly or reset the epoch; operator must read/reconcile.
             raise MongoSourceEpochError("actor revocation outcome uncertain") from None
         if (type(result) is not dict
+                or type(result.get("_id")) is not str or result["_id"] != key
+                or type(result.get("tenant_id")) is not str
+                or result["tenant_id"] != tenant_id
+                or type(result.get("actor_id")) is not str
+                or result["actor_id"] != actor_id
                 or type(result.get("phase")) is not str
                 or result["phase"] != "revoked"
                 or type(result.get("epoch")) is not int

@@ -189,6 +189,49 @@ class EpochRevocationTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(MongoSourceEpochError, "unverified"):
             await self.revoke()
 
+    async def test_revocation_rejects_forged_returned_scope(self):
+        original = self.collection.find_one_and_update
+        for field, value in (
+            ("_id", "wrong-id"), ("tenant_id", "other-tenant"),
+            ("actor_id", "other-actor"),
+        ):
+            with self.subTest(field=field):
+                self.collection = FakeMajorityCollection()
+                self.epoch._collection = self.collection
+                original = self.collection.find_one_and_update
+
+                async def forged(*args, **kwargs):
+                    result = await original(*args, **kwargs)
+                    result[field] = value
+                    return result
+
+                self.collection.find_one_and_update = forged
+                with self.assertRaisesRegex(MongoSourceEpochError, "unverified"):
+                    await self.revoke()
+                self.assertEqual(self.collection.calls, 1)
+
+    async def test_linearizable_read_rejects_forged_returned_scope(self):
+        for field, value in (
+            ("_id", "wrong-id"), ("tenant_id", "other-tenant"),
+            ("actor_id", "other-actor"),
+        ):
+            with self.subTest(field=field):
+                collection = FakeMajorityCollection()
+                original = collection.find_one
+
+                async def forged(*args, **kwargs):
+                    result = await original(*args, **kwargs)
+                    result[field] = value
+                    return result
+
+                collection.find_one = forged
+                reader = object.__new__(MongoCanonicalSourceEpoch)
+                reader._reader = collection
+                with self.assertRaisesRegex(MongoSourceEpochError, "quarantined"):
+                    await reader.read_epoch(
+                        tenant_id="tenant", actor_id="owner", context_id="context",
+                    )
+
     async def test_invalid_reason_denies_before_authorizer(self):
         with self.assertRaises(MongoSourceEpochError):
             await self.revoke(reason_code="migration")
