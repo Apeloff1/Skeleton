@@ -72,7 +72,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(observed=observed):
                 output = StringIO()
                 with patch("skeleton.app.compose_guarded_preflight._run_from_environment",
-                           new_callable=AsyncMock, return_value=observed), \\
+                           new_callable=AsyncMock, return_value=observed), \
                      redirect_stdout(output):
                     exit_code = main()
                 self.assertEqual(exit_code, expected_exit)
