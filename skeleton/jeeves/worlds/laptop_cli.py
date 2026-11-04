@@ -59,7 +59,9 @@ def _file(path: str):
                 raise CanonError("input_too_large")
             if len(data) != metadata.st_size:
                 raise CanonError("input_changed_during_read")
-            if not data:\n                raise CanonError("input_empty")\n            return strict_json(data)
+            if not data:
+                raise CanonError("input_empty")
+            return strict_json(data)
         finally:
             os.close(fd)
     finally:
@@ -195,7 +197,8 @@ def run(argv: list[str]) -> int:
             "input_permission_denied": "request_file_read_permission_without_bypassing_policy",
             "input_safe_open_unavailable": "use_a_platform_with_descriptor_anchored_file_open",
             "input_not_regular": "provide_a_regular_json_file_not_a_device_or_pipe",
-            "input_too_large": "reduce_json_input_below_524288_bytes",\n            "input_empty": "provide_a_nonempty_valid_json_document",
+            "input_too_large": "reduce_json_input_below_524288_bytes",
+            "input_empty": "provide_a_nonempty_valid_json_document",
             "input_changed_during_read": "retry_with_a_stable_unmodified_json_file",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
