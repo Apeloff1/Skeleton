@@ -80,7 +80,13 @@ class FirstTurnReceiptEvidenceTests(unittest.TestCase):
         self.assertEqual(len(record["request_id"]),34)
         self.assertEqual(self.worker.generation_calls,1)
         self.assertEqual(len(self.worker.spine.receipts),1)
-        self.assertTrue(record["native_model_observed"])
+        self.assertFalse(record["native_model_observed"])
+        self.assertFalse(record["installed_source_bound"])
+        self.assertEqual(
+            record["evidence_grade"], "source-only-simulated-or-unverified"
+        )
+        self.assertIsNone(record["installed_source"])
+        self.assertFalse(record["operator_approved_real_inference"])
         self.assertFalse(record["release_certified"])
         self.assertFalse(record["device_qualified"])
 

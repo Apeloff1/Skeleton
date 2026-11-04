@@ -13,9 +13,13 @@ from .identity import ActiveModel
 from .session_adapter import create
 from .turn_bridge import TurnBridge
 from .replay_probe import inspect_replay
+from .installed_witness import require_activated_source
 
 
-def run(worker, *, prompt, approved=False) -> dict[str, object]:
+def run(
+    worker, *, prompt, approved=False, installed_receipt=None,
+    require_real=False,
+) -> dict[str, object]:
     """Make exactly one NEW native inference and independently inspect replay.
 
     The installed model and tokenizer must stay bound to the same principal
@@ -24,6 +28,17 @@ def run(worker, *, prompt, approved=False) -> dict[str, object]:
     """
     if approved is not True:
         refuse("real end-to-end inference approval required")
+    if type(require_real) is not bool:
+        refuse("real acceptance must be an explicit boolean")
+    # No synthetic or arbitrary worker may claim native GGUF observation.
+    # All source evidence comes from the existing verified installer and the
+    # canonical supervisor, not from the model's generated text.
+    source = (
+        require_activated_source(worker, installed_receipt)
+        if installed_receipt is not None else None
+    )
+    if require_real and source is None:
+        refuse("independent installed source proof required")
     # Validate the complete operator-supplied prompt before allocating a new
     # durable SQLite session. An invalid Unicode scalar, NUL, empty prompt
     # or over-budget request must not create an orphan pending session.
@@ -70,8 +85,15 @@ def run(worker, *, prompt, approved=False) -> dict[str, object]:
         "prompt_tokens": first["prompt_tokens"],
         "generated_tokens": first["generated_tokens"],
         "replayed_without_generation": True,
-        "native_model_observed": True,
-        "operator_approved_real_inference": True,
+        "native_model_observed": source is not None,
+        "installed_source_bound": source is not None,
+        "evidence_grade": (
+            "native-installed-source-and-sqlite"
+            if source is not None else "source-only-simulated-or-unverified"
+        ),
+        "installed_source": source,
+        "operator_approved_turn_attempt": True,
+        "operator_approved_real_inference": source is not None,
         "device_qualified": False,
         "release_certified": False,
     }
