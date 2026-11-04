@@ -307,7 +307,13 @@ class MongoCanonicalSourceEpoch:
             ))
         except Exception as exc:
             raise MongoSourceEpochError("canonical writer admission unavailable") from exc
-        if (type(acquired) is not dict or type(acquired.get("writer_token")) is not str
+        if (type(acquired) is not dict or acquired.get("_id") != key
+                or type(acquired.get("tenant_id")) is not str
+                or acquired["tenant_id"] != tenant_id
+                or type(acquired.get("actor_id")) is not str
+                or acquired["actor_id"] != actor_id
+                or type(acquired.get("phase")) is not str
+                or type(acquired.get("writer_token")) is not str
                 or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
                 or type(acquired.get("epoch")) is not int
@@ -334,7 +340,13 @@ class MongoCanonicalSourceEpoch:
                 raise MongoSourceEpochError(
                     "canonical writer completion unavailable; epoch remains quarantined"
                 ) from exc
-            if (type(closed) is not dict or closed.get("phase") != "stable"
+            if (type(closed) is not dict or closed.get("_id") != key
+                    or type(closed.get("tenant_id")) is not str
+                    or closed["tenant_id"] != tenant_id
+                    or type(closed.get("actor_id")) is not str
+                    or closed["actor_id"] != actor_id
+                    or type(closed.get("phase")) is not str
+                    or closed.get("phase") != "stable"
                     or closed.get("writer_token") is not None
                     or type(closed.get("epoch")) is not int
                     or closed.get("epoch") != acquired["epoch"] + 1):
