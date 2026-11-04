@@ -158,6 +158,10 @@ def run(argv: list[str]) -> int:
             "laptop_engine_source_mismatch": "reinspect_laptop_and_engine_sources_before_retry",
             "laptop_engine_stale_source": "reinspect_engine_source_digests_before_compile",
             "laptop_engine_verify_mismatch": "reject_engine_handoff_and_reverify_exact_sources",
+            "input_invalid_path": "provide_a_normalized_existing_json_file_path",
+            "input_safe_open_unavailable": "use_a_platform_with_descriptor_anchored_file_open",
+            "input_not_regular": "provide_a_regular_json_file_not_a_device_or_pipe",
+            "input_too_large": "reduce_json_input_below_524288_bytes",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
                           "next_action": recovery.get(code, "inspect_input_and_custody")},
