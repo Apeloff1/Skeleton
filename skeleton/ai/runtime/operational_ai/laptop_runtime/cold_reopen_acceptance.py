@@ -65,6 +65,13 @@ def run(
     }
     stack, worker, installed = activate_checked(**options)
     with stack:
+        # The installed-model digest alone is not an authorization boundary:
+        # a different tenant/subject may use identical model weights.
+        # Reject a worker substituted after activation before SQLite creates
+        # any durable session or observes a private operator prompt.
+        first_principal = ActiveModel.from_supervisor(worker)
+        if (first_principal.tenant, first_principal.subject) != (tenant, subject):
+            refuse("first native worker belongs to another principal")
         first = first_turn(
             worker, prompt=prompt, approved=True,
             installed_receipt=installed, require_real=True,
@@ -94,6 +101,10 @@ def run(
         if type(reopened_source) is not dict or reopened_source != source:
             refuse("installed source changed across cold native restart")
         bound = ActiveModel.from_supervisor(second_worker)
+        if (bound.tenant, bound.subject) != (tenant, subject):
+            refuse("cold native worker belongs to another principal")
+        if bound != first_principal:
+            refuse("cold native model/tokenizer/principal changed")
         if (bound.model_sha256 != first["model_sha256"]
                 or bound.tokenizer_sha256 != first["tokenizer_sha256"]):
             refuse("cold native model/tokenizer changed")
@@ -109,6 +120,14 @@ def run(
             refuse("cold native SQLite replay not authoritative")
         if ActiveModel.from_supervisor(second_worker) != bound:
             refuse("cold native principal changed before output report")
+        # Read the actual live child and lease one more time AFTER the SQLite
+        # snapshot. A backend that dies, is cancelled or changes its source
+        # mid-replay must not yield a successful cold-reopen witness.
+        final_source = require_activated_source(
+            second_worker, second_installed,
+        )
+        if type(final_source) is not dict or final_source != source:
+            refuse("native source or resource lease changed after replay")
     return {
         "schema": "laptop-native-cold-reopen-e2e.v1",
         "session_id": session, "request_id": request,
