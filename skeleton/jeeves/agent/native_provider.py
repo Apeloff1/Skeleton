@@ -15,6 +15,7 @@ from typing import Any
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel
 from skeleton.ai.runtime.operational_ai.laptop_runtime.turn_bridge import TurnBridge
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import ContractViolation
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import Conflict
 
 from .native_prompt_boundary import prepare_native_prompt
@@ -159,10 +160,19 @@ class NativeJeevesProvider:
                 # exception. The canonical SQLite pending-state fence also
                 # survives a process crash and prevents a duplicate inference.
                 self._attempted.add(native_request_id)
-                generated = self._bridge.turn(
-                    session, native_request_id, prompt.text,
-                    seed=0, temperature=temperature,
-                )
+                try:
+                    generated = self._bridge.turn(
+                        session, native_request_id, prompt.text,
+                        seed=0, temperature=temperature,
+                    )
+                except ContractViolation as exc:
+                    # The lower native commit/identity boundary fails closed.
+                    # Keep the public Jeeves provider error contract stable
+                    # without retrying an uncertain native forward pass or
+                    # clearing the already-reserved attempt identity.
+                    raise ProviderError(
+                        "native generation did not meet committed source contract"
+                    ) from exc
                 # The worker's returned dictionary alone is not proof that
                 # SQLite committed. Independently read the authoritative
                 # committed response and compare the exact original bytes.
