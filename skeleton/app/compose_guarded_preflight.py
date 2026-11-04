@@ -58,6 +58,35 @@ def _scope(value: object) -> bool:
         return False
 
 
+def _authenticated_principals(response: object) -> tuple[tuple[str, str], ...] | None:
+    """Bound and normalize Mongo identities without logging their values.
+
+    Reject malformed, duplicated or excessively large server responses before
+    sorting. This is an authentication observation, not role authorization.
+    """
+    if type(response) is not dict or type(response.get("authInfo")) is not dict:
+        return None
+    users = response["authInfo"].get("authenticatedUsers")
+    if type(users) is not list or not 1 <= len(users) <= 16:
+        return None
+    principals: list[tuple[str, str]] = []
+    for user in users:
+        if type(user) is not dict:
+            return None
+        identity = []
+        for key in ("db", "user"):
+            value = user.get(key)
+            if (type(value) is not str or not value or value != value.strip()
+                    or len(value.encode("utf-8", errors="surrogatepass")) > 256
+                    or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
+                return None
+            identity.append(value)
+        principals.append((identity[0], identity[1]))
+    if len(set(principals)) != len(principals):
+        return None
+    return tuple(sorted(principals))
+
+
 async def inspect_compose_mongo_epoch(
     database: Any, *, tenant_id: str, actor_id: str, context_id: str,
 ) -> dict[str, object]:
@@ -93,20 +122,9 @@ async def inspect_compose_mongo_epoch(
             auth = await database.command("connectionStatus")
     except Exception:
         return _result("mongo_authenticated_session_unavailable", replica_set=True)
-    if (type(auth) is not dict
-            or type(auth.get("authInfo")) is not dict
-            or type(auth["authInfo"].get("authenticatedUsers")) is not list
-            or not auth["authInfo"]["authenticatedUsers"]
-            or any(
-                type(user) is not dict
-                or type(user.get("user")) is not str or not user["user"]
-                or type(user.get("db")) is not str or not user["db"]
-                for user in auth["authInfo"]["authenticatedUsers"]
-            )):
+    initial_users = _authenticated_principals(auth)
+    if initial_users is None:
         return _result("mongo_authenticated_session_required", replica_set=True)
-    initial_users = tuple(sorted((u["db"], u["user"]) for u in auth["authInfo"]["authenticatedUsers"]))
-    if len(set(initial_users)) != len(initial_users):
-        return _result("mongo_authenticated_identity_ambiguous", replica_set=True)
     try:
         epoch = MongoCanonicalSourceEpoch(database)
         async with asyncio.timeout(3.0):
@@ -128,15 +146,7 @@ async def inspect_compose_mongo_epoch(
         # stable primary and epoch do not prove the same authenticated writer.
         async with asyncio.timeout(3.0):
             final_auth = await database.command("connectionStatus")
-        final_users = (final_auth.get("authInfo", {}).get("authenticatedUsers")
-                       if type(final_auth) is dict
-                       and type(final_auth.get("authInfo")) is dict else None)
-        if (type(final_users) is not list or not final_users
-                or any(type(u) is not dict or type(u.get("user")) is not str
-                       or not u["user"] or type(u.get("db")) is not str
-                       or not u["db"] for u in final_users)
-                or len(set((u["db"], u["user"]) for u in final_users)) != len(final_users)
-                or tuple(sorted((u["db"], u["user"]) for u in final_users)) != initial_users):
+        if _authenticated_principals(final_auth) != initial_users:
             return _result("mongo_principal_changed_during_preflight",
                            replica_set=True, authenticated=False)
         async with asyncio.timeout(3.0):
@@ -160,15 +170,7 @@ async def inspect_compose_mongo_epoch(
                 != initial_topology):
             return _result("mongo_primary_changed_during_final_epoch_read",
                            replica_set=True, authenticated=False)
-        post_users = (post_auth.get("authInfo", {}).get("authenticatedUsers")
-                      if type(post_auth) is dict
-                      and type(post_auth.get("authInfo")) is dict else None)
-        if (type(post_users) is not list or not post_users
-                or any(type(u) is not dict or type(u.get("user")) is not str
-                       or not u["user"] or type(u.get("db")) is not str
-                       or not u["db"] for u in post_users)
-                or len(set((u["db"], u["user"]) for u in post_users)) != len(post_users)
-                or tuple(sorted((u["db"], u["user"]) for u in post_users)) != initial_users):
+        if _authenticated_principals(post_auth) != initial_users:
             return _result("mongo_principal_changed_during_final_epoch_read",
                            replica_set=True, authenticated=False)
     except Exception:

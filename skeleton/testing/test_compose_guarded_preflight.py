@@ -238,7 +238,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         user = {"user": "ci", "db": "admin"}
         self.db.auth = {"authInfo": {"authenticatedUsers": [user, dict(user)]}}
         result = await self.inspect()
-        self.assertEqual(result["code"], "mongo_authenticated_identity_ambiguous")
+        self.assertEqual(result["code"], "mongo_authenticated_session_required")
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
         self.assertEqual(FakeEpoch.instances, [])
 
@@ -254,6 +254,23 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         result = await self.inspect()
         self.assertEqual(result["code"], "mongo_principal_changed_during_final_epoch_read")
         self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_oversized_authentication_identity_denied_before_epoch(self):
+        for bad in ("a" * 257, "user\\nname", " user", "\\ud800"):
+            with self.subTest(value=repr(bad)):
+                self.db.auth = {"authInfo": {"authenticatedUsers": [
+                    {"user": bad, "db": "admin"}]}}
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_authenticated_session_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(FakeEpoch.instances, [])
+
+    async def test_unbounded_authenticated_user_list_denied(self):
+        self.db.auth = {"authInfo": {"authenticatedUsers": [
+            {"user": f"user{i}", "db": "admin"} for i in range(17)]}}
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_authenticated_session_required")
+        self.assertEqual(FakeEpoch.instances, [])
 
     async def test_authentication_probe_failure_redacts_credentials(self):
         class AuthFailureDB(FakeDB):
