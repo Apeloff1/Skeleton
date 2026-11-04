@@ -113,7 +113,8 @@ class DeviceMemoryBoundaryTests(unittest.TestCase):
 
     def test_kernel_integer_rejects_symlink_and_extra_bytes(self):
         for raw, extra in ((b"123\n",b"junk"),(b"-1\n",b""),(b"abc\n",b"")):
-            with self.subTest(raw=raw), (
+            with (
+                self.subTest(raw=raw),
                 mock.patch.object(device_observer.os,"open",return_value=9),
                 mock.patch.object(device_observer.os,"read",side_effect=[raw,extra]),
                 mock.patch.object(device_observer.os,"close"),
