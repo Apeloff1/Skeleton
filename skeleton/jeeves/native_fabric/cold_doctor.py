@@ -252,7 +252,8 @@ def inspect_native_operations(
     """No model activation, native effect, file mutation or network call."""
     if not isinstance(state_dir,Path) or not state_dir.is_absolute() or ".." in state_dir.parts:
         raise NativeColdFabricHold("private absolute canonical state root required")
-    exact_integer(maximum_rows,minimum=1,maximum=100000)
+    if type(maximum_rows) is not int or not 1 <= maximum_rows <= 100000:
+        raise NativeColdFabricHold("invalid bounded read-only audit inventory")
     identity=Identity(tenant,subject,model_sha256,tokenizer_sha256)
     from .contracts import Scope
     scope=Scope(tenant,subject,model_sha256,tokenizer_sha256)
