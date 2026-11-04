@@ -37,6 +37,9 @@ from .desktop_project_context import (
 from .desktop_project_work import (
     SCHEMA as MIXED_WORK_SCHEMA, MixedWorkHold, review_mixed_work,
 )
+from .desktop_source_graph import (
+    SourceGraphHold, analyze_python_source_graph,
+)
 
 SCHEMA = "jeeves.desktop.native-source-repair.v1"
 MAX_GOAL_BYTES = 4096
@@ -324,6 +327,13 @@ def _diagnostics(
         OSError, ValueError, UnicodeError,
     ):
         return None, None, ("proposal-schema-or-source-custody",)
+    if static.permits_inert_export:
+        try:
+            graph = analyze_python_source_graph(proposed)
+        except SourceGraphHold:
+            return None, static, ("python-graph-unqualified",)
+        if not graph.permits_inert_export:
+            return None, static, ("invalid-python-relative-import",)
     if not static.permits_inert_export:
         issues = tuple(
             (

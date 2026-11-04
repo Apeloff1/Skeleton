@@ -151,3 +151,15 @@ stdin CLI. Both original 64-character SHA-256 values and an
 explicit separate flag are needed for any new private write;
 read-only verification does not start a model. See
 `docs/ai/JEEVES_HEADLESS_LOCAL_SOURCE_WORK_CLI.md`.
+
+## SHA-bound Python import graph in the sealed stage
+
+The `manifest.json` and final private overlay receipt now
+also preserve the exact Python static dependency graph SHA-256,
+known reviewed-source import count, unverified original/external
+import count and observed cycle count. The parser refuses
+unqualified source graphs or provably impossible relative imports
+before staging. A later cold reopen verifies that this graph
+receipt is still **sealed and unchanged**; it does not claim
+to have re-parsed every module or scanned the live project.
+See `docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.

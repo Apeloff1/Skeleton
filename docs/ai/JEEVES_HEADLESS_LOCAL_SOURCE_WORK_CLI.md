@@ -190,3 +190,14 @@ inspection, original source drift and absence of
 model/Git/OS execution. Source tests are not
 real GGUF, Windows 11/WSL2 hardware, full-project
 builds, security release gates or model-license proof.
+
+## Python source dependency evidence
+
+The read-only `review` action also includes a finite,
+source-manifest/patch-SHA-bound Python AST import graph.
+Links between reviewed files are shown separately from
+unverified external dependencies. Provably invalid relative
+import depths prevent staging or private patch export;
+observed cycles are informational only. No Python imports
+or generated code are executed. See
+`docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.

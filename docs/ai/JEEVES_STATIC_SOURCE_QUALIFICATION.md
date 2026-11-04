@@ -110,3 +110,14 @@ of private patch export when a supported parser rejects the source.
 This is not evidence of physical Windows 11/WSL2 hardware, legal
 model rights, real GGUF inference, device pressure or final required
 release checks.
+
+## Project-relative Python source graph
+
+Source review also produces a **SHA-bound Python AST import
+graph** for Python modules included in the same exact original
+Git patch. It distinguishes links between reviewed sources from
+unverified external/original project imports, reports observed
+cycles, and blocks impossible package-relative import depths
+before private patch export. It does **not** import or execute
+the proposed code or assert external dependencies exist.
+See `docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.

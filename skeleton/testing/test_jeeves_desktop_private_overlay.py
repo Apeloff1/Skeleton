@@ -167,6 +167,14 @@ class PrivateSourceOverlayTests(unittest.TestCase):
         )
         self.assertEqual(receipt["manifest_sha256"], plan.manifest_sha256)
         self.assertEqual(receipt["patch_sha256"], plan.patch_sha256)
+        self.assertEqual(len(receipt["python_source_graph_sha256"]), 64)
+        self.assertEqual(
+            receipt["python_source_graph_sha256"],
+            separately["python_source_graph_sha256"],
+        )
+        self.assertEqual(receipt["python_source_graph_status"],
+                         "observed-internal-imports")
+        self.assertFalse(separately["graph_reparsed_on_cold_reopen"])
         self.assertEqual(separately["status"],
                          "complete-private-source-overlay-snapshot")
         self.assertEqual(separately["file_count"], 3)

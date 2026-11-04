@@ -13,9 +13,7 @@ matching CLI approval flag. There are no retries or silent fallbacks.
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 import json
-import os
 from pathlib import Path
 import sys
 from typing import BinaryIO, TextIO
@@ -29,6 +27,7 @@ from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
 from .desktop_private_overlay import stage_reviewed_overlay, verify_staged_overlay
 from .desktop_patch_reconcile import reconcile_reviewed_patch
 from .desktop_source_qualification import qualify_patch_sources
+from .desktop_source_graph import analyze_python_source_graph
 
 SCHEMA = "jeeves.workspace.local-source-cli.v1"
 RESULT_SCHEMA = "jeeves.workspace.local-source-cli-result.v1"
@@ -163,6 +162,7 @@ def _review_plan(req: dict[str, object]) -> PortablePatchPlan:
 def _public_receipt(action: str, *,
                     review: dict | None = None,
                     qualification: dict | None = None,
+                    source_graph: dict | None = None,
                     operation: dict | None = None) -> dict:
     result = {
         "schema": RESULT_SCHEMA,
@@ -172,6 +172,7 @@ def _public_receipt(action: str, *,
         else "explicit-private-source-work-completed",
         "review": review,
         "qualification": qualification,
+        "python_source_graph": source_graph,
         "operation": operation,
         "model_inference_started": False,
         "source_code_executed": False,
@@ -231,16 +232,19 @@ def execute(
 
     plan = _review_plan(req)
     static = qualify_patch_sources(plan)
+    graph = analyze_python_source_graph(plan)
     if action == "review":
         return _public_receipt(
             action, review=plan.public_review(),
             qualification=static.to_public(),
+            source_graph=graph.to_public(),
         )
     if action == "reconcile":
         reconciled = reconcile_reviewed_patch(plan)
         return _public_receipt(
             action, review=plan.public_review(),
             qualification=static.to_public(),
+            source_graph=graph.to_public(),
             operation=reconciled.to_public(),
         )
     if (
@@ -250,9 +254,9 @@ def execute(
         raise LocalSourceCLIHold(
             "operator-approved digests differ from freshly reviewed original source",
         )
-    if not static.permits_inert_export:
+    if not static.permits_inert_export or not graph.permits_inert_export:
         raise LocalSourceCLIHold(
-            "supported generated source syntax has a blocking error",
+            "supported source syntax or Python dependency graph has a blocking error",
         )
     if action == "stage":
         done = stage_reviewed_overlay(
@@ -272,7 +276,8 @@ def execute(
         raise LocalSourceCLIHold("unknown original source action")
     return _public_receipt(
         action, review=plan.public_review(),
-        qualification=static.to_public(), operation=done,
+        qualification=static.to_public(), source_graph=graph.to_public(),
+        operation=done,
     )
 
 

@@ -274,3 +274,15 @@ an explicit separate CLI flag**—create a new sealed private
 source overlay or inert Git patch. The model, source checkout
 and Git remain inactive. Documentation:
 `docs/ai/JEEVES_HEADLESS_LOCAL_SOURCE_WORK_CLI.md`.
+
+## Source-bound Python dependency graph
+
+The native coding workbench now analyzes imports across the
+exact reviewed Python changes. Known edges to other reviewed
+files, unknown original/external packages, invalid relative
+levels and observed cycles are separately reported under
+one graph SHA-256. Impossible relative imports block the
+private stage/export, while external imports remain
+unverified rather than falsely passed. All analysis is
+AST-only and non-executing:
+`docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.
