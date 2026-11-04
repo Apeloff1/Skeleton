@@ -3,14 +3,14 @@ import unittest
 
 from skeleton.app.compose_guarded_preflight import SCHEMA
 from skeleton.app.compose_mongo_first_run_status import (
-    REQUIRED_FIELDS, summarize_observation,
+    COMPLETE_CODE, REQUIRED_FIELDS, summarize_observation,
 )
 
 
 class FirstRunObservationTests(unittest.TestCase):
     def valid(self):
         return {
-            "schema_version": SCHEMA,
+            "schema_version": SCHEMA,\n            "code": COMPLETE_CODE,
             "writes_performed": False,
             "guarded_local_ai_ready": False,
             **{key: True for key in REQUIRED_FIELDS},
@@ -42,6 +42,24 @@ class FirstRunObservationTests(unittest.TestCase):
             payload = self.valid()
             payload[key] = 1
             with self.subTest(key=key):
+                self.assertFalse(summarize_observation(payload)["observation_valid"])
+
+    def test_error_code_cannot_masquerade_as_complete_observation(self):
+        for code in ("mongo_primary_probe_unavailable",
+                     "canonical_actor_epoch_changed_during_preflight",
+                     "mongo_preflight_deadline_exceeded", "", "unknown"):
+            payload = self.valid()
+            payload["code"] = code
+            with self.subTest(code=code):
+                status = summarize_observation(payload)
+                self.assertFalse(status["mongo_observation_complete"])
+                self.assertFalse(status["activation_permitted"])
+
+    def test_missing_or_non_string_code_never_complete(self):
+        for code in (None, False, 1, [], {}):
+            payload = self.valid()
+            payload["code"] = code
+            with self.subTest(code=code):
                 self.assertFalse(summarize_observation(payload)["observation_valid"])
 
     def test_partial_observation_never_complete(self):

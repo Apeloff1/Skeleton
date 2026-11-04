@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+# The only successful observation code. Every other code denotes incomplete or
+# indeterminate custody, regardless of optimistic boolean flags.
+COMPLETE_CODE = "mongo_epoch_observed_only"
+
 REQUIRED_FIELDS = (
     "mongo_replica_set_primary_observed",
     "mongo_authenticated_session_observed",
@@ -29,6 +33,7 @@ def summarize_observation(observation: object) -> dict[str, object]:
         and observation.get("schema_version") == SCHEMA
         and observation.get("writes_performed") is False
         and observation.get("guarded_local_ai_ready") is False
+        and type(observation.get("code")) is str
         and all(type(observation.get(key)) is bool for key in REQUIRED_FIELDS)
     )
     checks = {
@@ -39,7 +44,7 @@ def summarize_observation(observation: object) -> dict[str, object]:
         "schema_version": "skeleton.app.compose_mongo_first_run_status.v1",
         "observation_valid": bool(valid),
         "checks": checks,
-        "mongo_observation_complete": bool(valid and all(checks.values())),
+        "mongo_observation_complete": bool(\n            valid and observation.get("code") == COMPLETE_CODE and all(checks.values())\n        ),
         "guarded_local_ai_ready": False,
         "activation_permitted": False,
         "requires_independent_reviewer": True,
