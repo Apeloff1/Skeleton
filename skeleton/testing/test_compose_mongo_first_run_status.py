@@ -65,6 +65,18 @@ class FirstRunObservationTests(unittest.TestCase):
         payload["guarded_local_ai_ready"] = True
         self.assertFalse(summarize_observation(payload)["observation_valid"])
 
+    def test_contradictory_activation_evidence_denied(self):
+        for field in ("activation_permitted", "independent_reviewer_verified",
+                      "canonical_writer_inventory_verified",
+                      "activated_model_tokenizer_verified"):
+            with self.subTest(field=field):
+                payload = self.valid()
+                payload[field] = True
+                status = summarize_observation(payload)
+                self.assertFalse(status["observation_valid"])
+                self.assertFalse(status["mongo_observation_complete"])
+                self.assertFalse(status["activation_permitted"])
+
     def test_spoofed_write_flag_denied(self):
         payload = self.valid()
         payload["writes_performed"] = True
