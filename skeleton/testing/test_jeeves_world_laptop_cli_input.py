@@ -93,3 +93,10 @@ def test_cli_json_rejects_parent_fifo_without_blocking(tmp_path):
     os.mkfifo(tmp_path / "pipe")
     with pytest.raises(OSError):
         _file(str(tmp_path / "pipe" / "brief.json"))
+
+
+def test_cli_json_rejects_embedded_nul_before_open(tmp_path):
+    path = str(tmp_path / "brief.json") + "\x00" + "/ignored"
+    with pytest.raises(CanonError) as error:
+        _file(path)
+    assert error.value.code == "input_invalid_path"
