@@ -20,6 +20,7 @@ from .desktop_patch_bundle import (
 )
 from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
 from .desktop_source_qualification import qualify_patch_sources
+from .desktop_patch_reconcile import reconcile_reviewed_patch
 
 
 class PortablePatchWindow(tk.Toplevel):
@@ -123,8 +124,14 @@ class PortablePatchWindow(tk.Toplevel):
             command=self._invalidate,
         )
         self.reset_button.pack(side="left", padx=6)
+        self.reconcile_button = ttk.Button(
+            controls,
+            text="Reconcile original edits after external changes",
+            command=self._reconcile_changed_sources,
+        )
+        self.reconcile_button.pack(side="left", padx=6)
         ttk.Label(
-            controls, text="A changed original source or proposal invalidates export.",
+            controls, text="Conflicts never overwrite source or carry prior approval.",
         ).pack(side="left", padx=12)
 
         self.files = ttk.Treeview(
@@ -279,6 +286,10 @@ class PortablePatchWindow(tk.Toplevel):
     def _buttons(self):
         self.review_button.configure(state="disabled" if self._busy else "normal")
         self.reset_button.configure(state="disabled" if self._busy else "normal")
+        self.reconcile_button.configure(
+            state="normal" if not self._busy and self._plan is not None
+            else "disabled",
+        )
         self.export_button.configure(
             state="normal" if (
                 not self._busy and self._plan is not None
@@ -315,6 +326,40 @@ class PortablePatchWindow(tk.Toplevel):
                 ))
             except BaseException as exc:
                 self._queue.put(("held", epoch, values, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _reconcile_changed_sources(self):
+        # Changed real source cannot be silently accepted, merged or applied
+        # by the model. Only a new original-source proposal can be produced;
+        # fresh complete patch review and digest approval remain mandatory.
+        plan = self._plan
+        if self._busy or plan is None:
+            return
+        original_inputs = self._source_inputs()
+        if original_inputs != self._reviewed_texts:
+            self._invalidate()
+            return
+        self._busy = True
+        epoch = self._epoch
+        self.status.set(
+            "Inspecting current source drift; only independent line changes "
+            "may become a NEW reviewed proposal…",
+        )
+        self.progress.start(85)
+        self._buttons()
+
+        def work():
+            try:
+                outcome = reconcile_reviewed_patch(plan)
+                self._queue.put((
+                    "reconciled", epoch, original_inputs, outcome,
+                ))
+            except BaseException as exc:
+                self._queue.put((
+                    "reconcile-held", epoch, original_inputs,
+                    type(exc).__name__,
+                ))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -443,6 +488,60 @@ class PortablePatchWindow(tk.Toplevel):
                         + (" · " + "; ".join(issues[:3]) if issues else "")
                         + " · MANIFEST " + plan.manifest_sha256
                         + " · PATCH " + plan.patch_sha256,
+                    )
+                elif kind == "reconciled":
+                    _, _, original_inputs, report = message
+                    if original_inputs != self._source_inputs():
+                        self._invalidate()
+                        self.status.set(
+                            "Proposal changed during reconciliation; "
+                            "re-review original sources before any export.",
+                        )
+                        continue
+                    public = report.to_public()
+                    if report.status == "rebased-review-required":
+                        # This replaces only the source *proposal panes*,
+                        # never files in the project, the native model, or
+                        # the user's Git index. Old digest approval is
+                        # invalidated before any new review.
+                        self._invalidate()
+                        self.new_text.delete("1.0", "end")
+                        self.existing_text.delete("1.0", "end")
+                        if report.new_proposal is not None:
+                            self.new_text.insert("1.0", report.new_proposal)
+                        if report.existing_proposal is not None:
+                            self.existing_text.insert(
+                                "1.0", report.existing_proposal,
+                            )
+                        self.new_text.edit_modified(False)
+                        self.existing_text.edit_modified(False)
+                        self.status.set(
+                            "NEW SOURCE PROPOSAL ONLY · "
+                            + str(public["rebased_count"])
+                            + " nonoverlapping model edits reconciled · "
+                            + str(public["already_present_count"])
+                            + " already present · RE-REVIEW and re-approve "
+                            + "fresh manifest/patch SHA-256 before export · "
+                            + report.rebase_sha256,
+                        )
+                    else:
+                        conflicts = [
+                            f["path"] for f in public["files"]
+                            if f["status"] in (
+                                "conflict", "new-path-collision",
+                            )
+                        ]
+                        self.status.set(
+                            "RECONCILIATION HELD: " + report.status
+                            + " · " + str(public["conflict_count"])
+                            + " conflicting source paths · "
+                            + ", ".join(conflicts[:3])
+                            + " · NO auto-merge; original proposal untouched.",
+                        )
+                elif kind == "reconcile-held":
+                    self.status.set(
+                        "Source reconciliation refused: " + str(message[-1])
+                        + " · originals untouched; re-review manually.",
                     )
                 elif kind == "exported":
                     _, _, destination, result = message

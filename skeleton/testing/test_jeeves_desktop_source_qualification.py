@@ -188,6 +188,7 @@ class CompletePatchQualificationTests(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name) / "project"
         self.root.mkdir(mode=0o700)
+        (self.root / "pkg").mkdir(mode=0o700)
         self.private = Path(tmp.name) / "private"
         self.private.mkdir(mode=0o700)
         def source_fd(value):

@@ -205,3 +205,12 @@ syntax holds the export. TS/JS, YAML, SQL and other unsupported formats
 remain marked `unverified`; parser success is never called a build,
 runtime test or release qualification. See
 `docs/ai/JEEVES_STATIC_SOURCE_QUALIFICATION.md`.
+
+## Conservative source-drift reconciliation
+
+The reviewed Git patch window can now reconcile original source changes
+made by another editor, preserving independent line hunks and holding
+overlap/conflicts. It creates only a NEW unapproved JSON proposal,
+never a project write or Git apply. The prior SHA authorization is
+invalidated, with complete fresh review required before export.
+`docs/ai/JEEVES_CONSERVATIVE_SOURCE_REBASE.md`.
