@@ -7,6 +7,22 @@ from .schema import parse_world, world_dict, World
 from .engine import replay, RescueError
 
 MAX_BUNDLE = 256_000
+
+def _strict_json(text: str) -> Any:
+    def unique_members(pairs: list[tuple[str, Any]]) -> dict:
+        result: dict = {}
+        for key, value in pairs:
+            if key in result:
+                raise CustodyError("duplicate bundle JSON member")
+            result[key] = value
+        return result
+
+    def reject_nonfinite(value: str) -> None:
+        raise CustodyError("nonfinite bundle JSON number")
+
+    return json.loads(text, object_pairs_hook=unique_members,
+                      parse_constant=reject_nonfinite)
+
 class CustodyError(ValueError):
     pass
 
@@ -38,7 +54,7 @@ def verify_run(bundle: dict | bytes | str) -> dict:
         if len(bundle.encode("utf-8")) > MAX_BUNDLE:
             raise CustodyError("bundle exceeds byte budget")
         try:
-            bundle = json.loads(bundle)
+            bundle = _strict_json(bundle)
         except ValueError as exc:
             raise CustodyError("invalid bundle JSON") from exc
     if not isinstance(bundle, dict) or set(bundle) != {"payload", "sha256"}:
