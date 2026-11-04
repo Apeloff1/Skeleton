@@ -25,7 +25,7 @@ class TestNativeStartupPreInstall(unittest.TestCase):
             {"n_ctx":32}, {"max_new_tokens":4096},
             {"n_threads":0}, {"gpu_layers":129},
             {"capacity_budget_bytes":0}, {"capacity_slots":0},
-            {"inference_ms":0},
+            {"inference_ms":0}, {"inference_ms":99},
         ):
             with self.subTest(fields=fields):
                 values=dict(
