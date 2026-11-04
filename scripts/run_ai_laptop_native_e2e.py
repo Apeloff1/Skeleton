@@ -24,7 +24,7 @@ class _PrivateArgs(argparse.ArgumentParser):
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = _PrivateArgs(description="Live installed GGUF + cold SQLite replay")
+    parser = _PrivateArgs(description="Live installed GGUF + cold SQLite replay", allow_abbrev=False)
     parser.add_argument("--model-root", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--capacity-root", type=Path, required=True)

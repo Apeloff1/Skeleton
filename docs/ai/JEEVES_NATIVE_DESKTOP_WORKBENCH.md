@@ -268,3 +268,12 @@ candidate. Its publication uses no-clobber, descriptor-anchored creation of
 a *new* inert sibling; the existing file is not overwritten by Jeeves.
 The operator must apply reviewed candidates in their own editor/Git workflow.
 See `docs/ai/JEEVES_EXISTING_SOURCE_EDIT_REVIEW.md`.
+
+## Advanced operator-signed source lookup
+
+The strict native agent now optionally supports a **single read-only
+operator-signed source tool**, disabled by default. The desktop verifies
+HMAC, original bytes, tenant/model/tokenizer and expiry before loading
+GGUF, then verifies the same identity at native binding and each run. No
+unsigned source fallback or general file tool is permitted. See
+`docs/ai/JEEVES_DESKTOP_SIGNED_NATIVE_SOURCE_AGENT.md`.

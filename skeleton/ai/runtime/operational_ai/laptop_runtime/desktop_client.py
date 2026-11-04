@@ -41,13 +41,37 @@ class DesktopConfig:
     inference_ms: int = 90000
     capacity_budget_bytes: int = 8000000000
     startup_deadline_seconds: int = 180
+    signed_source_root: str | None = None
+    signed_source_manifest: str | None = None
+    enable_signed_source_tool: bool = False
+    max_signed_sources: int = 4
+    max_signed_tool_calls: int = 3
 
     def __post_init__(self) -> None:
         identifier(self.tenant, "tenant")
         identifier(self.subject, "subject")
-        for name in ("model_root", "state_dir", "capacity_root"):
+        if type(self.enable_signed_source_tool) is not bool:
+            raise DesktopBridgeHold("explicit boolean source tool approval required")
+        if (
+            (self.signed_source_root is None) != (self.signed_source_manifest is None)
+            or (self.signed_source_root is not None) is not self.enable_signed_source_tool
+        ):
+            raise DesktopBridgeHold("signed source manifest/root need explicit operator approval")
+        for name, low, high in (
+            ("max_signed_sources", 1, 6),
+            ("max_signed_tool_calls", 1, 3),
+        ):
             value = getattr(self, name)
-            if value is None and name == "capacity_root":
+            if type(value) is not int or not low <= value <= high:
+                raise DesktopBridgeHold("signed source grant exceeds finite ceiling")
+        for name in (
+            "model_root", "state_dir", "capacity_root",
+            "signed_source_root", "signed_source_manifest",
+        ):
+            value = getattr(self, name)
+            if value is None and name in (
+                "capacity_root", "signed_source_root", "signed_source_manifest",
+            ):
                 continue
             if type(value) is not str or not value or chr(0) in value:
                 raise DesktopBridgeHold("canonical local model/state path required")
@@ -90,6 +114,14 @@ class DesktopConfig:
         ]
         if self.capacity_root is not None:
             argv += ["--capacity-root", self.capacity_root]
+        if self.enable_signed_source_tool:
+            argv += [
+                "--enable-source-tool",
+                "--source-root", self.signed_source_root,
+                "--signed-source-manifest", self.signed_source_manifest,
+                "--max-sources", str(self.max_signed_sources),
+                "--max-source-tool-calls", str(self.max_signed_tool_calls),
+            ]
         if resume_session is not None:
             argv += ["--resume-session", resume_session]
         return argv
@@ -109,6 +141,7 @@ class DesktopBridge:
         self._started = False
         self.session_id: str | None = None
         self.model_sha256: str | None = None
+        self.signed_source_manifest_sha256: str | None = None
 
     @property
     def connected(self) -> bool:
@@ -134,6 +167,23 @@ class DesktopBridge:
         if session_id is not None:
             identifier(session_id, "durable desktop session")
         if result.get("status") == "native-gguf-ready":
+            approved_tool = getattr(getattr(self, "config", None), "enable_signed_source_tool", False)
+            if (
+                type(approved_tool) is not bool
+                or result.get("signed_source_tool_active", False) is not approved_tool
+            ):
+                raise DesktopBridgeHold("native child source grants disagree with operator")
+            signed_digest = result.get("signed_source_manifest_sha256")
+            if approved_tool:
+                if (
+                    type(signed_digest) is not str
+                    or len(signed_digest) != 64
+                    or any(ch not in "0123456789abcdef" for ch in signed_digest)
+                ):
+                    raise DesktopBridgeHold("signed source manifest witness absent")
+            elif signed_digest is not None:
+                raise DesktopBridgeHold("unrequested signed manifest receipt")
+            self.signed_source_manifest_sha256 = signed_digest
             if (result.get("source_bound") is not True
                     or result.get("physical_device_qualified") is not False
                     or result.get("tenant") != self.config.tenant
@@ -147,6 +197,7 @@ class DesktopBridge:
     _SUCCESS = {
         "status": frozenset(("ready", "no-active-session")),
         "telemetry": frozenset(("observed-runtime-capacity",)),
+        "source-status": frozenset(("signed-source-status",)),
         "agent": frozenset(("verified-agent-response",)),
         "durable": frozenset((
             "durable-work-inspected", "durable-work-committed",
@@ -216,7 +267,19 @@ class DesktopBridge:
                 or report.get("filesystem_write_authorized") is not False
                 or report.get("automatic_retry") is not False
                 or type(report.get("usage")) is not dict
-                or report["usage"].get("tool_calls") != 0
+                or type(report["usage"].get("tool_calls")) is not int
+                or report["usage"].get("tool_calls") < 0
+                or report["usage"].get("tool_calls") > (
+                    getattr(getattr(self, "config", None), "max_signed_tool_calls", 3)
+                    if getattr(getattr(self, "config", None), "enable_signed_source_tool", False)
+                    else 0
+                )
+                or report.get("signed_source_tool_active", False) is not getattr(
+                    self.config, "enable_signed_source_tool", False
+                )
+                or report.get("signed_source_manifest_sha256") != getattr(
+                    self, "signed_source_manifest_sha256", None
+                )
             ):
                 raise DesktopBridgeHold("native strict Jeeves agent result not authorized")
             answer = report.get("answer")
@@ -229,6 +292,25 @@ class DesktopBridge:
                 raise DesktopBridgeHold("agent answer contains invalid Unicode") from exc
             if observed != proof:
                 raise DesktopBridgeHold("agent answer differs from source-checked bytes")
+        if op == "source-status":
+            active = getattr(getattr(self, "config", None), "enable_signed_source_tool", False)
+            receipt = result.get("signed_source")
+            if result.get("signed_source_tool_active") is not active:
+                raise DesktopBridgeHold("current signed source approval changed")
+            if active:
+                if (
+                    type(receipt) is not dict
+                    or receipt.get("schema") != "jeeves.desktop.signed-source-admission.v1"
+                    or receipt.get("manifest_sha256") != getattr(
+                        self, "signed_source_manifest_sha256", None
+                    )
+                    or receipt.get("source_tool_active") is not True
+                    or receipt.get("independent_legal_rights_verified") is not False
+                    or receipt.get("release_certified") is not False
+                ):
+                    raise DesktopBridgeHold("signed source admission metadata not authenticated")
+            elif receipt is not None:
+                raise DesktopBridgeHold("unapproved signed source receipt disclosed")
         if op == "durable":
             report = result.get("durable")
             action = fields["action"]

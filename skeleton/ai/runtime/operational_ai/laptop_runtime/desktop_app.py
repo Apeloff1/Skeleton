@@ -49,6 +49,7 @@ class JeevesWindow(tk.Tk):
         self.agent_calls = tk.StringVar(value="8")
         self.agent_wall = tk.StringVar(value="180")
         self.durable_run_id = tk.StringVar(value="")
+        self.enable_signed_source_tool = tk.BooleanVar(value=False)
 
         self.fields: dict[str, tk.StringVar] = {
             "model_root": tk.StringVar(value=""),
@@ -62,6 +63,10 @@ class JeevesWindow(tk.Tk):
             "gpu_layers": tk.StringVar(value="0"),
             "inference_ms": tk.StringVar(value="90000"),
             "capacity_budget_bytes": tk.StringVar(value="8000000000"),
+            "signed_source_root": tk.StringVar(value=""),
+            "signed_source_manifest": tk.StringVar(value=""),
+            "max_signed_sources": tk.StringVar(value="4"),
+            "max_signed_tool_calls": tk.StringVar(value="3"),
         }
         self.resume_id = tk.StringVar(value="")
         self.session_text = tk.StringVar(value="No native session")
@@ -89,6 +94,10 @@ class JeevesWindow(tk.Tk):
             ("Max output tokens", "max_output_tokens", "CPU threads", "threads"),
             ("GPU layers", "gpu_layers", "Inference deadline (ms)", "inference_ms"),
             ("Capacity reservation (bytes)", "capacity_budget_bytes", None, None),
+            ("Approved source root (optional)", "signed_source_root",
+             "Signed source manifest", "signed_source_manifest"),
+            ("Signed sources", "max_signed_sources",
+             "Read-only lookup calls", "max_signed_tool_calls"),
         ]
         for row_idx, (label_a, key_a, label_b, key_b) in enumerate(rows):
             ttk.Label(settings, text=label_a).grid(
@@ -105,17 +114,22 @@ class JeevesWindow(tk.Tk):
                     row=row_idx, column=3, sticky="ew", padx=4, pady=4,
                 )
 
+        ttk.Checkbutton(
+            settings,
+            text="I explicitly authorize bounded read-only lookup of operator-signed sources",
+            variable=self.enable_signed_source_tool,
+        ).grid(row=8, column=0, columnspan=4, sticky="w", pady=(4, 2))
         self.profile_button = ttk.Button(
             settings, text="Suggest measured CPU/RAM profile",
             command=self._suggest_profile,
         )
         self.profile_button.grid(
-            row=6, column=1, columnspan=2, sticky="e", pady=(5, 0),
+            row=9, column=1, columnspan=2, sticky="e", pady=(5, 0),
         )
         ttk.Button(
             settings, text="Prepare / install approved local model",
             command=self._setup,
-        ).grid(row=6, column=3, sticky="e", pady=(5, 0))
+        ).grid(row=9, column=3, sticky="e", pady=(5, 0))
 
         bar = ttk.Frame(main)
         bar.grid(row=1, column=0, sticky="ew", pady=(0, 8))
@@ -144,6 +158,11 @@ class JeevesWindow(tk.Tk):
             bar, text="Live capacity", command=lambda: self._action("telemetry"),
         )
         self.telemetry_button.grid(row=0, column=8, padx=3)
+        self.source_status_button = ttk.Button(
+            bar, text="Signed source status",
+            command=lambda: self._action("source-status"),
+        )
+        self.source_status_button.grid(row=0, column=9, padx=3)
 
         console_frame = ttk.LabelFrame(main, text="Private local conversation", padding=6)
         console_frame.grid(row=2, column=0, sticky="nsew")
@@ -298,7 +317,7 @@ class JeevesWindow(tk.Tk):
         )
         for button in (
             self.new_button, self.resume_button,
-            self.telemetry_button, self.agent_button,
+            self.telemetry_button, self.source_status_button, self.agent_button,
             *self.durable_buttons,
         ):
             button.configure(state="normal" if active else "disabled")
@@ -314,10 +333,15 @@ class JeevesWindow(tk.Tk):
         fields = (
             "context", "max_output_tokens", "threads", "gpu_layers",
             "inference_ms", "capacity_budget_bytes",
+            "max_signed_sources", "max_signed_tool_calls",
         )
         for key in fields:
             form[key] = int(form[key])
-        form["capacity_root"] = form["capacity_root"] or None
+        for optional in (
+            "capacity_root", "signed_source_root", "signed_source_manifest",
+        ):
+            form[optional] = form[optional] or None
+        form["enable_signed_source_tool"] = self.enable_signed_source_tool.get()
         return DesktopConfig(**form)
 
     def _setup(self):
@@ -611,8 +635,13 @@ class JeevesWindow(tk.Tk):
                     self._bridge = name
                     self._connecting = None
                     self._busy = False
+                    signed = bool(
+                        payload.get("signed_source_tool_active", False)
+                    )
                     self.connection_text.set(
-                        "Real local model active — rights/source lease verified at startup",
+                        "Real installed GGUF source checked"
+                        + (" · signed read-only evidence enabled" if signed
+                           else " · no model tools enabled"),
                     )
                     self.session_text.set("SQLite session: " + str(name.session_id))
                     self.resume_id.set(str(name.session_id))
@@ -676,7 +705,20 @@ class JeevesWindow(tk.Tk):
                         )
                         if bridge.session_id is not None:
                             self.resume_id.set(bridge.session_id)
-                    if action == "telemetry":
+                    if action == "source-status":
+                        self._show(
+                            "Operator-signed source status",
+                            json.dumps(
+                                {
+                                    "source_tool_active": result.get(
+                                        "signed_source_tool_active", False,
+                                    ),
+                                    "signed_source": result.get("signed_source"),
+                                },
+                                ensure_ascii=False, sort_keys=True,
+                            ),
+                        )
+                    elif action == "telemetry":
                         self._show(
                             "Native supervised capacity (observation only)",
                             json.dumps(
@@ -722,7 +764,12 @@ class JeevesWindow(tk.Tk):
                             "Verified agent: " + str(report.get("run_id", ""))
                             + " · native model calls: "
                             + str(usage.get("model_calls", "?"))
-                            + " · tools granted: 0",
+                            + " · source tool: "
+                            + ("signed read-only"
+                               if report.get("signed_source_tool_active") is True
+                               else "disabled")
+                            + " · lookups: "
+                            + str(usage.get("tool_calls", "?")),
                         )
                     elif action == "turn":
                         record = result.get("turn", {})

@@ -53,6 +53,7 @@ class DesktopHost:
         self, worker, installed, *, tenant: str, subject: str,
         resume_session: str | None = None,
         limits: DesktopHostLimits | None = None,
+        signed_source: object | None = None,
     ) -> None:
         # Delayed import keeps pure framing tests independent of native GGUF.
         from skeleton.jeeves.agent.native_chat import NativeJeevesChat
@@ -70,6 +71,12 @@ class DesktopHost:
         )
         self.identity = ActiveModel.from_supervisor(worker)
         self.source.assert_live(worker)
+        from .desktop_signed_source import ActivatedSignedSource
+        if signed_source is not None and type(signed_source) is not ActivatedSignedSource:
+            raise DesktopHostHold("signed source tool requires canonical admission")
+        if signed_source is not None:
+            signed_source.assert_current(worker)
+        self.signed_source = signed_source
         if resume_session is not None:
             identifier(resume_session, "reopened session")
         # SQLite create or resume is authenticated by NativeJeevesChat.
@@ -111,6 +118,17 @@ class DesktopHost:
                     commands_processed=self._commands,
                     physical_device_qualified=False,
                 ), False
+            if op == "source-status":
+                active = getattr(self, "signed_source", None)
+                if active is not None:
+                    active.assert_current(self.worker)
+                self._live()
+                return self._public(
+                    "signed-source-status",
+                    signed_source_tool_active=active is not None,
+                    signed_source=active.public_metadata if active else None,
+                    physical_device_qualified=False,
+                ), False
             if op == "telemetry":
                 # Only the already active, source-checked supervisor provides
                 # the runtime state. No model generation or extra store.
@@ -133,6 +151,7 @@ class DesktopHost:
                     maximum_steps=req.get("maximum_steps", 8),
                     maximum_model_calls=req.get("maximum_model_calls", 8),
                     maximum_wall_seconds=req.get("maximum_wall_seconds", 180),
+                    signed_source=getattr(self, "signed_source", None),
                 )
                 self._live()
                 if report.get("success") is not True:
@@ -270,6 +289,13 @@ class DesktopHost:
                 self._emit(outgoing, self._public(
                     "native-gguf-ready", tenant=self.tenant,
                     subject=self.subject, source_bound=True,
+                    signed_source_tool_active=(
+                        getattr(self, "signed_source", None) is not None
+                    ),
+                    signed_source_manifest_sha256=(
+                        self.signed_source.admission.preflight.manifest_sha256
+                        if getattr(self, "signed_source", None) is not None else None
+                    ),
                     physical_device_qualified=False,
                 ))
                 while self._commands < self.limits.maximum_commands:
@@ -305,13 +331,18 @@ class _PrivateParser(argparse.ArgumentParser):
 
 
 def _args(argv):
-    parser = _PrivateParser(description="Local installed-GGUF desktop worker")
+    parser = _PrivateParser(description="Local installed-GGUF desktop worker", allow_abbrev=False)
     parser.add_argument("--model-root", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--subject", required=True)
     parser.add_argument("--approve-native", action="store_true")
     parser.add_argument("--resume-session")
+    parser.add_argument("--enable-source-tool", action="store_true")
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--signed-source-manifest", type=Path)
+    parser.add_argument("--max-sources", type=int, default=4)
+    parser.add_argument("--max-source-tool-calls", type=int, default=3)
     parser.add_argument("--context", type=int, default=4096)
     parser.add_argument("--max-output-tokens", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=4)
@@ -350,6 +381,27 @@ def main(argv=None) -> int:
             maximum_commands=args.maximum_commands,
             maximum_publication_bytes=args.maximum_publication_bytes,
         )
+        # Verify all original signed bytes, HMAC, principal and expiry BEFORE
+        # loading the licensed GGUF or allocating a native SQLite session.
+        signed_admission = None
+        if args.enable_source_tool:
+            if args.source_root is None or args.signed_source_manifest is None:
+                raise DesktopHostHold("signed source root and manifest required")
+            from .desktop_signed_source import preflight_signed_source
+            signed_admission = preflight_signed_source(
+                root=args.source_root, manifest_path=args.signed_source_manifest,
+                tenant=args.tenant, subject=args.subject,
+                maximum_sources=args.max_sources,
+                maximum_tool_calls=args.max_source_tool_calls,
+            )
+        elif args.source_root is not None or args.signed_source_manifest is not None:
+            raise DesktopHostHold("signed source locations require explicit tool approval")
+        if (
+            type(args.max_sources) is not int or not 1 <= args.max_sources <= 6
+            or type(args.max_source_tool_calls) is not int
+            or not 1 <= args.max_source_tool_calls <= 3
+        ):
+            raise DesktopHostHold("invalid finite signed lookup allowance")
         stack, worker, installed = activate_checked(
             model_root=args.model_root, state_dir=args.state_dir,
             tenant=args.tenant, subject=args.subject, n_ctx=args.context,
@@ -360,9 +412,14 @@ def main(argv=None) -> int:
             isolated=True,
         )
         with stack:
+            active_sources = None
+            if signed_admission is not None:
+                from .desktop_signed_source import activate_signed_source
+                active_sources = activate_signed_source(signed_admission, worker)
             host = DesktopHost(
                 worker, installed, tenant=args.tenant, subject=args.subject,
                 resume_session=args.resume_session, limits=limits,
+                signed_source=active_sources,
             )
             return host.serve(sys.stdin.buffer, sys.stdout.buffer)
     except (Exception, KeyboardInterrupt) as exc:

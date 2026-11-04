@@ -33,11 +33,14 @@ def run_agent(
     maximum_steps: int = 8,
     maximum_model_calls: int = 8,
     maximum_wall_seconds: int = 180,
+    signed_source: object | None = None,
 ) -> dict[str, object]:
-    """Perform one budgeted, fail-closed reasoning task with zero tool grants.
+    """Run one native agent with either zero tools or an EXPLICIT signed read grant.
 
-    A user-selected source reference is only literal prompt data. Unlike
-    operator-enabled signed sources, it may not become a privileged tool.
+    The signed-source capability has been admitted *before* native activation
+    and bound to the exact installed GGUF/tenant/tokenizer. The host grants
+    only the canonical bounded READ_ONLY lookup tool for this one run;
+    original file bytes and HMAC/expiry are reverified before and after.
     """
     # Delayed import preserves the cheap pure IPC admission boundary and
     # keeps canonical Jeeves ownership in its existing implementation.
@@ -45,7 +48,9 @@ def run_agent(
     from skeleton.jeeves.agent.native_runtime import NativeJeevesRuntime
     from skeleton.jeeves.agent.runtime import RunInputs
     from skeleton.jeeves.agent.tools import ToolRegistry
+    from skeleton.jeeves.agent.native_source_tool import readonly_source_grant
     from skeleton.jeeves.agent.types import Goal, Budget
+    from .desktop_signed_source import ActivatedSignedSource
 
     if type(source_fence) is not NativeSourceFence:
         raise DesktopAgentHold("canonical installed source guard required")
@@ -60,8 +65,17 @@ def run_agent(
     if (principal.tenant, principal.subject) != (checked_tenant, checked_subject):
         raise DesktopAgentHold("native agent worker belongs to another principal")
     source_fence.assert_live(worker)
-
-    runtime = NativeJeevesRuntime(worker, tools=ToolRegistry())
+    if signed_source is not None and type(signed_source) is not ActivatedSignedSource:
+        raise DesktopAgentHold("unrecognized or unsigned desktop source tool")
+    tool_registry = ToolRegistry()
+    grants = ()
+    maximum_tool_calls = 0
+    if signed_source is not None:
+        signed_source.assert_current(worker)
+        signed_source.bound_tool.install(tool_registry)
+        maximum_tool_calls = signed_source.admission.maximum_tool_calls
+        grants = (readonly_source_grant(maximum_calls=maximum_tool_calls),)
+    runtime = NativeJeevesRuntime(worker, tools=tool_registry)
     if (
         runtime.identity != principal
         or runtime.provider.name != "jeeves_native"
@@ -87,12 +101,12 @@ def run_agent(
         budget=Budget(
             max_steps=steps,
             max_model_calls=calls,
-            max_tool_calls=1,
+            max_tool_calls=maximum_tool_calls if maximum_tool_calls else 1,
             max_tokens=min(100000, ceiling * calls * 2),
             max_wall_seconds=seconds,
         ),
         preferred_provider="jeeves_native",
-        grants=(),
+        grants=grants,
         confirmed_actions=(),
     )
     # NativeJeevesRuntime uses the *same* supervised model, canonical SQLite
@@ -100,6 +114,8 @@ def run_agent(
     # never retried here or promoted to a successful operator result.
     result = runtime.run(inputs)
     source_fence.assert_live(worker)
+    if signed_source is not None:
+        signed_source.assert_current(worker)
     if ActiveModel.from_supervisor(worker) != principal:
         raise DesktopAgentHold("principal drift after native agent execution")
     if (
@@ -108,7 +124,8 @@ def run_agent(
         or type(result.success) is not bool
         or result.usage.model_calls > calls
         or result.usage.steps > steps
-        or result.usage.tool_calls != 0
+        or result.usage.tool_calls > maximum_tool_calls
+        or result.usage.tool_calls < 0
     ):
         raise DesktopAgentHold("strict native agent exceeded authorized execution")
     if result.success is not True:
@@ -122,6 +139,8 @@ def run_agent(
             "release_certified": False,
             "device_qualified": False,
             "automatic_retry": False,
+            "signed_source_tool_active": signed_source is not None,
+            "tool_call_ceiling": maximum_tool_calls,
         }
     answer = result.answer
     if type(answer) is not str:
@@ -154,6 +173,12 @@ def run_agent(
         "release_certified": False,
         "automatic_retry": False,
         "filesystem_write_authorized": False,
+        "signed_source_tool_active": signed_source is not None,
+        "tool_call_ceiling": maximum_tool_calls,
+        "signed_source_manifest_sha256": (
+            signed_source.admission.preflight.manifest_sha256
+            if signed_source is not None else None
+        ),
     }
 
 
