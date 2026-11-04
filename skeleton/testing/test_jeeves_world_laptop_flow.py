@@ -382,3 +382,35 @@ def test_laptop_lease_collision_preserves_existing_lock(tmp_path):
     lock.write_bytes(b"other-writer")
     reject("lease_busy", lambda: flow.inspect("lighthouse"))
     assert lock.read_bytes() == b"other-writer"
+
+
+def test_cli_unavailable_lease_preserves_foreign_lock_and_guides_recovery(tmp_path, capsys):
+    """A failed lease open must not remove another writer's lock or claim success."""
+    flow, _, _, _ = ready(tmp_path)
+    lock = tmp_path / "lighthouse.lock"
+    lock.write_text("foreign writer", encoding="utf-8")
+    assert run(["--store", str(tmp_path), "verify", "--world-id", "lighthouse"]) == 2
+    busy = json.loads(capsys.readouterr().out)
+    assert busy["error"] == "lease_busy"
+    assert busy["next_action"] == "retry_after_current_writer_finishes"
+    assert lock.read_text(encoding="utf-8") == "foreign writer"
+
+
+def test_cli_lease_permission_failure_has_specific_recovery(tmp_path, capsys, monkeypatch):
+    """Permission failures are distinct from contention and never unlink locks."""
+    flow, _, _, _ = ready(tmp_path)
+    from skeleton.jeeves.worlds import laptop_flow
+    real_open = laptop_flow.os.open
+
+    def denied(path, flags, *args, **kwargs):
+        if path == "lighthouse.lock" and flags & laptop_flow.os.O_EXCL:
+            raise PermissionError("read-only custody")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(laptop_flow.os, "open", denied)
+    assert run(["--store", str(tmp_path), "verify", "--world-id", "lighthouse"]) == 2
+    failure = json.loads(capsys.readouterr().out)
+    assert failure["error"] == "lease_unavailable"
+    assert failure["next_action"] == (
+        "inspect_custody_permissions_and_retry_without_removing_foreign_locks")
+    assert not (tmp_path / "lighthouse.lock").exists()
