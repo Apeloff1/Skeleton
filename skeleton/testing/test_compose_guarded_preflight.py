@@ -58,7 +58,6 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cli_exit_fails_closed_on_epoch_only_observation(self):
         from skeleton.app.compose_guarded_preflight import main
-        from unittest.mock import AsyncMock
         from contextlib import redirect_stdout
         from io import StringIO
         import json
@@ -71,8 +70,8 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(observed=observed):
                 output = StringIO()
-                with patch("skeleton.app.compose_guarded_preflight._run_from_environment",
-                           new_callable=AsyncMock, return_value=observed), \
+                with patch("skeleton.app.compose_guarded_preflight.asyncio.run",
+                           return_value=observed), \
                      redirect_stdout(output):
                     exit_code = main()
                 self.assertEqual(exit_code, expected_exit)
