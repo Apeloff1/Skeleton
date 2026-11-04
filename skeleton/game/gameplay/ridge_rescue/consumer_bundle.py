@@ -16,6 +16,7 @@ import zipfile
 from .consumer_store import SlotStore, _safe_directory
 
 MAX_SOURCE_FILES = 128
+MAX_SCANNED_PATHS = 1024
 MAX_SOURCE_FILE_BYTES = 192_000
 MAX_UNCOMPRESSED_BYTES = 4_000_000
 MAX_ARCHIVE_BYTES = 2_000_000
@@ -39,7 +40,11 @@ def build_bytes() -> bytes:
     if not source.is_dir() or source.is_symlink():
         raise BundleError("original source directory unavailable outside checkout")
     entries = []
-    for path in sorted(source.rglob("*")):
+    scanned = 0
+    for path in source.rglob("*"):
+        scanned += 1
+        if scanned > MAX_SCANNED_PATHS:
+            raise BundleError("original source tree traversal budget exceeded")
         if path.is_symlink():
             raise BundleError("linked source file or directory refused")
         if path.is_dir():
@@ -53,6 +58,7 @@ def build_bytes() -> bytes:
         if ".." in Path(relative).parts or relative.startswith("/"):
             raise BundleError("unsafe archive path")
         entries.append((relative, path.read_bytes()))
+    entries.sort(key=lambda item: item[0])
     if not 4 <= len(entries) <= MAX_SOURCE_FILES:
         raise BundleError("original game source inventory outside bounds")
     required = {"__init__.py", "consumer_cli.py", "consumer_store.py", "cinder_ridge_campaign.json"}
