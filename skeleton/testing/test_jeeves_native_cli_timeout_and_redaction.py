@@ -50,6 +50,15 @@ def call_cli(argv, *, prompt=b"  exact user prompt \r\n", worker=None):
             return_value=SimpleNamespace(source_bridge_ready=True),
         ),
         mock.patch(
+            "skeleton.jeeves.agent.native_source_fence.require_activated_source",
+            return_value={
+                "model_sha256":MODEL,"tokenizer_sha256":TOKENIZER,
+                "manifest_sha256":"c"*64,"archive_sha256":"d"*64,
+                "source_sha":"e"*40,"installed_model_bytes":1024,
+                "installed_shard_count":1,
+            },
+        ),
+        mock.patch(
             "skeleton.jeeves.agent.native_cli.NativeJeevesChat",
             return_value=chat,
         ),
@@ -171,6 +180,15 @@ class JeevesNativeCliBounds(unittest.TestCase):
             mock.patch(
                 "skeleton.jeeves.agent.native_cli.inspect_native_jeeves",
                 return_value=SimpleNamespace(source_bridge_ready=True),
+            ),
+            mock.patch(
+                "skeleton.jeeves.agent.native_source_fence.require_activated_source",
+                return_value={
+                    "model_sha256":MODEL,"tokenizer_sha256":TOKENIZER,
+                    "manifest_sha256":"c"*64,"archive_sha256":"d"*64,
+                    "source_sha":"e"*40,"installed_model_bytes":1024,
+                    "installed_shard_count":1,
+                },
             ),
             mock.patch(
                 "skeleton.jeeves.agent.native_cli.NativeJeevesChat",
