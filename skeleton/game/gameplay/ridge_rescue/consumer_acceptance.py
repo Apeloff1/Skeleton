@@ -44,9 +44,31 @@ def _interactive_contract(root: Path, actions: list[dict]) -> dict:
     completed = play(SlotStore(root), slot, read=command(limit=len(actions)), write=screen)
     if completed["status"] != "completed" or completed["revision"] != len(actions):
         raise ValueError("interactive restart did not reach earned ending")
+    # Verify consumer-facing terminal export and backup commands on the
+    # earned ending, not only direct store APIs. Reopening must preserve it.
+    output: list[str] = []
+    terminal_commands = iter(("e", "b", "a", "q"))
+    after_tools = play(SlotStore(root), slot,
+                       read=lambda _: next(terminal_commands),
+                       write=output.append, ascii_mode=True)
+    if after_tools["head"] != completed["head"] or after_tools["revision"] != completed["revision"]:
+        raise ValueError("terminal export/backup mutated completed campaign")
+    exports = [line.removeprefix("Exported: ") for line in output if line.startswith("Exported: ")]
+    backups = [line.removeprefix("Backup created: ") for line in output if line.startswith("Backup created: ")]
+    if len(exports) != 1 or len(backups) != 1 or not any(
+            line.startswith("Save audit verified: ") for line in output):
+        raise ValueError("completed terminal did not expose export, backup and audit")
+    from .consumer_backup import verify_backup
+    from .consumer_store import _source
+    exported = verify_export(Path(exports[0]).read_bytes())
+    backed_up, history = verify_backup(Path(backups[0]).read_bytes(), _source())
+    if (exported["head"] != completed["head"] or backed_up["head"] != completed["head"]
+            or len(history) != completed["revision"]):
+        raise ValueError("terminal-produced custody artifacts failed replay")
     if frames[0] < len(actions):
         raise ValueError("terminal did not render playable action frames")
-    return {"commands": prompts[0], "frames": frames[0], "head": completed["head"]}
+    return {"commands": prompts[0], "frames": frames[0], "head": completed["head"],
+            "terminal_export_backup_verified": True}
 
 
 def run_acceptance(root: Path | None = None) -> dict:
@@ -104,6 +126,7 @@ def run_acceptance(root: Path | None = None) -> dict:
             "head": final["head"], "portable_export_verified": True,
             "terminal_commands": terminal["commands"], "terminal_frames": terminal["frames"],
             "interactive_quit_restart_verified": True,
+            "interactive_export_backup_verified": terminal["terminal_export_backup_verified"],
             "backup_restore_replay_verified": True,
             "release_certified": False, "windows_device_certified": False,
             "exact_head_ci_certified": False}
