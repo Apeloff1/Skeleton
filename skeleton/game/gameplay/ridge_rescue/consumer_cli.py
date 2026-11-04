@@ -72,11 +72,11 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
     while True:
         write(_view(current, ascii_mode=ascii_mode))
         if current["status"] == "completed":
-            write("Campaign complete. Type e to export, b for full backup, j for journal, or q to quit.")
+            write("Campaign complete. Type a to audit, e to export, b for full backup, j for journal, or q to quit.")
         elif current["status"] != "playing":
-            write("Chapter ended without its required ending. Type r to retry, b for full backup, e to export, j for journal, q to quit.")
+            write("Chapter ended without its required ending. Type r to retry, a to audit, b for full backup, e to export, j for journal, q to quit.")
         else:
-            write("Choose an action number, h for a hint, j for journal, ? for help, e to export, b for full backup, s to sync the latest save, q to save and quit.")
+            write("Choose an action number, h for a hint, j for journal, a to audit, ? for help, e to export, b for full backup, s to sync the latest save, q to save and quit.")
         try:
             raw = read("> ")
         except (EOFError, KeyboardInterrupt):
@@ -88,7 +88,7 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
         if answer in ("q", "quit"):
             break
         if answer in ("?", "help"):
-            write("Numbers perform listed actions and save immediately. h = advisory route, j = recent events, e = replay-verified export, b = retry-aware full backup, s = sync from disk, q = quit without losing the last turn. No command besides a numbered action or retry consumes a turn.")
+            write("Numbers perform listed actions and save immediately. h = advisory route, j = recent events, a = replay-verify save history, e = replay-verified export, b = retry-aware full backup, s = sync from disk, q = quit without losing the last turn. No command besides a numbered action or retry consumes a turn.")
             continue
         if answer in ("s", "sync"):
             try:
@@ -96,6 +96,16 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
                 write("Authoritative save refreshed; no turn was consumed.")
             except (StoreError, CampaignError, OSError) as exc:
                 write("Save refresh unavailable; no turn was consumed: " + str(exc))
+            continue
+        if answer in ("a", "audit"):
+            try:
+                report = store.audit(slot)
+                if report["head"] != current["head"]:
+                    write("Audit verified a newer authoritative save; refreshing view.")
+                    current = store.load(slot)
+                write("Save audit verified: " + json.dumps(report, sort_keys=True))
+            except (StoreError, CampaignError, OSError) as exc:
+                write("Save audit unavailable; no turn was consumed: " + str(exc))
             continue
         if answer in ("h", "hint"):
             write(navigation_hint(current))
