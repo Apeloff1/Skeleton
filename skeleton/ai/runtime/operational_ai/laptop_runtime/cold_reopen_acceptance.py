@@ -81,9 +81,13 @@ def run(
     # The first context is completely closed before the following source
     # and device admission. Crash/pending custody is never retried.
     second_stack, second_worker, second_installed = activate_checked(**options)
-    if second_stack is stack or second_worker is worker:
-        refuse("cold native reopen must use an independently activated worker")
+    if second_stack is stack:
+        refuse("cold native reopen reused a closed activation context")
     with second_stack:
+        # A second independently activated context must always close, even
+        # if the adapter mistakenly returns the first worker instance.
+        if second_worker is worker:
+            refuse("cold native reopen must use an independently activated worker")
         reopened_source = require_activated_source(
             second_worker, second_installed,
         )
