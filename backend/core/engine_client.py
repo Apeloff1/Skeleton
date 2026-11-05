@@ -25,7 +25,7 @@ import re
 from skeleton.contracts.runtime_optimization import validate_runtime_policy_patch
 from time import monotonic
 from typing import Any, Mapping, Sequence
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -206,10 +206,46 @@ class EngineClientConfig:
     max_poll_attempts: int = 2400
 
     def __post_init__(self) -> None:
-        base = _text(self.base_url.rstrip("/"), "base_url", maximum=4096)
-        if not (base.startswith("http://") or base.startswith("https://")):
-            raise EngineProtocolError("engine base_url must use http or https")
-        object.__setattr__(self, "base_url", base)
+        # Do not delegate the service token to a URI with userinfo, query,
+        # fragments, or a path that changes the canonical engine origin.
+        # URL parsers silently discard CR/LF/TAB: reject those first.
+        supplied = _text(self.base_url, "base_url", maximum=4096)
+        if (
+            any(ord(ch) <= 32 or ord(ch) == 127 for ch in supplied)
+            or "\\" in supplied
+        ):
+            raise EngineProtocolError("engine base_url contains forbidden characters")
+        try:
+            url = urlsplit(supplied)
+            port = url.port
+            host = url.hostname
+        except ValueError as exc:
+            raise EngineProtocolError("engine base_url authority is invalid") from exc
+        if (
+            url.scheme not in {"http", "https"}
+            or not url.netloc
+            or not host
+            or url.username is not None
+            or url.password is not None
+            or url.path not in {"", "/"}
+            or "?" in supplied
+            or "#" in supplied
+            or "%" in url.netloc
+            or "@" in url.netloc
+            or port == 0
+        ):
+            raise EngineProtocolError("engine base_url must be an absolute origin without credentials or path")
+        # Permit Docker single-label hosts and bracketed IPv6, but not
+        # authority labels that are ambiguous after IDNA normalization.
+        if (
+            not host.isascii()
+            or any(ch.isspace() for ch in host)
+            or host.startswith(".")
+            or host.endswith(".")
+            or ".." in host
+        ):
+            raise EngineProtocolError("engine base_url host is invalid")
+        object.__setattr__(self, "base_url", supplied.rstrip("/"))
         token = self.service_token
         if token is not None:
             if not isinstance(token, str) or token != token.strip() or len(token) < 32 or len(token) > 4096:
@@ -1138,6 +1174,9 @@ class EngineClient:
                     timeout=timeout,
                     transport=self._transport,
                     follow_redirects=False,
+                    # Never let HTTP_PROXY/HTTPS_PROXY route delegated engine
+                    # credentials to an unrelated network gateway.
+                    trust_env=False,
                 ) as client:
                     async with client.stream(
                         method,
