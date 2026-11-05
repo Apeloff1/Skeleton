@@ -1,0 +1,129 @@
+"""Focused security and correctness tests for compressed-vault descriptor custody."""
+from __future__ import annotations
+
+from contextlib import nullcontext
+import os
+from pathlib import Path
+
+import pytest
+
+from core import compressed_vault as storage
+from core.vault_secure_fs import VaultPathError
+
+
+class PassThroughCodec:
+    """Exercise actual secure filesystem and JSONL logic without zstd/network."""
+    def stream_writer(self, handle):
+        return nullcontext(handle)
+
+    def stream_reader(self, handle):
+        return nullcontext(handle)
+
+
+@pytest.fixture
+def isolated_storage(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(storage, "VAULT_ROOT", tmp_path / "vault")
+    monkeypatch.setattr(storage, "SCRATCH_ROOT", tmp_path / "scratch")
+    monkeypatch.setattr(storage, "_MANIFEST_FILE", tmp_path / "vault" / "_manifest.json")
+    monkeypatch.setattr(storage, "_STORAGE_READY", False)
+    monkeypatch.setattr(storage, "_STORAGE_IDENTITY", {})
+    monkeypatch.setattr(storage, "_MANIFEST", {})
+    monkeypatch.setattr(storage, "_CACHE", {})
+    monkeypatch.setattr(storage, "_CACHE_SIZE_EST", {})
+    monkeypatch.setattr(storage, "_COMPRESSOR", PassThroughCodec())
+    monkeypatch.setattr(storage, "_DECOMPRESSOR", PassThroughCodec())
+    return storage
+
+
+def test_roundtrip_pagination_and_restart_safe_manifest(isolated_storage):
+    vault = isolated_storage
+    rows = [{"i": index} for index in range(6)]
+    entry = vault.write_shard("safe", rows, domain="testing")
+    assert entry["rows"] == 6
+    assert vault.read_shard("safe", limit=2, offset=2) == rows[2:4]
+    assert list(vault.iter_shard("safe")) == rows
+    assert vault.get_shard_entry("safe")["name"] == "safe"
+    vault._MANIFEST = {}
+    vault._load_manifest()
+    assert vault.read_shard("safe", limit=1, offset=5) == [{"i": 5}]
+
+
+def test_failed_compression_never_truncates_an_existing_shard(isolated_storage):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    target = vault.VAULT_ROOT / "stable.jsonl.zst"
+    original = target.read_bytes()
+
+    def interrupted():
+        yield {"value": "partial"}
+        raise RuntimeError("generator interrupted after first row")
+
+    with pytest.raises(RuntimeError, match="interrupted"):
+        vault.write_shard("stable", interrupted(), domain="testing")
+    assert target.read_bytes() == original
+    assert vault.read_shard("stable") == [{"value": "before"}]
+    assert not list(vault.VAULT_ROOT.glob(".vault-part-*"))
+
+
+def test_symlink_or_hardlink_shard_is_rejected_without_following_it(isolated_storage, tmp_path):
+    vault = isolated_storage
+    vault.write_shard("safe", [{"value": 1}], domain="testing")
+    target = vault.VAULT_ROOT / "safe.jsonl.zst"
+    outside = tmp_path / "outside"
+    outside.write_bytes(b'{"value":9}\n')
+    target.unlink()
+    target.symlink_to(outside)
+    with pytest.raises((VaultPathError, OSError)):
+        vault.read_shard("safe")
+    with pytest.raises((VaultPathError, OSError)):
+        vault.write_shard("safe", [{"value": 2}], domain="testing")
+    assert outside.read_bytes() == b'{"value":9}\n'
+
+    target.unlink()
+    os.link(outside, target)
+    with pytest.raises(VaultPathError, match="private regular"):
+        vault.read_shard("safe")
+    assert outside.read_bytes() == b'{"value":9}\n'
+
+
+def test_replacing_root_with_symlink_or_unrelated_directory_is_rejected(isolated_storage, tmp_path):
+    vault = isolated_storage
+    vault.write_shard("safe", [{"value": 1}], domain="testing")
+    original_root = vault.VAULT_ROOT
+    original_root.rename(tmp_path / "original")
+    original_root.mkdir()
+    with pytest.raises(VaultPathError, match="identity changed"):
+        vault.read_shard("safe")
+    original_root.rmdir()
+    original_root.symlink_to(tmp_path / "original", target_is_directory=True)
+    with pytest.raises((VaultPathError, OSError)):
+        vault.read_shard("safe")
+
+
+def test_corrupt_jsonl_and_duplicate_manifest_keys_fail_closed(isolated_storage):
+    vault = isolated_storage
+    vault.write_shard("safe", [{"value": 1}], domain="testing")
+    (vault.VAULT_ROOT / "safe.jsonl.zst").write_bytes(b'{"value":1}\n{"value":NaN}\n')
+    with pytest.raises(ValueError, match="corrupt row"):
+        vault.read_shard("safe", limit=5)
+    (vault.VAULT_ROOT / "_manifest.json").write_bytes(b'{"safe":{},"safe":{}}')
+    with pytest.raises(ValueError, match="duplicate"):
+        vault.vault_stats()
+
+
+def test_byte_limits_reject_oversized_rows_and_scans(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    monkeypatch.setattr(vault, "_MAX_ROW_CHARS", 32)
+    with pytest.raises(ValueError, match="row exceeds"):
+        vault.write_shard("oversize", [{"text": "X" * 256}], domain="testing")
+    assert not (vault.VAULT_ROOT / "oversize.jsonl.zst").exists()
+    vault.write_shard("safe", [{"x": 123456}], domain="testing")
+    monkeypatch.setattr(vault, "_MAX_SHARD_SCAN_BYTES", 8)
+    with pytest.raises(ValueError, match="decompressed byte budget"):
+        vault.read_shard("safe", limit=5)
+
+
+@pytest.mark.parametrize("limit,offset", [(True, 0), (1001, 0), (-1, 0), (1, -1), (1, 1_000_001)])
+def test_invalid_paging_is_rejected(isolated_storage, limit, offset):
+    with pytest.raises(ValueError):
+        isolated_storage.read_shard("safe", limit=limit, offset=offset)
