@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for sablegate."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('sablegate_arrival', (), (), ('arrival_record',)), Quest('sablegate_source', ('sablegate_arrival',), ('arrival_record',), ('source_proof',)), Quest('sablegate_witness', ('sablegate_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('sablegate_reconcile', ('sablegate_source', 'sablegate_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('sablegate_crossing', ('sablegate_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('sablegate_conclusion', ('sablegate_crossing',), ('crossing_pass',), ('ending_unlocked',)))

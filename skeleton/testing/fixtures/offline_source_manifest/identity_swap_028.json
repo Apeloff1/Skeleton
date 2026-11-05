@@ -1,0 +1,23 @@
+{
+  "schema": "offline-source-manifest-negative-case.v1",
+  "id": "identity_swap_028",
+  "attack": "identity_swap",
+  "expected": "reject",
+  "payload": "foreign_028",
+  "trust_boundary": "principal-model-scope",
+  "precondition": "operator root is 0700 and original file is 0600 with signed original bytes",
+  "attacker_control": "attacker changes tenant or subject in an otherwise valid signed manifest",
+  "evaluation_phase": "signed scope admission",
+  "expected_observations": {
+    "source_data_exfiltrated": false,
+    "foreign_tenant_admitted": false,
+    "unauthorized_native_dispatch": false,
+    "automatic_retry": false,
+    "approved_rights_fabricated": false,
+    "release_certified": false
+  },
+  "recovery_policy": "hold; retain existing original bytes, never invent matching model receipt",
+  "source_evidence_type": "deterministic local source file and nonproduction HMAC fixture",
+  "independent_model_execution_proved": false,
+  "independent_windows_device_proved": false
+}

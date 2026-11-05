@@ -1,0 +1,15 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "cancel",
+  "expect": "reject",
+  "reason": "Deadline-expired work cannot remain running",
+  "payload": {
+    "request_id": "req_001",
+    "state": "cancelled",
+    "now_ns": 1000000,
+    "deadline_ns": 2000000,
+    "generated_tokens": 4,
+    "acked": false,
+    "backend_active": false
+  }
+}

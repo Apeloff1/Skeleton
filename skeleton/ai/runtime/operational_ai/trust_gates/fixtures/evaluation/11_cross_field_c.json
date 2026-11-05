@@ -1,0 +1,16 @@
+{
+  "case": "11_cross_field_c",
+  "gate": "evaluation",
+  "expect": "reject",
+  "reason": "Evaluation evidence has caller approval",
+  "payload": {
+    "suite_id": "native_adversarial_v1",
+    "dataset_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "samples": 0,
+    "passes": 0,
+    "failures": 0,
+    "empty_errors": 0,
+    "approved": true
+  }
+}

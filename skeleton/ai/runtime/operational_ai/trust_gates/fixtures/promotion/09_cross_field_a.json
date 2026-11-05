@@ -1,0 +1,25 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "promotion",
+  "expect": "reject",
+  "reason": "Every required final-head CI gate succeeds",
+  "payload": {
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "checks": {
+      "Merge Readiness": "success",
+      "Backend Quality": "success",
+      "App Foundation E2E": "success",
+      "Workflow Input Security": "success",
+      "Sealed Context Guard": "pending",
+      "Artifact Policy": "success",
+      "Malware Gate": "success",
+      "Repository Hygiene": "success",
+      "Secret Scanning": "success",
+      "Dependency Review": "success"
+    },
+    "independent_review": true,
+    "real_model_e2e": true,
+    "model_rights": true,
+    "installation": true
+  }
+}
