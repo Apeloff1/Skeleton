@@ -1,0 +1,15 @@
+{
+  "case": "04_wrong_primary_type",
+  "gate": "quota",
+  "expect": "reject",
+  "reason": "No implicit numeric identity coercion",
+  "payload": {
+    "tenant": 17,
+    "prompt_used": 100,
+    "output_used": 100,
+    "new_prompt": 20,
+    "new_output": 30,
+    "tenant_ceiling": 1000,
+    "global_remaining": 200
+  }
+}

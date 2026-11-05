@@ -1,0 +1,23 @@
+{
+  "case": "05_null_primary",
+  "gate": "stream",
+  "expect": "reject",
+  "reason": "No null identity or resource",
+  "payload": {
+    "request_id": null,
+    "chunks": [
+      {
+        "index": 0,
+        "text": "Hi"
+      },
+      {
+        "index": 1,
+        "text": "."
+      }
+    ],
+    "max_bytes": 1024,
+    "terminal": "stop",
+    "generated_tokens": 2,
+    "token_ceiling": 128
+  }
+}

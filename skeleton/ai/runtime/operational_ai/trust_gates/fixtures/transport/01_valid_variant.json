@@ -1,0 +1,15 @@
+{
+  "case": "01_valid_variant",
+  "gate": "transport",
+  "expect": "accept",
+  "reason": "Alternative permitted operation",
+  "payload": {
+    "host": "::1",
+    "method": "POST",
+    "auth_type": "bearer",
+    "token_bytes": 64,
+    "body_bytes": 128,
+    "body_ceiling": 262144,
+    "content_type": "application/json"
+  }
+}

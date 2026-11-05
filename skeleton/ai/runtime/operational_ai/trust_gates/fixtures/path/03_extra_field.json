@@ -1,0 +1,16 @@
+{
+  "case": "03_extra_field",
+  "gate": "path",
+  "expect": "reject",
+  "reason": "Unrecognized authority fields denied",
+  "payload": {
+    "relative_path": "models/local.gguf",
+    "root_id": "installation",
+    "entry_type": "model",
+    "bytes": 1000,
+    "byte_limit": 100000000,
+    "suffix": ".gguf",
+    "immutable": true,
+    "untrusted_override": "allow"
+  }
+}
