@@ -19,6 +19,28 @@ class PlanTask:
         if type(self.depends_on) is not tuple or len(self.depends_on)>128:
             refuse("dependency ceiling")
         for dep in self.depends_on:identifier(dep)
+def plan_digest(record):
+    """Canonical digest over JSON arrays; no tuple/list round-trip ambiguity."""
+    fields={"order","edges","tokens","critical_path_ms",
+            "critical_path","source_plan_not_authority_to_execute"}
+    if type(record) is not dict or set(record)!=fields:
+        refuse("exact source plan digest projection required")
+    for k in ("order","edges","critical_path"):
+        if type(record[k]) is not tuple:
+            refuse("canonical ordered plan tuples required")
+    if any(type(e) is not tuple or len(e)!=2 for e in record["edges"]):
+        refuse("canonical dependency edge pairs required")
+    if record["source_plan_not_authority_to_execute"] is not True:
+        refuse("plan may not grant execution authority")
+    return fingerprint({
+        "order":list(record["order"]),
+        "edges":[list(e) for e in record["edges"]],
+        "tokens":record["tokens"],
+        "critical_path_ms":record["critical_path_ms"],
+        "critical_path":list(record["critical_path"]),
+        "source_plan_not_authority_to_execute":True,
+    })
+
 def compile_plan(tasks,*,max_tasks=4096,max_tokens=262144):
     integer(max_tasks,minimum=1,maximum=100000)
     integer(max_tokens,minimum=1,maximum=262144)
@@ -38,4 +60,4 @@ def compile_plan(tasks,*,max_tasks=4096,max_tokens=262144):
             "critical_path_ms":critical["length"],
             "critical_path":critical["path"],
             "source_plan_not_authority_to_execute":True}
-    return {**record,"sha256":fingerprint(record)}
+    return {**record,"sha256":plan_digest(record)}

@@ -230,7 +230,7 @@ class EvidenceIndex:
                       "passage_sha256":r["passage_sha256"]} for r in checked)
         return {"schema":"offline-source-attribution.v1","tenant":self.tenant,
                 "subject":self.subject,"citations":ledger,
-                "receipt_sha256":fingerprint(ledger),
+                "receipt_sha256":fingerprint(list(ledger)),
                 "byte_provenance_verified":True,
                 "semantic_entailment_proved":False,
                 "model_or_device_qualified":False}
