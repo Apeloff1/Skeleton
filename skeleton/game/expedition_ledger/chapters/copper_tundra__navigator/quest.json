@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "copper_tundra__navigator",
+  "chapter": 42,
+  "title": "Copper Tundra: The Navigator's Aurora Register",
+  "theme": "copper_tundra",
+  "discipline": "navigator",
+  "region": "Copper Tundra",
+  "premise": "In a magnetized polar steppe threaded by buried power rails, the navigator must synchronize the return route to the signal using a star-and-current sextant.",
+  "signal": "aurora compass",
+  "key_name": "aurora compass attunement",
+  "objective_name": "Aurora Register",
+  "ending": "Recover the Aurora Register and return with the verified return bearing; Polar Surveyors can finally verify the source testimony.",
+  "faction": "Polar Surveyors",
+  "challenge": "Survive conductive frost while evading the rail colossus without sacrificing the verified return bearing.",
+  "choice_yes": "Disclose evidence and ask Polar Surveyors to witness the star-and-current sextant.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to accept an unverified coordinate",
+  "tool": "star-and-current sextant",
+  "reward": "verified return bearing",
+  "enemy": "rail colossus",
+  "chapter_links": [
+    "copper_tundra__historian",
+    "verdant_ruins__cartographer"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}
