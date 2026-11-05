@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "candidate_only_06",
+  "category": "candidate_only",
+  "overrides": {
+    "candidate_only": true,
+    "seed": 205
+  },
+  "expected": "allowed",
+  "reason": "Confirm explicit local CPU-only candidate candidate_only boundary"
+}

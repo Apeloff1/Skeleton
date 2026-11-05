@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "step_budget_08",
+  "category": "step_budget",
+  "overrides": {
+    "max_optimizer_steps": -1
+  },
+  "expected": "denied",
+  "reason": "Fail closed on malformed or over-budget step_budget request"
+}

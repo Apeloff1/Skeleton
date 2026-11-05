@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "dim_03",
+  "category": "dim",
+  "overrides": {
+    "dim": 24
+  },
+  "expected": "allowed",
+  "reason": "Validate accepted dim boundary value in approved candidate-only policy"
+}

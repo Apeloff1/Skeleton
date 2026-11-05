@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "seed_12",
+  "category": "seed",
+  "overrides": {
+    "seed": null
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe or malformed seed boundary without allocating model"
+}

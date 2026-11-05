@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "feed_forward_12",
+  "category": "feed_forward",
+  "overrides": {
+    "d_ff": null
+  },
+  "expected": "denied",
+  "reason": "Reject unbounded or invalid feed_forward configuration before allocation"
+}

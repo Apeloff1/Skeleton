@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "ctx_04",
+  "category": "ctx",
+  "overrides": {
+    "ctx": 128
+  },
+  "expected": "allowed",
+  "reason": "Validate accepted ctx boundary value in approved candidate-only policy"
+}

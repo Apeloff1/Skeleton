@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "reserved_09",
+  "category": "reserved",
+  "overrides": {
+    "external_provider": "bad02"
+  },
+  "expected": "denied",
+  "reason": "Refuse malformed or unapproved reserved configuration without fallback"
+}

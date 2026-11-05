@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "position_mode_07",
+  "category": "position_mode",
+  "overrides": {
+    "position_mode": "alibi"
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe model position_mode without automatic downgrade or privilege escalation"
+}

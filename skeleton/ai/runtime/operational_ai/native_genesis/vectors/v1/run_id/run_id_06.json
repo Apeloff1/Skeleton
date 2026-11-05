@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "run_id_06",
+  "category": "run_id",
+  "overrides": {
+    "run_id": "native_seed_1"
+  },
+  "expected": "allowed",
+  "reason": "Accept explicit run_id configuration with bounded candidate semantics"
+}

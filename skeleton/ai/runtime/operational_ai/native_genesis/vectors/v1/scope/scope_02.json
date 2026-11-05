@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "scope_02",
+  "category": "scope",
+  "overrides": {
+    "training_scope": "offline_native_candidate_training",
+    "seed": 101
+  },
+  "expected": "allowed",
+  "reason": "Explicit original-data scope permission remains candidate-only"
+}

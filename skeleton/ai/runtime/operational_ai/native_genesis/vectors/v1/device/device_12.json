@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "device_12",
+  "category": "device",
+  "overrides": {
+    "device": "cpu "
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe model device without automatic downgrade or privilege escalation"
+}

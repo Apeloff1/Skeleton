@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "wall_budget_03",
+  "category": "wall_budget",
+  "overrides": {
+    "maximum_wall_ms": 10000
+  },
+  "expected": "allowed",
+  "reason": "Explicit original-data wall_budget permission remains candidate-only"
+}
