@@ -107,9 +107,11 @@ def _admit(task: str, prompt: str, system: str, panel: list | None,
 
 
 def _score_int(value: object) -> int | None:
-    if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100:
-        return None
-    return int(value)
+    if type(value) is int:
+        return value if 0 <= value <= 100 else None
+    if type(value) is float and math.isfinite(value) and 0 <= value <= 100:
+        return int(value)
+    return None
 
 
 _CRITIC_SYS = ("You are a ruthless but fair senior critic. Red-team the draft: list its "
@@ -256,9 +258,16 @@ async def deliberate(task: str, prompt: str, system: str = "",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        await _db.discourse_log.insert_one(dict(result))
+        receipt = await _db.discourse_log.insert_one(dict(result))
+        if getattr(receipt, "acknowledged", False) is not True:
+            raise RuntimeError("deliberation write was not acknowledged")
     except Exception:
-        pass
+        # The model result may be useful for diagnosis, but it must never be
+        # treated as durable evidence after an unavailable write.
+        result["error"] = "deliberation_not_durable"
+        result["persistence_status"] = "unconfirmed"
+    else:
+        result["persistence_status"] = "durable"
     return result
 
 
