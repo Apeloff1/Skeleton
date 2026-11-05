@@ -103,6 +103,7 @@ def main(argv=None):
             if args.mode=="acceptance":
                 result=run_first_turn_acceptance(
                     worker,prompt=message,approved=True,
+                    installed_receipt=installed, require_real=True,
                 )
                 # Return only hashes, counts and the new durable identifiers,
                 # never the private stdin prompt or raw model output.
