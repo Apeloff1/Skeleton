@@ -1,0 +1,90 @@
+{
+  "schema": "skeleton.production_scenario.v1",
+  "recipe": "arcane_ritual_lens",
+  "domain": "arcane",
+  "inputs": {
+    "material_per_batch": 6,
+    "energy_per_stage": 6
+  },
+  "outputs": {
+    "products_per_batch": 3,
+    "scrap_per_batch": 2
+  },
+  "stages": [
+    "prepare",
+    "fabricate",
+    "inspect"
+  ],
+  "initial": {
+    "materials": 35,
+    "energy": 87,
+    "products": 0,
+    "scrap": 0
+  },
+  "commands": [
+    {
+      "id": "arcane_ritual_lens:start",
+      "action": "start",
+      "batch": 1,
+      "expected_version": 0,
+      "tick": 1,
+      "evidence": ""
+    },
+    {
+      "id": "arcane_ritual_lens:prep",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 1,
+      "tick": 2,
+      "evidence": "trusted-stage-prep"
+    },
+    {
+      "id": "arcane_ritual_lens:work",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 2,
+      "tick": 3,
+      "evidence": "trusted-stage-work"
+    },
+    {
+      "id": "arcane_ritual_lens:inspect",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 3,
+      "tick": 4,
+      "evidence": "trusted-stage-inspect"
+    },
+    {
+      "id": "arcane_ritual_lens:finish",
+      "action": "finish",
+      "batch": 1,
+      "expected_version": 4,
+      "tick": 5,
+      "evidence": "trusted-quality-acceptance"
+    }
+  ],
+  "expected": {
+    "final_status": "completed",
+    "final_stage": 3,
+    "version": 5,
+    "product_count": 3,
+    "spent_materials": 6,
+    "energy_cost": 18,
+    "all_accepted": true
+  },
+  "negative_cases": [
+    "missing-stage-evidence",
+    "stages-incomplete",
+    "missing-quality-evidence",
+    "stale-version",
+    "duplicate-event",
+    "insufficient-energy",
+    "insufficient-material"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "physical_machine_control": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
