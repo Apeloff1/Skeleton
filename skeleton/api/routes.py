@@ -1519,7 +1519,10 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
     """
     del state
     _reject_remote_project_writes(request)
-    from skeleton.forge.game_build_queue import BUILD_KIND, IdempotencyMismatch, enqueue_game_build, request_hash, start_worker
+    from skeleton.forge.game_build_queue import (
+        BUILD_KIND, IdempotencyMismatch, enqueue_game_build, handle_game_build,
+        register_handler, request_hash, start_worker,
+    )
     from skeleton.forge.game_builder import DEFAULT_DEADLINE_S, _ID, coerce_brief
     from skeleton.forge.playtest import PLAYTEST_MODES
     from skeleton.forge.repair import REPAIR_MODES
@@ -1551,6 +1554,8 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
     project_id = request.get("project_id")
     if project_id is not None and (not isinstance(project_id, str) or _ID.fullmatch(project_id) is None):
         raise HTTPException(status_code=422, detail="project_id must be a projects identifier")
+    if project_id is not None:
+        raise HTTPException(status_code=422, detail="project-linked builds require the authenticated projects build route")
     payload: Dict[str, Any] = {
         "brief": brief,
         "playtest": playtest,
@@ -1564,6 +1569,11 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
         payload["era"] = _text_field(request, "era", "")
     if "archetype" in request:
         payload["archetype"] = _text_field(request, "archetype", "") or None
+    register_handler(BUILD_KIND, handle_game_build)
+    try:
+        start_worker()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="build worker unavailable; retry shortly") from exc
     try:
         header_key = _idempotency._extract_key(dict(http_request.headers))
         handle = enqueue_game_build(
@@ -1580,7 +1590,6 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
         raise HTTPException(status_code=409, detail="idempotency key was already used with a different body") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    start_worker()
     ack = _game_build_ack(handle)
     return JSONResponse(status_code=202, content=ack)
 
