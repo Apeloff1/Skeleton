@@ -361,6 +361,7 @@ class LaptopFlow:
             report["checks"]["source"] = {"ok": False, "error": exc.code}
             report["next_action"] = (
                 "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                else "inspect_custody_permissions_without_removing_foreign_locks" if exc.code == "lease_unavailable"
                 else "repair_or_restore_canonical_world_source")
             return report
         report["source_digest"] = current["source_digest"]
@@ -375,6 +376,7 @@ class LaptopFlow:
             report["checks"]["builder"] = {"ok": False, "error": exc.code}
             report["next_action"] = (
                 "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                else "inspect_custody_permissions_without_removing_foreign_locks" if exc.code == "lease_unavailable"
                 else "compile_and_verify_reviewed_source")
             return report
         report["checks"]["builder"] = {"ok": True}
@@ -397,6 +399,7 @@ class LaptopFlow:
             report["checks"]["acceptance"] = {"ok": False, "error": exc.code}
             report["next_action"] = (
                 "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                else "inspect_custody_permissions_without_removing_foreign_locks" if exc.code == "lease_unavailable"
                 else "repair_canonical_replay_or_save_before_engine_handoff")
             return report
         # Separate diagnostic stages may observe different approved revisions.
