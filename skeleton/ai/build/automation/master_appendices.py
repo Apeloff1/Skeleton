@@ -1,6 +1,7 @@
 """Canonical appendix cross-reference and terminology registry for VOL-121."""
 from __future__ import annotations
 from dataclasses import dataclass
+from collections.abc import Mapping
 import re
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$");_SHA=re.compile(r"^[0-9a-f]{64}$")
 class AppendixError(ValueError):pass
@@ -32,5 +33,7 @@ class ReferenceIndex:
   names=[x.term.casefold() for x in ts]
   if len(set(names))!=len(names):raise AppendixError("duplicate normative term definition")
  def stale_references(self,current_digests):
+  if not isinstance(current_digests,Mapping):raise AppendixError("digest snapshot must be mapping")
+  for value in current_digests.values():_sha(value,"snapshot digest")
   return tuple(sorted(r.reference_id for r in self.references.values() if current_digests.get(r.canonical_path)!=r.canonical_digest))
  def resolve_term(self,term_id):return self.terms[_id(term_id,"term_id")]
