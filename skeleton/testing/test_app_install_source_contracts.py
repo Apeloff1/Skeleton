@@ -204,3 +204,42 @@ def test_docker_context_reports_bounded_errors(tmp_path):
     errors = build_source_errors(tmp_path)
     assert len(errors) <= 33
     assert "further build input defects suppressed" in errors
+
+
+
+def test_smoke_cli_refuses_unsafe_env_without_network(monkeypatch, tmp_path, capsys):
+    import json
+
+    from skeleton.app import cli
+
+    (tmp_path / ".env").write_bytes(b"A" * (256 * 1024 + 1))
+    monkeypatch.setattr(cli, "find_repo_root", lambda: tmp_path)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("unsafe .env must not cause a network health probe")
+
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", forbidden)
+    assert cli.run_app_cli(["smoke", "--json"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["code"] == "runtime_configuration_unavailable"
+    assert payload["results"] == []
+    assert "AAAA" not in repr(payload)
+
+
+def test_status_cli_returns_redacted_error_for_invalid_config(monkeypatch, tmp_path, capsys):
+    import json
+
+    from skeleton.app import cli
+    from skeleton.app.assembly import runtime_manifest
+
+    (tmp_path / ".env").write_bytes(b"B" * (256 * 1024 + 1))
+    monkeypatch.setattr(
+        cli, "runtime_manifest",
+        lambda *_args, **_kwargs: runtime_manifest(root=tmp_path, environ={}),
+    )
+    assert cli.run_app_cli(["status", "--json"]) == 2
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is False
+    assert report["code"] == "runtime_configuration_unavailable"
+    assert "BBBB" not in repr(report)
