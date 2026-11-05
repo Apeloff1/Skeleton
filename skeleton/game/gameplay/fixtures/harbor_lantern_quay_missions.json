@@ -1,0 +1,36 @@
+{
+  "schema": "skeleton.game.harbor.mission-board.v1",
+  "source_id": "lantern-quay",
+  "missions": [
+    {
+      "id": "salvage",
+      "requires": [],
+      "points": 10,
+      "deadline": 64,
+      "objectives": [
+        {"kind": "gather", "item": "wood", "count": 2},
+        {"kind": "gather", "item": "ore", "count": 1}
+      ]
+    },
+    {
+      "id": "workshop",
+      "requires": ["salvage"],
+      "points": 20,
+      "deadline": 96,
+      "objectives": [
+        {"kind": "craft", "recipe": "lantern", "count": 1},
+        {"kind": "craft", "recipe": "ration", "count": 1}
+      ]
+    },
+    {
+      "id": "dispatch",
+      "requires": ["workshop"],
+      "points": 30,
+      "deadline": 128,
+      "objectives": [
+        {"kind": "deliver"},
+        {"kind": "choose", "choice": "signal"}
+      ]
+    }
+  ]
+}
