@@ -92,6 +92,31 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(FakeEpoch.instances[0].calls, 2)
         self.assertEqual(self.db.calls, 6)
 
+    async def test_unbounded_replica_set_generation_denied_before_epoch(self):
+        # BSON int64 is the maximum representable generation. An arbitrary
+        # Python integer must not be treated as a Mongo election witness.
+        for invalid in (-1, True, 1 << 63, 1 << 128):
+            with self.subTest(value=repr(invalid)):
+                self.db.hello["setVersion"] = invalid
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+                self.assertEqual(FakeEpoch.instances, [])
+        self.db.hello.pop("setVersion")
+
+    async def test_unbounded_actor_epoch_is_not_a_readiness_observation(self):
+        class UnboundedEpoch(FakeEpoch):
+            async def read_epoch(self, **kwargs):
+                self.calls += 1
+                return 1 << 128
+
+        with patch("skeleton.app.compose_guarded_preflight.MongoCanonicalSourceEpoch",
+                   UnboundedEpoch):
+            result = await self.inspect()
+        self.assertEqual(result["code"], "canonical_actor_epoch_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_conflicting_primary_endpoints_denied_before_epoch(self):
         self.db.hello.update({"me": "mongo-a:27017", "primary": "mongo-b:27017"})
         result = await self.inspect()

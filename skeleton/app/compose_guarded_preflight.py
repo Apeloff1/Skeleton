@@ -136,7 +136,7 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
             return None
     values.append(election)
     version = hello.get("setVersion")
-    if version is not None and (type(version) is not int or version < 0):
+    if version is not None and (type(version) is not int or not 0 <= version < (1 << 63)):
         return None
     values.append(version)
     # A primary can retain its election identifier while its topology
@@ -221,7 +221,7 @@ async def inspect_compose_mongo_epoch(
                 tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
             )
         if (type(first_epoch) is not int or type(final_epoch) is not int
-                or first_epoch < 2 or first_epoch % 2
+                or not 2 <= first_epoch < (1 << 63) or first_epoch % 2
                 or final_epoch != first_epoch):
             return _result("canonical_actor_epoch_changed_during_preflight",
                            replica_set=True, authenticated=True)
