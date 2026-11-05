@@ -40,6 +40,9 @@ def test_runtime_status_aggregates_backend_engine_and_mongo(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", FakeDB())
     monkeypatch.setattr(runtime, "_probe_engine", fake_engine)
+    async def healthy_backend(_probe, _timeout):
+        return {"name": "backend", "ok": True, "status": 200, "latency_ms": 1, "detail": "healthy"}
+    monkeypatch.setattr(runtime, "_probe_backend", healthy_backend)
 
     monkeypatch.setattr(
         runtime,
@@ -126,6 +129,9 @@ def test_product_readiness_unavailable_never_reports_healthy(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", HealthyDB())
     monkeypatch.setattr(runtime, "_probe_engine", healthy_engine)
+    async def healthy_backend(_probe, _timeout):
+        return {"name": "backend", "ok": True, "status": 200, "latency_ms": 1, "detail": "healthy"}
+    monkeypatch.setattr(runtime, "_probe_backend", healthy_backend)
     monkeypatch.setattr(runtime, "public_readiness", unavailable_readiness)
 
     payload = asyncio.run(runtime._runtime_status(500))
@@ -134,6 +140,30 @@ def test_product_readiness_unavailable_never_reports_healthy(monkeypatch):
     assert payload["product"]["detail"] == "RuntimeError"
     assert payload["ok"] is False
     assert "readiness provider unavailable" not in json.dumps(payload)
+
+
+def test_runtime_status_refuses_missing_or_unready_backend_probe(monkeypatch):
+    runtime = _runtime_module()
+    async def healthy_engine(_timeout):
+        return {"name": "skeleton", "ok": True, "status": 200, "latency_ms": 1, "detail": "healthy"}
+    class HealthyDB:
+        async def command(self, _name):
+            return {"ok": 1}
+    async def unavailable_backend():
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content={"status": "not_ready"})
+    async def healthy_backend():
+        return {"status": "ready"}
+
+    monkeypatch.setattr(runtime, "_probe_engine", healthy_engine)
+    monkeypatch.setattr(runtime, "core_db", HealthyDB())
+    monkeypatch.setattr(runtime, "public_readiness", lambda: {})
+    missing = asyncio.run(runtime._collect_runtime_status(500))
+    failed = asyncio.run(runtime._collect_runtime_status(500, readiness_probe=unavailable_backend))
+    ready = asyncio.run(runtime._collect_runtime_status(500, readiness_probe=healthy_backend))
+    assert missing["ok"] is False and missing["services"][0]["ok"] is False
+    assert failed["ok"] is False and failed["services"][0]["ok"] is False
+    assert ready["ok"] is True and ready["services"][0]["ok"] is True
 
 
 def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):

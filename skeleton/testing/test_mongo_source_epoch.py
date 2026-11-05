@@ -22,7 +22,7 @@ class Collection:
             self.records[record["_id"]] = dict(record)
         return SimpleNamespace(inserted_id=record["_id"])
 
-    async def find_one(self, query):
+    async def find_one(self, query, **kwargs):
         async with self.lock:
             record = self.records.get(query["_id"])
             if record is None or any(record.get(k) != v for k, v in query.items()):
@@ -44,11 +44,17 @@ class Database:
     def __init__(self):
         self.collection = Collection()
         self.received = None
+        self.concerns = []
 
-    def get_collection(self, name, *, read_concern, write_concern):
+    def get_collection(self, name, *, read_concern, read_preference, write_concern=None):
         assert name == "canonical_source_epochs"
-        assert read_concern.level == "majority"
-        assert write_concern.document.get("w") == "majority"
+        assert read_preference.name == "Primary"
+        self.concerns.append(read_concern.level)
+        if read_concern.level == "majority":
+            assert write_concern.document.get("w") == "majority"
+        else:
+            assert read_concern.level == "linearizable"
+            assert write_concern is None
         self.received = True
         return self.collection
 
@@ -79,6 +85,130 @@ async def test_durable_writer_epoch_requires_operator_migration_and_is_monotonic
             with pytest.raises(MongoSourceEpochError):
                 await read(owner)
     assert await read(owner) == 6
+
+
+@pytest.mark.asyncio
+async def test_epoch_reader_uses_linearizable_primary_and_a_server_deadline():
+    database = Database()
+    owner = MongoCanonicalSourceEpoch(database)
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    original = database.collection.find_one
+    options = []
+    async def observed(query, **kwargs):
+        options.append(kwargs)
+        return await original(query, **kwargs)
+    database.collection.find_one = observed
+    assert await read(owner) == 2
+    assert database.concerns == ["majority", "linearizable"]
+    assert options == [{"max_time_ms": 2000}]
+
+
+@pytest.mark.asyncio
+async def test_linearizable_read_unavailable_fails_closed_without_weak_fallback():
+    database = Database()
+    owner = MongoCanonicalSourceEpoch(database)
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    async def unavailable(*args, **kwargs):
+        raise RuntimeError("private Mongo connection details")
+    database.collection.find_one = unavailable
+    with pytest.raises(MongoSourceEpochError, match="linearizable source epoch read unavailable") as error:
+        await read(owner)
+    assert "private Mongo connection details" not in str(error.value)
+
+
+@pytest.mark.asyncio
+async def test_linearizable_read_deadline_fails_closed(monkeypatch):
+    import skeleton.persistence.mongo_source_epoch as source_epoch
+
+    database = Database()
+    owner = MongoCanonicalSourceEpoch(database)
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    entered = asyncio.Event()
+    async def stalled(*args, **kwargs):
+        entered.set()
+        await asyncio.Event().wait()
+    monkeypatch.setattr(source_epoch, "_EPOCH_READ_DEADLINE_SECONDS", 0.01)
+    database.collection.find_one = stalled
+    with pytest.raises(MongoSourceEpochError, match="linearizable source epoch read unavailable"):
+        await read(owner)
+    assert entered.is_set()
+
+
+@pytest.mark.asyncio
+async def test_independent_owner_instances_observe_the_same_inflight_writer():
+    database = Database()
+    conversation_owner = MongoCanonicalSourceEpoch(database)
+    memory_owner = MongoCanonicalSourceEpoch(database)
+    await conversation_owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    async with conversation_owner.writer(tenant_id="tenant", actor_id="actor"):
+        with pytest.raises(MongoSourceEpochError, match="writing"):
+            await read(memory_owner)
+        with pytest.raises(MongoSourceEpochError):
+            async with memory_owner.writer(tenant_id="tenant", actor_id="actor"):
+                pass
+    assert await read(memory_owner) == 4
+
+
+@pytest.mark.asyncio
+async def test_stale_majority_snapshot_cannot_hide_an_active_writer():
+    class LaggingDatabase(Database):
+        def __init__(self):
+            super().__init__()
+            self.live_find = self.collection.find_one
+            self.stale = None
+
+            async def stale_majority(query, **kwargs):
+                return dict(self.stale) if self.stale is not None else None
+
+            self.collection.find_one = stale_majority
+
+        def get_collection(self, name, **kwargs):
+            collection = super().get_collection(name, **kwargs)
+            if kwargs["read_concern"].level == "linearizable":
+                return SimpleNamespace(find_one=self.live_find)
+            return collection
+
+    database = LaggingDatabase()
+    owner = MongoCanonicalSourceEpoch(database)
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    database.stale = dict(next(iter(database.collection.records.values())))
+    async with owner.writer(tenant_id="tenant", actor_id="actor"):
+        # A legal stale majority read still advertises STABLE at epoch 2.
+        assert (await database.collection.find_one({}))["epoch"] == 2
+        with pytest.raises(MongoSourceEpochError, match="writing"):
+            await read(owner)
+    assert await read(owner) == 4
+    assert (await database.collection.find_one({}))["epoch"] == 2
+
+
+@pytest.mark.asyncio
+async def test_epoch_read_cancellation_preserves_task_custody():
+    database = Database()
+    owner = MongoCanonicalSourceEpoch(database)
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    entered = asyncio.Event()
+    observed = []
+
+    async def stalled(*args, **kwargs):
+        observed.append(asyncio.current_task())
+        entered.set()
+        await asyncio.Event().wait()
+
+    database.collection.find_one = stalled
+    task = asyncio.create_task(read(owner))
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    assert observed == [task]
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+@pytest.mark.parametrize("tenant,actor", [
+    ("a\0b", "c"), ("a", "b\0c"), ("\ud800", "actor"),
+])
+def test_epoch_identity_rejects_delimiter_and_invalid_unicode(tenant, actor):
+    with pytest.raises(MongoSourceEpochError, match="identity invalid"):
+        MongoCanonicalSourceEpoch._key(tenant, actor)
 
 
 @pytest.mark.asyncio
