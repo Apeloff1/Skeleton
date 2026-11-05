@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "chunk_partition",
+  "id": "25_no_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "chunk_partition",
+    "category": "retrieval",
+    "source_role": "retrieval",
+    "retrieval_mode": "lexical",
+    "context_limit": 7168,
+    "byte_limit": 77824,
+    "latency_ms": 46000,
+    "min_evidence": 2,
+    "priority": 11,
+    "rank_lexical": 0.6,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.1,
+    "operations": []
+  },
+  "risk": "Refuse no operations",
+  "native_e2e": false,
+  "release_certified": false
+}
