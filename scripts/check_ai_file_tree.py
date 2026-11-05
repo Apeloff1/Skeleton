@@ -96,9 +96,17 @@ def _python_semantically_equal(source: Path, destination: Path) -> bool:
 def _content_equivalent(source: Path, destination: Path) -> bool:
     # Digest equality alone is not a syntax check: two mirrored invalid Python
     # files can have identical bytes and previously passed the parity gate.
+    digest_equal = _digest(source) == _digest(destination)
     if source.suffix == ".py" and destination.suffix == ".py":
+        if digest_equal:
+            # Equal bytes need one syntax parse, not two full AST comparisons.
+            try:
+                ast.parse(source.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, SyntaxError):
+                return False
+            return True
         return _python_semantically_equal(source, destination)
-    return _digest(source) == _digest(destination)
+    return digest_equal
 
 
 def _display_path(path: Path) -> str:
