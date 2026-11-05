@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "embedding_search",
+  "id": "25_no_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "embedding_search",
+    "category": "retrieval",
+    "source_role": "retrieval",
+    "retrieval_mode": "dense",
+    "context_limit": 4608,
+    "byte_limit": 67584,
+    "latency_ms": 41000,
+    "min_evidence": 3,
+    "priority": 6,
+    "rank_lexical": 0.6,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.1,
+    "operations": []
+  },
+  "risk": "Refuse no operations",
+  "native_e2e": false,
+  "release_certified": false
+}
