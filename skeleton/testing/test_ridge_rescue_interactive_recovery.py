@@ -15,15 +15,15 @@ def test_menu_export_then_restart_keeps_authoritative_head(tmp_path):
     store = SlotStore(root)
     first = store.new("adventure")
     messages = []
-    state = play(store, "adventure", read=iter(("e", "q")).__next__,
+    commands = iter(("e", "q"))
+    state = play(store, "adventure", read=lambda _: next(commands),
                  write=messages.append, ascii_mode=True)
     assert state["head"] == first["head"]
     assert state["revision"] == first["revision"]
     assert any("Exported:" in message for message in messages)
-    exported = list(root.rglob("*.json"))
+    exported = list((root / "exports").glob("*.json"))
     valid = [verify_export(path.read_bytes()) for path in exported
-             if path.is_file() and path.stat().st_size > 0
-             and "export" in path.name.lower()]
+             if path.is_file() and path.stat().st_size > 0]
     assert any(bundle["head"] == first["head"] for bundle in valid)
     resumed = play(SlotStore(root), "adventure", read=lambda _: "q",
                    write=messages.append, ascii_mode=True)
