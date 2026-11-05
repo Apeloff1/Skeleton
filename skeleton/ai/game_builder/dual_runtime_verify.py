@@ -32,6 +32,18 @@ _REQUIRED = frozenset({
 })
 
 
+_STUDIO_REQUIRED = frozenset({
+    "studio/pipeline.json",
+    "studio/jeeves_dragon_tools.json",
+    "studio/executed_tool_receipts.json",
+    "studio/mirror_room.json",
+    "studio/consumer_gate.json",
+    "studio/companion_mirror_room.json",
+    "studio/companion_almanac.json",
+    "studio/companion_practice.json",
+})
+
+
 class DualRuntimeVerificationError(ValueError):
     """A published package is untrusted, inconsistent, or unsupported."""
 
@@ -344,16 +356,6 @@ def verify_exported_package(
         # Studio export is a separately named, metadata-augmented canonical
         # source package. Do not accept an empty label upgrade that omits the
         # original independent mirror/consumer evidence.
-        studio_required = frozenset({
-            "studio/pipeline.json",
-            "studio/jeeves_dragon_tools.json",
-            "studio/executed_tool_receipts.json",
-            "studio/mirror_room.json",
-            "studio/consumer_gate.json",
-            "studio/companion_mirror_room.json",
-            "studio/companion_almanac.json",
-            "studio/companion_practice.json",
-        })
         studio = schema == "skeleton.game_builder.studio_package.v1"
         digest = manifest.get("manifest_digest")
         body = {key: value for key, value in manifest.items()
@@ -370,7 +372,7 @@ def verify_exported_package(
         expected = set(declared) | {"release.json"}
         if not _REQUIRED <= expected or "release.json" in declared:
             raise DualRuntimeVerificationError("missing required game source")
-        if studio and not studio_required <= expected:
+        if studio and not _STUDIO_REQUIRED <= expected:
             raise DualRuntimeVerificationError("studio package lacks canonical evidence")
         if not studio and any(path.startswith("studio/") for path in declared):
             raise DualRuntimeVerificationError("studio evidence requires studio package schema")
