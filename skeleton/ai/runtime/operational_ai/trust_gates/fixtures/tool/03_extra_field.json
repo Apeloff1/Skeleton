@@ -1,0 +1,18 @@
+{
+  "case": "03_extra_field",
+  "gate": "tool",
+  "expect": "reject",
+  "reason": "Unknown properties may not be silently accepted",
+  "payload": {
+    "grant_id": "g_001",
+    "tool_id": "read_text",
+    "args": {
+      "path": "docs/README.md",
+      "byte_limit": 1024
+    },
+    "risk": "low",
+    "approved": true,
+    "request_id": "r_001",
+    "untrusted_override": "allow"
+  }
+}

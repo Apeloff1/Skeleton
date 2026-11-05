@@ -1,0 +1,16 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "replay",
+  "expect": "reject",
+  "reason": "Replay is model-epoch pinned",
+  "payload": {
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_model_sha": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "request_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stored_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "revision": 1,
+    "replayed": true,
+    "has_generation": false
+  }
+}

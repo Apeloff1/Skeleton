@@ -1,0 +1,26 @@
+{
+  "schema": "skeleton.game.harbor.salvage-story-board.v1",
+  "source_id": "lantern-quay",
+  "quests": [
+    {
+      "id": "discover_skiff", "kind": "recover", "target": "wrecked_skiff",
+      "requires": [], "reward": 2, "story": "skiff_discovered"
+    },
+    {
+      "id": "discover_cache", "kind": "recover", "target": "tide_cache",
+      "requires": ["discover_skiff"], "reward": 3, "story": "cache_discovered"
+    },
+    {
+      "id": "secure_manifest", "kind": "secure", "target": "tide_cache",
+      "requires": ["discover_cache"], "reward": 5, "story": "manifest_secured"
+    },
+    {
+      "id": "deliver_supplies", "kind": "deliver", "target": null,
+      "requires": ["secure_manifest"], "reward": 4, "story": "supplies_delivered"
+    },
+    {
+      "id": "rescue_signal", "kind": "rescue", "target": null,
+      "requires": ["deliver_supplies"], "reward": 8, "story": "harbor_restored"
+    }
+  ]
+}

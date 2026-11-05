@@ -7,6 +7,7 @@ from typing import Mapping
 import math
 import time
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
@@ -80,6 +81,78 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             detail=f"{type(exc).__name__}: health endpoint unreachable",
         )
 
+
+
+def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeResult:
+    """Probe the installed setup route without redirects or ambient proxies.
+
+    Unlike a generic health probe, this is a browser-admission boundary:
+    a local 302 must never cause a second request to an attacker-controlled
+    URL. Only a direct 2xx response from the declared local origin counts.
+    """
+    from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
+
+    if not math.isfinite(timeout) or not 0 < timeout <= 10:
+        raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
+    # Reject invalid targets here as well as in the Windows launcher, so a
+    # future caller cannot accidentally turn this local probe into an SSRF.
+    try:
+        parts = urlsplit(service.public_url)
+        local = (
+            parts.scheme == "http"
+            and parts.hostname in {"localhost", "127.0.0.1", "::1"}
+            and parts.port is not None
+            and 1 <= parts.port <= 65535
+            and parts.username is None
+            and parts.password is None
+            and parts.path in {"", "/"}
+            and not parts.query
+            and not parts.fragment
+        )
+    except ValueError:
+        local = False
+    if not local or service.health_path != "/setup":
+        return ProbeResult(
+            service=service.name, url="", ok=False, status=None,
+            detail="setup probe requires a local HTTP origin and exact /setup route",
+        )
+    url = service.public_url.rstrip("/") + "/setup"
+
+    class RejectRedirect(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            return None
+
+    opener = build_opener(ProxyHandler({}), RejectRedirect())
+    request = Request(url, headers={"User-Agent": "skeleton-setup-probe/1"})
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            status = int(getattr(response, "status", 200))
+            effective = response.geturl()
+            content_type = response.headers.get_content_type().lower()
+            sample = response.read(512)
+        # A local port can be occupied by a different process that returns
+        # HTTP 200. Only an HTML document may admit the setup browser, never
+        # a JSON health response or empty generic success payload.
+        html_document = (
+            content_type == "text/html"
+            and sample.lstrip().lower().startswith(b"<!doctype html")
+        )
+        ok = 200 <= status < 300 and effective == url and html_document
+        return ProbeResult(
+            service=service.name, url=url, ok=ok, status=status,
+            detail="healthy" if ok else "setup endpoint did not answer directly",
+        )
+    except HTTPError as exc:
+        status = int(exc.code)
+        return ProbeResult(
+            service=service.name, url=url, ok=False, status=status,
+            detail="health endpoint redirected" if 300 <= status < 400 else f"HTTP error {status}",
+        )
+    except (URLError, TimeoutError, OSError) as exc:
+        return ProbeResult(
+            service=service.name, url=url, ok=False, status=None,
+            detail=f"{type(exc).__name__}: setup endpoint unreachable",
+        )
 
 def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one declared public HTTP service."""

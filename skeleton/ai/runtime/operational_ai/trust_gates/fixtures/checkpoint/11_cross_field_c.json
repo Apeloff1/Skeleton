@@ -1,0 +1,16 @@
+{
+  "case": "11_cross_field_c",
+  "gate": "checkpoint",
+  "expect": "reject",
+  "reason": "Model/tokenizer digests are nonzero",
+  "payload": {
+    "model_id": "local-gguf",
+    "model_sha": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "gguf-v3",
+    "bytes": 5000,
+    "max_bytes": 100000000,
+    "step": 1,
+    "approved": true
+  }
+}

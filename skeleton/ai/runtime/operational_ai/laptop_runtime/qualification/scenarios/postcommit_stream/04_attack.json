@@ -1,0 +1,20 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "04_attack",
+  "domain": "postcommit_stream",
+  "expected": "reject",
+  "payload": {
+    "receipt": {
+      "replayed": false,
+      "text": "hello",
+      "output_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "chunk_bytes": 4,
+    "max_chunks": 8
+  },
+  "reason": "Refuse adversarial postcommit_stream variant 4",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational postcommit_stream contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

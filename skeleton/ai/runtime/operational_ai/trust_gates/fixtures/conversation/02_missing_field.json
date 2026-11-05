@@ -1,0 +1,21 @@
+{
+  "case": "02_missing_field",
+  "gate": "conversation",
+  "expect": "reject",
+  "reason": "Unknown defaults may not grant authority",
+  "payload": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "Reply safely."
+      },
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "max_bytes": 32768,
+    "revision": 1,
+    "final_role": "user"
+  }
+}

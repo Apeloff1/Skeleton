@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "task_decompose",
+  "id": "25_no_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "task_decompose",
+    "category": "orchestration",
+    "source_role": "user",
+    "retrieval_mode": "lexical",
+    "context_limit": 8192,
+    "byte_limit": 65536,
+    "latency_ms": 30000,
+    "min_evidence": 2,
+    "priority": 5,
+    "rank_lexical": 0.6,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.1,
+    "operations": []
+  },
+  "risk": "Refuse no operations",
+  "native_e2e": false,
+  "release_certified": false
+}

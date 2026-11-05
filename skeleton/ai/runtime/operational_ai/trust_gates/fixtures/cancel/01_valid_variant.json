@@ -1,0 +1,15 @@
+{
+  "case": "01_valid_variant",
+  "gate": "cancel",
+  "expect": "accept",
+  "reason": "Alternative permitted operation",
+  "payload": {
+    "request_id": "req_001",
+    "state": "cancelled",
+    "now_ns": 1000000,
+    "deadline_ns": 2000000,
+    "generated_tokens": 0,
+    "acked": true,
+    "backend_active": false
+  }
+}

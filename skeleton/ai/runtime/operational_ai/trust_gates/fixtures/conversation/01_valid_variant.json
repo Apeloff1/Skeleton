@@ -1,0 +1,30 @@
+{
+  "case": "01_valid_variant",
+  "gate": "conversation",
+  "expect": "accept",
+  "reason": "Alternative legitimate operation",
+  "payload": {
+    "session_id": "chat_001",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Reply safely."
+      },
+      {
+        "role": "user",
+        "content": "Hello"
+      },
+      {
+        "role": "assistant",
+        "content": "Hi"
+      },
+      {
+        "role": "user",
+        "content": "Next"
+      }
+    ],
+    "max_bytes": 32768,
+    "revision": 1,
+    "final_role": "user"
+  }
+}
