@@ -41,3 +41,29 @@ def test_latest_skips_prerelease_by_default():
     assert str(latest(["1.0.0", "1.1.0-rc.1", "0.9.0"])) == "1.0.0"
     assert str(latest(["1.0.0", "1.1.0-rc.1"], include_prerelease=True)) == "1.1.0-rc.1"
     assert latest([]) is None
+
+def test_versions_reject_unbounded_and_direct_invalid_shapes():
+    for raw in ("1" * 300 + ".0.0", "1.0.0-" + "a" * 300):
+        with pytest.raises(DeliveryError):
+            Version.parse(raw)
+    with pytest.raises(DeliveryError, match="bounded integers"):
+        Version(True, 0, 0)
+    with pytest.raises(DeliveryError, match="bounded integers"):
+        Version(-1, 0, 0)
+    with pytest.raises(DeliveryError, match="identifiers"):
+        Version(1, 0, 0, ("bad space",))
+    with pytest.raises(DeliveryError, match="prerelease label"):
+        Version.parse("1.0.0").bump("prerelease", pre_label="a" * 100)
+    with pytest.raises(DeliveryError, match="inventory exceeds"):
+        latest(["1.0.0"] * 8193)
+
+
+def test_direct_versions_cannot_bypass_canonical_prerelease_and_text_bounds():
+    from skeleton.ai.build.core.delivery import version as mirrored
+
+    for version_type in (Version, mirrored.Version):
+        with pytest.raises(DeliveryError, match="leading zeros"):
+            version_type(1, 0, 0, ("01",))
+        with pytest.raises(DeliveryError, match="version text exceeds"):
+            version_type(1, 0, 0, tuple("a" * 64 for _ in range(5)))
+        assert str(version_type(1, 0, 0, ("rc", "1"))) == "1.0.0-rc.1"
