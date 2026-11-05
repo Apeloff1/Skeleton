@@ -37,8 +37,14 @@ def _strict_action_json(payload: str) -> dict:
     def reject_constant(value: str) -> None:
         raise ValueError("non-finite action JSON number: " + value)
 
+    def finite_float(value: str) -> float:
+        number = float(value)
+        if not __import__("math").isfinite(number):
+            raise ValueError("non-finite action JSON number: " + value)
+        return number
+
     action = json.loads(payload, object_pairs_hook=unique_pairs,
-                        parse_constant=reject_constant)
+                        parse_constant=reject_constant, parse_float=finite_float)
     if not isinstance(action, dict):
         raise ValueError("action JSON must be an object")
     return action
