@@ -11,6 +11,7 @@ from __future__ import annotations
 import gzip
 import io
 import stat
+import struct
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -162,11 +163,51 @@ def list_tarball(data: bytes) -> dict[str, bytes]:
     return out
 
 
+def _preflight_zip_index(data: bytes | bytearray) -> None:
+    """Bound and validate the central directory before ZipFile indexes it.
+
+    ZipFile eagerly builds a list of every directory member at construction.
+    Checking len(infolist()) afterward is too late for hostile entry counts.
+    ZIP64 and multidisk archives are outside this bounded release format.
+    """
+    signature = bytes((80, 75, 5, 6))
+    start = max(0, len(data) - 22 - 65535)
+    eocd = data.rfind(signature, start)
+    while eocd >= start:
+        if eocd + 22 <= len(data):
+            fields = struct.unpack_from("<HHHHIIH", data, eocd + 4)
+            if eocd + 22 + fields[-1] == len(data):
+                break
+        eocd = data.rfind(signature, start, eocd)
+    if eocd < start:
+        raise DeliveryError("zip end-of-directory record invalid")
+    disk, cd_disk, disk_count, count, size, offset, _ = fields
+    if (disk or cd_disk or disk_count != count or count == 0xFFFF
+            or size == 0xFFFFFFFF or offset == 0xFFFFFFFF):
+        raise DeliveryError("zip central directory format unsupported")
+    if count > MAX_PACKAGE_FILES:
+        raise DeliveryError("zip member count exceeds bound")
+    cursor = eocd - size
+    if cursor < offset or cursor < 0:
+        raise DeliveryError("zip central directory bounds invalid")
+    for _ in range(count):
+        if cursor + 46 > eocd or data[cursor:cursor + 4] != bytes((80, 75, 1, 2)):
+            raise DeliveryError("zip central directory member framing invalid")
+        name_len, extra_len, comment_len = struct.unpack_from("<HHH", data, cursor + 28)
+        cursor += 46 + name_len + extra_len + comment_len
+        if cursor > eocd:
+            raise DeliveryError("zip central directory member exceeds bounds")
+    if cursor != eocd:
+        raise DeliveryError("zip central directory member count mismatch")
+
+
 def list_zip(data: bytes) -> dict[str, bytes]:
     """Reject duplicate, aliased, nonregular or oversized ZIP members."""
     out: dict[str, bytes] = {}
     total = 0
-    with zipfile.ZipFile(_archive_input(data)) as zf:
+    archive = _archive_input(data)
+    _preflight_zip_index(data)
+    with zipfile.ZipFile(archive) as zf:
         infos = zf.infolist()
         if len(infos) > MAX_PACKAGE_FILES:
             raise DeliveryError("zip member count exceeds bound")

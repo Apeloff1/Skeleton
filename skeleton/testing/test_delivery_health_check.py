@@ -77,3 +77,69 @@ def test_latency_and_status_evidence_must_be_bounded_integers():
     for status in (True, 200.0, "200", 600):
         report = evaluate([LIVE], [O("liveness", "r1", status, 1)], replicas=("r1",))
         assert report.verdict == "unhealthy"
+
+def test_health_observation_and_inventory_limits_fail_closed():
+    from itertools import repeat
+    from skeleton.build.delivery.health_check import (
+        MAX_HEALTH_OBSERVATIONS, MAX_HEALTH_PROBES, MAX_HEALTH_REPLICAS,
+        MAX_OBSERVATION_BODY_CHARS,
+    )
+
+    with pytest.raises(DeliveryError, match="observation count exceeds"):
+        evaluate([LIVE], repeat(O("liveness", "r1", 200, 1),
+                                MAX_HEALTH_OBSERVATIONS + 1), replicas=("r1",))
+    with pytest.raises(DeliveryError, match="invalid health observation"):
+        evaluate([LIVE], [object()], replicas=("r1",))
+    with pytest.raises(DeliveryError, match="body exceeds bound"):
+        evaluate([LIVE], [O("liveness", "r1", 200, 1,
+                            body="x" * (MAX_OBSERVATION_BODY_CHARS + 1))],
+                 replicas=("r1",))
+    with pytest.raises(DeliveryError, match="probe count exceeds"):
+        evaluate([ProbeSpec(f"p{i}", "/health") for i in range(MAX_HEALTH_PROBES + 1)],
+                 [], replicas=("r1",))
+    with pytest.raises(DeliveryError, match="replica count exceeds"):
+        evaluate([LIVE], [], replicas=tuple(
+            f"r{i}" for i in range(MAX_HEALTH_REPLICAS + 1)))
+
+
+def test_probe_spec_and_config_reject_coerced_security_evidence():
+    from skeleton.ai.build.core.delivery import health_check as mirrored
+
+    for module in (None, mirrored):
+        spec = ProbeSpec if module is None else module.ProbeSpec
+        parse = specs_from_config if module is None else module.specs_from_config
+        for bad in ("//other-host/health", "/../admin", "/health?token=x", "/health#ok", "/health\\\\admin"):
+            with pytest.raises(DeliveryError, match="unsafe probe path"):
+                spec("probe", bad)
+        for bad in (True, 200.0, "200"):
+            with pytest.raises(DeliveryError, match="expect_status"):
+                spec("probe", "/health", expect_status=(bad,))
+        for bad in (True, "100", 100.0):
+            with pytest.raises(DeliveryError, match="max_latency"):
+                parse({"path": "/health", "max_latency_ms": bad})
+        with pytest.raises(DeliveryError, match="required probe flag"):
+            parse({"path": "/health", "probes": [
+                {"id": "ready", "path": "/ready", "required": "false"}
+            ]})
+        with pytest.raises(DeliveryError, match="inventory exceeds"):
+            parse({"path": "/health", "probes": [
+                {"id": f"p{i}", "path": "/health"} for i in range(256)
+            ]})
+
+
+def test_health_adapter_error_is_redacted_from_release_evidence():
+    from skeleton.ai.build.core.delivery import health_check as mirrored
+
+    for module in (None, mirrored):
+        evaluate_fn = evaluate if module is None else module.evaluate
+        obs_type = O if module is None else module.ProbeObservation
+        spec_type = ProbeSpec if module is None else module.ProbeSpec
+        secret = "private-adapter-credential"
+        report = evaluate_fn(
+            [spec_type("liveness", "/health")],
+            [obs_type("liveness", "r1", None, None, error=secret)],
+            replicas=("r1",),
+        )
+        assert report.verdict == "unhealthy"
+        assert report.results[0].reason == "probe-error"
+        assert secret not in repr(report)

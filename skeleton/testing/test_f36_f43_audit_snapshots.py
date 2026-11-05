@@ -132,6 +132,7 @@ def test_env_flag_audit_locks_own_and_seal_names(monkeypatch) -> None:
         "SKELETON_OMNIFABRIC_API",
         "GF_SEAL_SECRET",
         "GF_SEAL_KEYRING",
+        "GF_SEAL_LEGACY",
         "SKELETON_OWN",
         "SKELETON_JEEVES_BOOTSTRAP",
     ]

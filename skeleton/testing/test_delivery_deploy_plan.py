@@ -56,3 +56,34 @@ def test_rejections():
         compile_plan(_manifest(), _env({"strategy": "canary", "stages": [10, 50]}))
     with pytest.raises(DeliveryError, match="prerelease"):
         compile_plan(_manifest("1.0.0-rc.1"), _env({"strategy": "blue-green"}, tier="production"))
+
+def test_deploy_plan_rejects_noncanonical_bake_and_forged_strategy():
+    from dataclasses import replace
+
+    for bad in (-1, True, False, 1.5, "30", 86401):
+        with pytest.raises(DeliveryError, match="bake_seconds"):
+            compile_plan(_manifest(), _env({"strategy": "rolling", "bake_seconds": bad}))
+    good = _env({"strategy": "rolling"})
+    forged = replace(good, values={**good.values, "rollout": {"strategy": "unknown"}})
+    with pytest.raises(DeliveryError, match="unknown rollout"):
+        compile_plan(_manifest(), forged)
+    forged = replace(good, values={**good.values, "replicas": True})
+    with pytest.raises(DeliveryError, match="replica count"):
+        compile_plan(_manifest(), forged)
+
+
+def test_deploy_plan_rejects_forged_config_digest_and_unknown_tier():
+    from dataclasses import replace
+    from skeleton.ai.build.core.delivery import deploy_plan as mirrored
+    from skeleton.build.delivery._util import sha256_json
+
+    good = _env({"strategy": "rolling"})
+    for compile_fn in (compile_plan, mirrored.compile_plan):
+        changed = replace(good, values={**good.values, "replicas": 3})
+        with pytest.raises(DeliveryError, match="config digest mismatch"):
+            compile_fn(_manifest(), changed)
+        unknown_values = {**good.values, "tier": "production-shadow"}
+        unknown = replace(good, values=unknown_values, digest=sha256_json(unknown_values))
+        with pytest.raises(DeliveryError, match="unknown deployment tier"):
+            compile_fn(_manifest(), unknown)
+        assert compile_fn(_manifest(), good).config_digest == good.digest

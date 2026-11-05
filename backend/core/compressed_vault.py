@@ -21,6 +21,7 @@ import io
 import json
 import time
 import hashlib
+import tempfile
 import threading
 import re
 from pathlib import Path
@@ -76,9 +77,9 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
-        test_file = p / ".writable_test"
-        test_file.write_text("ok")
-        test_file.unlink(missing_ok=True)
+        with tempfile.NamedTemporaryFile(prefix=".health-probe-", dir=p) as probe:
+            probe.write(b"ok")
+            probe.flush()
         return p
     except Exception:
         fp = Path(fallback)

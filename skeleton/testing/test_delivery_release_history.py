@@ -43,3 +43,52 @@ def test_rejects_bad_records():
         h.record(release_id="r", manifest_digest=M1, config_digest=C, outcome="deployed", recorded_at=5)
     with pytest.raises(DeliveryError):
         ReleaseHistory("Bad Name")
+
+def test_rehydration_rejects_semantically_invalid_but_rehashed_records():
+    from skeleton.build.delivery._util import sha256_json
+
+    baseline = _history().to_list()
+    for field, value in (
+        ("recorded_at", -1), ("outcome", "trusted"),
+        ("manifest_digest", "not-a-digest"), ("release_id", "../escape"),
+        ("sequence", True), ("config_digest", None),
+    ):
+        record = dict(baseline[0])
+        record[field] = value
+        record["digest"] = sha256_json({k: v for k, v in record.items() if k != "digest"})
+        with pytest.raises(DeliveryError):
+            ReleaseHistory.from_list("production", [record])
+    with pytest.raises(DeliveryError, match="missing required"):
+        ReleaseHistory.from_list("production", [{"sequence": 0}])
+
+
+def test_release_history_import_is_bounded_before_materializing():
+    from skeleton.build.delivery import release_history as module
+    original = module.MAX_RELEASE_RECORDS
+    module.MAX_RELEASE_RECORDS = 1
+    try:
+        history = ReleaseHistory("production")
+        history.record(release_id="r1", manifest_digest=M1, config_digest=C,
+                       outcome="deployed", recorded_at=10)
+        with pytest.raises(DeliveryError, match="record count exceeds"):
+            history.record(release_id="r2", manifest_digest=M2, config_digest=C,
+                           outcome="deployed", recorded_at=20)
+    finally:
+        module.MAX_RELEASE_RECORDS = original
+
+
+def test_release_history_requires_explicit_digest_and_rejects_extra_fields():
+    from skeleton.ai.build.core.delivery import release_history as mirrored
+
+    items = _history().to_list()
+    for history_type in (ReleaseHistory, mirrored.ReleaseHistory):
+        missing = [dict(items[0])]
+        missing[0].pop("digest")
+        with pytest.raises(DeliveryError, match="digest required"):
+            history_type.from_list("production", missing)
+
+        extra = [dict(items[0], verified=True)]
+        with pytest.raises(DeliveryError, match="unknown fields"):
+            history_type.from_list("production", extra)
+
+        assert history_type.from_list("production", items).head == _history().head
