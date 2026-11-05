@@ -8,12 +8,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+import unicodedata
 from typing import Any, Mapping, Union
 
 from .plurals import PLURAL_CATEGORIES, categories_for, is_rtl, plural_category, wrap_bidi
 
 MAX_MESSAGE = 4096
 MAX_DEPTH = 6
+MAX_RENDERED_CHARS = 65_536
+MAX_ARG_CHARS = 1_024
 
 
 class MessageError(ValueError):
@@ -198,33 +202,57 @@ def format_message(text: str, args: Mapping[str, Any], locale: str, *, isolate: 
     """Render ``text`` for ``locale``. ``isolate`` wraps values in bidi isolates."""
     rtl = is_rtl(locale)
 
+    def safe_arg(v: Any) -> str:
+        if type(v) not in (str, int, float, bool):
+            raise MessageError("unsupported message argument type")
+        if type(v) is int and abs(v) > 10**12:
+            raise MessageError("message numeric argument exceeds bound")
+        if type(v) is float and (not math.isfinite(v) or abs(v) > 10**12):
+            raise MessageError("message numeric argument must be bounded and finite")
+        value = str(v)
+        if len(value) > MAX_ARG_CHARS:
+            raise MessageError("message argument exceeds text bound")
+        if any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} for ch in value):
+            raise MessageError("message argument contains unsafe control characters")
+        return value
+
     def val(v: Any) -> str:
-        s = str(v)
-        return wrap_bidi(s) if isolate or (rtl and s.isascii() and s.strip()) else s
+        value = safe_arg(v)
+        return wrap_bidi(value) if isolate or (rtl and value.isascii() and value.strip()) else value
 
     def render(nodes, number=None) -> str:
         out: list[str] = []
+        rendered_chars = 0
+
+        def append_bounded(piece: str) -> None:
+            nonlocal rendered_chars
+            rendered_chars += len(piece)
+            if rendered_chars > MAX_RENDERED_CHARS:
+                raise MessageError("rendered message exceeds output bound")
+            out.append(piece)
+
         for n in nodes:
             if isinstance(n, str):
-                out.append(n)
+                append_bounded(n)
             elif isinstance(n, Hash):
-                out.append(str(number))
+                append_bounded(str(number))
             elif isinstance(n, Arg):
                 if n.name not in args:
                     raise MessageError(f"missing argument {n.name!r}")
-                out.append(val(args[n.name]))
+                append_bounded(val(args[n.name]))
             else:
                 if n.name not in args:
                     raise MessageError(f"missing argument {n.name!r}")
                 v = args[n.name]
                 if n.kind == "plural":
-                    if isinstance(v, bool) or not isinstance(v, int | float):
-                        raise MessageError(f"plural argument {n.name!r} must be a number")
+                    if (isinstance(v, bool) or not isinstance(v, int | float)
+                            or abs(v) > 10**12 or not math.isfinite(v)):
+                        raise MessageError(f"plural argument {n.name!r} must be a bounded finite number")
                     exact = f"={v}" if float(v).is_integer() else None
                     key = exact if exact in n.options else plural_category(locale, v)
-                    out.append(render(n.options.get(key, n.options["other"]), v))
+                    append_bounded(render(n.options.get(key, n.options["other"]), v))
                 else:
-                    out.append(render(n.options.get(str(v), n.options["other"]), number))
+                    append_bounded(render(n.options.get(safe_arg(v), n.options["other"]), number))
         return "".join(out)
 
     return render(parse_message(text))

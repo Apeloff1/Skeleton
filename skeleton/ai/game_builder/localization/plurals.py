@@ -6,8 +6,11 @@ the "other"-only rule rather than guessing.
 """
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+import re
 from typing import Callable
+
+_LOCALE_SUBTAG = re.compile(r"^[A-Za-z0-9]{1,8}$")
 
 PLURAL_CATEGORIES = ("zero", "one", "two", "few", "many", "other")
 _RTL_LANGS = frozenset({"ar", "he", "fa", "ur", "ps", "sd", "yi", "dv", "ug", "ckb"})
@@ -16,10 +19,18 @@ LRI, RLI, FSI, PDI = "\u2066", "\u2067", "\u2068", "\u2069"
 
 
 def _operands(n: int | float | Decimal | str) -> tuple[Decimal, int, int, int]:
-    d = Decimal(str(n)).copy_abs()
-    if not d.is_finite():
-        raise ValueError("plural operand must be finite")
+    raw = str(n)
+    if len(raw) > 64:
+        raise ValueError("plural operand exceeds bounded decimal length")
+    try:
+        d = Decimal(raw).copy_abs()
+    except InvalidOperation as exc:
+        raise ValueError("invalid plural operand") from exc
+    if not d.is_finite() or not -12 <= d.adjusted() <= 12:
+        raise ValueError("plural operand exceeds finite exponent bound")
     s = format(d, "f")
+    if len(s) > 64:
+        raise ValueError("plural operand exceeds expanded decimal bound")
     frac = s.split(".", 1)[1] if "." in s else ""
     return d, int(d), len(frac), int(frac) if frac else 0
 
@@ -96,8 +107,19 @@ _RULES: dict[str, Callable[..., str]] = {
 }
 
 
+def _locale_parts(locale: str) -> list[str]:
+    """Bound untrusted locale tags before normalization or script inspection."""
+    if (type(locale) is not str or not 1 <= len(locale) <= 128
+            or any(ord(ch) < 33 or ord(ch) == 127 for ch in locale)):
+        raise ValueError("locale must be a bounded printable tag")
+    parts = locale.replace("_", "-").split("-")
+    if any(_LOCALE_SUBTAG.fullmatch(part) is None for part in parts):
+        raise ValueError("locale must be a bounded printable tag")
+    return parts
+
+
 def _language(locale: str) -> str:
-    return locale.replace("_", "-").split("-", 1)[0].lower()
+    return _locale_parts(locale)[0].lower()
 
 
 def plural_category(locale: str, n: int | float | Decimal | str) -> str:
@@ -115,7 +137,7 @@ def categories_for(locale: str) -> frozenset[str]:
 
 
 def is_rtl(locale: str) -> bool:
-    parts = locale.replace("_", "-").split("-")
+    parts = _locale_parts(locale)
     if any(len(p) == 4 and p.title() in _RTL_SCRIPTS for p in parts[1:]):
         return True
     if any(len(p) == 4 and p.isalpha() for p in parts[1:]):

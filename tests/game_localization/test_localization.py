@@ -135,3 +135,76 @@ def test_json_roundtrip():
     assert g2.to_json() == g.to_json() and g2.table("ar").direction == "rtl"
     with pytest.raises(ValueError):
         LocalizedGame.from_json('{"schema": "nope"}')
+
+
+def test_plural_numeric_exponent_and_format_arguments_are_bounded():
+    for huge in ("1e1000000", "0." + "0" * 10000, "1e-1000000"):
+        with pytest.raises(ValueError, match="bound"):
+            plural_category("en", huge)
+    with pytest.raises(MessageError, match="bounded finite"):
+        format_message("{n, plural, other {#}}", {"n": 10**100}, "en")
+    with pytest.raises(MessageError, match="finite"):
+        format_message("{n, plural, other {#}}", {"n": float("inf")}, "en")
+    with pytest.raises(MessageError, match="text bound"):
+        format_message("{name}", {"name": "x" * 100_000}, "en")
+
+
+def test_rendered_message_budget_stops_before_unbounded_argument_expansion():
+    class CountedArgs(dict):
+        reads = 0
+
+        def __getitem__(self, key):
+            self.reads += 1
+            return super().__getitem__(key)
+
+    args = CountedArgs(name="x" * 1024)
+    with pytest.raises(MessageError, match="output bound"):
+        format_message("{name}" * 500, args, "en")
+    assert args.reads < 100
+
+
+def test_nested_render_budget_is_cumulative_across_selects():
+    message = "{s, select, a {" + "{name}" * 70 + "} other {safe}}"
+    with pytest.raises(MessageError, match="output bound"):
+        format_message(message, {"s": "a", "name": "x" * 1024}, "en")
+
+
+def test_untrusted_locale_tags_are_bounded_before_direction_and_plural_rules():
+    for bad in ("", "x" * 129, "en\nspoof", "en\x00US", True):
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            is_rtl(bad)
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            plural_category(bad, 1)
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            format_message("Hello {name}", {"name": "Ada"}, bad)
+    assert is_rtl("pa-Arab") and not is_rtl("az-Latn")
+
+
+def test_locale_tags_reject_noncanonical_separators_and_unicode_controls():
+    for bad in ("en--US", "-en", "en-", "en/US", "en:US",
+                "en\\u202eUS", "en\\u2066US", "en-abcdefghij", "é-FR"):
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            is_rtl(bad)
+        with pytest.raises(ValueError, match="bounded printable tag"):
+            plural_category(bad, 1)
+    assert is_rtl("pa-Arab")
+    assert not is_rtl("en_US")
+
+
+def test_untrusted_message_arguments_cannot_inject_controls_or_selectors():
+    """Interpolated text and select keys must share the same bounded contract."""
+    for value in ("trusted\x1b[31m", "abc\u202ereversed", "abc\u2066isolated",
+                  "line\nforged", "x" * 1025):
+        with pytest.raises(MessageError, match="unsafe control|text bound"):
+            format_message("Hello {name}", {"name": value}, "en")
+        with pytest.raises(MessageError, match="unsafe control|text bound"):
+            format_message("{name, select, other {ok}}", {"name": value}, "en")
+
+    class UntrustedSelector:
+        def __str__(self):
+            raise AssertionError("must not invoke arbitrary selector conversion")
+
+    with pytest.raises(MessageError, match="unsupported"):
+        format_message("{name, select, other {ok}}", {"name": UntrustedSelector()}, "en")
+    assert format_message("{name, select, safe {yes} other {no}}",
+                          {"name": "safe"}, "en") == "yes"
