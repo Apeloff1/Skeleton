@@ -276,7 +276,10 @@ def first_install_report(
             backend_url=manifest.service("backend").public_url,
             live=live,
             timeout=timeout,
-            auth_token_file=auth_token_file,
+            # Unsafe .env or invalid port configuration disables live
+            # inspection; never pass an authenticated token to a downgraded
+            # diagnostics call that cannot bind its target.
+            auth_token_file=auth_token_file if live else None,
         )
         crawler = report["studio"]["server"]["crawler"]
         observed = crawler.get("report", {})
