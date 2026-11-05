@@ -44,8 +44,13 @@ def _strict_action_json(payload: str) -> dict:
             raise ValueError("non-finite action JSON number: " + value)
         return number
 
-    action = json.loads(payload, object_pairs_hook=unique_pairs,
-                        parse_constant=reject_constant, parse_float=finite_float)
+    try:
+        action = json.loads(payload, object_pairs_hook=unique_pairs,
+                            parse_constant=reject_constant, parse_float=finite_float)
+    except RecursionError as exc:
+        # Deeply nested but byte-bounded input can exhaust the JSON decoder
+        # before the campaign validator ever sees an action.
+        raise ValueError("action JSON nesting exceeds parser budget") from exc
     if not isinstance(action, dict):
         raise ValueError("action JSON must be an object")
     return action
