@@ -655,8 +655,8 @@ def test_fresh_install_backend_cors_tracks_selected_frontend_port():
         "http://localhost:${FRONTEND_PORT:-3000},"
         "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
     ) in compose
-    assert "\\nCORS_ORIGINS=\\n" in template
-    assert "\\nCORS_ORIGINS=http://localhost:3000" not in template
+    assert "\nCORS_ORIGINS=\n" in template
+    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
 
 
 def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
@@ -665,7 +665,7 @@ def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
     # Operator policies and upgrades must not be expanded automatically.
     manual = "https://operator.example.invalid"
     (tmp_path / ".env").write_text(
-        f"CORS_ORIGINS={manual}\\n", encoding="utf-8"
+        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
     )
     ensure_runtime_environment(tmp_path)
     values = (tmp_path / ".env").read_text(encoding="utf-8")
