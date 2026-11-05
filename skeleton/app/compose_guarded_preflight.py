@@ -132,7 +132,7 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
         if hosts is None:
             membership.append(None)
             continue
-        if type(hosts) is not list or len(hosts) > 64:
+        if type(hosts) is not list or len(hosts) > 64 or len(seen_hosts) + len(hosts) > 64:
             return None
         trusted: list[str] = []
         for host in hosts:

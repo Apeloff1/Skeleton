@@ -156,6 +156,32 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(FakeEpoch.instances, [])
         self.db.hello.pop("hosts")
 
+
+    async def test_combined_replica_membership_budget_denied(self):
+        # Each advertised class is individually below the bound, but the
+        # aggregate topology exceeds the fixed custody inspection budget.
+        self.db.hello.update({
+            "me": "mongo-a:27017", "primary": "mongo-a:27017",
+            "hosts": ["mongo-a:27017"] + [f"mongo-h{i}:27017" for i in range(39)],
+            "passives": [f"mongo-p{i}:27017" for i in range(24)],
+            "arbiters": ["mongo-extra:27017"],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertEqual(FakeEpoch.instances, [])
+        self.assertEqual(self.db.calls, 1)
+
+    async def test_exact_membership_budget_is_observation_only(self):
+        self.db.hello.update({
+            "me": "mongo-a:27017", "primary": "mongo-a:27017",
+            "hosts": ["mongo-a:27017"] + [f"mongo-h{i}:27017" for i in range(39)],
+            "passives": [f"mongo-p{i}:27017" for i in range(24)],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_membership_rotation_during_epoch_denied(self):
         class RotatingMembers(FakeDB):
             async def command(self, name):
