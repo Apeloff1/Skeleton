@@ -338,3 +338,21 @@ def test_ambiguous_action_json_rejected_without_mutating_save(tmp_path: Path):
                       "--expected-head", initial["head"])
     assert committed["revision"] == 1
     assert _json(home, "audit")["verified"] is True
+
+
+def test_exponent_overflow_action_rejected_without_save_mutation(tmp_path: Path):
+    """Valid JSON exponent syntax must not smuggle infinity into a game action."""
+    home = tmp_path / "overflow-action"
+    initial = _json(home, "new")
+    for number in ("1e999", "-1e999", "9.9e999"):
+        payload = '{"verb":"move","distance":' + number + "}"
+        rejected = _invoke(home, "step", "--action", payload,
+                           "--expected-head", initial["head"])
+        assert rejected.returncode != 0
+        assert b"non-finite action JSON number" in rejected.stderr
+        assert _json(home, "status")["head"] == initial["head"]
+        assert _json(home, "audit")["audit_entries"] == 0
+    committed = _json(home, "step", "--action", json.dumps(initial["actions"][0]),
+                      "--expected-head", initial["head"])
+    assert committed["revision"] == 1
+    assert _json(home, "audit")["verified"] is True
