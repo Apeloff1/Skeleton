@@ -87,13 +87,13 @@ def canonical_json(obj: Mapping[str, Any]) -> bytes:
 
 
 def validate_service_name(name: str) -> str:
-    if not isinstance(name, str) or not _SERVICE_RE.match(name):
+    if type(name) is not str or not _SERVICE_RE.fullmatch(name):
         raise ValueError(f"invalid service name {name!r}")
     return name
 
 
 def validate_scope(scope: str) -> str:
-    if not isinstance(scope, str) or not _SCOPE_RE.match(scope):
+    if type(scope) is not str or not _SCOPE_RE.fullmatch(scope):
         raise ValueError(f"invalid scope {scope!r}")
     return scope
 

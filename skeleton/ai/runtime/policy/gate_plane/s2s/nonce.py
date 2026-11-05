@@ -19,6 +19,8 @@ import threading
 import time
 from typing import Callable, Dict, Optional, Protocol, Tuple, runtime_checkable
 
+from .tokens import validate_service_name
+
 # Domain-to-API imports are forbidden. The application injects its store.
 # This compatibility flag records that no upstream implementation is imported.
 UPSTREAM_NONCE_STORE = False
@@ -50,8 +52,9 @@ NonceStoreFull = _LocalNonceStoreFull
 
 def s2s_scope(service: str) -> str:
     """Nonce-store scope for tokens issued by ``service``."""
-    if not isinstance(service, str) or not service:
-        raise ValueError("service required for nonce scope")
+    # Bind replay scopes to the same canonical identity accepted by the
+    # signed-token issuer registry. Reject control and alias spellings.
+    service = validate_service_name(service)
     return f"{S2S_SCOPE_PREFIX}{service}"
 
 
