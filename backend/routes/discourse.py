@@ -21,11 +21,12 @@ import os
 import re
 import json
 import math
+import threading
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from core.databases import client as _SHARED_MONGO_CLIENT
 from routes.llm_router import route_complete, MODEL_CATALOG
@@ -43,6 +44,9 @@ MAX_PROMPT_CHARS = 20_000
 MAX_SYSTEM_CHARS = 8_000
 MAX_JUDGE_REPLY_CHARS = 32_768
 MAX_MODEL_CONTENT_CHARS = 12_000
+MAX_ASYNC_DELIBERATIONS = 16
+_ACTIVE_DELIBERATIONS: set[str] = set()
+_ACTIVE_LOCK = threading.Lock()
 
 
 def _extract_json(text: str) -> dict:
@@ -305,50 +309,115 @@ async def deliberate_endpoint(body: DeliberateBody):
 
 
 async def _run_bg(did: str, body: "DeliberateBody"):
-    """Background runner — writes status→result to discourse_jobs so big panels /
-    multi-round group chats never hit a request timeout."""
+    """Persist terminal job state; release local admission quota on all paths."""
     try:
-        res = await deliberate(body.task, body.prompt, body.system,
-                               body.panel or None, body.judge_model, body.discord, body.rounds)
-        res["job_id"] = did
-        res["status"] = "error" if res.get("error") else "done"
-        await _db.discourse_jobs.update_one({"job_id": did}, {"$set": res}, upsert=True)
-    except Exception:
-        await _db.discourse_jobs.update_one({"job_id": did},
-                                            {"$set": {"status": "error", "error": "deliberation_failed"}}, upsert=True)
+        try:
+            result = await deliberate(
+                body.task, body.prompt, body.system,
+                body.panel or None, body.judge_model, body.discord, body.rounds,
+            )
+            result["job_id"] = did
+            result["status"] = "error" if result.get("error") else "done"
+            acknowledgement = await _db.discourse_jobs.update_one(
+                {"job_id": did}, {"$set": result}, upsert=False,
+            )
+            if getattr(acknowledgement, "acknowledged", False) is not True:
+                raise RuntimeError("job completion was not acknowledged")
+        except Exception:
+            try:
+                # Never relabel an unconfirmed success as a committed result.
+                await _db.discourse_jobs.update_one(
+                    {"job_id": did},
+                    {"$set": {
+                        "status": "error", "error": "deliberation_failed",
+                        "finished_at": datetime.now(timezone.utc).isoformat(),
+                    }}, upsert=False,
+                )
+            except Exception:
+                # At this point persistence is unavailable. There is no honest
+                # durable result; a restart-safe recovery loop is out of scope.
+                pass
+    finally:
+        with _ACTIVE_LOCK:
+            _ACTIVE_DELIBERATIONS.discard(did)
 
 
 @router.post("/deliberate/async")
 async def deliberate_async(body: DeliberateBody):
-    """Kick a deliberation in the background; poll /result/{job_id}."""
+    """Admit a bounded, durably recorded panel before background execution."""
     if len(body.prompt) < 4:
         return {"error": "prompt too short"}
     if len(body.prompt) > MAX_PROMPT_CHARS:
         return {"error": "prompt exceeds 20k char limit"}
     try:
-        _admit(body.task, body.prompt, body.system, body.panel or None, body.judge_model,
-               body.discord, body.rounds)
+        _admit(
+            body.task, body.prompt, body.system, body.panel or None,
+            body.judge_model, body.discord, body.rounds,
+        )
     except ValueError as exc:
         return {"error": str(exc)}
-    did = uuid.uuid4().hex
-    await _db.discourse_jobs.insert_one({
-        "job_id": did, "status": "running", "task": body.task,
-        "prompt": body.prompt[:2000], "rounds": max(1, min(body.rounds, MAX_ROUNDS)),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    asyncio.create_task(_run_bg(did, body))
+
+    with _ACTIVE_LOCK:
+        if len(_ACTIVE_DELIBERATIONS) >= MAX_ASYNC_DELIBERATIONS:
+            raise HTTPException(503, "deliberation job admission at capacity")
+        did = uuid.uuid4().hex
+        _ACTIVE_DELIBERATIONS.add(did)
+
+    try:
+        stored = await _db.discourse_jobs.insert_one({
+            "job_id": did, "status": "running", "task": body.task,
+            "prompt": body.prompt[:2000], "rounds": body.rounds,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        if getattr(stored, "acknowledged", False) is not True:
+            raise RuntimeError("asynchronous admission was not acknowledged")
+    except Exception as exc:
+        with _ACTIVE_LOCK:
+            _ACTIVE_DELIBERATIONS.discard(did)
+        raise HTTPException(503, "deliberation job persistence unavailable") from exc
+
+    coroutine = _run_bg(did, body)
+    try:
+        asyncio.create_task(coroutine)
+    except Exception as exc:
+        coroutine.close()
+        with _ACTIVE_LOCK:
+            _ACTIVE_DELIBERATIONS.discard(did)
+        try:
+            await _db.discourse_jobs.update_one(
+                {"job_id": did},
+                {"$set": {"status": "error", "error": "worker_start_failed"}},
+                upsert=False,
+            )
+        except Exception:
+            pass
+        raise HTTPException(503, "deliberation worker could not start") from exc
+
     return {"job_id": did, "status": "running"}
 
 
 @router.get("/result/{job_id}")
 async def get_result(job_id: str):
-    doc = await _db.discourse_jobs.find_one({"job_id": job_id}, PROJ)
+    if (
+        not isinstance(job_id, str) or len(job_id) != 32
+        or any(char not in "0123456789abcdef" for char in job_id)
+    ):
+        return {"error": "not found", "status": "unknown"}
+    try:
+        doc = await _db.discourse_jobs.find_one({"job_id": job_id}, PROJ)
+    except Exception as exc:
+        raise HTTPException(503, "deliberation job history unavailable") from exc
     return doc or {"error": "not found", "status": "unknown"}
 
 
 @router.get("/history")
 async def history(limit: int = 20):
-    items = await _db.discourse_log.find(
-        {}, {**PROJ, "candidates": 0}  # omit heavy candidate bodies in the list
-    ).sort("created_at", -1).limit(min(limit, 100)).to_list(min(limit, 100))
+    if type(limit) is not int or not 1 <= limit <= 100:
+        raise HTTPException(422, "history limit must be in [1, 100]")
+    try:
+        items = await _db.discourse_log.find(
+            {}, {**PROJ, "candidates": 0},
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+    except Exception as exc:
+        raise HTTPException(503, "deliberation history unavailable") from exc
     return {"deliberations": items, "count": len(items)}
