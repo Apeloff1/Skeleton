@@ -104,6 +104,7 @@ def run(argv: list[str]) -> int:
             if name in ("session-restore", "session-restore-check"):
                 command.add_argument("--export-file", required=True)
     args = parser.parse_args(argv)
+    parsed_input = None
     try:
         # Validate untrusted JSON before constructing stores. Invalid input must
         # never initialize or modify canonical custody directories.
@@ -159,13 +160,25 @@ def run(argv: list[str]) -> int:
         if isinstance(exc, CanonError):
             code = exc.code
         elif isinstance(exc, OSError):
-            code = {
-                errno.ELOOP: "input_symlink_disallowed",
-                errno.ENOENT: "input_missing",
-                errno.ENOTDIR: "input_invalid_directory",
-                errno.EACCES: "input_permission_denied",
-                errno.EPERM: "input_permission_denied",
-            }.get(exc.errno, "invalid_input")
+            # Input-path errors and custody failures require different operator
+            # actions. Never advise replacing a brief file when the canonical
+            # store is inaccessible, or treat a failed write as invalid JSON.
+            if input_path and parsed_input is None:
+                code = {
+                    errno.ELOOP: "input_symlink_disallowed",
+                    errno.ENOENT: "input_missing",
+                    errno.ENOTDIR: "input_invalid_directory",
+                    errno.EACCES: "input_permission_denied",
+                    errno.EPERM: "input_permission_denied",
+                }.get(exc.errno, "input_io_unavailable")
+            else:
+                code = {
+                    errno.EACCES: "custody_permission_denied",
+                    errno.EPERM: "custody_permission_denied",
+                    errno.ENOSPC: "custody_storage_exhausted",
+                    errno.EDQUOT: "custody_storage_exhausted",
+                    errno.EROFS: "custody_read_only",
+                }.get(exc.errno, "custody_io_unavailable")
         else:
             code = "invalid_input"
         recovery = {
@@ -201,6 +214,11 @@ def run(argv: list[str]) -> int:
             "input_too_large": "reduce_json_input_below_524288_bytes",
             "input_empty": "provide_a_nonempty_valid_json_document",
             "input_changed_during_read": "retry_with_a_stable_unmodified_json_file",
+            "input_io_unavailable": "inspect_input_filesystem_without_bypassing_policy",
+            "custody_permission_denied": "inspect_canonical_store_permissions_without_removing_locks",
+            "custody_storage_exhausted": "free_authorized_storage_and_retry_without_discarding_saves",
+            "custody_read_only": "use_an_authorized_writable_canonical_store",
+            "custody_io_unavailable": "inspect_canonical_store_health_and_preserve_existing_saves",
         }
         print(json.dumps({"ok": False, "error": code, "phase": args.action,
                           "next_action": recovery.get(code, "inspect_input_and_custody")},
