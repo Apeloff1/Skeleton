@@ -7334,6 +7334,11 @@
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
     },
     {
+      "path": "skeleton/perf_profiler",
+      "owner": "runtime performance instrumentation",
+      "reason": "Existing standard-library runtime profiling helpers remain at their current owner outside AI-tree migration; separate architecture review is required for any AI-runtime promotion or cutover."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7777,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 161,
+    "retained_outside_ai_tree_count": 162,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
