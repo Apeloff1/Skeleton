@@ -315,7 +315,20 @@ def _print_status(
     full: bool = False,
     timeout: float = 3.0,
 ) -> int:
-    manifest = runtime_manifest()
+    try:
+        manifest = runtime_manifest()
+    except (OSError, ValueError, UnicodeError):
+        # Diagnostic output must not leak operator secrets or throw a traceback
+        # when the .env source is oversized, linked, malformed or replaced.
+        if as_json:
+            print(json.dumps({
+                "ok": False,
+                "code": "runtime_configuration_unavailable",
+                "message": "Cannot safely read runtime configuration or host port settings",
+            }, sort_keys=True))
+        else:
+            print("Runtime configuration unavailable; inspect app check --runtime")
+        return 2
     payload = manifest_payload(manifest)
     live_results = ()
     live_ok: bool | None = None
