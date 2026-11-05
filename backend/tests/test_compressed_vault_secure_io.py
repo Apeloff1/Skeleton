@@ -228,3 +228,44 @@ def test_late_manifest_fsync_failure_preserves_consistent_delete(isolated_storag
     # After uncertain publication, the data is conservatively retained for
     # recovery rather than deleted while the caller sees an error.
     assert (vault.VAULT_ROOT / "stable.jsonl.zst").exists()
+
+
+
+def test_post_replace_fsync_error_restores_prior_shard(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    shard = vault.VAULT_ROOT / "stable.jsonl.zst"
+    original_data = shard.read_bytes()
+    original_manifest = (vault.VAULT_ROOT / "_manifest.json").read_bytes()
+    write_atomically = vault.atomic_write
+
+    def fail_after_replace(fd, name, writer, **options):
+        result = write_atomically(fd, name, writer, **options)
+        if name == "stable.jsonl.zst":
+            raise OSError("directory fsync failed after replace")
+        return result
+
+    monkeypatch.setattr(vault, "atomic_write", fail_after_replace)
+    with pytest.raises(OSError, match="fsync failed"):
+        vault.write_shard("stable", [{"value": "after"}], domain="testing")
+    assert shard.read_bytes() == original_data
+    assert (vault.VAULT_ROOT / "_manifest.json").read_bytes() == original_manifest
+    assert vault.read_shard("stable") == [{"value": "before"}]
+    assert not list(vault.VAULT_ROOT.glob(".vault-backup-*"))
+
+
+def test_post_unlink_fsync_error_does_not_revive_dangling_manifest(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    unlink = vault.unlink_regular
+
+    def fail_after_unlink(fd, name):
+        unlink(fd, name)
+        raise OSError("directory fsync failed after unlink")
+
+    monkeypatch.setattr(vault, "unlink_regular", fail_after_unlink)
+    with pytest.raises(OSError, match="fsync failed"):
+        vault.delete_shard("stable")
+    assert not (vault.VAULT_ROOT / "stable.jsonl.zst").exists()
+    assert vault.get_shard_entry("stable") is None
+    assert "stable" not in json.loads((vault.VAULT_ROOT / "_manifest.json").read_text())
