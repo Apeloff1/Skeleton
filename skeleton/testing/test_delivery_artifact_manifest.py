@@ -71,3 +71,37 @@ def test_verify_files():
     assert verify_files(m, {"a": b"hello", "b": b"zz"}) == ()
     problems = verify_files(m, {"a": b"hellO", "x": b""})
     assert problems == ("digest:a", "missing:b", "unexpected:x")
+
+def test_verify_files_rejects_noncanonical_aliases_and_duplicate_identities():
+    m = _manifest(_entry("artifacts/a.bin", b"ok"))
+    assert verify_files(m, {"artifacts/a.bin": b"ok"}) == ()
+    assert verify_files(m, {"./artifacts/a.bin": b"ok"}) == (
+        "noncanonical:./artifacts/a.bin",)
+    assert verify_files(m, {"artifacts//a.bin": b"ok"}) == (
+        "noncanonical:artifacts//a.bin",)
+    assert verify_files(m, {"artifacts/a.bin": b"ok", "./artifacts/a.bin": b"ok"}) == (
+        "duplicate:artifacts/a.bin", "noncanonical:./artifacts/a.bin")
+
+
+def test_verify_files_fails_closed_on_nonbytes_and_unsafe_paths():
+    from skeleton.ai.build.core.delivery import artifact_manifest as mirrored
+
+    m = _manifest(_entry("a.bin", b"ok"))
+    for verify in (verify_files, mirrored.verify_files):
+        assert verify(m, {"a.bin": "ok"}) == ("nonbytes:a.bin",)
+        assert verify(m, {"../escape": b"ok"}) == (
+            "invalid-observed-path", "missing:a.bin"
+        )
+        assert verify(m, {42: b"ok"}) == (
+            "invalid-observed-path", "missing:a.bin"
+        )
+        assert verify(m, {"a.bin": b"ok"}) == ()
+
+
+def test_verify_files_bounds_untrusted_observed_inventory():
+    from skeleton.ai.build.core.delivery import artifact_manifest as mirrored
+
+    m = _manifest(_entry("a.bin", b"ok"))
+    observed = {f"junk-{i}": b"" for i in range(2049)}
+    for verify in (verify_files, mirrored.verify_files):
+        assert verify(m, observed) == ("observed-artifact-count-exceeds-bound",)
