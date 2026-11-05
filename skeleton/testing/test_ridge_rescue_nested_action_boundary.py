@@ -51,3 +51,15 @@ def test_nested_subprocess_command_preserves_save_and_allows_next_turn(tmp_path:
     audited = invoke("audit")
     assert audited.returncode == 0
     assert json.loads(audited.stdout)["verified"] is True
+
+
+def test_direct_action_decoder_rejects_nontext_and_oversized_unicode():
+    """Direct library callers share the CLI's byte budget, not just argv callers."""
+    import pytest
+    from skeleton.game.gameplay.ridge_rescue.consumer_cli import MAX_ACTION_JSON_BYTES
+
+    with pytest.raises(ValueError, match="must be text"):
+        _strict_action_json(None)
+    with pytest.raises(ValueError, match="byte budget"):
+        _strict_action_json('{"verb":"' + ("é" * (MAX_ACTION_JSON_BYTES // 2)) + '"}')
+    assert _strict_action_json('{"verb":"move"}') == {"verb": "move"}

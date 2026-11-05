@@ -27,6 +27,11 @@ MAX_ACTION_JSON_BYTES = 4096
 
 def _strict_action_json(payload: str) -> dict:
     """Reject duplicate keys and non-finite values before any save mutation."""
+    if not isinstance(payload, str):
+        raise ValueError("action JSON must be text")
+    if len(payload.encode("utf-8")) > MAX_ACTION_JSON_BYTES:
+        raise ValueError("action JSON exceeds byte budget")
+
     def unique_pairs(pairs: list[tuple[str, object]]) -> dict:
         result = {}
         for key, value in pairs:
