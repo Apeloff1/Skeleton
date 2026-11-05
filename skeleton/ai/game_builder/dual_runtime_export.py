@@ -869,6 +869,18 @@ def export_dual_runtime_package(
             raise DualRuntimeExportError("source data changed since rendering")
     if package.files["release.json"] != _json_bytes(package.manifest):
         raise DualRuntimeExportError("release metadata changed since rendering")
+    # POSIX source publication must not overwrite a racing empty directory.
+    # Stage and rename through pinned directory descriptors, never by path.
+    if os.name == "posix":
+        from .secure_export_publication import (
+            AtomicDirectoryPublicationError, publish_generated_tree,
+        )
+        try:
+            return publish_generated_tree(package.files, root)
+        except AtomicDirectoryPublicationError as exc:
+            raise DualRuntimeExportError(
+                "safe atomic source publication rejected"
+            ) from exc
     temporary = Path(tempfile.mkdtemp(prefix=".game-export-", dir=str(root.parent)))
     try:
         for relative, payload in package.files.items():

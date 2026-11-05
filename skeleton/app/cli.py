@@ -268,6 +268,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "game-project":
+        # Canonical assembled-app entrypoint for verified offline original games.
+        # Reuse the legal-first game-project owner rather than a parallel parser.
+        from scripts.game.game_project import main as game_project_main
+        return game_project_main(arguments[1:])
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main
         return chat_main(arguments[1:])

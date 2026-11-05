@@ -1,0 +1,90 @@
+{
+  "schema": "skeleton.production_scenario.v1",
+  "recipe": "carpentry_shelter_frame",
+  "domain": "carpentry",
+  "inputs": {
+    "material_per_batch": 4,
+    "energy_per_stage": 7
+  },
+  "outputs": {
+    "products_per_batch": 1,
+    "scrap_per_batch": 0
+  },
+  "stages": [
+    "prepare",
+    "fabricate",
+    "inspect"
+  ],
+  "initial": {
+    "materials": 50,
+    "energy": 85,
+    "products": 0,
+    "scrap": 0
+  },
+  "commands": [
+    {
+      "id": "carpentry_shelter_frame:start",
+      "action": "start",
+      "batch": 1,
+      "expected_version": 0,
+      "tick": 1,
+      "evidence": ""
+    },
+    {
+      "id": "carpentry_shelter_frame:prep",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 1,
+      "tick": 2,
+      "evidence": "trusted-stage-prep"
+    },
+    {
+      "id": "carpentry_shelter_frame:work",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 2,
+      "tick": 3,
+      "evidence": "trusted-stage-work"
+    },
+    {
+      "id": "carpentry_shelter_frame:inspect",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 3,
+      "tick": 4,
+      "evidence": "trusted-stage-inspect"
+    },
+    {
+      "id": "carpentry_shelter_frame:finish",
+      "action": "finish",
+      "batch": 1,
+      "expected_version": 4,
+      "tick": 5,
+      "evidence": "trusted-quality-acceptance"
+    }
+  ],
+  "expected": {
+    "final_status": "completed",
+    "final_stage": 3,
+    "version": 5,
+    "product_count": 1,
+    "spent_materials": 4,
+    "energy_cost": 21,
+    "all_accepted": true
+  },
+  "negative_cases": [
+    "missing-stage-evidence",
+    "stages-incomplete",
+    "missing-quality-evidence",
+    "stale-version",
+    "duplicate-event",
+    "insufficient-energy",
+    "insufficient-material"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "physical_machine_control": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

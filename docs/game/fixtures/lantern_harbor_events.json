@@ -1,0 +1,16 @@
+[
+  {
+    "sequence": 0,
+    "quest_id": "arrival",
+    "event_type": "interact",
+    "source_id": "harbor_gate",
+    "payload_digest": "231bf89d726826891c1578a8ffe06ad898e70ecad4adb07668c2d9beca734b0c"
+  },
+  {
+    "sequence": 1,
+    "quest_id": "beacon",
+    "event_type": "activate",
+    "source_id": "lighthouse",
+    "payload_digest": "99a7026172d42714d0293e5598ec1c8e8260d7d0c4b8582ad002c1883494e216"
+  }
+]
