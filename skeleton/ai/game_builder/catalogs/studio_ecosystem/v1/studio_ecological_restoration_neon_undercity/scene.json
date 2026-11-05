@@ -1,0 +1,64 @@
+{
+  "project_id": "studio_ecological_restoration_neon_undercity",
+  "genre": "ecological_restoration",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "world": "Neon Undercity",
+  "episode_plan": [
+    {
+      "id": "arrival",
+      "setting": "elevated night markets",
+      "quest_stage": "survey",
+      "environmental_trigger": "grid brownouts",
+      "interactive_objects": [
+        "survey_marker",
+        "community_notice",
+        "route_gate"
+      ]
+    },
+    {
+      "id": "negotiation",
+      "setting": "hidden radio library",
+      "quest_stage": "mediate",
+      "environmental_trigger": "Shortfall of community capacitors",
+      "interactive_objects": [
+        "records_table",
+        "faction_delegate",
+        "shared_access_gate"
+      ]
+    },
+    {
+      "id": "restoration",
+      "setting": "outer elevated night markets",
+      "quest_stage": "deliver",
+      "environmental_trigger": "Restoration reaches a measurable threshold",
+      "interactive_objects": [
+        "repair_console",
+        "witness_terminal",
+        "community_vote"
+      ]
+    }
+  ],
+  "cross_scene_state": [
+    "survey_complete",
+    "mediate_complete",
+    "repaired_infrastructure",
+    "public_trust"
+  ],
+  "camera": {
+    "primary": "isometric_or_third_person_design_requirement",
+    "fallback": "existing_offline_grid_preview"
+  },
+  "spatial_rules": {
+    "navigation": "at_least_two_feasible_routes_design_target",
+    "hazard": "grid brownouts",
+    "checkpoint": "after_each_act"
+  },
+  "preview_binding": {
+    "source": "intent.json",
+    "adapter": "skeleton.ai.game_builder.playable_compiler.compile_original_game",
+    "runtime": "offline_html5_grid",
+    "production_genre_claim": false
+  }
+}

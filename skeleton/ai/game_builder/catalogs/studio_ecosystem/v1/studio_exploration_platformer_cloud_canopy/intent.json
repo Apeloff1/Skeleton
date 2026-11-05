@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_cloud_canopy",
+  "title": "Cloud Canopy: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610301093,
+  "width": 19,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 3
+}

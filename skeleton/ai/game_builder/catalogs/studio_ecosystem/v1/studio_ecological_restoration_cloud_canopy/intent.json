@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_cloud_canopy",
+  "title": "Cloud Canopy: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610300837,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 6
+}

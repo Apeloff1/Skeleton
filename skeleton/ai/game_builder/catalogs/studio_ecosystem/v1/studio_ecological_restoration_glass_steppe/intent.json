@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_glass_steppe",
+  "title": "Glass Steppe: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610300939,
+  "width": 23,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "desert",
+  "starting_health": 4
+}

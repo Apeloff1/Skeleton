@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_salt_dunes",
+  "title": "Salt Dunes: The Maker Commons",
+  "subtitle": "Original the maker commons design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010312811,
+  "width": 23,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 10,
+  "theme": "desert",
+  "starting_health": 3
+}

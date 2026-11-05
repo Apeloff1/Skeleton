@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_luminous_marsh",
+  "title": "Luminous Marsh: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610300820,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 5
+}

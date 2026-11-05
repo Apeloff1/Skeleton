@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_misty_breakwater",
+  "title": "Misty Breakwater: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610300973,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 6
+}
