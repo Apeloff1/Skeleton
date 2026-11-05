@@ -42,6 +42,10 @@ _SYSTEM = (
 
 def grant_providers(issuer: TokenIssuer, provider_ids: Iterable[str], *, subject: str = "forge.ai_builder") -> str:
     """Mint a token covering exactly ``provider.<id>``/``call`` for each id."""
+    if isinstance(provider_ids, (str, bytes, bytearray)):
+        raise ValueError("provider grant identities require a bounded iterable of provider IDs")
+    if type(subject) is not str or not _REQUEST_ID.fullmatch(subject):
+        raise ValueError("provider grant subject is invalid or unbounded")
     ids = list(islice(provider_ids, 33))
     if len(ids) > 32 or any(type(pid) is not str or not _PROVIDER_ID.fullmatch(pid) for pid in ids):
         raise ValueError("provider grant identities exceed bounded allowlist")
@@ -81,7 +85,11 @@ def _response_payload(result: Any) -> Any:
     if response is None:
         return None
     structured = getattr(response, "structured", None)
-    return dict(structured) if structured else getattr(response, "text", None)
+    if structured:
+        if not isinstance(structured, Mapping) or len(structured) > 64:
+            raise PlanParseError("structured model response exceeds bounded shape")
+        return dict(structured)
+    return getattr(response, "text", None)
 
 
 class ModelPlanner:
@@ -133,9 +141,12 @@ class ModelPlanner:
             return fallback(receipt, f"route:{receipt.status}")
         try:
             proposal = parse_model_plan(_response_payload(call.result))
-        except PlanParseError as exc:
-            return fallback(receipt, f"parse:{exc}")
-        spec, violations = guard_proposal(compiled, proposal)
+            spec, violations = guard_proposal(compiled, proposal)
+        except Exception as exc:
+            # Provider-controlled structured accessors and guard inputs can
+            # raise arbitrary ordinary exceptions. Never leak their payload
+            # through a receipt or let them abort the deterministic fallback.
+            return fallback(receipt, f"parse:{type(exc).__name__}")
         if spec["spec_id"] == compiled["spec_id"]:
             return fallback(receipt, "no_change", violations)
         return PlanOutcome(text, compiled, spec, "model", receipt, violations)
