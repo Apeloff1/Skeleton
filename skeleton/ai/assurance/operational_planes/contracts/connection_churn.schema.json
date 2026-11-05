@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/connection_churn.schema.json",
+  "title": "transport.connection_churn observation contract",
+  "description": "Bound connection churn",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reconnects_per_min",
+        "half_open_connections"
+      ],
+      "properties": {
+        "reconnects_per_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60,
+          "description": "Upper bound for reconnects_per_min"
+        },
+        "half_open_connections": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12,
+          "description": "Upper bound for half_open_connections"
+        }
+      }
+    }
+  }
+}
