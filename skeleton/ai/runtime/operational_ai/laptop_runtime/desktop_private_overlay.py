@@ -178,11 +178,20 @@ def _canonical_json(raw: bytes, ceiling: int) -> dict:
 
 
 def _record(plan: PortablePatchPlan, qualification) -> dict:
+    from .desktop_source_graph import analyze_python_source_graph
+    graph = analyze_python_source_graph(plan)
+    if not graph.permits_inert_export:
+        raise SourceOverlayHold("invalid original Python import graph cannot stage")
     return {
         "schema": SCHEMA,
         "manifest_sha256": plan.manifest_sha256,
         "patch_sha256": plan.patch_sha256,
         "static_source_status": qualification.status,
+        "python_source_graph_sha256": graph.graph_sha256,
+        "python_source_graph_status": graph.status,
+        "linked_reviewed_python_imports": graph.linked_import_count,
+        "unverified_python_imports": graph.unverified_import_count,
+        "observed_python_cycles": len(graph.cycles),
         "file_count": len(plan.entries),
         "total_source_bytes": sum(x.replacement_bytes for x in plan.entries),
         "files": [{
@@ -215,6 +224,9 @@ def _require_manifest(value: dict, manifest: str, patch: str) -> list[dict]:
     if type(value) is not dict or set(value) != {
         "schema", "manifest_sha256", "patch_sha256",
         "static_source_status", "file_count", "total_source_bytes",
+        "python_source_graph_sha256", "python_source_graph_status",
+        "linked_reviewed_python_imports", "unverified_python_imports",
+        "observed_python_cycles",
         "files", "original_checkout_modified", "source_code_executed",
         "git_index_modified", "release_certified",
     }:
@@ -223,6 +235,18 @@ def _require_manifest(value: dict, manifest: str, patch: str) -> list[dict]:
         value["schema"] != SCHEMA or value["manifest_sha256"] != manifest
         or value["patch_sha256"] != patch
         or value["static_source_status"] not in ("parse-clean", "mixed-unverified")
+        or not _digest(value["python_source_graph_sha256"])
+        or value["python_source_graph_status"] not in (
+            "no-python-source", "observed-internal-imports",
+            "partially-unverified-imports",
+        )
+        or any(
+            type(value[name]) is not int or not 0 <= value[name] <= 1024
+            for name in (
+                "linked_reviewed_python_imports",
+                "unverified_python_imports", "observed_python_cycles",
+            )
+        )
         or type(value["file_count"]) is not int
         or type(value["total_source_bytes"]) is not int
         or value["original_checkout_modified"] is not False
@@ -376,6 +400,12 @@ def _stage_verify(
         "file_count": len(listed),
         "total_source_bytes": metadata["total_source_bytes"],
         "static_source_status": metadata["static_source_status"],
+        "python_source_graph_sha256": metadata["python_source_graph_sha256"],
+        "python_source_graph_status": metadata["python_source_graph_status"],
+        "linked_reviewed_python_imports": metadata["linked_reviewed_python_imports"],
+        "unverified_python_imports": metadata["unverified_python_imports"],
+        "observed_python_cycles": metadata["observed_python_cycles"],
+        "graph_reparsed_on_cold_reopen": False,
         "original_checkout_modified": False,
         "source_code_executed": False,
         "git_index_modified": False,

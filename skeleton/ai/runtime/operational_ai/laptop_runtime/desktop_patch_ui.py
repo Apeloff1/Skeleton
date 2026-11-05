@@ -24,6 +24,7 @@ from .desktop_private_overlay import (
     stage_reviewed_overlay, verify_staged_overlay,
 )
 from .desktop_source_qualification import qualify_patch_sources
+from .desktop_source_graph import analyze_python_source_graph
 from .desktop_patch_reconcile import reconcile_reviewed_patch
 from .desktop_project_work import (
     SCHEMA as MIXED_WORK_SCHEMA,
@@ -57,6 +58,7 @@ class PortablePatchWindow(tk.Toplevel):
         self._stage_receipt = None
         self._stage_path = None
         self._qualification = None
+        self._source_graph = None
         self._queue: Queue = Queue()
         self._build()
         if source_text:
@@ -324,6 +326,7 @@ class PortablePatchWindow(tk.Toplevel):
         self._stage_receipt = None
         self._stage_path = None
         self._qualification = None
+        self._source_graph = None
         self.expected_manifest.set("")
         self.expected_patch.set("")
         for item in self.files.get_children():
@@ -347,6 +350,8 @@ class PortablePatchWindow(tk.Toplevel):
                 not self._busy and self._plan is not None
                 and self._qualification is not None
                 and self._qualification.permits_inert_export
+                and self._source_graph is not None
+                and self._source_graph.permits_inert_export
             ) else "disabled",
         )
         self.verify_button.configure(
@@ -358,6 +363,8 @@ class PortablePatchWindow(tk.Toplevel):
                 not self._busy and self._plan is not None
                 and self._qualification is not None
                 and self._qualification.permits_inert_export
+                and self._source_graph is not None
+                and self._source_graph.permits_inert_export
             ) else "disabled",
         )
         self.verify_stage_button.configure(
@@ -386,8 +393,9 @@ class PortablePatchWindow(tk.Toplevel):
                 )
                 diff = get_reviewed_patch(plan)
                 qualification = qualify_patch_sources(plan)
+                graph = analyze_python_source_graph(plan)
                 self._queue.put((
-                    "reviewed", epoch, values, plan, diff, qualification,
+                    "reviewed", epoch, values, plan, diff, qualification, graph,
                 ))
             except BaseException as exc:
                 self._queue.put(("held", epoch, values, type(exc).__name__))
@@ -433,6 +441,8 @@ class PortablePatchWindow(tk.Toplevel):
         if (
             self._busy or plan is None or self._qualification is None
             or not self._qualification.permits_inert_export
+            or self._source_graph is None
+            or not self._source_graph.permits_inert_export
         ):
             return
         if self._reviewed_texts != self._source_inputs():
@@ -483,6 +493,8 @@ class PortablePatchWindow(tk.Toplevel):
         if (
             self._busy or plan is None or self._qualification is None
             or not self._qualification.permits_inert_export
+            or self._source_graph is None
+            or not self._source_graph.permits_inert_export
         ):
             return
         if self._reviewed_texts != self._source_inputs():
@@ -614,7 +626,7 @@ class PortablePatchWindow(tk.Toplevel):
                 self._busy = False
                 self.progress.stop()
                 if kind == "reviewed":
-                    _, _, inputs, plan, patch, qualification = message
+                    _, _, inputs, plan, patch, qualification, graph = message
                     if inputs != self._source_inputs():
                         self.status.set(
                             "Source inputs changed during review. Re-review required.",
@@ -623,6 +635,7 @@ class PortablePatchWindow(tk.Toplevel):
                         continue
                     self._plan = plan
                     self._qualification = qualification
+                    self._source_graph = graph
                     self._reviewed_texts = inputs
                     for index, item in enumerate(plan.entries):
                         self.files.insert(
@@ -650,6 +663,12 @@ class PortablePatchWindow(tk.Toplevel):
                         + " / unverified " + str(report["unverified_count"])
                         + " / held " + str(report["syntax_held_count"])
                         + (" · " + "; ".join(issues[:3]) if issues else "")
+                        + " · PYTHON GRAPH " + graph.status
+                        + " / linked " + str(graph.linked_import_count)
+                        + " / unverified " + str(graph.unverified_import_count)
+                        + " / invalid relatives " + str(graph.invalid_relative_count)
+                        + " / observed cycles " + str(len(graph.cycles))
+                        + " · GRAPH SHA " + graph.graph_sha256
                         + " · MANIFEST " + plan.manifest_sha256
                         + " · PATCH " + plan.patch_sha256,
                     )

@@ -451,6 +451,23 @@ def require_parseable_patch(plan: PortablePatchPlan) -> SourceQualification:
         raise StaticSourceHold(
             "original generated source contains structural errors; fix and re-review",
         )
+    # The standard Python parser accepts some imports which can never
+    # resolve from the proposed package hierarchy (e.g. three parent
+    # levels from a top-level module). Block only these proven invalid
+    # relations; external/unchanged project modules remain unverified.
+    from .desktop_source_graph import (
+        SourceGraphHold, analyze_python_source_graph,
+    )
+    try:
+        graph = analyze_python_source_graph(plan)
+    except SourceGraphHold as exc:
+        raise StaticSourceHold(
+            "original Python dependency graph cannot be qualified",
+        ) from exc
+    if not graph.permits_inert_export:
+        raise StaticSourceHold(
+            "generated source has invalid Python relative import or unbounded graph",
+        )
     return report
 
 

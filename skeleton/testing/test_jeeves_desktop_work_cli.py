@@ -198,6 +198,12 @@ class HeadlessSourceWorkflowTests(unittest.TestCase):
         self.assertEqual(public["new_files"], 1)
         self.assertEqual(public["existing_edits"], 1)
         self.assertEqual(result["qualification"]["file_count"], 2)
+        self.assertEqual(result["python_source_graph"]["status"],
+                         "observed-internal-imports")
+        self.assertEqual(len(result["python_source_graph"]["graph_sha256"]), 64)
+        self.assertFalse(
+            result["python_source_graph"]["all_dependencies_resolved"],
+        )
         self.assertEqual(public["manifest_sha256"],
                          result["qualification"]["source_manifest_sha256"])
         self.assertEqual(public["patch_sha256"],

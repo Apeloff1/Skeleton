@@ -174,3 +174,13 @@ last-written completion seal. Incomplete or tampered stages
 never count as qualified. The original checkout remains
 unchanged, and staged files are not executed or merged.
 See `docs/ai/JEEVES_PRIVATE_SOURCE_OVERLAY_STAGING.md`.
+
+## Import-link evidence on private delivery
+
+Approved Git patch receipts now include the SHA-256 and status
+of the non-executing Python source dependency graph. The same
+graph is included in sealed private source-overlay metadata.
+Invalid package-relative import depths block either form of
+private delivery; external dependencies remain unverified.
+This does not execute generated source or change the checkout.
+`docs/ai/JEEVES_OFFLINE_PYTHON_SOURCE_GRAPH.md`.

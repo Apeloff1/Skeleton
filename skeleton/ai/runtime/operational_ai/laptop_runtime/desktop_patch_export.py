@@ -162,6 +162,8 @@ def export_reviewed_patch(
     )
     try:
         static = require_parseable_patch(plan)
+        from .desktop_source_graph import analyze_python_source_graph
+        graph = analyze_python_source_graph(plan)
         patch = get_reviewed_patch(plan)
     except (OSError, ValueError, PatchBundleHold, StaticSourceHold) as exc:
         raise PatchExportHold("original source changed since operator review") from exc
@@ -228,6 +230,11 @@ def export_reviewed_patch(
             "git_index_modified": False,
             "patch_applied": False,
             "static_source_status": static.status,
+            "python_source_graph_sha256": graph.graph_sha256,
+            "python_source_graph_status": graph.status,
+            "linked_reviewed_python_imports": graph.linked_import_count,
+            "unverified_python_imports": graph.unverified_import_count,
+            "observed_python_cycles": len(graph.cycles),
             "parse_clean_count": sum(
                 f.status == "parse-clean" for f in static.files
             ),
