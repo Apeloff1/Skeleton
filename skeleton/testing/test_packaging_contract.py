@@ -29,14 +29,19 @@ def test_native_assembly_sources_and_header_are_package_data() -> None:
     assert "asm/*.h" in setup_cfg
 
 
-def test_packaging_workflow_watches_native_source_tree() -> None:
+def test_release_workflow_verifies_native_assembly_wheel_payload() -> None:
     workflow = (
-        ROOT / ".github" / "workflows" / "packaging-runtime-image.yml"
+        ROOT / ".github" / "workflows" / "reproducible-release.yml"
     ).read_text(encoding="utf-8")
 
-    assert workflow.count('      - "skeleton/native/**"') == 2
     assert "Verify native Assembly payload in wheel" in workflow
-    assert "skeleton/native/asm/skeleton_asm.h" in workflow
+    assert "exactly one wheel" in workflow
+    assert "native Assembly wheel payload missing" in workflow
+    assert "native Assembly wheel payload empty" in workflow
+    for source in (
+        "skeleton_asm.h", "aarch64.S", "x86_64.S", "README.md",
+    ):
+        assert f"skeleton/native/asm/{source}" in workflow
 
 
 def test_runtime_image_excludes_development_payload() -> None:
@@ -45,8 +50,8 @@ def test_runtime_image_excludes_development_payload() -> None:
     assert '.[dev]' not in dockerfile
     assert "p['optional-dependencies']['local-inference']" in dockerfile
     assert "p['optional-dependencies']['hosted-inference']" in dockerfile
-    assert "pip install --no-cache-dir -r /tmp/skeleton-runtime-requirements.txt" in dockerfile
-    assert "pip install --no-cache-dir --no-deps --no-build-isolation ." in dockerfile
+    assert "pip install --no-cache-dir --no-compile -r /tmp/skeleton-runtime-requirements.txt" in dockerfile
+    assert "pip install --no-cache-dir --no-compile --no-deps --no-build-isolation ." in dockerfile
     assert "pip install --no-cache-dir -e" not in dockerfile
     assert "COPY tests" not in dockerfile
     assert "USER appuser" in dockerfile

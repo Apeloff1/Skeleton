@@ -158,18 +158,22 @@ class SqliteJobQueue:
         return True
 
     def complete(self, job_id: str, worker_id: str,
-                 result: Optional[Mapping[str, Any]] = None) -> Job:
-        with self.db.tx() as c:
+                 result: Optional[Mapping[str, Any]] = None, *, transaction: Any = None) -> Job:
+        def finish(c):
             self._owned(c, job_id, worker_id)
             c.execute("UPDATE jobs SET status='succeeded', progress=1, result=?, lease_owner='',"
                       " updated_at=? WHERE job_id=?",
                       (json.dumps(dict(result or {}), sort_keys=True), self.clock(), job_id))
-        return self.get(job_id)  # type: ignore[return-value]
+            return self._job(c.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
+        if transaction is not None:
+            return finish(transaction)
+        with self.db.tx() as c:
+            return finish(c)
 
     def fail(self, job_id: str, worker_id: str, error: str, *,
-             retry_delay_s: float = 5.0) -> Job:
+             retry_delay_s: float = 5.0, transaction: Any = None) -> Job:
         now = self.clock()
-        with self.db.tx() as c:
+        def finish(c):
             self._owned(c, job_id, worker_id)
             r = c.execute("SELECT attempts, max_attempts FROM jobs WHERE job_id=?", (job_id,)).fetchone()
             if r["attempts"] >= r["max_attempts"]:
@@ -179,7 +183,11 @@ class SqliteJobQueue:
                 backoff = retry_delay_s * (2 ** (r["attempts"] - 1))
                 c.execute("UPDATE jobs SET status='queued', error=?, lease_owner='', run_after=?,"
                           " updated_at=? WHERE job_id=?", (error[:4000], now + backoff, now, job_id))
-        return self.get(job_id)  # type: ignore[return-value]
+            return self._job(c.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
+        if transaction is not None:
+            return finish(transaction)
+        with self.db.tx() as c:
+            return finish(c)
 
     def cancel(self, job_id: str) -> bool:
         with self.db.tx() as c:

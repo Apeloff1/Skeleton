@@ -4,6 +4,7 @@ export type ChatCooperationRole = 'plan' | 'draft' | 'critique' | 'refine';
 export type ChatCooperationPolicy = {
   schema_version: 'skeleton.ai.cooperation.v1';
   review_rounds: number;
+  draft_count?: number;
   max_stage_output_tokens: number;
   roles: Partial<Record<ChatCooperationRole, { provider_id: string; model_id: string }>>;
 };
@@ -17,7 +18,7 @@ export const COOPERATION_ROLES: readonly { role: ChatCooperationRole; label: str
   { role: 'plan', label: 'Planning' }, { role: 'draft', label: 'Drafting' },
   { role: 'critique', label: 'Review' }, { role: 'refine', label: 'Refinement' },
 ];
-export function cooperationStageCount(policy: ChatCooperationPolicy): number { return 2 + 2 * policy.review_rounds; }
+export function cooperationStageCount(policy: ChatCooperationPolicy): number { return 1 + (policy.draft_count ?? 1) + 2 * policy.review_rounds; }
 export function minimumCooperationTokens(policy: ChatCooperationPolicy): number { return 64 * cooperationStageCount(policy); }
 export function cooperationModelReady(model: ChatCooperationModel): boolean {
   return model.available && model.selectable && model.capabilities.includes('text-generation')
@@ -29,7 +30,7 @@ export function cooperationConfigurationIssues(policy: ChatCooperationPolicy, mo
   const issues: string[] = [];
   try { normalizeChatCooperation(policy); } catch (error) { return [error instanceof Error ? error.message : 'The review settings are invalid.']; }
   const minimum = minimumCooperationTokens(policy);
-  if (answerTokenLimit !== undefined && (!Number.isSafeInteger(answerTokenLimit) || answerTokenLimit < minimum)) issues.push(`${policy.review_rounds} review ${policy.review_rounds === 1 ? 'round needs' : 'rounds need'} at least ${minimum.toLocaleString()} total answer tokens. Increase the shared answer budget or reduce the rounds.`);
+  if (answerTokenLimit !== undefined && (!Number.isSafeInteger(answerTokenLimit) || answerTokenLimit < minimum)) issues.push(`${cooperationStageCount(policy)} model stages need at least ${minimum.toLocaleString()} total answer tokens. Increase the shared answer budget or reduce the drafts or rounds.`);
   for (const { role, label } of COOPERATION_ROLES) {
     const pair = policy.roles[role]; if (!pair) continue;
     const model = models.find(row => row.provider_id === pair.provider_id && row.model_id === pair.model_id);
@@ -40,6 +41,7 @@ export function cooperationConfigurationIssues(policy: ChatCooperationPolicy, mo
 export type ChatCooperationSummary = {
   schema_version: 'skeleton.ai.cooperation.v1'; policy_digest: string; brief_digest: string; source_snapshot_digest: string;
   completed_stages: number; total_stages: number; complete: boolean; independent_review_certified: false;
+  draft_count?: number;
   artifacts: { stage_id: string; role: ChatCooperationRole; output_digest: string; request_digest: string;
     provider_receipt: string; provider: string; model: string }[];
 };
@@ -47,13 +49,18 @@ export type ChatCooperationSummary = {
 export function validateChatCooperationSummary(value: ChatCooperationSummary): ChatCooperationSummary {
   const fail = (): never => { throw new ChatClientError('The recorded response-review evidence is invalid. Reopen the saved turn to recover its canonical answer.', { kind: 'protocol', code: 'invalid_cooperation_evidence', retryable: false }); };
   const hash = (raw: unknown) => typeof raw === 'string' && /^[a-f0-9]{64}$/.test(raw);
+  const draftCount = value?.draft_count === undefined ? 1 : value.draft_count;
+  const reviewRounds = (value?.total_stages - 1 - draftCount) / 2;
   if (!value || value.schema_version !== 'skeleton.ai.cooperation.v1' || !hash(value.policy_digest) || !hash(value.brief_digest)
-    || !hash(value.source_snapshot_digest) || ![4, 6, 8].includes(value.total_stages) || !Number.isSafeInteger(value.completed_stages)
+    || !hash(value.source_snapshot_digest) || !Number.isSafeInteger(value.total_stages)
+    || value.draft_count !== undefined && (!Number.isSafeInteger(draftCount) || draftCount < 2 || draftCount > 3)
+    || !Number.isSafeInteger(reviewRounds) || reviewRounds < 1 || reviewRounds > 3 || !Number.isSafeInteger(value.completed_stages)
     || value.completed_stages < 0 || value.completed_stages > value.total_stages || typeof value.complete !== 'boolean'
     || value.complete !== (value.completed_stages === value.total_stages) || value.independent_review_certified !== false
     || !Array.isArray(value.artifacts) || value.artifacts.length !== value.completed_stages) return fail();
-  const stages: { id: string; role: ChatCooperationRole }[] = [{ id: 'plan', role: 'plan' }, { id: 'draft', role: 'draft' }];
-  for (let round = 1; stages.length < value.total_stages; round += 1) stages.push({ id: `critique:${round}`, role: 'critique' }, { id: `refine:${round}`, role: 'refine' });
+  const stages: { id: string; role: ChatCooperationRole }[] = [{ id: 'plan', role: 'plan' }];
+  for (let draft = 1; draft <= draftCount; draft += 1) stages.push({ id: draftCount === 1 ? 'draft' : `draft:${draft}`, role: 'draft' });
+  for (let round = 1; round <= reviewRounds; round += 1) stages.push({ id: `critique:${round}`, role: 'critique' }, { id: `refine:${round}`, role: 'refine' });
   const receipts = new Set<string>();
   for (const [index, artifact] of value.artifacts.entries()) {
     if (!artifact || artifact.stage_id !== stages[index].id || artifact.role !== stages[index].role
@@ -72,7 +79,8 @@ export function reconcileChatCooperation(previous: ChatCooperationSummary | null
   if (!previous) return incoming;
   validateChatCooperationSummary(previous);
   if (previous.policy_digest !== incoming.policy_digest || previous.brief_digest !== incoming.brief_digest
-    || previous.source_snapshot_digest !== incoming.source_snapshot_digest || previous.total_stages !== incoming.total_stages) {
+    || previous.source_snapshot_digest !== incoming.source_snapshot_digest || previous.total_stages !== incoming.total_stages
+    || (previous.draft_count ?? 1) !== (incoming.draft_count ?? 1)) {
     throw new ChatClientError('The saved response-review identity changed. Reopen the canonical turn.', { kind: 'protocol', code: 'cooperation_identity_changed', retryable: false });
   }
   for (let index = 0; index < Math.min(previous.artifacts.length, incoming.artifacts.length); index += 1) {
@@ -100,9 +108,10 @@ export function normalizeChatCooperation(value: unknown): ChatCooperationPolicy 
   const invalid = (): never => { throw new ChatClientError('The saved response-review settings are invalid. Reopen the saved turn before continuing.', { kind: 'validation', code: 'invalid_cooperation_policy', retryable: false }); };
   if (!value || typeof value !== 'object' || Array.isArray(value)) return invalid();
   const policy = value as Record<string, unknown>;
-  if (Object.keys(policy).some(key => !['schema_version', 'review_rounds', 'max_stage_output_tokens', 'roles'].includes(key))
+  if (Object.keys(policy).some(key => !['schema_version', 'review_rounds', 'draft_count', 'max_stage_output_tokens', 'roles'].includes(key))
     || policy.schema_version !== 'skeleton.ai.cooperation.v1'
     || !Number.isSafeInteger(policy.review_rounds) || (policy.review_rounds as number) < 1 || (policy.review_rounds as number) > 3
+    || policy.draft_count !== undefined && (!Number.isSafeInteger(policy.draft_count) || (policy.draft_count as number) < 1 || (policy.draft_count as number) > 3)
     || !Number.isSafeInteger(policy.max_stage_output_tokens) || (policy.max_stage_output_tokens as number) < 64 || (policy.max_stage_output_tokens as number) > 4096
     || !policy.roles || typeof policy.roles !== 'object' || Array.isArray(policy.roles)) return invalid();
   const roles: ChatCooperationPolicy['roles'] = {};
@@ -116,5 +125,6 @@ export function normalizeChatCooperation(value: unknown): ChatCooperationPolicy 
     roles[role as ChatCooperationRole] = { provider_id: selection.provider_id, model_id: selection.model_id };
   }
   return { schema_version: 'skeleton.ai.cooperation.v1', review_rounds: policy.review_rounds as number,
-    max_stage_output_tokens: policy.max_stage_output_tokens as number, roles };
+    max_stage_output_tokens: policy.max_stage_output_tokens as number, roles,
+    ...((policy.draft_count as number) > 1 ? { draft_count: policy.draft_count as number } : {}) };
 }
