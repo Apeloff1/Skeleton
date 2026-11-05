@@ -93,6 +93,7 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_resource_shape.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_cli_*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_cumulative_budgets.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_jsonl_transport.py' -v
       - name: Canonical installed-model startup and local replay foundations
         env:
           PYTHONPATH: "."
