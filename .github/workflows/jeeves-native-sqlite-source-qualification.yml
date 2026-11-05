@@ -88,6 +88,7 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_operator_session.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_durable_cli.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_cli_timeout_and_redaction.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_source_fence*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_source_fence.py' -v
@@ -116,6 +117,13 @@ jobs:
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_laptop_real_acceptance_*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_cold_reopen_typed_source.py' -v
+      - name: Verify canonical source-object index and portable SQLite fixtures
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m pytest -q --noconftest tests/test_repository_integration.py -k test_integrated_source_identities_match_the_index
+          python -m unittest discover -s skeleton/testing -p 'test_ai_knowledge_plane.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_ai_flight_context_admission.py' -v
       - name: Keep source-only tests separate from device and release proof
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'
