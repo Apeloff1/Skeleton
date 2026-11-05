@@ -201,7 +201,9 @@ class OriginalAndReviewedCapsuleGraphTests(unittest.TestCase):
         with self.assertRaises(audit.CapsuleClosureHold):
             source("src/../bad.py", "value = 1\n")
         with self.assertRaises(audit.CapsuleClosureHold):
-            inspect(source("src/a.py", "value = 1\n"), )
+            audit.analyze_capsule_source_closure(
+                tuple(), source_manifest_sha256=A, source_patch_sha256=B,
+            )
 
     def test_source_sha_mutation_and_byte_count_refused(self):
         item = source("pkg/a.py", "value = 1\n")
