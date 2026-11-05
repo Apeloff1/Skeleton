@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_salt_dunes",
+  "title": "Salt Dunes: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010313793,
+  "width": 23,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 12,
+  "theme": "desert",
+  "starting_health": 5
+}

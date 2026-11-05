@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_cooperative_rescue_neon_undercity",
+  "genre": "cooperative_rescue",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Ena Sen",
+    "role": "responder",
+    "skill": "role synchronization",
+    "objective": "coordinate multiple rescue teams",
+    "weakness": "Personal responsibility for the grid brownouts aftermath",
+    "development": "Shares ownership of the remedy with residents"
+  },
+  "support": [
+    {
+      "id": "guide",
+      "name": "Mira Kest",
+      "knows": "Safe routes through elevated night markets",
+      "trust": "earned_by_documented_aid"
+    },
+    {
+      "id": "antagonist",
+      "name": "Kela Navin",
+      "affiliation": "a cascading emergency",
+      "agenda": "Privatize access to community capacitors",
+      "trust": "conditional_on_public_agreement"
+    }
+  ],
+  "factions": [
+    {
+      "id": "settlers",
+      "objective": "public welfare",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "objective": "scarce resource security",
+      "reputation": 0
+    }
+  ],
+  "dialogue_branches": [
+    {
+      "choice": "disclose_proof",
+      "reputation_delta": {
+        "settlers": 2,
+        "claimants": -1
+      }
+    },
+    {
+      "choice": "exclusive_license",
+      "reputation_delta": {
+        "settlers": -2,
+        "claimants": 2
+      }
+    }
+  ],
+  "rights": "original_story_material_only"
+}

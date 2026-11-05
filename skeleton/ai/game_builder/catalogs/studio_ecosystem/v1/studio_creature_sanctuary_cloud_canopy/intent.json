@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_cloud_canopy",
+  "title": "Cloud Canopy: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010313682,
+  "width": 27,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "forest",
+  "starting_health": 6
+}

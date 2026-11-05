@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_creature_sanctuary_sunken_metro",
+  "genre": "creature_sanctuary",
+  "biome": "sunken_metro",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Sunken Metro",
+    "landmark": "underwater tram hub",
+    "era": "the public restoration age",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control recycled batteries while rising flood gates destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "forensic"
+  },
+  "premise": "Tavi Juno, a caretaker with expertise in habitat preference, population feedback and ethical stewardship, must protect vulnerable species during a rapid environmental shift before rising flood gates reaches the underwater tram hub.",
+  "stakes": [
+    "Residents lose access to recycled batteries",
+    "an illegal collector consortium gains authority without independent evidence",
+    "The underwater tram hub becomes inaccessible beyond submerged tunnels"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured rising flood gates closes the main approach",
+      "goal": "Acquire an independent account of recycled batteries",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "an illegal collector consortium challenges Tavi Juno's mandate",
+      "goal": "Apply habitat preference, population feedback and ethical stewardship in submerged tunnels",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of underwater tram hub",
+      "goal": "protect vulnerable species during a rapid environmental shift",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains underwater tram hub with auditable access to recycled batteries"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain food, shelter and water without an illegal collector consortium"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over recycled batteries persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "underwater tram hub",
+      "submerged tunnels",
+      "pressure differentials"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}
