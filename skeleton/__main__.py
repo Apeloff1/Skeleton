@@ -67,6 +67,62 @@ Commands:
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
     creator     Canonical typed creator command surface (create/edit/test/preview/export)
+    world-laptop Laptop-first typed prompt, reviewed world, builder handoff and replay
+    world-canon  Original-world prompt, typed edit, proof and offline playable compile
+    world-assets Original asset briefs, reviewed provenance and engine compilation
+    world-timeline Source-bound causal chronology and temporal playable handoff
+    world-bundle Verified offline playable HTML and era engine handoff
+    world-plan   Typed source-derived production DAG, review and compilation
+    world-editor Offline browser scene editing with source-leased JSON export
+    world-route  Reviewed world navigation, deterministic route replay and playable handoff
+    world-cast   Original NPC presence, authored dialogue and playable continuity
+    world-experience Unified reviewed world, cast and route offline playable
+    world-session Source-verified offline play, save, resume and checkpoint replay
+    world-fork    Reviewed alternate save fork, causal replay and HTML5 handoff
+    world-epilogues Reviewed original ending closure and replay-verified HTML5 handoff
+    world-weather Reviewed deterministic scene weather and replay handoff
+    world-advisories Reviewed scene content notices and masked HTML5 player handoff
+    world-field-journal Player-authored source-leased notes and verified HTML5 handoff
+    world-migrate Reviewed source-revision save migration with exact replay proof
+    world-assurance Integrated exact-source gameplay assurance and HTML5 handoff
+    world-invariants Exhaustive authored world-state proof and playable handoff
+    world-scenario Authored gameplay acceptance and source-leased HTML5 proof
+    world-choice-impact Source-derived choice consequences and playable proof
+    world-playtest Bounded choice-coverage proof and verified playable QA handoff
+    world-revision Field-level causal impact review and source-verified HTML5 handoff
+    world-quest  Original objective authoring, earned consequences and quest proof
+    world-counterfactual Reviewed alternate endings from actual player choices
+    world-lore   Original lore canon, branch contradiction proof and player reveal
+    world-factions Reviewed faction reputation, earned choices and playable handoff
+    world-evidence Original clue discovery, reviewed canon and replayed playable
+    world-promises Reviewed narrative promises, closure proof and playable handoff
+    world-context Bounded source-leased author note custody and replay
+    world-integrated Verified cast, route, promises and private context playable
+    world-knowledge Reviewed NPC fact provenance, disclosure proof and playable handoff
+    world-atlas  Reviewed original regions, choice-bound travel and playable handoff
+    world-portals Reviewed multi-world original portal journeys and playable handoff
+    world-npc-schedule Reviewed NPC itineraries, temporal proof and offline playable
+    world-inventory Reviewed original item effects and source-bound HTML5 playable
+    world-puzzles Reviewed original scene riddles and verified choice-gated gameplay
+    world-studio-engine Reviewed original worlds to typed engine recipes
+    world-studio Reviewed multi-plane original-world playable assembly
+    world-director Unified reviewed chapters, cinematics and HTML5 playable
+    world-chapters Reviewed original chapter/act structure and playable navigation
+    world-cinematics Reviewed original scene storyboards, engine cues and HTML5 playable
+    world-pacing Reviewed dramatic arcs, climax witnesses and playable proof
+    world-accessibility Reviewed accessible narration and keyboard gameplay
+    world-localization Reviewed original language editions and offline playable
+    world-rumors Reviewed causal NPC information flow and playable handoff
+    world-testimony Reviewed NPC witnesses, contradiction proof and playable handoff
+    world-relationships Reviewed original NPC trust, replay and playable handoff
+    world-events Reviewed one-shot world events, flag closure and HTML5 handoff
+    world-dialogue-locales Reviewed original branching NPC language editions
+    world-dialogue-transcript Private source-leased NPC conversation custody and replay
+    world-interaction Unified original economy, character arcs and dialogue HTML5
+    world-dialogue Reviewed interactive NPC dialogue and atomic world-choice handoff
+    world-character-arcs Reviewed original character transformation and ending proof
+    world-economy Reviewed bounded resources, deterministic replay and HTML5 handoff
+    world-tools Static read-only typed Jeeves world tool registry and previews
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -761,6 +817,174 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "doctor": return _cmd_doctor(rest)
     if cmd == "creator": return _cmd_creator(rest)
+    if cmd == "world-laptop":
+        from skeleton.jeeves.worlds.laptop_cli import run as world_laptop_cli
+        return world_laptop_cli(rest)
+    if cmd == "world-canon":
+        from skeleton.jeeves.worlds.cli import run as world_canon_cli
+        return world_canon_cli(rest)
+    if cmd == "world-assets":
+        from skeleton.jeeves.worlds.assets_cli import run as world_assets_cli
+        return world_assets_cli(rest)
+    if cmd == "world-timeline":
+        from skeleton.jeeves.worlds.timeline_cli import run as world_timeline_cli
+        return world_timeline_cli(rest)
+    if cmd == "world-bundle":
+        from skeleton.jeeves.worlds.bundle_cli import run as world_bundle_cli
+        return world_bundle_cli(rest)
+    if cmd == "world-plan":
+        from skeleton.jeeves.worlds.plan_cli import run as world_plan_cli
+        return world_plan_cli(rest)
+    if cmd == "world-editor":
+        from skeleton.jeeves.worlds.editor_cli import run as world_editor_cli
+        return world_editor_cli(rest)
+    if cmd == "world-route":
+        from skeleton.jeeves.worlds.route_cli import run as world_route_cli
+        return world_route_cli(rest)
+    if cmd == "world-cast":
+        from skeleton.jeeves.worlds.cast_cli import run as world_cast_cli
+        return world_cast_cli(rest)
+    if cmd == "world-experience":
+        from skeleton.jeeves.worlds.experience_cli import run as world_experience_cli
+        return world_experience_cli(rest)
+    if cmd == "world-revision":
+        from skeleton.jeeves.worlds.revision_cli import run as world_revision_cli
+        return world_revision_cli(rest)
+    if cmd == "world-assurance":
+        from skeleton.jeeves.worlds.assurance_cli import run
+        return run(rest)
+    if cmd == "world-invariants":
+        from skeleton.jeeves.worlds.invariants_cli import run
+        return run(rest)
+    if cmd == "world-scenario":
+        from skeleton.jeeves.worlds.scenario_cli import run
+        return run(rest)
+    if cmd == "world-choice-impact":
+        from skeleton.jeeves.worlds.choice_impact_cli import run
+        return run(rest)
+    if cmd == "world-playtest":
+        from skeleton.jeeves.worlds.playtest_cli import run as world_playtest_cli
+        return world_playtest_cli(rest)
+    if cmd == "world-migrate":
+        from skeleton.jeeves.worlds.migration_cli import run
+        return run(rest)
+    if cmd == "world-field-journal":
+        from skeleton.jeeves.worlds.field_journal_cli import run as field_journal_cli
+        return field_journal_cli(rest)
+    if cmd == "world-weather":
+        from skeleton.jeeves.worlds.weather_cli import run as world_weather_cli
+        return world_weather_cli(rest)
+    if cmd == "world-advisories":
+        from skeleton.jeeves.worlds.advisories_cli import run as advisories_cli
+        return advisories_cli(rest)
+    if cmd == "world-epilogues":
+        from skeleton.jeeves.worlds.epilogues_cli import run as epilogues_cli
+        return epilogues_cli(rest)
+    if cmd == "world-fork":
+        from skeleton.jeeves.worlds.branching_cli import run as world_fork_cli
+        return world_fork_cli(rest)
+    if cmd == "world-session":
+        from skeleton.jeeves.worlds.session_cli import run as world_session_cli
+        return world_session_cli(rest)
+    if cmd == "world-quest":
+        from skeleton.jeeves.worlds.quest_cli import run as world_quest_cli
+        return world_quest_cli(rest)
+    if cmd == "world-counterfactual":
+        from skeleton.jeeves.worlds.counterfactual_cli import run as world_counterfactual_cli
+        return world_counterfactual_cli(rest)
+    if cmd == "world-lore":
+        from skeleton.jeeves.worlds.lore_cli import run as world_lore_cli
+        return world_lore_cli(rest)
+    if cmd == "world-factions":
+        from skeleton.jeeves.worlds.factions_cli import run as world_factions_cli
+        return world_factions_cli(rest)
+    if cmd == "world-evidence":
+        from skeleton.jeeves.worlds.evidence_cli import run as world_evidence_cli
+        return world_evidence_cli(rest)
+    if cmd == "world-integrated":
+        from skeleton.jeeves.worlds.integrated_cli import run as world_integrated_cli
+        return world_integrated_cli(rest)
+    if cmd == "world-context":
+        from skeleton.jeeves.worlds.context_cli import run as world_context_cli
+        return world_context_cli(rest)
+    if cmd == "world-promises":
+        from skeleton.jeeves.worlds.promises_cli import run as world_promises_cli
+        return world_promises_cli(rest)
+    if cmd == "world-knowledge":
+        from skeleton.jeeves.worlds.knowledge_cli import run as world_knowledge_cli
+        return world_knowledge_cli(rest)
+    if cmd == "world-studio-engine":
+        from skeleton.jeeves.worlds.studio_engine_cli import run as world_studio_engine_cli
+        return world_studio_engine_cli(rest)
+    if cmd == "world-studio":
+        from skeleton.jeeves.worlds.studio_assembly_cli import run as world_studio_cli
+        return world_studio_cli(rest)
+    if cmd == "world-director":
+        from skeleton.jeeves.worlds.director_cli import run as world_director_cli
+        return world_director_cli(rest)
+    if cmd == "world-chapters":
+        from skeleton.jeeves.worlds.chapters_cli import run as world_chapters_cli
+        return world_chapters_cli(rest)
+    if cmd == "world-cinematics":
+        from skeleton.jeeves.worlds.cinematics_cli import run as world_cinematics_cli
+        return world_cinematics_cli(rest)
+    if cmd == "world-pacing":
+        from skeleton.jeeves.worlds.pacing_cli import run as world_pacing_cli
+        return world_pacing_cli(rest)
+    if cmd == "world-accessibility":
+        from skeleton.jeeves.worlds.accessibility_cli import run as world_accessibility_cli
+        return world_accessibility_cli(rest)
+    if cmd == "world-localization":
+        from skeleton.jeeves.worlds.localization_cli import run as world_localization_cli
+        return world_localization_cli(rest)
+    if cmd == "world-rumors":
+        from skeleton.jeeves.worlds.rumors_cli import run as world_rumors_cli
+        return world_rumors_cli(rest)
+    if cmd == "world-testimony":
+        from skeleton.jeeves.worlds.testimony_cli import run as world_testimony_cli
+        return world_testimony_cli(rest)
+    if cmd == "world-relationships":
+        from skeleton.jeeves.worlds.relationships_cli import run as relationships_cli
+        return relationships_cli(rest)
+    if cmd == "world-events":
+        from skeleton.jeeves.worlds.events_cli import run as world_events_cli
+        return world_events_cli(rest)
+    if cmd == "world-puzzles":
+        from skeleton.jeeves.worlds.puzzles_cli import run as world_puzzles_cli
+        return world_puzzles_cli(rest)
+    if cmd == "world-inventory":
+        from skeleton.jeeves.worlds.inventory_cli import run as world_inventory_cli
+        return world_inventory_cli(rest)
+    if cmd == "world-npc-schedule":
+        from skeleton.jeeves.worlds.npc_schedule_cli import run as npc_schedule_cli
+        return npc_schedule_cli(rest)
+    if cmd == "world-portals":
+        from skeleton.jeeves.worlds.portals_cli import run as world_portals_cli
+        return world_portals_cli(rest)
+    if cmd == "world-atlas":
+        from skeleton.jeeves.worlds.atlas_cli import run as world_atlas_cli
+        return world_atlas_cli(rest)
+    if cmd == "world-dialogue-locales":
+        from skeleton.jeeves.worlds.dialogue_localization_cli import run as dialogue_locales_cli
+        return dialogue_locales_cli(rest)
+    if cmd == "world-dialogue-transcript":
+        from skeleton.jeeves.worlds.dialogue_transcript_cli import run as transcript_cli
+        return transcript_cli(rest)
+    if cmd == "world-interaction":
+        from skeleton.jeeves.worlds.interaction_assembly_cli import run as interaction_cli
+        return interaction_cli(rest)
+    if cmd == "world-dialogue":
+        from skeleton.jeeves.worlds.dialogue_graph_cli import run as dialogue_cli
+        return dialogue_cli(rest)
+    if cmd == "world-character-arcs":
+        from skeleton.jeeves.worlds.character_arcs_cli import run as arcs_cli
+        return arcs_cli(rest)
+    if cmd == "world-economy":
+        from skeleton.jeeves.worlds.economy_cli import run as economy_cli
+        return economy_cli(rest)
+    if cmd == "world-tools":
+        from skeleton.jeeves.worlds.tools_cli import run as world_tools_cli
+        return world_tools_cli(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
