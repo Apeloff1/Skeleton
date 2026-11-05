@@ -291,6 +291,23 @@ def _paint_world(project: StudioProject, args: Mapping[str, Any],
                     data[position] = floor
                 elif obstacle:
                     data[position] = wall
+        if tuple(data) == layer.data:
+            # The caller explicitly selected this layer for an authored Epic
+            # variation. A coincidental match to the inherited source must not
+            # silently skip it. Place one deterministic accent off the shared
+            # navigable center spine; never alter an out-of-region tile.
+            changed = False
+            for v in range(height):
+                if changed:
+                    break
+                for u in range(width):
+                    if (abs(u - (width - 1) / 2) <= .5
+                            or abs(v - (height - 1) / 2) <= .5):
+                        continue
+                    position = (y0 + v) * layer.width + x0 + u
+                    data[position] = wall if data[position] == floor else floor
+                    changed = True
+                    break
         updated = _replace_layer(updated, index, replace(layer, data=tuple(data)))
     return updated
 
@@ -374,7 +391,10 @@ def edit_epic(project: StudioProject, operation: str,
     parent, axis = parent_action(operation)
     first_cast = len(project.placements)
     first_quests = len(project.native_quests)
-    candidate = execute(project, parent, args)
+    # Epic-only sibling-layer selection belongs to _paint_world; the
+    # underlying recipe must retain its strict source-parameter allowlist.
+    parent_args = {key: value for key, value in args.items() if key != "epic_layers"}
+    candidate = execute(project, parent, parent_args)
     candidate = _paint_world(candidate, args, axis)
     candidate = _event(candidate, operation, args, axis)
     candidate = _stage_new_actors(candidate, first_cast, axis, args["seed"])

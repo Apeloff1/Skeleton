@@ -1,0 +1,12 @@
+[
+  {
+    "sequence": 0,
+    "recipe_id": "make_wick",
+    "batches": 1
+  },
+  {
+    "sequence": 1,
+    "recipe_id": "build_lantern",
+    "batches": 1
+  }
+]

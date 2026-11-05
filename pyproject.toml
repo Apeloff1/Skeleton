@@ -55,10 +55,12 @@ hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
 skeleton = "skeleton.__main__:main"
+skeleton-game-craft = "skeleton.game.gameplay.crafting_cli:main"
 skeleton-dev = "skeleton.developer.cli:main"
 skeleton-bootstrap = "skeleton.developer.bootstrap:main"
 skeleton-repo-machine = "skeleton.repo_machine.cli:main"
 skeleton-train-local-model = "skeleton.ai.runtime.inference.train:main"
+skeleton-local-model-inventory = "skeleton.ai.model_runtime.offline_inventory:main"
 skeleton-game-learning = "skeleton.jeeves.game_learning_cli:main"
 skeleton-game-pareto-train = "skeleton.ai.runtime.inference.game_pareto_train:main"
 skeleton-game-pareto-export = "skeleton.ai.runtime.inference.game_pareto_dataset:main"
