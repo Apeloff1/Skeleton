@@ -123,16 +123,15 @@ def micro_db_query(shard: str, limit: int = 50, offset: int = 0) -> dict:
 
 
 class SeedReq(BaseModel):
-    target_multiplier: float = 1.0
+    # Pydantic must reject nonfinite and nonpositive inputs before route execution.
+    # A NaN previously bypassed the `> 200` check and crashed in the seeder.
+    target_multiplier: float = Field(default=1.0, gt=0, le=200, allow_inf_nan=False)
     force: bool = False
     subset: list[str] | None = None
 
 
 @router.post("/micro-dbs/seed")
 def micro_db_seed(req: SeedReq) -> dict:
-    # Heavy operation – guard against accidental thermonuclear seeds.
-    if req.target_multiplier > 200:
-        raise HTTPException(400, "target_multiplier capped at 200 for safety")
     # Lazy import to keep router boot light
     from seeds.hyperscale_micro_dbs import seed_all
     return seed_all(
