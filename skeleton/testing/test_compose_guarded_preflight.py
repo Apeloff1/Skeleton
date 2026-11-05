@@ -157,7 +157,24 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.db.hello.pop("hosts")
 
 
-    async def test_conflicting_primary_role_flags_fail_before_epoch(self):\n        for role in ("secondary", "arbiterOnly"):\n            for value in (True, 1, "false", [], {}):\n                with self.subTest(role=role, value=repr(value)):\n                    self.db.hello[role] = value\n                    result = await self.inspect()\n                    self.assertEqual(result["code"], "mongo_replica_set_primary_required")\n                    self.assertFalse(result["guarded_local_ai_ready"])\n                    self.assertEqual(FakeEpoch.instances, [])\n                    self.db.hello.pop(role)\n\n    async def test_explicit_false_role_flags_remain_observation_only(self):\n        self.db.hello.update({"secondary": False, "arbiterOnly": False})\n        result = await self.inspect()\n        self.assertEqual(result["code"], "mongo_epoch_observed_only")\n        self.assertFalse(result["guarded_local_ai_ready"])\n\n    async def test_primary_cannot_claim_passive_or_arbiter_role(self):
+    async def test_conflicting_primary_role_flags_fail_before_epoch(self):
+        for role in ("secondary", "arbiterOnly"):
+            for value in (True, 1, "false", [], {}):
+                with self.subTest(role=role, value=repr(value)):
+                    self.db.hello[role] = value
+                    result = await self.inspect()
+                    self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                    self.assertFalse(result["guarded_local_ai_ready"])
+                    self.assertEqual(FakeEpoch.instances, [])
+                    self.db.hello.pop(role)
+
+    async def test_explicit_false_role_flags_remain_observation_only(self):
+        self.db.hello.update({"secondary": False, "arbiterOnly": False})
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_primary_cannot_claim_passive_or_arbiter_role(self):
         for field in ("passives", "arbiters"):
             for endpoint_field in ("me", "primary"):
                 with self.subTest(role=field, endpoint=endpoint_field):
