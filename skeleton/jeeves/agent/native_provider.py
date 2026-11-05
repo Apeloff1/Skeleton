@@ -36,7 +36,13 @@ class NativeJeevesProvider:
 
     name = "jeeves_native"
 
-    def __init__(self, worker: Any) -> None:
+    def __init__(self, worker: Any, *, maximum_attempts: int = 8192) -> None:
+        # Once this bounded process-local uncertainty fence is full, admit
+        # replay reads but hold new generation until a cold process restart.
+        # The canonical SQLite spine preserves durable pending/commit fencing.
+        if type(maximum_attempts) is not int or not 1 <= maximum_attempts <= 65536:
+            raise ProviderError("bounded native attempt-fence capacity required")
+        self._maximum_attempts = maximum_attempts
         self._worker = worker
         self._identity = ActiveModel.from_supervisor(worker)
         self._bridge = TurnBridge(worker)
@@ -118,6 +124,11 @@ class NativeJeevesProvider:
             else:
                 if native_request_id in self._attempted:
                     raise ProviderError("uncertain native request requires explicit custody reconciliation")
+                if len(self._attempted) >= self._maximum_attempts:
+                    # Never evict an uncertain operation merely to free RAM.
+                    # A clean provider restart may re-admit new identities;
+                    # SQLite remains the authority for old committed/pending work.
+                    raise ProviderError("native process attempt ledger at safe capacity")
                 # This in-process fence prevents a repeated call after an
                 # exception. The canonical SQLite pending-state fence also
                 # survives a process crash and prevents a duplicate inference.
