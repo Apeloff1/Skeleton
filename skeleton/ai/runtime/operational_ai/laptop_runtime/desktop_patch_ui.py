@@ -23,6 +23,10 @@ from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
 from .desktop_private_overlay import (
     stage_reviewed_overlay, verify_staged_overlay,
 )
+from .desktop_private_capsule import (
+    prepare_private_capsule, publish_private_capsule, verify_private_capsule,
+    PrivateCapsulePlan,
+)
 from .desktop_source_qualification import qualify_patch_sources
 from .desktop_source_graph import analyze_python_source_graph
 from .desktop_patch_reconcile import reconcile_reviewed_patch
@@ -39,8 +43,8 @@ class PortablePatchWindow(tk.Toplevel):
         super().__init__(parent)
         self.parent_ui = parent
         self.title("Jeeves — Review and Export Native Git Patch")
-        self.geometry("1180x850")
-        self.minsize(900, 675)
+        self.geometry("1180x990")
+        self.minsize(900, 790)
         self.protocol("WM_DELETE_WINDOW", self._exit)
         self.root_path = tk.StringVar()
         self.export_path = tk.StringVar()
@@ -57,6 +61,11 @@ class PortablePatchWindow(tk.Toplevel):
         self._export_receipt = None
         self._stage_receipt = None
         self._stage_path = None
+        self._capsule_plan: PrivateCapsulePlan | None = None
+        self._capsule_source_selection = None
+        self._capsule_receipt = None
+        self._capsule_path = None
+        self.capsule_expected = tk.StringVar()
         self._qualification = None
         self._source_graph = None
         self._queue: Queue = Queue()
@@ -237,6 +246,49 @@ class PortablePatchWindow(tk.Toplevel):
         ).grid(row=10, column=0, sticky="ew", pady=(7, 0))
         self.progress = ttk.Progressbar(frame, mode="indeterminate")
         self.progress.grid(row=11, column=0, sticky="ew", pady=(7, 0))
+
+        capsule = ttk.LabelFrame(
+            frame, text="Selected original dependencies + revised source capsule",
+            padding=7,
+        )
+        capsule.grid(row=12, column=0, sticky="ew", pady=(9, 2))
+        capsule.columnconfigure(1, weight=1)
+        ttk.Label(
+            capsule,
+            text="Explicit unmodified source paths (one relative path per line)",
+        ).grid(row=0, column=0, sticky="w")
+        self.capsule_sources = ScrolledText(
+            capsule, height=3, wrap="none", undo=True,
+        )
+        self.capsule_sources.grid(
+            row=0, column=1, columnspan=3, sticky="ew", padx=5,
+        )
+        ttk.Label(capsule, text="FULL capsule SHA-256").grid(
+            row=1, column=0, sticky="w",
+        )
+        ttk.Entry(capsule, textvariable=self.capsule_expected).grid(
+            row=1, column=1, sticky="ew", padx=5,
+        )
+        self.capsule_review_button = ttk.Button(
+            capsule, text="Inspect selected source", command=self._review_capsule,
+        )
+        self.capsule_review_button.grid(row=1, column=2, padx=(4, 0))
+        self.capsule_publish_button = ttk.Button(
+            capsule, text="Publish private capsule", command=self._publish_capsule,
+        )
+        self.capsule_publish_button.grid(row=1, column=3, padx=(5, 0))
+        self.capsule_verify_button = ttk.Button(
+            capsule, text="Cold verify capsule", command=self._verify_capsule,
+        )
+        self.capsule_verify_button.grid(row=2, column=3, pady=(6, 0))
+        ttk.Label(
+            capsule, wraplength=900,
+            text=(
+                "Capsule includes only selected unchanged sources plus the exact "
+                "reviewed new/edited files. No original checkout writes, no "
+                "model inference, no Git, no code execution or completeness claim."
+            ),
+        ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(5, 0))
         self._buttons()
 
     def _source_inputs(self):
@@ -325,6 +377,11 @@ class PortablePatchWindow(tk.Toplevel):
         self._export_receipt = None
         self._stage_receipt = None
         self._stage_path = None
+        self._capsule_plan = None
+        self._capsule_source_selection = None
+        self._capsule_receipt = None
+        self._capsule_path = None
+        self.capsule_expected.set("")
         self._qualification = None
         self._source_graph = None
         self.expected_manifest.set("")
@@ -371,6 +428,26 @@ class PortablePatchWindow(tk.Toplevel):
             state="normal" if (
                 not self._busy and self._stage_receipt is not None
                 and self._stage_path is not None
+            ) else "disabled",
+        )
+        self.capsule_review_button.configure(
+            state="normal" if (
+                not self._busy and self._plan is not None
+                and self._qualification is not None
+                and self._qualification.permits_inert_export
+                and self._source_graph is not None
+                and self._source_graph.permits_inert_export
+            ) else "disabled",
+        )
+        self.capsule_publish_button.configure(
+            state="normal" if (
+                not self._busy and self._capsule_plan is not None
+            ) else "disabled",
+        )
+        self.capsule_verify_button.configure(
+            state="normal" if (
+                not self._busy and self._capsule_receipt is not None
+                and self._capsule_path is not None
             ) else "disabled",
         )
 
@@ -560,6 +637,152 @@ class PortablePatchWindow(tk.Toplevel):
 
         threading.Thread(target=work, daemon=True).start()
 
+
+    def _capsule_selected(self) -> str:
+        return self.capsule_sources.get("1.0", "end-1c")
+
+    def _review_capsule(self):
+        plan = self._plan
+        if (
+            self._busy or plan is None or self._qualification is None
+            or not self._qualification.permits_inert_export
+            or self._source_graph is None
+            or not self._source_graph.permits_inert_export
+        ):
+            return
+        if self._reviewed_texts != self._source_inputs():
+            self._invalidate()
+            return
+        selected = self._capsule_selected()
+        self._capsule_plan = None
+        self._capsule_receipt = None
+        self._capsule_path = None
+        self.capsule_expected.set("")
+        epoch = self._epoch
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set(
+            "Cold-reading selected original dependencies and reviewed "
+            "source/graph SHA without writing original source…",
+        )
+
+        def work():
+            try:
+                capsule_plan = prepare_private_capsule(plan, selected)
+                self._queue.put((
+                    "capsule-reviewed", epoch, selected, capsule_plan,
+                ))
+            except BaseException as exc:
+                self._queue.put((
+                    "capsule-held", epoch, selected, type(exc).__name__,
+                ))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _publish_capsule(self):
+        planned = self._capsule_plan
+        if self._busy or planned is None or self._plan is None:
+            return
+        if (
+            self._reviewed_texts != self._source_inputs()
+            or self._capsule_source_selection != self._capsule_selected()
+        ):
+            self._invalidate()
+            return
+        if (
+            self.expected_manifest.get() != planned.patch.manifest_sha256
+            or self.expected_patch.get() != planned.patch.patch_sha256
+            or self.capsule_expected.get() != planned.capsule_sha256
+        ):
+            self.status.set("Type all THREE original source/patch/capsule SHA-256 values")
+            return
+        parent = filedialog.askdirectory(
+            parent=self,
+            title="Choose EXISTING 0700 owner-private directory outside source project",
+        )
+        if not parent:
+            return
+        name = simpledialog.askstring(
+            "New selected-source capsule",
+            "Enter a NEW capsule folder name. Existing paths are never overwritten.",
+            parent=self,
+        )
+        if not name:
+            return
+        destination = str(Path(parent) / name)
+        if not messagebox.askyesno(
+            "Publish selected-source capsule?",
+            "Create ONE new 0700 owner-private directory with exact changed "
+            "source and selected unchanged original files. Every final byte "
+            "is read back and the seal written last. A power failure may "
+            "leave an incomplete private directory. This does not run code, "
+            "modify the checkout, use Git or qualify a complete project. Continue?",
+            parent=self,
+        ):
+            return
+        epoch = self._epoch
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set(
+            "Writing new private source capsule under pinned no-follow "
+            "descriptors, then sealing after independent source rechecks…",
+        )
+
+        def work():
+            try:
+                result = publish_private_capsule(
+                    planned, destination,
+                    expected_capsule_sha256=planned.capsule_sha256,
+                    expected_manifest_sha256=planned.patch.manifest_sha256,
+                    expected_patch_sha256=planned.patch.patch_sha256,
+                    approve_private_capsule=True,
+                )
+                self._queue.put(("capsule-published", epoch, destination, result))
+            except BaseException as exc:
+                self._queue.put((
+                    "capsule-held", epoch, destination, type(exc).__name__,
+                ))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _verify_capsule(self):
+        planned = self._capsule_plan
+        receipt = self._capsule_receipt
+        source = self._capsule_path
+        if self._busy or planned is None or receipt is None or source is None:
+            return
+        if (
+            self._reviewed_texts != self._source_inputs()
+            or self._capsule_source_selection != self._capsule_selected()
+        ):
+            self._invalidate()
+            return
+        epoch = self._epoch
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set("Cold verifying every sealed private source byte and tree…")
+
+        def work():
+            try:
+                verified = verify_private_capsule(
+                    source,
+                    original_project_root=planned.patch.root,
+                    expected_capsule_sha256=planned.capsule_sha256,
+                    expected_seal_sha256=receipt["seal_sha256"],
+                )
+                self._queue.put((
+                    "capsule-verified", epoch, source, verified,
+                ))
+            except BaseException as exc:
+                self._queue.put((
+                    "capsule-held", epoch, source, type(exc).__name__,
+                ))
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _verify_stage(self):
         if (
             self._busy or self._stage_path is None
@@ -741,6 +964,42 @@ class PortablePatchWindow(tk.Toplevel):
                             + ". Apply only after separate Git source-review, "
                             + "git apply --check and operator authorization.",
                         )
+                elif kind == "capsule-reviewed":
+                    _, _, selected, capsule_plan = message
+                    if (
+                        selected != self._capsule_selected()
+                        or self._reviewed_texts != self._source_inputs()
+                    ):
+                        self._capsule_plan = None
+                        self.status.set("Selected source changed; inspect again before approval.")
+                        self._buttons()
+                        continue
+                    self._capsule_plan = capsule_plan
+                    self._capsule_source_selection = selected
+                    self.capsule_expected.set("")
+                    self.status.set(
+                        "SOURCE CAPSULE REVIEWED · "
+                        + str(len(capsule_plan.originals)) + " exact dependencies / "
+                        + str(len(capsule_plan.patch.entries)) + " proposed changes · "
+                        + str(capsule_plan.total_bytes) + " source bytes · "
+                        + "FULL CAPSULE SHA " + capsule_plan.capsule_sha256
+                        + " · type all three SHA values and approve separately."
+                    )
+                elif kind == "capsule-published":
+                    self._capsule_path = message[2]
+                    self._capsule_receipt = message[3]
+                    self.status.set(
+                        "PRIVATE SOURCE CAPSULE SEALED, NOT EXECUTED · "
+                        + str(message[3]["file_count"]) + " exact files · "
+                        + "SEAL SHA " + str(message[3]["seal_sha256"])
+                        + " · cold verify before separate testing or use."
+                    )
+                elif kind == "capsule-verified":
+                    self.status.set(
+                        "COLD SOURCE CAPSULE VERIFIED · "
+                        + str(message[3]["file_count"]) + " unchanged exact "
+                        "source files · no code executed or checkout change."
+                    )
                 elif kind == "staged":
                     self._stage_path = message[2]
                     self._stage_receipt = message[3]
