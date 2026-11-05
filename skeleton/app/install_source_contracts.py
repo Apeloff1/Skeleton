@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import glob
 import itertools
+import os
 import shlex
 import stat
 from pathlib import Path, PurePosixPath
@@ -32,8 +33,38 @@ _REQUIRED_IGNORES = (
 )
 
 
+
+def _bounded_source_text(path: Path) -> str:
+    """Admit the source manifest through one stable descriptor, never a link."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    if path.is_symlink():
+        raise ValueError("linked build contract input")
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as source:
+        opened = os.fstat(source.fileno())
+        current = os.lstat(path)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            or (os.name != "nt" and opened.st_nlink != 1)
+            or opened.st_size > MAX_DOCKERFILE_BYTES
+        ):
+            raise ValueError("unsafe or oversized build contract input")
+        data = source.read(MAX_DOCKERFILE_BYTES + 1)
+        current = os.lstat(path)
+        if (
+            len(data) > MAX_DOCKERFILE_BYTES
+            or not stat.S_ISREG(current.st_mode)
+            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+        ):
+            raise ValueError("build contract input changed or exceeded budget")
+    return data.decode("utf-8")
+
 def _source_path_error(context: Path, relative: str) -> str | None:
     """Return a bounded category, not the contents of any source file."""
+    if not context.is_dir() or context.is_symlink():
+        return "build context is missing or linked"
     if (
         not relative
         or len(relative.encode("utf-8", errors="replace")) > MAX_SOURCE_PATH_BYTES
@@ -108,23 +139,14 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
         source = root / dockerfile
         ignored = root / ignore_path
         try:
-            source_stat = source.lstat()
-            if (
-                not stat.S_ISREG(source_stat.st_mode)
-                or source_stat.st_size > MAX_DOCKERFILE_BYTES
-            ):
-                raise ValueError("Dockerfile is not a bounded regular file")
-            instructions = source.read_text(encoding="utf-8").splitlines()
+            instructions = _bounded_source_text(source).splitlines()
         except (OSError, UnicodeError, ValueError):
             issues.append(f"{scope}: Dockerfile missing, linked, oversized or unreadable")
             continue
         try:
-            ignore_stat = ignored.lstat()
-            if not stat.S_ISREG(ignore_stat.st_mode) or ignore_stat.st_size > MAX_DOCKERFILE_BYTES:
-                raise ValueError("ignore file is not a bounded regular file")
             ignore_lines = {
                 line.strip()
-                for line in ignored.read_text(encoding="utf-8").splitlines()
+                for line in _bounded_source_text(ignored).splitlines()
                 if line.strip() and not line.strip().startswith("#")
             }
         except (OSError, UnicodeError, ValueError):
