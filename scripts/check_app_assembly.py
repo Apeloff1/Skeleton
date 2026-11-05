@@ -1011,7 +1011,33 @@ def audit_product_route_registry() -> None:
         )
 
 
+def audit_preinstall_docker_sources() -> None:
+    """Keep the actual Dockerfile inputs inside the reviewed source contract."""
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    defects = build_source_errors(ROOT)
+    check(
+        not defects,
+        (
+            "pre-first-install Docker source admission failed: "
+            + "; ".join(defects[:4])
+            if defects
+            else "pre-first-install Docker source admission passed"
+        ),
+    )
+    manifest = json.loads(read("skeleton/app/manifest.json"))
+    required = manifest["required_paths"]
+    for path in (
+        "Dockerfile.dockerignore",
+        "backend/Dockerfile.dockerignore",
+        "frontend/.dockerignore",
+        "skeleton/app/install_source_contracts.py",
+    ):
+        check(path in required, f"installed assembly omits required Docker input: {path}")
+
+
 def main() -> int:
+    audit_preinstall_docker_sources()
     audit_manifest()
     audit_topology_alignment()
     audit_backend_public_identity()
