@@ -419,3 +419,18 @@ model/SQLite/private-source owners. Long work is performed on an isolated
 thread with held/no-retry receipts. No external service, source execution,
 hidden prompt or automatic source/Git write is introduced.
 See `docs/ai/JEEVES_NATIVE_CAMPAIGN_DESKTOP.md`.
+
+## One-click original goal-to-native-campaign composition
+
+The advanced Jeeves campaign window now provides **Compose tasks from
+original goals**: a private task planner that reuses the current installed
+local model and resource settings, accepts a finite human-authored task
+DAG and owner-private output names, double-checks the current original
+project source contexts and derives full native job SHA-256 values using
+the EXISTING read-only native GGUF inspector. The composer checks total
+campaign constraints and target absence without starting a model,
+rewrites only the owner-controlled private campaign editor, and never
+transfers old model or private storage approvals. Original source
+generation still requires the later explicit three-grant native run;
+the actual model, SQLite, escrow and patch publishers are unchanged.
+See `docs/ai/JEEVES_NATIVE_CAMPAIGN_GOAL_COMPOSER.md`.

@@ -35,6 +35,7 @@ class NativeCampaignWindow(tk.Toplevel):
         self._closing = False
         self._epoch = 0
         self._worker: threading.Thread | None = None
+        self._composer = None  # Exactly one private goal-to-campaign preview.
         self.status = tk.StringVar(value=(
             "Paste the original inspected campaign JSON. No model starts during review."
         ))
@@ -84,6 +85,11 @@ class NativeCampaignWindow(tk.Toplevel):
             command=lambda: self._dispatch("inspect"),
         )
         self.inspect_button.grid(row=0, column=0, sticky="w")
+        self.compose_button = ttk.Button(
+            phase_one, text="Compose tasks from original goals",
+            command=self._compose,
+        )
+        self.compose_button.grid(row=0, column=1, sticky="w", padx=9)
         ttk.Label(phase_one, text="Type FULL reviewed campaign SHA-256").grid(
             row=1, column=0, sticky="w", pady=(4, 0),
         )
@@ -166,6 +172,20 @@ class NativeCampaignWindow(tk.Toplevel):
             row=8, column=0, sticky="w", pady=(5, 0),
         )
 
+    def _compose(self):
+        if self._busy or self._closing or self._operator.native_launch_consumed:
+            self.status.set(
+                "Native campaign may already have committed; do not rearm "
+                "task planning in this operator window.",
+            )
+            return
+        if self._composer is not None:
+            self._composer.lift()
+            self._composer.focus_set()
+            return
+        from .desktop_campaign_composer_ui import NativeCampaignComposerWindow
+        self._composer = NativeCampaignComposerWindow(self)
+
     def _edited(self, _event=None):
         self.original_json.edit_modified(False)
         if not self._busy:
@@ -187,6 +207,9 @@ class NativeCampaignWindow(tk.Toplevel):
 
     def _dispatch(self, action: str) -> None:
         if self._busy or self._closing:
+            return
+        if self._composer is not None and getattr(self._composer, "_busy", False):
+            self.status.set("Finish current original source task inspection first.")
             return
         try:
             raw = self._original()
@@ -249,7 +272,7 @@ class NativeCampaignWindow(tk.Toplevel):
     def _controls(self):
         state = "disabled" if self._busy else "normal"
         for button in (
-            self.inspect_button, self.run_button, self.verify_button,
+            self.compose_button, self.inspect_button, self.run_button, self.verify_button,
             self.assembly_button, self.stage_button, self.patch_button,
         ):
             button.configure(state=state)
@@ -321,6 +344,14 @@ class NativeCampaignWindow(tk.Toplevel):
         self.after(100, self._pump)
 
     def _close(self):
+        if self._composer is not None and getattr(self._composer, "_busy", False):
+            messagebox.showwarning(
+                "Original source task composition active",
+                "The private source snapshot is in progress. It cannot be "
+                "silently adopted or discarded as a native approval.",
+                parent=self,
+            )
+            return
         if self._busy:
             messagebox.showwarning(
                 "Native work still in progress",
@@ -330,6 +361,8 @@ class NativeCampaignWindow(tk.Toplevel):
                 parent=self,
             )
             return
+        if self._composer is not None:
+            self._composer._close()
         self._closing = True
         self._epoch += 1
         self._operator.reset()
