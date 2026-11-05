@@ -153,3 +153,32 @@ def test_interactive_journal_refreshes_concurrent_save_without_consuming_turn(tm
     from skeleton.game.gameplay.ridge_rescue.consumer_experience import recent_events
     assert recent_events(advanced) in displayed
     assert player.audit("shared")["audit_entries"] == 1
+
+
+def test_interactive_hint_refreshes_concurrent_save_without_consuming_turn(tmp_path: Path):
+    """A hint is advisory but must use the latest authoritative state."""
+    from skeleton.game.gameplay.ridge_rescue.consumer_cli import play
+    from skeleton.game.gameplay.ridge_rescue.consumer_store import SlotStore
+    from skeleton.game.gameplay.ridge_rescue.consumer_experience import navigation_hint
+
+    root = tmp_path / "private-game"
+    player = SlotStore(root)
+    initial = player.new("shared")
+    displayed: list[str] = []
+    commands = iter(("h", "q"))
+    advanced = None
+
+    def read(_prompt: str) -> str:
+        nonlocal advanced
+        command = next(commands)
+        if command == "h":
+            advanced = SlotStore(root).step("shared", initial["actions"][0],
+                                            expected_head=initial["head"])
+        return command
+
+    result = play(player, "shared", read=read, write=displayed.append)
+    assert advanced is not None
+    assert result["head"] == advanced["head"]
+    assert result["revision"] == 1
+    assert navigation_hint(advanced) in displayed
+    assert player.audit("shared")["audit_entries"] == 1

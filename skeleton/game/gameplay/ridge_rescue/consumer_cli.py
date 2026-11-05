@@ -108,7 +108,12 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
                 write("Save audit unavailable; no turn was consumed: " + str(exc))
             continue
         if answer in ("h", "hint"):
-            write(navigation_hint(current))
+            try:
+                # Hints must never advise a route from a stale concurrent save.
+                current = store.load(slot)
+                write(navigation_hint(current))
+            except (StoreError, CampaignError, OSError) as exc:
+                write("Hint unavailable; no turn was consumed: " + str(exc))
             continue
         if answer in ("j", "journal"):
             try:
