@@ -36,28 +36,31 @@ class TestPanelConfig:
 
 
 def _base_url() -> str:
-    base = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
+    """Never access a local .env or network during pytest collection."""
+    base = (os.environ.get("EXPO_BACKEND_URL")
+            or os.environ.get("EXPO_PUBLIC_BACKEND_URL")
+            or "").strip().rstrip("/")
     if not base:
-        with open("/app/frontend/.env") as fh:
-            for line in fh:
-                if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
-                    base = line.split("=", 1)[1].strip().strip('"').rstrip("/")
-                    break
-    assert base
+        pytest.skip("live discourse tests need EXPO_BACKEND_URL or EXPO_PUBLIC_BACKEND_URL")
+    if not base.startswith(("https://", "http://")):
+        pytest.skip("live discourse backend URL must be absolute HTTP(S)")
     return base
 
 
-BASE_URL = _base_url()
+@pytest.fixture(scope="module")
+def live_base_url() -> str:
+    return _base_url()
 
 
+@pytest.mark.live_service
 class TestLive:
-    def test_panel_endpoint(self):
-        r = requests.get(f"{BASE_URL}/api/discourse/panel", timeout=15)
+    def test_panel_endpoint(self, live_base_url):
+        r = requests.get(f"{live_base_url}/api/discourse/panel", timeout=15)
         assert r.status_code == 200, r.text
         d = r.json()
         assert "default_panel" in d and "default_judge" in d and "available_models" in d
 
-    def test_history_endpoint(self):
-        r = requests.get(f"{BASE_URL}/api/discourse/history?limit=5", timeout=15)
+    def test_history_endpoint(self, live_base_url):
+        r = requests.get(f"{live_base_url}/api/discourse/history?limit=5", timeout=15)
         assert r.status_code == 200, r.text
         assert "deliberations" in r.json()
