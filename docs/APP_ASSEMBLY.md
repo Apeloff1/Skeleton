@@ -138,6 +138,46 @@ python scripts/check_capability_interfaces.py
 python scripts/check_provider_bootstrap.py
 ```
 
+## Deep source preflight and credential custody
+
+The read-only preloader now validates the three actual Docker build contexts
+(engine at the root, backend at the root and frontend in its subtree). It
+checks bounded Dockerfile and ignore-rule inputs, literal COPY sources,
+wildcard match counts, missing build prerequisites, symlink admission, and
+required exclusions for private runtime files. It separately verifies that
+all backend Python/Alpine stages share one reviewed immutable image identity,
+and that the Python version satisfies the pinned dependency compatibility
+guard. Missing inputs and incompatible bases must fail before creating
+secrets or starting Docker. These checks do not prove a completed image build,
+dependency resolution, or native AI execution.
+
+The Windows installer must package `Dockerfile.dockerignore` as well as
+`backend/Dockerfile.dockerignore` and `frontend/.dockerignore`. The root
+per-Dockerfile ignore is not interchangeable with the generic
+`.dockerignore` policy. A missing installed policy is a first-install
+failure, not permission to build with an expanded source context.
+
+`app check --runtime`, `app doctor` and `app status` use bounded,
+read-only private configuration input. A linked, non-regular, oversized,
+changed or non-UTF-8 `.env` is rejected; the CLI reports a redacted
+configuration failure and does not dispatch live doctor probes.
+`app setup` remains the sole owner of permission repair and atomic writes.
+A failed reader never resets an existing Mongo credential or deletes data.
+
+Focused source qualification for the combined preinstall changes:
+
+```bash
+python scripts/check_app_assembly.py
+python scripts/check_app_compose_parity.py
+python -m pytest -q skeleton/testing/test_app_assembly.py skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_installer.py skeleton/testing/test_windows_installer.py
+python -m compileall -q skeleton/app
+```
+
+These source checks are deliberately separate from a real fresh Windows/WSL2
+Docker Compose build, HTTP E2E acceptance, verified restore and guarded local
+model execution. Neither simulated tests nor source preflight certifies
+installer release readiness.
+
 ## Setup and installer plane
 
 The canonical first-run path is split into three bounded layers:
