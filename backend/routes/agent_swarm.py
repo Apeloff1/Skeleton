@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import time
+import threading
 import uuid
 from typing import Dict, List, Optional
 
@@ -179,7 +180,6 @@ async def swarm_graph(
 MAX_CONCURRENT_SWARM_RUNS = 8
 # Thread-backed, nonblocking admission avoids sharing asyncio semaphores
 # across ASGI workers and prevents unbounded 32-worker fanout per request.
-import threading
 _RUN_ADMISSION = threading.BoundedSemaphore(MAX_CONCURRENT_SWARM_RUNS)
 
 
@@ -190,7 +190,10 @@ async def run_swarm(
 ):
     """Admit bounded private swarm work; always release capacity."""
     scope, owner_key = _owner_scope(identity)
-    _project_id(req.project)
+    try:
+        _project_id(req.project)
+    except ValueError as exc:
+        raise HTTPException(422, "invalid project identity") from exc
     if not _RUN_ADMISSION.acquire(blocking=False):
         raise HTTPException(503, "swarm worker admission at capacity")
     try:
