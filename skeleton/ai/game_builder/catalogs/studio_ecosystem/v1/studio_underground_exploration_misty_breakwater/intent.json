@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_misty_breakwater",
+  "title": "Misty Breakwater: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610303789,
+  "width": 19,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_echo_caverns",
+  "title": "Echo Caverns: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010312125,
+  "width": 19,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 12,
+  "theme": "arcade",
+  "starting_health": 5
+}

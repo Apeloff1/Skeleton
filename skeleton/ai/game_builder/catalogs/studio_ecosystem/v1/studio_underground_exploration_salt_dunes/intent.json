@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_salt_dunes",
+  "title": "Salt Dunes: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610303704,
+  "width": 25,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 4
+}

@@ -1,0 +1,40 @@
+{
+  "project_id": "studio_time_loop_detective_ashen_archipelago",
+  "genre": "time_loop_detective",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "composition": {
+    "leading_voice": "harp",
+    "tempo": 106,
+    "meter": "6/8",
+    "harmonic_intent": "unresolved_progression_to_shared_cadence",
+    "originality": "new_composition_required"
+  },
+  "sound_layers": [
+    {
+      "cue": "arrival",
+      "trigger": "volcanic ash",
+      "source": "Spatial reflections around basalt islands",
+      "mix": "reactive"
+    },
+    {
+      "cue": "dispute",
+      "trigger": "faction_tension",
+      "source": "Original motif for a self-reinforcing paradox",
+      "mix": "sidechain_duck_under_dialogue"
+    },
+    {
+      "cue": "repair",
+      "trigger": "mission_resolution",
+      "source": "Original harp cadence accompanying public choice",
+      "mix": "adaptive"
+    }
+  ],
+  "audio_accessibility": [
+    "closed_captions",
+    "independent_channels",
+    "visual_information_parity"
+  ],
+  "render_status": "not_rendered"
+}
