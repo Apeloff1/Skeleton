@@ -128,3 +128,24 @@ def test_public_url_rejects_ambiguous_route_normalization(
         public_service_urls(
             tmp_path, manifest=replace(manifest, services=services), environ=override
         )
+
+
+@pytest.mark.parametrize("override", [{}, {"FRONTEND_PORT": "31999"}])
+@pytest.mark.parametrize("invalid_url", [
+    "http://localhost:",
+    "http://localhost:/ready",
+    "http://[::1]:",
+])
+def test_public_service_urls_rejects_explicit_empty_port(
+    tmp_path: Path, override: dict[str, str], invalid_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=invalid_url)
+        if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="invalid public URL port"):
+        public_service_urls(
+            tmp_path, manifest=replace(manifest, services=services), environ=override
+        )
