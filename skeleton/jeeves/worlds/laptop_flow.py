@@ -387,6 +387,7 @@ class LaptopFlow:
                 report["checks"]["session"] = {"ok": False, "error": exc.code}
                 report["next_action"] = (
                     "retry_after_current_writer_finishes" if exc.code == "lease_busy"
+                    else "inspect_custody_permissions_without_removing_foreign_locks" if exc.code == "lease_unavailable"
                     else "inspect_session_or_restore_from_trusted_export")
                 return report
             report["checks"]["session"] = {

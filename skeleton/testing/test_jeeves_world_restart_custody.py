@@ -68,3 +68,26 @@ def test_restart_detects_builder_corruption_before_session_mutation(tmp_path):
     assert exc.value.code == "laptop_builder_mismatch"
     # The failed operation must not advance the persisted session.
     assert LaptopFlow(tmp_path).sessions.inspect("lighthouse", "save")["session_digest"] == initial["session_digest"]
+
+
+def test_restart_diagnostic_reports_session_lease_permission_failure(tmp_path, monkeypatch):
+    """Permission-denied session custody is not a corrupt save or restore request."""
+    _compiled(tmp_path)
+    flow = LaptopFlow(tmp_path)
+    flow.create_session("lighthouse", "save")
+
+    def denied(*args, **kwargs):
+        raise CanonError("lease_unavailable")
+
+    monkeypatch.setattr(flow.sessions, "inspect", denied)
+    report = flow.diagnose("lighthouse", "save")
+    assert report["checks"]["source"] == {"ok": True}
+    assert report["checks"]["builder"] == {"ok": True}
+    assert report["checks"]["session"] == {
+        "ok": False, "error": "lease_unavailable"
+    }
+    assert report["next_action"] == (
+        "inspect_custody_permissions_without_removing_foreign_locks"
+    )
+    assert "acceptance" not in report["checks"]
+    assert LaptopFlow(tmp_path).inspect_session("lighthouse", "save")["revision"] == 0
