@@ -1,0 +1,24 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "queue-23",
+  "control": "queue",
+  "phase": "scheduling",
+  "kind": "adversarial-denial",
+  "objective": "Verify executable offline AI queue gate at profile 23",
+  "threat": "Bound total and per-owner ingress, enforce fair lane identity and reject queue overflow, profile 23",
+  "trust_boundary": "Untrusted incoming operations may never exceed authenticated offline AI authority",
+  "input": {
+    "owners": [
+      "a",
+      "b"
+    ],
+    "capacity": true,
+    "per_owner": 2
+  },
+  "expected_allow": false,
+  "expected_semantics": "Deny and preserve independently verified model, effect and evidence custody",
+  "evidence_rule": "Call actual policy_oracle and compare with separately declared expected decision",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

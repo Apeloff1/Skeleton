@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "fractions_07",
+  "domain": "fractions",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 7",
+  "steps": [
+    {
+      "prompt": "Reduce 63/66 to lowest terms. Output the fraction a/b only.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "21/22"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

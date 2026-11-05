@@ -1,0 +1,21 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "dependencies-28",
+  "domain": "dependencies",
+  "phase": "durability-and-observability",
+  "category": "adversarial-denial",
+  "threat": "Unknown dependency parent state \"unknown\" must be refused, not inferred as waiting or completed. Attack 28",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 27,
+    "parent_state": "unknown",
+    "sweep": true
+  },
+  "expected_allow": false,
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

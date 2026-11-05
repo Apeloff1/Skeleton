@@ -1,0 +1,24 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "sweep-15",
+  "domain": "sweep",
+  "phase": "native-job-execution",
+  "category": "permitted-boundary",
+  "threat": "Deterministic stale claim sweep holds ambiguous inference and expires old pending requests 15",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 14,
+    "expires_ms": 1100,
+    "claimed": true,
+    "now_ms": 1099,
+    "sweep_limit": 128
+  },
+  "expected_allow": true,
+  "expected_state": "running",
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

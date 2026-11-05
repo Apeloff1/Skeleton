@@ -1,0 +1,25 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "recovery-07",
+  "domain": "recovery",
+  "phase": "durability-and-observability",
+  "category": "permitted-boundary",
+  "threat": "Ambiguous native effect remains held pending explicit bounded operator authorization and proof 7",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 6,
+    "inspect": true,
+    "resume": true,
+    "now_ms": 1200,
+    "proof_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operator_approved": true
+  },
+  "expected_allow": true,
+  "expected_state": "pending",
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

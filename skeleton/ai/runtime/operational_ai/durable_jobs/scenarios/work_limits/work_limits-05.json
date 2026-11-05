@@ -1,0 +1,28 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "work_limits-05",
+  "domain": "work_limits",
+  "phase": "admission",
+  "category": "permitted-boundary",
+  "threat": "Reject nonintegral, unconstrained or escalating resident AI workload budgets; vector 5",
+  "trust_boundary": "Native AI job, principal, model and bounded capacity remain authoritative",
+  "input": {
+    "variant": 4,
+    "limits": {
+      "input_bytes": 1024,
+      "output_tokens": 32768,
+      "deadline_ms": 300000,
+      "lease_ms": 30000,
+      "queue_depth": 16,
+      "tenant_depth": 8,
+      "active_per_tenant": 2
+    }
+  },
+  "expected_allow": true,
+  "expected_state": "valid",
+  "acceptance": "Execute the actual durable_jobs.case_oracle on private test SQLite and assert exact disposition",
+  "no_hosted_fallback": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

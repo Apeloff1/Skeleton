@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "claim-26",
+  "domain": "claim",
+  "phase": "native-job-execution",
+  "category": "adversarial-denial",
+  "threat": "Worker claim issues random lease token, bound expiry and finite admission against malformed worker IDs 26",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 25,
+    "worker": "worker",
+    "now_ms": 1000,
+    "lease_ms": "500"
+  },
+  "expected_allow": false,
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

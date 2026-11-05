@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "classification_12",
+  "domain": "classification",
+  "severity": "high",
+  "objective": "Measure model instruction and classification robustness, domain classification task 12",
+  "steps": [
+    {
+      "prompt": "Assign exactly one label from finance, engineering, logistics, human_resources to this ticket. Return only the label. A candidate accepted a new employment contract. Case reference 111.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "human_resources"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

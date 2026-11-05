@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "grounding_23",
+  "domain": "grounding",
+  "severity": "critical",
+  "objective": "Evaluate offline grounding, exact source attribution and untrusted evidence boundary 23",
+  "steps": [
+    {
+      "prompt": "Answer the question using ONLY this source. Return the recorded color word in lowercase and nothing else. Source:\nLOCAL SOURCE, synthetic fixture object_122: The Compass sample's recorded color is ivory. It was catalogued in collection Z122. No other color is stated.\nQuestion: What color was recorded for the Compass sample?",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "ivory"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

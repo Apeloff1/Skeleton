@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "workspace-07",
+  "control": "workspace",
+  "phase": "source-intake",
+  "kind": "permitted-boundary",
+  "objective": "Validate the actual AI workspace control at exact adversarial boundary 07",
+  "threat": "Descriptor-anchored evidence file intake prohibits traversal, symlink aliases, device names and path confusion, profile 7",
+  "trust_boundary": "Local inference, principal, evidence and owner-private filesystem custody",
+  "input": {
+    "leaf": "weights.001"
+  },
+  "expected_allow": true,
+  "expected_semantics": "Accept only verifiably authorized and bounded bytes",
+  "evidence_rule": "Run a real policy_oracle instance and compare with the independently specified result",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

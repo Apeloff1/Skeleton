@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "citations_09",
+  "domain": "citations",
+  "severity": "critical",
+  "objective": "Evaluate offline grounding, exact source attribution and untrusted evidence boundary 9",
+  "steps": [
+    {
+      "prompt": "Use the exact two original fictional evidence snippets below. Which source identifies the color of the Moon sample? Answer in one short sentence naming the color navy, and cite the correct identifier in square brackets. Never cite the distractor.\n[source_108] The Moon sample's recorded color is navy.\n[source_308] The unrelated Moon shipment's weight is 13 kilograms.",
+      "checks": [
+        {
+          "kind": "contains",
+          "expected": "navy"
+        },
+        {
+          "kind": "citation_label",
+          "expected": "source_108"
+        },
+        {
+          "kind": "not_contains",
+          "expected": "[source_308]"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}
