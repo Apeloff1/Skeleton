@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "commerce_contract",
+  "domain": "commerce",
+  "role": "contract",
+  "rapport_threshold": 23,
+  "rapport_gain": 5,
+  "stress_increment": 3,
+  "steps": [
+    {
+      "id": "commerce_contract:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "commerce_contract:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "commerce_contract:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "commerce_contract:proof-1"
+    },
+    {
+      "id": "commerce_contract:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "commerce_contract:proof-2"
+    },
+    {
+      "id": "commerce_contract:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "commerce_contract:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}

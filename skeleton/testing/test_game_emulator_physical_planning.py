@@ -49,6 +49,10 @@ def fake_host():
     host._chain = "e" * 64
     host._audio_total = 4
     host._audio_generation = 1
+    # Mirror the native observation fields initialized by EmulatorEnvironment.
+    host._native_descriptor = None
+    host._native_values = None
+    host._native_memory_digest = None
     host._controls = [copy.deepcopy(_EMPTY)]
     host._pixels = bytes([20, 40, 60] * 4)
     host._audio = bytes([1, 0, 2, 0] * 4)

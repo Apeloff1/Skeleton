@@ -1,0 +1,23 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "stream",
+  "expect": "reject",
+  "reason": "Streamed UTF-8 output fits byte ceiling",
+  "payload": {
+    "request_id": "r_001",
+    "chunks": [
+      {
+        "index": 0,
+        "text": "Hi"
+      },
+      {
+        "index": 1,
+        "text": "."
+      }
+    ],
+    "max_bytes": 1,
+    "terminal": "stop",
+    "generated_tokens": 2,
+    "token_ceiling": 128
+  }
+}

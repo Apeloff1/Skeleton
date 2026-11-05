@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "combat_boss_phase",
+  "domain": "combat",
+  "stages": [
+    {
+      "key": "discover_boss_phase",
+      "evidence": "combat:boss_phase:discover:proof",
+      "grants": "combat:boss_phase:stage:1",
+      "risk": 2,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_boss_phase",
+      "evidence": "combat:boss_phase:prepare:proof",
+      "grants": "combat:boss_phase:stage:2",
+      "risk": 3,
+      "sequence": 1,
+      "requires_previous_grant": "combat:boss_phase:stage:1"
+    },
+    {
+      "key": "execute_boss_phase",
+      "evidence": "combat:boss_phase:execute:proof",
+      "grants": "combat:boss_phase:stage:3",
+      "risk": 4,
+      "sequence": 2,
+      "requires_previous_grant": "combat:boss_phase:stage:2"
+    },
+    {
+      "key": "resolve_boss_phase",
+      "evidence": "combat:boss_phase:resolve:proof",
+      "grants": "combat:boss_phase:stage:4",
+      "risk": 5,
+      "sequence": 3,
+      "requires_previous_grant": "combat:boss_phase:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "combat_boss_phase:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "combat:boss_phase:discover:proof"
+      ]
+    },
+    {
+      "id": "combat_boss_phase:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "combat:boss_phase:prepare:proof"
+      ]
+    },
+    {
+      "id": "combat_boss_phase:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "combat:boss_phase:execute:proof"
+      ]
+    },
+    {
+      "id": "combat_boss_phase:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "combat:boss_phase:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

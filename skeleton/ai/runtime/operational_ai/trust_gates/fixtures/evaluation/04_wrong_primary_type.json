@@ -1,0 +1,16 @@
+{
+  "case": "04_wrong_primary_type",
+  "gate": "evaluation",
+  "expect": "reject",
+  "reason": "Implicit identity coercion denied",
+  "payload": {
+    "suite_id": 17,
+    "dataset_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "samples": 50,
+    "passes": 45,
+    "failures": 4,
+    "empty_errors": 1,
+    "approved": true
+  }
+}

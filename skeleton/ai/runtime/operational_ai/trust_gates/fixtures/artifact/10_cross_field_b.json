@@ -1,0 +1,18 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "artifact",
+  "expect": "reject",
+  "reason": "Licensing approval is an operator input",
+  "payload": {
+    "model_id": "local-gguf",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 200,
+    "shard_bytes": [
+      100,
+      100
+    ],
+    "license": "operator-reviewed-license",
+    "approved": false,
+    "source": "offline-manifest-v1"
+  }
+}

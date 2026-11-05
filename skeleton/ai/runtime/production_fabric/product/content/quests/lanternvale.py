@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for lanternvale."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('lanternvale_arrival', (), (), ('arrival_record',)), Quest('lanternvale_source', ('lanternvale_arrival',), ('arrival_record',), ('source_proof',)), Quest('lanternvale_witness', ('lanternvale_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('lanternvale_reconcile', ('lanternvale_source', 'lanternvale_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('lanternvale_crossing', ('lanternvale_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('lanternvale_conclusion', ('lanternvale_crossing',), ('crossing_pass',), ('ending_unlocked',)))

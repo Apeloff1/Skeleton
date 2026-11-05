@@ -1,0 +1,18 @@
+{
+  "case": "04_wrong_primary_type",
+  "gate": "artifact",
+  "expect": "reject",
+  "reason": "No implicit numeric identity coercion",
+  "payload": {
+    "model_id": 17,
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 200,
+    "shard_bytes": [
+      100,
+      100
+    ],
+    "license": "operator-reviewed-license",
+    "approved": true,
+    "source": "offline-manifest-v1"
+  }
+}

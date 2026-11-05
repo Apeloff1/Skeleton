@@ -1,0 +1,17 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "cancel",
+  "expect": "reject",
+  "reason": "Typed values are not arbitrary objects",
+  "payload": {
+    "request_id": "req_001",
+    "state": "cancelled",
+    "now_ns": 1000000,
+    "deadline_ns": 2000000,
+    "generated_tokens": 4,
+    "acked": true,
+    "backend_active": {
+      "untrusted": true
+    }
+  }
+}

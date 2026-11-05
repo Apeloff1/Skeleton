@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "fields": {
+    "model_id": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "digest": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "vocab_size": {
+      "type": "int",
+      "min": 4,
+      "max": 10000000
+    },
+    "bos_id": {
+      "type": "int",
+      "min": 0,
+      "max": 10000000
+    },
+    "eos_id": {
+      "type": "int",
+      "min": 0,
+      "max": 10000000
+    },
+    "unk_id": {
+      "type": "int",
+      "min": 0,
+      "max": 10000000
+    },
+    "context_window": {
+      "type": "int",
+      "min": 128,
+      "max": 262144
+    },
+    "normalization": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "nfkc-v1",
+        "nfc-v1",
+        "byte-exact",
+        "unknown"
+      ]
+    }
+  }
+}
