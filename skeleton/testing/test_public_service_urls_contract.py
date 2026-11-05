@@ -4,6 +4,7 @@ These tests are deterministic URL-contract checks, not device qualification.
 """
 
 from pathlib import Path
+from dataclasses import replace
 
 import pytest
 
@@ -34,3 +35,19 @@ def test_public_service_urls_rejects_colliding_ports(tmp_path: Path):
             tmp_path, manifest=load_manifest(),
             environ={"FRONTEND_PORT": "8001", "BACKEND_PORT": "8001"},
         )
+
+
+@pytest.mark.parametrize("invalid_url", [
+    "http://localhost:bad",
+    "http://localhost:65536",
+    "http://localhost:-1",
+])
+def test_port_override_rejects_invalid_packaged_endpoint(tmp_path: Path, invalid_url: str):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=invalid_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    manifest = replace(manifest, services=services)
+    with pytest.raises(ValueError, match="invalid public URL port"):
+        public_service_urls(tmp_path, manifest=manifest, environ={"FRONTEND_PORT": "31999"})
