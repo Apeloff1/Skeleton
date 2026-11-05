@@ -42,6 +42,25 @@ def anchored_directory(path: Path) -> Iterator[int]:
         os.close(fd)
 
 
+def ensure_directory(path: Path) -> Path:
+    """Safely create missing path components relative to pinned parents."""
+    root = Path(os.path.abspath(path))
+    flags = _directory_flags()
+    fd = os.open("/", flags)
+    try:
+        for part in root.parts[1:]:
+            try:
+                next_fd = os.open(part, flags, dir_fd=fd)
+            except FileNotFoundError:
+                os.mkdir(part, 0o700, dir_fd=fd)
+                next_fd = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return root
+    finally:
+        os.close(fd)
+
+
 def _safe_file(fd: int, name: str, *, max_bytes: int | None = None) -> int:
     if not name or "/" in name or name in {".", ".."} or "\x00" in name:
         raise VaultPathError("invalid vault filename")
