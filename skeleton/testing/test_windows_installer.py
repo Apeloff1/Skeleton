@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -479,22 +480,52 @@ def test_windows_installer_runs_actual_frozen_payload_preflight():
     assert "SkeletonOffline.exe" in workflow
     assert 'ArgumentList @("--help") -Wait -PassThru' in workflow
 
-def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
+def test_open_app_does_not_spawn_browser_when_setup_ui_is_down(monkeypatch):
     from skeleton.app import windows_launcher as launcher
 
     monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=False, status=503, detail="setup endpoint unavailable",
+        ),
+    )
     calls = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
     ok, detail = launcher.open_running_application()
     assert not ok
-    assert "backend offline" in detail
+    assert "Setup UI unavailable" in detail
     assert calls == []
+
+
+def test_open_app_stays_available_for_setup_while_backend_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=True, status=200, detail="local setup route available",
+        ),
+    )
+    opened = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert ok
+    assert opened == ["http://localhost:3000/setup"]
+    assert "guarded AI readiness are NOT established" in detail
+    assert "backend offline" not in detail
 
 
 def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
     from skeleton.app import windows_launcher as launcher
 
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "all services healthy"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=True, status=200, detail="local setup route available",
+        ),
+    )
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
     ok, detail = launcher.open_running_application()
     assert not ok
@@ -503,7 +534,7 @@ def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypa
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
     ok, detail = launcher.open_running_application()
     assert ok
-    assert "all services healthy" in detail
+    assert "guarded AI readiness are NOT established" in detail
 
 def test_windows_ci_sparse_checkout_contains_every_installer_root():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
@@ -519,14 +550,48 @@ def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
     from skeleton.app import windows_launcher as launcher
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "healthy"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=True, status=200, detail="local setup route available",
+        ),
+    )
     opened = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
 
     success, detail = launcher.open_running_application(tmp_path)
     assert success
-    assert opened == ["http://localhost:3300"]
-    assert "http://localhost:3300" in detail
+    assert opened == ["http://localhost:3300/setup"]
+    assert "http://localhost:3300/setup" in detail
+
+
+@pytest.mark.parametrize("host", (
+    "https://example.com:3000",
+    "http://example.com:3000",
+    "http://localhost:3000/admin",
+    "http://localhost:3000?token=unsafe",
+    "http://localhost:3000#fragment",
+    "http://user:secret@localhost:3000",
+    "http://localhost:3000@evil.example",
+))
+def test_open_app_denies_nonlocal_or_credentialed_setup_urls(monkeypatch, host):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(
+        launcher, "public_service_urls",
+        lambda *args, **kwargs: {"frontend": host},
+    )
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: pytest.fail("unsafe URL must not be probed"),
+    )
+    monkeypatch.setattr(
+        launcher.webbrowser, "open",
+        lambda url: pytest.fail("unsafe URL must not reach the browser"),
+    )
+    allowed, detail = launcher.open_running_application()
+    assert allowed is False
+    assert "local HTTP endpoint" in detail
 
 
 def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
