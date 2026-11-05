@@ -15,6 +15,7 @@
 ╚════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
+import math
 import os
 import random
 import time
@@ -171,6 +172,17 @@ def seed_all(target_multiplier: float = 1.0, force: bool = False, subset: list[s
     force=False skips domains whose shard already exists on disk.
     subset=[ids] limits which domains are seeded (useful for incremental).
     """
+    # Protect direct callers as well as the HTTP/Pydantic boundary. Reject
+    # nonfinite and invalid multipliers before opening DB connections, writing
+    # archives or materializing any row generator.
+    if (
+        isinstance(target_multiplier, bool)
+        or not isinstance(target_multiplier, (int, float))
+        or not math.isfinite(target_multiplier)
+        or not 0 < target_multiplier <= 200
+    ):
+        raise ValueError("target_multiplier must be finite and within (0, 200]")
+
     client = MongoClient(_MONGO_URL, connect=False, serverSelectionTimeoutMS=5000)
     db = client[_DB_NAME]
     manifest = db[MANIFEST_COLLECTION]
