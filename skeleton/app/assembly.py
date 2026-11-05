@@ -653,7 +653,7 @@ def preflight(
             )
         )
 
-    from skeleton.app.install_source_contracts import build_source_errors
+    from skeleton.app.install_source_contracts import _bounded_source_text, build_source_errors
 
     build_errors = build_source_errors(root)
     checks.append(
@@ -670,12 +670,10 @@ def preflight(
 
     backend_dockerfile = root / "backend/Dockerfile"
     try:
-        # Small, bounded, source-only inspection; no Docker invocation and
-        # no host mutations before the existing setup process lock.
-        if backend_dockerfile.stat().st_size > 128 * 1024:
-            raise ValueError("backend Dockerfile exceeds the preflight size limit")
+        # Reuse the descriptor-anchored, bounded reader. A changing Dockerfile
+        # must never be treated as compatible by a stale source snapshot.
         image_errors = backend_python_image_errors(
-            backend_dockerfile.read_text(encoding="utf-8")
+            _bounded_source_text(backend_dockerfile)
         )
     except (OSError, UnicodeError, ValueError):
         image_errors = ("backend Dockerfile could not be inspected safely",)
