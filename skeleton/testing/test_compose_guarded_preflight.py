@@ -216,6 +216,23 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["code"], "canonical_actor_epoch_changed_during_preflight")
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
 
+    async def test_final_epoch_subclass_equality_never_executes(self):
+        class HostileEpoch(int):
+            def __eq__(self, other):
+                raise AssertionError("untrusted epoch equality executed")
+
+        class HostileFinalEpoch(FakeEpoch):
+            async def read_epoch(self, **kwargs):
+                self.calls += 1
+                return 2 if self.calls == 1 else HostileEpoch(2)
+
+        with patch("skeleton.app.compose_guarded_preflight.MongoCanonicalSourceEpoch",
+                   HostileFinalEpoch):
+            result = await self.inspect()
+        self.assertEqual(result["code"], "canonical_actor_epoch_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_mutable_scope_subclass_rejected_before_mongo(self):
         class UntrustedScope(str):
             def __eq__(self, other):
