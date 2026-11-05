@@ -16,18 +16,44 @@ merges the leaf results. Everything streams onto the PROOD event bus.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import math
 import time
 import uuid
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+
+from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/swarm-dag", tags=["swarm-dag"])
 
 _STOP = {"the", "a", "an", "and", "or", "of", "to", "for", "with", "build", "make",
          "create", "add", "game", "please", "then", "into", "that"}
+
+
+def _owner_scope(identity: dict) -> tuple[dict[str, str], str]:
+    """Require a normalized account/tenant principal before any graph access.
+
+    A hash is used only for collision-resistant storage keys; database
+    authorization always matches both original owner and tenant fields.
+    """
+    if not isinstance(identity, dict) or identity.get("dev_mode"):
+        raise HTTPException(401, "Authentication required for private swarm work")
+    tenant, owner = identity.get("tenant_id"), identity.get("owner_id")
+    if any(
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 256
+        or value != value.strip()
+        or any(ord(ch) < 32 for ch in value)
+        for value in (tenant, owner)
+    ):
+        raise HTTPException(403, "Swarm graph identity is unavailable")
+    key = hashlib.sha256((tenant + "\x00" + owner).encode("utf-8")).hexdigest()
+    return {"tenant_id": tenant, "owner_id": owner}, key
+
+
 
 
 class SwarmReq(BaseModel):
@@ -52,8 +78,9 @@ def _subtasks(directive: str, n: int) -> List[str]:
     return [unique[i % len(unique)] for i in range(n)]
 
 
-async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict:
-    """Generate one bounded finding and require acknowledged graph custody."""
+async def _worker(worker_id: int, focus: str, project: str, run_id: str, identity: dict) -> Dict:
+    """Generate one account-bound finding and require acknowledged graph custody."""
+    scope, owner_key = _owner_scope(identity)
     recall, kda = [], None
     recall_available = memory_written = False
     try:
@@ -67,9 +94,10 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
         pass
     try:
         from gameforge.omega import delta_memory as _dm
-        kda = await asyncio.to_thread(_dm.read, focus)
+        memory_key = f"{owner_key}:{project}:{focus}"
+        kda = await asyncio.to_thread(_dm.read, memory_key)
         await asyncio.to_thread(
-            _dm.write, f"{project}:{run_id}:{focus}",
+            _dm.write, memory_key,
             f"worker-{worker_id} explored {focus}", modality="text"
         )
         memory_written = True
@@ -96,12 +124,12 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
         "memory_written": memory_written,
         "run_id": run_id,
     }
-    node_id = f"{project}:{run_id}:worker:{worker_id}"
+    node_id = f"{owner_key}:{project}:{run_id}:worker:{worker_id}"
     try:
         from core.databases import core_db
         outcome = await core_db["swarm_graph"].update_one(
-            {"_id": node_id},
-            {"$set": {**finding, "project": project, "ts": time.time()}},
+            {"_id": node_id, **scope},
+            {"$set": {**finding, "project": project, **scope, "ts": time.time()}},
             upsert=True,
         )
         if getattr(outcome, "acknowledged", False) is not True:
@@ -112,7 +140,7 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
     try:
         from gameforge.prood import event_bus as _bus
         await _bus.publish("swarm.finding", {
-            "worker": worker_id, "focus": focus, "run_id": run_id,
+            "worker": worker_id, "run_id": run_id, "owner_scope": owner_key,
         })
     except Exception:  # telemetry not a source of durable graph authority
         pass
@@ -120,8 +148,13 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
 
 
 @router.get("/graph/{project}")
-async def swarm_graph(project: str, limit: int = 50):
-    """Query the graph; storage outages must not masquerade as empty history."""
+async def swarm_graph(
+    project: str,
+    limit: int = 50,
+    identity: dict = Depends(require_authenticated_identity),
+):
+    """Query only this account's graph, denying unowned legacy records."""
+    scope, _owner_key = _owner_scope(identity)
     if not isinstance(project, str) or not 1 <= len(project.strip()) <= 200:
         raise HTTPException(422, "invalid project identity")
     if type(limit) is not int or not 1 <= limit <= 100:
@@ -129,7 +162,7 @@ async def swarm_graph(project: str, limit: int = 50):
     try:
         from core.databases import core_db
         rows = await core_db["swarm_graph"].find(
-            {"project": project}, {"_id": 0},
+            {"project": project, **scope}, {"_id": 0},
         ).sort("ts", -1).to_list(limit)
     except Exception as exc:
         raise HTTPException(503, "swarm graph storage unavailable") from exc
@@ -137,13 +170,17 @@ async def swarm_graph(project: str, limit: int = 50):
 
 
 @router.post("/run")
-async def run_swarm(req: SwarmReq):
-    """Only an acknowledged graph merge makes a swarm DAG successful."""
+async def run_swarm(
+    req: SwarmReq,
+    identity: dict = Depends(require_authenticated_identity),
+):
+    """Only account-owned, acknowledged graph writes make a run successful."""
+    scope, owner_key = _owner_scope(identity)
     run_id = uuid.uuid4().hex
     foci = _subtasks(req.directive, req.workers)
     start = time.monotonic()
     attempts = await asyncio.gather(*[
-        _worker(index, focus, req.project, run_id)
+        _worker(index, focus, req.project, run_id, scope)
         for index, focus in enumerate(foci)
     ], return_exceptions=True)
     def _bound_receipt(index, result):
@@ -151,7 +188,7 @@ async def run_swarm(req: SwarmReq):
             isinstance(result, dict)
             and result.get("persisted") is True
             and result.get("run_id") == run_id
-            and result.get("node_id") == f"{req.project}:{run_id}:worker:{index}"
+            and result.get("node_id") == f"{owner_key}:{req.project}:{run_id}:worker:{index}"
         )
 
     successful = [
@@ -182,8 +219,8 @@ async def run_swarm(req: SwarmReq):
     try:
         from core.databases import core_db
         outcome = await core_db["swarm_graph"].update_one(
-            {"_id": f"{req.project}:{run_id}:merge"},
-            {"$set": {**merged, "project": req.project, "ts": time.time()}},
+            {"_id": f"{owner_key}:{req.project}:{run_id}:merge", **scope},
+            {"$set": {**merged, "project": req.project, **scope, "ts": time.time()}},
             upsert=True,
         )
         if getattr(outcome, "acknowledged", False) is not True:
@@ -198,7 +235,7 @@ async def run_swarm(req: SwarmReq):
     try:
         from gameforge.prood import event_bus as _bus
         await _bus.publish("swarm.merged", {
-            "run_id": run_id, "workers": len(successful),
+            "run_id": run_id, "workers": len(successful), "owner_scope": owner_key,
         })
     except Exception:
         pass
