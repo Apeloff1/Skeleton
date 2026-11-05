@@ -488,6 +488,12 @@ def runtime_manifest(
                 existing_port = url.port
             except ValueError as exc:
                 raise ValueError(f"{service.name} has an invalid public URL port") from exc
+            # An explicit empty port is ambiguous across URL consumers. Do not
+            # normalize it into a missing port before the packaged contract is
+            # admitted (including when no override was supplied).
+            authority = url.netloc.rsplit("@", 1)[-1]
+            if authority.endswith(":"):
+                raise ValueError(f"{service.name} has an invalid public URL port")
             if existing_port is not None and not 1 <= existing_port <= 65535:
                 raise ValueError(f"{service.name} has an invalid public URL port")
             host = url.hostname
