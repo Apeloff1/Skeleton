@@ -91,7 +91,9 @@ def main(argv=None):
         if args.mode in ("once","acceptance"):
             raw=sys.stdin.buffer.read(32769)
             if len(raw)>32768:raise ContractViolation("stdin prompt exceeds byte ceiling")
-            message=utf8(raw.decode("utf-8","strict").strip(),maximum=32768)
+            # Preserve exact private task indentation and trailing line breaks.
+            # UTF-8 validation still rejects empty and whitespace-only input.
+            message=utf8(raw.decode("utf-8","strict"),maximum=32768)
         stack,worker,installed=activate_checked(model_root=args.model_root,state_dir=args.state_dir,
             tenant=args.tenant,subject=args.subject,n_ctx=args.context,
             max_new_tokens=args.max_new_tokens,n_threads=args.threads,
