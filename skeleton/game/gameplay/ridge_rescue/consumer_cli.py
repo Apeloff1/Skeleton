@@ -111,7 +111,13 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             write(navigation_hint(current))
             continue
         if answer in ("j", "journal"):
-            write(recent_events(current))
+            try:
+                # A second player may have committed since this menu was shown.
+                # Journal is read-only, but must describe the authoritative slot.
+                current = store.load(slot)
+                write(recent_events(current))
+            except (StoreError, CampaignError, OSError) as exc:
+                write("Journal unavailable; no turn was consumed: " + str(exc))
             continue
         if answer == "e":
             try:
