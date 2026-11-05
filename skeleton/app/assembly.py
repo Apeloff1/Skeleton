@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import stat
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from importlib import resources
@@ -323,19 +324,60 @@ def _dotenv_value(raw: str) -> str:
     return value.split(" #", 1)[0].rstrip()
 
 
+_MAX_DOTENV_BYTES = 256 * 1024
+
+
 def _read_dotenv(path: Path) -> dict[str, str]:
+    """Read the exact private runtime file through a bounded, stable descriptor.
+
+    Doctor and preflight must not follow an attacker-supplied symlink, consume
+    an unlimited file, or block forever on a FIFO. This reader is read-only;
+    secret permission repair is reserved for the setup lock owner.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
+        return {}
+    except OSError:
+        raise ValueError("runtime .env source could not be safely opened") from None
+    try:
+        with os.fdopen(descriptor, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            named = os.lstat(path)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or not stat.S_ISREG(named.st_mode)
+                or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+                or (os.name != "nt" and opened.st_nlink != 1)
+            ):
+                raise ValueError("runtime .env must be a stable unlinked regular file")
+            if opened.st_size > _MAX_DOTENV_BYTES:
+                raise ValueError("runtime .env exceeds the 256 KiB input limit")
+            raw = stream.read(_MAX_DOTENV_BYTES + 1)
+            current = os.lstat(path)
+            if (
+                not stat.S_ISREG(current.st_mode)
+                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+                or len(raw) > _MAX_DOTENV_BYTES
+            ):
+                raise ValueError("runtime .env changed or exceeded the read limit")
+    except OSError:
+        raise ValueError("runtime .env could not be safely read") from None
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("runtime .env must contain UTF-8 text") from None
+
     values: dict[str, str] = {}
-    if not path.is_file():
-        return values
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if not key:
-            continue
-        values[key] = _dotenv_value(value)
+        if key:
+            values[key] = _dotenv_value(value)
     return values
 
 
@@ -639,11 +681,36 @@ def preflight(
                 message=(f"docker available at {docker}" if docker else "docker executable not found"),
             )
         )
-        values = _runtime_env(root, environ)
         try:
-            runtime_manifest(manifest, root=root, environ=values)
-        except ValueError as exc:
-            checks.append(AssemblyCheck("runtime:ports", False, str(exc)))
+            values = _runtime_env(root, environ)
+        except (OSError, ValueError, UnicodeError):
+            values = {}
+            source_ok = False
+        else:
+            source_ok = True
+        checks.append(
+            AssemblyCheck(
+                "env:source",
+                source_ok,
+                (
+                    "runtime environment source is bounded and stable"
+                    if source_ok
+                    else "runtime .env source invalid or unsafe; preserve it for manual repair"
+                ),
+            )
+        )
+        if source_ok:
+            try:
+                runtime_manifest(manifest, root=root, environ=values)
+            except ValueError as exc:
+                checks.append(AssemblyCheck("runtime:ports", False, str(exc)))
+        else:
+            checks.append(
+                AssemblyCheck(
+                    "runtime:ports", False,
+                    "host ports cannot be certified from an unsafe runtime environment",
+                )
+            )
         for key in manifest.required_env:
             value = values.get(key, "")
             ok = _usable_secret(value)
