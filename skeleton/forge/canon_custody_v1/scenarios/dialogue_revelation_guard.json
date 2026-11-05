@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.canon_scenario.v1",
+  "policy": "dialogue_revelation_guard",
+  "domain": "dialogue",
+  "topic": "revelation_guard",
+  "evidence_kind": "predecessor",
+  "limits": {
+    "max_records": 128,
+    "max_tick_gap": 9
+  },
+  "commands": [
+    {
+      "id": "dialogue_revelation_guard:a",
+      "entity": "hero",
+      "action": "establish",
+      "value": "revelation_guard:origin",
+      "predecessor": "",
+      "evidence": "verified-world-event:1",
+      "world": "primary",
+      "tick": 1,
+      "expected_revision": 0
+    },
+    {
+      "id": "dialogue_revelation_guard:b",
+      "entity": "hero",
+      "action": "amend",
+      "value": "revelation_guard:revision",
+      "predecessor": "dialogue_revelation_guard:a",
+      "evidence": "verified-world-event:2",
+      "world": "primary",
+      "tick": 2,
+      "expected_revision": 1
+    },
+    {
+      "id": "dialogue_revelation_guard:c",
+      "entity": "hero",
+      "action": "reconcile",
+      "value": "revelation_guard:canon",
+      "predecessor": "dialogue_revelation_guard:b",
+      "evidence": "verified-world-event:3",
+      "world": "primary",
+      "tick": 3,
+      "expected_revision": 2
+    }
+  ],
+  "expected": {
+    "revision": 3,
+    "records": 3,
+    "all_accepted": true,
+    "world": "primary"
+  },
+  "negative_cases": [
+    "unknown-parent",
+    "duplicate-event",
+    "revision-stale",
+    "cross-world",
+    "entity-lineage-mismatch",
+    "unjustified-clock-gap",
+    "missing-evidence"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "world_provenance_authenticated": false,
+    "release_certified": false
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "schema": "skeleton.production_scenario.v1",
+  "recipe": "alchemy_clarity_draught",
+  "domain": "alchemy",
+  "inputs": {
+    "material_per_batch": 3,
+    "energy_per_stage": 5
+  },
+  "outputs": {
+    "products_per_batch": 2,
+    "scrap_per_batch": 1
+  },
+  "stages": [
+    "prepare",
+    "fabricate",
+    "inspect"
+  ],
+  "initial": {
+    "materials": 42,
+    "energy": 77,
+    "products": 0,
+    "scrap": 0
+  },
+  "commands": [
+    {
+      "id": "alchemy_clarity_draught:start",
+      "action": "start",
+      "batch": 1,
+      "expected_version": 0,
+      "tick": 1,
+      "evidence": ""
+    },
+    {
+      "id": "alchemy_clarity_draught:prep",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 1,
+      "tick": 2,
+      "evidence": "trusted-stage-prep"
+    },
+    {
+      "id": "alchemy_clarity_draught:work",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 2,
+      "tick": 3,
+      "evidence": "trusted-stage-work"
+    },
+    {
+      "id": "alchemy_clarity_draught:inspect",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 3,
+      "tick": 4,
+      "evidence": "trusted-stage-inspect"
+    },
+    {
+      "id": "alchemy_clarity_draught:finish",
+      "action": "finish",
+      "batch": 1,
+      "expected_version": 4,
+      "tick": 5,
+      "evidence": "trusted-quality-acceptance"
+    }
+  ],
+  "expected": {
+    "final_status": "completed",
+    "final_stage": 3,
+    "version": 5,
+    "product_count": 2,
+    "spent_materials": 3,
+    "energy_cost": 15,
+    "all_accepted": true
+  },
+  "negative_cases": [
+    "missing-stage-evidence",
+    "stages-incomplete",
+    "missing-quality-evidence",
+    "stale-version",
+    "duplicate-event",
+    "insufficient-energy",
+    "insufficient-material"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "physical_machine_control": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

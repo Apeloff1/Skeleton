@@ -1,0 +1,110 @@
+# Offline deterministic NPC schedules (FLGB-13 consumer)
+
+This is a canonical gameplay extension under `skeleton/game/gameplay`, not a
+second simulation engine, a network provider, or an AI NPC model. The player can
+visit original NPCs at deterministic world ticks, make one-time interactions,
+unlock facts, advance the world clock, and restore the exact event stream from
+a content-bound saved command log. The CLI runs with no network access.
+
+## Original end-to-end Lantern Harbor journey
+
+The lighthouse keeper Mira requests a lens repair. Dockwright Sol repairs the
+lens at the workshop, after which Mira lights the beacon at tick 8 and Sol
+opens the tide gate at tick 12. These are original authored interactions,
+not generated audiovisual assets or third-party character likenesses.
+
+```sh
+python -m scripts.npc_schedule_cli \
+  --schedule skeleton/testing/fixtures/lantern_harbor_npc_schedule.json \
+  --commands skeleton/testing/fixtures/lantern_harbor_npc_commands.json \
+  --save /tmp/lantern-harbor-save.json
+python -m scripts.npc_schedule_cli \
+  --schedule skeleton/testing/fixtures/lantern_harbor_npc_schedule.json \
+  --resume /tmp/lantern-harbor-save.json
+python -m pytest -q skeleton/testing/test_npc_schedule.py
+```
+
+The CLI only creates a new save and refuses to overwrite an existing name.
+Save creation uses a same-directory temporary regular file, fsync and an
+atomic no-clobber hard link, with cleanup of the temporary name. File input
+refuses symlinks and oversized JSON. The CLI never invokes a provider.
+
+## Determinism and authority
+
+Schedule digest commits to world, canon digest, initial facts and every NPC
+route. A stop is active in `[start_tick, end_tick)`; stops of the same NPC
+cannot overlap, interaction IDs cannot repeat within a route, and world ticks
+cannot move backwards. Interactions require matching player, NPC, current
+tick, location/interaction ID and previously earned facts. An interaction
+can be consumed once only. Canonical `EventBus` commits to every advance
+and interaction; `SaveableGameplayState` binds world, canon, tick, replay
+state and optional parent save digest. Restoring re-executes all commands
+through the actual gameplay module and checks both digests. Unknown fields,
+non-integer ticks, forged saves and unbounded commands fail closed.
+
+Limits: 512 NPCs, 256 stops/NPC, 4,096 facts, 8,192 commands, 1,000,000
+ticks, and 2 MB per CLI JSON input/save. No claims of real-time NPC pathfinding,
+native 3D animation, model inference, or device qualification are made.
+
+## Integration and qualification
+
+Upstream: authored world and canon digest, FLGB-13 gameplay event bus.
+Downstream: a CLI-consumable JSON snapshot and an inspectable active-NPC
+view suitable for a builder UI adapter. Consumers must validate the original
+source digest before replay and must not silently substitute missing canon.
+
+Focused tests exercise the canonical gameplay module, original fixture,
+save/restore, no-clobber publication, symlink and oversized input refusal,
+replay tampering, prerequisite failure and deterministic event ordering.
+Required repository-wide architecture, security, exact-head CI, independent
+review, device and release gates remain pending until actually executed.
+
+## Play directly in a terminal
+
+```sh
+python -m scripts.npc_schedule_cli \
+  --schedule skeleton/testing/fixtures/lantern_harbor_npc_schedule.json \
+  --interactive --save /tmp/lantern-harbor-interactive.json
+```
+
+Use `look` to see present NPCs and locations, `talk mira_keeper
+ask_for_lens` to start the quest, `talk sol_dockwright repair_lens`,
+`advance 8`, `talk mira_keeper restore_beacon`, `advance 12`, and
+`talk sol_dockwright open_tide_gate` to finish. `facts` inspects
+consequences; `quit` saves when `--save` is supplied. Rejected
+actions leave the original session untouched. The terminal game requires
+no AI provider, audio or network access.
+
+## Authored alternate endings
+
+The same original harbor includes a council interaction, `talk harbor_council
+seal_harbor`, available at tick 0. It ends the game as `harbor_sealed`.
+Completing the lens, beacon and tide-gate sequence ends the game as
+`harbor_restored`. Endings have explicit, non-conflicting fact predicates
+and deterministic priorities; once one is reached, no more player commands
+can mutate the terminal story. The chosen ending is included in the
+source-bound state digest and verified during replay.
+
+## Canonical original-content provenance
+
+The schedule embeds a bounded original canon text, explicit project-original
+origin, CC0-1.0 license identifier and author. The canonical canon digest
+must equal SHA-256 of the exact UTF-8 authored text; a modified source,
+unsupported license or missing provenance fails before gameplay starts.
+This is machine-verifiable source binding, not an independent external
+copyright clearance or marketplace rights certification.
+
+## Canonical installed application command
+
+The same journey is reachable through the existing GameForge command dispatcher,
+without adding another top-level runtime or provider:
+
+```sh
+python -m skeleton game npc-schedule \
+  --schedule skeleton/testing/fixtures/lantern_harbor_npc_schedule.json \
+  --commands skeleton/testing/fixtures/lantern_harbor_npc_commands.json
+```
+
+The existing `game <brief>` production path remains unchanged; only the
+explicit `npc-schedule` subcommand is delegated to the offline gameplay
+module. The acceptance test enters through `skeleton.forge.game_builder.cli`.
