@@ -152,8 +152,12 @@ class CampaignAdmissionTests(CampaignFixture):
     def test_original_task_mutation_is_refused_before_any_model(self):
         request = self.request()
         request["tasks"][0]["native_request"]["goal"] += " MODIFIED"
+        # Structural JSON parsing cannot establish the live original file
+        # and job digest. The read-only inspector is the authoritative
+        # pre-model review boundary and must refuse changed task bytes.
+        plan, _ = campaign.parse_campaign(_canonical(request))
         with self.assertRaises(campaign.NativeCampaignHold):
-            campaign.parse_campaign(_canonical(request))
+            campaign.inspect_campaign(plan)
 
     def test_duplicate_task_id_is_denied(self):
         req = self.request()
