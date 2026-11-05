@@ -210,3 +210,42 @@ def test_mod_manifest_rejects_unbounded_versions_and_target_scopes():
     with pytest.raises(ModError, match="targets"):
         mm("direct", targets=tuple(["levels"] * 33))
     assert ModManifest.from_dict({**valid, "targets": ["levels"]}).targets == ("levels",)
+
+def test_resolver_rejects_unbounded_and_malformed_inputs():
+    from itertools import repeat
+    from skeleton.ai.game_builder.mods.resolve import MAX_RESOLVE_MODS
+
+    with pytest.raises(ResolveError, match="count exceeds"):
+        resolve_load_order(repeat(mm("same"), MAX_RESOLVE_MODS + 1))
+    with pytest.raises(ResolveError, match="invalid mod manifest"):
+        resolve_load_order([mm("good"), object()])
+    assert resolve_load_order([mm("good")]).ids() == ["good"]
+
+
+def test_resolver_rejects_unbounded_direct_manifest_edges():
+    from dataclasses import replace
+    from skeleton.ai.game_builder.mods.resolve import MAX_RESOLVE_REFERENCES
+
+    direct = replace(mm("core"), load_after=tuple(
+        f"mod{i}" for i in range(MAX_RESOLVE_REFERENCES + 1)))
+    with pytest.raises(ResolveError, match="dependency graph exceeds"):
+        resolve_load_order([direct])
+
+
+def test_resolver_iterator_failure_is_typed_and_never_returns_partial_plan():
+    def broken_inventory():
+        yield mm("good")
+        raise RuntimeError("untrusted inventory stopped")
+
+    with pytest.raises(ResolveError, match="mod inventory iterator failed"):
+        resolve_load_order(broken_inventory())
+
+    class HostileManifest(ModManifest):
+        @property
+        def mod_id(self):
+            raise AssertionError("subclass hook executed")
+
+    # A forged subclass must not be consulted by the graph resolver.
+    forged = object.__new__(HostileManifest)
+    with pytest.raises(ResolveError, match="invalid mod manifest"):
+        resolve_load_order([forged])
