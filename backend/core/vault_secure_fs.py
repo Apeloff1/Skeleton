@@ -116,7 +116,16 @@ class _BoundedSink:
         self._remaining -= written
         return written
 
+    def writelines(self, lines) -> None:
+        # File-like callers may use writelines instead of write; each emitted
+        # chunk must pass through the same byte budget.
+        for line in lines:
+            self.write(line)
+
     def __getattr__(self, name: str):
+        # Do not expose alternate handles that would bypass write accounting.
+        if name in {"raw", "buffer", "detach"}:
+            raise AttributeError(name)
         return getattr(self._handle, name)
 
 
