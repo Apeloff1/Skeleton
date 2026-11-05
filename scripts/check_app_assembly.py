@@ -1025,8 +1025,15 @@ def audit_preinstall_docker_sources() -> None:
             else "pre-first-install Docker source admission passed"
         ),
     )
-    manifest = json.loads(read("skeleton/app/manifest.json"))
-    required = manifest["required_paths"]
+    raw = read("skeleton/app/manifest.json")
+    try:
+        manifest = json.loads(raw)
+        required = manifest["required_paths"]
+        if not isinstance(required, list):
+            raise ValueError("required_paths must be a list")
+    except (ValueError, KeyError, TypeError):
+        check(False, "first-install required-path manifest is unreadable or invalid")
+        return
     for path in (
         "Dockerfile.dockerignore",
         "backend/Dockerfile.dockerignore",
