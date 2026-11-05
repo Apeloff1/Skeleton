@@ -65,7 +65,7 @@ def _validated_context(value: dict) -> dict:
     result["seed"] = seed
     era_year = value.get("era_year")
     if era_year is not None:
-        if type(era_year) is not int or not 0 <= era_year <= 100000:
+        if type(era_year) is not int or not -100000 <= era_year <= 100000:
             raise ValueError("game context era_year is invalid")
         result["era_year"] = era_year
     return result
