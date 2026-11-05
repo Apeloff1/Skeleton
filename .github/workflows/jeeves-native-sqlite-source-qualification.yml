@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/jeeves/agent/native_*.py"
+      - "skeleton/ai/agents/jeeves/**"
       - "skeleton/jeeves/agent/runtime.py"
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/**"
       - "skeleton/ai/runtime/production_fabric/product/**"
@@ -116,6 +117,8 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_startup*.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_device_observer_cgroups.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_device_admission_cgroups.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_source_guard.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_replay.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_postcommit.py' -v
