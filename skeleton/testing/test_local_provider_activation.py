@@ -81,6 +81,12 @@ def _local_env(monkeypatch, path) -> None:
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(path))
     monkeypatch.setenv("AI_LOCAL_MODEL_CACHE_SIZE", "8")
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "17")
+    # The reference n-gram fixture is a deliberately development-only local
+    # adapter. Production local startup still requires trusted guard
+    # components; it must not silently fall back to this test configuration.
+    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "false")
+    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
     for name in (
         "OPENAI_API_KEY",
         "OPENAI_BASE_URL",
@@ -134,6 +140,19 @@ def test_local_model_artifact_rejects_duplicate_keys_and_digest_drift(tmp_path) 
         load_local_model_artifact(path)
 
 
+def test_local_provider_without_trusted_guards_fails_closed(tmp_path, monkeypatch) -> None:
+    path, _ = _write_model(tmp_path)
+    _local_env(monkeypatch, path)
+    # The explicit development waiver used by reference-only tests does not
+    # turn normal production activation into a credential-free bypass.
+    monkeypatch.delenv("AI_LOCAL_GUARD_REQUIRED", raising=False)
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="guard-required local startup lacks trusted dependencies",
+    ):
+        ProviderRegistry.from_env()
+
+
 @pytest.mark.asyncio
 async def test_provider_registry_local_mode_is_credential_free_and_network_free(
     tmp_path,
@@ -143,7 +162,7 @@ async def test_provider_registry_local_mode_is_credential_free_and_network_free(
     _local_env(monkeypatch, path)
     _block_internet(monkeypatch)
 
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     adapter = registry.require_active()
     status = registry.statuses()
 
@@ -199,7 +218,7 @@ def test_local_mode_rejects_external_provider_escape_configuration(
     monkeypatch.setenv(name, value)
 
     with pytest.raises(ProviderUnavailableError, match=match):
-        ProviderRegistry.from_env()
+        ProviderRegistry.from_env(require_guarded_local=False)
 
 
 def _verified(
@@ -364,7 +383,7 @@ async def test_engine_coordinator_executes_local_registry_without_hosted_provide
         tenant_id=operation.tenant_id,
         now=operation.created_at,
     )
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     coordinator = EngineExecutionCoordinator(
         service,
         provider_registry=registry,
@@ -430,7 +449,7 @@ async def test_engine_coordinator_interrupts_running_local_inference_and_finaliz
         now=operation.created_at,
     )
 
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     adapter = registry.require_active()
     entered = threading.Event()
     cancel_seen = threading.Event()
@@ -528,7 +547,7 @@ async def test_authenticated_engine_http_boundary_executes_local_provider_offlin
             ]
         ),
     )
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     coordinator = EngineExecutionCoordinator(
         service,
         provider_registry=registry,
