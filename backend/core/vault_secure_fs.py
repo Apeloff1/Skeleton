@@ -6,7 +6,7 @@ absolute path component with O_NOFOLLOW and O_DIRECTORY.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 import os
 from pathlib import Path
 import secrets
@@ -192,19 +192,24 @@ def snapshot_regular(fd: int, name: str, *, max_bytes: int) -> str | None:
     An existing leaf must be regular, single-link and no larger than the
     caller's budget. A concurrently growing source remains bounded as copied.
     """
-    try:
-        with read_regular(fd, name, max_bytes=max_bytes) as source:
-            backup = ".vault-backup-" + secrets.token_hex(16)
-            atomic_write(
-                fd, backup,
-                lambda destination: _copy_bounded(
-                    source, destination, max_bytes=max_bytes,
-                ),
-                max_bytes=max_bytes,
+    with ExitStack() as stack:
+        try:
+            # Only a missing ORIGINAL shard means there is nothing to back up.
+            # A FileNotFoundError during publication must fail closed.
+            source = stack.enter_context(
+                read_regular(fd, name, max_bytes=max_bytes),
             )
-            return backup
-    except FileNotFoundError:
-        return None
+        except FileNotFoundError:
+            return None
+        backup = ".vault-backup-" + secrets.token_hex(16)
+        atomic_write(
+            fd, backup,
+            lambda destination: _copy_bounded(
+                source, destination, max_bytes=max_bytes,
+            ),
+            max_bytes=max_bytes,
+        )
+        return backup
 
 
 def unlink_regular(fd: int, name: str) -> None:
