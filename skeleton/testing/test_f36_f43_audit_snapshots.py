@@ -129,12 +129,16 @@ def test_env_flag_audit_locks_own_and_seal_names(monkeypatch) -> None:
         "SKL_GOVERNANCE_LIFECYCLE_PATH",
         "SKL_GOVERNANCE_ARTIFACT_ROOT",
         "SKELETON_PUBLIC_DEV_SURFACES",
+        "SKELETON_OMNIFABRIC_API",
         "GF_SEAL_SECRET",
         "GF_SEAL_KEYRING",
         "SKELETON_OWN",
+        "SKELETON_JEEVES_BOOTSTRAP",
     ]
     rows = {row["name"]: row for row in payload["flags"]}
+    assert rows["SKELETON_OMNIFABRIC_API"]["module"] == "skeleton.api.server"
     assert rows["SKELETON_OWN"]["module"] == "skeleton.cortex.live"
+    assert rows["SKELETON_JEEVES_BOOTSTRAP"]["module"] == "skeleton.cortex.live"
 
 
 def test_cli_http_and_command_parity_for_new_audits(capsys) -> None:

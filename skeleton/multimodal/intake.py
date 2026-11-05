@@ -33,6 +33,7 @@ _INSTRUCTION_PATTERN = re.compile(
     r"ignore\s+(?:all\s+)?previous\s+instructions?"
     r"|system\s+prompt"
     r"|developer\s+message"
+    r"|(?:system|developer)\s*:\s*(?:override|ignore|follow)\b"
     r"|follow\s+(?:these|the)\s+instructions?"
     r"|override\s+(?:the\s+)?(?:system|developer|policy)"
     r")\b"
@@ -134,6 +135,48 @@ def _sanitize_metadata(metadata: Mapping[str, object]) -> dict[str, object]:
     except (TypeError, ValueError) as exc:
         raise MultimodalSanitizationError("sanitized metadata is not deterministic JSON") from exc
     return dict(sorted(result.items()))
+
+
+def _verify_declared_media_metadata(
+    metadata: Mapping[str, object], measurement: MediaValidationReceipt,
+) -> None:
+    """Reject untrusted decoder claims that disagree with actual decoded bytes.
+
+    Filtering unknown metadata is insufficient: a caller must not supply
+    dimensions or audio parameters that contradict the verified receipt, even
+    when a claimed field is not retained as harmless display metadata.
+    """
+    measured = measurement.measured_metadata
+    expected = dict(measured)
+    if measurement.sample_rate_hz is not None:
+        expected["sample_rate_hz"] = measurement.sample_rate_hz
+        expected["sample_count"] = measurement.sample_count
+        expected["sample_width_bytes"] = measurement.sample_width_bytes
+        expected["duration_seconds"] = measurement.duration_seconds
+    declared_fields = {
+        "width", "height", "format", "channels", "sample_rate",
+        "sample_rate_hz", "sample_count", "sample_width_bytes",
+        "sample_width_bits", "frame_count", "duration_ms", "duration_seconds",
+    }
+    for raw_key, supplied in metadata.items():
+        key = _text("metadata key", raw_key, maximum=MAX_METADATA_KEY_CHARS).casefold()
+        if key not in declared_fields:
+            continue
+        actual = expected.get(key)
+        if actual is None or isinstance(supplied, bool):
+            raise MultimodalSanitizationError("declared media metadata conflicts with decoded source")
+        if isinstance(actual, str):
+            matches = type(supplied) is str and supplied == actual
+        else:
+            matches = (
+                (
+                    type(supplied) is int
+                    or (type(supplied) is float and math.isfinite(supplied))
+                )
+                and supplied == actual
+            )
+        if not matches:
+            raise MultimodalSanitizationError("declared media metadata conflicts with decoded source")
 
 
 def _detect_embedded_instruction(
@@ -257,7 +300,7 @@ class MultimodalIntake:
                 "authority_scope",
             )
         ):
-            raise MultimodalSanitizationError("asset id already bound to different source semantics")
+            raise MultimodalSanitizationError("asset identity conflict: asset id already bound to different source semantics")
         if prior is None and len(self._assets) >= self.max_assets:
             raise MultimodalSanitizationError("asset registry capacity exceeded")
         return candidate
@@ -302,6 +345,7 @@ class MultimodalIntake:
             )
         except MediaValidationError as exc:
             raise MultimodalSanitizationError(str(exc)) from exc
+        _verify_declared_media_metadata({} if metadata is None else metadata, measurement)
         verified = VerifiedMultimodalAsset(
             asset_id=candidate.asset_id,
             modality=candidate.modality,
@@ -320,10 +364,10 @@ class MultimodalIntake:
         self._assets[candidate.asset_id] = verified
         return verified
 
-    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> None:
+    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> VerifiedMultimodalAsset:
         if self._assets.get(getattr(asset, "asset_id", None)) is not asset:
             raise MultimodalSanitizationError("verified asset was not issued by this intake")
-        verify_verified_asset(asset, source)
+        return verify_verified_asset(asset, source)
 
     def safe_sanitize(self, **kwargs) -> MultimodalAsset:
         try:
@@ -361,7 +405,7 @@ class VerifiedMultimodalAsset(MultimodalAsset):
             raise MultimodalSanitizationError("decoder receipt and source identity differ")
 
 
-def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None:
+def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> VerifiedMultimodalAsset:
     if not isinstance(asset, VerifiedMultimodalAsset):
         raise MultimodalSanitizationError("typed verified asset is required")
     if not isinstance(source, bytes) or len(source) != asset.content_bytes:
@@ -375,10 +419,16 @@ def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None
             mime_type=asset.mime_type,
             limits=asset.validation.limits,
         )
-    except (MediaValidationError, AttributeError, TypeError) as exc:
+    except MediaValidationError as exc:
+        # Preserve a bounded policy-field diagnostic, never decoder payload data.
+        if "max_pixels" in str(exc):
+            raise MultimodalSanitizationError("verified source cannot be decoded: invalid max_pixels") from exc
+        raise MultimodalSanitizationError("verified source cannot be decoded") from exc
+    except (AttributeError, TypeError) as exc:
         raise MultimodalSanitizationError("verified source cannot be decoded") from exc
     if measured.as_dict() != asset.validation.as_dict() or asset.instruction_trusted:
         raise MultimodalSanitizationError("actual decoded source differs from issued evidence")
+    return asset
 
 
 _INSTRUCTION_PATTERNS = (re.compile(_INSTRUCTION_PATTERN.pattern.encode()),)

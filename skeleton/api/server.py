@@ -1416,6 +1416,10 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
     install_gate(app, policy=gate_policy)
     from skeleton.api.agent_edge_mount import install_registered_agent_edge
     install_registered_agent_edge(app)
+    # Registered create_app hooks (core v1 mount + dispatch scheduler);
+    # factory-time, env-gated (SKELETON_CREATE_APP_HOOKS), error-isolated.
+    from skeleton.gate_plane.create_app_hooks import apply_create_app_hooks
+    apply_create_app_hooks(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(

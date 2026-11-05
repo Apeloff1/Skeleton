@@ -74,3 +74,19 @@ def test_bad_key_and_no_key():
     with pytest.raises(CoreError):
         idem.run("short", ("t", "a", "r"), "fp", lambda: StoredResponse(200, {}))
     assert idem.run(None, ("t", "a", "r"), "fp", lambda: StoredResponse(200, {}))[1] is False
+
+
+def test_idempotency_scope_serialization_prevents_delimiter_collisions():
+    from core.core_v1.idempotency import scope_key
+
+    assert scope_key("tenant|actor", "user", "route", "key-00001") != scope_key(
+        "tenant", "actor|user", "route", "key-00001"
+    )
+    idem, _ = _idem()
+    first = lambda: StoredResponse(201, {"tenant": 1})
+    second = lambda: StoredResponse(201, {"tenant": 2})
+    idem.run("key-00001", ("tenant|actor", "user", "route"), "same", first)
+    response, replayed = idem.run("key-00001", ("tenant", "actor|user", "route"), "same", second)
+    assert not replayed and response.body == {"tenant": 2}
+    with pytest.raises(CoreError):
+        idem.run(123, ("t", "a", "r"), "fp", first)

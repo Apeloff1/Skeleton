@@ -52,7 +52,12 @@ def fingerprint(method: str, route: str, body: Any) -> str:
 
 
 def scope_key(tenant_id: str, actor_id: str, route: str, key: str) -> str:
-    return f"{tenant_id}|{actor_id}|{route}|{key}"
+    parts = (tenant_id, actor_id, route, key)
+    if any(type(value) is not str or not value or len(value) > 512 for value in parts):
+        raise validation("CORE.IDEMPOTENCY.INVALID_SCOPE", "idempotency scope is invalid")
+    # Unambiguous tuple serialization prevents cross-tenant collisions when
+    # trusted identifiers contain delimiters used by older concatenation.
+    return json.dumps(parts, separators=(",", ":"), ensure_ascii=True)
 
 
 class Idempotency:
@@ -64,7 +69,7 @@ class Idempotency:
         """Execute ``action`` at most once per key. Returns (response, replayed)."""
         if key is None:
             return action(), False
-        if not KEY_RE.match(key):
+        if type(key) is not str or not KEY_RE.fullmatch(key):
             raise validation("CORE.IDEMPOTENCY.INVALID_KEY", "Idempotency-Key is malformed")
         skey = scope_key(*skey_parts, key)
         now = self.clock.now()

@@ -230,6 +230,11 @@ SERVER_PY_ALLOWED_LINES = frozenset({
     # #3622 follow-up: registered agent edge behind install_gate (restored after #4139).
     "from skeleton.api.agent_edge_mount import install_registered_agent_edge",
     "install_registered_agent_edge(app)",
+    # Registered create_app hooks wired into create_app (core v1 mount live).
+    "# Registered create_app hooks (core v1 mount + dispatch scheduler);",
+    "# factory-time, env-gated (SKELETON_CREATE_APP_HOOKS), error-isolated.",
+    "from skeleton.gate_plane.create_app_hooks import apply_create_app_hooks",
+    "apply_create_app_hooks(app)",
     # skeleton.projects.v1 (#4097), restored after #4139.
     "from skeleton.api.projects_routes import router as projects_router",
     'app.include_router(projects_router, prefix="/api/v1")',

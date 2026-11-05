@@ -225,10 +225,14 @@ def grade(markdown: str, meta: dict[str, Any]) -> dict[str, Any]:
         "fifty_exact_archetypes": sum(line.startswith("| ") and " | epoch_" in line
                                       for line in markdown.splitlines()) == 50,
         "ten_system_workups": markdown.count("Executable epoch source: ") == 10,
-        "all_six_sections": all(s in markdown for s in (
-            "## Temporal scenario", "## Fifty registered", "## Ten gameplay",
-            "## Authoring, replay", "## Thirty adversarial",
-            "## Complete upstream", "## Legal and production")),
+        "all_six_sections": all(heading in set(markdown.splitlines()) for heading in (
+            "## Temporal scenario and authored effect",
+            "## Fifty registered source archetypes",
+            "## Ten gameplay system workups",
+            "## Authoring, replay and native build contract",
+            "## Thirty adversarial source and release checks",
+            "## Complete upstream chronicle dossier",
+            "## Legal and production qualification boundary")),
         "thirty_review_questions": all(f"{i+1}. {check}." in markdown
                                        for i, check in enumerate(CHECKS)),
         "retained_upstream_source": "## Chronicle objective" in markdown,
