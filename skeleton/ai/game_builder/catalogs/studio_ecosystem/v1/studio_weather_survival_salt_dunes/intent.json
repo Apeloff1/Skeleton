@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_salt_dunes",
+  "title": "Salt Dunes: Stormline",
+  "subtitle": "Original stormline design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010316739,
+  "width": 23,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 3
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_cloud_canopy",
+  "title": "Cloud Canopy: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010313191,
+  "width": 27,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 5,
+  "theme": "forest",
+  "starting_health": 5
+}

@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_tactical_defense_glacial_fjord",
+  "genre": "tactical_defense",
+  "biome": "glacial_fjord",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Glacial Fjord: Tactical Defense",
+  "foundation": {
+    "setting": "Glacial Fjord",
+    "era": "near-future renewal",
+    "environment": "blue tidal shelves",
+    "history": "The ice-locked archive was built to protect thermal vents, but fracturing ice interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Mira Kest, a warden, must protect the last community hub using line-of-sight cover while fracturing ice threatens the ice-locked archive.",
+  "central_conflict": "a rogue militia seeks control of thermal vents; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "fracturing ice isolates the ice-locked archive",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a rogue militia offers privileged access to thermal vents",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "ice-locked archive",
+    "critical_resource": "thermal vents",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

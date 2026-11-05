@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_tactical_defense_amber_highlands",
+  "genre": "tactical_defense",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_tactical_defense_amber_highlands:restore",
+  "objective": "protect the last community hub",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "terraced ridgepaths",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near mountain hospice",
+        "Seek a witness of landslides"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "mountain hospice",
+      "entry": "survey_complete",
+      "actions": [
+        "defend",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to resin lamps",
+        "Establish an independent path around a rogue militia"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "mountain hospice",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of mountain hospice",
+        "Construct a low-resource alternative using resin lamps"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden landslides interrupts transfer",
+    "The a rogue militia suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "resin lamps",
+    "unlimited_rewards": false
+  }
+}

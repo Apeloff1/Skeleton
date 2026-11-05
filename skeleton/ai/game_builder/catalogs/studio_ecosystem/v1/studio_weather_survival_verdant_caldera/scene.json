@@ -1,0 +1,94 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "project_id": "studio_weather_survival_verdant_caldera",
+  "genre": "weather_survival",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "episode_plan": [
+    {
+      "id": "origin",
+      "site": "outer stepped jungle terraces",
+      "weather_state": "geothermal plumes",
+      "quest_stage": "investigate",
+      "assets": [
+        "weather_verdant_caldera",
+        "navigator_weather_survival"
+      ],
+      "interactive_objects": [
+        "survey_beacon",
+        "witness_board",
+        "route_chart"
+      ],
+      "camera_target": "regional_overview",
+      "dialogue_hook": "witness"
+    },
+    {
+      "id": "contest",
+      "site": "hanging botanical lab",
+      "weather_state": "escalating geothermal plumes",
+      "quest_stage": "intervene",
+      "assets": [
+        "structure_verdant_caldera",
+        "tool_weather_survival"
+      ],
+      "interactive_objects": [
+        "maintenance_console",
+        "faction_emissary",
+        "evidence_station"
+      ],
+      "camera_target": "close_third_person",
+      "dialogue_hook": "rival"
+    },
+    {
+      "id": "settlement",
+      "site": "shared access node near hanging botanical lab",
+      "weather_state": "measured steam temperature",
+      "quest_stage": "ratify",
+      "assets": [
+        "commons_board",
+        "resource_verdant_caldera"
+      ],
+      "interactive_objects": [
+        "audit_terminal",
+        "branch_choice",
+        "repair_monitor"
+      ],
+      "camera_target": "cinematic_pullback",
+      "dialogue_hook": "technician"
+    }
+  ],
+  "continuity": {
+    "authority": "canonical_game_project_workspace",
+    "state_keys": [
+      "hazard_measurement",
+      "witness_consented",
+      "repair_evidence",
+      "faction_alignment"
+    ],
+    "canonical_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ],
+    "replay_obligation": "exact_input_world_digest_and_branch_receipts"
+  },
+  "genre_mechanics": {
+    "genre": "weather_survival",
+    "primary": "microclimate sheltering and heat-loss modeling",
+    "systemic_safety": "hypothermia margin",
+    "environment_feedback": "steam temperature"
+  },
+  "navigation": {
+    "routes": [
+      "direct",
+      "safe_detour",
+      "public_transport_when_available"
+    ],
+    "unreachable_gates": "explicitly_marked"
+  },
+  "runtime_binding": {
+    "preview": "existing_deterministic_2D_grid_HTML5",
+    "requested_runtime": "native_weather_survival",
+    "implemented": false
+  }
+}

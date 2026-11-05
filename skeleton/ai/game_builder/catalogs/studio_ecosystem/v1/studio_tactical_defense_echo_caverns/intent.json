@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_defense_echo_caverns",
+  "title": "Echo Caverns: Tactical Defense",
+  "subtitle": "An original tactical defense brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610300768,
+  "width": 25,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 4
+}

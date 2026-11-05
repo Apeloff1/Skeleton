@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_ashen_archipelago",
+  "title": "Ashen Archipelago: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610303107,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 5
+}

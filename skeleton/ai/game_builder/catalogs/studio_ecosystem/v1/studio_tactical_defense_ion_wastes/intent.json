@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_defense_ion_wastes",
+  "title": "Ion Wastes: Tactical Defense",
+  "subtitle": "An original tactical defense brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610300598,
+  "width": 21,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 6
+}
