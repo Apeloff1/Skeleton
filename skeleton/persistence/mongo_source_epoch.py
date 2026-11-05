@@ -447,7 +447,6 @@ def fence_memory_tombstone(method):
                 or type(getattr(current, "subject_id", None)) is not str
                 or current.tenant_id != tenant_id or current.namespace != namespace):
             raise MongoSourceEpochError("canonical memory tombstone scope changed")
-        epoch._key(tenant_id, current.subject_id)
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
             return await method(self, memory_id, *args, **kwargs)
 
