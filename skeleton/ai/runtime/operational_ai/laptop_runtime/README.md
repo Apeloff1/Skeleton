@@ -404,3 +404,18 @@ operator SHA approval can publish ONE privately staged source tree or ONE
 inert Git patch, using the existing no-clobber/cold-verification publishers.
 No source body appears on stdout and no original project is modified.
 See `docs/ai/JEEVES_NATIVE_CAMPAIGN_SOURCE_ASSEMBLY.md`.
+
+## Advanced native coding campaign desktop controller
+
+The Jeeves Tk desktop now includes an **Advanced native coding campaign**
+operator workbench alongside the existing source authoring controls.
+It presents the exact native task campaign JSON and SHA approval, requires
+three distinct real-model/storage consents, enforces a single visible
+campaign window and prevents competing parent chat GGUF connects while
+the workbench is open. A RAM-only once-consumed controller routes source
+inspection, native run, cold source review, aggregate cross-task patch
+inspection and exact-digest manual publication through the existing
+model/SQLite/private-source owners. Long work is performed on an isolated
+thread with held/no-retry receipts. No external service, source execution,
+hidden prompt or automatic source/Git write is introduced.
+See `docs/ai/JEEVES_NATIVE_CAMPAIGN_DESKTOP.md`.
