@@ -38,7 +38,10 @@ MAX_JUDGE_REPLY_CHARS = 32_768
 MAX_MODEL_CONTENT_CHARS = 12_000
 MAX_JUDGE_PROMPT_CHARS = 39_200
 MAX_ASYNC_DELIBERATIONS = 16
+MAX_ASYNC_PER_OWNER = 2
+MAX_ASYNC_PER_TENANT = 6
 _ACTIVE_DELIBERATIONS: set[str] = set()
+_ACTIVE_JOB_SCOPES: dict[str, tuple[str, str]] = {}
 _ACTIVE_LOCK = threading.Lock()
 
 
@@ -468,6 +471,7 @@ async def _run_bg(did: str, body: "DeliberateBody", identity: dict):
     finally:
         with _ACTIVE_LOCK:
             _ACTIVE_DELIBERATIONS.discard(did)
+            _ACTIVE_JOB_SCOPES.pop(did, None)
 
 
 @router.post("/deliberate/async")
@@ -500,8 +504,22 @@ async def deliberate_async(
     with _ACTIVE_LOCK:
         if len(_ACTIVE_DELIBERATIONS) >= MAX_ASYNC_DELIBERATIONS:
             raise HTTPException(503, "deliberation job admission at capacity")
+        owner_scope = (scope["tenant_id"], scope["owner_id"])
+        owner_active = sum(
+            identity == owner_scope for identity in _ACTIVE_JOB_SCOPES.values()
+        )
+        tenant_active = sum(
+            identity[0] == owner_scope[0] for identity in _ACTIVE_JOB_SCOPES.values()
+        )
+        if owner_active >= MAX_ASYNC_PER_OWNER:
+            raise HTTPException(429, "account deliberation capacity reached")
+        if tenant_active >= MAX_ASYNC_PER_TENANT:
+            raise HTTPException(429, "tenant deliberation capacity reached")
         did = uuid.uuid4().hex
+        if did in _ACTIVE_DELIBERATIONS or did in _ACTIVE_JOB_SCOPES:
+            raise HTTPException(503, "deliberation job ID admission collision")
         _ACTIVE_DELIBERATIONS.add(did)
+        _ACTIVE_JOB_SCOPES[did] = owner_scope
 
     try:
         stored = await _db.discourse_jobs.insert_one({
@@ -515,6 +533,7 @@ async def deliberate_async(
     except Exception as exc:
         with _ACTIVE_LOCK:
             _ACTIVE_DELIBERATIONS.discard(did)
+            _ACTIVE_JOB_SCOPES.pop(did, None)
         raise HTTPException(503, "deliberation job persistence unavailable") from exc
 
     coroutine = _run_bg(did, body, scope)
@@ -524,6 +543,7 @@ async def deliberate_async(
         coroutine.close()
         with _ACTIVE_LOCK:
             _ACTIVE_DELIBERATIONS.discard(did)
+            _ACTIVE_JOB_SCOPES.pop(did, None)
         try:
             await _db.discourse_jobs.update_one(
                 {"job_id": did, **scope},
