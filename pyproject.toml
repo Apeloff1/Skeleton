@@ -24,6 +24,7 @@ include = ["skeleton*"]
 "skeleton.ai.game_builder" = ["platform_catalog.json", "evolution_lineages.json", "legal_authorities.json"]
 "skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
 "skeleton.app" = ["manifest.json"]
+"skeleton.game.gameplay" = ["fixtures/*.json"]
 
 [build-system]
 requires = ["setuptools==84.2.1", "wheel==0.48.0"]
@@ -54,6 +55,8 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-harbor-crafting = "skeleton.game.gameplay.harbor_crafting_cli:main"
+skeleton-harbor-beacon-rescue = "skeleton.game.gameplay.harbor_crafting_beacon_cli:main"
 skeleton = "skeleton.__main__:main"
 skeleton-game-craft = "skeleton.game.gameplay.crafting_cli:main"
 skeleton-dev = "skeleton.developer.cli:main"
