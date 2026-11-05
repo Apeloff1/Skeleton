@@ -178,3 +178,31 @@ child is terminally revoked: the UI retains the original request ID for
 manual committed-state reconciliation and does **not** regenerate a task
 automatically. A source-revocation or partial response cannot be promoted
 into a successful desktop turn.
+
+## Strict Jeeves native agent mode
+
+The desktop has two distinct actions against the **same** already admitted
+isolated GGUF and source/SQLite authority:
+
+- **Send local chat** appends one committed, principal-bound SQLite turn and
+  can include explicitly enabled bounded historical conversation context.
+- **Run native Jeeves agent** invokes the existing `NativeJeevesRuntime`
+  with `StrictJeevesAgentRuntime`, bounded planning and verification,
+  and an empty host tool registry. No network, shell, filesystem write,
+  memory-promotion or hosted inference grant is created.
+
+Agent defaults are 8 steps, 8 native model calls and 180 seconds; the operator
+may reduce or increase them within 64 steps, 64 model calls and 600 seconds.
+The desktop records a unique visible run ID and preserves it on timeout or
+failure; all native effects remain subject to the original SQLite model
+commit/replay and single-worker source contract. The host refuses to disclose
+a successful agent reply if the strict runtime reports failure, resource
+overrun, a tool effect, principal drift or source revocation.
+
+The native client checks the agent's original run ID, source/model hash,
+UTF-8 answer digest and strict zero-tool result before displaying output.
+The operator may separately feed the returned text to the new-file review
+window, but doing so never confers file-write permission. The GUI agent lane
+is **in-process reasoning only**, not a claim of restart-safe durable agent
+checkpoints; the existing separately guarded durable operator CLI remains
+available for explicit cold recovery.

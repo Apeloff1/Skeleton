@@ -118,6 +118,10 @@ def write_frame(
 _ALLOWED: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "status": (frozenset(), frozenset()),
     "telemetry": (frozenset(), frozenset()),
+    "agent": (
+        frozenset({"run_id", "prompt"}),
+        frozenset({"maximum_steps", "maximum_model_calls", "maximum_wall_seconds"}),
+    ),
     "new": (frozenset(), frozenset()),
     "resume": (frozenset({"session_id"}), frozenset()),
     "turn": (frozenset({"request_id", "prompt"}), frozenset({"seed", "temperature", "context"})),
@@ -139,6 +143,8 @@ def command(op: str, **fields: object) -> dict[str, object]:
     result: dict[str, object] = {"schema": SCHEMA_COMMAND, "op": op}
     if "session_id" in fields:
         result["session_id"] = identifier(fields["session_id"], "session ID")
+    if "run_id" in fields:
+        result["run_id"] = identifier(fields["run_id"], "native agent run ID")
     if "request_id" in fields:
         result["request_id"] = identifier(fields["request_id"], "request ID")
     if "prompt" in fields:
@@ -153,13 +159,25 @@ def command(op: str, **fields: object) -> dict[str, object]:
         if type(fields["context"]) is not bool:
             raise DesktopProtocolHold("conversation context must be explicitly boolean")
         result["context"] = fields["context"]
+    for key, ceiling in (
+        ("maximum_steps", 64),
+        ("maximum_model_calls", 64),
+        ("maximum_wall_seconds", 600),
+    ):
+        if key in fields:
+            value = nonnegative(fields[key], maximum=ceiling)
+            if value < 1:
+                raise DesktopProtocolHold("native agent budget must be positive")
+            result[key] = value
     encoded(result, limit=MAX_INBOUND)
     return result
 
 
 def require_command(value: object) -> dict[str, object]:
     if type(value) is not dict or set(value) - (
-        {"schema", "op", "session_id", "request_id", "prompt", "seed", "temperature", "context"}
+        {"schema", "op", "session_id", "request_id", "prompt", "seed", "temperature",
+         "context", "run_id", "maximum_steps", "maximum_model_calls",
+         "maximum_wall_seconds"}
     ):
         raise DesktopProtocolHold("desktop command envelope has unknown fields")
     if value.get("schema") != SCHEMA_COMMAND:

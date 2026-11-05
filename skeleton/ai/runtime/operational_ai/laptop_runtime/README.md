@@ -89,3 +89,12 @@ cgroup v1/v2 CPU/RAM limits **before** real startup, then propose CPU-only
 resource bounds. This is read-only advisory sizing, not GPU/VRAM detection
 or certification. A connected operator can inspect actual supervisor
 capacity/circuit statistics without invoking generation.
+
+## Strict native Jeeves agent action
+
+Alongside SQLite chat, the UI can execute bounded multi-step reasoning through
+the existing `NativeJeevesRuntime` and `StrictJeevesAgentRuntime`. It
+reuses the live installed GGUF and source guard, with an empty tool registry,
+zero grants and a finite request/run budget. The UI never treats model output
+as permission to modify the host. The separate durable agent CLI remains the
+explicit restart-safe lane; desktop reasoning does not silently resume work.

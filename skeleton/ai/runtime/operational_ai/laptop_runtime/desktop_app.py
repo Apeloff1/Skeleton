@@ -45,6 +45,9 @@ class JeevesWindow(tk.Tk):
         self._attachments = []  # Explicit immutable source snapshots, never tool grants.
         self.attachment_text = tk.StringVar(value="No local source attached")
         self.context_enabled = tk.BooleanVar(value=True)
+        self.agent_steps = tk.StringVar(value="8")
+        self.agent_calls = tk.StringVar(value="8")
+        self.agent_wall = tk.StringVar(value="180")
 
         self.fields: dict[str, tk.StringVar] = {
             "model_root": tk.StringVar(value=""),
@@ -161,8 +164,15 @@ class JeevesWindow(tk.Tk):
         self.prompt = ScrolledText(compose, wrap="word", height=6, undo=True)
         self.prompt.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self.prompt.bind("<Control-Return>", self._keyboard_send)
-        self.send_button = ttk.Button(compose, text="Send locally", command=self._send)
-        self.send_button.grid(row=0, column=1, sticky="se")
+        send_actions = ttk.Frame(compose)
+        send_actions.grid(row=0, column=1, sticky="se")
+        self.send_button = ttk.Button(send_actions, text="Send local chat", command=self._send)
+        self.send_button.pack(fill="x", pady=(0, 5))
+        self.agent_button = ttk.Button(
+            send_actions, text="Run native Jeeves agent",
+            command=self._run_agent,
+        )
+        self.agent_button.pack(fill="x")
         attachment_bar = ttk.Frame(compose)
         attachment_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(5, 0))
         attachment_bar.columnconfigure(0, weight=1)
@@ -188,6 +198,21 @@ class JeevesWindow(tk.Tk):
             attachment_bar, text="Review Jeeves file proposal",
             command=self._workspace,
         ).grid(row=1, column=2, sticky="e", pady=(4, 0))
+        agent_budget = ttk.Frame(compose)
+        agent_budget.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(5, 0))
+        for column, (label, variable) in enumerate((
+            ("Agent steps", self.agent_steps),
+            ("Native calls", self.agent_calls),
+            ("Wall seconds", self.agent_wall),
+        )):
+            block = ttk.Frame(agent_budget)
+            block.grid(row=0, column=column, sticky="w", padx=(0, 12))
+            ttk.Label(block, text=label).pack(side="left", padx=(0, 5))
+            ttk.Entry(block, textvariable=variable, width=7).pack(side="left")
+        ttk.Label(
+            agent_budget,
+            text="Strict planning; same GGUF; no tool grants",
+        ).grid(row=0, column=3, sticky="w")
 
         footer = ttk.Frame(main)
         footer.grid(row=4, column=0, sticky="ew", pady=(5, 0))
@@ -234,7 +259,10 @@ class JeevesWindow(tk.Tk):
         self.profile_button.configure(
             state="normal" if not connected and not self._busy else "disabled",
         )
-        for button in (self.new_button, self.resume_button, self.telemetry_button):
+        for button in (
+            self.new_button, self.resume_button,
+            self.telemetry_button, self.agent_button,
+        ):
             button.configure(state="normal" if active else "disabled")
         has_session = (
             active and self._bridge is not None
@@ -420,6 +448,42 @@ class JeevesWindow(tk.Tk):
             context=self.context_enabled.get(),
         )
 
+    def _run_agent(self):
+        # The strict Jeeves planner runs through the same installed/source
+        # checked native child, with no extra memory store or tool grants.
+        bridge = self._bridge
+        if self._busy or bridge is None or not bridge.connected:
+            return
+        message = self.prompt.get("1.0", "end-1c")
+        try:
+            prompt = compose_prompt(message, tuple(self._attachments))
+            steps = int(self.agent_steps.get())
+            calls = int(self.agent_calls.get())
+            wall = int(self.agent_wall.get())
+            if (
+                not 1 <= steps <= 64 or not 1 <= calls <= 64
+                or not 1 <= wall <= 600
+            ):
+                raise ValueError("invalid finite Jeeves agent budget")
+        except (ValueError, DesktopAttachmentHold, UnicodeError) as exc:
+            self._show("Agent task held", type(exc).__name__, "warning")
+            return
+        run_id = "jrun_" + secrets.token_hex(16)
+        self._last_request = run_id
+        self.request_text.set("Native agent run: " + run_id)
+        self._show(
+            "You · bounded Jeeves agent",
+            message + (
+                "\n\n[" + str(len(self._attachments)) + " read-only source files]"
+                if self._attachments else ""
+            ), "you",
+        )
+        self._action(
+            "agent", prompt=prompt, run_id=run_id,
+            maximum_steps=steps, maximum_model_calls=calls,
+            maximum_wall_seconds=wall,
+        )
+
     def _keyboard_send(self, event):
         self._send()
         return "break"
@@ -515,6 +579,23 @@ class JeevesWindow(tk.Tk):
                                 result.get("observed", {}),
                                 ensure_ascii=False, sort_keys=True,
                             ),
+                        )
+                    elif action == "agent":
+                        report = result.get("agent", {})
+                        answer = report.get("answer", "")
+                        self._last_answer = answer if type(answer) is str else None
+                        self._show(
+                            "Jeeves strict agent · verified native output",
+                            str(answer), "jeeves",
+                        )
+                        self.prompt.delete("1.0", "end")
+                        self._clear_attachments()
+                        usage = report.get("usage", {})
+                        self.request_text.set(
+                            "Verified agent: " + str(report.get("run_id", ""))
+                            + " · native model calls: "
+                            + str(usage.get("model_calls", "?"))
+                            + " · tools granted: 0",
                         )
                     elif action == "turn":
                         record = result.get("turn", {})

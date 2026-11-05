@@ -121,6 +121,27 @@ class DesktopHost:
                     "observed-runtime-capacity", observed=observed,
                     physical_device_qualified=False,
                 ), False
+            if op == "agent":
+                # Reuse this single installed native worker and source fence.
+                # The existing strict Jeeves runtime owns planner/verifier
+                # state; tool registry is empty and no grants are supplied.
+                from .desktop_agent_mode import run_agent
+                report = run_agent(
+                    self.worker, self.source,
+                    tenant=self.tenant, subject=self.subject,
+                    prompt=req["prompt"], run_id=req["run_id"],
+                    maximum_steps=req.get("maximum_steps", 8),
+                    maximum_model_calls=req.get("maximum_model_calls", 8),
+                    maximum_wall_seconds=req.get("maximum_wall_seconds", 180),
+                )
+                self._live()
+                if report.get("success") is not True:
+                    raise DesktopHostHold("strict Jeeves agent result held")
+                return self._public(
+                    "verified-agent-response",
+                    run_id=req["run_id"], agent=report,
+                    physical_device_qualified=False,
+                ), False
             if op == "new":
                 self.chat = self._chat_class(self.worker, source_fence=self.source)
                 self._live()
