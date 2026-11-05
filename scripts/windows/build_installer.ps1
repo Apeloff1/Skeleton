@@ -83,6 +83,7 @@ if (-not $SourceManifest.required_paths) {
 }
 $RuntimePaths = @(
     ".dockerignore",
+    "Dockerfile.dockerignore",
     ".env.example",
     "Dockerfile",
     "README.md",
