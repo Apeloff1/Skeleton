@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 import uuid
+from threading import Lock
 
 from backend.core.security_augmentation import bound_text, is_safe_identifier, redact_error
 from backend.core.massive_upgrades import RateWindow, AuditTrail, health_probe
@@ -38,6 +39,8 @@ class EcosystemOrchestrator:
         self.audit = AuditTrail(max_entries=5000)
         self.sessions: dict[str, EcosystemSession] = {}
         self.studio = IntegratedStudio()
+        # The studio mutates its era and pipeline state; admit one run at a time.
+        self._run_lock = Lock()
 
     def create_session(self, brief: str, era: str = "ash", actor: str = "api") -> dict[str, Any]:
         brief = bound_text(brief, max_len=8000)
@@ -63,12 +66,17 @@ class EcosystemOrchestrator:
         if not self.rate.allow(actor):
             return {"ok": False, "reason": "rate_limited"}
 
+        if not self._run_lock.acquire(blocking=False):
+            return {"ok": False, "session_id": session_id, "reason": "studio_busy"}
         try:
+            if session.status != "created":
+                return {"ok": False, "session_id": session_id, "reason": "session_already_run"}
+            session.status = "running"
             self.studio.set_era(session.era)
             result = self.studio.run_pipeline(session.brief)
             session.result = result
             session.godot_files = list(result.get("godot_files") or [])
-            session.status = "sealed" if result.get("sealed") else "incomplete"
+            session.status = "sealed" if result.get("ok") and result.get("sealed") else "incomplete"
             session.error = None if result.get("ok") else result.get("reason")
             self.audit.record(actor, "session.run", f"{session_id}:{session.status}")
             return {
@@ -88,6 +96,8 @@ class EcosystemOrchestrator:
             session.error = redact_error(exc)
             self.audit.record(actor, "session.fail", session_id)
             return {"ok": False, "session_id": session_id, "reason": "internal_error"}
+        finally:
+            self._run_lock.release()
 
     def status(self, session_id: str) -> dict[str, Any]:
         if not is_safe_identifier(session_id):
