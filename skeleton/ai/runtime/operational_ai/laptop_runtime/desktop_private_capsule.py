@@ -398,6 +398,17 @@ def publish_private_capsule(
     path = _new_destination(destination, plan.patch.root)
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         raise PrivateCapsuleHold("POSIX/WSL2 private descriptor publication required")
+    # A caller can construct a typed dataclass; never trust cached static
+    # qualification alone to authorize new private source publication.
+    static = require_parseable_patch(plan.patch)
+    graph = analyze_python_source_graph(plan.patch)
+    if (
+        not static.permits_inert_export
+        or not graph.permits_inert_export
+        or static.status != plan.static_status
+        or graph.graph_sha256 != plan.python_graph_sha256
+    ):
+        raise PrivateCapsuleHold("source parser or import graph changed since review")
     _revalidate_selected(plan)
     revalidate_live_sources(plan.patch)
     parent = _pinned_private_directory(path)
@@ -536,38 +547,43 @@ def _capsule_tree(root_fd: int) -> tuple[set[str], set[str]]:
             fd, prefix = pending.pop()
             try:
                 _dir(fd)
-                names = os.listdir(fd)
-                if len(names) + len(files) + len(folders) > 512:
-                    raise PrivateCapsuleHold("unbounded or suspicious capsule tree")
-                for name in names:
-                    if type(name) is not str or not name or "/" in name:
-                        raise PrivateCapsuleHold("untrusted private source tree name")
-                    relative = prefix + name
-                    st = os.stat(name, dir_fd=fd, follow_symlinks=False)
-                    if st.st_uid != os.getuid() or st.st_mode & 0o077:
-                        raise PrivateCapsuleHold("shared or substituted capsule tree inode")
-                    if stat.S_ISDIR(st.st_mode):
-                        if len(folders) >= 256:
-                            raise PrivateCapsuleHold("capsule directory depth or count exceeded")
-                        folders.add(relative)
-                        opened = os.open(name, _DIR, dir_fd=fd)
-                        try:
-                            check = os.fstat(opened)
-                            if (check.st_dev, check.st_ino) != (st.st_dev, st.st_ino):
-                                raise PrivateCapsuleHold("private capsule directory replaced")
-                            pending.append((opened, relative + "/"))
-                            opened = None
-                        finally:
-                            if opened is not None:
-                                os.close(opened)
-                    elif stat.S_ISREG(st.st_mode):
-                        if st.st_nlink != 1:
-                            raise PrivateCapsuleHold("aliased capsule file denied")
-                        if len(files) >= MAX_CAPSULE_FILES + 1:
-                            raise PrivateCapsuleHold("unreviewed source files exceed capsule bound")
-                        files.add(relative)
-                    else:
-                        raise PrivateCapsuleHold("nonregular or symbolic capsule entry denied")
+                # An iterator, not os.listdir(), bounds even an attacker
+                # placing millions of entries inside a private directory.
+                inspected = 0
+                with os.scandir(fd) as entries:
+                    for child in entries:
+                        inspected += 1
+                        if inspected + len(files) + len(folders) > 512:
+                            raise PrivateCapsuleHold("unbounded or suspicious capsule tree")
+                        name = child.name
+                        if type(name) is not str or not name or "/" in name:
+                            raise PrivateCapsuleHold("untrusted private source tree name")
+                        relative = prefix + name
+                        st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                        if st.st_uid != os.getuid() or st.st_mode & 0o077:
+                            raise PrivateCapsuleHold("shared or substituted capsule tree inode")
+                        if stat.S_ISDIR(st.st_mode):
+                            if len(folders) >= 256:
+                                raise PrivateCapsuleHold("capsule directory depth or count exceeded")
+                            folders.add(relative)
+                            opened = os.open(name, _DIR, dir_fd=fd)
+                            try:
+                                check = os.fstat(opened)
+                                if (check.st_dev, check.st_ino) != (st.st_dev, st.st_ino):
+                                    raise PrivateCapsuleHold("private capsule directory replaced")
+                                pending.append((opened, relative + "/"))
+                                opened = None
+                            finally:
+                                if opened is not None:
+                                    os.close(opened)
+                        elif stat.S_ISREG(st.st_mode):
+                            if st.st_nlink != 1:
+                                raise PrivateCapsuleHold("aliased capsule file denied")
+                            if len(files) >= MAX_CAPSULE_FILES + 1:
+                                raise PrivateCapsuleHold("unreviewed source files exceed capsule bound")
+                            files.add(relative)
+                        else:
+                            raise PrivateCapsuleHold("nonregular or symbolic capsule entry denied")
             finally:
                 os.close(fd)
         return files, folders
@@ -696,6 +712,15 @@ def verify_private_capsule(
         actual_files, actual_dirs = _capsule_tree(capsule_fd)
         if actual_files != expected_files or actual_dirs != expected_dirs:
             raise PrivateCapsuleHold("capsule contains missing or unapproved tree entries")
+        # Reopen every byte after the whole tree walk. A directory entry
+        # swapped between the first read and tree enumeration cannot become
+        # silently accepted as the final source capsule.
+        for row in seal["files"]:
+            final_bytes = _read_capsule_file(
+                capsule_fd, row["path"], row["bytes"],
+            )
+            if len(final_bytes) != row["bytes"] or _hash(final_bytes) != row["sha256"]:
+                raise PrivateCapsuleHold("capsule source changed after tree audit")
         _identical_parent(path, private_parent)
         after = os.stat(path.name, dir_fd=private_parent, follow_symlinks=False)
         if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
