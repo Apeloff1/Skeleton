@@ -139,3 +139,48 @@ vault.write_shard("same", [{"worker": os.environ["WORKER"]}], domain="testing")
     manifest = json.loads((vault / "_manifest.json").read_text())
     raw = (vault / "same.jsonl.zst").read_bytes()
     assert manifest["same"]["sha1"] == hashlib.sha1(raw).hexdigest()
+
+
+
+def test_long_lived_reader_observes_other_process_commit(monkeypatch, tmp_path: Path):
+    """A process initialized before another process writes must refresh on read."""
+    vault = tmp_path / "vault"
+    scratch = tmp_path / "scratch"
+    for name, value in [
+        ("VAULT_ROOT", vault),
+        ("SCRATCH_ROOT", scratch),
+        ("_MANIFEST_FILE", vault / "_manifest.json"),
+        ("_STORAGE_READY", False),
+        ("_STORAGE_IDENTITY", {}),
+        ("_MANIFEST", {}),
+        ("_CACHE", {}),
+        ("_CACHE_SIZE_EST", {}),
+        ("_COMPRESSOR", SlowCodec()),
+        ("_DECOMPRESSOR", SlowCodec()),
+    ]:
+        monkeypatch.setattr(storage, name, value)
+    assert storage.list_shards() == []
+    child_code = r'''
+from contextlib import contextmanager
+from core import compressed_vault as storage
+class Codec:
+    @contextmanager
+    def stream_writer(self, handle):
+        yield handle
+storage._COMPRESSOR = Codec()
+storage.write_shard("external", [{"worker": "second"}], domain="testing")
+'''
+    env = os.environ.copy()
+    env["HYPERSCALE_VAULT_DIR"] = str(vault)
+    env["HYPERSCALE_SCRATCH_DIR"] = str(scratch)
+    result = subprocess.run(
+        [sys.executable, "-c", child_code],
+        cwd=Path(__file__).resolve().parents[1], env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, timeout=15, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert [entry["name"] for entry in storage.list_shards()] == ["external"]
+    assert storage.get_shard_entry("external")["rows"] == 1
+    assert storage.vault_stats()["shard_count"] == 1
+    assert storage.read_shard("external") == [{"worker": "second"}]
