@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import islice
 from typing import Iterable, Mapping
 
 from skeleton.build.delivery._util import DeliveryError
@@ -41,6 +42,15 @@ def evaluate(
     freeze: bool = False,
 ) -> PromotionVerdict:
     reasons: list[str] = []
+    # A missing check policy cannot authorize promotion to protected tiers.
+    required = list(islice(required_checks, 257))
+    if not required:
+        reasons.append("required-check-policy-missing")
+    if (len(required) > 256
+            or any(type(name) is not str or not name or len(name) > 128 for name in required)
+            or len(required) != len(set(name for name in required if type(name) is str))):
+        reasons.append("invalid-required-check-policy")
+        required = []
     if request.source_tier not in PROMOTION_ORDER or request.target_tier not in PROMOTION_ORDER:
         raise DeliveryError("unknown tier")
     src = PROMOTION_ORDER.index(request.source_tier)
@@ -55,11 +65,30 @@ def evaluate(
         reasons.append("manifest-mismatch")
     if request.target_tier == "production" and Version.parse(request.version).is_prerelease:
         reasons.append("prerelease-to-production")
-    approvers = set(request.approvals)
+    # These are caller-supplied identities, not GitHub review attestations.
+    # At minimum, malformed entries must never count as distinct approvals.
+    if (not isinstance(request.approvals, (tuple, list))
+            or len(request.approvals) > 256
+            or any(type(a) is not str or not a or len(a) > 128 for a in request.approvals)):
+        reasons.append("invalid-approval-evidence")
+        approvers: set[str] = set()
+    else:
+        approvers = set(request.approvals)
     if len(approvers) < required_approvals(request.target_tier):
         reasons.append(f"approvals:{len(approvers)}<{required_approvals(request.target_tier)}")
-    checks = dict(request.checks)
-    for name in required_checks:
+    # dict(...) would let a trailing forged success override a prior failure.
+    if (not isinstance(request.checks, (tuple, list)) or len(request.checks) > 256
+            or any(not isinstance(item, (tuple, list)) or len(item) != 2
+                   or type(item[0]) is not str or not item[0]
+                   or type(item[1]) is not str for item in request.checks)):
+        reasons.append("invalid-check-evidence")
+        checks: dict[str, str] = {}
+    else:
+        names = [name for name, _ in request.checks]
+        if len(names) != len(set(names)):
+            reasons.append("duplicate-check-evidence")
+        checks = dict(request.checks)
+    for name in required:
         status = checks.get(name)
         if status != "success":
             reasons.append(f"check:{name}:{status or 'missing'}")

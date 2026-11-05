@@ -54,3 +54,21 @@ def test_farm_reproducible_entry():
 def test_farm_rejections(items):
     with pytest.raises(DeliveryError):
         entry_from_reproducible(items, path="a", kind="wheel", size=1)
+
+
+def test_remote_receipt_stream_and_artifact_budgets_fail_closed(monkeypatch):
+    """An infinite or duplicate-heavy verified stream must never allocate forever."""
+    from itertools import repeat
+    from skeleton.build.delivery import remote_bridge
+
+    monkeypatch.setattr(remote_bridge, "MAX_REMOTE_RECEIPTS", 2)
+    with pytest.raises(DeliveryError, match="receipt count exceeds bound"):
+        remote_bridge.entries_from_receipts(repeat(_receipt()))
+
+    monkeypatch.setattr(remote_bridge, "MAX_REMOTE_RECEIPTS", 10)
+    monkeypatch.setattr(remote_bridge, "MAX_REMOTE_ARTIFACTS", 1)
+    with pytest.raises(DeliveryError, match="artifact count exceeds bound"):
+        remote_bridge.entries_from_receipts([_receipt(), _receipt()])
+
+    monkeypatch.setattr(remote_bridge, "MAX_REMOTE_ARTIFACTS", 2)
+    assert len(remote_bridge.entries_from_receipts([_receipt(), _receipt()])) == 1

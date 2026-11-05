@@ -18,6 +18,7 @@ from .llama_cpp import (
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
+    _runtime_library_identities,
     build_llama_cpp_adapter,
     inspect_gguf,
 )
@@ -128,6 +129,7 @@ class LocalModelDeployment:
     output_framing: str = "raw"
     runtime_scratch_bytes: int = 512 * 1024 * 1024
     kv_bytes_per_token: int | None = None
+    runtime_libraries: tuple[tuple[str, str], ...] = ()
     kv_cache_location: str = "backend"
     kv_cache_type_k: str | None = None
     kv_cache_type_v: str | None = None
@@ -178,6 +180,7 @@ class LocalModelDeployment:
             "executable_sha256",
             "model_path",
             "model_sha256",
+            "runtime_libraries",
             "config",
         }
         unknown_top_level = set(payload) - allowed_top_level
@@ -204,6 +207,10 @@ class LocalModelDeployment:
                 raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
         executable_digest = _digest_field(payload.get("executable_sha256"), "executable_sha256")
         model_digest = _digest_field(payload.get("model_sha256"), "model_sha256")
+        library_map = payload.get("runtime_libraries")
+        if "runtime_libraries" in payload and (not isinstance(library_map, dict) or not library_map):
+            raise LocalModelDeploymentError("runtime_libraries must be a non-empty name-to-SHA256 object")
+        library_pins = () if library_map is None else tuple(library_map.items())
         config = payload.get("config", {})
         if not isinstance(config, dict):
             raise LocalModelDeploymentError("config must be an object")
@@ -254,9 +261,14 @@ class LocalModelDeployment:
                 kv_bytes_per_token=config.get("kv_bytes_per_token"),
                 reject_model_symlink=True,
                 rehash_artifacts_each_run=False,
+                runtime_libraries=library_pins,
             )
         except (TypeError, ValueError, OSError) as exc:
             raise LocalModelDeploymentError(f"invalid llama.cpp deployment config: {exc}") from exc
+        if validated.runtime_libraries:
+            library_paths = {executable.parent / name for name, _ in validated.runtime_libraries}
+            if library_paths.intersection({executable, model, resolved_manifest}):
+                raise LocalModelDeploymentError("runtime libraries cannot overlap deployment artifacts")
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
@@ -291,9 +303,18 @@ class LocalModelDeployment:
             output_framing=validated.output_framing,
             runtime_scratch_bytes=validated.runtime_scratch_bytes,
             kv_bytes_per_token=validated.kv_bytes_per_token,
+            runtime_libraries=validated.runtime_libraries,
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
+        if max_artifact_bytes is not None and validated.runtime_libraries:
+            try:
+                libraries = _runtime_library_identities(executable.parent, validated.runtime_libraries)
+                referenced.update({Path(item.path): item.size_bytes for item in libraries})
+                if sum(referenced.values()) > max_artifact_bytes:
+                    raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
+            except LlamaCppRuntimeError as exc:
+                raise LocalModelDeploymentError("runtime library inventory is invalid") from exc
         if expected_sha256 is not None:
             try:
                 with resolved_manifest.open("rb") as stream:
@@ -309,6 +330,11 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(self.model_path) != self.model_sha256:
             raise LocalModelDeploymentError("model artifact digest mismatch")
+        if self.runtime_libraries:
+            try:
+                _runtime_library_identities(self.executable_path.parent, self.runtime_libraries)
+            except LlamaCppRuntimeError as exc:
+                raise LocalModelDeploymentError("runtime library inventory is invalid") from exc
 
     def llama_cpp_config(
         self,
@@ -337,6 +363,7 @@ class LocalModelDeployment:
             kv_bytes_per_token=self.kv_bytes_per_token,
             reject_model_symlink=True,
             rehash_artifacts_each_run=rehash_artifacts_each_run,
+            runtime_libraries=self.runtime_libraries,
         )
 
     def adapter(

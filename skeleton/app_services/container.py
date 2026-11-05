@@ -62,5 +62,9 @@ class AppServices:
     def build_runner(self, executor: BuildExecutor, **kw) -> BuildJobRunner:
         return BuildJobRunner(self.queue, self.builds, executor, publisher=self.events, **kw)
 
-    def close(self) -> None:
+    def close(self, *, worker_timeout_s: float = 5.0) -> None:
+        # A stuck handler must not indefinitely block shutdown, or outlive a
+        # closed queue database. The caller can retry after the worker exits.
+        if not self.jobs.stop_worker(timeout=worker_timeout_s):
+            raise RuntimeError("job worker did not stop; application data remains open")
         self.db.close()

@@ -130,3 +130,30 @@ def test_zip_reader_rejects_unix_special_file_modes():
         entry.external_attr = (stat.S_IFREG | 0o644) << 16
         z.writestr(entry, b"ok")
     assert list_zip(buf.getvalue()) == {"regular": b"ok"}
+
+
+def test_zip_central_directory_preflight_rejects_forged_counts():
+    """Reject inconsistent index metadata before eager ZipFile allocation."""
+    import struct
+
+    archive = build_zip("safe.zip", {"a": b"one", "b": b"two"}).data
+    eocd = archive.rfind(bytes((80, 75, 5, 6)))
+    assert eocd > 0
+    assert list_zip(archive) == {"a": b"one", "b": b"two"}
+    for offset, value, fmt in (
+        (10, 1, "<H"),  # Claimed total differs from disk count.
+        (12, 1, "<I"),  # Truncated central directory size.
+        (20, 99, "<H"),  # Impossible trailing comment length.
+        (10, 0xFFFF, "<H"),  # ZIP64 sentinel is not admitted.
+    ):
+        forged = bytearray(archive)
+        struct.pack_into(fmt, forged, eocd + offset, value)
+        with pytest.raises(DeliveryError):
+            list_zip(bytes(forged))
+    forged = bytearray(archive)
+    struct.pack_into("<H", forged, eocd + 8, 1)
+    struct.pack_into("<H", forged, eocd + 10, 1)
+    with pytest.raises(DeliveryError, match="count mismatch"):
+        list_zip(bytes(forged))
+    # A bounded executable stub before the ZIP payload remains parseable.
+    assert list_zip(b"stub" + archive) == {"a": b"one", "b": b"two"}
