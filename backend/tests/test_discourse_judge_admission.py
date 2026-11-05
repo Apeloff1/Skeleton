@@ -98,7 +98,8 @@ def test_provider_exception_does_not_cancel_surviving_candidate(monkeypatch):
 
     class Collection:
         async def insert_one(self, *_args):
-            return None
+            from types import SimpleNamespace
+            return SimpleNamespace(acknowledged=True)
 
     class Database:
         discourse_log = Collection()
@@ -126,7 +127,8 @@ def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
 
     class Collection:
         async def insert_one(self, *_args):
-            return None
+            from types import SimpleNamespace
+            return SimpleNamespace(acknowledged=True)
 
     class Database:
         discourse_log = Collection()
@@ -138,3 +140,37 @@ def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
     ))
     assert result["winner_index"] == 0
     assert result["winner_model"] == "m1"
+
+
+
+def test_large_integer_scores_do_not_overflow_float_conversion():
+    assert discourse._score_int(10 ** 1000) is None
+    assert discourse._score_int(100) == 100
+
+
+def test_unacknowledged_log_write_is_not_reported_as_durable(monkeypatch):
+    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
+        "m1": {"provider": "a"}, "judge": {"provider": "b"}
+    })
+
+    async def fake_route(*_args, model=None, **_kwargs):
+        if model == "judge":
+            return {"content": '{"winner_index":0,"scores":[{"index":0,"quality":85,"fidelity":92}]}'}
+        return {"content": "candidate"}
+
+    class Collection:
+        async def insert_one(self, *_args):
+            from types import SimpleNamespace
+            return SimpleNamespace(acknowledged=False)
+
+    class Database:
+        discourse_log = Collection()
+
+    monkeypatch.setattr(discourse, "route_complete", fake_route)
+    monkeypatch.setattr(discourse, "_db", Database())
+    result = asyncio.run(discourse.deliberate(
+        "creative", "valid prompt", panel=["m1"], judge_model="judge", do_discord=False
+    ))
+    assert result["error"] == "deliberation_not_durable"
+    assert result["persistence_status"] == "unconfirmed"
+    assert result["winner_score"] > 0
