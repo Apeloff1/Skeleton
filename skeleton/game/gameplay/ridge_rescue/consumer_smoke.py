@@ -212,6 +212,34 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
     ))
     if not backup_audit["verified"] or backup_audit["audit_entries"] != len(choices):
         raise SmokeError("restored backup action history is incomplete")
+    # Tamper with a real terminal-produced full-history backup. Verification
+    # and restore must both fail without creating a slot or damaging the
+    # already completed save. The checks run in separate consumer processes.
+    corrupt_backup = json.loads(backup_payload.decode("utf-8"))
+    corrupt_backup["payload"]["history"][0]["next_head"] = "0" * 64
+    corrupted_bytes = json.dumps(corrupt_backup, sort_keys=True).encode("utf-8")
+    _invoke(
+        command, ["verify-backup", "--file", "-"], env=env, cwd=root,
+        stdin=corrupted_bytes.decode("utf-8"), expect_success=False,
+    )
+    _invoke(
+        command, ["restore-backup", "--slot", "corrupt-backup", "--file", "-"],
+        env=env, cwd=root, stdin=corrupted_bytes.decode("utf-8"),
+        expect_success=False,
+    )
+    absent = _invoke(
+        command, ["status", "--slot", "corrupt-backup"], env=env, cwd=root,
+        expect_success=False,
+    )
+    if not absent.strip():
+        raise SmokeError("rejected backup unexpectedly allocated a save slot")
+    post_rejection = json.loads(_invoke(
+        command, ["audit", "--slot", "smoke"], env=env, cwd=root,
+    ))
+    if (not post_rejection["verified"] or
+            post_rejection["head"] != expected_head or
+            post_rejection["audit_entries"] != len(choices)):
+        raise SmokeError("rejected backup corrupted the completed game")
     # A rejected mutation must not damage the earned save or append history.
     invalid = _invoke(
         command, ["step", "--slot", "smoke", "--action", '{"verb":"fly"}',
@@ -237,6 +265,7 @@ def _smoke(command: list[str], *, root: Path, portable: bool) -> dict:
         "partial_restore_resume_verified": True,
         "stdin_export_verification": True,
         "full_history_backup_restored": True,
+        "tampered_backup_rejected_without_slot": True,
         "restore_overwrite_rejected": True,
         "tampered_restore_rejected": True,
         "invalid_mutation_rejected": True,
