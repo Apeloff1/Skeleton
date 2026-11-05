@@ -769,7 +769,13 @@ def test_promotion_ledger_rollback_rebinding_fails_closed() -> None:
 def test_promotion_ledger_rejects_nonindependent_rollback_verifier() -> None:
     ledger = PromotionLedger()
     selected = candidate()
-    decision = promoted_decision(selected)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     for verifier in (
         selected.builder_id,
         decision.verifier_id,
