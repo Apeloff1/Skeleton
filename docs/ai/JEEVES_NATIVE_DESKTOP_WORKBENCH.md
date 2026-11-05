@@ -123,3 +123,20 @@ A user-supplied source file may contain prompt-injection instructions; its
 text remains **untrusted reference data** and cannot gain host tool
 permissions. The app currently has no automatic source-editing or patch
 application feature.
+
+## Explicit local new-file builder
+
+The desktop also supports a real, narrowly scoped source-delivery step.
+Click **Insert source proposal format** to ask the existing GGUF for strict
+JSON, then **Review Jeeves file proposal** to inspect the model's untrusted
+answer. Choose the local workspace, inspect each SHA-256 and unified diff,
+and individually confirm the full digest before publishing that **one NEW
+file**. Existing paths are never overwritten. The publisher performs
+descriptor-anchored, symlink-safe, no-clobber, fsynced writes; it neither
+executes the proposed source nor grants autonomous tools.
+
+Detailed source contract, usage and limitation notes:
+`docs/ai/JEEVES_WORKSPACE_NEW_FILE_DELIVERY.md`.
+
+Source-only qualification of this file writer cannot establish model
+correctness or consumer-device readiness.
