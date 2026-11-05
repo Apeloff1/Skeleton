@@ -560,13 +560,17 @@ def audit_compose_modes() -> None:
         if "  frontend:" in base and "\n  mongo:" in base
         else ""
     )
+    # First-run diagnostics must be available even when Mongo, the engine
+    # or backend cannot start. Keep the UI independent and leave protected
+    # API admission to the backend/engine health and authorization fences.
     check(
-        "backend:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy backend",
+        not re.search(r"(?m)^    depends_on:\s*$", frontend_block),
+        "frontend setup/diagnostic UI must not depend on backend or engine startup",
     )
     check(
-        "skeleton:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy Skeleton engine",
+        "backend:\n        condition: service_healthy" in backend_block
+        or "skeleton:\n        condition: service_healthy" in backend_block,
+        "backend must preserve its protected startup dependencies",
     )
 
 
@@ -599,9 +603,23 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        upstream = f"proxy_pass http://{name}:{port};"
+        alias = {"backend": "application_backend", "skeleton": "application_engine"}[name]
+        upstream = f"upstream {alias} {{"
+        member = f"server {name}:{port} resolve;"
+        proxy = f"proxy_pass http://{alias};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
-        check(upstream in nginx, f"production ingress upstream drift: {upstream}")
+        check(
+            nginx.count(upstream) == 1 and member in nginx,
+            f"production ingress resolver upstream drift: {name}",
+        )
+        location_start = nginx.find(location)
+        location_end = nginx.find("\n    }", location_start) if location_start >= 0 else -1
+        location_body = (
+            nginx[location_start:location_end]
+            if location_start >= 0 and location_end > location_start
+            else ""
+        )
+        check(proxy in location_body, f"production ingress route target drift: {name}")
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -973,8 +991,8 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = APIRouter(prefix="/api/admin/ops"' in ops,
-        "backend ops prefix drift",
+        'router = project_router(prefix="/api/admin/ops"' in ops,
+        "backend ops prefix must use the canonical project router",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
 
