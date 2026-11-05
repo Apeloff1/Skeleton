@@ -52,6 +52,49 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    scene-author  Atomically edit playable scene worlds and preview routes
+    scene-circuit  Play switch puzzles and conditional gates
+    scene-circuit-solve  Solve replayable circuit routes with bounded search
+    scene-circuit-author  Atomically edit and preview playable circuit sources
+    scene-patrol-solve  Find bounded legal routes through timed guards
+    scene-patrol-author  Transactionally edit and preview timed patrols
+    scene-patrol  Play timed guard routes and replay-verified scene checkpoints
+    scene-accept  Audit playable scenes, verify replay and portable exports
+    scene-travel  Simulate, verify and resume original offline scene journeys
+    scene-survival-campaign  Play replay-verified multi-stage survival campaigns
+    scene-survival-campaign-author  Edit and preview multi-stage survival campaigns
+    scene-survival-campaign-route  Solve and verify campaign stage routes
+    scene-survival-campaign-play  Play campaigns with restartable checkpoints
+    scene-survival-campaign-accept  Verify end-to-end playable campaign delivery
+    scene-survival-play  Interactively play survival with restartable checkpoints
+    scene-survival-author  Transactionally edit survival sources and preview play
+    scene-survival-route  Find replay-proven bounded survival routes
+    scene-survival  Play source-bound tile hazards, earned food, shelter and replay
+    scene-market-accept  Verify game-to-export market acceptance evidence
+    scene-market-play  Play offline market quests with durable checkpoints
+    scene-market-author  Edit and preview source-bound trading quests
+    scene-market  Play earned-currency trading, crafting and delivery quests
+    scene-tiles  Play authored grid movement/collision and replay scene saves
+    scene-tiles-route  Solve collision-aware replayable tile game routes
+    scene-achievements  Earn replay-verified authored scene milestones
+    scene-npc  Play authored NPC itineraries, choices and earned scene endings
+    scene-npc-solve  Find bounded replayable routes through NPC dialogue
+    scene-npc-play  Play offline NPC encounters interactively with checkpoints
+    scene-atlas  Explore fog-of-war maps, legal known routes and portable replay
+    scene-consequences  Inspect replay-derived mission choices and endings
+    scene-mission  Play authored mission DAG and branching choices over scenes
+    scene-mission-play  Interactively play authored missions with replayable checkpoints
+    scene-mission-board  Inspect replay-derived mission objectives and legal actions
+    scene-mission-author  Transactionally edit authored missions and preview play
+    scene-mission-route  Solve replayable authored mission ending paths
+    scene-mission-assist  Offer replay-proven non-mutating mission hints\n    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
+    scene-mission-timeline  Play replay-verified offline mission checkpoints
+    scene-mission-league  Rank completed source-bound mission replays offline
+    scene-mission-league-author  Transactionally edit and preview league scoring
+    scene-escort  Play source-bound convoy deliveries, save/replay and export
+    scene-escort-author  Transactionally edit and preview escort missions
+    scene-escort-solve  Find replay-proven safe convoy routes with bounded search
+    scene-escort-play  Interactively play and checkpoint offline convoy deliveries
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -736,6 +779,141 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "scene-escort":
+        from skeleton.game.gameplay.scene_escort import cli as escort_cli
+        return escort_cli(rest)
+    if cmd == "scene-escort-play":
+        from skeleton.game.gameplay.scene_escort_interactive import cli as escort_play_cli
+        return escort_play_cli(rest)
+    if cmd == "scene-escort-solve":
+        from skeleton.game.gameplay.scene_escort_solver import cli as escort_solver_cli
+        return escort_solver_cli(rest)
+    if cmd == "scene-escort-author":
+        from skeleton.game.gameplay.scene_escort_author import cli as escort_author_cli
+        return escort_author_cli(rest)
+    if cmd == "scene-mission-league-author":
+        from skeleton.game.gameplay.scene_mission_league_author import cli as league_author_cli
+        return league_author_cli(rest)
+    if cmd == "scene-mission-league":
+        from skeleton.game.gameplay.scene_mission_league import cli as league_cli
+        return league_cli(rest)
+    if cmd == "scene-mission-timeline":
+        from skeleton.game.gameplay.scene_mission_timeline import cli as timeline_cli
+        return timeline_cli(rest)
+    if cmd == "scene-mission-assist":
+        from skeleton.game.gameplay.scene_mission_assistance import cli as assist_cli
+        return assist_cli(rest)
+    if cmd == "scene-mission-liveness":
+        from skeleton.game.gameplay.scene_mission_liveness import cli as liveness_cli
+        return liveness_cli(rest)
+    if cmd == "scene-mission-accept":
+        from skeleton.game.gameplay.scene_mission_acceptance import cli as accept_cli
+        return accept_cli(rest)
+    if cmd == "scene-mission-route":
+        from skeleton.game.gameplay.scene_mission_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "scene-consequences":
+        from skeleton.game.gameplay.scene_mission_consequences import cli as consequences_cli
+        return consequences_cli(rest)
+    if cmd == "scene-mission":
+        from skeleton.game.gameplay.scene_mission import cli as mission_cli
+        return mission_cli(rest)
+    if cmd == "scene-mission-play":
+        from skeleton.game.gameplay.scene_mission_interactive import cli as mission_play_cli
+        return mission_play_cli(rest)
+    if cmd == "scene-mission-board":
+        from skeleton.game.gameplay.scene_mission_board import cli as mission_board_cli
+        return mission_board_cli(rest)
+    if cmd == "scene-mission-author":
+        from skeleton.game.gameplay.scene_mission_author import cli as mission_author_cli
+        return mission_author_cli(rest)
+    if cmd == "scene-author":
+        from skeleton.game.gameplay.scene_world_author import cli as scene_author_cli
+        return scene_author_cli(rest)
+    if cmd == "scene-achievements":
+        from skeleton.game.gameplay.scene_achievements import cli as achievements_cli
+        return achievements_cli(rest)
+    if cmd == "scene-atlas":
+        from skeleton.game.gameplay.scene_atlas import cli as atlas_cli
+        return atlas_cli(rest)
+    if cmd == "scene-circuit-author":
+        from skeleton.game.gameplay.scene_circuit_author import cli as circuit_author_cli
+        return circuit_author_cli(rest)
+    if cmd == "scene-circuit-solve":
+        from skeleton.game.gameplay.scene_circuit_solver import cli as circuit_solver_cli
+        return circuit_solver_cli(rest)
+    if cmd == "scene-circuit":
+        from skeleton.game.gameplay.scene_circuit import cli as circuit_cli
+        return circuit_cli(rest)
+    if cmd == "scene-patrol-solve":
+        from skeleton.game.gameplay.scene_guard_patrol_solver import cli as patrol_solver_cli
+        return patrol_solver_cli(rest)
+    if cmd == "scene-patrol-author":
+        from skeleton.game.gameplay.scene_guard_patrol_author import cli as patrol_author_cli
+        return patrol_author_cli(rest)
+    if cmd == "scene-patrol":
+        from skeleton.game.gameplay.scene_guard_patrol import cli as patrol_cli
+        return patrol_cli(rest)
+    if cmd == "scene-accept":
+        from skeleton.game.gameplay.scene_acceptance import cli as accept_cli
+        return accept_cli(rest)
+    if cmd == "scene-tiles-route":
+        from skeleton.game.gameplay.scene_tile_route import cli as scene_tile_route_cli
+        return scene_tile_route_cli(rest)
+    if cmd == "scene-survival-campaign-author":
+        from skeleton.game.gameplay.scene_survival_campaign_author import cli as campaign_author_cli
+        return campaign_author_cli(rest)
+    if cmd == "scene-survival-campaign-route":
+        from skeleton.game.gameplay.scene_survival_campaign_route import cli as campaign_route_cli
+        return campaign_route_cli(rest)
+    if cmd == "scene-survival-campaign-accept":
+        from skeleton.game.gameplay.scene_survival_campaign_acceptance import cli as campaign_accept_cli
+        return campaign_accept_cli(rest)
+    if cmd == "scene-survival-campaign-play":
+        from skeleton.game.gameplay.scene_survival_campaign_interactive import cli as campaign_play_cli
+        return campaign_play_cli(rest)
+    if cmd == "scene-survival-campaign":
+        from skeleton.game.gameplay.scene_survival_campaign import cli as survival_campaign_cli
+        return survival_campaign_cli(rest)
+    if cmd == "scene-survival-play":
+        from skeleton.game.gameplay.scene_tile_survival_interactive import cli as survival_play_cli
+        return survival_play_cli(rest)
+    if cmd == "scene-survival-author":
+        from skeleton.game.gameplay.scene_tile_survival_author import cli as survival_author_cli
+        return survival_author_cli(rest)
+    if cmd == "scene-survival-route":
+        from skeleton.game.gameplay.scene_tile_survival_route import cli as survival_route_cli
+        return survival_route_cli(rest)
+    if cmd == "scene-survival":
+        from skeleton.game.gameplay.scene_tile_survival import cli as scene_survival_cli
+        return scene_survival_cli(rest)
+    if cmd == "scene-market-accept":
+        from skeleton.game.gameplay.scene_market_acceptance import cli as market_accept_cli
+        return market_accept_cli(rest)
+    if cmd == "scene-market-play":
+        from skeleton.game.gameplay.scene_market_interactive import cli as market_play_cli
+        return market_play_cli(rest)
+    if cmd == "scene-market-author":
+        from skeleton.game.gameplay.scene_market_author import cli as market_author_cli
+        return market_author_cli(rest)
+    if cmd == "scene-market":
+        from skeleton.game.gameplay.scene_market import cli as market_cli
+        return market_cli(rest)
+    if cmd == "scene-tiles":
+        from skeleton.game.gameplay.scene_tile_walk import cli as scene_tiles_cli
+        return scene_tiles_cli(rest)
+    if cmd == "scene-travel":
+        from skeleton.game.gameplay.scene_travel import cli as scene_cli
+        return scene_cli(rest)
+    if cmd == "scene-npc":
+        from skeleton.game.gameplay.scene_npc_encounter import cli as npc_cli
+        return npc_cli(rest)
+    if cmd == "scene-npc-solve":
+        from skeleton.game.gameplay.scene_npc_solver import cli as npc_solver_cli
+        return npc_solver_cli(rest)
+    if cmd == "scene-npc-play":
+        from skeleton.game.gameplay.scene_npc_interactive import cli as npc_play_cli
+        return npc_play_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
