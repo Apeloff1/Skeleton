@@ -30,6 +30,10 @@ from .desktop_source_qualification import (
     SourceQualification, StaticSourceHold, qualify_patch_sources,
 )
 from .contracts import identifier, utf8
+from .desktop_project_context import (
+    ProjectSourceContext, SourceContextHold,
+    context_prompt_fragment, revalidate_project_context,
+)
 
 SCHEMA = "jeeves.desktop.native-source-repair.v1"
 MAX_GOAL_BYTES = 4096
@@ -53,6 +57,7 @@ class SourceRepairRequest:
     goal: str
     format: str
     maximum_attempts: int
+    source_context: ProjectSourceContext | None = None
 
     def __post_init__(self):
         from pathlib import Path
@@ -76,6 +81,18 @@ class SourceRepairRequest:
             raise NativeSourceRepairHold("bounded original human goal required") from exc
         if not selected.strip():
             raise NativeSourceRepairHold("nonempty operator task required")
+        if self.source_context is not None:
+            if (
+                type(self.source_context) is not ProjectSourceContext
+                or self.source_context.root != self.root
+            ):
+                raise NativeSourceRepairHold(
+                    "source-context root differs from human selected project",
+                )
+            try:
+                self.source_context.__post_init__()
+            except SourceContextHold as exc:
+                raise NativeSourceRepairHold("project source context changed after review") from exc
 
     @property
     def goal_sha256(self) -> str:
@@ -133,6 +150,7 @@ class SourceRepairResult:
     candidate: PortablePatchPlan | None
     qualification: SourceQualification | None
     proposal: str | None
+    source_context_sha256: str | None = None
 
     def __post_init__(self):
         if (
@@ -147,6 +165,10 @@ class SourceRepairResult:
             != len(self.attempts)
         ):
             raise NativeSourceRepairHold("invalid single-native source-work result")
+        if self.source_context_sha256 is not None and not _digest(
+            self.source_context_sha256
+        ):
+            raise NativeSourceRepairHold("missing exact source snapshot SHA-256")
         if self.status == "review-required":
             if (
                 type(self.candidate) is not PortablePatchPlan
@@ -180,6 +202,8 @@ class SourceRepairResult:
             "source_patch_sha256": (
                 self.candidate.patch_sha256 if self.candidate else None
             ),
+            "operator_source_context_sha256": self.source_context_sha256,
+            "operator_source_context_file_access": "explicit-reviewed-snapshots-only",
             "static_source_status": (
                 self.qualification.status if self.qualification else None
             ),
@@ -217,8 +241,9 @@ def _format_instructions(kind: str) -> str:
         + '" and "files": an array of {"path": existing_relative_file, '
         '"expected_sha256": full_known_original_sha256, '
         '"replacement": complete_new_utf8_text}. Use only original '
-        "file paths and complete SHA-256 values already provided by the "
-        "operator. If the operator did not provide exact old SHA values, "
+        "file paths and complete SHA-256 values provided by verified "
+        "operator-selected source reference data when present. "
+        "If the operator did not provide exact old SHA values, "
         "explain the missing information in the JSON only; do not invent "
         "hashes or write to the project."
     )
@@ -235,6 +260,8 @@ def _prompt(request: SourceRepairRequest, *, feedback: str = "",
         "ORIGINAL OPERATOR GOAL:\n" + request.goal + "\n"
         "REQUIRED OUTPUT SHAPE:\n" + _format_instructions(request.format)
     )
+    if request.source_context is not None:
+        base += context_prompt_fragment(request.source_context)
     if feedback:
         base += (
             "\nYOUR PREVIOUS COMMITTED JSON PROPOSAL was rejected by the "
@@ -352,11 +379,15 @@ class NativeSourceRepairRunner:
         proposal = None
         with self.worker.exclusive_batch(self.request.goal_sha256):
             self._assert_same_worker()
+            if self.request.source_context is not None:
+                revalidate_project_context(self.request.source_context)
             for attempt in range(1, self.request.maximum_attempts + 1):
                 if self._stop.is_set():
                     outcome = "operator-stopped"
                     break
                 self._assert_same_worker()
+                if self.request.source_context is not None:
+                    revalidate_project_context(self.request.source_context)
                 prompt = _prompt(self.request, feedback=feedback, previous=previous)
                 # Every distinct repair is a *new committed native turn*,
                 # never an automatic replay of an uncertain prior request.
@@ -366,6 +397,8 @@ class NativeSourceRepairRunner:
                     context=False,
                 )
                 self._assert_same_worker()
+                if self.request.source_context is not None:
+                    revalidate_project_context(self.request.source_context)
                 record = native.get("turn") if type(native) is dict else None
                 if (
                     type(native) is not dict
@@ -435,6 +468,10 @@ class NativeSourceRepairRunner:
             attempts=tuple(attempts),
             candidate=candidate, qualification=static,
             proposal=proposal,
+            source_context_sha256=(
+                self.request.source_context.manifest_sha256
+                if self.request.source_context is not None else None
+            ),
         )
 
 

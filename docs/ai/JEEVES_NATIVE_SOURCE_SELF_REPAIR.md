@@ -115,3 +115,17 @@ source file privacy, stale model/session epochs, operator stop,
 bounded exhaustion and unreplayed uncertain result handling.
 Physical device and real installed GGUF acceptance remain
 separately required.
+
+## Operator-selected exact original source for existing-file edits
+
+The native source-repair window now supports **one to four** explicitly
+selected existing project files before requesting a replacement.
+**Review original SHA + full text** descriptor-reads the actual file
+bytes and full original SHA-256, displaying the complete context
+locally. The same GGUF receives those facts as untrusted reference
+data, and revalidates original inode, byte hash, mode, ctime and
+root on every turn. This removes the prior need to ask the GGUF
+to invent original edit SHA-256 values. The source manifest is
+included in the final human-only receipt; no model filesystem
+permission, direct file overwrite or Git commit is granted. See
+`docs/ai/JEEVES_OPERATOR_PROJECT_SOURCE_CONTEXT.md`.
