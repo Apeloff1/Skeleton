@@ -33,6 +33,7 @@ class DeclaredPanel:
     provider_diverse: bool
     independent_judge: bool
     source: str = "tenant_model_inventory"
+    available_models: tuple[str, ...] = ()
 
 
 def _model_row(item: object) -> DeclaredModel | None:
@@ -109,6 +110,7 @@ def _catalog_panel(
         mode=mode,
         provider_diverse=len(unique_providers) > 1,
         independent_judge=judge.key not in {model.key for model in models},
+        available_models=tuple(sorted(ready)),
     )
 
 
