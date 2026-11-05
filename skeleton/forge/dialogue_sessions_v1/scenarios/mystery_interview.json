@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "mystery_interview",
+  "domain": "mystery",
+  "role": "interview",
+  "rapport_threshold": 18,
+  "rapport_gain": 4,
+  "stress_increment": 2,
+  "steps": [
+    {
+      "id": "mystery_interview:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "mystery_interview:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "mystery_interview:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "mystery_interview:proof-1"
+    },
+    {
+      "id": "mystery_interview:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "mystery_interview:proof-2"
+    },
+    {
+      "id": "mystery_interview:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "mystery_interview:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}
