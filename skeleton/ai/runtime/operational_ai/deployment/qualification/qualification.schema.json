@@ -1,0 +1,30 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://skeleton.local/contracts/ai-first-boot-qualification-v1",
+  "type":"object","additionalProperties":false,
+  "required":["schema","model_sha256","tokenizer_sha256","session_sha256",
+    "request_id_sha256","request_sha256","output_sha256","transcript_sha256",
+    "revision","generated_tokens","prompt_tokens","context_sha256",
+    "replay_without_regeneration","database_turns","checkpoint_execution_mode",
+    "status","proof_sha256"],
+  "properties":{
+    "schema":{"const":"skeleton.ai.first-boot-qualification.v1"},
+    "model_sha256":{"$ref":"#/$defs/digest"},
+    "tokenizer_sha256":{"$ref":"#/$defs/digest"},
+    "session_sha256":{"$ref":"#/$defs/digest"},
+    "request_id_sha256":{"$ref":"#/$defs/digest"},
+    "request_sha256":{"$ref":"#/$defs/digest"},
+    "output_sha256":{"$ref":"#/$defs/digest"},
+    "transcript_sha256":{"$ref":"#/$defs/digest"},
+    "context_sha256":{"$ref":"#/$defs/digest"},
+    "revision":{"type":"integer","minimum":1},
+    "prompt_tokens":{"type":"integer","minimum":0},
+    "generated_tokens":{"type":"integer","minimum":0},
+    "database_turns":{"type":"integer","minimum":1},
+    "replay_without_regeneration":{"const":true},
+    "checkpoint_execution_mode":{"enum":["actual-gguf-llama-cpp","injected-test-double"]},
+    "status":{"enum":["real-first-boot-replay-probe-not-release-certified",
+                       "fixture-only-not-production-certified"]}
+  },
+  "$defs":{"digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}
+}

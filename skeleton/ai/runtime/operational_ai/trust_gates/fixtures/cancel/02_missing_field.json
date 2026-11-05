@@ -1,0 +1,14 @@
+{
+  "case": "02_missing_field",
+  "gate": "cancel",
+  "expect": "reject",
+  "reason": "Missing authority field cannot default to allowance",
+  "payload": {
+    "state": "cancelled",
+    "now_ns": 1000000,
+    "deadline_ns": 2000000,
+    "generated_tokens": 4,
+    "acked": true,
+    "backend_active": false
+  }
+}

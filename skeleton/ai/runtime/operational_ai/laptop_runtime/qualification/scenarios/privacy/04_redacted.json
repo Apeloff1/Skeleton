@@ -1,0 +1,15 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "04_redacted",
+  "domain": "privacy",
+  "expected": "no_leak",
+  "payload": {
+    "status": "ok",
+    "bearer": "SENSITIVE_NEVER_ECHO"
+  },
+  "reason": "Private bearer must never escape telemetry permitlist",
+  "threat": "private-prompt-or-token-exfiltration",
+  "authority_boundary": "Operational privacy contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

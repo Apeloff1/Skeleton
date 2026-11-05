@@ -1,0 +1,15 @@
+{
+  "case": "04_wrong_primary_type",
+  "gate": "transport",
+  "expect": "reject",
+  "reason": "Implicit identity coercion denied",
+  "payload": {
+    "host": 17,
+    "method": "POST",
+    "auth_type": "bearer",
+    "token_bytes": 64,
+    "body_bytes": 128,
+    "body_ceiling": 262144,
+    "content_type": "application/json"
+  }
+}

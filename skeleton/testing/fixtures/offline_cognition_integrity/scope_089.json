@@ -1,0 +1,27 @@
+{
+  "schema": "offline-cognition-integrity-case.v1",
+  "id": "scope_089",
+  "kind": "scope_invariant",
+  "expected": "equal",
+  "query": "vector",
+  "local_documents": [
+    {
+      "document_id": "local_a",
+      "text": "vector vector vector verified original source bounded operator"
+    },
+    {
+      "document_id": "local_b",
+      "text": "local private reading vector signed evidence source"
+    },
+    {
+      "document_id": "local_c",
+      "text": "document vector finite history proof replay"
+    }
+  ],
+  "foreign_documents": [
+    {
+      "document_id": "foreign_x",
+      "text": "vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector vector foreign confidential vocabulary token 61"
+    }
+  ]
+}
