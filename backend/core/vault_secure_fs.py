@@ -100,6 +100,26 @@ def _reject_unsafe_existing(fd: int, name: str) -> None:
         raise VaultPathError("vault destination is a link or non-regular file")
 
 
+class _BoundedSink:
+    """Enforce disk-output limits before each write rather than after close."""
+
+    def __init__(self, handle: BinaryIO, max_bytes: int):
+        if type(max_bytes) is not int or max_bytes < 0:
+            raise VaultPathError("invalid vault output byte budget")
+        self._handle = handle
+        self._remaining = max_bytes
+
+    def write(self, data) -> int:
+        if len(data) > self._remaining:
+            raise VaultPathError("vault output exceeds compressed byte budget")
+        written = self._handle.write(data)
+        self._remaining -= written
+        return written
+
+    def __getattr__(self, name: str):
+        return getattr(self._handle, name)
+
+
 def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None], *, max_bytes: int | None = None) -> int:
     """Publish complete bytes under a fresh private name, then fsync and rename.
 
@@ -115,7 +135,8 @@ def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None], *, max_
     try:
         # Keep the descriptor alive even when compression closes its writer.
         with os.fdopen(opened, "wb", closefd=False) as handle:
-            writer(handle)
+            sink = _BoundedSink(handle, max_bytes) if max_bytes is not None else handle
+            writer(sink)
             if not handle.closed:
                 handle.flush()
         os.fsync(opened)
