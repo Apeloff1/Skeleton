@@ -42,6 +42,8 @@ jobs:
           python-version: "3.11.16"
       - name: Verify canonical AI mirror and exact source object identities
         run: python scripts/check_ai_file_tree.py
+      - name: Compile governed Jeeves and Forge Python source and mirrors
+        run: python -m compileall -q skeleton/jeeves skeleton/ai/agents/jeeves skeleton/forge skeleton/ai/forge
       - name: Deny upward API and architecture dependency violations
         run: python scripts/check_architecture_boundaries.py
       - name: Verify committed tree source identities and portable test roots
