@@ -308,6 +308,14 @@ def preview_existing_edit(plan: ExistingEditPlan, index: int) -> dict[str, objec
     }
 
 
+def _candidate_absent(parent: int, destination: str) -> None:
+    """Unify no-clobber refusal with existing-source typed API holds."""
+    try:
+        _absent(parent, destination)
+    except WorkspaceDeliveryHold as exc:
+        raise ExistingEditHold("reviewed candidate already exists; no overwrite") from exc
+
+
 def stage_existing_edit_candidate(
     plan: ExistingEditPlan, index: int, *,
     expected_manifest_sha256: str, expected_original_sha256: str,
@@ -363,7 +371,7 @@ def stage_existing_edit_candidate(
                 .encode("utf-8", "strict")
             ).hexdigest()
             destination = ".jeeves-edit-candidate-" + binding[:32] + ".txt"
-            _absent(parent, destination)
+            _candidate_absent(parent, destination)
             temporary = ".jeeves-stage-" + secrets.token_hex(16)
             stage_fd = os.open(
                 temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -401,7 +409,7 @@ def stage_existing_edit_candidate(
                     or observed.st_mtime_ns != item.original_mtime_ns
                 ):
                     raise ExistingEditHold("source changed during candidate publication")
-                _absent(parent, destination)
+                _candidate_absent(parent, destination)
                 _rename_no_replace(parent, temporary, destination)
                 os.fsync(parent)
             finally:
