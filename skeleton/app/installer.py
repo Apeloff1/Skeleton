@@ -405,6 +405,9 @@ def install_application(
             delay=1.0,
             public_url_overrides=host_urls,
         )
+        if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+            phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
         healthy = probes_ok(results)
         failed = [result.service for result in results if not result.ok]
         phases.append(
