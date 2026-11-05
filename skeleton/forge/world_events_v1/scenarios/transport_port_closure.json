@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.world_event_scenario.v1",
+  "id": "transport_port_closure",
+  "domain": "transport",
+  "sensor": "demand",
+  "threshold": 28,
+  "severity": 4,
+  "cost": 7,
+  "boost": 10,
+  "cooldown": 6,
+  "initial": {
+    "region": "central",
+    "pressure": 100,
+    "resources": 100,
+    "resilience": 50
+  },
+  "commands": [
+    {
+      "id": "transport_port_closure:open",
+      "action": "activate",
+      "tick": 1,
+      "expected_version": 0,
+      "intensity": 0,
+      "evidence": ""
+    },
+    {
+      "id": "transport_port_closure:finish",
+      "action": "resolve",
+      "tick": 2,
+      "expected_version": 1,
+      "intensity": 0,
+      "evidence": "trusted-world-proof"
+    },
+    {
+      "id": "transport_port_closure:ready",
+      "action": "release_cooldown",
+      "tick": 8,
+      "expected_version": 2,
+      "intensity": 0,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "final_lifecycle": "idle",
+    "final_version": 3,
+    "accepted": 3,
+    "resolution_requires_evidence": true,
+    "duplicate_events_rejected": true,
+    "optimistic_version_fence": true
+  },
+  "qualification": {
+    "synthetic": true,
+    "provenance_authenticated": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

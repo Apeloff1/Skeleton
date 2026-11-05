@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "arcane rune smith NPC event",
+  "description": "Validated deterministic command for rune smith; host must independently authenticate world event and witness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "effort",
+    "tick",
+    "expected_version",
+    "destination",
+    "witness"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "observe",
+        "work",
+        "rest",
+        "socialize",
+        "travel",
+        "retreat",
+        "negotiate",
+        "guard"
+      ]
+    },
+    "effort": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 12
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "destination": {
+      "type": "string",
+      "enum": [
+        "home",
+        "market",
+        "outpost",
+        "sanctuary",
+        "camp",
+        "hall"
+      ]
+    },
+    "witness": {
+      "type": "string",
+      "maxLength": 128
+    }
+  },
+  "$comment": "Policy arcane_rune_smith: work 6, rest 13, social 5, initial energy 65; version and timestamp fences enforced by engine."
+}
