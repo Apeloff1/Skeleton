@@ -1,21 +1,10 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  DISCOURSE & DISCORD ENGINE — multi-AI debate for the creative process     ║
-║                                                                            ║
-║  Instead of trusting a single model, a creative prompt is deliberated by a ║
-║  PANEL of provider-diverse models, then the strongest answer is selected:  ║
-║                                                                            ║
-║    1. DISCOURSE  — every panel model independently drafts a candidate      ║
-║                    (parallel, cross-vendor: Claude + GPT + Gemini).        ║
-║    2. DISCORD    — each candidate is RED-TEAMED by a *different* model that ║
-║                    surfaces flaws, gaps and fidelity issues (adversarial). ║
-║    3. JUDGEMENT  — a judge model scores every candidate on QUALITY +       ║
-║                    FIDELITY (informed by the critiques) and picks the      ║
-║                    highest, returning the full transcript for transparency.║
-║                                                                            ║
-║  ★ This is best-of-N multi-model debate + LLM-as-judge selection — the     ║
-║  highest-quality/fidelity path, at the cost of more tokens (opt-in).       ║
-╚══════════════════════════════════════════════════════════════════════════╝
+"""Tenant-authorized multi-model creative deliberation.
+
+The canonical engine's live inventory controls executable provider/model pairs.
+Legacy planning labels never grant execution authority. If one model is ready,
+the result is explicitly labeled single-model self-review rather than fabricated
+multi-provider consensus. Every private request, journal and result is bound to
+an authenticated tenant and account.
 """
 import os
 import re
@@ -30,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.discourse_catalog import DeclaredModel, PanelUnavailable, tenant_panel
-from routes.llm_router import route_complete, MODEL_CATALOG
+from routes.llm_router import route_complete
 from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/discourse", tags=["discourse"])
@@ -117,13 +106,13 @@ def _admit(task: str, prompt: str, system: str, panel: list | None,
         raise ValueError("round count must be between 1 and 4")
     if type(do_discord) is not bool:
         raise ValueError("discord flag must be boolean")
-    if not isinstance(judge_model, str) or len(judge_model) > 128:
+    if not isinstance(judge_model, str) or len(judge_model) > 385:
         raise ValueError("judge model identifier is invalid")
     if panel is None or panel == []:
         models = []
     elif isinstance(panel, (list, tuple)) and 1 <= len(panel) <= MAX_PANEL:
         if any(
-            not isinstance(model, str) or not 1 <= len(model) <= 384
+            not isinstance(model, str) or not 1 <= len(model) <= 385
             or model != model.strip() for model in panel
         ):
             raise ValueError("panel requires declared model identities")
@@ -340,7 +329,7 @@ class DeliberateBody(BaseModel):
     prompt: str = Field(..., max_length=MAX_PROMPT_CHARS)
     system: str = Field(default="", max_length=MAX_SYSTEM_CHARS)
     panel: list[str] = Field(default_factory=list, max_length=MAX_PANEL)
-    judge_model: str = Field(default="", max_length=128)
+    judge_model: str = Field(default="", max_length=385)
     discord: bool = True
     rounds: int = Field(default=1, ge=1, le=MAX_ROUNDS)
 
