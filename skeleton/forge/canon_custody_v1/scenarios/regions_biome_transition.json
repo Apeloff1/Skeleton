@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.canon_scenario.v1",
+  "policy": "regions_biome_transition",
+  "domain": "regions",
+  "topic": "biome_transition",
+  "evidence_kind": "anchor",
+  "limits": {
+    "max_records": 112,
+    "max_tick_gap": 7
+  },
+  "commands": [
+    {
+      "id": "regions_biome_transition:a",
+      "entity": "hero",
+      "action": "establish",
+      "value": "biome_transition:origin",
+      "predecessor": "",
+      "evidence": "verified-world-event:1",
+      "world": "primary",
+      "tick": 1,
+      "expected_revision": 0
+    },
+    {
+      "id": "regions_biome_transition:b",
+      "entity": "hero",
+      "action": "amend",
+      "value": "biome_transition:revision",
+      "predecessor": "regions_biome_transition:a",
+      "evidence": "verified-world-event:2",
+      "world": "primary",
+      "tick": 2,
+      "expected_revision": 1
+    },
+    {
+      "id": "regions_biome_transition:c",
+      "entity": "hero",
+      "action": "reconcile",
+      "value": "biome_transition:canon",
+      "predecessor": "regions_biome_transition:b",
+      "evidence": "verified-world-event:3",
+      "world": "primary",
+      "tick": 3,
+      "expected_revision": 2
+    }
+  ],
+  "expected": {
+    "revision": 3,
+    "records": 3,
+    "all_accepted": true,
+    "world": "primary"
+  },
+  "negative_cases": [
+    "unknown-parent",
+    "duplicate-event",
+    "revision-stale",
+    "cross-world",
+    "entity-lineage-mismatch",
+    "unjustified-clock-gap",
+    "missing-evidence"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "world_provenance_authenticated": false,
+    "release_certified": false
+  }
+}

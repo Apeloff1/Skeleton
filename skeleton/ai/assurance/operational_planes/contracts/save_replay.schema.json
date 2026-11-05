@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/save_replay.schema.json",
+  "title": "gameworld.save_replay observation contract",
+  "description": "Guard save reproducibility",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nondeterministic_replays",
+        "unrestorable_game_saves"
+      ],
+      "properties": {
+        "nondeterministic_replays": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for nondeterministic_replays"
+        },
+        "unrestorable_game_saves": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unrestorable_game_saves"
+        }
+      }
+    }
+  }
+}
