@@ -153,12 +153,31 @@ class NativeOperatorSession:
         self._native_output_ceiling=worker.spine.limits.max_output_tokens
 
     def _valid_worker(self):
-        if ActiveModel.from_supervisor(self.worker)!=self.identity:
+        try:
+            active=ActiveModel.from_supervisor(self.worker)
+        except Exception as exc:
+            raise NativeOperatorSessionHold(
+                "native source identity unavailable"
+            ) from exc
+        if active!=self.identity:
             raise NativeOperatorSessionHold("native model epoch/principal changed")
         if self._closed:
             raise NativeOperatorSessionHold("session already stopped")
         if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
             raise NativeOperatorSessionHold("operator session time budget exhausted")
+
+    def _post_io(self) -> None:
+        """Hold private SQLite or model output after a source/owner change.
+
+        A failed post-I/O check permanently closes this process-local
+        operator session. The canonical SQLite receipt remains authoritative
+        and cannot be regenerated implicitly on an uncertain native effect.
+        """
+        try:
+            self._valid_worker()
+        except BaseException:
+            self._closed=True
+            raise
 
     def _reserve(self,cmd:OperatorCommand):
         self._valid_worker()
@@ -246,7 +265,7 @@ class NativeOperatorSession:
                 }
             if cmd.operation=="status":
                 journal=NativeSQLiteCheckpointer(self.worker)
-                return {
+                report={
                     "schema":"jeeves.native_operator_command_result.v1",
                     "operation":"status","status":"active",
                     "installed_model_sha256":self.identity.model_sha256,
@@ -259,19 +278,26 @@ class NativeOperatorSession:
                     "actual_model_forward_pass_by_status":False,
                     "release_certified":False,
                 }
+                self._post_io()
+                return report
             inputs=self._inputs(cmd)
             if cmd.operation in ("start","resume"):
                 self._reserve(cmd)
             runner=NativeDurableJeevesAgent(self.worker)
             if cmd.operation=="inspect":
-                return runner.inspect(inputs)
+                record=runner.inspect(inputs)
+                self._post_io()
+                return record
             if cmd.operation=="replay":
-                return runner.replay_terminal(inputs)
+                record=runner.replay_terminal(inputs)
+                self._post_io()
+                return record
             try:
                 if cmd.operation=="start":
                     result=runner.run(inputs)
                 else:
                     result=runner.resume_operator_approved(inputs)
+                self._post_io()
             except BaseException:
                 # A native call may have committed or become uncertain. Never
                 # admit another command in this process after any such failure.
