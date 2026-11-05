@@ -63,3 +63,15 @@ def test_direct_action_decoder_rejects_nontext_and_oversized_unicode():
     with pytest.raises(ValueError, match="byte budget"):
         _strict_action_json('{"verb":"' + ("é" * (MAX_ACTION_JSON_BYTES // 2)) + '"}')
     assert _strict_action_json('{"verb":"move"}') == {"verb": "move"}
+
+
+def test_direct_action_decoder_rejects_unpaired_surrogate_without_mutation(tmp_path: Path):
+    """An invalid Unicode scalar must become a bounded consumer error."""
+    import pytest
+
+    store = SlotStore(root=tmp_path / "slots")
+    initial = store.new("unicode")
+    with pytest.raises(ValueError, match="invalid Unicode"):
+        _strict_action_json('{"verb":"\\ud800"}')
+    assert store.load("unicode")["head"] == initial["head"]
+    assert store.audit("unicode")["verified"] is True
