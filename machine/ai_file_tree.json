@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "batch construction and volume-specific build tooling",
+      "reason": "Existing tracked mass-build volume organs remain governed non-canonical construction tooling; no AI-runtime cutover, provider grant, build completion or release authority is implied by retaining this source tree."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7772,7 +7777,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 161,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
