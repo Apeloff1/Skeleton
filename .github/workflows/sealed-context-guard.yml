@@ -55,6 +55,9 @@ on:
       - 'skeleton/testing/test_delivery_*.py'
       - 'skeleton/testing/test_sealed_*.py'
       - 'pyproject.toml'
+      - 'skeleton/app/offline_encrypted_spill.py'
+      - 'skeleton/app/offline_spill_cli.py'
+      - 'skeleton/testing/test_offline_encrypted_spill.py'
       - '.github/workflows/sealed-context-guard.yml'
   push:
     branches:
@@ -85,6 +88,8 @@ jobs:
       - name: Compile changed production boundaries
         run: |
           python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
+      - name: Encrypted offline spill custody regressions
+        run: python -m pytest -q --noconftest skeleton/testing/test_offline_encrypted_spill.py
       - name: Verify canonical metadata and AI-tree parity
         run: |
           python scripts/check_root_package_metadata_parity.py
