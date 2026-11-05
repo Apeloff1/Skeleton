@@ -991,6 +991,11 @@ def project_operator_http(result: Mapping[str, Any], *, include_files: bool = Fa
 
 def cli(argv: Sequence[str]) -> int:
     """``python -m skeleton game`` implementation."""
+    if argv and argv[0] == "npc-schedule":
+        # Reuse the canonical game command, not a second runtime root.
+        from scripts.npc_schedule_cli import main as npc_schedule_main
+
+        return npc_schedule_main(list(argv[1:]))
     out: Optional[str] = None
     overwrite = False
     as_json = False
