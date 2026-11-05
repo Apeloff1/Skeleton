@@ -1123,7 +1123,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 if check.required and not check.ok:
                     print(f"[FAIL] {check.detail}; {check.remediation}")
             return 1
-        manifest = runtime_manifest(manifest, root=root)
+        try:
+            manifest = runtime_manifest(manifest, root=root)
+        except (OSError, ValueError, UnicodeError):
+            print("application start aborted: runtime configuration changed or is unsafe")
+            return 2
         mode = "production" if bool(args.production) else "development"
         try:
             startup_command = compose_command(
@@ -1172,7 +1176,20 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
 
-        manifest = runtime_manifest(manifest, root=root)
+        try:
+            manifest = runtime_manifest(manifest, root=root)
+        except (OSError, ValueError, UnicodeError):
+            message = "runtime configuration unsafe or unreadable; health probes were not sent"
+            if bool(args.as_json):
+                print(json.dumps({
+                    "ok": False,
+                    "code": "runtime_configuration_unavailable",
+                    "message": message,
+                    "results": [],
+                }, sort_keys=True))
+            else:
+                print("application smoke blocked: " + message)
+            return 2
         timeout = float(args.timeout)
         attempts = int(args.attempts)
         delay = float(args.delay)
