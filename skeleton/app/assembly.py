@@ -689,6 +689,24 @@ def preflight(
         )
     )
 
+    # Validate concrete Docker build context inputs before .env setup or
+    # an expensive image build. This check is source-only and never follows
+    # symlinks to read credentials or model data.
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    build_errors = build_source_errors(root)
+    checks.append(
+        AssemblyCheck(
+            code="image:build-inputs",
+            ok=not build_errors,
+            message=(
+                "first-install Docker source inputs and context boundaries agree"
+                if not build_errors
+                else "; ".join(build_errors)
+            ),
+        )
+    )
+
     if runtime:
         docker = shutil.which("docker")
         checks.append(
