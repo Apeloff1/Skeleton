@@ -99,3 +99,49 @@ def test_invalid_seed_type_or_range_is_rejected(seed):
 def test_mixed_type_dependency_keys_have_controlled_error():
     with pytest.raises(ValueError, match="keys"):
         planner.plan_build("b", phases=["a"], deps={1: [], "other": []})
+
+
+def test_validator_recomputes_coverage_even_if_old_cached_flag_says_complete():
+    plan = planner.plan_build("b", phases=["a", "b"], seed=3)
+    assert plan["coverage"]["all_covered"]
+    plan["nodes"] = [node for node in plan["nodes"] if node.get("phase_id") != "b"]
+    result = planner.verify_plan(plan)
+    assert not result["valid"]
+    assert result["coverage_ok"] is False
+    assert any("coverage" in problem for problem in result["problems"])
+
+
+def test_validator_rejects_mutated_worker_and_objective_receipt():
+    plan = planner.plan_build("b", phases=["a"], seed=3)
+    plan["objectives"] = ["substituted objective"]
+    assert not planner.verify_plan(plan)["valid"]
+    assert any("receipt" in p for p in planner.verify_plan(plan)["problems"])
+
+    plan = planner.plan_build("b", phases=["a"], seed=3)
+    platoon = next(node for node in plan["nodes"] if node["tier"] == "platoon")
+    platoon["workers"] = []
+    verdict = planner.verify_plan(plan)
+    assert not verdict["valid"]
+    assert any("custody" in p for p in verdict["problems"])
+
+
+def test_runtime_refuses_tampered_plan_before_invoking_executor():
+    from core import swarm_scheduler as scheduler
+    plan = planner.plan_build("b", phases=["a", "b"], seed=3)
+    plan["objectives"] = ["tampered goal"]
+
+    def must_not_run(*_args):
+        raise AssertionError("unverified phase was executed")
+
+    with pytest.raises(ValueError, match="unverified"):
+        scheduler.run_with_executor(plan, must_not_run)
+
+
+def test_game_genre_affects_receipt_even_if_workers_are_identical(monkeypatch):
+    # Pin the worker RNG so the genre only changes identity, not selection.
+    import random
+    monkeypatch.setattr(planner, "_rng", lambda *_: random.Random(7))
+    a = planner.plan_build("b", phases=["a"], game_ctx={"genre": "fantasy"})
+    b = planner.plan_build("b", phases=["a"], game_ctx={"genre": "sci-fi"})
+    assert a["worker_assignments"] == b["worker_assignments"]
+    assert a["plan_hash"] != b["plan_hash"]
