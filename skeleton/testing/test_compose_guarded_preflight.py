@@ -77,6 +77,30 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(exit_code, expected_exit)
                 self.assertEqual(json.loads(output.getvalue()), observed)
 
+    async def test_malformed_authenticated_role_metadata_denied_before_epoch(self):
+        for invalid in (False, {}, "readWrite", [None],
+                        [{"db": "admin", "role": True}],
+                        [{"db": "admin", "role": "read"},
+                         {"db": "admin", "role": "read"}],
+                        [{"db": "admin", "role": "read"}] * 65):
+            with self.subTest(invalid=repr(invalid)[:80]):
+                self.db.auth["authInfo"]["authenticatedUserRoles"] = invalid
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_authenticated_session_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+                self.assertEqual(FakeEpoch.instances, [])
+        self.db.auth["authInfo"].pop("authenticatedUserRoles")
+
+    async def test_valid_authenticated_roles_remain_observation_only(self):
+        self.db.auth["authInfo"]["authenticatedUserRoles"] = [
+            {"db": "admin", "role": "readWrite"}
+        ]
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertFalse(result["independent_reviewer_verified"])
+        self.assertFalse(result["canonical_writer_inventory_verified"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_primary_and_stable_epoch_only_prove_mongo_preflight(self):
         result = await self.inspect()
         self.assertEqual(result["schema_version"], SCHEMA)

@@ -92,7 +92,30 @@ def _authenticated_principals(response: object) -> tuple[tuple[str, str], ...] |
         principals.append((identity[0], identity[1]))
     if len(set(principals)) != len(principals):
         return None
-    return tuple(sorted(principals))
+    # Bind the observation to authenticated role assignments when supplied.
+    # Missing role metadata is not authorization evidence; this is strictly
+    # an additional fail-closed rotation detector, never a readiness grant.
+    roles = response["authInfo"].get("authenticatedUserRoles")
+    if roles is None:
+        return tuple(sorted(principals))
+    if type(roles) is not list or len(roles) > 64:
+        return None
+    trusted_roles: list[tuple[str, str]] = []
+    for role in roles:
+        if type(role) is not dict:
+            return None
+        pair: list[str] = []
+        for key in ("db", "role"):
+            value = role.get(key)
+            if (type(value) is not str or not value or value != value.strip()
+                    or not _valid_principal_utf8(value)
+                    or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
+                return None
+            pair.append(value)
+        trusted_roles.append((pair[0], pair[1]))
+    if len(set(trusted_roles)) != len(trusted_roles):
+        return None
+    return tuple(sorted(principals)) + (("ROLE_BOUNDARY", ""),) + tuple(sorted(trusted_roles))
 
 
 def _trusted_topology(hello: object) -> tuple[object, ...] | None:
