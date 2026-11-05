@@ -97,7 +97,7 @@ def test_bad_sources_rejected(demo, mutation):
 @pytest.mark.parametrize("mutation", [
     lambda x: x["state"].update(health=100),
     lambda x: x["state"].update(food=100),
-    lambda x: x["state"]["tile"]["state"].update(position=[999, 999]),
+    lambda x: x["state"]["tile"]["state"].update(position=[0, 0]),
     lambda x: x["journal"][0]["action"].update(kind="rest"),
     lambda x: x["journal"][0].update(receipt="0" * 64),
     lambda x: x.update(source_digest="0" * 64),

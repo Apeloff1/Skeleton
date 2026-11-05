@@ -109,7 +109,7 @@ def test_bad_authored_mission_rejected(mutate):
 
 @pytest.mark.parametrize("mutate", [
     lambda s: s["state"].update(reputation=1000),
-    lambda s: s["state"]["scene"]["state"].update(scene_id="forged_scene"),
+    lambda s: s["state"]["scene"]["state"].update(scene_id="sanctuary"),
     lambda s: s["state"]["missions"].append("phantom"),
     lambda s: s["state"]["choices"].update(restore_lantern="decline"),
     lambda s: s["journal"][0].update(receipt="0" * 64),
