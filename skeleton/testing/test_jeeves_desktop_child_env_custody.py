@@ -51,6 +51,7 @@ class NativeEnvironmentContractTests(unittest.TestCase):
 
     def test_windows_and_gpu_essentials_survive_without_exposing_secrets(self):
         source = {
+            "Path": "C:\\Windows\\System32;C:\\Python",
             "SystemRoot": "C:\\Windows",
             "WINDIR": "C:\\Windows",
             "TEMP": "C:\\Users\\Owner\\AppData\\Local\\Temp",
