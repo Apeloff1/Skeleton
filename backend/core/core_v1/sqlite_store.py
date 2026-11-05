@@ -91,6 +91,30 @@ MIGRATIONS: tuple[tuple[int, str, str], ...] = (
             PRIMARY KEY (delivery_id, attempt)
         )
     """),
+    (4, "secrets_at_rest_and_delivery_log", """
+        ALTER TABLE core_v1_webhook_secrets ADD COLUMN key_id TEXT NOT NULL DEFAULT '';
+        CREATE INDEX idx_core_v1_secrets_key ON core_v1_webhook_secrets(key_id);
+        CREATE TABLE core_v1_job_checkpoints (
+            job TEXT PRIMARY KEY,
+            cursor TEXT NOT NULL,
+            done INTEGER NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE TABLE core_v1_retry_policies (
+            webhook_id TEXT PRIMARY KEY REFERENCES core_v1_webhooks(webhook_id),
+            tenant_id TEXT NOT NULL,
+            base_seconds REAL NOT NULL,
+            factor REAL NOT NULL,
+            cap_seconds REAL NOT NULL,
+            max_age_seconds REAL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX idx_core_v1_dlv_tenant ON core_v1_deliveries(tenant_id, created_at, delivery_id);
+        CREATE INDEX idx_core_v1_dlv_event ON core_v1_deliveries(tenant_id, event_id, created_at, delivery_id);
+        CREATE INDEX idx_core_v1_dlv_status ON core_v1_deliveries(tenant_id, status, updated_at);
+        CREATE INDEX idx_core_v1_dlv_replay ON core_v1_deliveries(replay_of) WHERE replay_of != '';
+        CREATE INDEX idx_core_v1_att_started ON core_v1_attempts(started_at, delivery_id, attempt)
+    """),
 )
 
 
@@ -221,18 +245,76 @@ class SqliteSubscriptionRepository:
 
 
 class SqliteSecretRepository:
+    """Raw secret blob store (``secret_vault.SecretBlobStore``); crypto lives in
+    ``secret_vault.EncryptedSecretRepository``. ``key_id`` mirrors the envelope
+    header ('' = legacy plaintext) so rotation progress is a cheap query."""
+
     def __init__(self, db: Database) -> None:
         self.db = db
 
+    @staticmethod
+    def _kid(blob: bytes) -> str:
+        from .envelope import EnvelopeError, key_id_of
+        try:
+            return key_id_of(blob)
+        except EnvelopeError:
+            return ""
+
     def put(self, secret_id: str, tenant_id: str, secret: bytes, created_at: float) -> None:
         with self.db.tx() as c:
-            c.execute("INSERT INTO core_v1_webhook_secrets VALUES (?,?,?,?)",
-                      (secret_id, tenant_id, secret, created_at))
+            c.execute("INSERT INTO core_v1_webhook_secrets (secret_id, tenant_id, secret, created_at, key_id) "
+                      "VALUES (?,?,?,?,?)", (secret_id, tenant_id, bytes(secret), created_at, self._kid(secret)))
 
     def get(self, tenant_id: str, secret_id: str) -> bytes | None:
         rows = self.db.query("SELECT secret FROM core_v1_webhook_secrets WHERE tenant_id=? AND secret_id=?",
                              (tenant_id, secret_id))
         return bytes(rows[0][0]) if rows else None
+
+    def scan(self, after_id: str, limit: int):
+        from .secret_vault import SecretRow
+        rows = self.db.query("SELECT secret_id, tenant_id, secret, created_at FROM core_v1_webhook_secrets "
+                             "WHERE secret_id > ? ORDER BY secret_id LIMIT ?", (after_id, limit))
+        return [SecretRow(r[0], r[1], bytes(r[2]), r[3]) for r in rows]
+
+    def compare_and_set(self, secret_id: str, expected: bytes, new: bytes, key_id: str) -> bool:
+        with self.db.tx() as c:
+            cur = c.execute("UPDATE core_v1_webhook_secrets SET secret=?, key_id=? WHERE secret_id=? AND secret=?",
+                            (bytes(new), key_id, secret_id, bytes(expected)))
+            return cur.rowcount == 1
+
+    def count_by_key(self) -> dict[str, int]:
+        rows = self.db.query("SELECT key_id, COUNT(*) FROM core_v1_webhook_secrets GROUP BY key_id")
+        return {r[0]: r[1] for r in rows}
+
+
+class SqliteCheckpointStore:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+    def get(self, job: str):
+        from .secret_migration import Checkpoint
+        rows = self.db.query("SELECT * FROM core_v1_job_checkpoints WHERE job=?", (job,))
+        if not rows:
+            return None
+        r = rows[0]
+        return Checkpoint(r["job"], r["cursor"], bool(r["done"]), r["updated_at"])
+
+    def save(self, cp) -> None:
+        with self.db.tx() as c:
+            updated = c.execute(
+                "INSERT INTO core_v1_job_checkpoints VALUES (?,?,?,?) "
+                "ON CONFLICT(job) DO UPDATE SET "
+                "cursor=excluded.cursor, done=excluded.done, updated_at=excluded.updated_at "
+                "WHERE excluded.cursor >= core_v1_job_checkpoints.cursor "
+                "AND excluded.updated_at >= core_v1_job_checkpoints.updated_at "
+                "AND (core_v1_job_checkpoints.done=0 OR excluded.done=1)",
+                (cp.job, cp.cursor, int(cp.done), cp.updated_at))
+            if updated.rowcount != 1:
+                raise ValueError("secret migration checkpoint regression")
+
+    def reset(self, job: str) -> None:
+        with self.db.tx() as c:
+            c.execute("DELETE FROM core_v1_job_checkpoints WHERE job=?", (job,))
 
 
 # --------------------------------------------------------- events/deliveries
