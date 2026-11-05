@@ -222,7 +222,7 @@ def test_malformed_subprocess_action_never_advances_saved_revision(tmp_path: Pat
         b"{",
         b"null",
         b"[]",
-        b'{"verb":"move","direction":"north","extra":true}',
+        b'"not-an-action"',
     )
     for payload in malformed:
         failed = _invoke(
