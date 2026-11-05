@@ -129,6 +129,12 @@ def test_first_install_does_not_trust_malformed_route_report(monkeypatch, tmp_pa
 
 
 def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True, observed_urls=None):
+    # The production installer now binds a stable private runtime file before
+    # Compose. Keep this mocked route-registry fixture realistic rather than
+    # bypassing a mandatory configuration custody gate.
+    (tmp_path / ".env").write_text(
+        "FRONTEND_PORT=3000\nBACKEND_PORT=8001\n", encoding="utf-8"
+    )
     installer = importlib.import_module("skeleton.app.installer")
     health = importlib.import_module("skeleton.app.health")
     doctor = importlib.import_module("skeleton.app.first_install")
