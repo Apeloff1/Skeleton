@@ -88,22 +88,28 @@ class SourceFencedLaptopDispatcher(LaptopDispatcher):
         super().__init__(worker)
         self.source_guard = guard
 
-    def dispatch(self, operation, payload):
+    def _dispatch_exclusive(self, operation, data):
+        """Check source under the same lock as SQLite and native effects.
+
+        The base dispatch() owns the nonblocking single-flight admission.
+        Source inspection outside that critical section would let a second
+        request begin between a turn and its final lease verification.
+        """
         self.source_guard.assert_live(self.worker)
         try:
-            return super().dispatch(operation, payload)
+            return super()._dispatch_exclusive(operation, data)
         finally:
-            # The canonical dispatcher itself can fail after detecting a
-            # model-epoch change. Even on that exception, terminate this
-            # source lease rather than leaving a reusable stale guard.
             self.source_guard.assert_live(self.worker)
 
     def protocol(self):
-        self.source_guard.assert_live(self.worker)
+        # Protocol reads also must not interleave active native work.
+        if not self._flight.acquire(blocking=False):
+            refuse("native dispatcher already has an active request")
         try:
-            return super().protocol()
-        finally:
             self.source_guard.assert_live(self.worker)
-
-
-__all__ = ["LocalSourceFence", "SourceFencedLaptopDispatcher"]
+            try:
+                return super().protocol()
+            finally:
+                self.source_guard.assert_live(self.worker)
+        finally:
+            self._flight.release()

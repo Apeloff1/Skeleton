@@ -11,10 +11,13 @@ from io import BytesIO, StringIO
 from types import SimpleNamespace
 from unittest import mock
 import json
+import threading
 import unittest
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import ContractViolation
 from skeleton.ai.runtime.operational_ai.laptop_runtime.cli import main
+from skeleton.ai.runtime.operational_ai.laptop_runtime.dispatcher import LaptopDispatcher
+from skeleton.ai.runtime.operational_ai.laptop_runtime.run_once import generate_once
 from skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard import (
     LocalSourceFence, SourceFencedLaptopDispatcher,
 )
@@ -209,6 +212,93 @@ class InstalledGGUFSourceGuardTests(unittest.TestCase):
                 self.assertEqual(result["identity"]["model_sha256"], MODEL)
         self.assertFalse(guard._revoked)
         self.assertEqual(worker.generation_calls, 0)
+
+    def test_competing_request_is_denied_before_an_extra_source_probe(self):
+        """Nonblocking admission must reject a second source inspection."""
+        worker = FakeWorker()
+        started, release = threading.Event(), threading.Event()
+        actual_turn = worker.turn
+
+        def blocked_turn(*args, **kwargs):
+            started.set()
+            if not release.wait(5):
+                raise TimeoutError("synthetic blocked generation")
+            return actual_turn(*args, **kwargs)
+
+        worker.turn = blocked_turn
+        responses = []
+        with mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
+            return_value=dict(SOURCE),
+        ) as inspection:
+            guard = LocalSourceFence(worker, object(), tenant="local", subject="owner")
+            dispatcher = SourceFencedLaptopDispatcher(worker, guard)
+            session = dispatcher.dispatch("create", {})["session_id"]
+
+            def issue_turn():
+                try:
+                    responses.append(dispatcher.dispatch("turn", {
+                        "session_id": session, "request_id": "r_test",
+                        "prompt": "private task",
+                    }))
+                except BaseException as exc:
+                    responses.append(exc)
+
+            running = threading.Thread(target=issue_turn, daemon=True)
+            running.start()
+            try:
+                self.assertTrue(started.wait(5))
+                prior_probes = inspection.call_count
+                with self.assertRaises(ContractViolation):
+                    dispatcher.dispatch("identity", {})
+                with self.assertRaises(ContractViolation):
+                    dispatcher.protocol()
+                self.assertEqual(inspection.call_count, prior_probes)
+            finally:
+                release.set()
+                running.join(5)
+            self.assertFalse(running.is_alive())
+            self.assertEqual(len(responses), 1)
+            self.assertIsInstance(responses[0], dict)
+            self.assertEqual(worker.generation_calls, 1)
+
+    def test_source_revoked_during_sqlite_create_prevents_native_generation(self):
+        worker = FakeWorker()
+        original_create = worker.spine.create
+
+        def change_model_after_create(session):
+            created = original_create(session)
+            worker.spine.backend.model_digest = "f" * 64
+            return created
+
+        worker.spine.create = change_model_after_create
+        with mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
+            return_value=dict(SOURCE),
+        ):
+            guard = LocalSourceFence(worker, object(), tenant="local", subject="owner")
+            dispatcher = SourceFencedLaptopDispatcher(worker, guard)
+            with self.assertRaises(ContractViolation):
+                generate_once(worker, "private task", dispatcher=dispatcher)
+        self.assertTrue(guard._revoked)
+        self.assertEqual(worker.generation_calls, 0)
+        self.assertEqual(len(worker.spine.created), 1)
+
+    def test_unfenced_or_foreign_dispatcher_refused_before_sqlite_creation(self):
+        worker = FakeWorker()
+        with self.assertRaises(ContractViolation):
+            generate_once(worker, "private task", dispatcher=LaptopDispatcher(worker))
+        self.assertFalse(worker.spine.created)
+        with mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
+            return_value=dict(SOURCE),
+        ):
+            other = FakeWorker()
+            guard = LocalSourceFence(other, object(), tenant="local", subject="owner")
+            foreign = SourceFencedLaptopDispatcher(other, guard)
+            with self.assertRaises(ContractViolation):
+                generate_once(worker, "private task", dispatcher=foreign)
+        self.assertFalse(worker.spine.created)
 
 
 def flags(mode):

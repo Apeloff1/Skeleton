@@ -155,8 +155,11 @@ def main(argv=None):
                 },sys.stdout)
                 return 0
             if args.mode=="once":
-                result=generate_once(worker,message,session=args.session,
-                                     request_id=args.request_id)
+                result=generate_once(
+                    worker,message,session=args.session,
+                    request_id=args.request_id,
+                    dispatcher=SourceFencedLaptopDispatcher(worker,source_fence),
+                )
                 emit_native_jsonl(worker,source_fence,{
                     "status":"real-offline-turn-committed",
                     "output":result,

@@ -13,7 +13,16 @@ import json
 import unittest
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.cli import main as native_main
-from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL
+from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL, TOKENIZER
+
+# Synthetic installed-source contract shape, not independently validated GGUF rights.
+# Keep production require_activated_source strict: only this test patches it.
+SYNTHETIC_SOURCE = {
+    "model_sha256": MODEL, "tokenizer_sha256": TOKENIZER,
+    "manifest_sha256": "c" * 64, "archive_sha256": "d" * 64,
+    "source_sha": "e" * 40, "installed_model_bytes": 2048,
+    "installed_shard_count": 1,
+}
 
 
 def argv(*extra):
@@ -37,6 +46,10 @@ def dispatch(raw, *, options=()):
         mock.patch(
             "skeleton.ai.runtime.operational_ai.laptop_runtime.cli.sys.stdin",
             stdin,
+        ),
+        mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
+            return_value=dict(SYNTHETIC_SOURCE),
         ),
         redirect_stdout(stdout),
         redirect_stderr(stderr),
