@@ -452,7 +452,9 @@ def runtime_manifest(
             if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
             url = urlsplit(service.public_url)
-            if url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}:
+            if (url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}
+                    or url.username is not None or url.password is not None
+                    or url.query or url.fragment):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
             host = url.hostname
             if ":" in host:
