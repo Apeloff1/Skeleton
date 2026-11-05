@@ -134,7 +134,12 @@ class FiveHundredBillionEpochs(unittest.TestCase):
         self.assertTrue(result["receipt"]["actually_changed"])
         self.assertEqual(450_000_000_000,
                          authored_summary(result["project"])["epoch_recipe_count"])
+<<<<<<< HEAD
         self.assertEqual(500_000_000_000,
+=======
+        # The epoch slice is a subset of the complete persisted 50T catalog.
+        self.assertEqual(len(AUTHORING_ACTIONS),
+>>>>>>> origin/main
                          authored_summary(result["project"])["catalog_total"])
         with self.assertRaises(StudioError):
             apply_authoring_batch(base, [

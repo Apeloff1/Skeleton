@@ -78,10 +78,14 @@
       "public_url": "http://localhost:3000",
       "health_path": "/",
       "container_port": 3000,
+<<<<<<< HEAD
       "depends_on": [
         "backend",
         "skeleton"
       ],
+=======
+      "depends_on": [],
+>>>>>>> origin/main
       "canonical": true,
       "ingress_prefix": "/"
     },
@@ -92,7 +96,11 @@
       "kind": "fastapi",
       "entrypoint": "server:app",
       "public_url": "http://localhost:8001",
+<<<<<<< HEAD
       "health_path": "/api/health",
+=======
+      "health_path": "/api/health/ready",
+>>>>>>> origin/main
       "container_port": 8001,
       "depends_on": [
         "mongo",

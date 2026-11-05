@@ -9,6 +9,11 @@ independent held-out designs.
 The builder stages output privately, validates it with the actual production
 dataset loader, and exclusively publishes train/eval files before their
 manifest. Existing datasets cannot be overwritten.
+<<<<<<< HEAD
+=======
+If publication is interrupted, already-published files remain for the operator
+to inspect; a retry must use a new prefix or reconcile those files explicitly.
+>>>>>>> origin/main
 """
 from __future__ import annotations
 
@@ -25,7 +30,11 @@ from typing import Any
 from .jeeves_production_game_train import ProductionCheckpointError, _strict_json
 from .jeeves_game_corpus import (
     FAMILIES, MIN_TRAIN_PER_FAMILY, MIN_HOLDOUT_PER_FAMILY,
+<<<<<<< HEAD
     MAX_DATASET_BYTES, _check_rights, _ID, _text, load_approved_corpus, SCHEMA,
+=======
+    MAX_DATASET_BYTES, _check_rights, _ID, _read_bounded_regular_file, _text, load_approved_corpus, SCHEMA,
+>>>>>>> origin/main
 )
 
 INTAKE_SCHEMA = "skeleton.jeeves.reviewed_game_design_intake.v1"
@@ -44,7 +53,13 @@ def _validated_examples(intake: Path) -> tuple[list[dict[str, Any]], str]:
         raise ProductionCheckpointError("reviewed game corpus intake must be a regular file")
     if not 16 <= intake.stat().st_size <= MAX_INTake_BYTES:
         raise ProductionCheckpointError("reviewed game corpus intake outside bounded file size")
+<<<<<<< HEAD
     raw = intake.read_bytes()
+=======
+    raw = _read_bounded_regular_file(
+        intake, minimum=16, maximum=MAX_INTake_BYTES, label="reviewed game corpus intake",
+    )
+>>>>>>> origin/main
     rows: list[dict[str, Any]] = []
     record_ids: set[str] = set()
     project_ids: set[str] = set()
@@ -202,11 +217,19 @@ def build(
             "rights_declarations_need_operator_verification": True,
             "generation_does_not_constitute_legal_review": True,
         }
+<<<<<<< HEAD
         with (staging / filenames["manifest"]).open("xb") as output:
             output.write((json.dumps(
                 manifest, ensure_ascii=False, sort_keys=True, indent=2,
                 allow_nan=False,
             ) + "\n").encode("utf-8"))
+=======
+        manifest_raw = (json.dumps(
+            manifest, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False,
+        ) + "\n").encode("utf-8")
+        with (staging / filenames["manifest"]).open("xb") as output:
+            output.write(manifest_raw)
+>>>>>>> origin/main
             output.flush()
             os.fsync(output.fileno())
         os.chmod(staging / filenames["manifest"], 0o600)
@@ -214,6 +237,7 @@ def build(
         # catches long copied passages, benchmark contamination and invalid
         # rights metadata even when the builder's source fields passed.
         _train, _held, validated = load_approved_corpus(staging / filenames["manifest"])
+<<<<<<< HEAD
         published: list[Path] = []
         try:
             for key in ("train", "heldout", "manifest"):
@@ -227,6 +251,42 @@ def build(
         "status": "reviewed_game_dataset_published_candidate_for_rights_confirmation",
         "paths": {key: str(value.resolve()) for key, value in targets.items()},
         "manifest_sha256": _sha(targets["manifest"].read_bytes()),
+=======
+        try:
+            for key in ("train", "heldout", "manifest"):
+                os.link(staging / filenames[key], targets[key])
+        except OSError as exc:
+            # A shared output directory can change after publication. Unlinking
+            # a previously published name here can delete someone else's file
+            # if that name was replaced concurrently. Preserve all names for
+            # explicit operator reconciliation; the manifest is published last.
+            raise ProductionCheckpointError(
+                "Corpus publication incomplete; files were preserved. "
+                "Inspect the destination before retrying with a new prefix."
+            ) from exc
+        # Bind the receipt to the bytes accepted in private staging. A later
+        # read of the manifest name alone could attest someone else's replaced
+        # file while retaining our train/eval hashes and approval metadata.
+        for key, digest in (
+            ("train", manifest["train_sha256"]),
+            ("heldout", manifest["heldout_sha256"]),
+            ("manifest", _sha(manifest_raw)),
+        ):
+            published_raw = _read_bounded_regular_file(
+                targets[key], minimum=16,
+                maximum=64 * 1024 if key == "manifest" else MAX_DATASET_BYTES,
+                label="published corpus " + key,
+            )
+            if _sha(published_raw) != digest:
+                raise ProductionCheckpointError(
+                    "Corpus changed during publication; files were preserved for inspection."
+                )
+        validated = {**validated, "manifest_path": str(targets["manifest"].absolute())}
+    return {
+        "status": "reviewed_game_dataset_published_candidate_for_rights_confirmation",
+        "paths": {key: str(value.absolute()) for key, value in targets.items()},
+        "manifest_sha256": _sha(manifest_raw),
+>>>>>>> origin/main
         "train_sha256": manifest["train_sha256"],
         "heldout_sha256": manifest["heldout_sha256"],
         "approved_intake_sha256": source_sha,

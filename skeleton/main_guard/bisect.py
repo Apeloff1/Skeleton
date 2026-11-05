@@ -341,6 +341,25 @@ class GitBisectRun:
             )
             output = f"{proc.stdout}\n{proc.stderr}"
             result.steps = _read_steps(steps_log)
+<<<<<<< HEAD
+=======
+            # Git trusts the caller's bad endpoint. Its summary is not proof
+            # that this test command actually fails at that commit. Check it
+            # in a disposable worktree before accepting any unique culprit.
+            if proc.returncode == 0:
+                endpoint_tree = tmp / "verified-bad-endpoint"
+                self.git.run("worktree", "add", "--detach", "--force", str(endpoint_tree), bad_sha)
+                try:
+                    endpoint_probe = make_step_runner(
+                        command, timeout_s=self.timeout_s, timeout_as=self.timeout_as,
+                    )(endpoint_tree, bad_sha)
+                    result.steps.append(endpoint_probe)
+                finally:
+                    self.git.run("worktree", "remove", "--force", str(endpoint_tree), check=False)
+                    self.git.run("worktree", "prune", check=False)
+                if endpoint_probe.outcome != BAD:
+                    raise BisectError("test command does not fail at declared bad endpoint")
+>>>>>>> origin/main
             match = _FIRST_BAD.search(output)
             if match:
                 result.first_bad = self.git.commit(match.group(1))
@@ -349,7 +368,30 @@ class GitBisectRun:
                 if could:
                     shas = [s for s in could.group(1).split() if s]
                     result.candidates = self.git.commits(shas)
+<<<<<<< HEAD
                 elif proc.returncode != 0:
+=======
+                elif proc.returncode == 0:
+                    # Git may change its human-readable success wording. The
+                    # fallback still requires a proven adjacent good/bad pair.
+                    proven = _verified_bisect_head(self.git, candidates, good_sha, result.steps)
+                    if proven is not None:
+                        result.first_bad = self.git.commit(proven)
+                    elif candidates and candidates[-1] == bad_sha:
+                        # Newer Git may leave HEAD on the final good probe
+                        # without emitting the canonical first-bad sentence.
+                        # Only accept the declared endpoint when its *direct*
+                        # bad probe above and its adjacent good predecessor
+                        # establish a unique good/bad boundary.
+                        predecessor = good_sha if len(candidates) == 1 else candidates[-2]
+                        good_witness = any(
+                            step.sha == predecessor and step.outcome == GOOD
+                            for step in result.steps
+                        )
+                        if predecessor == good_sha or good_witness:
+                            result.first_bad = self.git.commit(bad_sha)
+                else:
+>>>>>>> origin/main
                     raise BisectError("git bisect run failed: " + (output.strip().splitlines() or ["?"])[-1])
         finally:
             self._restore(head_before, branch_before)
@@ -375,6 +417,32 @@ class GitBisectRun:
             )
 
 
+<<<<<<< HEAD
+=======
+def _verified_bisect_head(git: Git, candidates: Sequence[str], good_sha: str,
+                          steps: Sequence[BisectStep]) -> str | None:
+    """Recover a first-bad SHA only from a uniquely proven git-bisect boundary.
+
+    Some Git versions omit the canonical first-bad sentence from the captured
+    output. Never infer a culprit from exit status or HEAD alone: require a
+    bad probe of HEAD and a good probe of its immediate candidate predecessor
+    (or the explicitly supplied known-good endpoint).
+    """
+    head = git.head_sha()
+    if head not in candidates:
+        return None
+    index = candidates.index(head)
+    predecessor = good_sha if index == 0 else candidates[index - 1]
+    if not any(step.sha == head and step.outcome == BAD for step in steps):
+        return None
+    if predecessor != good_sha and not any(
+        step.sha == predecessor and step.outcome == GOOD for step in steps
+    ):
+        return None
+    return head
+
+
+>>>>>>> origin/main
 def _read_steps(path: Path) -> list[BisectStep]:
     steps: list[BisectStep] = []
     try:

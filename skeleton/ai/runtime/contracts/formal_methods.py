@@ -350,9 +350,14 @@ class ImplementationBinding:
         )
 
     def resolve(self) -> object:
+<<<<<<< HEAD
         # A serialized binding is a reference to already-admitted code, not an
         # executable module-import capability. Loading a new module here would
         # permit verification itself to run arbitrary package import hooks.
+=======
+        # Binding metadata is a reference, never a module-import capability.
+        # Trusted owners must load code explicitly before verification.
+>>>>>>> origin/main
         module = sys.modules.get(self.module_path)
         if module is None:
             raise FormalMethodError(

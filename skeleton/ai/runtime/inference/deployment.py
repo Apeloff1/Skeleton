@@ -18,6 +18,10 @@ from .llama_cpp import (
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
+<<<<<<< HEAD
+=======
+    _runtime_library_identities,
+>>>>>>> origin/main
     build_llama_cpp_adapter,
     inspect_gguf,
 )
@@ -128,6 +132,13 @@ class LocalModelDeployment:
     output_framing: str = "raw"
     runtime_scratch_bytes: int = 512 * 1024 * 1024
     kv_bytes_per_token: int | None = None
+<<<<<<< HEAD
+=======
+    runtime_libraries: tuple[tuple[str, str], ...] = ()
+    kv_cache_location: str = "backend"
+    kv_cache_type_k: str | None = None
+    kv_cache_type_v: str | None = None
+>>>>>>> origin/main
 
     @classmethod
     def load(
@@ -175,6 +186,10 @@ class LocalModelDeployment:
             "executable_sha256",
             "model_path",
             "model_sha256",
+<<<<<<< HEAD
+=======
+            "runtime_libraries",
+>>>>>>> origin/main
             "config",
         }
         unknown_top_level = set(payload) - allowed_top_level
@@ -201,6 +216,13 @@ class LocalModelDeployment:
                 raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
         executable_digest = _digest_field(payload.get("executable_sha256"), "executable_sha256")
         model_digest = _digest_field(payload.get("model_sha256"), "model_sha256")
+<<<<<<< HEAD
+=======
+        library_map = payload.get("runtime_libraries")
+        if "runtime_libraries" in payload and (not isinstance(library_map, dict) or not library_map):
+            raise LocalModelDeploymentError("runtime_libraries must be a non-empty name-to-SHA256 object")
+        library_pins = () if library_map is None else tuple(library_map.items())
+>>>>>>> origin/main
         config = payload.get("config", {})
         if not isinstance(config, dict):
             raise LocalModelDeploymentError("config must be an object")
@@ -212,6 +234,12 @@ class LocalModelDeployment:
             "threads",
             "batch_size",
             "gpu_layers",
+<<<<<<< HEAD
+=======
+            "kv_cache_location",
+            "kv_cache_type_k",
+            "kv_cache_type_v",
+>>>>>>> origin/main
             "temperature",
             "extra_args",
             "output_framing",
@@ -238,6 +266,12 @@ class LocalModelDeployment:
                 threads=config.get("threads"),
                 batch_size=config.get("batch_size"),
                 gpu_layers=config.get("gpu_layers"),
+<<<<<<< HEAD
+=======
+                kv_cache_location=config.get("kv_cache_location", "backend"),
+                kv_cache_type_k=config.get("kv_cache_type_k"),
+                kv_cache_type_v=config.get("kv_cache_type_v"),
+>>>>>>> origin/main
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
@@ -245,9 +279,20 @@ class LocalModelDeployment:
                 kv_bytes_per_token=config.get("kv_bytes_per_token"),
                 reject_model_symlink=True,
                 rehash_artifacts_each_run=False,
+<<<<<<< HEAD
             )
         except (TypeError, ValueError, OSError) as exc:
             raise LocalModelDeploymentError(f"invalid llama.cpp deployment config: {exc}") from exc
+=======
+                runtime_libraries=library_pins,
+            )
+        except (TypeError, ValueError, OSError) as exc:
+            raise LocalModelDeploymentError(f"invalid llama.cpp deployment config: {exc}") from exc
+        if validated.runtime_libraries:
+            library_paths = {executable.parent / name for name, _ in validated.runtime_libraries}
+            if library_paths.intersection({executable, model, resolved_manifest}):
+                raise LocalModelDeploymentError("runtime libraries cannot overlap deployment artifacts")
+>>>>>>> origin/main
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
@@ -274,14 +319,35 @@ class LocalModelDeployment:
             threads=validated.threads,
             batch_size=validated.batch_size,
             gpu_layers=validated.gpu_layers,
+<<<<<<< HEAD
+=======
+            kv_cache_location=validated.kv_cache_location,
+            kv_cache_type_k=validated.kv_cache_type_k,
+            kv_cache_type_v=validated.kv_cache_type_v,
+>>>>>>> origin/main
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
             runtime_scratch_bytes=validated.runtime_scratch_bytes,
             kv_bytes_per_token=validated.kv_bytes_per_token,
+<<<<<<< HEAD
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
+=======
+            runtime_libraries=validated.runtime_libraries,
+            manifest_digest=_stable_digest(payload),
+        )
+        deployment.verify_artifacts()
+        if max_artifact_bytes is not None and validated.runtime_libraries:
+            try:
+                libraries = _runtime_library_identities(executable.parent, validated.runtime_libraries)
+                referenced.update({Path(item.path): item.size_bytes for item in libraries})
+                if sum(referenced.values()) > max_artifact_bytes:
+                    raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
+            except LlamaCppRuntimeError as exc:
+                raise LocalModelDeploymentError("runtime library inventory is invalid") from exc
+>>>>>>> origin/main
         if expected_sha256 is not None:
             try:
                 with resolved_manifest.open("rb") as stream:
@@ -297,6 +363,14 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(self.model_path) != self.model_sha256:
             raise LocalModelDeploymentError("model artifact digest mismatch")
+<<<<<<< HEAD
+=======
+        if self.runtime_libraries:
+            try:
+                _runtime_library_identities(self.executable_path.parent, self.runtime_libraries)
+            except LlamaCppRuntimeError as exc:
+                raise LocalModelDeploymentError("runtime library inventory is invalid") from exc
+>>>>>>> origin/main
 
     def llama_cpp_config(
         self,
@@ -315,6 +389,12 @@ class LocalModelDeployment:
             threads=self.threads,
             batch_size=self.batch_size,
             gpu_layers=self.gpu_layers,
+<<<<<<< HEAD
+=======
+            kv_cache_location=self.kv_cache_location,
+            kv_cache_type_k=self.kv_cache_type_k,
+            kv_cache_type_v=self.kv_cache_type_v,
+>>>>>>> origin/main
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
@@ -322,6 +402,10 @@ class LocalModelDeployment:
             kv_bytes_per_token=self.kv_bytes_per_token,
             reject_model_symlink=True,
             rehash_artifacts_each_run=rehash_artifacts_each_run,
+<<<<<<< HEAD
+=======
+            runtime_libraries=self.runtime_libraries,
+>>>>>>> origin/main
         )
 
     def adapter(
@@ -382,6 +466,12 @@ def create_local_model_deployment(
     context_size: int = 4096,
     threads: int | None = None,
     gpu_layers: int = 0,
+<<<<<<< HEAD
+=======
+    kv_cache_location: str = "backend",
+    kv_cache_type_k: str | None = None,
+    kv_cache_type_v: str | None = None,
+>>>>>>> origin/main
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
@@ -428,6 +518,12 @@ def create_local_model_deployment(
         context_size=context_size,
         threads=threads,
         gpu_layers=gpu_layers,
+<<<<<<< HEAD
+=======
+        kv_cache_location=kv_cache_location,
+        kv_cache_type_k=kv_cache_type_k,
+        kv_cache_type_v=kv_cache_type_v,
+>>>>>>> origin/main
         timeout_seconds=timeout_seconds,
         output_framing=output_framing,
         reject_model_symlink=True,
@@ -456,6 +552,16 @@ def create_local_model_deployment(
             "kv_bytes_per_token": validated.kv_bytes_per_token,
         },
     }
+<<<<<<< HEAD
+=======
+    if validated.kv_cache_location != "backend":
+        # Preserve exact manifests for previously installed default profiles.
+        payload["config"]["kv_cache_location"] = validated.kv_cache_location
+    for key in ("kv_cache_type_k", "kv_cache_type_v"):
+        value = getattr(validated, key)
+        if value is not None:
+            payload["config"][key] = value
+>>>>>>> origin/main
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None

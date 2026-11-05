@@ -23,15 +23,25 @@
     "test:known-advisories": "node --test ./scripts/test-known-yarn-advisories.cjs",
     "test:deepmerge-security": "node --test ./scripts/test-deepmerge-prototype-patch.cjs",
     "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs scripts/test-operation-stream-session.mjs",
+<<<<<<< HEAD
     "test:conversation": "node --test scripts/test-conversation-projection.mjs scripts/test-chat-error-boundary.mjs scripts/test-ai-runtime-recovery.cjs scripts/test-auth-transport.cjs",
     "test:auth-transport": "node --test scripts/test-auth-transport.cjs scripts/test-legacy-transport-session.cjs",
     "test:playable-preview": "node --test scripts/test-playable-preview.cjs scripts/test-playable-preview-browser.cjs",
+=======
+    "test:conversation": "node --test scripts/test-conversation-projection.mjs scripts/test-chat-error-boundary.mjs scripts/test-ai-runtime-recovery.cjs scripts/test-chat-multidraft.cjs scripts/test-auth-transport.cjs",
+    "test:auth-transport": "node --test scripts/test-auth-transport.cjs scripts/test-legacy-transport-session.cjs",
+    "test:playable-preview": "node --test scripts/test-playable-preview.cjs scripts/test-playable-preview-browser.cjs scripts/test-successor-preview-isolation.cjs",
+>>>>>>> origin/main
     "test:private-media": "node --test scripts/test-private-image.cjs scripts/test-private-image-browser.cjs scripts/test-private-atlas-export.cjs",
     "test:creator-identity": "node --test scripts/test-creator-account-identity.cjs scripts/test-creator-dashboard-identity.cjs",
     "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
+<<<<<<< HEAD
     "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs",
+=======
+    "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs",
+>>>>>>> origin/main
     "test:app-foundation:render": "node --test scripts/app-foundation/render/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",

@@ -26,7 +26,11 @@ def test_schema_registry_covers_runtime_catalog_exactly() -> None:
     records = runtime["records"]
     schemas = registry["schemas"]
 
+<<<<<<< HEAD
     assert len(records) == len(schemas) == 40
+=======
+    assert len(records) == len(schemas)  # Registry must track the entire evolving runtime catalog.
+>>>>>>> origin/main
     assert [row["record_name"] for row in schemas] == list(records)
     assert len({row["schema_id"] for row in schemas}) == len(schemas)
     assert all(row["schema_id"] == f"SCHEMA-{row['record_name']}" for row in schemas)

@@ -6,6 +6,14 @@ and persist STABLE only after every source write is durably acknowledged.
 There is deliberately no automatic lease takeover: crash leaves the actor
 unavailable until an operator performs separately audited reconciliation.
 
+<<<<<<< HEAD
+=======
+Readers use a primary-bound linearizable read, not a majority snapshot: a
+majority-committed snapshot may lag a writer that has already entered WRITING.
+Linearizable reads require a MongoDB replica-set primary. A standalone server
+cannot qualify this fence and must not silently fall back to weaker reads.
+
+>>>>>>> origin/main
 It is NOT a two-phase commit, distributed transaction or proof that
 unregistered external writers cannot modify Mongo. Production activation
 must ensure all mutations are routed through the participating owners.
@@ -21,6 +29,12 @@ from hashlib import sha256
 from uuid import uuid4
 from typing import Any
 
+<<<<<<< HEAD
+=======
+_EPOCH_READ_MAX_TIME_MS = 2000
+_EPOCH_READ_DEADLINE_SECONDS = 3.0
+
+>>>>>>> origin/main
 class MongoSourceEpochError(RuntimeError):
     """Canonical source epoch is unavailable or violates write fencing."""
 
@@ -44,26 +58,55 @@ class MongoCanonicalSourceEpoch:
             raise MongoSourceEpochError("canonical Mongo database required")
         try:
             from pymongo.read_concern import ReadConcern
+<<<<<<< HEAD
+=======
+            from pymongo.read_preferences import ReadPreference
+>>>>>>> origin/main
             from pymongo.write_concern import WriteConcern
             collection = database.get_collection(
                 "canonical_source_epochs",
                 read_concern=ReadConcern("majority"),
                 write_concern=WriteConcern(w="majority", wtimeout=10000),
+<<<<<<< HEAD
+=======
+                read_preference=ReadPreference.PRIMARY,
+            )
+            reader = database.get_collection(
+                "canonical_source_epochs",
+                read_concern=ReadConcern("linearizable"),
+                read_preference=ReadPreference.PRIMARY,
+>>>>>>> origin/main
             )
         except Exception as exc:
             raise MongoSourceEpochError("majority-durable source epoch unavailable") from exc
         for method in ("find_one", "find_one_and_update", "insert_one"):
             if not callable(getattr(collection, method, None)):
                 raise MongoSourceEpochError("durable source epoch collection unavailable")
+<<<<<<< HEAD
         self._collection = collection
+=======
+        if not callable(getattr(reader, "find_one", None)):
+            raise MongoSourceEpochError("linearizable source epoch reader unavailable")
+        self._collection = collection
+        self._reader = reader
+>>>>>>> origin/main
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
             "skeleton.canonical_source_writer", default=None,
         )
 
     @staticmethod
     def _key(tenant_id: str, actor_id: str) -> str:
+<<<<<<< HEAD
         if any(not isinstance(v, str) or not v or v != v.strip()
                or len(v.encode("utf-8", "strict")) > 512 for v in (tenant_id, actor_id)):
+=======
+        try:
+            invalid = any(not isinstance(v, str) or not v or v != v.strip() or "\0" in v
+                          or len(v.encode("utf-8", "strict")) > 512 for v in (tenant_id, actor_id))
+        except UnicodeError as exc:
+            raise MongoSourceEpochError("canonical source writer identity invalid") from exc
+        if invalid:
+>>>>>>> origin/main
             raise MongoSourceEpochError("canonical source writer identity invalid")
         return sha256(
             ("skeleton.canonical-source-epoch.v1\0" + tenant_id + "\0" + actor_id)
@@ -74,10 +117,25 @@ class MongoCanonicalSourceEpoch:
         # Scope includes context for callers, but the epoch deliberately fences
         # ALL contexts for one actor: memory mutations affect every conversation.
         self._key(tenant_id, context_id)
+<<<<<<< HEAD
         doc = await self._collection.find_one({
             "_id": self._key(tenant_id, actor_id),
             "tenant_id": tenant_id, "actor_id": actor_id,
         })
+=======
+        try:
+            # Keep cancellation/task identity intact and bound both Mongo's
+            # server-side operation and the caller's overall read window.
+            async with asyncio.timeout(_EPOCH_READ_DEADLINE_SECONDS):
+                doc = await self._reader.find_one({
+                    "_id": self._key(tenant_id, actor_id),
+                    "tenant_id": tenant_id, "actor_id": actor_id,
+                }, max_time_ms=_EPOCH_READ_MAX_TIME_MS)
+        except MongoSourceEpochError:
+            raise
+        except Exception as exc:
+            raise MongoSourceEpochError("linearizable source epoch read unavailable") from exc
+>>>>>>> origin/main
         if (not isinstance(doc, dict) or doc.get("phase") != "stable"
                 or doc.get("writer_token") is not None
                 or type(doc.get("epoch")) is not int or doc["epoch"] < 2

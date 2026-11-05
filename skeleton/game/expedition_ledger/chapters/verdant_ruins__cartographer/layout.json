@@ -1,0 +1,36 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "verdant_ruins__cartographer",
+  "chapter": 43,
+  "region": "Verdant Ruins",
+  "visual_motif": "jade and ancient stone",
+  "rows": [
+    "#############",
+    "#S.K.H.O.R.E#",
+    "#...C...?...#",
+    "#......#....#",
+    "#...X....M..#",
+    "#.....#.....#",
+    "#..F...L....#",
+    "#....#......#",
+    "#############"
+  ],
+  "entry_rule": "S",
+  "unlock_rule": "K>O>E",
+  "symbols": {
+    "#": "impassable",
+    ".": "floor",
+    "S": "start",
+    "K": "source key",
+    "H": "hazard",
+    "O": "objective",
+    "R": "recharge",
+    "E": "exit",
+    "C": "cache",
+    "?": "choice",
+    "X": "guardian",
+    "M": "medicine",
+    "F": "faction",
+    "L": "lore"
+  }
+}

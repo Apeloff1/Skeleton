@@ -103,7 +103,11 @@ class SQLiteInboxLedger:
         if type(require_causal_receipts) is not bool:
             raise ValueError("require_causal_receipts must be boolean")
         self.require_causal_receipts = require_causal_receipts
+<<<<<<< HEAD
         if type(path) not in (str, Path):
+=======
+        if not isinstance(path, (str, Path)):
+>>>>>>> origin/main
             raise ValueError("SQLite inbox path must be a string or Path")
         if str(path) != ":memory:":
             target = Path(path)

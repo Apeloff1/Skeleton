@@ -105,6 +105,7 @@ def parse_genesis_tree() -> ast.AST | None:
 
 
 def genesis_boot_phase_order(tree: ast.AST | None = None) -> list[str]:
+<<<<<<< HEAD
     parsed = tree if tree is not None else parse_genesis_tree()
     if parsed is None:
         return []
@@ -123,6 +124,78 @@ def genesis_boot_phase_order(tree: ast.AST | None = None) -> list[str]:
                 if attr.startswith("_phase_") and len(attr) > 7:
                     phases.append(attr[7:])
             return phases
+=======
+    """Read direct calls or the statically proven BOOT_PHASES dispatch loop.
+
+    The current Genesis boot uses a bounded named phase catalogue rather than
+    direct calls. Do not treat an unrelated constant as executed boot evidence:
+    require the loop, the dynamic phase binding and all method owners.
+    """
+    parsed = tree if tree is not None else parse_genesis_tree()
+    if not isinstance(parsed, ast.Module):
+        return []
+    for node in parsed.body:
+        if not isinstance(node, ast.ClassDef) or node.name != "Genesis":
+            continue
+        methods = {
+            item.name: item for item in node.body
+            if isinstance(item, ast.FunctionDef)
+        }
+        boot = methods.get("boot")
+        if boot is None:
+            return []
+        direct: list[str] = []
+        for stmt in boot.body:
+            call = stmt.value if isinstance(stmt, ast.Expr) else None
+            if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
+                continue
+            attr = call.func.attr
+            if attr.startswith("_phase_") and len(attr) > 7:
+                direct.append(attr[7:])
+        if direct:
+            return direct
+        steps = methods.get("_boot_steps")
+        catalog = assigned_str_tuple(parsed, "BOOT_PHASES")
+        if steps is None or not catalog or len(set(catalog)) != len(catalog):
+            return []
+        if any(f"_phase_{phase}" not in methods for phase in catalog):
+            return []
+        dispatch = [
+            stmt for stmt in boot.body
+            if isinstance(stmt, ast.For)
+            and isinstance(stmt.iter, ast.Call)
+            and isinstance(stmt.iter.func, ast.Attribute)
+            and isinstance(stmt.iter.func.value, ast.Name)
+            and stmt.iter.func.value.id == "self"
+            and stmt.iter.func.attr == "_boot_steps"
+        ]
+        if len(dispatch) != 1 or not any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "step"
+            for child in ast.walk(dispatch[0])
+        ):
+            return []
+        binds_phases = any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "getattr"
+            and len(child.args) >= 2
+            and isinstance(child.args[1], ast.JoinedStr)
+            and any(
+                isinstance(part, ast.Constant) and part.value == "_phase_"
+                for part in child.args[1].values
+            )
+            for child in ast.walk(steps)
+        )
+        iterates_catalog = any(
+            isinstance(child, ast.comprehension)
+            and isinstance(child.iter, ast.Name)
+            and child.iter.id == "BOOT_PHASES"
+            for child in ast.walk(steps)
+        )
+        return catalog if binds_phases and iterates_catalog else []
+>>>>>>> origin/main
     return []
 
 
@@ -1432,6 +1505,60 @@ def _idempotency_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool
     return replay, remember
 
 
+<<<<<<< HEAD
+=======
+def _idempotency_wrapper_verified(tree: ast.Module) -> bool:
+    """Recognize the shared guard only when both replay and completion exist."""
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name != "_forge_idempotent":
+            continue
+        calls = {
+            child.func.attr
+            for child in ast.walk(node)
+            if isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and isinstance(child.func.value, ast.Name)
+            and child.func.value.id == "_idempotency"
+        }
+        return {"operation", "complete"}.issubset(calls)
+    return False
+
+
+def _queued_build_idempotency_verified(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Recognize the durable build queue only with its scoped replay key and digest."""
+    extracts_key = any(
+        isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Attribute)
+        and isinstance(child.func.value, ast.Name)
+        and child.func.value.id == "_idempotency"
+        and child.func.attr == "_extract_key"
+        for child in ast.walk(fn)
+    )
+    enqueue_calls = (
+        child for child in ast.walk(fn)
+        if isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+        and child.func.id == "enqueue_game_build"
+    )
+    return extracts_key and any(
+        any(
+            keyword.arg == "idempotency_key"
+            and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "header_key"
+            for keyword in call.keywords
+        )
+        and any(
+            keyword.arg == "request_digest"
+            and isinstance(keyword.value, ast.Call)
+            and isinstance(keyword.value.func, ast.Name)
+            and keyword.value.func.id == "request_hash"
+            for keyword in call.keywords
+        )
+        for call in enqueue_calls
+    )
+
+
+>>>>>>> origin/main
 def idempotency_handler_rows() -> list[dict[str, object]]:
     modules = (
         ("skeleton.api.routes", "/api/v1"),
@@ -1442,10 +1569,24 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
         tree = parse_module_tree(module)
         if tree is None or not isinstance(tree, ast.Module):
             continue
+<<<<<<< HEAD
+=======
+        guarded_wrapper = _idempotency_wrapper_verified(tree)
+>>>>>>> origin/main
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             replay, remember = _idempotency_attrs(node)
+<<<<<<< HEAD
+=======
+            if module == "skeleton.api.routes" and node.name == "game_build" and _queued_build_idempotency_verified(node):
+                replay, remember = True, True
+            if guarded_wrapper and any(
+                isinstance(decorator, ast.Name) and decorator.id == "_forge_idempotent"
+                for decorator in node.decorator_list
+            ):
+                replay, remember = True, True
+>>>>>>> origin/main
             if not replay and not remember:
                 continue
             for decorator in node.decorator_list:

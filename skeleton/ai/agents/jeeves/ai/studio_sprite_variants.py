@@ -72,11 +72,21 @@ def derive_original_sprite_variants(
         if (not isinstance(frame, dict) or set(frame) != {
                 "frame_id", "duration_ms", "pixels",
             } or type(frame["frame_id"]) is not str
+<<<<<<< HEAD
                 or frame["frame_id"] in sources or type(frame["pixels"]) is not list
                 or len(frame["pixels"]) != width * height
                 or any(type(index) is not int or not 0 <= index < len(colors)
                        for index in frame["pixels"])):
             raise SpriteVariantError("directional variants require reviewed full source pixels")
+=======
+                or type(frame["pixels"]) is not list
+                or len(frame["pixels"]) != width * height
+                or any(type(index) is not int or not 0 <= index < len(colors)
+                       for index in frame["pixels"])):
+            raise SpriteVariantError("directional variants require reviewed full source pixel data")
+        if frame["frame_id"] in sources:
+            raise SpriteVariantError("sprite frame identity repeated")
+>>>>>>> origin/main
         sources[frame["frame_id"]] = frame
     if len(sources) != len(originals):
         raise SpriteVariantError("duplicate original frame identities")

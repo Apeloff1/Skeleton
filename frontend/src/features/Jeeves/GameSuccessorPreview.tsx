@@ -1,12 +1,17 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Platform, Text, TouchableOpacity, View } from 'react-native';
 import { type LearningFile } from '../../product/gameLearningClient';
+<<<<<<< HEAD
+=======
+import { successorPreviewDocument } from './successorPreviewDocument';
+>>>>>>> origin/main
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 
 /** Derived, opaque-origin preview of the exact emitted local game files. */
 export default function GameSuccessorPreview({ files, title }: { files: LearningFile[]; title: string }) {
   const [open, setOpen] = useState(false); const [revision, setRevision] = useState(0);
   const iframe = useRef<HTMLIFrameElement | null>(null); const [displayError, setDisplayError] = useState<string | null>(null);
+<<<<<<< HEAD
   const html = useMemo(() => {
     const map = new Map(files.map(file => [file.path, file.content]));
     const entry = map.get('game/successor/index.html'); if (!entry || entry.length > 2 * 1024 * 1024) return null;
@@ -21,6 +26,9 @@ export default function GameSuccessorPreview({ files, title }: { files: Learning
     else result = policy + result;
     return result.length <= 4 * 1024 * 1024 ? result : null;
   }, [files]);
+=======
+  const html = useMemo(() => successorPreviewDocument(files), [files]);
+>>>>>>> origin/main
   if (Platform.OS !== 'web' || !html) return <Text style={s.muted}>Adopt the saved game and use Play & observe for this device’s actual game preview.</Text>;
   return <View style={{ gap: 12 }}><View style={s.chips}><TouchableOpacity accessibilityRole="button" onPress={() => setOpen(value => !value)} style={s.button}><Text style={s.buttonText}>{open ? 'Close browser preview' : 'Play browser build preview'}</Text></TouchableOpacity>{open && <><TouchableOpacity accessibilityRole="button" onPress={() => setRevision(value => value + 1)} style={s.button}><Text style={s.buttonText}>Restart preview</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => { if (!iframe.current?.requestFullscreen) { setDisplayError('Full-screen display is unavailable in this browser.'); return; } void iframe.current.requestFullscreen().catch(() => setDisplayError('The browser did not allow full-screen display.')); }} style={s.button}><Text style={s.buttonText}>Play full screen</Text></TouchableOpacity></>}</View>
     {!!displayError && <Text style={s.unavailable}>{displayError}</Text>}

@@ -3445,6 +3445,18 @@ async def health():
 import logging as _probe_logging
 _probe_log = _probe_logging.getLogger("probes")
 
+<<<<<<< HEAD
+=======
+from skeleton.app.assembly import load_manifest as _load_health_manifest
+_health_manifest = _load_health_manifest()
+_BACKEND_HEALTH_IDENTITY = {
+    "name": _health_manifest.name,
+    "version": _health_manifest.version,
+    "component": "backend",
+    "ingress_prefix": _health_manifest.service("backend").ingress_prefix,
+}
+
+>>>>>>> origin/main
 
 def _probe_event(probe: str, outcome: str, **fields):
     """Emit a structured probe log line."""
@@ -3452,6 +3464,76 @@ def _probe_event(probe: str, outcome: str, **fields):
     _probe_log.info(f"probe={probe} outcome={outcome} {extra}")
 
 
+<<<<<<< HEAD
+=======
+def _probe_vault_io(directory):
+    """Check a vault without overwriting files or racing other probes."""
+    # A fixed filename can clobber user data and concurrent health requests can
+    # remove each other's files. NamedTemporaryFile uses exclusive creation and
+    # cleans up even if the write or read fails.
+    with tempfile.NamedTemporaryFile(
+        mode="w+", encoding="utf-8", prefix=".health-probe-", dir=directory
+    ) as probe:
+        probe.write("rw_test")
+        probe.flush()
+        probe.seek(0)
+        if probe.read() != "rw_test":
+            raise OSError("vault probe readback failed")
+
+
+def _collect_vault_readiness():
+    """Perform blocking filesystem work outside the event-loop thread."""
+    checks = {}
+    try:
+        from routes.galaxy_studio import VAULT_DIR as vault_dir
+        _probe_vault_io(vault_dir)
+        checks["vault_galaxy"] = {"ok": True, "path": str(vault_dir)}
+    except Exception as exc:
+        logger.warning("health probe failed (vault_galaxy): %s", type(exc).__name__)
+        checks["vault_galaxy"] = {"ok": False, "error": "probe_failed"}
+    try:
+        from core import build_vault
+        if build_vault.BUILDS_VAULT_FALLBACK:
+            raise OSError("persistent build vault unavailable")
+        _probe_vault_io(str(build_vault.BUILDS_ROOT))
+        checks["vault_builds"] = {"ok": True, "path": str(build_vault.BUILDS_ROOT)}
+    except Exception as exc:
+        logger.warning("health probe failed (vault_builds): %s", type(exc).__name__)
+        checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
+    return checks
+
+
+async def _bounded_vault_observation(slot, worker):
+    """Share one worker per probe kind; timeouts never enqueue more work."""
+    attribute = f"_vault_observation_{slot}"
+    task = getattr(app.state, attribute, None)
+    if task is None or task.done():
+        task = asyncio.create_task(asyncio.to_thread(worker))
+        setattr(app.state, attribute, task)
+
+        def consume_result(done):
+            if not done.cancelled():
+                done.exception()
+
+        task.add_done_callback(consume_result)
+    try:
+        return await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
+    except Exception:
+        return None
+
+
+async def _probe_mongo_readiness():
+    try:
+        from services.database import db
+        await asyncio.wait_for(db.command("ping"), timeout=2.0)
+        return {"ok": True, "latency_ms_lt": 2000}
+    except Exception as exc:
+        logger.warning("health probe failed (mongo): %s", type(exc).__name__)
+        return {"ok": False, "error": "probe_failed",
+                "note": "Required database is warming up or unreachable"}
+
+
+>>>>>>> origin/main
 @api_router.get("/health/live")
 async def health_live():
     """Liveness probe — minimum signal that the event loop is alive.
@@ -3471,13 +3553,20 @@ async def health_live():
 async def health_ready():
     """Readiness probe — can we serve real requests right now?
 
+<<<<<<< HEAD
     Checks: Mongo ping (5s timeout), AI key presence, and that the
     persistent vault dirs are writable. Returns 503 if anything fails so
     K8s can stop sending traffic until we recover.
+=======
+    Checks the required Mongo dependency, vault access and critical routes.
+    AI availability is reported separately because it is optional for some
+    product operations. Required failures return 503 until they recover.
+>>>>>>> origin/main
     """
     checks: dict = {}
     overall_ok = True
 
+<<<<<<< HEAD
     # 1) Mongo ping — SOFT check. On a cold/slow managed Mongo (e.g. Atlas) the
     #    first connection can exceed the probe budget; we must NOT fail readiness
     #    on a transient downstream DB, otherwise K8s never marks the pod Ready and
@@ -3494,6 +3583,17 @@ async def health_ready():
         checks["mongo"] = {"ok": False, "soft": True, "warming": True,
                            "error": "probe_failed",
                            "note": "DB warming/unreachable — readiness not failed (soft check)"}
+=======
+    # Probe independent dependencies concurrently so their individual 2s and
+    # 1s budgets fit within the product's 2.5s aggregate deadline.
+    mongo_check, vault_checks = await asyncio.gather(
+        _probe_mongo_readiness(),
+        _bounded_vault_observation("ready", _collect_vault_readiness),
+    )
+    checks["mongo"] = mongo_check
+    if not mongo_check["ok"]:
+        overall_ok = False
+>>>>>>> origin/main
 
     # 2) Canonical AI provider + architecture receipt
     try:
@@ -3509,6 +3609,7 @@ async def health_ready():
         logger.warning("health probe failed (ai_provider): %s", type(e).__name__)
         checks["ai_provider"] = {"ok": False, "error": "probe_failed"}
 
+<<<<<<< HEAD
     # 3) Vault writable (galaxy-studio)
     try:
         from routes.galaxy_studio import VAULT_DIR as _vault_dir
@@ -3533,6 +3634,17 @@ async def health_ready():
     except Exception as e:
         logger.warning("health probe failed (vault_builds): %s", type(e).__name__)
         checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
+=======
+    # One retained worker prevents repeated health requests from queuing
+    # unbounded blocked filesystem calls while a mount is stalled.
+    if vault_checks is None:
+        vault_checks = {
+            "vault_galaxy": {"ok": False, "error": "probe_timeout_or_unavailable"},
+            "vault_builds": {"ok": False, "error": "probe_timeout_or_unavailable"},
+        }
+    checks.update(vault_checks)
+    if not all(item.get("ok") for item in vault_checks.values()):
+>>>>>>> origin/main
         overall_ok = False
 
     # A running process is not ready to serve the product if mandatory
@@ -3552,13 +3664,29 @@ async def health_ready():
     _probe_event("readiness", "ok" if overall_ok else "degraded",
                  failing=",".join(k for k, v in checks.items() if not v.get("ok")) or "none")
 
+<<<<<<< HEAD
     body = {"status": "ready" if overall_ok else "not_ready", "checks": checks}
+=======
+    body = {
+        "status": "ready" if overall_ok else "not_ready",
+        "checks": checks,
+        "canonical_application": dict(_BACKEND_HEALTH_IDENTITY),
+    }
+>>>>>>> origin/main
     if not overall_ok:
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=503, content=body)
     return body
 
 
+<<<<<<< HEAD
+=======
+# The aggregate application status uses the exact same backend readiness
+# decision; a responsive status route alone cannot attest durable storage.
+app.state.backend_readiness_probe = health_ready
+
+
+>>>>>>> origin/main
 @api_router.get("/health/startup")
 async def health_startup():
     """Startup probe — did first-boot succeed cleanly?
@@ -3592,8 +3720,12 @@ async def health_startup():
     return body
 
 
+<<<<<<< HEAD
 @api_router.get("/health/vault")
 async def health_vault():
+=======
+def _collect_vault_deep():
+>>>>>>> origin/main
     """Deep vault probe — write/read/delete round-trip on both vaults.
 
     Useful for ops: confirms that builds will actually persist to disk
@@ -3605,6 +3737,7 @@ async def health_vault():
     # Galaxy vault (ZIPs + APKs)
     try:
         from routes.galaxy_studio import VAULT_DIR as _gv
+<<<<<<< HEAD
         tp = os.path.join(_gv, ".probe_rw")
         with open(tp, "w") as f: f.write("rw_test")
         with open(tp) as f: assert f.read() == "rw_test"
@@ -3612,6 +3745,12 @@ async def health_vault():
         # also list a few entries to confirm dir is readable
         zip_count = len(os.listdir(os.path.join(_gv, "zips"))) if os.path.isdir(os.path.join(_gv, "zips")) else 0
         out["checks"]["galaxy_vault"] = {"ok": True, "path": _gv, "zips": zip_count}
+=======
+        _probe_vault_io(_gv)
+        # also list a few entries to confirm dir is readable
+        zip_count = len(os.listdir(os.path.join(_gv, "zips"))) if os.path.isdir(os.path.join(_gv, "zips")) else 0
+        out["checks"]["galaxy_vault"] = {"ok": True, "path": str(_gv), "zips": zip_count}
+>>>>>>> origin/main
     except Exception as e:
         logger.warning("health probe failed (galaxy_vault): %s", type(e).__name__)
         out["checks"]["galaxy_vault"] = {"ok": False, "error": "probe_failed"}
@@ -3620,11 +3759,18 @@ async def health_vault():
     # Build vault (shards)
     try:
         from core import build_vault as _bv
+<<<<<<< HEAD
         root = str(_bv.BUILDS_ROOT)
         tp = os.path.join(root, ".probe_rw")
         with open(tp, "w") as f: f.write("rw_test")
         with open(tp) as f: assert f.read() == "rw_test"
         os.remove(tp)
+=======
+        if _bv.BUILDS_VAULT_FALLBACK:
+            raise OSError("persistent build vault unavailable")
+        root = str(_bv.BUILDS_ROOT)
+        _probe_vault_io(root)
+>>>>>>> origin/main
         build_count = len([x for x in os.listdir(root) if os.path.isdir(os.path.join(root, x))])
         out["checks"]["build_vault"] = {"ok": True, "path": root, "builds": build_count}
     except Exception as e:
@@ -3635,7 +3781,12 @@ async def health_vault():
     # Disk free
     try:
         import shutil as _sh
+<<<<<<< HEAD
         total, used, free = _sh.disk_usage("/app/backend/data")
+=======
+        from core import build_vault as _disk_vault
+        total, used, free = _sh.disk_usage(str(_disk_vault.BUILDS_ROOT))
+>>>>>>> origin/main
         out["disk"] = {
             "total_gb": round(total / 1_073_741_824, 2),
             "used_gb": round(used / 1_073_741_824, 2),
@@ -3648,6 +3799,11 @@ async def health_vault():
     except Exception as e:
         logger.warning("health probe failed (disk): %s", type(e).__name__)
         out["disk"] = {"error": "probe_failed"}
+<<<<<<< HEAD
+=======
+        out["checks"]["disk_pressure"] = {"ok": False, "error": "probe_failed"}
+        overall = False
+>>>>>>> origin/main
 
     out["status"] = "ok" if overall else "degraded"
     _probe_event("vault", "ok" if overall else "degraded")
@@ -3657,6 +3813,19 @@ async def health_vault():
     return out
 
 
+<<<<<<< HEAD
+=======
+@api_router.get("/health/vault")
+async def health_vault():
+    result = await _bounded_vault_observation("deep", _collect_vault_deep)
+    if result is None:
+        return JSONResponse(status_code=503, content={
+            "status": "degraded", "checks": {"vault": {"ok": False, "error": "probe_timeout_or_unavailable"}}
+        })
+    return result
+
+
+>>>>>>> origin/main
 @api_router.get("/health/deep")
 async def health_deep():
     """Exhaustive deep health — all probes in one call.

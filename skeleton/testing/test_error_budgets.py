@@ -219,6 +219,10 @@ def test_budget_decision_cannot_claim_override_or_authority() -> None:
         blocking_reasons=(),
         safety_gate_passed=True,
         reliability_gate_passed=True,
+<<<<<<< HEAD
+=======
+        budget_exhausted=False,
+>>>>>>> origin/main
     )
 
     with pytest.raises(ErrorBudgetPolicyError, match="override safety"):

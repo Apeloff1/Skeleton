@@ -232,6 +232,16 @@ class NativeTokenizer:
             sha256(text.encode("utf-8")).hexdigest(),
         )
 
+<<<<<<< HEAD
+=======
+    def stage_text(self, text: str, spool: object) -> str:
+        """Persist source-bound native token IDs in an explicit offline spool."""
+        from .long_context_spool import LongContextSpool
+        if not isinstance(spool, LongContextSpool):
+            raise TokenizerContractError("LongContextSpool required")
+        return spool.stage(self.encode_sequence(text))
+
+>>>>>>> origin/main
     def token_text(self, token_id: int) -> str:
         if not _is_int(token_id) or not 0 <= token_id < self.vocab_size:
             raise TokenizerContractError("token id outside vocabulary")

@@ -15,6 +15,10 @@ from skeleton.intelligence.admission import (
     ResourceBudget,
     UsageEstimate,
 )
+<<<<<<< HEAD
+=======
+from skeleton.intelligence.admission_runtime import AdmissionRuntimeConflict
+>>>>>>> origin/main
 from skeleton.intelligence.quota import TenantQuota
 
 
@@ -128,6 +132,7 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         now_wall=10.5,
     )
 
+<<<<<<< HEAD
     # Crash injection: the spend ledger commits terminal accounting, but the
     # governor never reaches qualification/journal terminalization.
     completion = first.runtime.complete(
@@ -136,6 +141,29 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         now_wall=11.0,
     )
     assert completion.quota_completion is not None
+=======
+    # Inject the crash through the governor's real completion path, after
+    # durable completion intent and quota accounting but before qualification
+    # and terminal journal commit. Calling runtime.complete() directly skips
+    # the intent and must instead fail closed (tested separately below).
+    def crash_before_qualification(*_args, **_kwargs):
+        raise SystemExit("simulated process loss before qualification")
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            first, "_completed_decision", crash_before_qualification
+        )
+        with pytest.raises(
+            SystemExit, match="simulated process loss before qualification"
+        ):
+            first.complete(
+                operation,
+                actual,
+                evidence_refs=_refs("completion"),
+                now_wall=11.0,
+            )
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["completions"] == 1
+>>>>>>> origin/main
 
     restarted = _governor(path)
     recovered = restarted.recover_completed(
@@ -350,7 +378,13 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
     first._journal.mark_release_pending(operation, active.receipt)
 
     # Simulate an impossible-but-defensive race where accounting completes
+<<<<<<< HEAD
     # while the governor journal says release is pending.
+=======
+    # while the governor journal says release is pending. A direct runtime
+    # completion cannot create the governor's durable completion intent, so
+    # the completed accounting MUST be recovered fail-closed.
+>>>>>>> origin/main
     first.runtime.complete(operation, actual, now_wall=11.0)
 
     restarted = _governor(path)
@@ -365,10 +399,22 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         evidence_refs=_refs("completion-wins"),
     )
     assert completed.state == "completed"
+<<<<<<< HEAD
     assert completed.accepted is True
 
 
 def test_restart_journal_conflict_never_releases_preexisting_reservation(
+=======
+    assert completed.accepted is False
+    assert completed.reasons == ("operation-budget-recovery-intent-missing",)
+    assert completed.promotion_authority is False
+    assert restarted.recover_completed(
+        operation, evidence_refs=_refs("completion-wins"),
+    ) == completed
+
+
+def test_restart_reattach_conflict_never_releases_preexisting_reservation(
+>>>>>>> origin/main
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -381,6 +427,7 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     restarted = _governor(path)
     assert restarted._journal is not None
 
+<<<<<<< HEAD
     def reject_replay(**_kwargs):
         raise CostGovernorConflict("simulated journal replay conflict")
 
@@ -393,6 +440,19 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     with pytest.raises(
         CostGovernorConflict,
         match="simulated journal replay conflict",
+=======
+    # Active-journal replay reattaches the existing durable lease rather than
+    # rewriting the journal. Reject that real replay boundary to prove an
+    # unsuccessful reattach cannot release the preexisting reservation.
+    def reject_reattach(*_args, **_kwargs):
+        raise AdmissionRuntimeConflict("simulated lease reattach conflict")
+
+    monkeypatch.setattr(restarted.runtime, "reattach", reject_reattach)
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="simulated lease reattach conflict",
+>>>>>>> origin/main
     ):
         restarted.reserve(request, now_wall=20.0)
 
@@ -401,3 +461,38 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["reserved"]["cost_usd"] == pytest.approx(2.0)
+<<<<<<< HEAD
+=======
+
+
+def test_completed_recovery_without_durable_intent_fails_closed(tmp_path) -> None:
+    path = tmp_path / "quota.sqlite3"
+    operation = "op-no-completion-intent"
+    first = _governor(path)
+    first.reserve(_request(operation), now_wall=10.0)
+    actual = UsageEstimate(cost_usd=0.5)
+    first.charge(
+        operation,
+        "provider-1",
+        "provider",
+        actual,
+        now_wall=10.5,
+    )
+
+    # A runtime-only completion cannot prove the original operation budget.
+    # Recovery must not promote it, even if tenant-wide quotas are healthy.
+    first.runtime.complete(operation, actual, now_wall=11.0)
+    restarted = _governor(path)
+    denied = restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("no-intent"),
+    )
+    assert denied.state == "completed"
+    assert denied.accepted is False
+    assert denied.reasons == ("operation-budget-recovery-intent-missing",)
+    assert denied.promotion_authority is False
+    assert restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("no-intent"),
+    ) == denied
+>>>>>>> origin/main

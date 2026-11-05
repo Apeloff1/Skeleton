@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import json
+<<<<<<< HEAD
+=======
+import math
+>>>>>>> origin/main
 
 
 class InferencePhase(str, Enum):
@@ -21,8 +25,14 @@ class IterationWork:
     age: int = 0
 
     def __post_init__(self) -> None:
+<<<<<<< HEAD
         if not self.request_id:
             raise ValueError("request_id required")
+=======
+        if (type(self.request_id) is not str or not 1 <= len(self.request_id) <= 256
+                or any(ord(char) < 32 or ord(char) == 127 for char in self.request_id)):
+            raise ValueError("bounded request_id required")
+>>>>>>> origin/main
         if isinstance(self.remaining_tokens, bool) or not isinstance(self.remaining_tokens, int) or self.remaining_tokens <= 0:
             raise ValueError("positive remaining_tokens required")
         if isinstance(self.priority, bool) or not isinstance(self.priority, int):
@@ -46,6 +56,18 @@ class IterationPlan:
     digest: str
 
 
+<<<<<<< HEAD
+=======
+@dataclass(frozen=True, slots=True)
+class PressureIterationPlan:
+    plan: IterationPlan
+    effective_token_budget: int
+    measured_pressure_fraction: float
+    source: str
+    digest: str
+
+
+>>>>>>> origin/main
 class IterationScheduler:
     def __init__(
         self,
@@ -74,6 +96,13 @@ class IterationScheduler:
         return (-effective, -work.age, work.request_id)
 
     def plan(self, work: tuple[IterationWork, ...]) -> IterationPlan:
+<<<<<<< HEAD
+=======
+        if not isinstance(work, tuple) or len(work) > 65_536:
+            raise ValueError("iteration work must be a bounded tuple")
+        if any(not isinstance(item, IterationWork) for item in work):
+            raise ValueError("iteration work must contain validated requests")
+>>>>>>> origin/main
         ids = [item.request_id for item in work]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate iteration request identity")
@@ -105,5 +134,55 @@ class IterationScheduler:
         ).hexdigest()
         return IterationPlan(tuple(slices), self.token_budget - remaining_budget, tuple(deferred), digest)
 
+<<<<<<< HEAD
 
 __all__ = ["InferencePhase", "IterationPlan", "IterationScheduler", "IterationSlice", "IterationWork"]
+=======
+    def plan_pressure_aware(
+        self,
+        work: tuple[IterationWork, ...],
+        *,
+        measured_pressure_fraction: float,
+        source: str,
+        minimum_tokens: int = 1,
+    ) -> PressureIterationPlan:
+        """Tighten per-iteration tokens without mutating operator limits.
+
+        A source label is caller provenance, not hardware attestation. Missing
+        or nonfinite pressure is rejected rather than guessed as zero.
+        """
+        pressure = measured_pressure_fraction
+        if (isinstance(pressure, bool) or not isinstance(pressure, (int, float))
+                or not math.isfinite(pressure) or not 0 <= pressure <= 1):
+            raise ValueError("finite measured pressure fraction required")
+        if (type(source) is not str or not 1 <= len(source) <= 128
+                or any(ord(char) < 32 for char in source) or source == "unavailable"):
+            raise ValueError("measured pressure provenance required")
+        if type(minimum_tokens) is not int or not 1 <= minimum_tokens <= self.token_budget:
+            raise ValueError("invalid minimum iteration token budget")
+        effective = max(minimum_tokens, math.ceil(self.token_budget * (1.0 - pressure)))
+        tightened = IterationScheduler(
+            token_budget=effective,
+            prefill_quantum=self.prefill_quantum,
+            decode_priority_boost=self.decode_priority_boost,
+            max_age_boost=self.max_age_boost,
+        )
+        plan = tightened.plan(work)
+        body = {
+            "schema": "skeleton.ai.pressure-iteration-plan.v1",
+            "plan_digest": plan.digest,
+            "effective_token_budget": effective,
+            "measured_pressure_fraction": float(pressure),
+            "source": source,
+        }
+        digest = hashlib.sha256(
+            json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return PressureIterationPlan(plan, effective, float(pressure), source, digest)
+
+
+__all__ = [
+    "InferencePhase", "IterationPlan", "PressureIterationPlan",
+    "IterationScheduler", "IterationSlice", "IterationWork",
+]
+>>>>>>> origin/main

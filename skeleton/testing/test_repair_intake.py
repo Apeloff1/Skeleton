@@ -304,6 +304,7 @@ def test_classify_intake_preempts_duplicate_stale_recovered_and_family_work() ->
     )
 
 
+<<<<<<< HEAD
 def test_workflow_run_trigger_surface_is_bounded() -> None:
     workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
 
@@ -366,3 +367,26 @@ def test_issue_body_template_cannot_escape_yaml_shell_block() -> None:
     assert "\n${marker}\n" not in workflow
     assert "\n- Workflow: ${RUN_NAME}\n" not in workflow
     assert "\nCorrelate this observation against existing findings" not in workflow
+=======
+def test_retired_repair_intake_cannot_auto_admit_workflow_runs() -> None:
+    # The legacy workflow_run consumer was retired to preserve the bounded
+    # automatic workflow admission surface. Do not silently reactivate it.
+    assert not Path(".github/workflows/repair-intake.yml").exists()
+    traffic = Path(".github/workflows/automation-traffic-manager.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "workflow_run:" not in traffic
+    assert "repair-intake.yml" not in traffic
+    assert "permissions: {}" in traffic
+    assert "cancel-in-progress: false" in traffic
+
+
+def test_active_traffic_admission_stays_default_branch_and_policy_bound() -> None:
+    traffic = Path(".github/workflows/automation-traffic-manager.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'test "$TRAFFIC_EVENT_REF" = "$TRAFFIC_EXPECTED_REF"' in traffic
+    assert "if: ${{ needs.admission.outputs.admit == 'true' }}" in traffic
+    assert "Queue admitted repository supervisor" in traffic
+    assert "actions: write" in traffic
+>>>>>>> origin/main

@@ -53,7 +53,11 @@
         "mongo",
         "skeleton"
       ],
+<<<<<<< HEAD
       "expected_health_path": "/api/health",
+=======
+      "expected_health_path": "/api/health/ready",
+>>>>>>> origin/main
       "expected_entrypoint": "server:app",
       "lifecycle_bindings": [
         {
@@ -259,7 +263,11 @@
       "required_symbols": [
         "def _remaining_provider_timeout(",
         "asyncio.wait_for(",
+<<<<<<< HEAD
         "except asyncio.TimeoutError",
+=======
+        "except TimeoutError",
+>>>>>>> origin/main
         "ProviderInvocationError("
       ]
     },

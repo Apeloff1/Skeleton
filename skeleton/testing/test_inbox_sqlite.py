@@ -20,6 +20,14 @@ def msg(
     return InboundMessage.create(producer, epoch, seq, payload, causes)
 
 
+<<<<<<< HEAD
+=======
+def test_inbox_rejects_non_path_objects():
+    with pytest.raises(ValueError, match="string or Path"):
+        SQLiteInboxLedger(7)  # type: ignore[arg-type]
+
+
+>>>>>>> origin/main
 def test_canonical_inbox_receipt_identity_matches_reference(tmp_path: Path):
     state = tmp_path / "inbox.sqlite"
     first, second = msg(0), msg(1)
