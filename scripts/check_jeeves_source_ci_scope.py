@@ -37,7 +37,7 @@ def _safe_path(value: str) -> bool:
     return (
         type(value) is str
         and bool(_ALLOWED_PATTERN.fullmatch(value))
-        and value[0] not in "./"
+        and not value.startswith("/")
         and "//" not in value
         and all(part not in {"", ".", ".."} for part in value.split("/"))
     )

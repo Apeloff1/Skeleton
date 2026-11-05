@@ -122,6 +122,17 @@ class JeevesSourceScopeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_registry(root)
 
+    def test_dot_prefixed_github_workflow_path_is_admitted(self) -> None:
+        from scripts.check_jeeves_source_ci_scope import _safe_path
+
+        self.assertTrue(_safe_path(".github/workflows/sealed-context-guard.yml"))
+        self.assertFalse(_safe_path("../outside"))
+        selected = selected_gates(
+            [".github/workflows/jeeves-native-sqlite-source-qualification.yml"],
+            load_registry(),
+        )
+        self.assertTrue(selected["sqlite"])
+
     def test_unsafe_changed_path_refuses_positive_gate(self) -> None:
         with self.assertRaises(ValueError):
             selected_gates(["../unsafe"], load_registry())
