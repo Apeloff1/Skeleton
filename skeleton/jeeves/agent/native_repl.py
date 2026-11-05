@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import threading
 from typing import Any, BinaryIO, TextIO
 
 from .native_chat import NativeChatHold, NativeJeevesChat
@@ -128,6 +129,12 @@ class NativeJeevesRepl:
         self._terminated = False
         self._output_bytes = 0
         self._uncertain_output = False
+        # The entire interactive stdin stream has one process-local owner.
+        # A second serve() must fail before reading private input while the
+        # first caller blocks in readline or native inference.
+        self._state_lock = threading.RLock()
+        self._serving = False
+        self._serving_thread = None
 
     def _publish(self, target: TextIO, payload: dict[str, Any]) -> None:
         # A native model can disappear or lose its capacity fence during a
@@ -170,12 +177,24 @@ class NativeJeevesRepl:
         }
 
     def serve(self, source: BinaryIO, target: TextIO) -> int:
-        if self._terminated:
-            raise NativeReplHold("interactive loop already terminated")
-        if not callable(getattr(source, "readline", None)):
-            raise NativeReplHold("bounded binary input stream required")
-        if not callable(getattr(target, "write", None)):
-            raise NativeReplHold("JSON lines output stream required")
+        with self._state_lock:
+            if self._terminated or self._serving:
+                raise NativeReplHold("interactive loop already active or terminated")
+            if not callable(getattr(source, "readline", None)):
+                raise NativeReplHold("bounded binary input stream required")
+            if not callable(getattr(target, "write", None)):
+                raise NativeReplHold("JSON lines output stream required")
+            self._serving = True
+            self._serving_thread = threading.get_ident()
+        try:
+            return self._serve_exclusive_stream(source, target)
+        finally:
+            with self._state_lock:
+                self._serving = False
+                self._serving_thread = None
+                self._terminated = True
+
+    def _serve_exclusive_stream(self, source: BinaryIO, target: TextIO) -> int:
         # The first live-source check is an activation/authorization fence.
         # Preserve the existing public behavior: failures before the ready
         # frame propagate to the CLI; they are not converted into a healthy
