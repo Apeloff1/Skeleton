@@ -985,3 +985,15 @@ def test_mutable_asset_buffer_cannot_change_receipt_after_parse(monkeypatch):
     assert result.sha256 == sha256(expected).hexdigest()
     assert result.metadata == {"verified": True}
     assert bytes(caller_buffer) != expected
+
+
+@pytest.mark.parametrize("coordinate", ["NaN", "Infinity", "-Infinity", "1e309"])
+def test_obj_rejects_nonfinite_coordinates_before_manifest_publication(tmp_path, coordinate):
+    payload = (f"v {coordinate} 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n").encode()
+    with pytest.raises(AssetImportError, match="non-finite vertex"):
+        import_bytes("invalid.obj", payload)
+    (tmp_path / "invalid.obj").write_bytes(payload)
+    report = import_files(tmp_path, ["invalid.obj"])
+    assert not report.ok and not report.imported
+    assert not report.manifest.entries
+    assert any(issue.code == "broken" for issue in report.issues)
