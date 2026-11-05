@@ -19,7 +19,7 @@ class NativeChildEnvironmentHold(ValueError):
 # locale/timezone, native ABI and device selector discovery. Do not inherit
 # PYTHONPATH/PYTHONHOME, proxy variables, shell hooks or preloaded DLLs.
 _ALLOWED = frozenset({
-    "PATH", "SystemRoot", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT",
+    "PATH", "Path", "SystemRoot", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT",
     "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE", "HOMEDRIVE",
     "HOMEPATH", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "PUBLIC",
     "XDG_RUNTIME_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME",
