@@ -458,7 +458,9 @@ def runtime_manifest(
         # Validate packaged endpoints even without operator overrides. An
         # invalid default must never be returned as an apparently safe URL.
         if service.public_url:
-            if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+            # An absent override retains the validated packaged port. Only
+            # explicitly supplied overrides need their own port validation.
+            if raw and (not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535):
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
             # urlsplit strips ASCII controls; reject ambiguous URLs before parsing.
             if (service.public_url != service.public_url.strip()
