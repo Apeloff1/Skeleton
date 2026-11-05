@@ -92,6 +92,23 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(FakeEpoch.instances[0].calls, 2)
         self.assertEqual(self.db.calls, 6)
 
+    async def test_conflicting_primary_endpoints_denied_before_epoch(self):
+        self.db.hello.update({"me": "mongo-a:27017", "primary": "mongo-b:27017"})
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(FakeEpoch.instances, [])
+        self.assertEqual(self.db.calls, 1)
+
+    async def test_matching_primary_endpoints_are_observation_only(self):
+        self.db.hello.update({"me": "mongo-a:27017", "primary": "mongo-a:27017"})
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertTrue(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["canonical_cluster_identity_verified"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_primary_election_between_reads_denies_stable_epoch(self):
         class RotatingDB(FakeDB):
             async def command(self, name):
