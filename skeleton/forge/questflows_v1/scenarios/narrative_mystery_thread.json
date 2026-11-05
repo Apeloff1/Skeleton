@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "narrative_mystery_thread",
+  "domain": "narrative",
+  "stages": [
+    {
+      "key": "discover_mystery_thread",
+      "evidence": "narrative:mystery_thread:discover:proof",
+      "grants": "narrative:mystery_thread:stage:1",
+      "risk": 4,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_mystery_thread",
+      "evidence": "narrative:mystery_thread:prepare:proof",
+      "grants": "narrative:mystery_thread:stage:2",
+      "risk": 5,
+      "sequence": 1,
+      "requires_previous_grant": "narrative:mystery_thread:stage:1"
+    },
+    {
+      "key": "execute_mystery_thread",
+      "evidence": "narrative:mystery_thread:execute:proof",
+      "grants": "narrative:mystery_thread:stage:3",
+      "risk": 6,
+      "sequence": 2,
+      "requires_previous_grant": "narrative:mystery_thread:stage:2"
+    },
+    {
+      "key": "resolve_mystery_thread",
+      "evidence": "narrative:mystery_thread:resolve:proof",
+      "grants": "narrative:mystery_thread:stage:4",
+      "risk": 7,
+      "sequence": 3,
+      "requires_previous_grant": "narrative:mystery_thread:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "narrative_mystery_thread:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "narrative:mystery_thread:discover:proof"
+      ]
+    },
+    {
+      "id": "narrative_mystery_thread:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "narrative:mystery_thread:prepare:proof"
+      ]
+    },
+    {
+      "id": "narrative_mystery_thread:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "narrative:mystery_thread:execute:proof"
+      ]
+    },
+    {
+      "id": "narrative_mystery_thread:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "narrative:mystery_thread:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

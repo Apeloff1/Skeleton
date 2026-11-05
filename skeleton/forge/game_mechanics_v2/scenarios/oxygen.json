@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "oxygen",
+  "domain": "survival",
+  "initial": 58,
+  "capacity": 140,
+  "events": [
+    {
+      "id": "oxygen:gain:1",
+      "action": "gain",
+      "amount": 8,
+      "tick": 1
+    },
+    {
+      "id": "oxygen:spend:2",
+      "action": "spend",
+      "amount": 4,
+      "tick": 2
+    },
+    {
+      "id": "oxygen:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "oxygen:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "oxygen:decay:5",
+      "action": "decay",
+      "amount": 0,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      140
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for survival simulation with bounded condition units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}
