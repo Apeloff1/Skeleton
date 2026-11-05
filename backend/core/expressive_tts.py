@@ -9,6 +9,9 @@ from typing import Dict, List, Optional
 from core.engine_client import EngineClient, EngineClientError
 
 TTS_LIMIT = 4096
+MAX_NARRATION_TEXT_CHARS = 1_000_000
+MAX_NARRATION_CHUNKS = 4096
+MAX_ENGINE_AUDIO_BYTES = 48 * 1024 * 1024
 
 # ── TONE PRESETS ────────────────────────────────────────────────────────────
 # voice    : a valid tts-1-hd voice (alloy/ash/coral/echo/fable/nova/onyx/sage/shimmer)
@@ -57,12 +60,16 @@ _PAUSE_AFTER_INTRO = (
 
 
 def emotion_to_tone(emotional_state: Optional[str]) -> str:
-    if not emotional_state:
+    if emotional_state is None or emotional_state == "":
         return DEFAULT_TONE
+    if not isinstance(emotional_state, str):
+        raise ValueError("emotional state must be a string")
     return EMOTION_TONE.get(emotional_state.strip().lower(), DEFAULT_TONE)
 
 
 def resolve_tone(tone: Optional[str]) -> Dict:
+    if tone is not None and not isinstance(tone, str):
+        raise ValueError("TTS tone must be a string")
     t = (tone or DEFAULT_TONE).strip().lower()
     preset = TONE_PRESETS.get(t)
     if not preset:
@@ -73,6 +80,8 @@ def resolve_tone(tone: Optional[str]) -> Dict:
 
 def shape_cadence(text: str, tone: Optional[str] = None) -> str:
     """Rewrite a script with bounded, linear-time cadence shaping."""
+    if not isinstance(text, str):
+        raise ValueError("TTS text must be a string")
     preset = resolve_tone(tone)
     pauses = preset["pauses"]
     use_ellipses = preset["ellipses"]
@@ -176,7 +185,16 @@ async def generate_expressive_tts(
     """Generate immersive HD audio. Returns {audio_base64, voice, speed, tone,
     spoken_text}. Always uses tts-1-hd (top scale). Raises on failure so the
     caller can present a graceful fallback."""
+    if type(shape) is not bool:
+        raise ValueError("TTS shaping flag must be boolean")
+    if not isinstance(text, str):
+        raise ValueError("TTS text must be a string")
     preset = resolve_tone(tone)
+    if voice_override is not None and (
+        not isinstance(voice_override, str)
+        or re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", voice_override) is None
+    ):
+        raise ValueError("TTS voice must be a normalized identifier")
     voice = voice_override or preset["voice"]
     if isinstance(speed_override, bool):
         raise ValueError("TTS speed must be a finite numeric value")
@@ -207,9 +225,13 @@ async def generate_expressive_tts(
         response_format="mp3",
         trace_id="expressive-tts:" + operation_id,
     )
+    if not isinstance(response, dict):
+        raise EngineClientError("engine speech response is not an object")
     audio = response.get("audio")
     if not isinstance(audio, (bytes, bytearray)) or not audio:
         raise EngineClientError("engine speech response is missing audio")
+    if len(audio) > MAX_ENGINE_AUDIO_BYTES:
+        raise EngineClientError("engine speech response exceeds the media budget")
     audio_b64 = base64.b64encode(bytes(audio)).decode("ascii")
     return {
         "audio_base64": audio_b64,
@@ -234,6 +256,8 @@ def chunk_for_narration(text: str, max_chars: int = 700) -> List[str]:
         raise ValueError(f"max_chars must be an integer in [1, {TTS_LIMIT}]")
     if not isinstance(text, str):
         raise TypeError("narration text must be a string")
+    if len(text) > MAX_NARRATION_TEXT_CHARS:
+        raise ValueError("narration text exceeds the maximum text budget")
     if not text or not text.strip():
         return []
 
@@ -261,6 +285,8 @@ def chunk_for_narration(text: str, max_chars: int = 700) -> List[str]:
             if not piece:
                 continue
             if current and len(current) + len(piece) + 1 > max_chars:
+                if len(out) >= MAX_NARRATION_CHUNKS:
+                    raise ValueError("narration exceeds the maximum chunk count")
                 out.append(current)
                 current = ""
             current = f"{current} {piece}" if current else piece
@@ -271,6 +297,8 @@ def chunk_for_narration(text: str, max_chars: int = 700) -> List[str]:
         start = match.end()
     append_sentence(text[start:])
     if current:
+        if len(out) >= MAX_NARRATION_CHUNKS:
+            raise ValueError("narration exceeds the maximum chunk count")
         out.append(current)
     return out
 
