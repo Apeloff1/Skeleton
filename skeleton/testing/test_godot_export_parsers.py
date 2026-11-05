@@ -249,3 +249,124 @@ def test_pck_rejects_bad_input(tmp_path):
         pck.read(plain)
     assert pck.find_embedded(b"short") is None
     assert pck.find_embedded(b"\0" * 20 + struct.pack("<Q", 999) + pck.MAGIC) is None
+
+
+def test_godot_project_res_paths_reject_absolute_and_symlink_escapes(tmp_path):
+    from skeleton.godot_export.project import res_to_path
+
+    (tmp_path / "safe.gd").write_text("extends Node")
+    assert res_to_path(tmp_path, "res://safe.gd") == tmp_path / "safe.gd"
+    for bad in ("res:////etc/passwd", "res:///etc/passwd", "res://../escape.gd",
+                "res://a//b.gd", "res://a/./b.gd", "res://a\\\\b.gd", "res://"):
+        with pytest.raises(ValueError):
+            res_to_path(tmp_path, bad)
+    outside = tmp_path.parent / "outside_godot.gd"
+    outside.write_text("outside")
+    link = tmp_path / "shortcut.gd"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlink"):
+        res_to_path(tmp_path, "res://shortcut.gd")
+
+
+def test_godot_project_file_inventory_is_bounded(tmp_path, monkeypatch):
+    from skeleton.godot_export import project as project_mod
+
+    for i in range(4):
+        (tmp_path / f"script{i}.gd").write_text("extends Node")
+    project = project_mod.GodotProject(tmp_path, configfile.loads("[application]\n"))
+    monkeypatch.setattr(project_mod, "MAX_PROJECT_SCAN_ENTRIES", 2)
+    with pytest.raises(ValueError, match="entry bound"):
+        project.scripts()
+
+
+def test_godot_res_paths_reject_uri_ambiguity_and_invisible_controls(tmp_path):
+    from skeleton.godot_export.project import res_to_path
+
+    bad_names = ("folder/%2e%2e/escape.gd", "file.gd?query", "file.gd#fragment",
+                 "file" + chr(10) + ".gd", "file" + chr(0x202e) + ".gd",
+                 "file" + chr(0x2066) + ".gd")
+    for bad in bad_names:
+        with pytest.raises(ValueError, match="unsafe res://"):
+            res_to_path(tmp_path, "res://" + bad)
+
+
+def test_godot_project_rejects_noninteger_or_unbounded_physics_tick_rate(tmp_path):
+    from skeleton.godot_export.project import GodotProject
+
+    cfg = configfile.loads("[physics]\n")
+    project = GodotProject(tmp_path, cfg)
+    for bad in (True, False, 0, -1, 1001, 60.5, float("nan"), "60.5", "99999"):
+        cfg.set("physics", "common/physics_ticks_per_second", bad)
+        with pytest.raises(ValueError, match="physics tick rate"):
+            _ = project.physics_ticks
+    for valid in (60, "60", 1000):
+        cfg.set("physics", "common/physics_ticks_per_second", valid)
+        assert project.physics_ticks == int(valid)
+
+
+def test_godot_rejects_symlinked_project_root_before_reference_or_scan(tmp_path):
+    from skeleton.godot_export import project as project_mod
+
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    (actual / "project.godot").write_text("[application]\\n")
+    (actual / "script.gd").write_text("extends Node")
+    link = tmp_path / "alias"
+    try:
+        link.symlink_to(actual, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project_mod.res_to_path(link, "res://script.gd")
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project_mod.path_to_res(link, link / "script.gd")
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project_mod.GodotProject.load(link)
+    project = project_mod.GodotProject(link, configfile.loads("[application]\\n"))
+    with pytest.raises(ValueError, match="symlinked Godot project root"):
+        project.scripts()
+
+
+def test_godot_path_to_res_rejects_aliases_and_ancestor_symlinks(tmp_path):
+    from skeleton.godot_export.project import path_to_res, res_to_path
+
+    root = tmp_path / "project"
+    root.mkdir()
+    script = root / "script.gd"
+    script.write_text("extends Node")
+    assert path_to_res(root, script) == "res://script.gd"
+    with pytest.raises(ValueError, match="outside"):
+        path_to_res(root, tmp_path / "outside.gd")
+
+    alias = root / "script_alias.gd"
+    try:
+        alias.symlink_to(script)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlinked"):
+        path_to_res(root, alias)
+
+    parent = tmp_path / "real_parent"
+    parent.mkdir()
+    nested = parent / "nested"
+    nested.mkdir()
+    (nested / "scene.tscn").write_text("[gd_scene format=3]\n")
+    linked_parent = tmp_path / "linked_parent"
+    linked_parent.symlink_to(parent, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlinked"):
+        res_to_path(linked_parent / "nested", "res://scene.tscn")
+    with pytest.raises(ValueError, match="symlinked"):
+        path_to_res(linked_parent / "nested", linked_parent / "nested" / "scene.tscn")
+
+
+def test_godot_inventory_fails_closed_on_symlinked_entries(tmp_path):
+    from skeleton.godot_export.project import GodotProject
+
+    (tmp_path / "valid.gd").write_text("extends Node")
+    (tmp_path / "alias.gd").symlink_to(tmp_path / "valid.gd")
+    project = GodotProject(tmp_path, configfile.loads("[application]\n"))
+    with pytest.raises(ValueError, match="symlinked Godot inventory"):
+        project.scripts()
