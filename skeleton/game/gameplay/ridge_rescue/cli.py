@@ -20,9 +20,26 @@ def _source(path: str | None):
     return parse_world(read_bounded(path or DEMO_PATH, 96_000))
 
 def _actions(raw: str) -> list[dict]:
-    data = json.loads(raw)
-    if not isinstance(data, list):
-        raise ValueError("actions must be a JSON list")
+    """Reject oversized or ambiguous gameplay commands before changing state."""
+    if not isinstance(raw, str) or len(raw.encode("utf-8")) > 96_000:
+        raise ValueError("actions exceed input byte budget")
+
+    def unique_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate action JSON key")
+            result[key] = value
+        return result
+
+    def reject_constant(value):
+        raise ValueError("non-finite action JSON number")
+
+    data = json.loads(raw, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+    if not isinstance(data, list) or len(data) > 512:
+        raise ValueError("actions must be a bounded JSON list")
+    if any(not isinstance(action, dict) for action in data):
+        raise ValueError("each action must be a JSON object")
     return data
 
 def main(argv: list[str] | None = None) -> int:

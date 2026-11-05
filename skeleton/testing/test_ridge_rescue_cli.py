@@ -39,3 +39,30 @@ def test_author_cli():
 def test_invalid_actions_refused():
     result = run_cli("play", "--actions", '[{"verb":"move","direction":"west"}]')
     assert result.returncode != 0
+
+
+def test_cli_rejects_duplicate_action_keys():
+    result = run_cli("play", "--actions", '[{"verb":"rest","verb":"move"}]')
+    assert result.returncode != 0
+    assert "duplicate action JSON key" in result.stderr
+
+
+def test_cli_rejects_nonfinite_and_nonobject_actions():
+    for actions in ('[{"verb":"rest","amount":NaN}]', "[null]", "[42]"):
+        result = run_cli("play", "--actions", actions)
+        assert result.returncode != 0
+
+
+def test_cli_rejects_oversized_action_payload_without_output(tmp_path):
+    output = tmp_path / "should-not-exist.json"
+    actions = '[{"verb":"rest","padding":"' + ("x" * 96_000) + '"}]'
+    result = run_cli("play", "--actions", actions, "--output", str(output))
+    assert result.returncode != 0
+    assert not output.exists()
+
+
+def test_cli_accepts_valid_action_after_strict_validation(tmp_path):
+    output = tmp_path / "run.json"
+    result = run_cli("play", "--actions", '[{"verb":"rest"}]', "--output", str(output))
+    assert result.returncode == 0, result.stderr
+    assert output.exists()
