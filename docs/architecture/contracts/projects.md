@@ -58,11 +58,32 @@ A start is `POST` without `execution_id`:
 
 | Field | Rule |
 |-------|------|
-| `target` | string, at most 64 characters, default `""` |
-| `options` | object, default `{}` |
+| `target` | `godot`, `json`, `yaml`, or empty for the Godot default |
+| `options` | object, default `{}`; see allowed fields below |
 | `idempotency_key` | optional string, 1..128 characters |
 
-The handler calls `job_api.enqueue("game.build", {"target", "options"}, ...)`. The `game.build` worker runs `build_playable_game` (#4119); this route does not call `Forge.materialise` itself. `x-request-id` is the correlation id. The effective idempotency key is `{tenant}:{actor}:game.build:{project_id}:{key}`. The same key with the same target and options returns 202 and the original build with `replayed: true`. A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See [`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
+Starting a build requires both the project session and the `forge/run` charter.
+Client-provided governance weight headers do not grant elevated build authority;
+the route uses the default weight until an authenticated weight owner is available.
+Linking an existing execution does not start work. The service registers the
+canonical `game.build` handler on the same job service that stores the request
+and starts its worker. The worker reads the saved project brief using the
+job's actor and tenant; request options cannot substitute another brief or
+select a host executable. Project-style jobs queued by an older version lack
+the forge admission marker and fail closed when claimed: submit a newly
+authorized build rather than assuming those old jobs will run.
+
+`options` accepts `era` and `archetype` (strings up to 64 characters),
+`playtest` (`off`, `auto`, or `require`), `repair_mode` (`apply` or `suggest`),
+`max_rounds` (integer 1–3), `deadline_s` (finite number in (0, 120]), and
+`include_files` (boolean). Unknown fields are rejected. An empty target uses
+the builder's Godot default; a different target does not by itself establish a
+playable console build. The default deadline is 120 seconds.
+
+`x-request-id` is the correlation id. The same idempotency key with the same
+target and options returns 202 and the original build with `replayed: true`.
+A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See
+[`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
 
 `Build` is:
 
@@ -71,9 +92,12 @@ schema_version, schema_id, build_id, execution_id, project_id, status,
 target, job_id, result, error, created_at, updated_at, replayed
 ```
 
-`schema_id` is `skeleton.projects.v1`. `execution_id` equals `build_id`. `status` is `pending`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`. A start returns `queued` once the job is enqueued. `job_id` is a string or null. `result` is an object. `error` is a string. Timestamps are RFC3339 UTC ending in `Z`.
+`schema_id` is `skeleton.projects.v1`. `execution_id` equals `build_id`. `status` is `pending`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`. A newly accepted job can already have advanced by the time the response is read. `job_id` is a string or null. `result` is an object. `error` is a string. Timestamps are RFC3339 UTC ending in `Z`.
 
-The new build id is appended to `build_ids`. A 65th link is `PROJECT.BUILD_CONFLICT` (HTTP 409) and the job just enqueued is cancelled. An `execution_id` already linked for another tenant is the same code.
+The new build id is appended to `build_ids` in the same transaction that
+creates and publishes the job. A 65th link is `PROJECT.BUILD_CONFLICT` (HTTP
+409); no job or build is published. An `execution_id` already linked for another
+tenant is the same code.
 
 A link is `POST` with `execution_id` and without `target`, `options`, or `idempotency_key`. Combining them is `PROJECT.INVALID`. The response is `ProjectBuildLink`:
 
