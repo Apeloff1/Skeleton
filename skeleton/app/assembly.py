@@ -520,9 +520,17 @@ def backend_python_image_errors(source: str) -> tuple[str, ...]:
     if len(set(stages.values())) > 1:
         errors.append("backend Python image stages must share the same pinned Python/Alpine ABI")
 
-    guard = re.search(
-        r"sys\.version_info\[:2\]\s*<\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
-        source,
+    # An assertion copied into a comment is not an executable build guard.
+    guard_lines = [
+        line.strip() for line in source.splitlines()
+        if line.lstrip().startswith("RUN python -c ")
+    ]
+    guard = (
+        re.search(
+            r"sys\.version_info\[:2\]\s*<\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+            guard_lines[0],
+        )
+        if len(guard_lines) == 1 else None
     )
     if guard is None:
         errors.append("backend dependency Python upper-bound guard is missing")
