@@ -29,7 +29,11 @@ def _strict_action_json(payload: str) -> dict:
     """Reject duplicate keys and non-finite values before any save mutation."""
     if not isinstance(payload, str):
         raise ValueError("action JSON must be text")
-    if len(payload.encode("utf-8")) > MAX_ACTION_JSON_BYTES:
+    try:
+        payload_size = len(payload.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("action JSON contains invalid Unicode") from exc
+    if payload_size > MAX_ACTION_JSON_BYTES:
         raise ValueError("action JSON exceeds byte budget")
 
     def unique_pairs(pairs: list[tuple[str, object]]) -> dict:
@@ -273,8 +277,6 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "step":
                 if not args.action or not args.expected_head:
                     raise StoreError("--action and --expected-head required")
-                if len(args.action.encode("utf-8")) > MAX_ACTION_JSON_BYTES:
-                    raise StoreError("action JSON exceeds byte budget")
                 result = store.step(args.slot, _strict_action_json(args.action), expected_head=args.expected_head)
             elif args.command == "retry":
                 if not args.expected_head:
