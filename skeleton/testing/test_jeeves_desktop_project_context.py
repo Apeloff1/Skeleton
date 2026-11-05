@@ -118,6 +118,7 @@ class VerifiedLocalProjectSourceTests(unittest.TestCase):
         prompt = context.context_prompt_fragment(selected)
         self.assertIn('"original_sha256"', prompt)
         self.assertIn('"original_utf8"', prompt)
+        self.assertIn(selected.manifest_sha256, prompt)
         self.assertIn("def run()", prompt)
         self.assertIn("read-only", prompt.lower())
         context.revalidate_project_context(selected)
