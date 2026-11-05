@@ -41,3 +41,28 @@ def test_default_published_ports_remain_distinct(tmp_path: Path) -> None:
     urls = public_service_urls(tmp_path, manifest=load_manifest(), environ={})
     assert len(urls) == 4
     assert len(set(urls.values())) == 4
+
+
+@pytest.mark.parametrize(
+    "unsafe_url",
+    [
+        "http://operator:secret@localhost:8001",
+        "http://localhost:8001/?token=private",
+        "http://localhost:8001/#fragment",
+    ],
+)
+def test_port_override_rejects_credentialed_or_decorated_manifest_urls(
+    tmp_path: Path, unsafe_url: str
+) -> None:
+    from dataclasses import replace
+
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=unsafe_url) if service.name == "backend" else service
+        for service in manifest.services
+    )
+    hostile = replace(manifest, services=services)
+    with pytest.raises(ValueError, match="non-local public URL"):
+        runtime_manifest(hostile, root=tmp_path, environ={"BACKEND_PORT": "18001"})
+    with pytest.raises(ValueError, match="non-local public URL"):
+        public_service_urls(tmp_path, manifest=hostile, environ={"BACKEND_PORT": "18001"})
