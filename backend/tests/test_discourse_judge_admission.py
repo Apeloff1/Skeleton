@@ -183,3 +183,156 @@ def test_malformed_outer_object_cannot_salvage_nested_forged_judgment():
         '"winner_index":0},"candidate":{}}'
     )
     assert discourse._extract_json(payload) == {}
+
+
+
+@pytest.fixture(autouse=True)
+def isolate_async_admission_registry(monkeypatch):
+    monkeypatch.setattr(discourse, "_ACTIVE_DELIBERATIONS", set())
+
+
+def test_unacknowledged_async_admission_never_schedules_work(monkeypatch):
+    from fastapi import HTTPException
+    from types import SimpleNamespace
+
+    class Collection:
+        async def insert_one(self, *_args, **_kw):
+            return SimpleNamespace(acknowledged=False)
+
+    class Database:
+        discourse_jobs = Collection()
+
+    monkeypatch.setattr(discourse, "_db", Database())
+    body = discourse.DeliberateBody(prompt="Build the game system")
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(discourse.deliberate_async(body))
+    assert exc.value.status_code == 503
+    assert not discourse._ACTIVE_DELIBERATIONS
+
+
+def test_async_capacity_refuses_new_jobs_before_database(monkeypatch):
+    from fastapi import HTTPException
+
+    class ForbiddenDatabase:
+        @property
+        def discourse_jobs(self):
+            raise AssertionError("Database used after capacity was exhausted")
+
+    monkeypatch.setattr(discourse, "_db", ForbiddenDatabase())
+    discourse._ACTIVE_DELIBERATIONS.update(f"{i:032x}" for i in range(
+        discourse.MAX_ASYNC_DELIBERATIONS
+    ))
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(discourse.deliberate_async(
+            discourse.DeliberateBody(prompt="Build the game system")
+        ))
+    assert exc.value.status_code == 503
+
+
+def test_acknowledged_async_job_completes_and_frees_capacity(monkeypatch):
+    from types import SimpleNamespace
+
+    seen = []
+
+    class Jobs:
+        async def insert_one(self, row):
+            seen.append(("admitted", row["status"]))
+            return SimpleNamespace(acknowledged=True)
+
+        async def update_one(self, query, update, **_kw):
+            seen.append(("terminal", update["$set"]["status"]))
+            return SimpleNamespace(acknowledged=True)
+
+    class Database:
+        discourse_jobs = Jobs()
+
+    async def fake_deliberation(*_a, **_kw):
+        return {"winner_model": "m", "winner_score": 80}
+
+    monkeypatch.setattr(discourse, "_db", Database())
+    monkeypatch.setattr(discourse, "deliberate", fake_deliberation)
+
+    async def scenario():
+        result = await discourse.deliberate_async(
+            discourse.DeliberateBody(prompt="Build the game system")
+        )
+        for _ in range(10):
+            if not discourse._ACTIVE_DELIBERATIONS:
+                break
+            await asyncio.sleep(0)
+        return result
+
+    result = asyncio.run(scenario())
+    assert result["status"] == "running"
+    assert seen == [("admitted", "running"), ("terminal", "done")]
+    assert not discourse._ACTIVE_DELIBERATIONS
+
+
+def test_async_terminal_write_without_ack_marks_error(monkeypatch):
+    from types import SimpleNamespace
+
+    updates = []
+
+    class Jobs:
+        async def update_one(self, query, update, **_kw):
+            updates.append(update["$set"])
+            return SimpleNamespace(acknowledged=len(updates) > 1)
+
+    class Database:
+        discourse_jobs = Jobs()
+
+    async def fake_deliberation(*_a, **_kw):
+        return {"winner_model": "m", "winner_score": 80}
+
+    monkeypatch.setattr(discourse, "_db", Database())
+    monkeypatch.setattr(discourse, "deliberate", fake_deliberation)
+    did = "a" * 32
+    discourse._ACTIVE_DELIBERATIONS.add(did)
+    asyncio.run(discourse._run_bg(
+        did, discourse.DeliberateBody(prompt="Build the game system")
+    ))
+    assert [row["status"] for row in updates] == ["done", "error"]
+    assert not discourse._ACTIVE_DELIBERATIONS
+
+
+@pytest.mark.parametrize("limit", [0, -1, 101, True, "10", 2.3])
+def test_history_invalid_budget_rejected_before_db(monkeypatch, limit):
+    from fastapi import HTTPException
+
+    class ForbiddenDatabase:
+        @property
+        def discourse_log(self):
+            raise AssertionError("database accessed before pagination validation")
+
+    monkeypatch.setattr(discourse, "_db", ForbiddenDatabase())
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(discourse.history(limit))
+    assert exc.value.status_code == 422
+
+
+def test_history_db_outage_is_not_an_empty_success(monkeypatch):
+    from fastapi import HTTPException
+
+    class Broken:
+        def find(self, *_a, **_kw):
+            raise ConnectionError("offline")
+
+    class Database:
+        discourse_log = Broken()
+
+    monkeypatch.setattr(discourse, "_db", Database())
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(discourse.history())
+    assert exc.value.status_code == 503
+
+
+def test_invalid_job_identity_does_not_access_database(monkeypatch):
+    class ForbiddenDatabase:
+        @property
+        def discourse_jobs(self):
+            raise AssertionError("invalid job ID reached storage")
+
+    monkeypatch.setattr(discourse, "_db", ForbiddenDatabase())
+    assert asyncio.run(discourse.get_result("../../../etc/passwd")) == {
+        "error": "not found", "status": "unknown",
+    }
