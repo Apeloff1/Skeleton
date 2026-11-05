@@ -118,6 +118,7 @@ def write_frame(
 _ALLOWED: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "status": (frozenset(), frozenset()),
     "telemetry": (frozenset(), frozenset()),
+    "source-status": (frozenset(), frozenset()),
     "agent": (
         frozenset({"run_id", "prompt"}),
         frozenset({"maximum_steps", "maximum_model_calls", "maximum_wall_seconds"}),

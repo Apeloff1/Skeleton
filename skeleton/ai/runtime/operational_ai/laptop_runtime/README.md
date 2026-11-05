@@ -122,3 +122,12 @@ original content hashes, shows full unified diffs, and permits an operator
 to stage a single inert no-clobber sibling candidate per full SHA approval.
 It NEVER overwrites the original; explicit editor/Git application is
 separate. `docs/ai/JEEVES_EXISTING_SOURCE_EDIT_REVIEW.md`.
+
+## Optional read-only signed source agent
+
+The desktop agent can explicitly opt into the existing
+`jeeves_signed_source_lookup` via a host-verified signed source manifest,
+independent operator HMAC key, installed model/tokenizer identity and finite
+source/call grants. Off by default. Original source bytes are verified
+before native startup and before/after each strict agent run; no tool
+authorizes writes. `docs/ai/JEEVES_DESKTOP_SIGNED_NATIVE_SOURCE_AGENT.md`.
