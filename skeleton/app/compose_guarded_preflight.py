@@ -147,6 +147,15 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     if values[2] is not None and hello.get("hosts") is not None:
         if values[2] not in membership[0]:
             return None
+    # A writable primary cannot simultaneously advertise itself as a passive
+    # or arbiter. Even when the voting-host list is omitted, these conflicting
+    # role claims invalidate the snapshot before any canonical epoch read.
+    # This is a consistency check, not a topology discovery or activation grant.
+    for endpoint in (values[1], values[2]):
+        if endpoint is not None and any(
+            endpoint in members for members in membership[1:] if members is not None
+        ):
+            return None
     values.extend(membership)
     election = hello.get("electionId")
     if election is not None:

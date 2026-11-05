@@ -157,6 +157,21 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.db.hello.pop("hosts")
 
 
+    async def test_primary_cannot_claim_passive_or_arbiter_role(self):
+        for field in ("passives", "arbiters"):
+            for endpoint_field in ("me", "primary"):
+                with self.subTest(role=field, endpoint=endpoint_field):
+                    self.db.hello.update({
+                        "me": "mongo-a:27017", "primary": "mongo-a:27017",
+                        field: ["mongo-a:27017"],
+                    })
+                    result = await self.inspect()
+                    self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                    self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+                    self.assertFalse(result["guarded_local_ai_ready"])
+                    self.assertEqual(FakeEpoch.instances, [])
+                    self.db.hello.pop(field)
+
     async def test_combined_replica_membership_budget_denied(self):
         # Each advertised class is individually below the bound, but the
         # aggregate topology exceeds the fixed custody inspection budget.
