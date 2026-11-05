@@ -1,28 +1,23 @@
 """
 routes/agent_swarm.py — Graph-Engineering swarm DAG (/api/swarm-dag).
 
-Implements the "Karpathy loop → AgentHub → Dynamic Workflows" progression from
-the Graph-Engineering playbook: a single directive fans out into N parallel
-sub-agent workers arranged on a dependency DAG. Each worker
-
-  1. RECALLS shared memory (LAFS canon + Delta-KDA associative memory),
-  2. produces a typed result node, and
-  3. WRITES its finding back into the shared knowledge graph + Delta memory,
-
-so the graph — not an ever-growing orchestrator transcript — is the durable
-shared-memory layer (exactly the playbook's thesis). An orchestrator node then
-merges the leaf results. Everything streams onto the PROOD event bus.
+A scoped directive fans out into bounded parallel sub-agent workers. Each
+worker reads only account-owned prior graph findings, publishes its finding to
+the account-owned graph, and contributes to an acknowledged merge receipt.
+The shared LAFS and Delta-KDA memories have no tenant authorization contract
+and are deliberately not read here. Event-bus notifications carry only
+opaque run and owner-scope references, not private finding contents.
 """
 from __future__ import annotations
 
 import asyncio
 import hashlib
-import time
 import threading
+import time
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from routes.gameforge_auth import require_authenticated_identity
@@ -43,6 +38,7 @@ def _project_id(project: str) -> str:
     ):
         raise ValueError("project must be bounded printable non-empty text")
     return project
+
 
 def _owner_scope(identity: dict) -> tuple[dict[str, str], str]:
     """Require a normalized account/tenant principal before any graph access.
