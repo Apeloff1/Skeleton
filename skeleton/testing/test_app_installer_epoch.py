@@ -401,3 +401,25 @@ def test_stable_setup_ui_recovery_does_not_promote_protected_stack(
     assert receipt.ok is False
     assert any(p.name == "setup-ui-availability" and p.ok for p in receipt.phases)
     assert any(p.name == "start" and not p.ok and p.required for p in receipt.phases)
+
+
+def test_runtime_fingerprint_rejects_inplace_rewrite_during_bounded_read(
+    tmp_path, monkeypatch,
+):
+    from skeleton.app import setup_runtime
+
+    env = tmp_path / ".env"
+    env.write_text("JWT_SECRET=local-fixture\n", encoding="utf-8")
+    original_reader = setup_runtime._read_existing_env
+
+    def changing_reader(path, **kwargs):
+        contents, repaired = original_reader(path, **kwargs)
+        before = path.stat()
+        os.utime(path, ns=(
+            before.st_atime_ns, before.st_mtime_ns + 2_000_000_000,
+        ))
+        return contents, repaired
+
+    monkeypatch.setattr(setup_runtime, "_read_existing_env", changing_reader)
+    with pytest.raises(ValueError, match="runtime configuration source"):
+        runtime_source_fingerprint(tmp_path)

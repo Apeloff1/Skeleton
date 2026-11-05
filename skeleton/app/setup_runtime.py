@@ -253,7 +253,11 @@ def runtime_source_fingerprint(root: Path) -> str:
                 or (root_before.st_dev, root_before.st_ino) !=
                    (root_after.st_dev, root_after.st_ino)
                 or (file_before.st_dev, file_before.st_ino) !=
-                   (file_after.st_dev, file_after.st_ino)):
+                   (file_after.st_dev, file_after.st_ino)
+                or (file_before.st_size, file_before.st_mtime_ns,
+                    file_before.st_ctime_ns) !=
+                   (file_after.st_size, file_after.st_mtime_ns,
+                    file_after.st_ctime_ns)):
             raise ValueError("runtime source identity changed during admission")
         identity = {
             "root": (root_after.st_dev, root_after.st_ino),
