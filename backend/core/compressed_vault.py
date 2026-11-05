@@ -25,7 +25,7 @@ import threading
 import re
 import stat
 from functools import wraps
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 from itertools import islice
 from .vault_secure_fs import anchored_directory, ensure_directory, read_regular, atomic_write, unlink_regular, snapshot_regular, VaultPathError
 from pathlib import Path
@@ -165,6 +165,31 @@ def _exclusive_vault_mutation():
                     raise VaultPathError("vault mutation lock is not a private regular file")
                 import fcntl  # POSIX descriptor custody: unsupported platforms fail closed.
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                _load_manifest()
+                yield
+            finally:
+                os.close(lock_fd)
+
+
+@contextmanager
+def _shared_vault_snapshot():
+    """Read the latest committed manifest under the writer's advisory lock.
+
+    Across processes, an already initialized worker must not keep serving its
+    startup snapshot forever. The shared flock spans each shard read so the
+    corresponding manifest cannot be replaced by a cooperating writer midway.
+    """
+    _ensure_storage()
+    with _MUTATION_LOCK:
+        with _storage_fd() as directory:
+            flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+            lock_fd = os.open(".vault-mutation.lock", flags, 0o600, dir_fd=directory)
+            try:
+                info = os.fstat(lock_fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise VaultPathError("vault mutation lock is not a private regular file")
+                import fcntl
+                fcntl.flock(lock_fd, fcntl.LOCK_SH)
                 _load_manifest()
                 yield
             finally:
@@ -402,15 +427,21 @@ def read_shard(name: str, limit: int = 50, offset: int = 0) -> list[dict]:
         raise ValueError("vault page offset is outside allowed bounds")
     if limit == 0:
         return []
-    return list(islice(iter_shard(name), offset, offset + limit))
+    with closing(iter_shard(name)) as reader:
+        return list(islice(reader, offset, offset + limit))
 
 
 def iter_shard(name: str) -> Iterator[dict]:
     """Stream JSONL through a bounded, symlink-proof descriptor."""
     _ensure_storage()
     name = _safe_name(name)
-    if name not in _MANIFEST:
-        raise KeyError(f"Shard '{name}' not in manifest")
+    with _shared_vault_snapshot():
+        if name not in _MANIFEST:
+            raise KeyError(f"Shard '{name}' not in manifest")
+        yield from _stream_shard(name)
+
+
+def _stream_shard(name: str) -> Iterator[dict]:
     shard_name = f"{name}.jsonl.zst"
     total_bytes = 0
     total_rows = 0
@@ -451,40 +482,40 @@ def iter_shard(name: str) -> Iterator[dict]:
 
 
 def sample_shard(name: str, k: int = 5) -> list[dict]:
-    out: list[dict] = []
-    for row in iter_shard(name):
-        out.append(row)
-        if len(out) >= k:
-            break
-    return out
+    if type(k) is not int or not 0 <= k <= _MAX_PAGE_LIMIT:
+        raise ValueError("vault sample size is outside allowed bounds")
+    if k == 0:
+        return []
+    return read_shard(name, limit=k)
 
 
 def list_shards() -> list[dict]:
-    _ensure_storage()
-    return sorted(_MANIFEST.values(), key=lambda e: e["name"])
+    with _shared_vault_snapshot():
+        return sorted((dict(entry) for entry in _MANIFEST.values()), key=lambda e: e["name"])
 
 
 def get_shard_entry(name: str) -> dict | None:
-    _ensure_storage()
-    return _MANIFEST.get(_safe_name(name))
+    name = _safe_name(name)
+    with _shared_vault_snapshot():
+        entry = _MANIFEST.get(name)
+        return dict(entry) if entry is not None else None
 
 
 def vault_stats() -> dict:
-    _ensure_storage()
-    _load_manifest()
-    shards = list(_MANIFEST.values())
-    total_raw = sum(s.get("raw_bytes", 0) for s in shards)
-    total_comp = sum(s.get("compressed_bytes", 0) for s in shards)
-    total_rows = sum(s.get("rows", 0) for s in shards)
-    return {
-        "shard_count": len(shards),
-        "total_rows": total_rows,
-        "total_raw_bytes": total_raw,
-        "total_compressed_bytes": total_comp,
-        "avg_compression_ratio": round(total_raw / max(total_comp, 1), 2),
-        "vault_root": str(VAULT_ROOT),
-        "scratch_root": str(SCRATCH_ROOT),
-    }
+    with _shared_vault_snapshot():
+        shards = list(_MANIFEST.values())
+        total_raw = sum(s.get("raw_bytes", 0) for s in shards)
+        total_comp = sum(s.get("compressed_bytes", 0) for s in shards)
+        total_rows = sum(s.get("rows", 0) for s in shards)
+        return {
+            "shard_count": len(shards),
+            "total_rows": total_rows,
+            "total_raw_bytes": total_raw,
+            "total_compressed_bytes": total_comp,
+            "avg_compression_ratio": round(total_raw / max(total_comp, 1), 2),
+            "vault_root": str(VAULT_ROOT),
+            "scratch_root": str(SCRATCH_ROOT),
+        }
 
 
 def purge_cache() -> int:
