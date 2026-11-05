@@ -9,8 +9,10 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 
+import pytest
 
-def _doctor(monkeypatch, tmp_path, critical):
+
+def _doctor(monkeypatch, tmp_path, critical, *, providers=None):
     install = importlib.import_module("skeleton.app.first_install")
     health = importlib.import_module("skeleton.app.health")
 
@@ -33,7 +35,7 @@ def _doctor(monkeypatch, tmp_path, critical):
     def bounded(url, *, timeout, max_response_bytes=65536):
         if url.endswith("/api/health/registry"):
             return critical
-        return {
+        return providers if providers is not None else {
             "engine": "skeleton-engine", "providers": [],
             "llm_available": False, "availability_observed": True,
         }
@@ -71,6 +73,37 @@ def test_first_install_accepts_observed_required_routes(monkeypatch, tmp_path):
     })
     assert report["services_ready"] is True
     assert report["critical_routes"]["ready"] is True
+
+
+@pytest.mark.parametrize("code", ["local_guard_unavailable", "local_guard_configuration_invalid"])
+def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeypatch, tmp_path, code):
+    report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
+        "ok": True, "report_available": True, "missing": [],
+    }}, providers={
+        "engine": "skeleton-engine", "active": "local", "providers": [],
+        "llm_available": False, "availability_observed": True, "active_readiness_code": code,
+    })
+    assert report["ai"]["readiness_code"] == code
+    assert report["ai"]["available"] is False
+    assert any("guard" in step.lower() for step in report["next_steps"])
+    assert not any("Configure genuine trained local weights" in step for step in report["next_steps"])
+
+
+@pytest.mark.parametrize("overrides", [
+    {"active": "openai"}, {"llm_available": True}, {"availability_observed": False},
+    {"active_readiness_code": "secret: do-not-print"}, {"active_readiness_code": ["invalid"]},
+])
+def test_doctor_ignores_untrusted_or_contradictory_guard_codes(monkeypatch, tmp_path, overrides):
+    payload = {
+        "engine": "skeleton-engine", "active": "local", "providers": [],
+        "llm_available": False, "availability_observed": True, "active_readiness_code": "local_guard_unavailable",
+    }
+    payload.update(overrides)
+    report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
+        "ok": True, "report_available": True, "missing": [],
+    }}, providers=payload)
+    assert "readiness_code" not in report["ai"]
+    assert "do-not-print" not in str(report)
 
 
 def test_first_install_rejects_contradictory_ready_with_missing_routes(monkeypatch, tmp_path):
