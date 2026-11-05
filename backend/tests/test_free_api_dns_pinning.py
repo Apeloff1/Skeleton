@@ -89,3 +89,48 @@ def test_private_dns_stops_before_network_client(monkeypatch):
     result = asyncio.run(free_apis.fetch("github", {"q": "x"}))
     assert result["ok"] is False
     assert result["error"] == "api_fetch_failed"
+
+
+
+def test_dns_excessive_answer_volume_rejected(monkeypatch):
+    monkeypatch.setattr(free_apis.socket, "getaddrinfo", lambda *_a, **_kw: _PUBLIC * 33)
+    with pytest.raises(ValueError, match="too many"):
+        free_apis._pin_public_origin("api.github.com")
+
+
+@pytest.mark.parametrize("params", [
+    {"q": "x" * 513},
+    {"q": float("nan")},
+    {"q": float("inf")},
+    {"q": ["unsafe"]},
+    {"x" * 65: "value"},
+    dict.fromkeys(str(i) for i in range(17)),
+    "not-a-dictionary",
+])
+def test_reject_bad_query_parameters_before_dns(monkeypatch, params):
+    monkeypatch.setattr(
+        free_apis.socket, "getaddrinfo",
+        lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("DNS before validation")),
+    )
+    result = asyncio.run(free_apis.fetch("github", params))
+    assert result["ok"] is False
+    assert result["error"] == "api_fetch_failed"
+
+
+def test_catalog_dns_dispatch_uses_background_thread(monkeypatch):
+    called = []
+    async def fake_to_thread(function, *args):
+        called.append((function.__name__, args))
+        return function(*args)
+
+    monkeypatch.setattr(free_apis.socket, "getaddrinfo", lambda *_a, **_kw: _PUBLIC)
+    monkeypatch.setattr(free_apis.asyncio, "to_thread", fake_to_thread)
+    # Avoid a real connection; we need only reach DNS background dispatch.
+    import httpx
+    class BrokenClient:
+        def __init__(self, **_kw):
+            raise RuntimeError("no external network in unit tests")
+    monkeypatch.setattr(httpx, "AsyncClient", BrokenClient)
+    result = asyncio.run(free_apis.fetch("github", {"q": "public"}))
+    assert called == [("_pin_public_origin", ("api.github.com",))]
+    assert result["ok"] is False
