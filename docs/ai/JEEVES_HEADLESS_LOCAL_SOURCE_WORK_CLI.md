@@ -226,3 +226,15 @@ independent** review and explicit patch/stage
 authorization. Model-generated code is never
 applied automatically. See
 `docs/ai/JEEVES_NATIVE_PRIVATE_SOURCE_ESCROW.md`.
+
+## From private native source escrow directly to reviewed deliverable
+
+A separate `desktop_native_source_delivery_cli` now reads
+an exact already-reviewed private `*.source.json` file
+without any source text in stdout, independently checks
+the current workspace, syntax and Python graph, and can
+write a new private source-overlay or inert Git patch
+after the operator explicitly approves both full source
+and patch hashes plus one action-specific flag. This
+avoids manually copying private GGUF code into this CLI.
+See `docs/ai/JEEVES_NATIVE_ESCROW_TO_STAGE.md`.
