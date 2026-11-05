@@ -5,8 +5,10 @@ plus an async fetcher. Results can be folded back into Jeeves' trainable brain.
 """
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
+import math
 import re
 import socket
 from typing import Any, Optional
@@ -137,6 +139,8 @@ def _pin_public_origin(hostname: str) -> str:
         raise ValueError("Catalog API host resolution failed") from exc
     if not addresses:
         raise ValueError("Catalog API host has no DNS addresses")
+    if len(addresses) > 32:
+        raise ValueError("Catalog API host has too many DNS addresses")
     public: set[str] = set()
     for answer in addresses:
         try:
@@ -174,15 +178,40 @@ async def fetch(api_key: str, params: dict) -> dict:
     api = FREE_APIS.get(api_key)
     if not api:
         return {"ok": False, "error": f"unknown api '{api_key}'", "available": sorted(FREE_APIS.keys())}
-    url = _build_url(api, params or {})
+    url = api["url"]
     try:
+        # Bound caller-controlled query material before quoting, DNS lookup,
+        # transport allocation or stringification of arbitrary Python objects.
+        if params is None:
+            params = {}
+        if not isinstance(params, dict) or len(params) > 16:
+            raise ValueError("Catalog API parameters are invalid")
+        safe_params = {}
+        for key, value in params.items():
+            if type(key) is not str or not 1 <= len(key) <= 64:
+                raise ValueError("Catalog API parameter name is invalid")
+            if type(value) not in (str, int, float):
+                raise ValueError("Catalog API parameter type is invalid")
+            if type(value) is float and not math.isfinite(value):
+                raise ValueError("Catalog API parameter must be finite")
+            encoded_value = str(value)
+            if len(encoded_value) > 512:
+                raise ValueError("Catalog API parameter exceeds size limit")
+            safe_params[key] = encoded_value
+        url = _build_url(api, safe_params)
+        if len(url) > 8192:
+            raise ValueError("Catalog API URL exceeds size limit")
         base_url, request_target = _catalog_request_parts(api, url)
         hostname = urlsplit(base_url).hostname
         if hostname is None:
             raise ValueError("Catalog API origin has no hostname")
         # Validate DNS once, then connect to that exact global address. The
         # virtual Host header and SNI preserve the catalog's TLS identity.
-        pinned_url = _pin_public_origin(hostname)
+        # DNS resolution may block for seconds. It must not occupy the ASGI
+        # event loop or bypass a bounded admission timeout.
+        pinned_url = await asyncio.wait_for(
+            asyncio.to_thread(_pin_public_origin, hostname), timeout=5.0
+        )
         import httpx
         async with httpx.AsyncClient(
             base_url=pinned_url,
