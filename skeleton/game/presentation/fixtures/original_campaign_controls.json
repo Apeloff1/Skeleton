@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "profile_id": "original-campaign-controls",
+  "revision": 0,
+  "bindings": [
+    {
+      "binding_id": "keyboard-east",
+      "action_id": "move-east",
+      "device_class": "keyboard",
+      "control_path": "KeyD",
+      "modifiers": []
+    },
+    {
+      "binding_id": "keyboard-west",
+      "action_id": "move-west",
+      "device_class": "keyboard",
+      "control_path": "KeyA",
+      "modifiers": []
+    },
+    {
+      "binding_id": "keyboard-north",
+      "action_id": "move-north",
+      "device_class": "keyboard",
+      "control_path": "KeyW",
+      "modifiers": []
+    },
+    {
+      "binding_id": "keyboard-south",
+      "action_id": "move-south",
+      "device_class": "keyboard",
+      "control_path": "KeyS",
+      "modifiers": []
+    },
+    {
+      "binding_id": "controller-east",
+      "action_id": "move-east",
+      "device_class": "controller",
+      "control_path": "DPadRight",
+      "modifiers": []
+    },
+    {
+      "binding_id": "touch-east",
+      "action_id": "move-east",
+      "device_class": "touch",
+      "control_path": "SwipeRight",
+      "modifiers": []
+    }
+  ]
+}

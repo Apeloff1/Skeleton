@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "arcane_mana_reserve",
+  "domain": "arcane",
+  "topic": "mana_reserve",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 5,
+  "approval": 4,
+  "commands": [
+    {
+      "id": "arcane_mana_reserve:open",
+      "action": "open",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "arcane_mana_reserve:vote:0",
+      "action": "cast",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "arcane_mana_reserve:vote:1",
+      "action": "cast",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "arcane_mana_reserve:vote:2",
+      "action": "cast",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "arcane_mana_reserve:vote:3",
+      "action": "cast",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "delegate_4",
+      "choice": "yes",
+      "expected_version": 4
+    },
+    {
+      "id": "arcane_mana_reserve:vote:4",
+      "action": "cast",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "delegate_5",
+      "choice": "yes",
+      "expected_version": 5
+    },
+    {
+      "id": "arcane_mana_reserve:finalize",
+      "action": "finalize",
+      "proposal": "arcane_mana_reserve",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 6
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 5,
+    "yes": 5,
+    "final_version": 7
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/ack_delay.schema.json",
+  "title": "transport.ack_delay observation contract",
+  "description": "Prevent acknowledgement stalls",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ack_p99_ms",
+        "unacknowledged_messages"
+      ],
+      "properties": {
+        "ack_p99_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2500,
+          "description": "Upper bound for ack_p99_ms"
+        },
+        "unacknowledged_messages": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Upper bound for unacknowledged_messages"
+        }
+      }
+    }
+  }
+}

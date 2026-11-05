@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import hashlib,re
 _IDENT=re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_VERSION=re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+\-]{0,127}$")
 @dataclass(frozen=True)
 class ExtensionPoint: name:str
 @dataclass(frozen=True)
@@ -8,7 +9,8 @@ class GenerationSpec: contract_version:str; target:str; fields:tuple[str,...]; e
 @dataclass(frozen=True)
 class GeneratedCode: content:str; digest:str; generated:bool=True
 def generate_code(spec):
- if spec.target not in {"python-model","python-adapter","python-validator"}:raise ValueError("unsupported generation target")
+ if spec.target not in {"python","python-model","python-adapter","python-validator"}:raise ValueError("unsupported generation target")
+ if not isinstance(spec.contract_version,str) or not _VERSION.fullmatch(spec.contract_version):raise ValueError("unsafe contract version")
  names=tuple(spec.fields)+tuple(x.name for x in spec.extensions)
  if any(not _IDENT.fullmatch(x) for x in names):raise ValueError("unsafe generated identifier")
  fields="\n".join(f"    {x}: object" for x in sorted(set(spec.fields)))

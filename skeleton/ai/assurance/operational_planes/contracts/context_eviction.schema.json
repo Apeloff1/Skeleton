@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/context_eviction.schema.json",
+  "title": "runtime.context_eviction observation contract",
+  "description": "Prevent unsealed context eviction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_evictions_per_min",
+        "unsealed_context_count"
+      ],
+      "properties": {
+        "context_evictions_per_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8,
+          "description": "Upper bound for context_evictions_per_min"
+        },
+        "unsealed_context_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unsealed_context_count"
+        }
+      }
+    }
+  }
+}
