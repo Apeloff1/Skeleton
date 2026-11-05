@@ -439,7 +439,34 @@ def public_service_urls(
         "skeleton": "SKELETON_PORT",
         "chroma": "CHROMA_PORT",
     }
-    return {name: resolved.service(name).public_url for name in ports if resolved.service(name).public_url}
+    urls: dict[str, str] = {}
+    for name in ports:
+        public_url = resolved.service(name).public_url
+        if not public_url:
+            continue
+        # A manifest URL is untrusted even without a host-port override.
+        # Never return credential-bearing, remote, or ambiguous authorities to
+        # the setup UI or readiness probes.
+        try:
+            parsed = urlsplit(public_url)
+            valid_port = parsed.port
+            valid = (
+                parsed.scheme in {"http", "https"}
+                and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+                and parsed.username is None
+                and parsed.password is None
+                and not parsed.query
+                and not parsed.fragment
+                and valid_port is not None
+                and 1 <= valid_port <= 65535
+                and parsed.path in {"", "/"}
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError(f"{name} has an invalid local public URL")
+        urls[name] = public_url
+    return urls
 
 
 def _usable_secret(value: str) -> bool:
