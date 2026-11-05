@@ -130,7 +130,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "a447d8f161c9f5fe0973c4583fb1a7a94d63810b",
+      "source_git_object_sha": "a05afa72b5647ae6b7303435404d7f9804b0bdb9",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -210,7 +210,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "71254e28e9a4f7914987f635f39249bc64f7e08f",
+      "source_git_object_sha": "ed1d92c4f7cd7d59734c9d4c08a4b70290284bcc",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "a1625d2bcdc85af67155b6c8ff0048b64ebbd099",
+      "source_git_object_sha": "502ea2af6d42ff58dc2a4f1b5e01b2c3e98a336f",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -391,7 +391,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "8e90248e1264b8ab314a6c26440d7ed9f600100f",
+      "source_git_object_sha": "ce7104b6eedb972c8df30ef1887bb097c8d4ad2a",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -583,7 +583,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "7a60d3b559d25c6eeb3e28f2dfb0ad8abbfc384a",
+      "source_git_object_sha": "11f03d5e1eea61236be38940b89d202c95d05523",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "cfab5f4766adaa8907ce993e7b76e4c6443db608",
+      "source_git_object_sha": "6c45cf1631eab8971f6b7c813128d3718749732b",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1571,7 +1571,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "23a02688699707869950ea6d72c8390159b389d0",
+      "source_git_object_sha": "ef7b7b9153fa9621fdafda485c35d3da891fbe71",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -1830,7 +1830,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "8c17812d3b317287de101b7710d3ad4b29e20ab2",
+      "source_git_object_sha": "7b099837e1afcd5f7060c47fa14db210a69b5c94",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -6228,7 +6228,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "6f9897545ee1be69d3cfe23aa424c29faca951f3",
+      "source_git_object_sha": "d626851e5f24ed881d55cab25b410074d72bc640",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",

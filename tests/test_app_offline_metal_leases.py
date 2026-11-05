@@ -76,10 +76,10 @@ class AppleUnifiedLeaseTests(unittest.TestCase):
             "skeleton.app.offline_metal_runtime._apple_silicon",
             return_value=True,
         ), patch(
-            "skeleton.app.offline_metal_leases.probe_local_resources",
+            "skeleton.app.offline_resources.probe_local_resources",
             return_value=resource,
         ), patch(
-            "skeleton.app.offline_metal_leases.probe_gpu_resources",
+            "skeleton.app.offline_resource_fabric.probe_gpu_resources",
             return_value=(device,),
         ), patch(
             "skeleton.app.offline_metal_leases.GLOBAL_METAL_LEASE_BOOK",

@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import os
 import re
+import secrets
 import threading
 import time
 import uuid
@@ -34,6 +35,11 @@ REMINT_MARGIN_SECS = 30
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _SECRET_ENV = "GF_SEAL_SECRET"
 _KEYRING_ENV = "GF_SEAL_KEYRING"
+V2_PREFIX = "v2."
+V2_CANONICAL_TAG = "gf-seal/v2"
+MAX_V2_TTL_SECS = 3600
+_V2_FIELD_RE = re.compile(r"^[A-Za-z0-9_:-]{1,128}$")
+_V2_NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 
 
 def new_request_id() -> str:
@@ -84,8 +90,15 @@ def mint_seal_token(
     secret: str | None = None,
     principal: str | None = None,
     now: float | None = None,
+    domain: str | None = None,
+    nonce: str | None = None,
 ) -> str | None:
     """Mint an ``x-gf-seal`` value; ``None`` when no secret/keyring is available.
+
+    With ``domain``: single-use v2
+    ``v2.{principal}.{attester}.{domain}.{expiry}.{nonce}.{hex_hmac_sha256(canonical)}``,
+    canonical ``"gf-seal/v2\n{principal}\n{attester}\n{domain}\n{expiry}\n{nonce}"``;
+    ``principal`` defaults to ``attester``.
 
     Without ``principal``: ``{attester}.{expiry}.{hex_hmac_sha256(attester|expiry)}``.
     With ``principal``: ``{principal}.{attester}.{expiry}.{hex_hmac_sha256(principal.attester.expiry)}``.
@@ -95,6 +108,22 @@ def mint_seal_token(
     if isinstance(ttl_secs, bool) or not isinstance(ttl_secs, int):
         raise ValueError("ttl_secs must be an integer")
     expiry = int(now if now is not None else time.time()) + ttl_secs
+
+    if domain is not None:
+        principal = principal or attester
+        if ttl_secs <= 0 or ttl_secs > MAX_V2_TTL_SECS:
+            raise ValueError(f"ttl_secs must be in 1..{MAX_V2_TTL_SECS} for v2 seals")
+        nonce = nonce or secrets.token_hex(16)
+        if not all(isinstance(v, str) and _V2_FIELD_RE.fullmatch(v) for v in (principal, attester, domain)):
+            raise ValueError("principal/attester/domain must match [A-Za-z0-9_:-]{1,128}")
+        if not _V2_NONCE_RE.fullmatch(nonce):
+            raise ValueError("nonce must match [A-Za-z0-9_-]{16,128}")
+        key = _mint_key(secret)
+        if key is None:
+            return None
+        canonical = f"{V2_CANONICAL_TAG}\n{principal}\n{attester}\n{domain}\n{expiry}\n{nonce}"
+        sig = hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+        return f"{V2_PREFIX}{principal}.{attester}.{domain}.{expiry}.{nonce}.{sig}"
 
     if principal:
         key = _mint_key(secret)
@@ -120,9 +149,15 @@ def mint_seal_token(
 
 
 class RequestSealer:
-    """Caches one minted seal and re-mints ~30s before its absolute expiry."""
+    """Caches one minted seal and re-mints ~30s before its absolute expiry.
 
-    __slots__ = ("_attester", "_principal", "_secret", "_ttl", "_clock", "_lock", "_token", "_expiry")
+    With ``domain=`` (seal v2) every :meth:`token` call mints a fresh single-use
+    seal: v2 nonces are rejected on replay, so tokens are never cached.
+    """
+
+    __slots__ = (
+        "_attester", "_principal", "_secret", "_ttl", "_clock", "_lock", "_token", "_expiry", "_domain",
+    )
 
     def __init__(
         self,
@@ -132,6 +167,7 @@ class RequestSealer:
         seal_secret: str | None = None,
         ttl_secs: int = DEFAULT_TTL_SECS,
         clock: Callable[[], float] = time.time,
+        domain: str | None = None,
     ) -> None:
         if not attester or "." in attester:
             raise SkeletonSealConfigError("attester must be non-empty and contain no '.'")
@@ -139,6 +175,11 @@ class RequestSealer:
             raise SkeletonSealConfigError("principal must be non-empty and contain no '.'")
         if isinstance(ttl_secs, bool) or not isinstance(ttl_secs, int) or ttl_secs <= REMINT_MARGIN_SECS:
             raise SkeletonSealConfigError(f"ttl_secs must be an int > {REMINT_MARGIN_SECS}")
+        if domain is not None and not _V2_FIELD_RE.fullmatch(domain or ""):
+            raise SkeletonSealConfigError("domain must match [A-Za-z0-9_:-]{1,128}")
+        if domain is not None and ttl_secs > MAX_V2_TTL_SECS:
+            raise SkeletonSealConfigError(f"ttl_secs must be <= {MAX_V2_TTL_SECS} for v2 seals")
+        self._domain = domain
         self._attester = attester
         self._principal = principal
         self._secret = seal_secret  # None -> read GF_SEAL_SECRET / GF_SEAL_KEYRING at mint time
@@ -149,11 +190,19 @@ class RequestSealer:
         self._expiry = 0.0
 
     def __repr__(self) -> str:  # never expose secret/token
-        return f"RequestSealer(attester={self._attester!r}, principal={self._principal!r}, ttl_secs={self._ttl})"
+        return (
+            f"RequestSealer(attester={self._attester!r}, principal={self._principal!r}, "
+            f"domain={self._domain!r}, ttl_secs={self._ttl})"
+        )
 
     def _mint(self, now: float) -> str:
         token = mint_seal_token(
-            self._attester, self._ttl, secret=self._secret, principal=self._principal, now=now
+            self._attester,
+            self._ttl,
+            secret=self._secret,
+            principal=self._principal,
+            now=now,
+            domain=self._domain,
         )
         if not token:
             raise SkeletonSealConfigError(
@@ -164,6 +213,8 @@ class RequestSealer:
     def token(self) -> str:
         with self._lock:
             now = self._clock()
+            if self._domain is not None:  # v2: single-use, never cached
+                return self._mint(now)
             if self._token is None or now >= self._expiry - REMINT_MARGIN_SECS:
                 self._token = self._mint(now)
                 self._expiry = int(now) + self._ttl

@@ -42,6 +42,29 @@ class WebhookEvent:
     event_type: str
     session_id: str | None
     payment_status: str | None
+    amount_total: int | None = None
+    currency: str | None = None
+
+
+def paid_amount_matches(transaction: Mapping[str, Any], amount_total: Any, currency: Any) -> bool:
+    """Match provider cents to a persisted USD order without inventing legacy data."""
+    if not isinstance(transaction, Mapping) or type(amount_total) is not int or amount_total <= 0:
+        return False
+    amount = transaction.get("amount")
+    if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+        return False
+    stored_currency = transaction.get("currency")
+    if (not isinstance(stored_currency, str) or stored_currency.lower() != "usd"
+            or not isinstance(currency, str) or currency.lower() != "usd"):
+        return False
+    try:
+        decimal_amount = Decimal(str(amount))
+        if not decimal_amount.is_finite():
+            return False
+        cents = int((decimal_amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError, OverflowError):
+        return False
+    return 0 < cents <= 50_000_00 and cents == amount_total
 
 
 class StripeCheckout:
@@ -84,7 +107,7 @@ class StripeCheckout:
         return CheckoutStatus(
             status=str(getattr(session, "status", "") or "unknown"),
             payment_status=str(getattr(session, "payment_status", "") or "unknown"),
-            amount_total=int(amount) if isinstance(amount, int) else None,
+            amount_total=amount if type(amount) is int else None,
             currency=(str(getattr(session, "currency", "") or "") or None),
         )
 
@@ -100,7 +123,14 @@ class StripeCheckout:
                 payload, signature, self.webhook_secret
             )
 
-        event = await asyncio.to_thread(_construct)
+        try:
+            event = await asyncio.to_thread(_construct)
+        except Exception as exc:
+            signature_error = getattr(stripe, "SignatureVerificationError", None)
+            if (isinstance(exc, ValueError)
+                    or isinstance(signature_error, type) and isinstance(exc, signature_error)):
+                raise ValueError("webhook verification failed") from exc
+            raise
         event_type = str(event.get("type") or "")
         data = event.get("data") if isinstance(event, Mapping) else None
         obj = data.get("object") if isinstance(data, Mapping) else None
@@ -108,12 +138,12 @@ class StripeCheckout:
             obj = {}
         session_id = obj.get("id") if str(obj.get("object") or "") == "checkout.session" else None
         payment_status = obj.get("payment_status")
-        if event_type == "checkout.session.completed" and not payment_status:
-            payment_status = "paid"
         return WebhookEvent(
             event_type=event_type,
             session_id=str(session_id) if isinstance(session_id, str) else None,
             payment_status=str(payment_status) if isinstance(payment_status, str) else None,
+            amount_total=obj.get("amount_total") if type(obj.get("amount_total")) is int else None,
+            currency=obj.get("currency") if isinstance(obj.get("currency"), str) else None,
         )
 
 
