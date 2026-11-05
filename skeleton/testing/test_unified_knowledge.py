@@ -19,7 +19,8 @@ class TestUnifiedKnowledge(unittest.TestCase):
   self.assertEqual(b.text,"web evidence\n\nremembered")
   self.assertEqual(b.external_ids,("web",))
   self.assertEqual(len(b.memory_ids),1)
-  self.assertTrue(all(not x.mandatory for x in b.compiled.items))
+  self.assertEqual(b.compiled.selected_ids,b.external_ids+b.memory_ids)
+  self.assertEqual(b.compiled.used_tokens,4)
  def test_priority_arbitrates_scarce_budget(self):
   b=compile_unified_knowledge("op",(ext("web","web evidence",2,10),),mem(),token_budget=2)
   self.assertEqual(b.text,"web evidence")

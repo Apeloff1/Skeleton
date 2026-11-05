@@ -78,6 +78,156 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conn.close()
         return status, json.loads(raw_response), headers_received
 
+    def test_mac_longform_virtual_memory_requires_approval_and_verifies_pages(self) -> None:
+        root = self.folder / "longform-books"
+        root.mkdir()
+        text = "continuity and long context " * 10000
+        (root / "manuscript.txt").write_text(text, encoding="utf-8")
+        selected = {
+            "root": str(root), "relative_path": "manuscript.txt",
+            "approved": False,
+        }
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected, authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected,
+        )
+        self.assertEqual(status, 403)
+        selected["approved"] = True
+        status, result, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(result["source_bytes"], len(text.encode("utf-8")))
+        self.assertGreater(result["page_count"], 1)
+        source_id = result["source_id"]
+        status, verified, _ = self._request(
+            "POST", "/v1/resources/longform/verify",
+            {"source_id": source_id},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(verified["verified"])
+        status, hit, _ = self._request(
+            "POST", "/v1/resources/longform/search",
+            {"source_id": source_id, "query": "continuity", "limit": 2},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(hit["hits"])
+        self.assertFalse(hit["model_context_applied"])
+        status, page, _ = self._request(
+            "POST", "/v1/resources/longform/window",
+            {"source_id": source_id, "start_page": 0, "pages": 1},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(text.startswith(page["text"]))
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/window",
+            {"source_id": "../escape"},
+        )
+        self.assertEqual(status, 422)
+
+    def test_longform_work_cursor_http_cas_replay_and_resume(self) -> None:
+        import secrets
+        source = self.folder / "work"
+        source.mkdir()
+        (source / "book.txt").write_text(
+            "verified chapter and longform continuity " * 8000,
+            encoding="utf-8",
+        )
+        status, result, _ = self._request(
+            "POST", "/v1/resources/longform/ingest",
+            {"root": str(source), "relative_path": "book.txt",
+             "approved": True},
+        )
+        self.assertEqual(status, 201)
+        sid = result["source_id"]
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-start",
+            {"source_id": sid, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        status, started, _ = self._request(
+            "POST", "/v1/resources/longform/work-start",
+            {"source_id": sid, "approved": True},
+        )
+        self.assertEqual(status, 201)
+        self.assertGreater(started["total_pages"], 1)
+        work = started["work_id"]
+        request_id = secrets.token_hex(24)
+        payload = {
+            "work_id": work, "expected_revision": 0,
+            "request_id": request_id, "pages": 1,
+        }
+        status, one, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(one["next_page"], 1)
+        self.assertTrue(one["progress_committed"])
+        status, replay, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["receipt_digest"], one["receipt_digest"])
+        self.assertEqual(replay["text"], one["text"])
+        status, resumed, _ = self._request(
+            "POST", "/v1/resources/longform/work-status", {"work_id": work},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(resumed["revision"], 1)
+        payload["request_id"] = secrets.token_hex(24)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 422)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-status", {"work_id": work},
+            authorized=False,
+        )
+        self.assertEqual(status, 401)
+
+    def test_resource_fabric_auth_and_readonly_multisource_staging(self) -> None:
+        status, _, _ = self._request(
+            "GET", "/v1/resources", authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, monitor, _ = self._request("GET", "/v1/resources")
+        self.assertEqual(status, 200)
+        self.assertEqual(monitor["schema"], "skeleton.offline.resource-fabric.v1")
+        self.assertFalse(monitor["shared_memory_is_additive"])
+        self.assertEqual(monitor["gpu_backend_binding"], "advisory_only")
+        status, planned, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "desired_streams": 2,
+        })
+        self.assertEqual(status, 200)
+        self.assertFalse(planned["backend_gpu_transfer_executed"])
+        self.assertTrue(planned["evidence_digest"])
+        source = self.folder / "selected"
+        source.mkdir()
+        (source / "first.txt").write_text("immutable selected file")
+        (source / "second.txt").write_text("another verified local file")
+        request = {
+            "root": str(source), "paths": ["first.txt", "second.txt"],
+            "desired_streams": 2, "approved": False,
+        }
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 403)
+        request["approved"] = True
+        status, output, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 200)
+        self.assertTrue(output["verified"])
+        self.assertFalse(output["gpu_transfer_executed"])
+        self.assertEqual(len(output["sources"]), 2)
+        self.assertTrue(all(item["readonly"] for item in output["sources"]))
+        self.assertEqual((source / "first.txt").read_text(),
+                         "immutable selected file")
+        request["paths"] = ["../http.sqlite3"]
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 422)
+
     def test_native_local_http_roundtrip_and_exactly_once_retry(self) -> None:
         status, health, _ = self._request("GET", "/v1/status")
         self.assertEqual(status, 200)
