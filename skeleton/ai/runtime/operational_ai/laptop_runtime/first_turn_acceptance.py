@@ -37,6 +37,15 @@ def run(
         require_activated_source(worker, installed_receipt)
         if installed_receipt is not None else None
     )
+    if source is not None:
+        # A substituted partial/boolean source result can never turn a
+        # synthetic generator into a positive installed GGUF witness.
+        if (type(source) is not dict or set(source) != {
+            "model_sha256", "tokenizer_sha256",
+            "manifest_sha256", "archive_sha256", "source_sha",
+            "installed_model_bytes", "installed_shard_count",
+        }):
+            refuse("complete installed native source witness required")
     if require_real and source is None:
         refuse("independent installed source proof required")
     # Validate the complete operator-supplied prompt before allocating a new
@@ -74,6 +83,17 @@ def run(
     # tenant-stale operator session after a principal epoch transition.
     if ActiveModel.from_supervisor(worker) != bound:
         refuse("native model identity changed during first-turn acceptance")
+    if source is not None:
+        # Commit and replay prove the output, not that an installed model
+        # stayed alive with the same archive, tokenizer, rights evidence and
+        # kernel-fenced capacity lease while inference was in flight.
+        # This check is read-only. A failed check preserves SQLite custody
+        # and MUST NOT trigger a second native forward pass.
+        observed = require_activated_source(worker, installed_receipt)
+        if type(observed) is not dict or observed != source:
+            refuse("verified native source changed after model generation")
+        if ActiveModel.from_supervisor(worker) != bound:
+            refuse("native principal changed after final source verification")
 
     return {
         "schema": "laptop-real-first-turn-e2e.v1",
