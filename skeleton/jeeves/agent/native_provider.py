@@ -166,10 +166,12 @@ class NativeJeevesProvider:
                         seed=0, temperature=temperature,
                     )
                 except ContractViolation as exc:
-                    # The lower native commit/identity boundary fails closed.
-                    # Keep the public Jeeves provider error contract stable
-                    # without retrying an uncertain native forward pass or
-                    # clearing the already-reserved attempt identity.
+                    # Keep public failures precise without disclosing private
+                    # native source details or retrying an uncertain effect.
+                    if not self.available():
+                        raise ProviderError(
+                            "active native principal changed during generation"
+                        ) from exc
                     raise ProviderError(
                         "native generation did not meet committed source contract"
                     ) from exc
