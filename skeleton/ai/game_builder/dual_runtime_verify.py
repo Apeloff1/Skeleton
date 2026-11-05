@@ -271,6 +271,10 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
                 markers["H"], solve_safe_path(rows),
             ))
         world = PlayableWorld(intent, tuple(levels), manifest["world_algorithm"])
+    except DualRuntimeVerificationError:
+        # Preserve explicit bounded-input rejection categories. They are
+        # canonical fixed messages, never an echo of hostile world content.
+        raise
     except (KeyError, IndexError, TypeError, ValueError) as exc:
         raise DualRuntimeVerificationError("invalid canonical world geometry") from exc
     if (world.digest != manifest.get("world_digest")
