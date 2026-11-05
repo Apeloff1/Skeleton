@@ -92,3 +92,29 @@ def test_port_override_rejects_credential_or_fragment_url(tmp_path: Path, public
             manifest=replace(manifest, services=services),
             environ={"FRONTEND_PORT": "31999"},
         )
+
+
+@pytest.mark.parametrize(
+    "public_url",
+    [
+        "http://localhost:invalid/",
+        "http://localhost:99999/",
+        "http://localhost/",
+        "http://[::1]:invalid/",
+        "http://127.0.0.1:0/",
+    ],
+)
+def test_port_override_rejects_invalid_manifest_authority(
+    tmp_path: Path, public_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="public URL port"):
+        public_service_urls(
+            tmp_path,
+            manifest=replace(manifest, services=services),
+            environ={"FRONTEND_PORT": "31999"},
+        )
