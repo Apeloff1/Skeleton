@@ -10,7 +10,8 @@ import os
 from pathlib import Path
 import sys
 from .contracts import ContractViolation,token,utf8
-from .dispatcher import LaptopDispatcher
+from .source_guard import LocalSourceFence, SourceFencedLaptopDispatcher
+from .publication import emit_native_jsonl
 from .run_once import generate_once
 from .first_turn_acceptance import run as run_first_turn_acceptance
 from .cold_reopen_acceptance import run as run_cold_reopen_acceptance
@@ -126,6 +127,9 @@ def main(argv=None):
             capacity_budget_bytes=args.capacity_budget_bytes,
             inference_ms=args.inference_ms)
         with stack:
+            source_fence=LocalSourceFence(
+                worker,installed,tenant=args.tenant,subject=args.subject,
+            )
             if args.mode=="acceptance":
                 result=run_first_turn_acceptance(
                     worker,prompt=message,approved=True,
@@ -133,24 +137,31 @@ def main(argv=None):
                 )
                 # Return only hashes, counts and the new durable identifiers,
                 # never the private stdin prompt or raw model output.
-                print(json.dumps({
+                emit_native_jsonl(worker,source_fence,{
                     "status":"real-first-turn-native-replay-checked",
                     "evidence":result,
                     "release_certified":False,
-                },sort_keys=True,ensure_ascii=False))
+                },sys.stdout)
                 return 0
             if args.mode=="once":
                 result=generate_once(worker,message,session=args.session,
                                      request_id=args.request_id)
-                print(json.dumps({"status":"real-offline-turn-committed",
-                                  "output":result},sort_keys=True,ensure_ascii=False))
+                emit_native_jsonl(worker,source_fence,{
+                    "status":"real-offline-turn-committed",
+                    "output":result,
+                    "release_certified":False,
+                },sys.stdout)
                 return 0
-            with LaptopHTTPServer(("127.0.0.1",args.port),
-                                  LaptopDispatcher(worker),bearer) as server:
-                print(json.dumps({"status":"native-loopback-listening",
+            with LaptopHTTPServer(
+                ("127.0.0.1",args.port),
+                SourceFencedLaptopDispatcher(worker,source_fence),bearer,
+            ) as server:
+                emit_native_jsonl(worker,source_fence,{
+                    "status":"native-loopback-listening",
                     "host":"127.0.0.1","port":server.server_port,
                     "model_sha256":worker.spine.identity.model_sha256,
-                    "release_certified":False},sort_keys=True),flush=True)
+                    "release_certified":False,
+                },sys.stdout)
                 server.serve_forever(poll_interval=0.2)
         return 0
     except (Exception,KeyboardInterrupt) as exc:

@@ -34,6 +34,20 @@ def dispatch(raw, *, options=()):
             "skeleton.ai.runtime.operational_ai.laptop_runtime.cli.activate_checked",
             return_value=(nullcontext(),worker,object()),
         ) as activate,
+        # Source-only fixtures must supply the exact independently
+        # inspected source to reach private prompt preservation checks.
+        # Production never accepts a fake worker or mock installed rights.
+        mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
+            return_value={
+                "model_sha256": MODEL, "tokenizer_sha256": "b"*64,
+                "archive_sha256": "c"*64,
+                "manifest_sha256": "d"*64,
+                "source_sha": "e"*40,
+                "installed_model_bytes": 2048,
+                "installed_shard_count": 1,
+            },
+        ),
         mock.patch(
             "skeleton.ai.runtime.operational_ai.laptop_runtime.cli.sys.stdin",
             stdin,

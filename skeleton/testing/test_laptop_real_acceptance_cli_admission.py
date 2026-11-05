@@ -39,6 +39,9 @@ def cli_args(*extra):
 def invoke(args, *, worker=None, input_data=b"private local AI prompt"):
     """CLI fake installed stack; never bypass source verification in production."""
     fake=FakeWorker() if worker is None else worker
+    # Synthetic CLI fixture must model the requested exact principal; the
+    # production installed-source fence never accepts a foreign operator.
+    fake.spine.identity.subject="operator"
     input_stream=SimpleNamespace(buffer=BytesIO(input_data))
     output=StringIO()
     error=StringIO()
@@ -53,6 +56,16 @@ def invoke(args, *, worker=None, input_data=b"private local AI prompt"):
         # separate installed-witness rejection test suite.
         mock.patch(
             "skeleton.ai.runtime.operational_ai.laptop_runtime.first_turn_acceptance.require_activated_source",
+            return_value={
+                "model_sha256": MODEL, "tokenizer_sha256": TOKENIZER,
+                "archive_sha256": "c"*64, "source_sha": "d"*40,
+                "manifest_sha256": "e"*64,
+                "installed_model_bytes": 1024,
+                "installed_shard_count": 1,
+            },
+        ),
+        mock.patch(
+            "skeleton.ai.runtime.operational_ai.laptop_runtime.source_guard.require_activated_source",
             return_value={
                 "model_sha256": MODEL, "tokenizer_sha256": TOKENIZER,
                 "archive_sha256": "c"*64, "source_sha": "d"*40,
