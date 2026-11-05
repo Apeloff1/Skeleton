@@ -150,7 +150,9 @@ class PrivateCapsulePlan:
             or self.static_status not in ("parse-clean", "mixed-unverified")
             or not _sha(self.python_graph_sha256)
             or not _sha(self.capsule_sha256)
-            or self.capsule_sha256 != _capsule_digest(self)
+            or self.capsule_sha256 != _capsule_digest(
+                self.patch, self.originals, self.python_graph_sha256,
+            )
         ):
             raise PrivateCapsuleHold("selected project capsule identity changed")
 
@@ -177,14 +179,17 @@ class PrivateCapsulePlan:
         }
 
 
-def _capsule_digest(plan: PrivateCapsulePlan) -> str:
+def _capsule_digest(
+    patch: PortablePatchPlan, originals: tuple[FrozenSource, ...],
+    python_graph_sha256: str,
+) -> str:
     return _hash(_canonical({
         "schema": SCHEMA,
-        "original_root_device": plan.patch.root_device,
-        "original_root_inode": plan.patch.root_inode,
-        "source_manifest_sha256": plan.patch.manifest_sha256,
-        "patch_sha256": plan.patch.patch_sha256,
-        "python_graph_sha256": plan.python_graph_sha256,
+        "original_root_device": patch.root_device,
+        "original_root_inode": patch.root_inode,
+        "source_manifest_sha256": patch.manifest_sha256,
+        "patch_sha256": patch.patch_sha256,
+        "python_graph_sha256": python_graph_sha256,
         "originals": [
             {
                 "path": s.path, "sha256": s.digest,
@@ -192,9 +197,9 @@ def _capsule_digest(plan: PrivateCapsulePlan) -> str:
                 "ctime_ns": s.ctime_ns, "mtime_ns": s.mtime_ns,
                 "mode": s.mode,
             }
-            for s in plan.originals
+            for s in originals
         ],
-        "changes": [e.public() for e in plan.patch.entries],
+        "changes": [e.public() for e in patch.entries],
     }))
 
 
@@ -241,23 +246,23 @@ def prepare_private_capsule(
         raise PrivateCapsuleHold("selected original source cannot be trusted") from exc
     finally:
         os.close(root_fd)
-    preliminary = PrivateCapsulePlan.__new__(PrivateCapsulePlan)
-    # A frozen dataclass gets its digest from the exact completed selected
-    # snapshot. No model output or project path is serialized into stdout.
-    object.__setattr__(preliminary, "patch", patch)
-    object.__setattr__(preliminary, "originals", tuple(originals))
-    object.__setattr__(preliminary, "python_graph_sha256", graph.graph_sha256)
-    object.__setattr__(preliminary, "static_status", static.status)
-    object.__setattr__(preliminary, "original_bytes", total)
-    object.__setattr__(
-        preliminary, "total_bytes",
-        total + sum(e.replacement_bytes for e in patch.entries),
+    selected = tuple(originals)
+    planned = PrivateCapsulePlan(
+        patch=patch,
+        originals=selected,
+        capsule_sha256=_capsule_digest(
+            patch, selected, graph.graph_sha256,
+        ),
+        original_bytes=total,
+        total_bytes=total + sum(
+            entry.replacement_bytes for entry in patch.entries
+        ),
+        static_status=static.status,
+        python_graph_sha256=graph.graph_sha256,
     )
-    object.__setattr__(preliminary, "capsule_sha256", _capsule_digest(preliminary))
-    preliminary.__post_init__()
     revalidate_live_sources(patch)
-    _revalidate_selected(preliminary)
-    return preliminary
+    _revalidate_selected(planned)
+    return planned
 
 
 def _revalidate_selected(plan: PrivateCapsulePlan) -> None:
