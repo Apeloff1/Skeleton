@@ -15,6 +15,7 @@
 ╚════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
+import math
 import os
 import random
 import time
@@ -171,6 +172,42 @@ def seed_all(target_multiplier: float = 1.0, force: bool = False, subset: list[s
     force=False skips domains whose shard already exists on disk.
     subset=[ids] limits which domains are seeded (useful for incremental).
     """
+    # Protect direct callers as well as the HTTP/Pydantic boundary. Reject
+    # nonfinite and invalid multipliers before opening DB connections, writing
+    # archives or materializing any row generator.
+    if (
+        isinstance(target_multiplier, bool)
+        or not isinstance(target_multiplier, (int, float))
+        or not math.isfinite(target_multiplier)
+        or not 0 < target_multiplier <= 200
+    ):
+        raise ValueError("target_multiplier must be finite and within (0, 200]")
+
+    # None means all domains; an explicitly empty selection means NO domains.
+    # Validate membership before any database connection or destructive force.
+    requested: set[str] | None = None
+    if subset is not None:
+        allowed = {domain["id"] for domain in SWARM_DOMAINS}
+        if (
+            not isinstance(subset, (list, tuple))
+            or len(subset) > len(allowed)
+            or any(type(item) is not str or item not in allowed for item in subset)
+        ):
+            raise ValueError("seed subset must contain at most 200 known swarm agent IDs")
+        requested = set(subset)
+        if not requested:
+            stats = vault_stats()
+            return {
+                "elapsed_sec": 0.0,
+                "created": 0,
+                "skipped": 0,
+                "total_shards": stats["shard_count"],
+                "total_rows": stats["total_rows"],
+                "compressed_mb": round(stats["total_compressed_bytes"] / 1024 / 1024, 2),
+                "raw_mb": round(stats["total_raw_bytes"] / 1024 / 1024, 2),
+                "avg_ratio": stats["avg_compression_ratio"],
+            }
+
     client = MongoClient(_MONGO_URL, connect=False, serverSelectionTimeoutMS=5000)
     db = client[_DB_NAME]
     manifest = db[MANIFEST_COLLECTION]
@@ -183,7 +220,7 @@ def seed_all(target_multiplier: float = 1.0, force: bool = False, subset: list[s
     skipped: list[str] = []
 
     for d in SWARM_DOMAINS:
-        if subset and d["id"] not in subset:
+        if requested is not None and d["id"] not in requested:
             continue
         name = d["id"]
         existing = get_shard_entry(name)
