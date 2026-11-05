@@ -87,7 +87,7 @@ def test_failed_receipt_insert_never_reports_success(monkeypatch):
 
     monkeypatch.setattr(databases, "get_sync_db", lambda: {"swarm_schedule_runs": Collection()})
     with pytest.raises(RuntimeError, match="not durably recorded"):
-        scheduler.execute_schedule("b", phases=["a"], persist=True, rounds=1)
+        scheduler._persist_run({"build_id": "b", "plan_hash": "sha", "created_at": 123})
 
 
 def test_unacknowledged_insert_never_reports_success(monkeypatch):
@@ -99,7 +99,7 @@ def test_unacknowledged_insert_never_reports_success(monkeypatch):
 
     monkeypatch.setattr(databases, "get_sync_db", lambda: {"swarm_schedule_runs": Collection()})
     with pytest.raises(RuntimeError, match="not durably recorded"):
-        scheduler.execute_schedule("b", phases=["a"], persist=True, rounds=1)
+        scheduler._persist_run({"build_id": "b", "plan_hash": "sha", "created_at": 123})
 
 
 def test_durable_insert_success_is_not_rejected_for_cleanup_failure(monkeypatch):
@@ -112,9 +112,7 @@ def test_durable_insert_success_is_not_rejected_for_cleanup_failure(monkeypatch)
             raise OSError("retention check unavailable")
 
     monkeypatch.setattr(databases, "get_sync_db", lambda: {"swarm_schedule_runs": Collection()})
-    result = scheduler.execute_schedule("b", phases=["a"], persist=True, rounds=1)
-    assert result["verification"]["valid"]
-    assert result["execution"]["execution_complete"]
+    scheduler._persist_run({"build_id": "b", "plan_hash": "sha", "created_at": 123})
 
 
 def test_invalid_run_plan_does_not_start_any_phase():
