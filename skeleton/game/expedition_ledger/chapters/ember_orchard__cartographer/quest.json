@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "ember_orchard__cartographer",
+  "chapter": 22,
+  "title": "Ember Orchard: The Cartographer's Seed Archive",
+  "theme": "ember_orchard",
+  "discipline": "cartographer",
+  "region": "Ember Orchard",
+  "premise": "In a volcanic garden whose fruit germinates in cooling ash, the cartographer must chart hidden passages before nightfall using a living contour chart.",
+  "signal": "cinder lantern",
+  "key_name": "cinder lantern attunement",
+  "objective_name": "Seed Archive",
+  "ending": "Recover the Seed Archive and return with the charted evacuation line; Orchard Keepers can finally verify the source testimony.",
+  "faction": "Orchard Keepers",
+  "challenge": "Survive thermal surge while evading the ashwood guardian without sacrificing the charted evacuation line.",
+  "choice_yes": "Disclose evidence and ask Orchard Keepers to witness the living contour chart.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to publish an unsafe shortcut",
+  "tool": "living contour chart",
+  "reward": "charted evacuation line",
+  "enemy": "ashwood guardian",
+  "chapter_links": [
+    "saltglass_cavern__navigator",
+    "ember_orchard__diplomat"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

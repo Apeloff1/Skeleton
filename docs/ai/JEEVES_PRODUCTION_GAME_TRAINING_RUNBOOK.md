@@ -136,6 +136,19 @@ then exclusively publishes two JSONL files and a SHA-pinned manifest.
 A builder receipt remains a review declaration, NOT legal verification
 or proof of game-design quality.
 
+Intake, manifest and dataset reads are bounded and reject observed replacement
+or modification while being read. The split check rejects exact short passages
+embedded across training and held-out prompts or answers, as well as the existing
+longer overlap checks. This is contamination screening, not proof of semantic
+independence.
+
+The manifest is published last. If publication is interrupted or a destination
+changes during publication, existing files are retained for inspection; the
+builder does not delete names that another process could have replaced. Inspect
+the output before retrying with a new prefix. A successful receipt binds the
+accepted staged bytes and published paths; later edits still require fresh
+admission by the production loader.
+
 All eight families need at least four TRAIN examples and two HELDOUT examples:
 mechanics, narrative, npc, world, economy, tooling, accessibility and review.
 This is a minimum STRUCTURAL validity threshold, NOT a recommended dataset
