@@ -52,6 +52,56 @@ def test_manifest_payload_is_json_serializable():
     assert '"machine/ai_app_construction.json"' in encoded
 
 
+def test_backend_image_python_guard_accepts_current_pinned_abi():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    assert backend_python_image_errors(source) == ()
+    actual = next(
+        item for item in preflight(root) if item.code == "image:backend-python"
+    )
+    assert actual.ok
+
+
+def test_backend_image_python_315_bump_is_rejected_before_setup():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace("FROM python:3.14-alpine@", "FROM python:3.15-alpine@")
+    assert bumped != source
+    errors = backend_python_image_errors(bumped)
+    assert any("violates its dependency guard" in error for error in errors)
+
+
+def test_backend_image_stage_version_drift_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace(
+        "FROM python:3.14-alpine@", "FROM python:3.15-alpine@", 1
+    )
+    errors = backend_python_image_errors(bumped)
+    assert any("share the same pinned" in error for error in errors)
+
+
+def test_backend_image_guard_removal_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace(
+        "sys.version_info[:2] < (3, 15)", "sys.version_info[:2] >= (3, 10)"
+    )
+    assert changed != source
+    assert any(
+        "upper-bound guard is missing" in error
+        for error in backend_python_image_errors(changed)
+    )
+
+
 def test_structural_preflight_passes_for_repository_checkout():
     root = find_repo_root(Path(__file__))
     checks = preflight(root)
