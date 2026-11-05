@@ -142,6 +142,33 @@ class DesktopHost:
                     run_id=req["run_id"], agent=report,
                     physical_device_qualified=False,
                 ), False
+            if op == "durable":
+                # The existing NativeDurableJeevesAgent owns all real SQLite
+                # checkpoints, restart fences and explicit recovery authority.
+                from .desktop_durable_work import run_durable
+                report = run_durable(
+                    self.worker, self.source,
+                    action=req["action"],
+                    tenant=self.tenant, subject=self.subject,
+                    task=req["prompt"], run_id=req["run_id"],
+                    maximum_steps=req.get("maximum_steps", 8),
+                    maximum_model_calls=req.get("maximum_model_calls", 8),
+                    maximum_wall_seconds=req.get("maximum_wall_seconds", 180),
+                )
+                self._live()
+                status = report.get("status")
+                if status == "inspected":
+                    label = "durable-work-inspected"
+                elif status == "terminal-replayed":
+                    label = "durable-work-replayed"
+                elif status == "terminal-committed":
+                    label = "durable-work-committed"
+                else:
+                    raise DesktopHostHold("durable native result held for inspection")
+                return self._public(
+                    label, run_id=req["run_id"], durable=report,
+                    physical_device_qualified=False,
+                ), False
             if op == "new":
                 self.chat = self._chat_class(self.worker, source_fence=self.source)
                 self._live()

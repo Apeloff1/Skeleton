@@ -48,6 +48,7 @@ class JeevesWindow(tk.Tk):
         self.agent_steps = tk.StringVar(value="8")
         self.agent_calls = tk.StringVar(value="8")
         self.agent_wall = tk.StringVar(value="180")
+        self.durable_run_id = tk.StringVar(value="")
 
         self.fields: dict[str, tk.StringVar] = {
             "model_root": tk.StringVar(value=""),
@@ -214,6 +215,30 @@ class JeevesWindow(tk.Tk):
             text="Strict planning; same GGUF; no tool grants",
         ).grid(row=0, column=3, sticky="w")
 
+        durable = ttk.LabelFrame(
+            compose, text="Restart-safe native work orders · exact task/budgets required",
+            padding=5,
+        )
+        durable.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(5, 0))
+        durable.columnconfigure(1, weight=1)
+        ttk.Label(durable, text="Durable run ID").grid(row=0, column=0, padx=(0, 7))
+        ttk.Entry(
+            durable, textvariable=self.durable_run_id, width=30,
+        ).grid(row=0, column=1, sticky="ew")
+        self.durable_buttons = []
+        for column, (label, work_action) in enumerate((
+            ("New durable work", "start"),
+            ("Inspect", "inspect"),
+            ("Resume explicitly", "resume"),
+            ("Replay terminal", "replay"),
+        ), start=2):
+            button = ttk.Button(
+                durable, text=label,
+                command=lambda action=work_action: self._durable(action),
+            )
+            button.grid(row=0, column=column, padx=3)
+            self.durable_buttons.append(button)
+
         footer = ttk.Frame(main)
         footer.grid(row=4, column=0, sticky="ew", pady=(5, 0))
         footer.columnconfigure(0, weight=1)
@@ -262,6 +287,7 @@ class JeevesWindow(tk.Tk):
         for button in (
             self.new_button, self.resume_button,
             self.telemetry_button, self.agent_button,
+            *self.durable_buttons,
         ):
             button.configure(state="normal" if active else "disabled")
         has_session = (
@@ -484,6 +510,47 @@ class JeevesWindow(tk.Tk):
             maximum_wall_seconds=wall,
         )
 
+    def _durable(self, action: str):
+        # The operator must use the original task/limits on cold reopen.
+        # No stored credentials, hidden run resume or model-granted tools.
+        bridge = self._bridge
+        if self._busy or bridge is None or not bridge.connected:
+            return
+        if action == "start":
+            run_id = "wrun_" + secrets.token_hex(16)
+            self.durable_run_id.set(run_id)
+        else:
+            run_id = self.durable_run_id.get().strip()
+            if not run_id:
+                self._show(
+                    "Durable work held", "Enter the original durable run ID",
+                    "warning",
+                )
+                return
+        message = self.prompt.get("1.0", "end-1c")
+        try:
+            original = compose_prompt(message, tuple(self._attachments))
+            steps = int(self.agent_steps.get())
+            calls = int(self.agent_calls.get())
+            wall = int(self.agent_wall.get())
+            if not (1 <= steps <= 64 and 1 <= calls <= 64 and 1 <= wall <= 600):
+                raise ValueError("invalid durable wall and step budget")
+        except (ValueError, DesktopAttachmentHold, UnicodeError) as exc:
+            self._show("Durable work held", type(exc).__name__, "warning")
+            return
+        self._last_request = run_id
+        self.request_text.set("Durable native " + action + ": " + run_id)
+        self._show(
+            "Durable operator " + action,
+            "Source-bound task and budget submitted under " + run_id
+            + ". No automatic recovery or tool grants.",
+        )
+        self._action(
+            "durable", action=action, run_id=run_id, prompt=original,
+            maximum_steps=steps, maximum_model_calls=calls,
+            maximum_wall_seconds=wall,
+        )
+
     def _keyboard_send(self, event):
         self._send()
         return "break"
@@ -579,6 +646,29 @@ class JeevesWindow(tk.Tk):
                                 result.get("observed", {}),
                                 ensure_ascii=False, sort_keys=True,
                             ),
+                        )
+                    elif action == "durable":
+                        report = result.get("durable", {})
+                        self.durable_run_id.set(str(report.get("run_id", "")))
+                        if report.get("status") == "inspected":
+                            self._show(
+                                "Canonical SQLite durable checkpoint",
+                                json.dumps(
+                                    report.get("snapshot", {}),
+                                    ensure_ascii=False, sort_keys=True,
+                                ),
+                            )
+                        else:
+                            answer = report.get("answer", "")
+                            self._last_answer = answer if type(answer) is str else None
+                            self._show(
+                                "Jeeves durable native result",
+                                str(answer), "jeeves",
+                            )
+                        self.request_text.set(
+                            "Durable " + str(report.get("action", ""))
+                            + ": " + str(report.get("run_id", ""))
+                            + " · original task/budgets needed for cold recovery",
                         )
                     elif action == "agent":
                         report = result.get("agent", {})

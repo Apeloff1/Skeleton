@@ -148,6 +148,10 @@ class DesktopBridge:
         "status": frozenset(("ready", "no-active-session")),
         "telemetry": frozenset(("observed-runtime-capacity",)),
         "agent": frozenset(("verified-agent-response",)),
+        "durable": frozenset((
+            "durable-work-inspected", "durable-work-committed",
+            "durable-work-replayed",
+        )),
         "new": frozenset(("new-durable-session",)),
         "resume": frozenset(("existing-durable-session-reopened",)),
         "turn": frozenset(("committed-native-chat-turn",)),
@@ -225,6 +229,60 @@ class DesktopBridge:
                 raise DesktopBridgeHold("agent answer contains invalid Unicode") from exc
             if observed != proof:
                 raise DesktopBridgeHold("agent answer differs from source-checked bytes")
+        if op == "durable":
+            report = result.get("durable")
+            action = fields["action"]
+            expected = {
+                "start": ("durable-work-committed", "terminal-committed", True),
+                "resume": ("durable-work-committed", "terminal-committed", True),
+                "inspect": ("durable-work-inspected", "inspected", False),
+                "replay": ("durable-work-replayed", "terminal-replayed", False),
+            }[action]
+            if (
+                type(report) is not dict
+                or result.get("status") != expected[0]
+                or report.get("status") != expected[1]
+                or report.get("schema") != "jeeves.desktop.durable-work.v1"
+                or report.get("action") != action
+                or report.get("run_id") != fields["run_id"]
+                or result.get("run_id") != fields["run_id"]
+                or report.get("model_sha256") != self.model_sha256
+                or report.get("native_generation_executed") is not expected[2]
+                or report.get("device_qualified") is not False
+                or report.get("release_certified") is not False
+                or report.get("automatic_resume") is not False
+            ):
+                raise DesktopBridgeHold("durable SQLite work response not authorized")
+            if action == "inspect":
+                snapshot = report.get("snapshot")
+                if (
+                    type(snapshot) is not dict
+                    or snapshot.get("schema") != "jeeves.native_durable_run.v1"
+                    or snapshot.get("run_id") != fields["run_id"]
+                    or snapshot.get("model_sha256") != self.model_sha256
+                    or snapshot.get("device_qualified") is not False
+                    or snapshot.get("release_certified") is not False
+                ):
+                    raise DesktopBridgeHold("durable checkpoint inspection not source bound")
+            else:
+                if (
+                    report.get("success") is not True
+                    or type(report.get("usage")) is not dict
+                    or report["usage"].get("tool_calls") != 0
+                    or (action == "replay")
+                    is not (report.get("replayed_without_native_generation") is True)
+                ):
+                    raise DesktopBridgeHold("durable terminal result missing committed proof")
+                answer = report.get("answer")
+                proof = report.get("output_sha256")
+                if type(answer) is not str or type(proof) is not str:
+                    raise DesktopBridgeHold("durable terminal answer or digest missing")
+                try:
+                    observed = sha256(answer.encode("utf-8", "strict")).hexdigest()
+                except UnicodeError as exc:
+                    raise DesktopBridgeHold("durable terminal text invalid Unicode") from exc
+                if observed != proof:
+                    raise DesktopBridgeHold("durable committed answer differs from SQLite bytes")
         if op == "history":
             if (
                 type(result.get("messages")) is not list
@@ -294,7 +352,12 @@ class DesktopBridge:
                 min(660.0, self.config.inference_ms / 1000.0 + 45.0)
                 if op == "turn" else (
                     min(660.0, float(fields.get("maximum_wall_seconds", 180)) + 45.0)
-                    if op == "agent" else 30.0
+                    if (
+                        op == "agent" or (
+                            op == "durable" and fields.get("action")
+                            in ("start", "resume")
+                        )
+                    ) else 30.0
                 )
             )
             watchdog = threading.Timer(deadline, self.abort)

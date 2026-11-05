@@ -122,6 +122,10 @@ _ALLOWED: dict[str, tuple[frozenset[str], frozenset[str]]] = {
         frozenset({"run_id", "prompt"}),
         frozenset({"maximum_steps", "maximum_model_calls", "maximum_wall_seconds"}),
     ),
+    "durable": (
+        frozenset({"run_id", "prompt", "action"}),
+        frozenset({"maximum_steps", "maximum_model_calls", "maximum_wall_seconds"}),
+    ),
     "new": (frozenset(), frozenset()),
     "resume": (frozenset({"session_id"}), frozenset()),
     "turn": (frozenset({"request_id", "prompt"}), frozenset({"seed", "temperature", "context"})),
@@ -145,6 +149,13 @@ def command(op: str, **fields: object) -> dict[str, object]:
         result["session_id"] = identifier(fields["session_id"], "session ID")
     if "run_id" in fields:
         result["run_id"] = identifier(fields["run_id"], "native agent run ID")
+    if "action" in fields:
+        if (
+            type(fields["action"]) is not str
+            or fields["action"] not in ("start", "inspect", "resume", "replay")
+        ):
+            raise DesktopProtocolHold("invalid explicit durable action")
+        result["action"] = fields["action"]
     if "request_id" in fields:
         result["request_id"] = identifier(fields["request_id"], "request ID")
     if "prompt" in fields:
@@ -177,7 +188,7 @@ def require_command(value: object) -> dict[str, object]:
     if type(value) is not dict or set(value) - (
         {"schema", "op", "session_id", "request_id", "prompt", "seed", "temperature",
          "context", "run_id", "maximum_steps", "maximum_model_calls",
-         "maximum_wall_seconds"}
+         "maximum_wall_seconds", "action"}
     ):
         raise DesktopProtocolHold("desktop command envelope has unknown fields")
     if value.get("schema") != SCHEMA_COMMAND:

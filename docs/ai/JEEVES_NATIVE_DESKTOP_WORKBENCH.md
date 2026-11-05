@@ -206,3 +206,41 @@ window, but doing so never confers file-write permission. The GUI agent lane
 is **in-process reasoning only**, not a claim of restart-safe durable agent
 checkpoints; the existing separately guarded durable operator CLI remains
 available for explicit cold recovery.
+
+## Cold-restart-safe durable Jeeves work
+
+The desktop **Durable work orders** controls delegate to the original
+`NativeDurableJeevesAgent` and its one authoritative SQLite journal. These
+are not auto-run jobs, a background task scheduler or a separate database.
+
+Choose **New durable work** while a source-checked native worker is connected.
+The UI allocates and displays a fresh immutable `wrun_...` ID. The worker
+binds that ID to the **exact original task, maximum steps, maximum model
+calls, wall-time budget, tenant, subject, model and tokenizer** before any
+native work. Keep the run ID, task and budget values yourself. A later
+connection may use **Inspect**, **Resume explicitly**, or **Replay terminal**
+with precisely those original details:
+
+- **Inspect:** read-only authoritative checkpoint state. Never regenerates
+  or interprets a missing model outcome as success.
+- **Resume explicitly:** only at the operator's instruction. The existing
+  `NativeDurableJeevesAgent` checks the sealed chain, rejects pending
+  generation uncertainty, unsafe tool steps, changed owner/source/input,
+  terminal checkpoints and conflicting attempts.
+- **Replay terminal:** reads a previously committed sealed SQLite result
+  without creating a new model effect. A failed terminal run is a hold,
+  not a false completed result.
+
+No implicit tool grants, file edits, internet calls, memory promotion or
+automatic native retries are created by the desktop. A failed or timed-out
+run can be inspected explicitly after a new independently admitted worker
+activation. The desktop does not automatically restart it.
+
+The private binary bridge checks `run_id`, action, source/model digest,
+verified terminal success, zero tool calls, release hold, exact answer
+SHA-256 and the distinction between **native generation** and **read-only
+inspection/replay** before displaying a result.
+
+**Important:** The model must actually be approved and installed locally.
+The source-level interface cannot certify physical CPU/GPU performance,
+Windows 11/WSL2 installation, legal rights, native cancellation, or release.
