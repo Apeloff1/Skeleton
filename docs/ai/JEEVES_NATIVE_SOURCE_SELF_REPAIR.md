@@ -141,3 +141,16 @@ bounded self-repair turns. After verification, the mixed
 response opens a fresh human-only Git patch review, not an
 automatic application or branch push. Full schema and
 operator flow: `docs/ai/JEEVES_NATIVE_MIXED_PROJECT_WORK.md`.
+
+## Terminal-first native coding without the desktop GUI
+
+`python -m skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_code_cli`
+runs the *same* source-repair loop on the *same* installed GGUF
+and SQLite child without Tk. A read-only `inspect` hashes
+the operator's task, source selection and resource budgets.
+A second `generate` call must reproduce those exact hashes
+and carry `--approve-native-generation` before a single
+new native/SQLite session can start. The CLI never runs Git,
+writes original sources or prints raw source code unless an
+additional `--emit-private-proposal` flag is supplied.
+`docs/ai/JEEVES_HEADLESS_NATIVE_CODE_GENERATION.md`.
