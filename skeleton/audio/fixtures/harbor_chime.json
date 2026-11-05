@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "patch_id": "SFX.HARBOR_CHIME",
+  "author": "Skeleton original audio studio",
+  "license": "CC0-1.0",
+  "waveform": "triangle",
+  "sample_rate": 16000,
+  "frequency_millihz": 660000,
+  "duration_ms": 300,
+  "gain_permille": 500,
+  "attack_ms": 20,
+  "release_ms": 100,
+  "seed": 1729
+}

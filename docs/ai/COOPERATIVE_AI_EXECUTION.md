@@ -2,7 +2,7 @@
 
 **Review and refine** is an opt-in response workflow inside the existing
 canonical AI execution runtime. It asks configured models to produce a public
-plan, a draft, an advisory critique and a refined answer under one original
+plan, one to three draft candidates, an advisory critique and a refined answer under one original
 request, source snapshot and resource grant. It uses actual provider calls;
 it does not create another provider service, grant tool authority or train
 model weights.
@@ -18,7 +18,8 @@ A model revising an answer does not establish that it built or played a game.
 The chat control is **off by default**. Enable **Review and refine** before
 sending the request. The default preset uses one critique/refinement round,
 a 512-token stage ceiling and the configured selected model. Open **Advanced**
-to choose one to three rounds, a 64–4,096-token stage ceiling, and an exact
+to choose one to three draft candidates, one to three rounds, a 64–4,096-token
+stage ceiling, and an exact
 available model for each role. The inventory shows current model capacities.
 Unavailable selections remain visible and block a new send until corrected.
 Changing settings performs no inference and does not activate providers.
@@ -52,6 +53,7 @@ conversation version, idempotency key or operation resource grant.
 | Setting | Behavior |
 | --- | --- |
 | `review_rounds` | Integer 1–3; defaults to 1 |
+| `draft_count` | Optional integer 1–3; defaults to 1; omitted from canonical policies when 1 |
 | `max_stage_output_tokens` | Integer 64–4,096; defaults to 512; a ceiling rather than a new grant |
 | `roles` | Optional overrides for `plan`, `draft`, `critique` and `refine`; defaults to an empty object |
 | Role override | Exactly `provider_id` and `model_id`, resolved against the configured scoped model inventory |
@@ -64,7 +66,23 @@ Stage order is fixed and sequential:
 | 2 | Above, then `critique:2`, `refine:2` | 384 tokens for 6 stages |
 | 3 | Above, then `critique:3`, `refine:3` | 512 tokens for 8 stages |
 
-Each later critique addresses the latest draft/refinement. A refinement receives
+For two or three candidates, add `"draft_count": 2` or `"draft_count": 3` to
+the policy. The plan is followed by `draft:1`, `draft:2`, and, when requested,
+`draft:3`, then the same critique/refinement rounds. Each draft receives the
+original request, history and public plan without the contents of sibling
+drafts. The first critique and refinement can compare all candidates. All draft
+candidates use the configured `draft` role and run sequentially. There is no
+promise of different answers or lower latency; additional drafts consume
+additional input, output, attempts and time.
+
+Total stages are `1 + draft_count + 2 * review_rounds`. Reserve at least 64
+aggregate output tokens per stage: three drafts and one review round need at
+least 384 tokens; three drafts and three rounds need at least 640 tokens.
+Verification may need further capacity within the same grant. Omitting
+`draft_count`, or selecting one, preserves existing policy/checkpoint identities
+and the original `draft` stage name.
+
+Each later critique addresses the latest refinement. A refinement receives
 the original brief, current public plan/draft, applicable critique and artifact
 lineage. These are untrusted task artifacts, not new instructions, permissions
 or evidence that a tool ran. The workflow requests concise public work products;
@@ -106,7 +124,7 @@ cost and deadline also remain within the parent operation's existing grant.
 Four stages with a 512-token ceiling do not automatically receive 2,048 tokens.
 A 256-token total allowance permits only the minimum four 64-token reservations,
 subject to all other readiness and admission checks. Increasing the number of
-rounds requires enough original attempt/turn credits and output for every
+rounds or draft candidates requires enough original attempt/turn credits and output for every
 remaining stage. A configured ceiling is not a promise that every stage will
 use it or that the final answer will have that many tokens.
 
@@ -142,7 +160,9 @@ A timer, a pending dispatch, a configured round count or a model saying
 "finished" cannot advance the completed-stage count. The expandable response
 record shows the actual participating models and output identities; when all
 roles used one model, it says so. Saved-turn and progress projections must match
-the canonical operation and its receipt prefix.
+the canonical operation and its receipt prefix. Multi-draft progress includes
+the immutable `draft_count`; mismatched counts, changed stage order and forged
+receipt prefixes are rejected.
 
 **4/4 stages recorded means the generation stages completed.** Final response
 verification and canonical conversation publication remain separate. A complete

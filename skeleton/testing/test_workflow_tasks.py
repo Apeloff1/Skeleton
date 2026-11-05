@@ -49,3 +49,28 @@ def test_workflow_task_depth_invariants_fail_closed():
  with pytest.raises(ValueError):classify("generic",profiles)
  e=ComplexityEstimate(1,0.2,"cal",(ComplexityFeature("x",1),ComplexityFeature("x",2)))
  with pytest.raises(ValueError):revise(e,1,0.2,"evidence")
+
+
+def test_unknown_task_never_inherits_privileged_generic_authority():
+    import pytest
+    profiles = {
+        TaskType.GENERIC: TaskProfile(TaskType.GENERIC, 1, (), ("write",)),
+        TaskType.CODE: TaskProfile(TaskType.CODE, 5, (), ("write",)),
+    }
+    with pytest.raises(ValueError, match="complete task profiles"):
+        classify("mystery", profiles)
+    with pytest.raises(ValueError, match="complete task profiles"):
+        classify("mystery", {TaskType.CODE: profiles[TaskType.CODE]})
+
+
+def test_known_task_requires_complete_and_matching_profiles():
+    import pytest
+    profiles = {
+        task: TaskProfile(task, 1, ()) for task in TaskType
+    }
+    assert classify("code", profiles).task_type is TaskType.CODE
+    profiles[TaskType.CODE] = TaskProfile(TaskType.GENERIC, 1, ())
+    with pytest.raises(ValueError, match="complete task profiles"):
+        classify("code", profiles)
+    with pytest.raises(ValueError, match="task label required"):
+        classify("", profiles)
