@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_cloud_canopy",
+  "title": "Cloud Canopy: Outer Settlement",
+  "subtitle": "Original outer settlement design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010311227,
+  "width": 27,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 13,
+  "theme": "forest",
+  "starting_health": 5
+}
