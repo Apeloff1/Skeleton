@@ -217,7 +217,7 @@ def parse_existing_edits(
     rows = doc["files"]
     if type(rows) is not list or not 1 <= len(rows) <= MAX_EDITS:
         raise ExistingEditHold("invalid number of proposed existing-file edits")
-    if type(root) not in (Path, str):
+    if not isinstance(root, (Path, str)):
         raise ExistingEditHold("explicit absolute trusted local root required")
     path = Path(root)
     if not path.is_absolute() or ".." in path.parts or chr(0) in str(path):

@@ -354,7 +354,7 @@ def search_workspace(
     terms = _terms(query)
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         raise DesktopSearchHold("trusted descriptor workspace search unavailable")
-    if type(root) not in (str, Path):
+    if not isinstance(root, (str, Path)):
         raise DesktopSearchHold("explicit absolute source root required")
     root_path = Path(root)
     if (

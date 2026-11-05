@@ -19,7 +19,7 @@ class DesktopProvisionHold(ValueError):
 
 
 def private_path(value: str | Path) -> Path:
-    if type(value) not in (str, Path):
+    if not isinstance(value, (str, Path)):
         raise DesktopProvisionHold("absolute private path required")
     path = Path(value)
     if (not path.is_absolute() or ".." in path.parts or chr(0) in str(path)

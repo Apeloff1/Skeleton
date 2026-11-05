@@ -56,7 +56,7 @@ class DesktopAttachment:
 
 
 def _check_selected_path(path: str | Path) -> Path:
-    if type(path) not in (str, Path):
+    if not isinstance(path, (str, Path)):
         raise DesktopAttachmentHold("explicit absolute local file required")
     selected = Path(path)
     if (not selected.is_absolute() or ".." in selected.parts

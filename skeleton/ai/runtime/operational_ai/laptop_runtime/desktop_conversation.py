@@ -88,11 +88,14 @@ def _decode_wrapped(text: str) -> str | None:
     if type(record["current_sha256"]) is not str or record["current_sha256"] != check:
         raise DesktopConversationHold("conversation original task digest changed")
     for row in record["history"]:
-        if type(row) is not dict or set(row) != {"role", "text"}:
+        # V1 native SQLite frames store historical user/assistant turns
+        # as {"role","content"}. This is a canonical data shape, not a
+        # permission grant. Keep old exact-byte committed prompts readable.
+        if type(row) is not dict or set(row) != {"role", "content"}:
             raise DesktopConversationHold("malformed historical source turn")
         if row["role"] not in ("user", "assistant"):
             raise DesktopConversationHold("unapproved historical source role")
-        _raw(row["text"], maximum=MAX_PROMPT)
+        _raw(row["content"], maximum=MAX_PROMPT)
     # Verify byte-identical canonical encoding. Fabricating a status flag is
     # not proof of identity, but this rules out ambiguous alternate encodings.
     serialized = json.dumps(

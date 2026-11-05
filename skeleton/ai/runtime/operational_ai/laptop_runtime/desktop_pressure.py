@@ -173,7 +173,7 @@ def observe_pressure(
     if type(policy) is not PressurePolicy:
         raise DesktopPressureHold("typed native pressure policy required")
     if (
-        type(state_dir) is not Path
+        not isinstance(state_dir, Path)
         or not state_dir.is_absolute()
         or ".." in state_dir.parts
         or chr(0) in str(state_dir)
@@ -247,7 +247,7 @@ class NativePressureSupervisor:
             or not callable(observation)
         ):
             raise DesktopPressureHold("typed owned native subprocess required")
-        if type(state_dir) is not Path or not state_dir.is_absolute():
+        if not isinstance(state_dir, Path) or not state_dir.is_absolute():
             raise DesktopPressureHold("canonical native state directory required")
         self.process = process
         self.state_dir = state_dir
