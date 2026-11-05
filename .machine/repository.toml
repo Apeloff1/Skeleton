@@ -664,7 +664,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "game-simulation-extensions"
-prefixes = ["skeleton/cs300/", "skeleton/emulation/", "skeleton/frontier_nav/", "skeleton/gameforge/", "skeleton/godot/"]
+prefixes = ["skeleton/cs300/", "skeleton/emulation/", "skeleton/frontier_nav/", "skeleton/gameforge/", "skeleton/godot/", "skeleton/godot_export/"]
 owner = "simulation-runtime"
 criticality = "high"
 purpose = "Game-engine, frontier navigation, emulator and gameforge simulation surfaces."
@@ -691,7 +691,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "automation-extensions"
-prefixes = ["skeleton/completion/", "skeleton/fix/", "skeleton/jobs/", "skeleton/maximise/", "skeleton/merge/", "skeleton/p3/", "skeleton/p4/", "skeleton/p5/"]
+prefixes = ["skeleton/completion/", "skeleton/fix/", "skeleton/jobs/", "skeleton/mass_build/", "skeleton/maximise/", "skeleton/merge/", "skeleton/p3/", "skeleton/p4/", "skeleton/p5/"]
 owner = "automation-control-plane"
 criticality = "medium"
 purpose = "Governed automation jobs, repository repair, merge orchestration and staged work."
