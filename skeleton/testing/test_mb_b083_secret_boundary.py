@@ -13,3 +13,73 @@ def test_evaluate():
     assert set(v.findings) == {"secret:b.log:pattern3", "long_lived:w", "wildcard_scope:w"}
 def test_bad_credential():
     with pytest.raises(m.ContractError): m.Credential("x", (), 5, 5)
+
+
+def test_secret_diagnostics_reject_unbounded_artifacts_and_audit_logs(monkeypatch):
+    with pytest.raises(m.ContractError, match="scan input"):
+        m.scan("x" * (m.MAX_ARTIFACT_CHARS + 1))
+    with pytest.raises(m.ContractError, match="artifact collection"):
+        m.evaluate({str(i): "safe" for i in range(m.MAX_ARTIFACTS + 1)}, [])
+    for bad in (True, -1, "0"):
+        with pytest.raises(m.ContractError):
+            m.Credential("bad", ("read",), bad, 10)
+    c = m.Credential("ci", ("read",), 0, 100)
+    ledger = m.CredentialLedger()
+    monkeypatch.setattr(m, "MAX_AUDIT_EVENTS", 1)
+    assert ledger.use(c, "read", 1)
+    with pytest.raises(m.ContractError, match="audit log"):
+        ledger.use(c, "read", 2)
+
+
+def test_secret_evidence_rejects_control_and_bidi_diagnostic_labels():
+    for bad in ("log" + chr(10) + "forged", "log" + chr(27) + "[31m", "log" + chr(0x202e) + "fake"):
+        with pytest.raises(m.ContractError, match="artifact path"):
+            m.evaluate({bad: "safe"}, [])
+        with pytest.raises(m.ContractError, match="credential name"):
+            m.Credential(bad, ("read",), 0, 60)
+        with pytest.raises(m.ContractError, match="credential scopes"):
+            m.Credential("valid", (bad,), 0, 60)
+        ledger = m.CredentialLedger()
+        with pytest.raises(m.ContractError, match="audit scope"):
+            ledger.use(m.Credential("valid", ("read",), 0, 60), bad, 1)
+        assert not ledger.events
+
+
+def test_secret_audit_refuses_unbounded_timestamp_and_untyped_credential():
+    for bad in (10**1000, m.MAX_AUDIT_TIMESTAMP + 1):
+        with pytest.raises(m.ContractError, match="lifetime"):
+            m.Credential("ci", ("read",), 0, bad)
+    cred = m.Credential("ci", ("read",), 0, 100)
+    ledger = m.CredentialLedger()
+    with pytest.raises(m.ContractError, match="audit time"):
+        ledger.use(cred, "read", 10**1000)
+    with pytest.raises(m.ContractError, match="credential"):
+        ledger.use(object(), "read", 1)
+    assert not ledger.events
+
+
+def test_credential_name_cannot_embed_secret_or_log_delimiters():
+    for bad in ("password=supersecret123", "token: secretvalue",
+                "name with spaces", "x\\tfield", "=malformed"):
+        with pytest.raises(m.ContractError, match="credential name"):
+            m.Credential(bad, ("read",), 0, 60)
+    assert m.Credential("ci-runner:release_1", ("read",), 0, 60).name == "ci-runner:release_1"
+
+
+def test_secret_scan_detects_temporary_aws_and_fine_grained_github_tokens():
+    # Synthetic fixtures: never embed actual credentials in the repository.
+    aws_temporary = "ASIA" + "A" * 16
+    github_fine_grained = "github_pat_" + "A" * 48
+    assert "pattern0" in m.scan("temporary " + aws_temporary)
+    assert "pattern4" in m.scan("token=" + github_fine_grained)
+    report = m.evaluate({"artifact.txt": "prefix " + github_fine_grained}, [])
+    assert not report.passed
+    assert "secret:artifact.txt:pattern4" in report.findings
+
+
+def test_secret_evidence_bounds_aggregate_content_and_reject_non_text(monkeypatch):
+    monkeypatch.setattr(m, "MAX_TOTAL_ARTIFACT_CHARS", 3)
+    with pytest.raises(m.ContractError, match="aggregate artifact content"):
+        m.evaluate({"a.txt": "ab", "b.txt": "cd"}, [])
+    with pytest.raises(m.ContractError, match="per-file bound"):
+        m.evaluate({"a.txt": object()}, [])
