@@ -1,0 +1,34 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "moonlit_breakwater__cartographer",
+  "hazard_damage": 2,
+  "guardian_damage": 2,
+  "recharge": 8,
+  "supply": 5,
+  "medicine": 2,
+  "faction_reputation": 1,
+  "choice_reputation": 1,
+  "lore_score": 7,
+  "guardian": "lighthouse revenant",
+  "hazard": "undertow gate",
+  "choice_context": "whether to publish an unsafe shortcut",
+  "witness": "Night Harbor Guild",
+  "min_health_to_explore": 1,
+  "max_turns": 256,
+  "available_branches": [
+    "main_causeway",
+    "faction_outpost",
+    "guardian_detour",
+    "lore_approach"
+  ],
+  "evidence_rules": [
+    "source_digest",
+    "bounded_command_replay",
+    "canonical_save_digest"
+  ],
+  "rewards": {
+    "main": "Harbor Charter",
+    "optional": "charted evacuation line"
+  },
+  "response_policy": "deterministic_once_per_tile"
+}

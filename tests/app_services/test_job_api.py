@@ -123,3 +123,30 @@ def test_module_level_api_and_background_worker(svc):
         assert job_api.get_result(h.job_id).result == {"done": True}
     finally:
         job_api.set_job_service(None)
+
+
+def test_application_close_keeps_database_open_if_worker_is_stuck(tmp_path):
+    import threading
+
+    from skeleton.app_services.container import AppServices
+
+    services = AppServices.open(tmp_path / "shutdown")
+    started, release = threading.Event(), threading.Event()
+    def blocked(ctx, payload):
+        started.set()
+        assert release.wait(5)
+        return {"done": True}
+    services.jobs.register_handler("blocked", blocked)
+    services.jobs.enqueue("blocked", {}, actor_id="owner", tenant_id="default")
+    worker = services.jobs.start_worker(poll_s=0.01)
+    try:
+        assert started.wait(5)
+        with pytest.raises(RuntimeError, match="application data remains open"):
+            services.close(worker_timeout_s=0.01)
+        assert services.db.query("SELECT 1")
+        with pytest.raises(RuntimeError, match="still stopping"):
+            services.jobs.start_worker()
+    finally:
+        release.set()
+        worker.stop(5)
+        services.close()

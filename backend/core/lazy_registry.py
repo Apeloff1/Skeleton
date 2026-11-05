@@ -71,6 +71,7 @@ _LOADERS = {
     'core.content_store': lambda: importlib.import_module('core.content_store'),
     'core.contradiction_resolver': lambda: importlib.import_module('core.contradiction_resolver'),
     'core.control_plane': lambda: importlib.import_module('core.control_plane'),
+    'core.core_v1_webhooks': lambda: importlib.import_module('core.core_v1_webhooks'),
     'core.control_plane_deployment': lambda: importlib.import_module('core.control_plane_deployment'),
     'core.conversations': lambda: importlib.import_module('core.conversations'),
     'core.course_runtime': lambda: importlib.import_module('core.course_runtime'),
