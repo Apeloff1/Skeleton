@@ -131,6 +131,33 @@ def run_with_executor(plan: dict, executor: Executor) -> dict:
     }
 
 
+def _persist_run(run: dict) -> None:
+    """Publish a completed run or fail closed if Mongo cannot acknowledge it.
+
+    Retention maintenance is intentionally independent of receipt publication:
+    failure to remove old historical documents cannot erase an acknowledged
+    new run or falsely change its delivery state.
+    """
+    try:
+        from core.databases import get_sync_db
+        col = get_sync_db()["swarm_schedule_runs"]
+        col.create_index([("build_id", 1), ("created_at", -1)])
+        write_result = col.insert_one(dict(run))
+        if getattr(write_result, "acknowledged", False) is not True:
+            raise RuntimeError("swarm schedule insert was not acknowledged")
+    except Exception as exc:
+        raise RuntimeError("swarm schedule result was not durably recorded") from exc
+    try:
+        total = col.estimated_document_count()
+        if total > 2000:
+            old = col.find({}, {"_id": 1}).sort("created_at", 1).limit(total - 2000)
+            ids = [doc["_id"] for doc in old]
+            if ids:
+                col.delete_many({"_id": {"$in": ids}})
+    except Exception:
+        pass
+
+
 def execute_schedule(
     build_id: str,
     phases: list[str] | None = None,
@@ -264,29 +291,7 @@ def execute_schedule(
     }
 
     if persist:
-        try:
-            from core.databases import get_sync_db
-            col = get_sync_db()["swarm_schedule_runs"]
-            col.create_index([("build_id", 1), ("created_at", -1)])
-            write_result = col.insert_one(dict(run))
-            if getattr(write_result, "acknowledged", False) is not True:
-                raise RuntimeError("swarm schedule insert was not acknowledged")
-        except Exception as exc:
-            # Execution may have produced a result, but without an acknowledged
-            # durable receipt it must not be returned as a successful run.
-            raise RuntimeError("swarm schedule result was not durably recorded") from exc
-
-        # Retention is maintenance, distinct from the acknowledged insert.
-        # Cleanup failure is not evidence that the committed run was lost.
-        try:
-            total = col.estimated_document_count()
-            if total > 2000:
-                old = col.find({}, {"_id": 1}).sort("created_at", 1).limit(total - 2000)
-                ids = [doc["_id"] for doc in old]
-                if ids:
-                    col.delete_many({"_id": {"$in": ids}})
-        except Exception:
-            pass
+        _persist_run(run)
 
     return run
 
