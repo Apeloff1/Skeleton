@@ -219,8 +219,16 @@ class NativeJeevesRepl:
                     })
                     continue
                 if message == ":history":
+                    # Bound transcript materialization separately from
+                    # the full output frame and cumulative disclosure quota.
+                    remaining = max(
+                        1, self.limits.max_total_output_bytes-self._output_bytes
+                    )
                     history = self.chat.history(
                         maximum_messages=self.limits.max_history_messages,
+                        maximum_total_bytes=min(
+                            remaining, self.limits.max_result_frame_bytes,
+                        ),
                     )
                     self._publish(target, {
                         "status": "explicit-history-export",
