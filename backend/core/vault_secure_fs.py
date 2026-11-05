@@ -64,7 +64,8 @@ def ensure_directory(path: Path) -> Path:
 def _safe_file(fd: int, name: str, *, max_bytes: int | None = None) -> int:
     if not name or "/" in name or name in {".", ".."} or "\x00" in name:
         raise VaultPathError("invalid vault filename")
-    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    flags = (os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+             | getattr(os, "O_NONBLOCK", 0))
     opened = os.open(name, flags, dir_fd=fd)
     try:
         info = os.fstat(opened)
