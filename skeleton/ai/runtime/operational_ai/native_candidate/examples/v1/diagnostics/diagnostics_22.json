@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "diagnostics_22",
+  "domain": "diagnostics",
+  "prompt": "Classify synthetic AI diagnostic 121: code expired_lease. Output exactly ready or blocked.",
+  "completion": "blocked",
+  "group_id": "diagnostics_22",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

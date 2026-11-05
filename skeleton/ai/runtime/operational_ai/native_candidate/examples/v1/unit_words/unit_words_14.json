@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "unit_words_14",
+  "domain": "unit_words",
+  "prompt": "Write 16 seconds with digits and the singular unit in square brackets.",
+  "completion": "16 [second]",
+  "group_id": "unit_words_14",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

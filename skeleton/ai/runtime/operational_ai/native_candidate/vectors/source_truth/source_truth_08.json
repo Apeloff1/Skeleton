@@ -1,0 +1,15 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "source_truth_08",
+  "domain": "source_truth",
+  "objective": "Independently recompute original correct answer for source item offset 7",
+  "trust_boundary": "Candidate-model text cannot alter immutable authored training labels",
+  "input": {
+    "offset": 7,
+    "modified": true
+  },
+  "expected_allow": false,
+  "expected_reason": "independently_detected_answer_mutation",
+  "model_qualified": false,
+  "release_certified": false
+}

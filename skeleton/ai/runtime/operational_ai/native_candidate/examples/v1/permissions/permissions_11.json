@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "permissions_11",
+  "domain": "permissions",
+  "prompt": "A sandbox grants only read capability. May a fictional actor invoke network for action 11? Answer allow or deny.",
+  "completion": "deny",
+  "group_id": "permissions_11",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

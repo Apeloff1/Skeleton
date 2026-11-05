@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "ownership_09",
+  "domain": "ownership",
+  "prompt": "In fictional scope 18, owner=team_a and caller=team_c. Is same-owner access permitted? Respond yes or no.",
+  "completion": "no",
+  "group_id": "ownership_09",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

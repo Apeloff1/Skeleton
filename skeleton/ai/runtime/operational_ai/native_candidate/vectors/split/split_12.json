@@ -1,0 +1,15 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "split_12",
+  "domain": "split",
+  "objective": "Preserve full 576-source group boundaries at partition offset 11",
+  "trust_boundary": "Validation and holdout identities must remain outside gradient updates",
+  "input": {
+    "mode": "missing",
+    "offset": 11
+  },
+  "expected_allow": false,
+  "expected_reason": "split_group_or_inventory_failure",
+  "model_qualified": false,
+  "release_certified": false
+}
