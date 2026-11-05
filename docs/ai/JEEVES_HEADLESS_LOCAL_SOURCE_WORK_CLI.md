@@ -212,3 +212,17 @@ review in this **separate** source-work CLI. Model-written
 source is never automatically staged or applied; all actual
 source and patch SHA checks here remain independent.
 See `docs/ai/JEEVES_HEADLESS_NATIVE_CODE_GENERATION.md`.
+
+## Original GGUF source to headless source-work pipeline
+
+The native source-generation CLI can now save its
+independently reviewed model proposal in a separate
+owner-private `*.source.json` file without raw
+code on stdout. Cold verify its task, model, SQLite,
+original source and patch SHA custody, then manually
+extract the original `proposal` from that private
+file into this source-work CLI for a **second
+independent** review and explicit patch/stage
+authorization. Model-generated code is never
+applied automatically. See
+`docs/ai/JEEVES_NATIVE_PRIVATE_SOURCE_ESCROW.md`.
