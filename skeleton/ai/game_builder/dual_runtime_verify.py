@@ -89,7 +89,10 @@ def _flags(directory: bool) -> int:
         raise DualRuntimeVerificationError(
             "descriptor-safe verifier requires POSIX O_NOFOLLOW"
         )
-    flags = os.O_RDONLY | os.O_NOFOLLOW
+    # A malicious FIFO at a purported source-file path must fail closed,
+    # not suspend the verifier indefinitely before fstat can reject it.
+    # O_NONBLOCK is inert for regular files and directories on POSIX.
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
     if directory:
@@ -132,12 +135,15 @@ def _child_fd(root: int, parts: tuple[str, ...], *, directory: bool) -> int:
         raise
 
 
-def _read(root: int, path: str, limit: int) -> bytes:
+def _read(root: int, path: str, limit: int, *, owner_controlled: bool = False) -> bytes:
     with_fd = _child_fd(root, _parts(path), directory=False)
     try:
         info = os.fstat(with_fd)
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
-                or info.st_size < 0 or info.st_size > limit):
+                or info.st_size < 0 or info.st_size > limit
+                or (owner_controlled and (
+                    info.st_uid != os.geteuid() or info.st_mode & 0o022
+                ))):
             raise DualRuntimeVerificationError("unsafe or oversized package file")
         with os.fdopen(os.dup(with_fd), "rb", closefd=True) as stream:
             data = stream.read(limit + 1)
@@ -394,4 +400,42 @@ def verify_exported_package(
         os.close(fd)
 
 
-__all__ = ["DualRuntimeVerificationError", "verify_exported_package"]
+def load_verified_playable_world(
+    root: str | Path, *, expected_manifest_sha256: str, authorized: bool,
+) -> PlayableWorld:
+    """Load a canonical world only from independently pinned replayable source.
+
+    The source is verified both before and after reading the world. This
+    returns a typed in-memory snapshot for offline play, never executable
+    content from the untrusted package or a persistent filesystem lock.
+    """
+    if authorized is not True:
+        raise PermissionError("operator authorization required for offline gameplay")
+    before = verify_exported_package(
+        root, expected_manifest_sha256=expected_manifest_sha256, authorized=True,
+    )
+    try:
+        fd = _root_fd(root)
+    except (OSError, TypeError, ValueError) as exc:
+        raise DualRuntimeVerificationError("unsafe offline game source") from exc
+    try:
+        manifest = _json(_read(fd, "release.json", _MAX_MANIFEST), _MAX_MANIFEST)
+        native = _json(_read(fd, "godot/world.json", _MAX_BYTES), _MAX_BYTES)
+        world = _world(native, manifest)
+        if world.digest != before["world_digest"]:
+            raise DualRuntimeVerificationError("offline world identity changed")
+        _assert_original_root(root, fd)
+    finally:
+        os.close(fd)
+    after = verify_exported_package(
+        root, expected_manifest_sha256=expected_manifest_sha256, authorized=True,
+    )
+    if after != before or world.digest != after["world_digest"]:
+        raise DualRuntimeVerificationError("offline game source changed during load")
+    return world
+
+
+__all__ = [
+    "DualRuntimeVerificationError", "verify_exported_package",
+    "load_verified_playable_world",
+]
