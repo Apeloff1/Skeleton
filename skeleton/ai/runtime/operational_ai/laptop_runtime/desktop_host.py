@@ -54,6 +54,7 @@ class DesktopHost:
         resume_session: str | None = None,
         limits: DesktopHostLimits | None = None,
         signed_source: object | None = None,
+        preload_admission: object | None = None,
     ) -> None:
         # Delayed import keeps pure framing tests independent of native GGUF.
         from skeleton.jeeves.agent.native_chat import NativeJeevesChat
@@ -70,6 +71,16 @@ class DesktopHost:
             expected_subject=self.subject,
         )
         self.identity = ActiveModel.from_supervisor(worker)
+        from .desktop_preload_admission import PreloadAdmission
+        if preload_admission is not None:
+            if (
+                type(preload_admission) is not PreloadAdmission
+                or preload_admission.model_sha256 != self.identity.model_sha256
+            ):
+                raise DesktopHostHold(
+                    "live preloader model differs from activated native owner",
+                )
+        self.preload_admission = preload_admission
         self.source.assert_live(worker)
         from .desktop_signed_source import ActivatedSignedSource
         if signed_source is not None and type(signed_source) is not ActivatedSignedSource:
@@ -290,6 +301,11 @@ class DesktopHost:
                 self._emit(outgoing, self._public(
                     "native-gguf-ready", tenant=self.tenant,
                     subject=self.subject, source_bound=True,
+                    preload_admission=(
+                        self.preload_admission.to_public()
+                        if getattr(self, "preload_admission", None) is not None
+                        else None
+                    ),
                     signed_source_tool_active=(
                         getattr(self, "signed_source", None) is not None
                     ),
@@ -338,6 +354,7 @@ def _args(argv):
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--subject", required=True)
     parser.add_argument("--approve-native", action="store_true")
+    parser.add_argument("--enforce-preload-safety", action="store_true")
     parser.add_argument("--resume-session")
     parser.add_argument("--enable-source-tool", action="store_true")
     parser.add_argument("--source-root", type=Path)
@@ -403,6 +420,20 @@ def main(argv=None) -> int:
             or not 1 <= args.max_source_tool_calls <= 3
         ):
             raise DesktopHostHold("invalid finite signed lookup allowance")
+        # The GUI's profile is advisory only. The protected startup path
+        # takes new CPU/RAM/cgroup/private-disk measurements immediately
+        # before activating actual GGUF bytes; it never silently shrinks
+        # operator-selected native memory, threads or token limits.
+        preload = None
+        if args.enforce_preload_safety:
+            from .desktop_preload_admission import check_fresh_native_preload
+            preload = check_fresh_native_preload(
+                model_root=args.model_root, state_dir=args.state_dir,
+                n_ctx=args.context, max_new_tokens=args.max_output_tokens,
+                n_threads=args.threads, gpu_layers=args.gpu_layers,
+                capacity_budget_bytes=args.capacity_budget_bytes,
+                inference_ms=args.inference_ms,
+            )
         stack, worker, installed = activate_checked(
             model_root=args.model_root, state_dir=args.state_dir,
             tenant=args.tenant, subject=args.subject, n_ctx=args.context,
@@ -421,6 +452,7 @@ def main(argv=None) -> int:
                 worker, installed, tenant=args.tenant, subject=args.subject,
                 resume_session=args.resume_session, limits=limits,
                 signed_source=active_sources,
+                preload_admission=preload,
             )
             return host.serve(sys.stdin.buffer, sys.stdout.buffer)
     except (Exception, KeyboardInterrupt) as exc:

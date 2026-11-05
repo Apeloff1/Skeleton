@@ -131,6 +131,10 @@ class DesktopConfig:
         ]
         if self.capacity_root is not None:
             argv += ["--capacity-root", self.capacity_root]
+        if self.enable_pressure_guard:
+            # The child must establish fresh CPU/cgroup/installed-source fit
+            # BEFORE loading GGUF; a stale advisory profile never suffices.
+            argv += ["--enforce-preload-safety"]
         if self.enable_signed_source_tool:
             argv += [
                 "--enable-source-tool",
@@ -209,6 +213,34 @@ class DesktopBridge:
         if session_id is not None:
             identifier(session_id, "durable desktop session")
         if result.get("status") == "native-gguf-ready":
+            checked_preload = result.get("preload_admission")
+            requires_preload = getattr(
+                getattr(self, "config", None), "enable_pressure_guard", False,
+            )
+            if requires_preload:
+                from .desktop_preload_admission import (
+                    PreloadAdmissionHold, verify_public_preload_receipt,
+                )
+                try:
+                    verify_public_preload_receipt(
+                        checked_preload,
+                        expected_model_sha256=claimed_model,
+                        requested_context_tokens=self.config.context,
+                        requested_output_tokens=self.config.max_output_tokens,
+                        requested_cpu_threads=self.config.threads,
+                        requested_gpu_layers=self.config.gpu_layers,
+                        requested_capacity_budget_bytes=(
+                            self.config.capacity_budget_bytes
+                        ),
+                    )
+                except PreloadAdmissionHold as exc:
+                    raise DesktopBridgeHold(
+                        "native child skipped exact live RAM/cgroup preload admission",
+                    ) from exc
+            elif checked_preload is not None:
+                raise DesktopBridgeHold(
+                    "unrequested native preload resource admission evidence",
+                )
             approved_tool = getattr(getattr(self, "config", None), "enable_signed_source_tool", False)
             if (
                 type(approved_tool) is not bool
