@@ -240,9 +240,9 @@ def _decode_archive(
         names.add(name.casefold())
     if SEAL_NAME.casefold() not in names:
         raise CapsuleTransportHold("last-written completion seal is missing")
-    if [name for name, _, _ in files] != sorted(
-        names_in_order := [name for name, _, _ in files],
-        key=lambda name: (name != SEAL_NAME, name.casefold(), name),
+    ordered = [name for name, _, _ in files]
+    if ordered != sorted(
+        ordered, key=lambda name: (name != SEAL_NAME, name.casefold(), name),
     ):
         raise CapsuleTransportHold("transport source order is not deterministic")
     by_name = {name: data for name, data, _ in files}
