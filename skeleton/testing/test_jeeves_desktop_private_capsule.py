@@ -313,5 +313,150 @@ class PrivateCapsuleCLITests(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "JEEVES_PRIVATE_SOURCE_CAPSULE_HELD\n")
 
 
+    def test_complete_capsule_cold_verification_matches_every_source_byte(self):
+        plan = self.prepare()
+        stage = self.publish(plan)
+        with (
+            mock.patch("subprocess.Popen") as process,
+            mock.patch("subprocess.run") as shell,
+        ):
+            outcome = capsule.verify_private_capsule(
+                self.output, original_project_root=str(self.project),
+                expected_capsule_sha256=plan.capsule_sha256,
+                expected_seal_sha256=stage["seal_sha256"],
+            )
+            process.assert_not_called()
+            shell.assert_not_called()
+        self.assertEqual(outcome["file_count"], 4)
+        self.assertTrue(outcome["all_sealed_source_bytes_verified"])
+        self.assertFalse(outcome["release_certified"])
+
+    def test_capsule_verifier_rejects_changed_source_and_seal(self):
+        plan = self.prepare()
+        stage = self.publish(plan)
+        path = self.output / "src/fresh.py"
+        path.write_text("altered source bytes\n")
+        with self.assertRaises((ValueError, OSError)):
+            capsule.verify_private_capsule(
+                self.output, original_project_root=str(self.project),
+                expected_capsule_sha256=plan.capsule_sha256,
+                expected_seal_sha256=stage["seal_sha256"],
+            )
+
+    def test_capsule_verifier_rejects_added_unapproved_file(self):
+        plan = self.prepare()
+        stage = self.publish(plan)
+        (self.output / "src/hidden.py").write_bytes(b"secret = 1\n")
+        with self.assertRaises((ValueError, OSError)):
+            capsule.verify_private_capsule(
+                self.output, original_project_root=str(self.project),
+                expected_capsule_sha256=plan.capsule_sha256,
+                expected_seal_sha256=stage["seal_sha256"],
+            )
+
+    def test_capsule_verifier_rejects_symlink_tree_entry(self):
+        plan = self.prepare()
+        stage = self.publish(plan)
+        (self.output / "src/alias.py").symlink_to("fresh.py")
+        with self.assertRaises((ValueError, OSError)):
+            capsule.verify_private_capsule(
+                self.output, original_project_root=str(self.project),
+                expected_capsule_sha256=plan.capsule_sha256,
+                expected_seal_sha256=stage["seal_sha256"],
+            )
+
+    def test_capsule_verifier_rejects_seal_replacement_and_digest_mismatch(self):
+        plan = self.prepare()
+        stage = self.publish(plan)
+        verify = lambda **kw: capsule.verify_private_capsule(
+            self.output, original_project_root=str(self.project),
+            expected_capsule_sha256=plan.capsule_sha256,
+            expected_seal_sha256=stage["seal_sha256"], **kw,
+        )
+        with self.assertRaises((ValueError, OSError)):
+            capsule.verify_private_capsule(
+                self.output, original_project_root=str(self.project),
+                expected_capsule_sha256="0" * 64,
+                expected_seal_sha256=stage["seal_sha256"],
+            )
+        path = self.output / capsule.SEAL_NAME
+        seal = json.loads(path.read_bytes())
+        seal["release_certified"] = True
+        path.write_text(json.dumps(seal))
+        with self.assertRaises((ValueError, OSError)):
+            verify()
+
+    def test_verifier_refuses_incomplete_unsealed_capsule(self):
+        plan = self.prepare()
+        original_copy = capsule._copy
+        def no_seal(fd, relative, data, digest):
+            if relative == capsule.SEAL_NAME:
+                raise OSError("simulated crash before seal")
+            return original_copy(fd, relative, data, digest)
+        with mock.patch.object(capsule, "_copy", side_effect=no_seal):
+            with self.assertRaises(OSError):
+                self.publish(plan)
+        with self.assertRaises((ValueError, OSError)):
+            capsule.verify_private_capsule(
+                self.output, original_project_root=str(self.project),
+                expected_capsule_sha256=plan.capsule_sha256,
+                expected_seal_sha256="0" * 64,
+            )
+
+
+from skeleton.ai.runtime.operational_ai.laptop_runtime import (
+    desktop_capsule_verifier_cli as verifier,
+)
+
+
+class PrivateCapsuleVerifierCLITests(unittest.TestCase):
+    def req(self):
+        return {
+            "schema": verifier.SCHEMA,
+            "capsule_directory": "/private/project-review",
+            "original_project_root": "/project",
+            "expected_capsule_sha256": "a" * 64,
+            "expected_seal_sha256": "b" * 64,
+        }
+
+    def test_read_only_verified_receipt_and_no_hidden_side_effects(self):
+        req = self.req()
+        with mock.patch.object(
+            verifier, "verify_private_capsule",
+            return_value={"all_sealed_source_bytes_verified": True},
+        ) as verification:
+            result = verifier.execute_verification(req)
+            self.assertEqual(
+                result["verification"]["all_sealed_source_bytes_verified"], True,
+            )
+            self.assertFalse(result["model_or_git_invoked"])
+            self.assertFalse(result["release_certified"])
+            verification.assert_called_once()
+
+    def test_strict_verifier_rejects_duplicate_unknown_and_nonfinite(self):
+        for raw in (
+            b'{"schema":1,"schema":2}',
+            b'{"schema":NaN}',
+            json.dumps({**self.req(), "extra": 1}).encode(),
+            json.dumps({**self.req(), "expected_seal_sha256": False}).encode(),
+            json.dumps({**self.req(), "capsule_directory": "relative"}).encode(),
+        ):
+            with self.subTest(raw=raw[:75]):
+                with self.assertRaises(ValueError):
+                    verifier.parse_verification(raw)
+
+    def test_private_verifier_stdout_is_blank_on_failure(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        status = verifier.main(
+            [], stdin=io.BytesIO(b"invalid verification"),
+            stdout=stdout, stderr=stderr,
+        )
+        self.assertEqual(status, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(
+            stderr.getvalue(), "JEEVES_PRIVATE_CAPSULE_VERIFICATION_HELD\n",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
