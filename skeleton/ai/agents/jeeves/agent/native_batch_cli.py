@@ -13,12 +13,29 @@ from pathlib import Path
 import sys
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime.startup import activate_checked
+from skeleton.ai.runtime.operational_ai.laptop_runtime.publication import emit_native_jsonl
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import identifier
+from .native_operator_preflight import check_native_resource_shape
+from .native_source_fence import NativeSourceFence
 from skeleton.jeeves.native_fabric.contracts import parse_json
 from .native_batch_runtime import (
     NativeBatchHold, NativeBatchTask, NativeBatchPolicy, NativeBatchConveyor,
     preflight_batch_tasks,
 )
 from .native_readiness import inspect_native_jeeves
+
+
+class _RedactedBatchParser(argparse.ArgumentParser):
+    """Refuse bad argv without echoing private paths or command contents."""
+
+    def error(self, message: str) -> None:
+        raise NativeBatchHold("invalid native batch operator arguments")
+
+
+def _require_absolute_private_root(path: object, label: str) -> None:
+    if (not isinstance(path, Path) or not path.is_absolute()
+            or ".." in path.parts or "\x00" in str(path)):
+        raise NativeBatchHold("absolute private " + label + " required")
 
 
 def parse_casebook(raw: bytes) -> tuple[str, tuple[NativeBatchTask, ...]]:
@@ -47,7 +64,7 @@ def parse_casebook(raw: bytes) -> tuple[str, tuple[NativeBatchTask, ...]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = _RedactedBatchParser(
         description="One source-bound native worker executing a bounded idempotent batch"
     )
     parser.add_argument("--model-root", type=Path, required=True)
@@ -67,12 +84,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--maximum-reserved-output-tokens", type=int, default=65536)
     parser.add_argument("--maximum-wall-seconds", type=float, default=1800)
     parser.add_argument("--maximum-single-job-ms", type=int, default=300000)
-    args = parser.parse_args(argv)
     try:
+        args = parser.parse_args(argv)
         if not args.batch_stdin or not args.approve_native:
             raise NativeBatchHold("explicit approved native batch and stdin required")
-        raw = sys.stdin.buffer.read(1048577)
-        batch_id, tasks = parse_casebook(raw)
+        identifier(args.tenant, "tenant")
+        identifier(args.subject, "subject")
+        _require_absolute_private_root(args.model_root, "installed model root")
+        _require_absolute_private_root(args.state_dir, "SQLite state root")
+        if args.capacity_root is not None:
+            _require_absolute_private_root(args.capacity_root, "capacity root")
+        check_native_resource_shape(
+            context_tokens=args.context,
+            output_tokens=args.max_new_tokens,
+            native_threads=args.threads,
+            gpu_layers=args.gpu_layers,
+            capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=90000,
+        )
         policy = NativeBatchPolicy(
             maximum_jobs=args.maximum_jobs,
             maximum_prompt_bytes=args.maximum_prompt_bytes,
@@ -80,6 +109,10 @@ def main(argv: list[str] | None = None) -> int:
             maximum_wall_seconds=args.maximum_wall_seconds,
             maximum_single_job_ms=args.maximum_single_job_ms,
         )
+        # Pure path, owner, shape and numeric admission precedes reading even
+        # one byte of the operator's private batch casebook.
+        raw = sys.stdin.buffer.read(1048577)
+        batch_id, tasks = parse_casebook(raw)
         preflight_batch_tasks(
             batch_id, tasks, policy,
             configured_output_tokens=args.max_new_tokens,
@@ -97,12 +130,20 @@ def main(argv: list[str] | None = None) -> int:
             readiness = inspect_native_jeeves(worker, installed)
             if not readiness.source_bridge_ready:
                 raise NativeBatchHold("source-installed native model identity is unqualified")
+            source_fence = NativeSourceFence(
+                worker, installed, expected_tenant=args.tenant,
+                expected_subject=args.subject,
+            )
             conveyor = NativeBatchConveyor(worker, approved=True, policy=policy)
+            source_fence.assert_live(worker)
             result = conveyor.run(batch_id, tasks)
-        sys.stdout.write(json.dumps(
-            result.to_public_record(), sort_keys=True, ensure_ascii=False,
-        ) + "\n")
-        return 0
+            # Publish before closing the source-approved native process.
+            # Reject a lost lease/owner, malformed JSON or partial output
+            # instead of acknowledging uncertain committed model work.
+            emit_native_jsonl(
+                worker, source_fence, result.to_public_record(), sys.stdout,
+            )
+            return 0
     except (Exception, KeyboardInterrupt) as exc:
         sys.stderr.write(json.dumps({
             "schema": "jeeves.native_batch_result.v1",
