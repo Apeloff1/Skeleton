@@ -127,3 +127,24 @@ def test_atomic_sink_refuses_unmetered_file_interfaces(tmp_path: Path, bypass):
                 directory, "shard", reject_unmetered, max_bytes=1,
             )
     assert not (tmp_path / "shard").exists()
+
+
+
+def test_failed_backup_publication_is_not_silently_ignored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    target = tmp_path / "shard"
+    target.write_bytes(b"prior")
+    original = secure_fs.atomic_write
+
+    def missing_during_backup(fd, name, writer, **kwargs):
+        if name.startswith(".vault-backup-"):
+            raise FileNotFoundError("simulated backup publication failure")
+        return original(fd, name, writer, **kwargs)
+
+    monkeypatch.setattr(secure_fs, "atomic_write", missing_during_backup)
+    with secure_fs.anchored_directory(tmp_path) as directory:
+        with pytest.raises(FileNotFoundError, match="backup publication"):
+            secure_fs.snapshot_regular(directory, "shard", max_bytes=8)
+    assert target.read_bytes() == b"prior"
+    assert not list(tmp_path.glob(".vault-backup-*"))
