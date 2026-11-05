@@ -189,11 +189,10 @@ services:
       - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}
       - NODE_ENV=${NODE_ENV:-development}
-    depends_on:
-      backend:
-        condition: service_healthy
-      skeleton:
-        condition: service_healthy
+    # First-run setup and diagnostics must start independently of backend
+    # and engine. Even service_started would transitively block this UI:
+    # backend requires a healthy engine, which requires healthy MongoDB.
+    # Keep the backend/engine health fences unchanged; failed APIs stay closed.
     networks:
       - tutolage
 
