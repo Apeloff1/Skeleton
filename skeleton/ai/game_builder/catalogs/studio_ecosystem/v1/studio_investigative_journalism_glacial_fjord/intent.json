@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_glacial_fjord",
+  "title": "Glacial Fjord: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010314062,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 13,
+  "theme": "ocean",
+  "starting_health": 4
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_ion_wastes",
+  "title": "Ion Wastes: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010314701,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 10,
+  "theme": "space",
+  "starting_health": 5
+}

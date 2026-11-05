@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_glacial_fjord",
+  "title": "Glacial Fjord: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010314553,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 14,
+  "theme": "ocean",
+  "starting_health": 5
+}
