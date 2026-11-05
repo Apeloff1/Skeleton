@@ -1,0 +1,211 @@
+"""Incomplete kernel CPU thermal zones must not authorize local inference.
+
+These are simulated sysfs fixtures, not hardware qualification.
+"""
+from __future__ import annotations
+
+import sys
+
+import pytest
+
+from skeleton.app.offline_cpu_thermal import probe_cpu_thermal, CPUThermalController
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux", reason="Linux sysfs fixture contract",
+)
+
+
+def zone(root, name, *, kind="cpu-thermal", temp="50000", trip="90000"):
+    directory = root / name
+    directory.mkdir()
+    (directory / "type").write_text(kind, encoding="ascii")
+    (directory / "temp").write_text(temp, encoding="ascii")
+    (directory / "trip_point_0_type").write_text("critical", encoding="ascii")
+    (directory / "trip_point_0_temp").write_text(trip, encoding="ascii")
+    return directory
+
+
+def test_all_measured_cpu_zones_remain_visible(tmp_path):
+    zone(tmp_path, "thermal_zone0")
+    zone(tmp_path, "thermal_zone1", kind="soc-thermal", temp="55000")
+    sensors = probe_cpu_thermal(tmp_path)
+    assert len(sensors) == 2
+    assert all(sensor.trip_c == 90.0 for sensor in sensors)
+    controller = CPUThermalController()
+    controller.observe(sensors)
+    assert controller.snapshot()["trip_measured"] is True
+
+
+@pytest.mark.parametrize("missing", [
+    "type", "temp", "trip_point_0_type", "trip_point_0_temp",
+])
+def test_missing_cpu_zone_evidence_invalidates_whole_sample(tmp_path, missing):
+    zone(tmp_path, "thermal_zone0")
+    second = zone(tmp_path, "thermal_zone1", kind="soc-thermal")
+    (second / missing).unlink()
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("corrupt", [
+    ("temp", "unknown"), ("trip_point_0_temp", "nan"),
+])
+def test_corrupt_cpu_telemetry_invalidates_whole_sample(tmp_path, corrupt):
+    zone(tmp_path, "thermal_zone0")
+    second = zone(tmp_path, "thermal_zone1")
+    (second / corrupt[0]).write_text(corrupt[1], encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("value", [
+    "5_0000", "+50000", "50 000", "50000\\x00", "0xC350", "50000.0",
+])
+@pytest.mark.parametrize("attribute", ["temp", "trip_point_0_temp"])
+def test_noncanonical_millidegree_evidence_holds_all_cpu_zones(tmp_path, value, attribute):
+    zone(tmp_path, "thermal_zone0", kind="cpu")
+    second = zone(tmp_path, "thermal_zone1", kind="soc")
+    (second / attribute).write_text(value, encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("identity", [
+    None, 1, (), "", " cpu", "cpu ", "cpu\\n", "cpu\\x00", "cpú",
+])
+@pytest.mark.parametrize("field", ["zone", "kind"])
+def test_typed_sensor_identity_rejects_untrusted_control_text(identity, field):
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+
+    values = {"zone": "thermal_zone0", "kind": "cpu"}
+    values[field] = identity
+    with pytest.raises(ValueError, match="invalid thermal sensor identity"):
+        CPUThermalSensor(values["zone"], values["kind"], 50.0, 90.0)
+
+
+def test_irrelevant_sensor_does_not_certify_missing_cpu_trip(tmp_path):
+    zone(tmp_path, "thermal_zone0", kind="gpu", temp="40000")
+    second = zone(tmp_path, "thermal_zone1", kind="cpu")
+    (second / "trip_point_0_temp").unlink()
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_unknown_trip_type_does_not_mask_lowest_trip(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_type").unlink()
+    (first / "trip_point_1_type").write_text("critical", encoding="ascii")
+    (first / "trip_point_1_temp").write_text("95000", encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_oversized_kernel_attribute_is_bounded_and_fails_closed(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "type").write_bytes(b"cpu" + b"x" * (1 << 20))
+    assert probe_cpu_thermal(tmp_path) == ()
+    (first / "type").write_text("cpu", encoding="ascii")
+    (first / "temp").write_bytes(b"50000" + b"0" * (1 << 20))
+    assert probe_cpu_thermal(tmp_path) == ()
+    (first / "temp").write_text("50000", encoding="ascii")
+    (first / "trip_point_0_type").write_bytes(b"critical" + b"x" * (1 << 20))
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_unexpected_matching_zone_suffix_does_not_hide_inventory(tmp_path):
+    zone(tmp_path, "thermal_zone0")
+    zone(tmp_path, "thermal_zone0_backup", kind="cpu")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_unknown_kernel_trip_type_does_not_hide_lower_threshold(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_type").write_text("unclassified", encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_active_kernel_trip_is_a_measured_cpu_threshold(tmp_path):
+    first = zone(tmp_path, "thermal_zone0", temp="85000", trip="80000")
+    (first / "trip_point_0_type").write_text("active", encoding="ascii")
+    sensors = probe_cpu_thermal(tmp_path)
+    assert len(sensors) == 1
+    assert sensors[0].trip_c == 80.0
+    controller = CPUThermalController()
+    controller.observe(sensors)
+    assert controller.snapshot()["thermal_backpressure"] is True
+
+
+
+def test_thermal_sensor_identity_change_latches_hold_across_cool_recovery():
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+
+    controller = CPUThermalController()
+    original = (CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),)
+    substitute = (CPUThermalSensor("thermal_zone1", "cpu", 40.0, 90.0),)
+    controller.observe(original)
+    assert controller.snapshot()["sensor_identity_drift"] is False
+    assert controller.snapshot()["thermal_backpressure"] is False
+    controller.observe(substitute)
+    assert controller.snapshot()["sensor_identity_drift"] is True
+    assert controller.snapshot()["thermal_backpressure"] is True
+    controller.observe(original)
+    assert controller.snapshot()["sensor_identity_drift"] is True
+    assert controller.snapshot()["thermal_backpressure"] is True
+
+
+def test_incomplete_trip_coverage_is_not_a_positive_thermal_measurement():
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+
+    controller = CPUThermalController()
+    controller.observe((
+        CPUThermalSensor("thermal_zone0", "cpu", 50.0, 90.0),
+        CPUThermalSensor("thermal_zone1", "soc", 50.0, None),
+    ))
+    assert controller.snapshot()["trip_measured"] is False
+    assert controller.snapshot()["thermal_backpressure"] is True
+
+
+def test_symlinked_zone_is_not_cpu_thermal_authority(tmp_path):
+    real = tmp_path / "real"
+    real.mkdir()
+    zone(real, "thermal_zone0")
+    (tmp_path / "thermal_zone0").symlink_to(real / "thermal_zone0",
+                                            target_is_directory=True)
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("attribute", ["type", "temp", "trip_point_0_type",
+                                         "trip_point_0_temp"])
+def test_symlinked_cpu_attribute_is_rejected(tmp_path, attribute):
+    first = zone(tmp_path, "thermal_zone0")
+    target = tmp_path / "external"
+    target.write_text("50000", encoding="ascii")
+    (first / attribute).unlink()
+    (first / attribute).symlink_to(target)
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_symlinked_sysfs_ancestor_is_rejected(tmp_path):
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    zone(actual, "thermal_zone0")
+    (tmp_path / "alias").symlink_to(actual, target_is_directory=True)
+    assert probe_cpu_thermal(tmp_path / "alias") == ()
+
+
+def test_trip_type_without_temperature_is_not_positive_thermal_evidence(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_temp").unlink()
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_temperature_without_trip_type_is_not_positive_thermal_evidence(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_0_type").unlink()
+    assert probe_cpu_thermal(tmp_path) == ()
+
+
+def test_thermal_root_traversal_is_denied(tmp_path):
+    zone(tmp_path, "thermal_zone0")
+    assert probe_cpu_thermal(str(tmp_path) + "/../" + tmp_path.name) == ()
+
+
+def test_unknown_trip_temperature_suffix_blocks_whole_sample(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_1_temp_backup").write_text("60000", encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
