@@ -405,15 +405,17 @@ def purge_cache() -> int:
 def delete_shard(name: str) -> bool:
     _ensure_storage()
     name = _safe_name(name)
-    entry = _MANIFEST.pop(name, None)
-    if not entry:
+    if name not in _MANIFEST:
         return False
+    with _storage_fd() as directory:
+        unlink_regular(directory, f"{name}.jsonl.zst")
+    old_entry = _MANIFEST.pop(name)
     try:
-        _shard_path(name).unlink(missing_ok=True)
-    except Exception:
-        pass
-    _save_manifest()
+        _save_manifest()
+    except BaseException:
+        _MANIFEST[name] = old_entry
+        raise
     with _CACHE_LOCK:
         _CACHE.pop(name, None)
-        _CACHE_SIZE_EST.pop(name, 0)
+        _CACHE_SIZE_EST.pop(name, None)
     return True
