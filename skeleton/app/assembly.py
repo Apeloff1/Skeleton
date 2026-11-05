@@ -455,7 +455,9 @@ def runtime_manifest(
             "chroma": "CHROMA_PORT",
         }.get(service.name)
         raw = values.get(key, "") if key else ""
-        if raw and service.public_url:
+        # Validate packaged endpoints even without operator overrides. An
+        # invalid default must never be returned as an apparently safe URL.
+        if service.public_url:
             if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
             # urlsplit strips ASCII controls; reject ambiguous URLs before parsing.
@@ -480,9 +482,10 @@ def runtime_manifest(
             host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"
-            service = replace(
-                service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
-            )
+            if raw:
+                service = replace(
+                    service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
+                )
         services.append(service)
     return replace(manifest, services=tuple(services))
 

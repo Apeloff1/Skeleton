@@ -86,3 +86,21 @@ def test_port_override_rejects_control_characters(tmp_path: Path, control: str):
             tmp_path, manifest=replace(manifest, services=services),
             environ={"FRONTEND_PORT": "31999"},
         )
+
+
+@pytest.mark.parametrize("invalid_url", [
+    "http://localhost:bad",
+    "http://localhost:65536",
+    "http://localhost:3000?token=secret",
+    "http://user:password@localhost:3000",
+    "http://remote.example:3000",
+    "http://localhost:3000/\\\\unsafe",
+])
+def test_default_public_url_fails_closed_without_override(tmp_path: Path, invalid_url: str):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=invalid_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="public URL"):
+        public_service_urls(tmp_path, manifest=replace(manifest, services=services), environ={})
