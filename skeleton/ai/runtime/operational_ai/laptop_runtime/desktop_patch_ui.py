@@ -670,8 +670,10 @@ class PortablePatchWindow(tk.Toplevel):
         def work():
             try:
                 capsule_plan = prepare_private_capsule(plan, selected)
+                public_review = capsule_plan.public_review()
                 self._queue.put((
                     "capsule-reviewed", epoch, selected, capsule_plan,
+                    public_review,
                 ))
             except BaseException as exc:
                 self._queue.put((
@@ -965,7 +967,7 @@ class PortablePatchWindow(tk.Toplevel):
                             + "git apply --check and operator authorization.",
                         )
                 elif kind == "capsule-reviewed":
-                    _, _, selected, capsule_plan = message
+                    _, _, selected, capsule_plan, closure_review = message
                     if (
                         selected != self._capsule_selected()
                         or self._reviewed_texts != self._source_inputs()
@@ -982,7 +984,12 @@ class PortablePatchWindow(tk.Toplevel):
                         + str(len(capsule_plan.originals)) + " exact dependencies / "
                         + str(len(capsule_plan.patch.entries)) + " proposed changes · "
                         + str(capsule_plan.total_bytes) + " source bytes · "
-                        + "FULL CAPSULE SHA " + capsule_plan.capsule_sha256
+                        + "PYTHON CLOSURE " + closure_review["selected_python_closure_status"]
+                        + " · linked originals " + str(closure_review["linked_original_imports"])
+                        + " · unknown imports "
+                        + str(closure_review["unverified_external_or_unselected_imports"])
+                        + " · CLOSURE SHA " + closure_review["python_closure_sha256"]
+                        + " · FULL CAPSULE SHA " + capsule_plan.capsule_sha256
                         + " · type all three SHA values and approve separately."
                     )
                 elif kind == "capsule-published":

@@ -34,6 +34,12 @@ def fake_window(*, manifest="a" * 64, patch="b" * 64,
         patch=current, originals=(1, 2),
         capsule_sha256=capsule_digest,
         total_bytes=2048,
+        public_review=lambda: {
+            "selected_python_closure_status": "partially-unverified-python",
+            "linked_original_imports": 1,
+            "unverified_external_or_unselected_imports": 1,
+            "python_closure_sha256": "d" * 64,
+        },
     )
     view = SimpleNamespace(
         _busy=False, _closed=False, _epoch=8,
@@ -158,7 +164,10 @@ class SourceCapsuleDesktopUIContractTests(unittest.TestCase):
         view._capsule_source_selection = None
         view._capsule_selected = lambda: "src/changed.py"
         view._capsule_plan = None
-        view._queue.put(("capsule-reviewed", view._epoch, "src/dependency.py", plan))
+        view._queue.put((
+            "capsule-reviewed", view._epoch, "src/dependency.py", plan,
+            plan.public_review(),
+        ))
         ui.PortablePatchWindow._poll(view)
         self.assertIsNone(view._capsule_plan)
         self.assertFalse(view._busy)

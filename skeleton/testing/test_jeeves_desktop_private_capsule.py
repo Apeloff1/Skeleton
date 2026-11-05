@@ -324,6 +324,57 @@ class PrivateSelectedSourceCapsuleTests(unittest.TestCase):
             )
 
 
+    def test_real_mixed_source_private_capsule_binds_original_imports_to_seal(self):
+        plan = self.prepare()
+        review = plan.public_review()
+        self.assertEqual(review["linked_original_imports"], 2)
+        self.assertEqual(review["linked_review_change_imports"], 0)
+        self.assertEqual(review["unverified_external_or_unselected_imports"], 0)
+        self.assertEqual(review["selected_python_closure_status"], "linked-selected-python")
+        receipt = self.publish(plan)
+        self.assertEqual(
+            receipt["python_closure_sha256"], plan.python_closure_sha256,
+        )
+        seal = json.loads((self.output / capsule.SEAL_NAME).read_bytes())
+        self.assertEqual(seal["unverified_source_import_count"], 0)
+        verified = capsule.verify_private_capsule(
+            self.output, original_project_root=str(self.project),
+            expected_capsule_sha256=plan.capsule_sha256,
+            expected_seal_sha256=receipt["seal_sha256"],
+        )
+        self.assertEqual(verified["linked_original_source_imports"], 2)
+        self.assertEqual(verified["python_closure_sha256"], plan.python_closure_sha256)
+
+    def test_real_original_dependency_import_unknown_survives_publish_and_verify(self):
+        self.dep.write_text("import external_library\nvalue = 4\n")
+        plan = self.prepare()
+        self.assertEqual(
+            plan.public_review()["unverified_external_or_unselected_imports"], 1,
+        )
+        receipt = self.publish(plan)
+        self.assertEqual(receipt["unverified_source_import_count"], 1)
+        verified = capsule.verify_private_capsule(
+            self.output, original_project_root=str(self.project),
+            expected_capsule_sha256=plan.capsule_sha256,
+            expected_seal_sha256=receipt["seal_sha256"],
+        )
+        self.assertEqual(verified["unverified_external_or_unselected_imports"], 1)
+        self.assertFalse(verified["all_source_dependencies_complete"])
+
+    def test_real_capsule_holds_original_dependency_with_invalid_relative_import(self):
+        self.dep.write_text("from ...unreachable import thing\n")
+        with self.assertRaises(ValueError):
+            self.prepare()
+        self.assertFalse(self.output.exists())
+
+    def test_source_closure_digest_mutation_cannot_publish(self):
+        plan = self.prepare()
+        mutated = replace(plan, python_closure_sha256="0"*64)
+        with self.assertRaises(ValueError):
+            self.publish(mutated)
+        self.assertFalse(self.output.exists())
+
+
 class PrivateCapsuleCLITests(unittest.TestCase):
     def req(self, action="inspect"):
         return {
