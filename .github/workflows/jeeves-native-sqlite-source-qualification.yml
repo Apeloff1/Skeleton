@@ -1,0 +1,92 @@
+name: Jeeves native SQLite source qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/jeeves/agent/native_*.py"
+      - "skeleton/jeeves/agent/runtime.py"
+      - "skeleton/ai/runtime/operational_ai/laptop_runtime/**"
+      - "skeleton/testing/test_jeeves_native_*.py"
+      - "skeleton/testing/test_jeeves_single_provider_*.py"
+      - "skeleton/testing/test_laptop_runtime_*.py"
+      - ".github/workflows/jeeves-native-sqlite-source-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-native-sqlite-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source_contracts:
+    name: Source-only native and protected SQLite runtime tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use supported interpreter for existing local native runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical domain-test import dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+          "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0"
+          "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
+          "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
+          "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Compile the canonical Jeeves and local inference source
+        run: >-
+          python -m compileall -q
+          skeleton/jeeves/agent
+          skeleton/ai/runtime/operational_ai/laptop_runtime
+      - name: Strict native model provider and verified receipt contracts
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_provider_bridge.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_prompt_and_schema.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_preflight_resource_admission.py' -v
+      - name: Single-provider, attempt budget, uncertain replay and epoch fences
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_single_provider_*.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_provider_attempt_limits.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_quota_*.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_epoch_*.py' -v
+      - name: Source-bound native conversational replay and private history
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_chat.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_chat_*_fence.py' -v
+      - name: Protected SQLite exact-identity turns and cold replay custody
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_sqlite_integration.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_checkpoint_journal.py' -v
+      - name: Durable native operator session and strict local CLI preflight
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_operator_session.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_resource_shape.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_cli_*.py' -v
+      - name: Canonical installed-model startup and local replay foundations
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_startup.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_replay.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_postcommit.py' -v
+      - name: Keep source-only tests separate from device and release proof
+        run: |
+          python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'
