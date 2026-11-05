@@ -369,6 +369,39 @@ def test_playtest_does_not_start_godot_after_deadline(monkeypatch):
     assert "deadline exceeded" in report["errors"]
 
 
+@pytest.mark.parametrize("bad", [
+    float("nan"), float("inf"), float("-inf"), True, -1, 10 ** 1000,
+])
+def test_game_build_rejects_nonfinite_or_overflowed_deadlines(bad):
+    from skeleton.forge.game_build_queue import _builder_deadline_s
+    class Context:
+        timeout_s = 30
+    with pytest.raises(ValueError):
+        _builder_deadline_s({"deadline_s": bad}, {}, Context())
+    with pytest.raises(ValueError):
+        _builder_deadline_s({}, {"deadline_s": bad}, Context())
+
+
+@pytest.mark.parametrize("bad", [
+    float("nan"), float("inf"), float("-inf"), True, 0, -1, 10 ** 1000,
+])
+def test_game_build_rejects_invalid_queue_timeout_before_compilation(bad):
+    from skeleton.forge.game_build_queue import _builder_deadline_s
+    class Context:
+        timeout_s = bad
+    with pytest.raises(ValueError):
+        _builder_deadline_s({}, {}, Context())
+
+
+def test_game_build_deadline_is_bounded_by_actual_queue_lease():
+    from skeleton.forge.game_build_queue import _builder_deadline_s
+    class Context:
+        timeout_s = 30
+    assert _builder_deadline_s({"deadline_s": 120}, {}, Context()) == 30
+    assert _builder_deadline_s({"deadline_s": 12}, {}, Context()) == 12
+    assert _builder_deadline_s({"deadline_s": 0}, {}, Context()) == 0
+
+
 def test_job_timeout_is_the_builder_deadline(monkeypatch, fallback_queue):
     seen = []
 
