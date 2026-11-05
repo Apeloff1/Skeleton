@@ -1,0 +1,92 @@
+{
+  "schema": "skeleton.game.harbor.convoy-league.v1",
+  "source_id": "lantern-quay",
+  "rounds": [
+    {
+      "id": "canal_relief",
+      "board": {
+        "schema": "skeleton.game.harbor.convoy-board.v1",
+        "source_id": "lantern-quay",
+        "route": [
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            5,
+            3
+          ],
+          [
+            6,
+            3
+          ]
+        ],
+        "encounters": [
+          {
+            "id": "canal_raider",
+            "at_index": 2,
+            "strength": 1,
+            "reward": 7
+          }
+        ],
+        "hull": 3,
+        "weapon_item": "lantern",
+        "max_turns": 80
+      },
+      "minimum_bounty": 7,
+      "minimum_hull": 2
+    },
+    {
+      "id": "lantern_homecoming",
+      "board": {
+        "schema": "skeleton.game.harbor.convoy-board.v1",
+        "source_id": "lantern-quay",
+        "route": [
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            5,
+            3
+          ],
+          [
+            6,
+            3
+          ]
+        ],
+        "encounters": [
+          {
+            "id": "canal_marauder",
+            "at_index": 2,
+            "strength": 1,
+            "reward": 9
+          }
+        ],
+        "hull": 3,
+        "weapon_item": "lantern",
+        "max_turns": 80
+      },
+      "minimum_bounty": 9,
+      "minimum_hull": 2
+    }
+  ],
+  "target_score": 25,
+  "max_total_ticks": 160
+}

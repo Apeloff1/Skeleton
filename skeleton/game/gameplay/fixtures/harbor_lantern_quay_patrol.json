@@ -1,0 +1,45 @@
+{
+  "schema": "skeleton.game.harbor.patrol-board.v1",
+  "source_id": "lantern-quay",
+  "guards": [
+    {
+      "id": "breakwater_watch",
+      "route": [
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ]
+      ],
+      "sight": 1
+    }
+  ],
+  "objectives": [
+    {
+      "id": "tide_registry",
+      "at": [
+        2,
+        1
+      ],
+      "reward": 7
+    },
+    {
+      "id": "dock_manifest",
+      "at": [
+        5,
+        3
+      ],
+      "reward": 11
+    }
+  ],
+  "exit": [
+    5,
+    3
+  ],
+  "max_turns": 128,
+  "alert_limit": 4,
+  "smoke_item": "lantern"
+}
