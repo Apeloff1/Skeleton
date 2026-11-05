@@ -985,3 +985,34 @@ def test_mutable_asset_buffer_cannot_change_receipt_after_parse(monkeypatch):
     assert result.sha256 == sha256(expected).hexdigest()
     assert result.metadata == {"verified": True}
     assert bytes(caller_buffer) != expected
+
+def test_hardlinked_assets_and_sidecars_fail_closed(tmp_path):
+    """An inode aliased outside the package is not a source-bound asset."""
+    from skeleton.game.build.asset_ingest import pipeline
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    root = tmp_path / "assets"
+    root.mkdir()
+    (outside / "private.png").write_bytes(png())
+    os.link(outside / "private.png", root / "hero.png")
+
+    for report in (pipeline.import_files(root, ["hero.png"]),
+                   pipeline.import_directory(root)):
+        assert not report.ok
+        assert not report.imported and not report.manifest.entries
+        assert any("hard-linked" in issue.detail for issue in report.issues)
+
+    (root / "hero.png").unlink()
+    (root / "mesh.obj").write_bytes(OBJ)
+    (outside / "private.mtl").write_bytes(b"newmtl stone\\n")
+    os.link(outside / "private.mtl", root / "cube.mtl")
+    report = pipeline.import_files(root, ["mesh.obj"])
+    assert not report.ok
+    assert not report.imported and not report.manifest.entries
+    assert any(issue.code == "missing_reference" and "hard-linked" in issue.detail
+               for issue in report.issues)
+
+    (root / "cube.mtl").unlink()
+    (root / "cube.mtl").write_bytes(b"newmtl stone\\n")
+    assert pipeline.import_files(root, ["mesh.obj"]).ok
