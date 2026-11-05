@@ -167,8 +167,8 @@ def _request_deadline_seconds(op: str, fields: dict[str, object], inference_ms: 
         value = fields.get("maximum_wall_seconds", 180)
         if (
             type(value) not in (int, float)
-            or not math.isfinite(value)
             or not 1 <= value <= 3600
+            or (type(value) is float and not math.isfinite(value))
         ):
             raise DesktopBridgeHold("invalid native agent wall deadline")
         return min(660.0, float(value) + 45.0)
