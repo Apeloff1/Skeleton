@@ -12,6 +12,7 @@ import sys
 from .contracts import ContractViolation,token,utf8
 from .dispatcher import LaptopDispatcher
 from .run_once import generate_once
+from .first_turn_acceptance import run as run_first_turn_acceptance
 from .server import LaptopHTTPServer
 from .startup import activate_checked
 from .preflight import validate_native_shape
@@ -30,7 +31,9 @@ def main(argv=None):
     p.add_argument("--state-dir",type=Path,required=True)
     p.add_argument("--tenant",required=True)
     p.add_argument("--subject",required=True)
-    p.add_argument("--mode",choices=("once","serve"),required=True)
+    p.add_argument("--mode",choices=("once","serve","acceptance"),required=True)
+    p.add_argument("--approve-real-acceptance",action="store_true",
+                   help="Explicitly permit one source-installed native inference acceptance run")
     p.add_argument("--session")
     p.add_argument("--request-id")
     p.add_argument("--prompt-stdin",action="store_true",
@@ -71,14 +74,21 @@ def main(argv=None):
         )
         if type(args.port) is not int or not 1 <= args.port <= 65535:
             raise ContractViolation("finite loopback port required")
-        if args.mode=="once" and not args.prompt_stdin:
-            raise ContractViolation("one-shot CLI requires explicit --prompt-stdin")
+        if args.mode in ("once","acceptance") and not args.prompt_stdin:
+            raise ContractViolation("native one-shot command requires --prompt-stdin")
         if args.mode=="serve" and (args.prompt_stdin or args.session or args.request_id):
             raise ContractViolation("server cannot combine one-shot options")
+        if args.mode=="acceptance":
+            if args.approve_real_acceptance is not True:
+                raise ContractViolation("explicit real native acceptance approval required")
+            if args.session is not None or args.request_id is not None:
+                raise ContractViolation("native acceptance must allocate a new durable request")
+        elif args.approve_real_acceptance:
+            raise ContractViolation("real acceptance approval is restricted to acceptance mode")
         bearer=None
         if args.mode=="serve":
             bearer=token(os.environ.get("SKELETON_LOCAL_AI_BEARER",""))
-        if args.mode=="once":
+        if args.mode in ("once","acceptance"):
             raw=sys.stdin.buffer.read(32769)
             if len(raw)>32768:raise ContractViolation("stdin prompt exceeds byte ceiling")
             message=utf8(raw.decode("utf-8","strict").strip(),maximum=32768)
@@ -90,6 +100,18 @@ def main(argv=None):
             capacity_slots=args.capacity_slots,
             capacity_budget_bytes=args.capacity_budget_bytes)
         with stack:
+            if args.mode=="acceptance":
+                result=run_first_turn_acceptance(
+                    worker,prompt=message,approved=True,
+                )
+                # Return only hashes, counts and the new durable identifiers,
+                # never the private stdin prompt or raw model output.
+                print(json.dumps({
+                    "status":"real-first-turn-native-replay-checked",
+                    "evidence":result,
+                    "release_certified":False,
+                },sort_keys=True,ensure_ascii=False))
+                return 0
             if args.mode=="once":
                 result=generate_once(worker,message,session=args.session,
                                      request_id=args.request_id)

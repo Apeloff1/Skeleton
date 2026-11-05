@@ -5,6 +5,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/runtime/operational_ai/laptop_runtime/dispatcher.py"
+      - "skeleton/ai/runtime/operational_ai/laptop_runtime/turn_bridge.py"
+      - "skeleton/ai/runtime/operational_ai/laptop_runtime/first_turn_acceptance.py"
+      - "skeleton/ai/runtime/operational_ai/laptop_runtime/cli.py"
+      - "skeleton/testing/test_laptop_real_acceptance_*.py"
+      - "skeleton/testing/test_laptop_turnbridge_*.py"
+      - "skeleton/testing/test_laptop_runtime_turn_bridge.py"
       - "skeleton/testing/test_laptop_dispatcher_*.py"
       - "skeleton/testing/test_laptop_runtime_dispatcher.py"
       - ".github/workflows/jeeves-laptop-dispatcher-source-tests.yml"
@@ -45,6 +51,9 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_laptop_dispatcher_replay_tamper.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_dispatcher_metadata_and_outbox.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_dispatcher.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_turnbridge_*.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_runtime_turn_bridge.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_real_acceptance_*.py' -v
       - name: Assert this gate cannot claim laptop or release qualification
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.dispatcher import LaptopDispatcher; assert not hasattr(LaptopDispatcher, "release_certified")'
