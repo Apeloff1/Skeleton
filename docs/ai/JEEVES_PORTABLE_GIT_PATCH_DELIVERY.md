@@ -129,3 +129,13 @@ directories and original project trees must meet the existing
 source custody policies. Every output receipt explicitly states
 `project_files_modified=false`, `git_index_modified=false`,
 `patch_applied=false` and `release_certified=false`.
+
+## Source structure check before private export
+
+Every generated replacement is now checked through a non-executing
+built-in parser where reliable: Python AST, strict JSON, and TOML.
+Invalid supported syntax **blocks** export; other formats are
+explicitly `unverified`, not falsely passed. Results are bound
+to the exact reviewed replacement SHA-256 and shown in the patch UI.
+The private exporter runs the gate again before creating a file.
+See `docs/ai/JEEVES_STATIC_SOURCE_QUALIFICATION.md`.

@@ -135,7 +135,7 @@ class GitPatchReviewTests(unittest.TestCase):
         self.assertEqual(plan.public_review()["existing_edits"], 1)
         self.assertEqual(
             list(e.path for e in plan.entries),
-            ["README.md", "pkg/core.py", "pkg/extra.py"],
+            ["pkg/core.py", "pkg/extra.py", "README.md"],
         )
         original_bytes = source.read_bytes()
         rendered = patch.get_reviewed_patch(plan)

@@ -195,3 +195,13 @@ the original workspace. The model gains no shell, Git index, or file
 write grant. The exported bytes may be manually checked with
 `git apply --check` before any separate operator-authorized
 application. `docs/ai/JEEVES_PORTABLE_GIT_PATCH_DELIVERY.md`.
+
+## Offline parser qualification for generated source
+
+Before an operator-approved private Git patch export, Jeeves checks
+generated Python (AST), JSON (strict duplicate/NaN rejection), and
+TOML (stdlib parser) without executing source. Invalid supported
+syntax holds the export. TS/JS, YAML, SQL and other unsupported formats
+remain marked `unverified`; parser success is never called a build,
+runtime test or release qualification. See
+`docs/ai/JEEVES_STATIC_SOURCE_QUALIFICATION.md`.

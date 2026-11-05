@@ -19,6 +19,7 @@ from .desktop_patch_bundle import (
     PortablePatchPlan, review_patch_bundle, get_reviewed_patch,
 )
 from .desktop_patch_export import export_reviewed_patch, verify_saved_patch
+from .desktop_source_qualification import qualify_patch_sources
 
 
 class PortablePatchWindow(tk.Toplevel):
@@ -44,6 +45,7 @@ class PortablePatchWindow(tk.Toplevel):
         self._plan: PortablePatchPlan | None = None
         self._reviewed_texts = None
         self._export_receipt = None
+        self._qualification = None
         self._queue: Queue = Queue()
         self._build()
         if source_text:
@@ -262,6 +264,7 @@ class PortablePatchWindow(tk.Toplevel):
         self._plan = None
         self._reviewed_texts = None
         self._export_receipt = None
+        self._qualification = None
         self.expected_manifest.set("")
         self.expected_patch.set("")
         for item in self.files.get_children():
@@ -277,8 +280,11 @@ class PortablePatchWindow(tk.Toplevel):
         self.review_button.configure(state="disabled" if self._busy else "normal")
         self.reset_button.configure(state="disabled" if self._busy else "normal")
         self.export_button.configure(
-            state="normal" if not self._busy and self._plan is not None
-            else "disabled",
+            state="normal" if (
+                not self._busy and self._plan is not None
+                and self._qualification is not None
+                and self._qualification.permits_inert_export
+            ) else "disabled",
         )
         self.verify_button.configure(
             state="normal" if not self._busy and self._export_receipt is not None
@@ -303,7 +309,10 @@ class PortablePatchWindow(tk.Toplevel):
                     root, new_files=additions, existing_edits=edits,
                 )
                 diff = get_reviewed_patch(plan)
-                self._queue.put(("reviewed", epoch, values, plan, diff))
+                qualification = qualify_patch_sources(plan)
+                self._queue.put((
+                    "reviewed", epoch, values, plan, diff, qualification,
+                ))
             except BaseException as exc:
                 self._queue.put(("held", epoch, values, type(exc).__name__))
 
@@ -311,7 +320,10 @@ class PortablePatchWindow(tk.Toplevel):
 
     def _export(self):
         plan = self._plan
-        if self._busy or plan is None:
+        if (
+            self._busy or plan is None or self._qualification is None
+            or not self._qualification.permits_inert_export
+        ):
             return
         if self._reviewed_texts != self._source_inputs():
             self._invalidate()
@@ -393,7 +405,7 @@ class PortablePatchWindow(tk.Toplevel):
                 self._busy = False
                 self.progress.stop()
                 if kind == "reviewed":
-                    _, _, inputs, plan, patch = message
+                    _, _, inputs, plan, patch, qualification = message
                     if inputs != self._source_inputs():
                         self.status.set(
                             "Source inputs changed during review. Re-review required.",
@@ -401,6 +413,7 @@ class PortablePatchWindow(tk.Toplevel):
                         self._buttons()
                         continue
                     self._plan = plan
+                    self._qualification = qualification
                     self._reviewed_texts = inputs
                     for index, item in enumerate(plan.entries):
                         self.files.insert(
@@ -411,11 +424,24 @@ class PortablePatchWindow(tk.Toplevel):
                             ),
                         )
                     self._preview(patch.decode("utf-8", "strict"))
+                    report = qualification.to_public()
+                    issues = [
+                        issue["code"] + "@" + str(issue["line"] or "?")
+                        + ":" + str(issue["column"] or "?")
+                        + " in " + info["path"]
+                        for info in report["files"]
+                        for issue in info["issues"]
+                    ]
                     self.status.set(
-                        "FULL diff reviewed: "
-                        + str(len(plan.entries)) + " original changes · "
-                        + str(plan.patch_bytes) + " inert patch bytes · "
-                        + "MANIFEST " + plan.manifest_sha256
+                        "COMPLETE source review · "
+                        + str(len(plan.entries)) + " changes / "
+                        + str(plan.patch_bytes) + " bytes · "
+                        + "STRUCTURAL: " + report["status"]
+                        + " · clean " + str(report["parse_clean_count"])
+                        + " / unverified " + str(report["unverified_count"])
+                        + " / held " + str(report["syntax_held_count"])
+                        + (" · " + "; ".join(issues[:3]) if issues else "")
+                        + " · MANIFEST " + plan.manifest_sha256
                         + " · PATCH " + plan.patch_sha256,
                     )
                 elif kind == "exported":
@@ -427,8 +453,10 @@ class PortablePatchWindow(tk.Toplevel):
                         self.status.set(
                             "NEW private inert patch exported · SHA-256 "
                             + str(result["patch_sha256"])
-                            + " · " + str(result["file_count"]) + " source changes. "
-                            + "Apply only after separate Git source-review, "
+                            + " · " + str(result["file_count"]) + " source changes"
+                            + " · static " + str(result["static_source_status"])
+                            + " / unknown " + str(result["unverified_source_count"])
+                            + ". Apply only after separate Git source-review, "
                             + "git apply --check and operator authorization.",
                         )
                 elif kind == "verified":
