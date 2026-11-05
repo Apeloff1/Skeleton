@@ -51,3 +51,23 @@ def test_port_override_rejects_invalid_packaged_endpoint(tmp_path: Path, invalid
     manifest = replace(manifest, services=services)
     with pytest.raises(ValueError, match="invalid public URL port"):
         public_service_urls(tmp_path, manifest=manifest, environ={"FRONTEND_PORT": "31999"})
+
+
+@pytest.mark.parametrize("invalid_url", [
+    "http://localhost:3000\\n",
+    "http://localhost:3000\\t",
+    " http://localhost:3000",
+    "http://localhost:3000\\\\@remote.example",
+    "http://localhost:3000/\\rpath",
+])
+def test_port_override_rejects_unsafe_packaged_url(tmp_path: Path, invalid_url: str):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=invalid_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="unsafe public URL"):
+        public_service_urls(
+            tmp_path, manifest=replace(manifest, services=services),
+            environ={"FRONTEND_PORT": "31999"},
+        )

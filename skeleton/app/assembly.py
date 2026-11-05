@@ -451,6 +451,11 @@ def runtime_manifest(
         if raw and service.public_url:
             if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
+            # urlsplit strips ASCII controls; reject ambiguous URLs before parsing.
+            if (service.public_url != service.public_url.strip()
+                    or any(ord(char) < 32 or ord(char) == 127 for char in service.public_url)
+                    or chr(92) in service.public_url):
+                raise ValueError(f"{service.name} has an unsafe public URL")
             url = urlsplit(service.public_url)
             if (url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}
                     or url.username is not None or url.password is not None
