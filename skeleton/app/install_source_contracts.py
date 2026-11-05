@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import glob
 import itertools
-from pathlib import Path, PurePosixPath
 import shlex
 import stat
+from pathlib import Path, PurePosixPath
 
 MAX_DOCKERFILE_BYTES = 128 * 1024
 MAX_SOURCE_PATH_BYTES = 2048
