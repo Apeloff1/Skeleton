@@ -58,3 +58,22 @@ def test_if_match():
     with pytest.raises(CoreError):
         check_if_match("W/" + tag, "whk_1", 3)  # weak tags never match writes
     check_if_match(None, "whk_1", 3, required=False)
+
+
+def test_cursor_rejects_nonfinite_boolean_and_malformed_base64():
+    import base64
+    import json
+
+    c = CursorCodec(b"s" * 32)
+    for value in (float("nan"), float("inf"), True):
+        with pytest.raises(ValueError, match="bounded and finite"):
+            c.encode("scope", value, "id")
+    for bad in (float("nan"), float("inf"), True):
+        body = json.dumps({"s": "scope", "t": bad, "i": "id"}).encode()
+        forged = base64.urlsafe_b64encode(body).decode().rstrip("=") + "." + c._mac(body)
+        with pytest.raises(CoreError):
+            c.decode("scope", forged)
+    with pytest.raises(CoreError):
+        c.decode("scope", "!!!!.0000000000000000")
+    with pytest.raises(CoreError):
+        parse_limit(True)

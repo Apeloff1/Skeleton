@@ -8,6 +8,8 @@ inserts.
 from __future__ import annotations
 
 import base64
+import binascii
+import math
 import hashlib
 import hmac
 import json
@@ -39,7 +41,7 @@ class Page(Generic[T]):
 
 class CursorCodec:
     def __init__(self, key: bytes) -> None:
-        if len(key) < 16:
+        if type(key) is not bytes or len(key) < 16:
             raise ValueError("cursor key must be at least 16 bytes")
         self._key = key
 
@@ -47,6 +49,10 @@ class CursorCodec:
         return hmac.new(self._key, body, hashlib.sha256).hexdigest()[:16]
 
     def encode(self, scope: str, created_at: float, item_id: str) -> str:
+        if (type(scope) is not str or not 1 <= len(scope) <= 128
+                or type(item_id) is not str or not 1 <= len(item_id) <= 96
+                or type(created_at) not in (int, float) or not math.isfinite(created_at)):
+            raise ValueError("cursor inputs must be bounded and finite")
         body = json.dumps({"s": scope, "t": created_at, "i": item_id},
                           separators=(",", ":"), sort_keys=True).encode()
         token = base64.urlsafe_b64encode(body).decode().rstrip("=")
@@ -60,14 +66,15 @@ class CursorCodec:
         try:
             body = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
             data = json.loads(body)
-        except (ValueError, json.JSONDecodeError):
+        except (ValueError, binascii.Error, UnicodeError):
             raise bad from None
         if not hmac.compare_digest(mac, self._mac(body)):
             raise bad
         if not isinstance(data, dict) or data.get("s") != scope:
             raise bad
         t, i = data.get("t"), data.get("i")
-        if not isinstance(t, (int, float)) or not isinstance(i, str):
+        if (type(t) not in (int, float) or not math.isfinite(t)
+                or type(i) is not str or not 1 <= len(i) <= 96):
             raise bad
         return float(t), i
 
@@ -76,6 +83,8 @@ def parse_limit(raw: int | str | None) -> int:
     if raw is None:
         return DEFAULT_LIMIT
     try:
+        if type(raw) is bool:
+            raise ValueError("boolean limit")
         value = int(raw)
     except (TypeError, ValueError):
         raise validation("CORE.PAGINATION.INVALID_LIMIT", "limit must be an integer",

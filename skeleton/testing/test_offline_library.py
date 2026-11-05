@@ -173,7 +173,7 @@ def test_library_cli_rejects_invalid_mixed_authority(tmp_path: Path, capsys) -> 
     assert capsys.readouterr().out == ""
 
 
-def test_total_library_limit_is_atomic_across_multiple_import_roots(
+def test_multiple_import_roots_use_live_resources_not_retired_file_caps(
     tmp_path: Path, monkeypatch,
 ) -> None:
     import skeleton.app.offline_library as mod
@@ -185,23 +185,22 @@ def test_total_library_limit_is_atomic_across_multiple_import_roots(
     (first / "alpha.md").write_text("local alpha knowledge", encoding="utf-8")
     (second / "beta.md").write_text("local beta knowledge", encoding="utf-8")
     db = tmp_path / "knowledge.sqlite"
+    # This compatibility name no longer controls admission: local capacity is
+    # measured against available RAM, swap and disk, not an arbitrary file count.
     monkeypatch.setattr(mod, "MAX_LIBRARY_FILES", 1)
     with OfflineDocumentLibrary(db) as library:
-        library.index_directory(first)
-        with pytest.raises(OfflineLibraryError, match="aggregate"):
-            library.index_directory(second)
-        assert library.count() == 1
+        assert library.index_directory(first)["indexed_files"] == 1
+        assert library.index_directory(second)["indexed_files"] == 1
+        assert library.count() == 2
         assert library.search("alpha")
-        assert library.search("beta") == ()
+        assert library.search("beta")
     with OfflineDocumentLibrary(db) as reopened:
-        assert reopened.count() == 1
+        assert reopened.count() == 2
 
 
-def test_aggregate_size_cap_rolls_back_a_second_library_import(
-    tmp_path: Path, monkeypatch,
+def test_disk_exhaustion_at_commit_rolls_back_second_library_import(
+    tmp_path: Path,
 ) -> None:
-    import skeleton.app.offline_library as mod
-
     root1 = tmp_path / "r1"
     root2 = tmp_path / "r2"
     root1.mkdir()
@@ -209,12 +208,19 @@ def test_aggregate_size_cap_rolls_back_a_second_library_import(
     (root1 / "one.md").write_text("one local knowledge", encoding="utf-8")
     (root2 / "two.md").write_text("two local knowledge", encoding="utf-8")
     db = tmp_path / "local.sqlite"
+
+    def disk_full() -> None:
+        raise sqlite3.OperationalError("database or disk is full")
+
     with OfflineDocumentLibrary(db) as library:
         assert library.index_directory(root1)["indexed_files"] == 1
-        monkeypatch.setattr(mod, "MAX_LIBRARY_BYTES", 20)
-        with pytest.raises(OfflineLibraryError, match="aggregate"):
-            library.index_directory(root2)
+        with pytest.raises(sqlite3.OperationalError, match="disk is full"):
+            library.index_directory(root2, before_commit=disk_full)
         assert library.count() == 1
+        assert library.search("one")
+        assert library.search("two") == ()
+    with OfflineDocumentLibrary(db) as reopened:
+        assert reopened.count() == 1
 
 
 def test_parent_directory_swap_cannot_index_external_private_text(
