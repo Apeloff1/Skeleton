@@ -27,6 +27,7 @@ from skeleton.ai.runtime.operational_ai.authority.canonical import load_json
 
 from .native_durable_runtime import NativeDurableJeevesAgent
 from .native_checkpoint_journal import NativeSQLiteCheckpointer
+from .native_source_fence import NativeSourceFence
 from .runtime import RunInputs
 from .types import Budget, Goal
 from skeleton.jeeves.native_fabric.contracts import (
@@ -133,6 +134,7 @@ class NativeOperatorSession:
         self, worker: Any,*,approved: bool,
         limits:OperatorSessionLimits|None=None,
         monotonic:Callable[[],float]=time.monotonic,
+        source_fence:NativeSourceFence|None=None,
     ):
         if approved is not True:
             raise NativeOperatorSessionHold("explicit operator native approval required")
@@ -140,6 +142,13 @@ class NativeOperatorSession:
             raise NativeOperatorSessionHold("trusted monotonic clock required")
         self.identity=ActiveModel.from_supervisor(worker)
         self.worker=worker
+        if source_fence is not None and not isinstance(
+            source_fence, NativeSourceFence,
+        ):
+            raise NativeOperatorSessionHold("canonical native source fence required")
+        self.source_fence=source_fence
+        if source_fence is not None:
+            source_fence.assert_live(worker)
         self.limits=limits or OperatorSessionLimits()
         if not isinstance(self.limits,OperatorSessionLimits):
             raise NativeOperatorSessionHold("typed session budget required")
@@ -160,11 +169,22 @@ class NativeOperatorSession:
                 "native source identity unavailable"
             ) from exc
         if active!=self.identity:
+            self._closed=True
             raise NativeOperatorSessionHold("native model epoch/principal changed")
         if self._closed:
             raise NativeOperatorSessionHold("session already stopped")
         if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
+            self._closed=True
             raise NativeOperatorSessionHold("operator session time budget exhausted")
+        if self.source_fence is not None:
+            try:
+                self.source_fence.assert_live(self.worker)
+            except BaseException:
+                # A lost lease, installed archive or owner makes this whole
+                # process-local operator session terminal, even when a caller
+                # invokes dispatch() without the JSONL serve() outer loop.
+                self._closed=True
+                raise
 
     def _post_io(self) -> None:
         """Hold private SQLite or model output after a source/owner change.
@@ -175,6 +195,28 @@ class NativeOperatorSession:
         """
         try:
             self._valid_worker()
+        except BaseException:
+            self._closed=True
+            raise
+
+    def _before_publication(self) -> None:
+        """Last source/owner fence after encoding and before stdout.
+
+        Dispatch checks before/after SQLite I/O; however its caller may
+        serialize a private result after the lease has been revoked. The
+        output stream must not publish that stale result.
+        """
+        try:
+            if ActiveModel.from_supervisor(self.worker)!=self.identity:
+                raise NativeOperatorSessionHold(
+                    "native operator identity changed before publication"
+                )
+            if self.source_fence is not None:
+                self.source_fence.assert_live(self.worker)
+            if ActiveModel.from_supervisor(self.worker)!=self.identity:
+                raise NativeOperatorSessionHold(
+                    "native operator identity changed during publication check"
+                )
         except BaseException:
             self._closed=True
             raise
@@ -334,6 +376,7 @@ class NativeOperatorSession:
                 )+"\n"
                 if len(output.encode("utf-8","strict"))>self.limits.maximum_result_bytes:
                     raise NativeOperatorSessionHold("operator disclosure exceeds result ceiling")
+                self._before_publication()
                 destination.write(output)
                 if callable(getattr(destination,"flush",None)):
                     destination.flush()

@@ -97,6 +97,13 @@ class TestJeevesReadinessWithCanonicalSpine(unittest.TestCase):
             {**SOURCE,"installed_shard_count":0},
             {**SOURCE,"installed_model_bytes":1.5},
             {**SOURCE,"installed_model_bytes":None},
+            {**SOURCE,"installed_model_bytes":10**12+1},
+            {**SOURCE,"installed_shard_count":65537},
+            {**SOURCE,"manifest_sha256":"A"*64},
+            {**SOURCE,"archive_sha256":"z"*63},
+            {**SOURCE,"source_sha":"Q"*40},
+            {**SOURCE,"source_sha":"a"*39},
+            {**SOURCE,"unexpected_source_rights_claim":True},
         )
         for witness in modified:
             with self.subTest(value=repr(witness)[:60]),mock.patch(
