@@ -222,24 +222,39 @@ def write_shard(
     description: str = "",
     scratch: bool = False,
 ) -> dict:
-    """Write an iterable of JSON rows to a compressed shard."""
+    """Publish a complete, bounded compressed shard with descriptor custody."""
     name = _safe_name(name)
     shard_path = _shard_path(name, scratch)
-    shard_path.parent.mkdir(parents=True, exist_ok=True)
-
     count = 0
     raw_bytes = 0
     hasher = hashlib.sha1()
-    with shard_path.open("wb") as fh:
-        with _COMPRESSOR.stream_writer(fh) as zw:
+
+    def _compress(handle) -> None:
+        nonlocal count, raw_bytes
+        with _COMPRESSOR.stream_writer(handle) as writer:
             for row in rows:
-                line = (json.dumps(row, separators=(",", ":"), ensure_ascii=False, default=_json_default) + "\n").encode("utf-8")
-                zw.write(line)
+                if not isinstance(row, dict):
+                    raise ValueError("vault rows must be JSON objects")
+                line = (
+                    json.dumps(
+                        row, separators=(",", ":"), ensure_ascii=False,
+                        default=_json_default, allow_nan=False,
+                    ) + "\n"
+                ).encode("utf-8")
+                if len(line) > _MAX_ROW_CHARS:
+                    raise ValueError("vault row exceeds line byte budget")
+                if count >= _MAX_SHARD_ROWS or raw_bytes + len(line) > _MAX_SHARD_SCAN_BYTES:
+                    raise ValueError("vault write exceeds row/byte budget")
+                writer.write(line)
                 hasher.update(line)
                 raw_bytes += len(line)
                 count += 1
 
-    compressed_bytes = shard_path.stat().st_size
+    with _storage_fd(scratch) as directory:
+        compressed_bytes = atomic_write(
+            directory, shard_path.name, _compress, max_bytes=_MAX_COMPRESSED_BYTES,
+        )
+
     entry = {
         "name": name,
         "domain": domain,
@@ -255,8 +270,19 @@ def write_shard(
         "created_at": time.time(),
     }
     if not scratch:
+        old_entry = _MANIFEST.get(name)
         _MANIFEST[name] = entry
-        _save_manifest()
+        try:
+            _save_manifest()
+        except BaseException:
+            if old_entry is None:
+                _MANIFEST.pop(name, None)
+            else:
+                _MANIFEST[name] = old_entry
+            raise
+    with _CACHE_LOCK:
+        _CACHE.pop(name, None)
+        _CACHE_SIZE_EST.pop(name, None)
     return entry
 
 
