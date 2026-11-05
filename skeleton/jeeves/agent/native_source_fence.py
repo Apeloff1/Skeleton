@@ -10,6 +10,8 @@ recovery, source reapproval or second model inference is performed here.
 """
 from __future__ import annotations
 
+import threading
+
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
     identifier, refuse,
 )
@@ -85,23 +87,44 @@ class NativeSourceFence:
         if not valid_source_snapshot(initial, self._principal):
             refuse("complete installed native source and model proof required")
         self._source = initial.copy()
+        # Once a source, owner or capacity lease fails its live check,
+        # this fence cannot be resurrected by a later transient healthy
+        # report or an attacker reverting the archive to earlier bytes.
+        self._lock = threading.RLock()
+        self._revoked = False
         # A first witness is only a snapshot; the native model can still
         # exit, lose its resource lease or change its source after this point.
         self.assert_live(worker)
 
     def assert_live(self, worker: object) -> None:
-        """Refuse stale native identity or source before publication."""
+        """Refuse stale or previously revoked installed GGUF custody.
 
-        if worker is not self._worker:
-            refuse("source fence belongs to a different native worker")
-        active = ActiveModel.from_supervisor(worker)
-        if active != self._principal:
-            refuse("native model, tokenizer or operator scope changed")
-        current = require_activated_source(worker, self._receipt)
-        if not valid_source_snapshot(current, self._principal) or current != self._source:
-            refuse("installed GGUF source, rights or native lease changed")
-        if ActiveModel.from_supervisor(worker) != self._principal:
-            refuse("native principal changed after source witness")
+        The same-instance lock makes revocation monotonic under concurrent
+        chat, history, operator status and output publication. A real source
+        failure is terminal for this fence, even if the child later recovers.
+        Reopening requires a new installed-source activation and lease.
+        """
+        with self._lock:
+            if self._revoked:
+                refuse("native installed source fence permanently revoked")
+            try:
+                if worker is not self._worker:
+                    refuse("source fence belongs to a different native worker")
+                active = ActiveModel.from_supervisor(worker)
+                if active != self._principal:
+                    refuse("native model, tokenizer or operator scope changed")
+                current = require_activated_source(worker, self._receipt)
+                if (not valid_source_snapshot(current, self._principal)
+                        or current != self._source):
+                    refuse("installed GGUF source, rights or native lease changed")
+                if ActiveModel.from_supervisor(worker) != self._principal:
+                    refuse("native principal changed after source witness")
+            except BaseException:
+                # Never implicitly restore a previously failed source,
+                # even after a malformed report, expired lease or wrong
+                # owner appears transiently to become healthy again.
+                self._revoked = True
+                raise
 
     @property
     def principal(self) -> ActiveModel:
