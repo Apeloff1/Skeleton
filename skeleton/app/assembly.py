@@ -456,6 +456,15 @@ def runtime_manifest(
                     or url.username is not None or url.password is not None
                     or url.query or url.fragment):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+            # A malformed or out-of-range embedded port must never be silently
+            # replaced by an operator override: that would admit an invalid
+            # packaged endpoint as though its transport contract were valid.
+            try:
+                existing_port = url.port
+            except ValueError as exc:
+                raise ValueError(f"{service.name} has an invalid public URL port") from exc
+            if existing_port is not None and not 1 <= existing_port <= 65535:
+                raise ValueError(f"{service.name} has an invalid public URL port")
             host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"
