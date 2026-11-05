@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_frosted_crater",
+  "title": "Frosted Crater: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010314247,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 11,
+  "theme": "space",
+  "starting_health": 5
+}

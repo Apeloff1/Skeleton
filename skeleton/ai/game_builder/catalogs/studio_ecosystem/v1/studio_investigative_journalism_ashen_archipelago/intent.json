@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_ashen_archipelago",
+  "title": "Ashen Archipelago: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010314099,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 5
+}

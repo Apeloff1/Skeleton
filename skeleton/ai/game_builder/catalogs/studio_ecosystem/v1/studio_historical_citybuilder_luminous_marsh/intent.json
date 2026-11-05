@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_luminous_marsh",
+  "title": "Luminous Marsh: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010317082,
+  "width": 25,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 11,
+  "theme": "forest",
+  "starting_health": 4
+}

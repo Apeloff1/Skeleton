@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_industrial_logistics_misty_breakwater",
+  "genre": "industrial_logistics",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Misty Breakwater: Industrial Logistics",
+  "foundation": {
+    "setting": "Misty Breakwater",
+    "era": "decades after the crossing",
+    "environment": "mist-channel locks",
+    "history": "A forgotten historic sea wall once protected fog horns, until recurring low-visibility tides forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Vera Kiri, a engineer, must restart a failing supply corridor, relying on production-chain balancing despite low-visibility tides.",
+  "central_conflict": "a brittle monopoly threatens the historic sea wall by restricting fog horns.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "low-visibility tides destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a brittle monopoly contests access to fog horns",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The historic sea wall becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers fog horns"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "historic sea wall",
+    "critical_resource": "fog horns",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

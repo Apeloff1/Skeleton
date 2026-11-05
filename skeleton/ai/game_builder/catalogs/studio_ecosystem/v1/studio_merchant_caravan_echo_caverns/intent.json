@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_echo_caverns",
+  "title": "Echo Caverns: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010315071,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 3
+}

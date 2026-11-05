@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_neon_undercity",
+  "title": "Neon Undercity: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010314997,
+  "width": 25,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 14,
+  "theme": "arcade",
+  "starting_health": 5
+}
