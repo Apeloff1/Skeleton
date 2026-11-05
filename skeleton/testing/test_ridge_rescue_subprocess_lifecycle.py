@@ -103,3 +103,23 @@ def test_stale_process_command_and_corrupt_restore_leave_slot_unchanged(tmp_path
     missing = _invoke(home, "status", "--slot", "bad-restore")
     assert missing.returncode != 0
     assert _json(home, "status")["head"] == advanced["head"]
+
+
+def test_read_only_journal_survives_process_restart(tmp_path: Path):
+    """The noninteractive journal must not mutate the authoritative save."""
+    home = tmp_path / "private-data"
+    initial = _json(home, "new")
+    empty = _json(home, "journal")
+    assert empty["slot"] == "process-game"
+    assert empty["head"] == initial["head"]
+    assert empty["revision"] == 0
+    assert isinstance(empty["journal"], str)
+    action = initial["actions"][0]
+    advanced = _json(home, "step", "--action", json.dumps(action),
+                     "--expected-head", initial["head"])
+    journal = _json(home, "journal")
+    assert journal["head"] == advanced["head"]
+    assert journal["revision"] == 1
+    assert isinstance(journal["journal"], str)
+    assert _json(home, "status")["head"] == advanced["head"]
+    assert _json(home, "audit")["audit_entries"] == 1

@@ -165,7 +165,7 @@ def _portable_input(path: str | None) -> bytes:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cinder-ridge-consumer")
-    parser.add_argument("command", choices=("play", "new", "status", "step", "retry", "export", "restore", "backup", "restore-backup", "audit", "verify-export", "verify-backup", "acceptance", "bundle", "smoke", "portable-smoke"))
+    parser.add_argument("command", choices=("play", "new", "status", "journal", "step", "retry", "export", "restore", "backup", "restore-backup", "audit", "verify-export", "verify-backup", "acceptance", "bundle", "smoke", "portable-smoke"))
     parser.add_argument("--slot", default="adventure", help="lowercase save name, 1-32 safe characters")
     parser.add_argument("--ascii", action="store_true", help="ASCII-only terminal fallback")
     parser.add_argument("--action", help="canonical JSON action for a noninteractive step")
@@ -209,6 +209,11 @@ def main(argv: list[str] | None = None) -> int:
                 result = {"path": str(store.backup(args.slot))}
             elif args.command == "status":
                 result = store.load(args.slot)
+            elif args.command == "journal":
+                current = store.load(args.slot)
+                result = {"slot": args.slot, "head": current["head"],
+                          "revision": current["revision"],
+                          "journal": recent_events(current)}
             elif args.command == "step":
                 if not args.action or not args.expected_head:
                     raise StoreError("--action and --expected-head required")
