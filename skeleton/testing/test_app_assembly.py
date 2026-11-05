@@ -881,3 +881,41 @@ def test_app_preflight_rejects_invalid_replica_set_host_list(tmp_path, monkeypat
     entry = next(c for c in checks if c.code == "env:MONGO_URL")
     assert not entry.ok
     assert "secret" not in entry.message
+
+
+def test_python_image_preflight_rejects_unsupported_clean_install_source(tmp_path):
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace("FROM python:3.14-alpine@", "FROM python:3.15-alpine@")
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend/Dockerfile").write_text(bumped, encoding="utf-8")
+
+    checks = preflight(tmp_path)
+    image_check = next(check for check in checks if check.code == "image:backend-python")
+    assert image_check.ok is False
+    assert "violates its dependency guard" in image_check.message
+    assert not checks_ok(checks)
+
+
+def test_python_image_guard_in_comment_does_not_count():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace("RUN python -c '", "# RUN python -c '", 1)
+    assert changed != source
+    errors = backend_python_image_errors(changed)
+    assert any("upper-bound guard is missing" in error for error in errors)
+
+
+def test_python_image_unpinned_stage_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace(
+        "FROM python:3.14-alpine@sha256:", "FROM python:3.14-alpine@", 1
+    )
+    assert changed != source
+    errors = backend_python_image_errors(changed)
+    assert any("digest-pinned Alpine stage" in error for error in errors)
