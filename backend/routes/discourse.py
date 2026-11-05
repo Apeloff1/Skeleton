@@ -36,6 +36,7 @@ MAX_PROMPT_CHARS = 20_000
 MAX_SYSTEM_CHARS = 8_000
 MAX_JUDGE_REPLY_CHARS = 32_768
 MAX_MODEL_CONTENT_CHARS = 12_000
+MAX_JUDGE_PROMPT_CHARS = 39_200
 MAX_ASYNC_DELIBERATIONS = 16
 _ACTIVE_DELIBERATIONS: set[str] = set()
 _ACTIVE_LOCK = threading.Lock()
@@ -156,6 +157,58 @@ _JUDGE_SYS = ("You are an impartial head judge. Score each candidate on QUALITY 
               "(weight fidelity slightly higher than quality).")
 
 
+def _judge_prompt(prompt: str, candidates: list[dict]) -> str:
+    """Preserve the whole brief and fit all candidates beneath router limits.
+
+    No model text is trusted as code. Equal first-pass allocations ensure that
+    a long first draft cannot starve a later candidate's evidence.
+    """
+    if (
+        not isinstance(prompt, str) or not 4 <= len(prompt) <= MAX_PROMPT_CHARS
+        or not isinstance(candidates, list) or not 1 <= len(candidates) <= MAX_PANEL
+    ):
+        raise ValueError("invalid judge prompt input")
+    head = "BRIEF:\n" + prompt + "\n\nCANDIDATES:\n"
+    remaining = MAX_JUDGE_PROMPT_CHARS - len(head)
+    if remaining < len(candidates) * 128:
+        raise ValueError("insufficient judge context")
+    sections: list[str] = []
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            raise ValueError("invalid judge candidate")
+        name = candidate.get("model")
+        draft = candidate.get("content")
+        critique = candidate.get("critique", "")
+        if (
+            not isinstance(name, str) or not 1 <= len(name) <= 385
+            or not isinstance(draft, str) or not draft.strip()
+            or not isinstance(critique, str)
+        ):
+            raise ValueError("invalid judge candidate fields")
+        label = f"[CANDIDATE {index}] (model={name})\n"
+        sep = "\n\n" if sections else ""
+        allowance = remaining // (len(candidates) - index)
+        body_room = allowance - len(sep) - len(label)
+        if body_room < 1:
+            raise ValueError("judge context metadata exceeds budget")
+        critique_label = "\nCRITIQUE: "
+        critique_len = min(1500, max(0, body_room // 4 - len(critique_label))) if critique else 0
+        draft_len = min(5000, body_room - (len(critique_label) + critique_len if critique_len else 0))
+        if draft_len < 1:
+            raise ValueError("judge context leaves no candidate content")
+        section = sep + label + draft[:draft_len]
+        if critique_len:
+            section += critique_label + critique[:critique_len]
+        if len(section) > remaining:
+            raise ValueError("judge context exceeds budget")
+        remaining -= len(section)
+        sections.append(section)
+    result = head + "".join(sections)
+    if len(result) > MAX_JUDGE_PROMPT_CHARS:
+        raise ValueError("judge context exceeds budget")
+    return result
+
+
 async def deliberate(task: str, prompt: str, system: str = "",
                      panel: list = None, judge_model: str = "",
                      do_discord: bool = True, rounds: int = 1,
@@ -242,13 +295,13 @@ async def deliberate(task: str, prompt: str, system: str = "",
         for c in candidates:
             c["critique"] = ""
 
-    # 3. JUDGEMENT — score quality + fidelity, pick the winner.
-    panel_block = "\n\n".join(
-        f"[CANDIDATE {i}] (model={c['model']})\n{c['content'][:5000]}"
-        + (f"\nCRITIQUE: {c['critique'][:1500]}" if c.get('critique') else "")
-        for i, c in enumerate(candidates)
-    )
-    judge_prompt = f"BRIEF:\n{prompt}\n\nCANDIDATES:\n{panel_block}"
+    # Strictly budget the combined brief, drafts, and critiques before paying
+    # for a judge request; never silently discard the user's original brief.
+    try:
+        judge_prompt = _judge_prompt(prompt, candidates)
+    except ValueError:
+        return {"error": "judge_context_unavailable", "panel": panel}
+
     try:
         judged = await _run_model("reasoning", judge_prompt, _JUDGE_SYS, declared.judge, scope)
     except Exception:
