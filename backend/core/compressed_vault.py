@@ -25,7 +25,7 @@ import threading
 import re
 from contextlib import contextmanager
 from itertools import islice
-from .vault_secure_fs import anchored_directory, ensure_directory, read_regular, atomic_write, unlink_regular, VaultPathError
+from .vault_secure_fs import anchored_directory, ensure_directory, read_regular, atomic_write, unlink_regular, snapshot_regular, VaultPathError
 from pathlib import Path
 from typing import Iterable, Iterator, Any
 
@@ -259,40 +259,59 @@ def write_shard(
                 count += 1
 
     with _storage_fd(scratch) as directory:
-        compressed_bytes = atomic_write(
-            directory, shard_path.name, _compress, max_bytes=_MAX_COMPRESSED_BYTES,
+        # Preserve the previous published bytes until the manifest points to
+        # the replacement. A rejected manifest update must never lose data.
+        backup_name = None if scratch else snapshot_regular(
+            directory, shard_path.name, max_bytes=_MAX_COMPRESSED_BYTES,
         )
-
-    entry = {
-        "name": name,
-        "domain": domain,
-        "agent_id": agent_id or f"agent_{name}",
-        "description": description,
-        "path": str(shard_path),
-        "scratch": scratch,
-        "rows": count,
-        "raw_bytes": raw_bytes,
-        "compressed_bytes": compressed_bytes,
-        "compression_ratio": round(raw_bytes / max(compressed_bytes, 1), 2),
-        "sha1": hasher.hexdigest(),
-        "created_at": time.time(),
-    }
-    if not scratch:
-        old_entry = _MANIFEST.get(name)
-        _MANIFEST[name] = entry
         try:
-            _save_manifest()
-        except BaseException:
-            if old_entry is None:
-                _MANIFEST.pop(name, None)
-            else:
-                _MANIFEST[name] = old_entry
-            raise
+            compressed_bytes = atomic_write(
+                directory, shard_path.name, _compress, max_bytes=_MAX_COMPRESSED_BYTES,
+            )
+            entry = {
+                "name": name,
+                "domain": domain,
+                "agent_id": agent_id or f"agent_{name}",
+                "description": description,
+                "path": str(shard_path),
+                "scratch": scratch,
+                "rows": count,
+                "raw_bytes": raw_bytes,
+                "compressed_bytes": compressed_bytes,
+                "compression_ratio": round(raw_bytes / max(compressed_bytes, 1), 2),
+                "sha1": hasher.hexdigest(),
+                "created_at": time.time(),
+            }
+            if not scratch:
+                old_entry = _MANIFEST.get(name)
+                _MANIFEST[name] = entry
+                try:
+                    _save_manifest()
+                except BaseException:
+                    if old_entry is None:
+                        _MANIFEST.pop(name, None)
+                    else:
+                        _MANIFEST[name] = old_entry
+                    # Restore the *previous bytes*, not merely a pointer to
+                    # an already replaced file. If restore itself fails, keep
+                    # the backup for forensic/manual recovery rather than
+                    # cleaning up the last good content.
+                    if backup_name is not None:
+                        previous = backup_name
+                        backup_name = None
+                        os.replace(previous, shard_path.name,
+                                   src_dir_fd=directory, dst_dir_fd=directory)
+                        os.fsync(directory)
+                    else:
+                        unlink_regular(directory, shard_path.name)
+                    raise
+        finally:
+            if backup_name is not None:
+                unlink_regular(directory, backup_name)
     with _CACHE_LOCK:
         _CACHE.pop(name, None)
         _CACHE_SIZE_EST.pop(name, None)
     return entry
-
 
 def _cache_evict_if_needed() -> None:
     total = sum(_CACHE_SIZE_EST.values())
@@ -415,15 +434,23 @@ def purge_cache() -> int:
 def delete_shard(name: str) -> bool:
     _ensure_storage()
     name = _safe_name(name)
-    if name not in _MANIFEST:
+    old_entry = _MANIFEST.get(name)
+    if old_entry is None:
         return False
-    with _storage_fd() as directory:
-        unlink_regular(directory, f"{name}.jsonl.zst")
-    old_entry = _MANIFEST.pop(name)
+    # Commit metadata first: on failure the old file is still intact.
+    _MANIFEST.pop(name)
     try:
         _save_manifest()
     except BaseException:
         _MANIFEST[name] = old_entry
+        raise
+    try:
+        with _storage_fd() as directory:
+            unlink_regular(directory, f"{name}.jsonl.zst")
+    except BaseException:
+        # Preserve the entry if the data remains but cannot be removed.
+        _MANIFEST[name] = old_entry
+        _save_manifest()
         raise
     with _CACHE_LOCK:
         _CACHE.pop(name, None)
