@@ -95,3 +95,35 @@ def test_invalid_output_budgets_rejected(tmp_path: Path, budget):
                 max_bytes=budget,
             )
     assert not (tmp_path / "shard").exists()
+
+
+
+def test_atomic_writelines_cannot_bypass_byte_budget(tmp_path: Path):
+    with secure_fs.anchored_directory(tmp_path) as directory:
+        with pytest.raises(secure_fs.VaultPathError, match="output exceeds"):
+            secure_fs.atomic_write(
+                directory,
+                "shard",
+                lambda output: output.writelines([b"abcd", b"efgh"]),
+                max_bytes=7,
+            )
+        assert secure_fs.atomic_write(
+            directory,
+            "shard",
+            lambda output: output.writelines([b"abcd", b"efgh"]),
+            max_bytes=8,
+        ) == 8
+    assert (tmp_path / "shard").read_bytes() == b"abcdefgh"
+
+
+@pytest.mark.parametrize("bypass", ["raw", "buffer", "detach"])
+def test_atomic_sink_refuses_unmetered_file_interfaces(tmp_path: Path, bypass):
+    def reject_unmetered(output):
+        getattr(output, bypass)
+
+    with secure_fs.anchored_directory(tmp_path) as directory:
+        with pytest.raises(AttributeError):
+            secure_fs.atomic_write(
+                directory, "shard", reject_unmetered, max_bytes=1,
+            )
+    assert not (tmp_path / "shard").exists()
