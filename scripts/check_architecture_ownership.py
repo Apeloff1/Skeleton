@@ -86,11 +86,16 @@ def build_graph(root: Path = ROOT) -> dict[str, Any]:
         if binding.get("title") != volume.get("title"):
             raise ArchitectureOwnershipError(f"masterplan title drift for {ref}")
         gaps = binding.get("required_gap_texts")
-        if not isinstance(gaps, list) or not gaps:
-            raise ArchitectureOwnershipError(f"{ref} gap binding must be non-empty")
-        for gap in gaps:
-            if gap not in volume.get("gaps", []):
-                raise ArchitectureOwnershipError(f"masterplan gap drift for {ref}: {gap!r}")
+        canonical_gaps = volume.get("gaps")
+        if not isinstance(gaps, list) or not isinstance(canonical_gaps, list):
+            raise ArchitectureOwnershipError(f"{ref} gaps must be arrays")
+        if any(not isinstance(gap, str) or not gap.strip() for gap in gaps + canonical_gaps):
+            raise ArchitectureOwnershipError(f"{ref} gaps must be non-empty strings")
+        if len(set(gaps)) != len(gaps) or len(set(canonical_gaps)) != len(canonical_gaps):
+            raise ArchitectureOwnershipError(f"{ref} gaps must be unique")
+        # Matching empty records establish consistency, not readiness or closure evidence.
+        if gaps != canonical_gaps:
+            raise ArchitectureOwnershipError(f"masterplan gap drift for {ref}: exact binding required")
     if refs != {"VOL-002", "VOL-051"}:
         raise ArchitectureOwnershipError("ownership graph must remain bound to VOL-002 and VOL-051")
 
