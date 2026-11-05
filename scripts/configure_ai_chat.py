@@ -28,6 +28,7 @@ _MAX_MANIFEST_BYTES = 1024 * 1024
 _LOCAL_TARGET = "/app/configured-local-ai"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _RUNTIME_LIBRARY = re.compile(r"lib[A-Za-z0-9_.+\-]+\.so(?:\.[A-Za-z0-9_.+\-]+)?\Z")
+_PINNED_RUNTIME_LIBRARY = re.compile(r"lib[A-Za-z0-9_+.\-]{1,120}\.so(?:\.[A-Za-z0-9_+.\-]+)?\Z")
 _VARIABLE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}\Z")
 _TENANT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,511}\Z")
 _HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?\Z")
@@ -261,6 +262,40 @@ def _pinned_file(path: Path, expected: object, *, maximum: int) -> int:
     return count
 
 
+def _pinned_runtime_library(path: Path, expected: object) -> int:
+    """Verify a regular adjacent library without following a final symlink."""
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ConfigurationError("pinned runtime libraries require no-follow file opens")
+    if not isinstance(expected, str) or _SHA256.fullmatch(expected) is None:
+        raise ConfigurationError("runtime library source digest must be lowercase SHA-256")
+    _checked_path(path)
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+        with os.fdopen(descriptor, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= 32 * 1024 * 1024:
+                raise ConfigurationError("pinned runtime library exceeds its file bound")
+            value, count = hashlib.sha256(), 0
+            while True:
+                block = stream.read(min(1024 * 1024, before.st_size + 1 - count))
+                if not block:
+                    break
+                count += len(block)
+                if count > before.st_size:
+                    raise ConfigurationError("pinned runtime library grew while hashing")
+                value.update(block)
+            after = os.fstat(stream.fileno())
+        current = path.lstat()
+    except OSError as exc:
+        raise ConfigurationError("pinned runtime library is unavailable or symlinked") from exc
+    identity = lambda item: (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns, item.st_ctime_ns)
+    if (not stat.S_ISREG(current.st_mode) or count != before.st_size
+            or value.hexdigest() != expected or identity(before) != identity(after)
+            or identity(after) != identity(current)):
+        raise ConfigurationError("pinned runtime library differs from its declared digest")
+    return count
+
+
 def _local_binding(source: Path, target: str) -> dict:
     # Compose interpolates dollar signs even inside a JSON-encoded override.
     # Escaping preserves literal host filenames without reading environment.
@@ -279,7 +314,9 @@ def _prepared_local_sources(options: dict, *, force: bool, dry_run: bool) -> Non
     if options["deployment"] is None and options["catalog"] is None:
         return
     output_prefix = str(options["env_file"])
-    referenced: dict[Path, int] = {}
+    # Activation measures unique *container paths*. The same host file mounted
+    # at two targets is counted twice by the canonical catalog loader.
+    referenced: dict[str, int] = {}
     target_counts = 0
     platforms: set[str] = set()
 
@@ -287,14 +324,14 @@ def _prepared_local_sources(options: dict, *, force: bool, dry_run: bool) -> Non
         options["local_bindings"].append(_local_binding(source, target))
         options["local_reader_paths"].append(source)
         if activation_source:
-            referenced[source] = source.stat().st_size
+            referenced[target] = source.stat().st_size
 
     def prepare_deployment(source: Path, *, maximum: int) -> tuple[Path, str, bytes]:
         nonlocal target_counts
         options["local_source_paths"].append(source)
         payload, _raw = _read_manifest(source)
         required = {"schema_version", "runtime_kind", "model_id", "executable_path", "executable_sha256", "model_path", "model_sha256"}
-        if not required <= set(payload) or set(payload) - required - {"config"} or (
+        if not required <= set(payload) or set(payload) - required - {"config", "runtime_libraries"} or (
             payload.get("schema_version") != "skeleton.local_model.deployment.v1"
             or payload.get("runtime_kind") != "llama.cpp-cli"
             or not isinstance(payload.get("config", {}), dict)
@@ -303,8 +340,20 @@ def _prepared_local_sources(options: dict, *, force: bool, dry_run: bool) -> Non
         if not isinstance(payload["model_id"], str):
             raise ConfigurationError("local deployment requires a model name")
         model_name = _local_model_name(payload["model_id"].strip())
+        library_pins = payload.get("runtime_libraries")
+        if "runtime_libraries" in payload and (
+            not isinstance(library_pins, dict) or not 1 <= len(library_pins) <= 128
+            or any(not isinstance(name, str) or _PINNED_RUNTIME_LIBRARY.fullmatch(name) is None
+                   or not isinstance(digest, str) or _SHA256.fullmatch(digest) is None
+                   for name, digest in library_pins.items())
+        ):
+            raise ConfigurationError("invalid pinned runtime library inventory")
         model = _source_path(source.parent, payload["model_path"])
         executable = _source_path(source.parent, payload["executable_path"])
+        if library_pins is not None and any(
+            executable.parent / name in {source, model, executable} for name in library_pins
+        ):
+            raise ConfigurationError("runtime libraries cannot overlap deployment artifacts")
         _pinned_file(model, payload["model_sha256"], maximum=maximum)
         _pinned_file(executable, payload["executable_sha256"], maximum=min(maximum, 128 * 1024 * 1024))
         with executable.open("rb") as stream:
@@ -331,12 +380,19 @@ def _prepared_local_sources(options: dict, *, force: bool, dry_run: bool) -> Non
         # do not expose the whole operator directory or copy executables.
         libraries = []
         for entry_count, candidate in enumerate(executable.parent.iterdir(), 1):
-            if entry_count > 4096:
+            if entry_count > (512 if library_pins is not None else 4096):
                 raise ConfigurationError("local runtime directory exceeds its metadata enumeration bound")
+            if library_pins is not None:
+                if candidate.is_symlink() or candidate.is_dir():
+                    raise ConfigurationError("pinned runtime directory contains a link or nested directory")
+                if candidate.name.startswith("lib") and ".so" in candidate.name and _PINNED_RUNTIME_LIBRARY.fullmatch(candidate.name) is None:
+                    raise ConfigurationError("pinned runtime contains an invalid library name")
             if _RUNTIME_LIBRARY.fullmatch(candidate.name):
                 libraries.append(candidate)
                 if len(libraries) > 128:
                     raise ConfigurationError("local runtime directory contains too many shared libraries")
+        if library_pins is not None and {candidate.name for candidate in libraries} != set(library_pins):
+            raise ConfigurationError("pinned runtime library inventory differs from source")
         library_bytes = 0
         for candidate in sorted(libraries):
             try:
@@ -344,10 +400,12 @@ def _prepared_local_sources(options: dict, *, force: bool, dry_run: bool) -> Non
             except (OSError, RuntimeError) as exc:
                 raise ConfigurationError("local runtime library aliases could not be resolved safely") from exc
             library = _checked_path(resolved)
-            library_bytes += library.stat().st_size
+            size = (_pinned_runtime_library(library, library_pins[candidate.name])
+                    if library_pins is not None else library.stat().st_size)
+            library_bytes += size
             if library_bytes > 128 * 1024 * 1024:
                 raise ConfigurationError("local runtime shared libraries exceed the container binding budget")
-            add_source(library, runtime_target + "/" + candidate.name, activation_source=False)
+            add_source(library, runtime_target + "/" + candidate.name, activation_source=library_pins is not None)
         prepared = dict(payload)
         prepared["model_id"] = model_name
         prepared["model_path"] = model_target
@@ -397,8 +455,8 @@ def _prepared_local_sources(options: dict, *, force: bool, dry_run: bool) -> Non
             prepared_models.append({**row, "path": target, "sha256": digest})
         if primary not in names or (verifier is not None and (verifier not in names or verifier == primary)):
             raise ConfigurationError("local catalog primary and verifier must name distinct configured entries")
-        # Match the canonical activation budget: model files, executables and
-        # prepared manifests. Neighbor libraries have a separate 128 MiB cap.
+        # Match the canonical activation budget, including individually bound
+        # pinned libraries and each generated deployment manifest.
         prepared_bytes = sum(size for size in referenced.values()) + sum(len(raw) for _, raw in options["local_manifests"])
         if prepared_bytes > budget:
             raise ConfigurationError("portable catalog bindings exceed the declared artifact byte budget")
