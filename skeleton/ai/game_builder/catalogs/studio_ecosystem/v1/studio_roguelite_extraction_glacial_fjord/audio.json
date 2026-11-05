@@ -1,0 +1,40 @@
+{
+  "project_id": "studio_roguelite_extraction_glacial_fjord",
+  "genre": "roguelite_extraction",
+  "biome": "glacial_fjord",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "composition": {
+    "leading_voice": "marimba",
+    "tempo": 96,
+    "meter": "4/4",
+    "harmonic_intent": "unresolved_progression_to_shared_cadence",
+    "originality": "new_composition_required"
+  },
+  "sound_layers": [
+    {
+      "cue": "arrival",
+      "trigger": "fracturing ice",
+      "source": "Spatial reflections around blue tidal shelves",
+      "mix": "reactive"
+    },
+    {
+      "cue": "dispute",
+      "trigger": "faction_tension",
+      "source": "Original motif for a hostile salvage crew",
+      "mix": "sidechain_duck_under_dialogue"
+    },
+    {
+      "cue": "repair",
+      "trigger": "mission_resolution",
+      "source": "Original marimba cadence accompanying public choice",
+      "mix": "adaptive"
+    }
+  ],
+  "audio_accessibility": [
+    "closed_captions",
+    "independent_channels",
+    "visual_information_parity"
+  ],
+  "render_status": "not_rendered"
+}

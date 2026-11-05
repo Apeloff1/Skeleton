@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_neon_undercity",
+  "title": "Neon Undercity: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610303038,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 3
+}

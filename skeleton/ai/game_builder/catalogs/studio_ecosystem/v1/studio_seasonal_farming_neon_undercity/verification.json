@@ -1,0 +1,72 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.verification.v1",
+  "project_id": "studio_seasonal_farming_neon_undercity",
+  "genre": "seasonal_farming",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "stage": "source_production_plan",
+  "quality_gates": [
+    {
+      "id": "source",
+      "check": "All eight files have unique identities and valid canonical JSON",
+      "status": "not_tested"
+    },
+    {
+      "id": "gameplay",
+      "check": "Actual compiled seasonal_farming supports soil health, rotation, weather and food preservation",
+      "status": "not_tested"
+    },
+    {
+      "id": "physics",
+      "check": "The power duty cycles model is numerically stable under grid brownouts",
+      "status": "not_tested"
+    },
+    {
+      "id": "economy",
+      "check": "No unearned creation of soil nutrients and stored seed",
+      "status": "not_tested"
+    },
+    {
+      "id": "narrative",
+      "check": "Every ending is reachable and obeys immutable canon",
+      "status": "not_tested"
+    },
+    {
+      "id": "asset",
+      "check": "Meshes, textures, rigs and audio are originally produced for Neon Undercity",
+      "status": "not_tested"
+    },
+    {
+      "id": "hardware",
+      "check": "GPU/RAM/CPU/virtual-memory and offload mechanisms survive pressure",
+      "status": "not_tested"
+    },
+    {
+      "id": "release",
+      "check": "No consumer readiness without native replay, device proof and signed provenance",
+      "status": "not_tested"
+    }
+  ],
+  "acceptance": {
+    "prototype": "offline_html5_grid_only",
+    "desired_full_genre": "seasonal_farming",
+    "required_capability": "seasonal crop yield",
+    "native_qualified": false,
+    "consumer_release_certified": false
+  },
+  "release_blockers": [
+    "real_genre_runtime_not_implemented",
+    "high_fidelity_assets_not_created",
+    "multi_end_branch_runtime_not_bound",
+    "audio_not_rendered",
+    "device_endurance_not_qualified",
+    "rights_review_pending",
+    "required_exact_head_ci_pending"
+  ],
+  "provenance": {
+    "source": "original_project_brief",
+    "external_input": false,
+    "proof_required": "replay_attested_bundle_receipts",
+    "public_release_authorized": false
+  }
+}

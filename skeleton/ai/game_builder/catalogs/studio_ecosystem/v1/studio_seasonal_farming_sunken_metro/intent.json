@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_sunken_metro",
+  "title": "Sunken Metro: The Four Harvests",
+  "subtitle": "Original the four harvests design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010315303,
+  "width": 25,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 5
+}

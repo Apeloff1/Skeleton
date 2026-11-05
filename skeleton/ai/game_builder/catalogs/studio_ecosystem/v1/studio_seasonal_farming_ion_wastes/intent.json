@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_ion_wastes",
+  "title": "Ion Wastes: The Four Harvests",
+  "subtitle": "Original the four harvests design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010315192,
+  "width": 19,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 11,
+  "theme": "space",
+  "starting_health": 6
+}

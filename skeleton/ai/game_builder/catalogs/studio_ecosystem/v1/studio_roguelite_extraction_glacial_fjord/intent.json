@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_glacial_fjord",
+  "title": "Glacial Fjord: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610302834,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 3
+}

@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_seasonal_farming_glass_steppe",
+  "genre": "seasonal_farming",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Glass Steppe",
+    "landmark": "shattered outpost",
+    "era": "the second settlement",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control ceramic heat tiles while glass-shard gales destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "high-stakes"
+  },
+  "premise": "Lio Lark, a agronomist with expertise in soil health, rotation, weather and food preservation, must sustain an original village across uncertain seasons before glass-shard gales reaches the shattered outpost.",
+  "stakes": [
+    "Residents lose access to ceramic heat tiles",
+    "a water-hoarding estate gains authority without independent evidence",
+    "The shattered outpost becomes inaccessible beyond prismatic plains"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured glass-shard gales closes the main approach",
+      "goal": "Acquire an independent account of ceramic heat tiles",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a water-hoarding estate challenges Lio Lark's mandate",
+      "goal": "Apply soil health, rotation, weather and food preservation in prismatic plains",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of shattered outpost",
+      "goal": "sustain an original village across uncertain seasons",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains shattered outpost with auditable access to ceramic heat tiles"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain soil nutrients and stored seed without a water-hoarding estate"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over ceramic heat tiles persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "shattered outpost",
+      "prismatic plains",
+      "abrasion"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

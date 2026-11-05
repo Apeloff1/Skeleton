@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_echo_caverns",
+  "title": "Echo Caverns: The Four Harvests",
+  "subtitle": "Original the four harvests design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010315562,
+  "width": 19,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 4
+}
