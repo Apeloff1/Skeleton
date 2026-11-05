@@ -93,6 +93,14 @@ class ProviderUnavailableError(ProviderError):
     """Raised when the selected provider cannot be used."""
 
 
+class _LocalGuardUnavailable(ProviderUnavailableError):
+    """A safe, typed reason for a retained local provider's guard failure."""
+
+    def __init__(self, message: str, *, readiness_code: str) -> None:
+        super().__init__(message)
+        self.readiness_code = readiness_code
+
+
 class ProviderInvocationError(ProviderError):
     """Raised when a configured provider fails to return usable output."""
 
@@ -3414,13 +3422,15 @@ class ProviderRegistry:
                 guarded_components=guarded_components,
                 require_guarded_local=require_guarded_local,
             )
-        except ProviderUnavailableError:
+        except ProviderUnavailableError as exc:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
                 raise
             model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
             deployment_path = os.getenv("AI_LOCAL_DEPLOYMENT_PATH", "").strip()
             catalog_path = os.getenv("AI_LOCAL_MODEL_CATALOG_PATH", "").strip()
-            if any(
+            if isinstance(exc, _LocalGuardUnavailable):
+                code = exc.readiness_code
+            elif any(
                 os.getenv(name, "").strip()
                 for name in (
                     "AI_SECONDARY_API_KEY",
@@ -3452,9 +3462,13 @@ class ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
         if raw_guard not in {"", "0", "false", "1", "true"}:
-            raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
+            raise _LocalGuardUnavailable(
+                "invalid AI_LOCAL_GUARD_REQUIRED policy", readiness_code="local_guard_configuration_invalid"
+            )
         if require_guarded_local is not None and type(require_guarded_local) is not bool:
-            raise ProviderUnavailableError("local guard policy must be a boolean")
+            raise _LocalGuardUnavailable(
+                "local guard policy must be a boolean", readiness_code="local_guard_configuration_invalid"
+            )
         development_legacy = (
             active == "local" and raw_guard in {"0", "false"}
             and require_guarded_local is False and guarded_components is None
@@ -3462,7 +3476,10 @@ class ProviderRegistry:
             and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
         )
         if active == "local" and (raw_guard in {"0", "false"} or require_guarded_local is False) and not development_legacy:
-            raise ProviderUnavailableError("unguarded local model requires explicit development-only authorization")
+            raise _LocalGuardUnavailable(
+                "unguarded local model requires explicit development-only authorization",
+                readiness_code="local_guard_configuration_invalid",
+            )
         guarded_required = (
             (active == "local" and not development_legacy)
             or raw_guard in {"1", "true"}
@@ -3474,9 +3491,15 @@ class ProviderRegistry:
         if guarded_required:
             from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
             if not isinstance(guarded_components, ProtectedLocalComponents):
-                raise ProviderUnavailableError("guard-required local startup lacks trusted dependencies")
+                raise _LocalGuardUnavailable(
+                    "guard-required local startup lacks trusted dependencies",
+                    readiness_code="local_guard_unavailable",
+                )
             if raw_guard in {"0", "false"} or require_guarded_local is False:
-                raise ProviderUnavailableError("guarded local startup cannot disable its enforcement")
+                raise _LocalGuardUnavailable(
+                    "guarded local startup cannot disable its enforcement",
+                    readiness_code="local_guard_configuration_invalid",
+                )
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {

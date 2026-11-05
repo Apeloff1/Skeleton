@@ -16,6 +16,7 @@ from skeleton.build.delivery._util import (
 
 GENESIS = "0" * 64
 OUTCOMES = frozenset({"deployed", "failed", "rolled-back"})
+MAX_RELEASE_RECORDS = 65536
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,22 @@ class ReleaseHistory:
         return self._records[-1].digest if self._records else GENESIS
 
     def _append_checked(self, record: ReleaseRecord) -> None:
+        # Hash-chain consistency alone does not validate record semantics.
+        # Rehydrated or directly constructed records must satisfy the same
+        # identity and evidence contracts as record() calls.
+        if not isinstance(record, ReleaseRecord):
+            raise DeliveryError("release history requires ReleaseRecord entries")
+        if len(self._records) >= MAX_RELEASE_RECORDS:
+            raise DeliveryError("release history record count exceeds bound")
+        require_non_negative_int(record.sequence, field="record.sequence")
+        require_env_name(record.environment)
+        require_id(record.release_id, field="record.release_id")
+        require_sha256(record.manifest_digest, field="record.manifest_digest")
+        require_sha256(record.config_digest, field="record.config_digest")
+        require_sha256(record.previous, field="record.previous")
+        require_non_negative_int(record.recorded_at, field="record.recorded_at")
+        if type(record.outcome) is not str or record.outcome not in OUTCOMES:
+            raise DeliveryError("invalid release record outcome")
         if record.environment != self.environment:
             raise DeliveryError("record environment mismatch")
         if record.sequence != len(self._records):
@@ -119,11 +136,24 @@ class ReleaseHistory:
 
     @classmethod
     def from_list(cls, environment: str, items: Iterable[Mapping[str, Any]]) -> "ReleaseHistory":
-        records = []
+        history = cls(environment)
         for item in items:
-            body = {k: item[k] for k in ReleaseRecord.__dataclass_fields__}
+            if not isinstance(item, Mapping):
+                raise DeliveryError("release history record must be a mapping")
+            allowed = set(ReleaseRecord.__dataclass_fields__) | {"digest"}
+            if set(item) - allowed:
+                raise DeliveryError("release history record has unknown fields")
+            if "digest" not in item or type(item["digest"]) is not str:
+                raise DeliveryError("release history record digest required")
+            require_sha256(item["digest"], field="record.digest")
+            try:
+                body = {k: item[k] for k in ReleaseRecord.__dataclass_fields__}
+            except KeyError as exc:
+                raise DeliveryError("release history record missing required field") from exc
             record = ReleaseRecord(**body)
-            if "digest" in item and item["digest"] != record.digest:
+            # Validate before hashing so malformed values cannot trigger
+            # unbounded serialization or become trusted history entries.
+            history._append_checked(record)
+            if item["digest"] != record.digest:
                 raise DeliveryError(f"record {record.sequence} digest mismatch")
-            records.append(record)
-        return cls(environment, records)
+        return history

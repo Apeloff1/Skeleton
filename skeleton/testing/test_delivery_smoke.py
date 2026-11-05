@@ -20,3 +20,50 @@ def test_rejects_mutating_methods_and_duplicates():
         load_suite([{"id": "x", "method": "POST", "path": "/x"}])
     with pytest.raises(DeliveryError):
         load_suite([SUITE[0], SUITE[0]])
+
+def test_smoke_evidence_rejects_duplicates_and_status_coercion():
+    cases = load_suite(SUITE)
+    with pytest.raises(DeliveryError, match="duplicate smoke outcome"):
+        evaluate(cases, [SmokeOutcome("health", 503), SmokeOutcome("health", 200)])
+    with pytest.raises(DeliveryError, match="unknown or malformed"):
+        evaluate(cases, [SmokeOutcome("forged", 200)])
+    for status in (True, 200.0, "200"):
+        with pytest.raises(DeliveryError, match="invalid smoke outcome"):
+            evaluate(cases, [SmokeOutcome("health", status)])
+        with pytest.raises(DeliveryError, match="expected status"):
+            load_suite([{"id": "x", "path": "/x", "expect_status": status}])
+
+
+def test_smoke_suite_and_outcome_bounds(monkeypatch):
+    from itertools import repeat
+    from skeleton.build.delivery import smoke as module
+
+    monkeypatch.setattr(module, "MAX_SMOKE_CASES", 1)
+    with pytest.raises(DeliveryError, match="suite count exceeds"):
+        load_suite(SUITE)
+    monkeypatch.setattr(module, "MAX_SMOKE_CASES", 256)
+    monkeypatch.setattr(module, "MAX_SMOKE_OUTCOMES", 2)
+    with pytest.raises(DeliveryError, match="outcome count exceeds"):
+        evaluate(load_suite(SUITE), repeat(SmokeOutcome("health", 200), 3))
+    with pytest.raises(DeliveryError, match="nonzero"):
+        evaluate([], [])
+
+
+def test_smoke_suite_rejects_external_path_and_unbounded_key_evidence():
+    from skeleton.ai.build.core.delivery import smoke as mirrored
+
+    for module in (None, mirrored):
+        load = load_suite if module is None else module.load_suite
+        evaluate_fn = evaluate if module is None else module.evaluate
+        outcome_type = SmokeOutcome if module is None else module.SmokeOutcome
+        for path in ("//external/health", "/../admin", "/health?token=x",
+                     "/health#ok", "/health\\admin"):
+            with pytest.raises(DeliveryError, match="unsafe smoke path"):
+                load([{"id": "x", "path": path}])
+        with pytest.raises(DeliveryError, match="JSON keys invalid"):
+            load([{"id": "x", "path": "/x", "expect_json_keys": ["x" * 129]}])
+        cases = load([{"id": "x", "path": "/x"}])
+        with pytest.raises(DeliveryError, match="invalid smoke outcome evidence"):
+            evaluate_fn(cases, [outcome_type("x", 200, ("x" * 129,))])
+        with pytest.raises(DeliveryError, match="invalid smoke case definition"):
+            evaluate_fn([object()], [])

@@ -12,6 +12,10 @@ from skeleton.build.delivery._util import DeliveryError
 from skeleton.build.delivery.artifact_manifest import ARTIFACT_KINDS, ArtifactEntry
 from skeleton.build.remote_build import VerifiedRemoteReceipt
 
+# Bound hostile or accidentally unending receipt streams before publication.
+MAX_REMOTE_RECEIPTS = 4096
+MAX_REMOTE_ARTIFACTS = 16384
+
 
 def _kind_for(artifact_id: str) -> str:
     lowered = artifact_id.lower()
@@ -33,12 +37,18 @@ def entries_from_receipts(
     default the artifact id is used as the path.
     """
     out: dict[str, ArtifactEntry] = {}
-    for receipt in receipts:
+    artifact_count = 0
+    for receipt_index, receipt in enumerate(receipts):
+        if receipt_index >= MAX_REMOTE_RECEIPTS:
+            raise DeliveryError("remote receipt count exceeds bound")
         if not isinstance(receipt, VerifiedRemoteReceipt):
             raise DeliveryError("verified remote receipts required")
         if receipt.status != "success":
             raise DeliveryError(f"job {receipt.job_id} did not succeed ({receipt.status})")
         for ref in receipt.output_artifacts:
+            artifact_count += 1
+            if artifact_count > MAX_REMOTE_ARTIFACTS:
+                raise DeliveryError("remote artifact count exceeds bound")
             path = (paths or {}).get(ref.artifact_id, ref.artifact_id)
             kind = _kind_for(path)
             assert kind in ARTIFACT_KINDS
