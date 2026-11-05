@@ -53,8 +53,10 @@ class SourceAssemblyFixture(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         self.project = self.root / "project"
-        self.project.mkdir()
-        (self.project / "pkg").mkdir()
+        self.project.mkdir(mode=0o700)
+        self.project.chmod(0o700)
+        (self.project / "pkg").mkdir(mode=0o700)
+        (self.project / "pkg").chmod(0o700)
         self.private = self.root / "private"
         self.private.mkdir(mode=0o700)
         self.private.chmod(0o700)
