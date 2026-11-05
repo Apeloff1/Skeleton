@@ -46,7 +46,11 @@ jobs:
           PYTHONPATH: "backend:."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          python -m pytest -q --maxfail=1 \
+          # These tests use their own mock HTTPX transport. Loading the
+          # repository-wide conftest would import the entire backend server
+          # and turn a transport-only gate into a full application bootstrap.
+          # Autoload is off: explicitly enable only the async test plugin.
+          python -m pytest -q --maxfail=1 --noconftest -p pytest_asyncio.plugin \
             backend/tests/test_engine_transport_origin_custody.py \
             backend/tests/test_engine_client.py
       - name: Refuse device and release certification from source-only tests
