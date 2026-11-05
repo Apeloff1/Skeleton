@@ -56,12 +56,19 @@ Chroma container. Keep the backup outside the repository:
 ```bash
 docker stop tutolage-chroma
 python scripts/chroma_backup.py --output "$HOME/chroma-custody-backup"
+python scripts/chroma_backup.py --verify "$HOME/chroma-custody-backup"
 ```
 
 This reads the stopped container's `/data` and legacy
 `/chroma/chroma` mount separately, records bounded SHA-256 file manifests,
 rechecks container identity and mounts, and refuses existing destinations,
-links, unsafe state and unexpected mounts. It does **not** remove the
+links, unsafe state and unexpected mounts. It rejects restarts during copying
+and uses no-replace publication so a concurrently created destination is not
+overwritten. Offline `--verify` rehashes both copied stores and rejects missing,
+modified, extra or linked files. A matching unsigned manifest does not prove
+authenticity, SQLite consistency, source authority or safety of restoration.
+Use the supported Linux or WSL filesystem path for this procedure; native
+Windows ownership and ACL semantics have not been qualified. It does **not** remove the
 container, change volume mounts, restore data, prove SQLite consistency or
 authorize `--full` startup. Verified restore, database integrity, writer
 fencing and recreation evidence remain mandatory before migration acceptance.
@@ -472,6 +479,26 @@ whether health came from `bootstrap` or `fallback` metadata.
 Legacy `/api/health` fields remain compatibility-stable; canonical Skeleton
 identity is attached there as `canonical_application` while new clients use
 `/api/app/bootstrap` as the source of truth.
+
+The backend process liveness probe is `/api/health/live`. The declared backend
+readiness probe is `/api/health/ready`: it returns 503 while Mongo, required
+routes, or either build-vault check are unavailable. A temporary build-vault
+fallback does not count as durable storage. AI provider availability is
+reported separately. If readiness fails for the vault, restore the configured
+`GALAXY_BUILDS_VAULT_DIR` and its write permissions before using build features;
+do not treat process liveness or the temporary fallback as proof that builds
+will persist. The legacy `/api/health` endpoint does not check Mongo.
+
+Vault selection happens when the backend starts. If it selected the temporary
+fallback, first stop new builds and preserve any files in the running backend's
+`/tmp/galaxy_builds_vault` outside the container without overwriting existing
+artifacts. Restore the configured persistent volume and permissions, then
+restart the backend and confirm `/api/health/ready` succeeds before resuming.
+Review and reconcile preserved fallback files separately; do not silently merge
+or delete them. Restarting or recreating a container can discard its `/tmp`
+contents. Vault health checks use bounded shared workers; if a filesystem call
+stalls, readiness fails while its worker remains occupied until the operating
+system returns the call.
 
 ## Frontend endpoint boundary
 
