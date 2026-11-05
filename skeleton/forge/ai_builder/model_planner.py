@@ -9,6 +9,8 @@ Any non-OK route, unusable output, or exception falls back to
 from __future__ import annotations
 
 import time
+import re
+from itertools import islice
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
@@ -29,6 +31,8 @@ from .plan_schema import PLAN_SCHEMA, RESPONSE_SCHEMA, PlanParseError, parse_mod
 from .prompt_normalizer import normalize_prompt
 
 TASK_TYPE = "forge.plan"
+_PROVIDER_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 _SYSTEM = (
     "You refine a compiled game design spec. Reply with JSON only, schema "
     f"{PLAN_SCHEMA!r}, keys title, fantasy, core_loop, systems. Do not change genre, "
@@ -38,7 +42,10 @@ _SYSTEM = (
 
 def grant_providers(issuer: TokenIssuer, provider_ids: Iterable[str], *, subject: str = "forge.ai_builder") -> str:
     """Mint a token covering exactly ``provider.<id>``/``call`` for each id."""
-    caps = [Capability(f"provider.{pid}", "call") for pid in dict.fromkeys(provider_ids)]
+    ids = list(islice(provider_ids, 33))
+    if len(ids) > 32 or any(type(pid) is not str or not _PROVIDER_ID.fullmatch(pid) for pid in ids):
+        raise ValueError("provider grant identities exceed bounded allowlist")
+    caps = [Capability(f"provider.{pid}", "call") for pid in dict.fromkeys(ids)]
     if not caps:
         raise ValueError("grant at least one provider")
     return issuer.mint(subject, caps)
@@ -82,6 +89,8 @@ class ModelPlanner:
                  budget: CallBudget | None = None, max_output_tokens: int = 800) -> None:
         if gate is None:
             raise ValueError("a capsec gate is required")
+        if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 4096:
+            raise ValueError("model output token budget exceeds bound")
         self._router = router
         self._gate = gate
         self._cap = cap
@@ -106,7 +115,9 @@ class ModelPlanner:
     async def plan(self, brief: str, *, era: str = "", request_id: str | None = None) -> PlanOutcome:
         text = normalize_prompt(brief)
         compiled = compile_brief(text, era=era)
-        rid = request_id or f"aib-{uuid.uuid4().hex[:12]}"
+        rid = request_id if request_id is not None else f"aib-{uuid.uuid4().hex[:12]}"
+        if type(rid) is not str or not _REQUEST_ID.fullmatch(rid):
+            raise ValueError("model request identity is invalid or unbounded")
 
         def fallback(receipt: RoutingReceipt, reason: str, violations: tuple[str, ...] = ()) -> PlanOutcome:
             return PlanOutcome(text, compiled, compiled, "compiler", receipt, violations, reason)
