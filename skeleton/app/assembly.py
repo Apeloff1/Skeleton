@@ -419,7 +419,7 @@ def public_service_urls(
         "skeleton": "SKELETON_PORT",
         "chroma": "CHROMA_PORT",
     }
-    return {name: resolved.service(name).public_url for name, key in ports.items() if values.get(key, "")}
+    return {name: resolved.service(name).public_url for name in ports if resolved.service(name).public_url}
 
 
 def _usable_secret(value: str) -> bool:
