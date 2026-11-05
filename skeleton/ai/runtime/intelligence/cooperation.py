@@ -44,6 +44,7 @@ def normalize_cooperation_policy(value: object) -> dict[str, object] | None:
     if not isinstance(value, Mapping) or set(value) - {
         "schema_version",
         "review_rounds",
+        "draft_count",
         "max_stage_output_tokens",
         "roles",
     }:
@@ -51,6 +52,7 @@ def normalize_cooperation_policy(value: object) -> dict[str, object] | None:
     if value.get("schema_version") != SCHEMA:
         raise CooperationPolicyError("unsupported cooperation policy schema")
     rounds = _integer(value.get("review_rounds", 1), "review_rounds", 1, 3)
+    drafts = _integer(value.get("draft_count", 1), "draft_count", 1, 3)
     output = _integer(value.get("max_stage_output_tokens", 512), "max_stage_output_tokens", 64, 4096)
     roles = value.get("roles", {})
     if not isinstance(roles, Mapping) or set(roles) - ROLES:
@@ -72,18 +74,28 @@ def normalize_cooperation_policy(value: object) -> dict[str, object] | None:
                 raise CooperationPolicyError(f"cooperation {name} is invalid")
             pair[name] = text
         normalized[str(role)] = pair
-    return {
+    policy: dict[str, object] = {
         "schema_version": SCHEMA,
         "review_rounds": rounds,
         "max_stage_output_tokens": output,
         "roles": normalized,
     }
+    # Retain the original v1 bytes and checkpoint identity for one draft.
+    # Only explicitly requested additional candidates change the policy.
+    if drafts > 1:
+        policy["draft_count"] = drafts
+    return policy
 
 
 def cooperation_stages(policy: Mapping[str, object]) -> tuple[tuple[str, str], ...]:
     normalized = normalize_cooperation_policy(policy)
     assert normalized is not None
-    stages = [("plan", "plan"), ("draft", "draft")]
+    drafts = int(normalized.get("draft_count", 1))
+    stages = [("plan", "plan")]
+    if drafts == 1:
+        stages.append(("draft", "draft"))
+    else:
+        stages.extend((f"draft:{index}", "draft") for index in range(1, drafts + 1))
     for index in range(1, int(normalized["review_rounds"]) + 1):
         stages.extend(((f"critique:{index}", "critique"), (f"refine:{index}", "refine")))
     return tuple(stages)
@@ -234,6 +246,37 @@ def stage_prompt(state: Mapping[str, object]) -> str:
         for row in (latest_plan, latest_draft, latest_critique if role == "refine" else None)
         if row is not None
     ]
+    if int(policy.get("draft_count", 1)) > 1:
+        # Siblings receive the same immutable brief/history and public plan.
+        # A prior candidate's content must never leak into a later candidate.
+        latest_refinement = next((row for row in reversed(artifacts) if row["role"] == "refine"), None)
+        visible = [latest_plan] if latest_plan is not None else []
+        if role in {"critique", "refine"}:
+            if latest_refinement is not None:
+                visible.append(latest_refinement)
+            else:
+                visible.extend(row for row in artifacts if row["role"] == "draft")
+            if role == "refine" and latest_critique is not None:
+                visible.append(latest_critique)
+        directives["draft"] = (
+            "Produce a complete useful candidate addressing the original request and constraints. "
+            "Use the public plan as advisory context and choose an approach suited to this candidate's stage ID. "
+            "Sibling candidates are not available; do not invent their content. "
+            "Do not claim unexecuted tools, builds or tests succeeded."
+        )
+        if latest_refinement is None:
+            directives["critique"] = (
+                "Compare every supplied draft candidate against the original request. "
+                "Identify concrete strengths, omissions, contradictions and unsupported claims, "
+                "and recommend what to retain or change in a coherent final deliverable. "
+                "This is an advisory critique, not a verified quality score or independent evidence."
+            )
+            directives["refine"] = (
+                "Return only one coherent improved final deliverable requested by the user. "
+                "Use the strongest compatible material from the supplied draft candidates and "
+                "resolve applicable critique while preserving the original request, constraints and source facts. "
+                "Do not include internal stage narration or claim unobserved execution."
+            )
     material = {
         "original_request": state["brief"],
         "original_request_digest": state["brief_digest"],
@@ -261,7 +304,7 @@ def cooperation_summary(state: Mapping[str, object]) -> dict[str, object]:
     stages = cooperation_stages(policy)
     artifacts = state.get("artifacts", [])
     assert isinstance(artifacts, list)
-    return {
+    summary: dict[str, object] = {
         "schema_version": SCHEMA,
         "policy_digest": state["policy_digest"],
         "brief_digest": state["brief_digest"],
@@ -286,6 +329,10 @@ def cooperation_summary(state: Mapping[str, object]) -> dict[str, object]:
         ],
         "independent_review_certified": False,
     }
+    drafts = int(policy.get("draft_count", 1))
+    if drafts > 1:
+        summary["draft_count"] = drafts
+    return summary
 
 
 def validate_cooperation_summary(
@@ -301,7 +348,7 @@ def validate_cooperation_summary(
     normalized = normalize_cooperation_policy(policy)
     if not isinstance(summary, Mapping) or normalized is None or summary.get("schema_version") != SCHEMA:
         raise CooperationPolicyError("cooperation result summary is invalid")
-    if set(summary) != {
+    expected_fields = {
         "schema_version",
         "policy_digest",
         "brief_digest",
@@ -311,10 +358,16 @@ def validate_cooperation_summary(
         "complete",
         "artifacts",
         "independent_review_certified",
-    }:
+    }
+    drafts = int(normalized.get("draft_count", 1))
+    if drafts > 1:
+        expected_fields.add("draft_count")
+        if _integer(summary.get("draft_count"), "draft_count", 2, 3) != drafts:
+            raise CooperationPolicyError("cooperation result draft count differs")
+    if set(summary) != expected_fields:
         raise CooperationPolicyError("cooperation result contains unapproved fields")
-    _integer(summary.get("total_stages"), "total_stages", 4, 8)
-    _integer(summary.get("completed_stages"), "completed_stages", 0, 8)
+    _integer(summary.get("total_stages"), "total_stages", 4, 10)
+    _integer(summary.get("completed_stages"), "completed_stages", 0, 10)
     stages = cooperation_stages(normalized)
     artifacts = summary.get("artifacts")
     if (

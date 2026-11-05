@@ -256,6 +256,39 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     )
 
 
+@pytest.mark.parametrize("drafts,rounds", [(1, 1), (2, 1), (3, 1), (3, 2)])
+def test_multidraft_command_reserves_exact_attempts_without_multiplying_output_or_time(drafts, rounds):
+    context = _context()
+    started = _now()
+    deadline = started + timedelta(seconds=90)
+    command = command_from_context(
+        context=context, actor_id="actor-a", capability="assistant.chat",
+        idempotency_key="multiple-drafts", instructions="Follow the policy.", prompt="Design the editor.",
+        created_at=started, deadline=deadline,
+        cooperation={"schema_version": "skeleton.ai.cooperation.v1", "draft_count": drafts, "review_rounds": rounds},
+    )
+    budget = command.execution_request.resource_budget
+    stages = 1 + drafts + 2 * rounds
+    assert budget["max_provider_attempts"] == stages
+    assert budget["max_model_turns"] == stages
+    assert budget["max_output_tokens"] == context.budget.reserved_output_tokens
+    assert budget["max_elapsed_seconds"] == 90
+    assert budget["max_input_tokens"] == stages * context.budget.input_capacity(tools_enabled=False)
+    policy = command.execution_request.context_policy["cooperation"]
+    assert policy.get("draft_count", 1) == drafts
+    if drafts == 1:
+        assert "draft_count" not in policy
+
+
+def test_multidraft_command_refuses_more_candidates_than_the_output_reserve_can_cover():
+    with pytest.raises(EngineProtocolError, match="output allowance cannot cover"):
+        command_from_context(
+            context=_context(), actor_id="actor-a", capability="assistant.chat",
+            idempotency_key="too-many-drafts", instructions="Follow the policy.", prompt="Design the editor.",
+            cooperation={"schema_version": "skeleton.ai.cooperation.v1", "draft_count": 3, "review_rounds": 3},
+        )
+
+
 def test_command_from_context_uses_context_projection_over_legacy_text() -> None:
     context = _projected_context()
 

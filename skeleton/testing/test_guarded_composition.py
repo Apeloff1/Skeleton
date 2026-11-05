@@ -109,7 +109,7 @@ def test_protected_composition_executes_twice_with_per_call_authority():
         first = await adapter.generate(request)
         second = await adapter.generate(request)
         assert first.provider == "local" and second.provider == "local"
-        assert reader.reads == 4
+        assert reader.reads == 6
         with pytest.raises(ProviderPolicyError):
             await engine.generate(LocalInferenceRequest(prompt="untrusted"))
     asyncio.run(scenario())
@@ -143,7 +143,7 @@ def test_registry_preserves_protected_admission_and_context(tmp_path, monkeypatc
     async def scenario():
         result = await adapter.generate(request)
         assert adapter.require_guarded_inference is True
-        assert reader.reads == 2
+        assert reader.reads == 3
         assert result.context_digest == request.context_digest
         assert result.governance_decision_id is not None
         with pytest.raises(SealedContextIntegrityError):
@@ -216,15 +216,15 @@ def test_tokenizer_drift_midflight_denies_verified_output():
             verification_count += 1
             # The startup and initial preflight are valid. Simulate a
             # tokenizer/model hot swap before the final response can escape.
-            return verification_count < 3
+            return verification_count < 4
 
         adapter = compose_protected_local_adapter(
             engine, components=secure_components(reader, attestor=verifier),
         )
         with pytest.raises(SealedContextIntegrityError, match="tokenizer identity"):
             await adapter.generate(request)
-        assert reader.reads == 1
-        assert verification_count == 3
+        assert reader.reads == 2
+        assert verification_count == 4
 
     asyncio.run(scenario())
 
@@ -239,7 +239,7 @@ def test_attestor_crash_midflight_fails_closed_without_response():
         def verifier(model, encode, decode):
             nonlocal verification_count
             verification_count += 1
-            if verification_count == 3:
+            if verification_count == 4:
                 raise RuntimeError("tokenizer owner unavailable")
             return True
 
@@ -248,7 +248,7 @@ def test_attestor_crash_midflight_fails_closed_without_response():
         )
         with pytest.raises(SealedContextBoundaryError, match="identity verification unavailable"):
             await adapter.generate(request)
-        assert reader.reads == 1
-        assert verification_count == 3
+        assert reader.reads == 2
+        assert verification_count == 4
 
     asyncio.run(scenario())
