@@ -160,8 +160,11 @@ def _load_manifest() -> None:
     with _storage_fd() as directory:
         try:
             with read_regular(directory, "_manifest.json", max_bytes=8 * 1024 * 1024) as stream:
+                payload = stream.read(8 * 1024 * 1024 + 1)
+                if len(payload) > 8 * 1024 * 1024:
+                    raise ValueError("vault manifest exceeds byte budget")
                 data = json.loads(
-                    stream.read().decode("utf-8"),
+                    payload.decode("utf-8"),
                     object_pairs_hook=_unique_pairs,
                     parse_constant=_deny_nonfinite,
                 )
