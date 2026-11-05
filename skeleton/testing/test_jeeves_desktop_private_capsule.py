@@ -233,86 +233,6 @@ class PrivateSelectedSourceCapsuleTests(unittest.TestCase):
         self.assertFalse((self.project / capsule.SEAL_NAME).exists())
 
 
-class PrivateCapsuleCLITests(unittest.TestCase):
-    def req(self, action="inspect"):
-        return {
-            "schema": cli.SCHEMA, "action": action,
-            "project_root": "/project",
-            "saved_proposal_file": "/private/original.source.json",
-            "expected_saved_file_sha256": "a" * 64,
-            "expected_saved_file_bytes": 400,
-            "expected_job_sha256": "b" * 64,
-            "selected_sources": "src/dependency.py",
-            "target": None if action == "inspect" else "/private/capsule",
-            "source_manifest_sha256": None if action == "inspect" else "c" * 64,
-            "source_patch_sha256": None if action == "inspect" else "d" * 64,
-            "capsule_sha256": None if action == "inspect" else "e" * 64,
-        }
-
-    def test_valid_two_phase_parser_and_distinct_authority(self):
-        for action in ("inspect", "publish"):
-            self.assertEqual(
-                cli.parse_capsule_request(json.dumps(self.req(action)).encode())["action"],
-                action,
-            )
-        req = self.req()
-        req["target"] = "/private/wrong"
-        with self.assertRaises(ValueError):
-            cli.parse_capsule_request(json.dumps(req).encode())
-
-    def test_json_duplicate_unknown_nonfinite_and_boolean_bytes_fail_closed(self):
-        cases = [
-            b'{"schema":1,"schema":2}',
-            b'{"schema":NaN}',
-            b'\xff',
-            json.dumps({**self.req(), "other": 1}).encode(),
-            json.dumps({**self.req(), "expected_saved_file_bytes": True}).encode(),
-            json.dumps({**self.req(), "selected_sources": ""}).encode(),
-        ]
-        for raw in cases:
-            with self.subTest(raw=raw[:80]):
-                with self.assertRaises(ValueError):
-                    cli.parse_capsule_request(raw)
-
-    def test_inspect_does_not_publish_and_publish_checks_three_sha(self):
-        plan = SimpleNamespace(
-            capsule_sha256="e"*64,
-            patch=SimpleNamespace(manifest_sha256="c"*64, patch_sha256="d"*64),
-            public_review=lambda: {"capsule_sha256": "e"*64},
-        )
-        reviewed = SimpleNamespace(
-            source_plan=plan.patch, private_file_sha256="a"*64,
-            job_sha256="b"*64, model_sha256="f"*64,
-            source_manifest_sha256="c"*64, patch_sha256="d"*64,
-        )
-        with (
-            mock.patch.object(cli, "inspect_saved_native_source", return_value=reviewed),
-            mock.patch.object(cli, "prepare_private_capsule", return_value=plan),
-            mock.patch.object(cli, "publish_private_capsule", return_value={"ok": True}) as pub,
-        ):
-            outcome = cli.execute_capsule_request(self.req())
-            self.assertEqual(outcome["action"], "inspect")
-            self.assertIsNone(outcome["publication"])
-            pub.assert_not_called()
-            with self.assertRaises(ValueError):
-                cli.execute_capsule_request(self.req("publish"))
-            result = cli.execute_capsule_request(
-                self.req("publish"), approve_private_capsule=True,
-            )
-            self.assertEqual(result["publication"], {"ok": True})
-            self.assertFalse(result["native_inference_executed"])
-            pub.assert_called_once()
-
-    def test_stderr_redacted_on_any_failure_and_no_stdout(self):
-        stdout, stderr = io.StringIO(), io.StringIO()
-        result = cli.main(
-            [], stdin=io.BytesIO(b"invalid source"), stdout=stdout, stderr=stderr,
-        )
-        self.assertEqual(result, 2)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertEqual(stderr.getvalue(), "JEEVES_PRIVATE_SOURCE_CAPSULE_HELD\n")
-
-
     def test_complete_capsule_cold_verification_matches_every_source_byte(self):
         plan = self.prepare()
         stage = self.publish(plan)
@@ -402,6 +322,86 @@ class PrivateCapsuleCLITests(unittest.TestCase):
                 expected_capsule_sha256=plan.capsule_sha256,
                 expected_seal_sha256="0" * 64,
             )
+
+
+class PrivateCapsuleCLITests(unittest.TestCase):
+    def req(self, action="inspect"):
+        return {
+            "schema": cli.SCHEMA, "action": action,
+            "project_root": "/project",
+            "saved_proposal_file": "/private/original.source.json",
+            "expected_saved_file_sha256": "a" * 64,
+            "expected_saved_file_bytes": 400,
+            "expected_job_sha256": "b" * 64,
+            "selected_sources": "src/dependency.py",
+            "target": None if action == "inspect" else "/private/capsule",
+            "source_manifest_sha256": None if action == "inspect" else "c" * 64,
+            "source_patch_sha256": None if action == "inspect" else "d" * 64,
+            "capsule_sha256": None if action == "inspect" else "e" * 64,
+        }
+
+    def test_valid_two_phase_parser_and_distinct_authority(self):
+        for action in ("inspect", "publish"):
+            self.assertEqual(
+                cli.parse_capsule_request(json.dumps(self.req(action)).encode())["action"],
+                action,
+            )
+        req = self.req()
+        req["target"] = "/private/wrong"
+        with self.assertRaises(ValueError):
+            cli.parse_capsule_request(json.dumps(req).encode())
+
+    def test_json_duplicate_unknown_nonfinite_and_boolean_bytes_fail_closed(self):
+        cases = [
+            b'{"schema":1,"schema":2}',
+            b'{"schema":NaN}',
+            b'\xff',
+            json.dumps({**self.req(), "other": 1}).encode(),
+            json.dumps({**self.req(), "expected_saved_file_bytes": True}).encode(),
+            json.dumps({**self.req(), "selected_sources": ""}).encode(),
+        ]
+        for raw in cases:
+            with self.subTest(raw=raw[:80]):
+                with self.assertRaises(ValueError):
+                    cli.parse_capsule_request(raw)
+
+    def test_inspect_does_not_publish_and_publish_checks_three_sha(self):
+        plan = SimpleNamespace(
+            capsule_sha256="e"*64,
+            patch=SimpleNamespace(manifest_sha256="c"*64, patch_sha256="d"*64),
+            public_review=lambda: {"capsule_sha256": "e"*64},
+        )
+        reviewed = SimpleNamespace(
+            source_plan=plan.patch, private_file_sha256="a"*64,
+            job_sha256="b"*64, model_sha256="f"*64,
+            source_manifest_sha256="c"*64, patch_sha256="d"*64,
+        )
+        with (
+            mock.patch.object(cli, "inspect_saved_native_source", return_value=reviewed),
+            mock.patch.object(cli, "prepare_private_capsule", return_value=plan),
+            mock.patch.object(cli, "publish_private_capsule", return_value={"ok": True}) as pub,
+        ):
+            outcome = cli.execute_capsule_request(self.req())
+            self.assertEqual(outcome["action"], "inspect")
+            self.assertIsNone(outcome["publication"])
+            pub.assert_not_called()
+            with self.assertRaises(ValueError):
+                cli.execute_capsule_request(self.req("publish"))
+            result = cli.execute_capsule_request(
+                self.req("publish"), approve_private_capsule=True,
+            )
+            self.assertEqual(result["publication"], {"ok": True})
+            self.assertFalse(result["native_inference_executed"])
+            pub.assert_called_once()
+
+    def test_stderr_redacted_on_any_failure_and_no_stdout(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        result = cli.main(
+            [], stdin=io.BytesIO(b"invalid source"), stdout=stdout, stderr=stderr,
+        )
+        self.assertEqual(result, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(stderr.getvalue(), "JEEVES_PRIVATE_SOURCE_CAPSULE_HELD\n")
 
 
 from skeleton.ai.runtime.operational_ai.laptop_runtime import (
