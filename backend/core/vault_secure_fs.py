@@ -10,7 +10,6 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import secrets
-import shutil
 import stat
 from typing import BinaryIO, Callable, Iterator
 
@@ -137,18 +136,40 @@ def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None], *, max_
                 pass
 
 
-def snapshot_regular(fd: int, name: str, *, max_bytes: int) -> str | None:
-    """Keep a private same-directory copy before a canonical shard overwrite.
+def _copy_bounded(source: BinaryIO, destination: BinaryIO, *, max_bytes: int) -> None:
+    """Reject a growing source before copying more than the admitted budget.
 
-    A renamed/hardlinked canonical file would temporarily break readers or
-    violate single-link custody; bounded copy leaves the published file live.
+    An initial fstat size check is insufficient: another process can append to
+    the already-open source after inspection. Never read or write beyond the
+    admission budget, including a one-byte probe for excess source content.
+    """
+    if type(max_bytes) is not int or max_bytes < 0:
+        raise VaultPathError("invalid vault backup byte budget")
+    remaining = max_bytes
+    while True:
+        chunk = source.read(min(1024 * 1024, remaining + 1))
+        if not chunk:
+            return
+        if len(chunk) > remaining:
+            raise VaultPathError("vault backup exceeds compressed byte budget")
+        destination.write(chunk)
+        remaining -= len(chunk)
+
+
+def snapshot_regular(fd: int, name: str, *, max_bytes: int) -> str | None:
+    """Keep a private bounded copy before a canonical shard overwrite.
+
+    An existing leaf must be regular, single-link and no larger than the
+    caller's budget. A concurrently growing source remains bounded as copied.
     """
     try:
         with read_regular(fd, name, max_bytes=max_bytes) as source:
             backup = ".vault-backup-" + secrets.token_hex(16)
             atomic_write(
                 fd, backup,
-                lambda destination: shutil.copyfileobj(source, destination, 1024 * 1024),
+                lambda destination: _copy_bounded(
+                    source, destination, max_bytes=max_bytes,
+                ),
                 max_bytes=max_bytes,
             )
             return backup
