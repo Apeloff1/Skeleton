@@ -104,3 +104,27 @@ def test_default_public_url_fails_closed_without_override(tmp_path: Path, invali
     )
     with pytest.raises(ValueError, match="public URL"):
         public_service_urls(tmp_path, manifest=replace(manifest, services=services), environ={})
+
+
+@pytest.mark.parametrize("invalid_url", [
+    "http://localhost:3000//admin",
+    "http://localhost:3000/ready/../admin",
+    "http://localhost:3000/./ready",
+    "http://localhost:3000/%2e%2e/admin",
+    "http://localhost:3000/api%2fadmin",
+    "http://localhost:3000/api%5cadmin",
+])
+@pytest.mark.parametrize("override", [{}, {"FRONTEND_PORT": "31999"}])
+def test_public_url_rejects_ambiguous_route_normalization(
+    tmp_path: Path, invalid_url: str, override: dict[str, str]
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=invalid_url)
+        if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="unsafe public URL path"):
+        public_service_urls(
+            tmp_path, manifest=replace(manifest, services=services), environ=override
+        )
