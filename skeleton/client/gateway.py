@@ -41,11 +41,15 @@ class GatewayClient:
         seal_principal: str | None = None,
         seal_secret: str | None = None,
         seal_domain: str | None = None,
+        seal_bind_request: bool = False,
+        seal_tenant: str | None = None,
     ) -> None:
         """``seal=`` or ``seal_attester=`` enables ``x-gf-seal`` on every request.
 
         The secret comes from ``seal_secret=`` or ``GF_SEAL_SECRET``.
         ``seal_domain=`` mints domain-bound single-use v2 seals (fresh per request).
+        ``seal_bind_request=True`` (with ``seal_domain=``) mints v3 seals bound to the
+        method, path, query, body hash and ``seal_tenant=`` of each request.
         """
         if not base_url:
             raise ValueError("base_url is required")
@@ -60,6 +64,8 @@ class GatewayClient:
                 principal=seal_principal,
                 seal_secret=seal_secret,
                 domain=seal_domain,
+                bind_request=seal_bind_request,
+                tenant=seal_tenant,
             )
         self._seal = seal
         self.last_request_id: str | None = None
@@ -87,7 +93,7 @@ class GatewayClient:
         if not valid_request_id(rid):
             raise ValueError("request_id must match ^[A-Za-z0-9._:-]{1,128}$")
         headers = {REQUEST_ID_HEADER: rid}
-        if self._seal is not None:
+        if self._seal is not None and not getattr(self._seal, "binds_request", False):
             headers.update(self._seal.headers())
         return headers
 
@@ -120,13 +126,28 @@ class GatewayClient:
                 cancel.raise_if_cancelled()
             headers = self._call_headers(request_id)
             try:
-                response = self._client.request(
-                    method,
-                    path,
-                    json=json,
-                    params=params,
-                    headers=headers,
-                )
+                if self._seal is not None and getattr(self._seal, "binds_request", False):
+                    # v3: seal the exact bytes httpx will send (method, path, query, body).
+                    req = self._client.build_request(
+                        method, path, json=json, params=params, headers=headers
+                    )
+                    req.headers.update(
+                        self._seal.headers_for(
+                            req.method,
+                            req.url.path,
+                            req.url.query.decode("ascii") if isinstance(req.url.query, bytes) else str(req.url.query),
+                            req.content,
+                        )
+                    )
+                    response = self._client.send(req)
+                else:
+                    response = self._client.request(
+                        method,
+                        path,
+                        json=json,
+                        params=params,
+                        headers=headers,
+                    )
             except httpx.TimeoutException as exc:
                 raise SkeletonTimeoutError(str(exc)) from exc
             except httpx.TransportError as exc:
