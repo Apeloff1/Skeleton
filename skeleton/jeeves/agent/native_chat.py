@@ -83,6 +83,19 @@ class NativeJeevesChat:
             self.worker.spine.history(self.session_id)
         self._closed = False
 
+    def _assert_current(self) -> None:
+        """Deny stale session reads, writes and disclosures after a model swap.
+
+        This check is independent of the model-generated answer and cannot
+        grant permissions or reopen a foreign/closed SQLite session.
+        """
+        try:
+            active = ActiveModel.from_supervisor(self.worker)
+        except (ValueError, AttributeError) as exc:
+            raise NativeChatHold("native principal unavailable") from exc
+        if active != self.identity:
+            raise NativeChatHold("native model or principal changed")
+
     def turn(
         self,
         message: str,
@@ -97,9 +110,7 @@ class NativeJeevesChat:
         id_ = identifier(request_id if request_id is not None else new_request_id())
         seed = nonnegative(seed, maximum=2**32 - 1)
         temperature = number(temperature, minimum=0.000000001, maximum=2)
-        current = ActiveModel.from_supervisor(self.worker)
-        if current != self.identity:
-            raise NativeChatHold("active model changed since session binding")
+        self._assert_current()
         # The owner-bound spine verifies the request digest on replay.
         committed = self.worker.spine.replay(
             self.session_id, id_, prompt, seed=seed, temperature=temperature,
@@ -119,6 +130,9 @@ class NativeJeevesChat:
             if (fresh.get("text") != committed.get("text")
                 or fresh.get("output_sha256") != committed.get("output_sha256")):
                 raise NativeChatHold("native result disagrees with committed receipt")
+        # Model identity may have changed after the first read or generation.
+        # Never publish even committed private text through a stale chat owner.
+        self._assert_current()
         verified = receive_committed_turn(
             committed, active=self.identity,
             session_id=self.session_id, native_request_id=id_,
@@ -138,6 +152,7 @@ class NativeJeevesChat:
     def history(self, *, maximum_messages: int = 256) -> tuple[dict, ...]:
         if self._closed:
             raise NativeChatHold("closed chat session")
+        self._assert_current()
         if type(maximum_messages) is not int or not 1 <= maximum_messages <= 8192:
             raise NativeChatHold("invalid bounded history limit")
         # Source of truth is the native, integrity-checked SQLite transcript.
@@ -155,6 +170,7 @@ class NativeJeevesChat:
     def close(self) -> bool:
         if self._closed:
             return False
+        self._assert_current()
         closed = self.worker.spine.close(self.session_id)
         if type(closed) is not bool:
             raise NativeChatHold("native close response not boolean")
