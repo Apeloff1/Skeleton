@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_exploration_platformer_echo_caverns",
+  "genre": "exploration_platformer",
+  "biome": "echo_caverns",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Echo Caverns: Exploration Platformer",
+  "foundation": {
+    "setting": "Echo Caverns",
+    "era": "near-future renewal",
+    "environment": "ringing stone halls",
+    "history": "The underground listening post was built to protect acoustic reflectors, but unstable resonance interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Sela Bryn, a scout, must recover the missing navigation cores using momentum traversal while unstable resonance threatens the underground listening post.",
+  "central_conflict": "a collapsing frontier seeks control of acoustic reflectors; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "unstable resonance isolates the underground listening post",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a collapsing frontier offers privileged access to acoustic reflectors",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "underground listening post",
+    "critical_resource": "acoustic reflectors",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

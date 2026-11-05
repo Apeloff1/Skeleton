@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_neon_undercity",
+  "title": "Neon Undercity: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610301246,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 4
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_cloud_canopy",
+  "title": "Cloud Canopy: The Maker Commons",
+  "subtitle": "Original the maker commons design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010312700,
+  "width": 27,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 4
+}

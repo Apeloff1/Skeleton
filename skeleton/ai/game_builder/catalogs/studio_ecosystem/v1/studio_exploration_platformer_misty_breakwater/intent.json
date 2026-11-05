@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_misty_breakwater",
+  "title": "Misty Breakwater: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610301229,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 3
+}
