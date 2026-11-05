@@ -300,3 +300,22 @@ def test_interactive_stale_number_is_rejected_and_new_state_displayed(tmp_path: 
     assert any("Action not saved; refreshing authoritative slot:" in m for m in messages)
     assert any("Revision: 1" in m for m in messages)
     assert SlotStore(root).audit("shared")["audit_entries"] == 1
+
+
+def test_oversized_action_json_is_rejected_before_parsing_and_preserves_save(tmp_path: Path):
+    """External action payloads have a fixed budget, even when JSON is valid."""
+    home = tmp_path / "bounded-action"
+    initial = _json(home, "new")
+    oversized = json.dumps({"verb": "move", "padding": "x" * 5000})
+    rejected = _invoke(home, "step", "--action", oversized,
+                       "--expected-head", initial["head"])
+    assert rejected.returncode != 0
+    assert b"action JSON exceeds byte budget" in rejected.stderr
+    unchanged = _json(home, "status")
+    assert unchanged["head"] == initial["head"]
+    assert unchanged["revision"] == 0
+    assert _json(home, "audit")["audit_entries"] == 0
+    advanced = _json(home, "step", "--action", json.dumps(initial["actions"][0]),
+                     "--expected-head", initial["head"])
+    assert advanced["revision"] == 1
+    assert _json(home, "audit")["verified"] is True
