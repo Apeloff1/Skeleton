@@ -155,6 +155,11 @@ class SessionStore:
                            os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)
         except FileExistsError:
             raise CanonError("lease_busy") from None
+        except OSError as exc:
+            # A failed acquisition never grants ownership of the lock. Surface
+            # filesystem custody failures as typed session errors rather than
+            # misclassifying them as CLI input-file permission problems.
+            raise CanonError("lease_unavailable") from exc
 
     @staticmethod
     def _require_world_lease(world: Any, expected_world_digest: str | None) -> None:
