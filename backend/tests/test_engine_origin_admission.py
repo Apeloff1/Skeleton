@@ -27,6 +27,8 @@ TOKEN = "test-engine-token-" + "f" * 64
     "https://skeleton:8001/api/v1/engine",
     "https://skeleton:8001/?search=engines",
     "https://skeleton:8001/#fragment",
+    "https://skeleton:8001/?",
+    "https://skeleton:8001/#",
     "http://skeleton:8001?redirect=https://evil.example",
     "http://skeleton:8001#test",
     "http://skeleton:8001\\@evil.example",
