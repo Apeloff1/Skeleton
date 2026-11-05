@@ -123,3 +123,33 @@ def test_read_only_journal_survives_process_restart(tmp_path: Path):
     assert isinstance(journal["journal"], str)
     assert _json(home, "status")["head"] == advanced["head"]
     assert _json(home, "audit")["audit_entries"] == 1
+
+
+def test_interactive_journal_refreshes_concurrent_save_without_consuming_turn(tmp_path: Path):
+    """An interactive player must not display an obsolete journal after another writer commits."""
+    from skeleton.game.gameplay.ridge_rescue.consumer_cli import play
+    from skeleton.game.gameplay.ridge_rescue.consumer_store import SlotStore
+
+    root = tmp_path / "private-game"
+    player = SlotStore(root)
+    initial = player.new("shared")
+    displayed: list[str] = []
+    commands = iter(("j", "q"))
+    advanced = None
+
+    def read(_prompt: str) -> str:
+        nonlocal advanced
+        command = next(commands)
+        if command == "j":
+            other = SlotStore(root)
+            advanced = other.step("shared", initial["actions"][0],
+                                  expected_head=initial["head"])
+        return command
+
+    result = play(player, "shared", read=read, write=displayed.append)
+    assert advanced is not None
+    assert result["head"] == advanced["head"]
+    assert result["revision"] == 1
+    assert any("recent" in line.lower() or "turn" in line.lower()
+               for line in displayed)
+    assert player.audit("shared")["audit_entries"] == 1
