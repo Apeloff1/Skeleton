@@ -152,6 +152,7 @@ class DesktopHost:
                     maximum_model_calls=req.get("maximum_model_calls", 8),
                     maximum_wall_seconds=req.get("maximum_wall_seconds", 180),
                     signed_source=getattr(self, "signed_source", None),
+                    reasoning_profile=req.get("profile", "guarded"),
                 )
                 self._live()
                 if report.get("success") is not True:

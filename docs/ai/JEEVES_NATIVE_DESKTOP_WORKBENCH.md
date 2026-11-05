@@ -289,3 +289,14 @@ worker without repeating uncertain native work. **Host pressure status**
 displays only the latest bounded measurements. GPU/VRAM and native
 cancellation qualification remain open. See
 `docs/ai/JEEVES_NATIVE_PRESSURE_SUPERVISOR.md`.
+
+## Advanced bounded native planning
+
+The **Reasoning profile** control now selects either conservative guarded
+reasoning or an explicit advanced profile. Advanced mode uses the existing
+strict Jeeves runtime, up to 32 plan steps, finite replans, grounded
+verification and deterministic model sampling, all subject to original
+model-call/time/step and source permissions. Unsupported or under-budgeted
+advanced requests are held, not silently downgraded. Profile receipts
+state verification **requested**, never invent its successful execution.
+See `docs/ai/JEEVES_ADVANCED_NATIVE_REASONING.md`.

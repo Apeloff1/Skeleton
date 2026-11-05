@@ -48,6 +48,7 @@ class JeevesWindow(tk.Tk):
         self.agent_steps = tk.StringVar(value="8")
         self.agent_calls = tk.StringVar(value="8")
         self.agent_wall = tk.StringVar(value="180")
+        self.reasoning_profile = tk.StringVar(value="advanced")
         self.durable_run_id = tk.StringVar(value="")
         self.enable_signed_source_tool = tk.BooleanVar(value=False)
         self.enable_pressure_guard = tk.BooleanVar(value=True)
@@ -258,9 +259,18 @@ class JeevesWindow(tk.Tk):
             ttk.Label(block, text=label).pack(side="left", padx=(0, 5))
             ttk.Entry(block, textvariable=variable, width=7).pack(side="left")
         ttk.Label(
+            agent_budget, text="Reasoning profile",
+        ).grid(row=0, column=3, sticky="w", padx=(4, 6))
+        ttk.Combobox(
             agent_budget,
-            text="Strict planning; same GGUF; no tool grants",
-        ).grid(row=0, column=3, sticky="w")
+            textvariable=self.reasoning_profile,
+            values=("advanced", "guarded"),
+            state="readonly", width=11,
+        ).grid(row=0, column=4, sticky="w")
+        ttk.Label(
+            agent_budget,
+            text="Host-bounded reasoning; no hidden provider/memory permissions",
+        ).grid(row=1, column=0, columnspan=5, sticky="w", pady=(3, 0))
 
         durable = ttk.LabelFrame(
             compose, text="Restart-safe native work orders · exact task/budgets required",
@@ -578,6 +588,11 @@ class JeevesWindow(tk.Tk):
             steps = int(self.agent_steps.get())
             calls = int(self.agent_calls.get())
             wall = int(self.agent_wall.get())
+            profile = self.reasoning_profile.get()
+            if profile not in ("guarded", "advanced"):
+                raise ValueError("unapproved native planner profile")
+            if profile == "advanced" and (steps < 4 or calls < 6):
+                raise ValueError("advanced planner needs at least 4 steps and 6 model calls")
             if (
                 not 1 <= steps <= 64 or not 1 <= calls <= 64
                 or not 1 <= wall <= 600
@@ -600,6 +615,7 @@ class JeevesWindow(tk.Tk):
             "agent", prompt=prompt, run_id=run_id,
             maximum_steps=steps, maximum_model_calls=calls,
             maximum_wall_seconds=wall,
+            profile=profile,
         )
 
     def _durable(self, action: str):
@@ -800,7 +816,9 @@ class JeevesWindow(tk.Tk):
                                if report.get("signed_source_tool_active") is True
                                else "disabled")
                             + " · lookups: "
-                            + str(usage.get("tool_calls", "?")),
+                            + str(usage.get("tool_calls", "?"))
+                            + " · reasoning: "
+                            + str(report.get("reasoning_profile", "guarded")),
                         )
                     elif action == "turn":
                         record = result.get("turn", {})

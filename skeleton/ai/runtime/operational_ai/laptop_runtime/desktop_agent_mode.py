@@ -34,6 +34,7 @@ def run_agent(
     maximum_model_calls: int = 8,
     maximum_wall_seconds: int = 180,
     signed_source: object | None = None,
+    reasoning_profile: str = "guarded",
 ) -> dict[str, object]:
     """Run one native agent with either zero tools or an EXPLICIT signed read grant.
 
@@ -65,6 +66,15 @@ def run_agent(
     if (principal.tenant, principal.subject) != (checked_tenant, checked_subject):
         raise DesktopAgentHold("native agent worker belongs to another principal")
     source_fence.assert_live(worker)
+    from .desktop_agent_profiles import choose_profile
+    planned = choose_profile(
+        name=reasoning_profile,
+        native_max_output_tokens=worker.spine.limits.max_output_tokens,
+        maximum_steps=steps,
+        maximum_model_calls=calls,
+        maximum_wall_seconds=seconds,
+        signed_source_available=signed_source is not None,
+    )
     if signed_source is not None and type(signed_source) is not ActivatedSignedSource:
         raise DesktopAgentHold("unrecognized or unsigned desktop source tool")
     tool_registry = ToolRegistry()
@@ -75,7 +85,12 @@ def run_agent(
         signed_source.bound_tool.install(tool_registry)
         maximum_tool_calls = signed_source.admission.maximum_tool_calls
         grants = (readonly_source_grant(maximum_calls=maximum_tool_calls),)
-    runtime = NativeJeevesRuntime(worker, tools=tool_registry)
+    if planned.name == "advanced":
+        runtime = NativeJeevesRuntime(
+            worker, tools=tool_registry, config=planned.config,
+        )
+    else:
+        runtime = NativeJeevesRuntime(worker, tools=tool_registry)
     if (
         runtime.identity != principal
         or runtime.provider.name != "jeeves_native"
@@ -141,6 +156,8 @@ def run_agent(
             "automatic_retry": False,
             "signed_source_tool_active": signed_source is not None,
             "tool_call_ceiling": maximum_tool_calls,
+            "reasoning_profile": planned.name,
+            "planning_policy": planned.to_public(),
         }
     answer = result.answer
     if type(answer) is not str:
@@ -173,6 +190,8 @@ def run_agent(
         "release_certified": False,
         "automatic_retry": False,
         "filesystem_write_authorized": False,
+        "reasoning_profile": planned.name,
+        "planning_policy": planned.to_public(),
         "signed_source_tool_active": signed_source is not None,
         "tool_call_ceiling": maximum_tool_calls,
         "signed_source_manifest_sha256": (
