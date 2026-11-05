@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 
 import pytest
@@ -37,6 +38,30 @@ _ROW_KEYS = {
     "genesis_handles",
     "documented_subsystems",
 }
+
+
+
+def test_boot_phase_parser_requires_real_dispatch_and_phase_methods() -> None:
+    from skeleton.app.runtime.audit_parse import genesis_boot_phase_order
+
+    source = """
+BOOT_PHASES = ("foundation", "kernel")
+class Genesis:
+    def boot(self):
+        for name, step in self._boot_steps():
+            step()
+    def _boot_steps(self):
+        return tuple((name, getattr(self, f"_phase_{name}")) for name in BOOT_PHASES)
+    def _phase_foundation(self):
+        pass
+    def _phase_kernel(self):
+        pass
+"""
+    parsed = ast.parse(source)
+    assert genesis_boot_phase_order(parsed) == ["foundation", "kernel"]
+    assert genesis_boot_phase_order(ast.parse(source.replace(
+        "    def _phase_kernel(self):\n        pass\n", ""
+    ))) == []
 
 
 def test_genesis_boot_audit_is_import_free(monkeypatch) -> None:

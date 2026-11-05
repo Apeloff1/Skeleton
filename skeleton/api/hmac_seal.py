@@ -322,15 +322,18 @@ def _verify_v2(
     # Domain binding: only after MAC so a forged domain never reaches here.
     if expected_domain is not None and not hmac.compare_digest(domain, expected_domain):
         raise AuthError(_OPAQUE)
-    if replay_cache is not None:
-        try:
-            fresh = replay_cache.check_and_store(
-                f"{principal}.{attester}.{nonce}", expiry + REPLAY_SKEW_SECS, ts
-            )
-        except Exception:
-            raise AuthError(_OPAQUE)
-        if not fresh:
-            raise AuthError(_OPAQUE)
+    # A valid MAC is not a single-use credential without atomic nonce custody.
+    # Direct verification must fail closed when no replay store is supplied.
+    if replay_cache is None:
+        raise AuthError(_OPAQUE)
+    try:
+        fresh = replay_cache.check_and_store(
+            f"{principal}.{attester}.{nonce}", expiry + REPLAY_SKEW_SECS, ts
+        )
+    except Exception:
+        raise AuthError(_OPAQUE) from None
+    if not fresh:
+        raise AuthError(_OPAQUE)
     return attester
 
 
