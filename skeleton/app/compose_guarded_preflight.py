@@ -176,9 +176,14 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
             seen_hosts.add(host)
             trusted.append(host)
         membership.append(tuple(sorted(trusted)))
-    if values[2] is not None and hello.get("hosts") is not None:
-        if values[2] not in membership[0]:
-            return None
+    # Both advertised identities of this writable primary must be present in
+    # the voting host set when supplied. Checking only `primary` misses a
+    # contradictory `me` when `primary` is omitted; never treat that as a
+    # trusted stable topology across an epoch read.
+    if hello.get("hosts") is not None:
+        for endpoint in (values[1], values[2]):
+            if endpoint is not None and endpoint not in membership[0]:
+                return None
     # A writable primary cannot simultaneously advertise itself as a passive
     # or arbiter. Even when the voting-host list is omitted, these conflicting
     # role claims invalidate the snapshot before any canonical epoch read.
