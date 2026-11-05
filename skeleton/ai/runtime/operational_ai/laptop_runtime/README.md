@@ -359,3 +359,17 @@ an independent cold verifier reparses the sealed source bytes before
 accepting the original receipt. The Tk workbench displays the linked and
 unknown import counts during source review without running model code.
 See `docs/ai/JEEVES_SELECTED_PROJECT_SOURCE_CLOSURE.md`.
+
+## Owner-approved portable cold source-capsule transfer
+
+`desktop_capsule_transport_cli` and `scripts/jeeves_capsule_transport.py`
+now export a previously completed, independently cold-verified selected
+source capsule to a no-clobber 0600 offline archive. A separate read-only
+inspect action checks the exact archive/capsule/seal SHA-256 identities,
+all source frames and selected Python dependency graph without loading a
+model or executing source. An independently consented import recreates a
+NEW 0700 private source tree, writes the completion seal last and runs the
+existing cold capsule verifier. Archive contents and private paths never
+enter stdout; a SHA alone is not an authenticity signature, and no full
+project or release completion is claimed.
+See `docs/ai/JEEVES_PORTABLE_PRIVATE_SOURCE_CAPSULE.md`.
