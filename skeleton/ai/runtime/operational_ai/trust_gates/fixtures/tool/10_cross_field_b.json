@@ -1,0 +1,17 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "tool",
+  "expect": "reject",
+  "reason": "Caller approval is independent of model output",
+  "payload": {
+    "grant_id": "g_001",
+    "tool_id": "read_text",
+    "args": {
+      "path": "docs/README.md",
+      "byte_limit": 1024
+    },
+    "risk": "low",
+    "approved": false,
+    "request_id": "r_001"
+  }
+}

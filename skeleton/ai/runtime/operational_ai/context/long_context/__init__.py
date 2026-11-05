@@ -1,0 +1,1 @@
+"""Loss-aware context assembly and complete-history custody. No model authority."""

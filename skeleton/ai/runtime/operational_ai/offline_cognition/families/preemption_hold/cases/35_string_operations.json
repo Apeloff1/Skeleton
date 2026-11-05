@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "preemption_hold",
+  "id": "35_string_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "preemption_hold",
+    "category": "capacity",
+    "source_role": "system",
+    "retrieval_mode": "lexical",
+    "context_limit": 11776,
+    "byte_limit": 90112,
+    "latency_ms": 37000,
+    "min_evidence": 2,
+    "priority": 10,
+    "rank_lexical": 0.6,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.1,
+    "operations": "source"
+  },
+  "risk": "Reject string operations",
+  "native_e2e": false,
+  "release_certified": false
+}

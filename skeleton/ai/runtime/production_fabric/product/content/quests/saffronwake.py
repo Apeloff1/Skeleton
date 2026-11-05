@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for saffronwake."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('saffronwake_arrival', (), (), ('arrival_record',)), Quest('saffronwake_source', ('saffronwake_arrival',), ('arrival_record',), ('source_proof',)), Quest('saffronwake_witness', ('saffronwake_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('saffronwake_reconcile', ('saffronwake_source', 'saffronwake_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('saffronwake_crossing', ('saffronwake_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('saffronwake_conclusion', ('saffronwake_crossing',), ('crossing_pass',), ('ending_unlocked',)))

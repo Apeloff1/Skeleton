@@ -1,0 +1,15 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "path",
+  "expect": "reject",
+  "reason": "Traversal/absolute path is denied lexically",
+  "payload": {
+    "relative_path": "../private.key",
+    "root_id": "installation",
+    "entry_type": "model",
+    "bytes": 1000,
+    "byte_limit": 100000000,
+    "suffix": ".gguf",
+    "immutable": true
+  }
+}
