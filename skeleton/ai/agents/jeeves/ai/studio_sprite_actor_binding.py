@@ -65,7 +65,7 @@ def binding_from_source(
                 or type(animation) is not str or ASSET.fullmatch(animation) is None):
             raise SpriteBindingError("player avatar references unsafe asset or animation")
         if type(doc["billboard"]) is not bool or type(doc["hide_capsule"]) is not bool:
-            raise SpriteBindingError("player avatar visual policies must be explicit")
+            raise SpriteBindingError("player avatar visual policies must be explicit booleans")
         if len(candidates) >= 1:
             raise SpriteBindingError("multiple original sources compete for player avatar")
         matching = [
