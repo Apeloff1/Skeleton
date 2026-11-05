@@ -139,3 +139,14 @@ explicitly `unverified`, not falsely passed. Results are bound
 to the exact reviewed replacement SHA-256 and shown in the patch UI.
 The private exporter runs the gate again before creating a file.
 See `docs/ai/JEEVES_STATIC_SOURCE_QUALIFICATION.md`.
+
+## Non-destructive reconciliation after project drift
+
+If someone edits source between review and export, the normal exporter
+still refuses changed originals. You can now select **Reconcile original
+edits after external changes** to produce a NEW candidate for independent
+line changes, using the exact previously reviewed base and current
+descriptor-read source files. Overlapping edits and new path collisions
+hold the entire package. Neither source files nor Git are changed,
+and all prior digest approvals are invalidated before a new review.
+`docs/ai/JEEVES_CONSERVATIVE_SOURCE_REBASE.md`.
