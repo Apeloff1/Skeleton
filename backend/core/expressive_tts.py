@@ -1,6 +1,7 @@
 """Expressive TTS shaping for engine-owned speech synthesis.\n\nThe backend owns presentation concerns only: tone presets, voice/speed choices,\ncadence shaping, chunking, and the product-facing response shape. Provider\ncredentials, provider transport, governance/admission, and speech execution\nbelong to the Skeleton engine process through EngineClient.\n\nThis keeps the historical immersive storyteller behavior while enforcing the\nStage-5 process boundary: backend may describe the desired speech operation but\ncannot instantiate or authenticate a model provider locally.\n"""
 from __future__ import annotations
 import base64
+import math
 import re
 import uuid
 from typing import Dict, List, Optional
@@ -177,7 +178,15 @@ async def generate_expressive_tts(
     caller can present a graceful fallback."""
     preset = resolve_tone(tone)
     voice = voice_override or preset["voice"]
-    speed = float(speed_override) if speed_override is not None else float(preset["speed"])
+    if isinstance(speed_override, bool):
+        raise ValueError("TTS speed must be a finite numeric value")
+    try:
+        speed = float(speed_override) if speed_override is not None else float(preset["speed"])
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("TTS speed must be a finite numeric value") from exc
+    if not math.isfinite(speed):
+        raise ValueError("TTS speed must be finite")
+    # Preserve historical in-range clamping for otherwise valid numeric rates.
     speed = max(0.25, min(4.0, speed))
 
     spoken = shape_cadence(text, preset["id"]) if shape else (text or "").strip()[:TTS_LIMIT]
@@ -215,21 +224,54 @@ async def generate_expressive_tts(
 
 
 def chunk_for_narration(text: str, max_chars: int = 700) -> List[str]:
-    """Split long narration into sentence-bounded chunks for smooth, fast-first
-    playback (architect win: streaming-friendly narration)."""
-    if not text:
+    """Yield a complete narration in bounded, ordered chunks.
+
+    Prefer sentence ends and then whitespace, but always split unusually long
+    sentences or words. Never pass an oversized chunk to engine-owned TTS.
+    The scan walks the input once without making an unbounded split list.
+    """
+    if isinstance(max_chars, bool) or not isinstance(max_chars, int) or not 1 <= max_chars <= TTS_LIMIT:
+        raise ValueError(f"max_chars must be an integer in [1, {TTS_LIMIT}]")
+    if not isinstance(text, str):
+        raise TypeError("narration text must be a string")
+    if not text or not text.strip():
         return []
-    sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
+
     out: List[str] = []
-    cur = ""
-    for sent in sentences:
-        if len(cur) + len(sent) + 1 > max_chars and cur:
-            out.append(cur.strip())
-            cur = sent
-        else:
-            cur = f"{cur} {sent}".strip()
-    if cur:
-        out.append(cur.strip())
+    current = ""
+
+    def append_sentence(sentence: str) -> None:
+        nonlocal current
+        pos = 0
+        length = len(sentence)
+        while pos < length:
+            while pos < length and sentence[pos].isspace():
+                pos += 1
+            if pos >= length:
+                break
+            stop = min(length, pos + max_chars)
+            if stop < length:
+                # A natural word break is preferable; an unbroken word still
+                # advances by max_chars rather than producing an oversized row.
+                boundary = sentence.rfind(" ", pos + 1, stop + 1)
+                if boundary > pos:
+                    stop = boundary
+            piece = sentence[pos:stop].strip()
+            pos = stop
+            if not piece:
+                continue
+            if current and len(current) + len(piece) + 1 > max_chars:
+                out.append(current)
+                current = ""
+            current = f"{current} {piece}" if current else piece
+
+    start = 0
+    for match in re.finditer(r"(?<=[.!?…])\s+", text):
+        append_sentence(text[start:match.start()])
+        start = match.end()
+    append_sentence(text[start:])
+    if current:
+        out.append(current)
     return out
 
 
