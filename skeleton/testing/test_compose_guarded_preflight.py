@@ -125,6 +125,48 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["guarded_local_ai_ready"])
         self.assertEqual(FakeEpoch.instances[0].calls, 1)
 
+    async def test_topology_generation_rotation_denies(self):
+        from bson.objectid import ObjectId
+        process = ObjectId()
+
+        class RotatingTopology(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "hello" and self.calls == 3:
+                    return {**result, "topologyVersion": {
+                        "processId": process, "counter": 9}}
+                return result
+
+        self.db = RotatingTopology()
+        self.db.hello["topologyVersion"] = {
+            "processId": process, "counter": 8}
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_primary_changed_during_preflight")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_untrusted_topology_fields_denied_before_epoch(self):
+        from bson.objectid import ObjectId
+
+        class ForgedCounter(int):
+            def __eq__(self, other):
+                raise AssertionError("untrusted counter equality executed")
+
+        for bad in (
+            {"processId": ObjectId(), "counter": True},
+            {"processId": ObjectId(), "counter": ForgedCounter(1)},
+            {"processId": "forged", "counter": 1},
+            {"processId": ObjectId(), "counter": -1},
+            {"processId": ObjectId(), "counter": 1 << 63},
+            {"processId": ObjectId(), "counter": 1, "extra": 2},
+        ):
+            with self.subTest(value=repr(bad)):
+                self.db.hello["topologyVersion"] = bad
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+                self.assertEqual(FakeEpoch.instances, [])
+
     async def test_primary_loss_between_reads_denies(self):
         class LostPrimary(FakeDB):
             async def command(self, name):
