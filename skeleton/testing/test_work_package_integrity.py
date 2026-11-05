@@ -38,7 +38,7 @@ def test_evidence_is_bound_to_exact_package_digest():
 def test_evidence_role_must_be_typed():
  p=pkg()
  with pytest.raises(WorkPackageError,match="EvidenceRole"):
-  WorkPackageEvidence("EVID.X",p.package_id,p.digest,"implementation","ACTOR.X",SHA)
+  WorkPackageEvidence("EVID.X",p.package_id,p.digest,"implementation","ACTOR.X",SHA,NOW)
 
 def test_dependency_identity_is_immutable():
  r=WorkPackageRegistry();r.add(pkg("PKG.A"));r.add(pkg("PKG.B"));r.add(pkg("PKG.C"))
