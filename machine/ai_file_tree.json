@@ -6440,9 +6440,9 @@
         "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
       },
       {
-        "path": "skeleton/perf_profiler",
-        "owner": "product/runtime performance profiling",
-        "reason": "frame and allocation instrumentation is product/runtime evidence; AI percentile statistics remain delegated to the governed observability profiler"
+        "path": "skeleton/godot_export",
+        "owner": "product/game export and native engine qualification",
+        "reason": "Godot 4 project parsing, export and device certification are product delivery adapters, not canonical AI inference or model ownership"
       },
       {
         "path": "skeleton/testing",
