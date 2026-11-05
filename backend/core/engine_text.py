@@ -67,6 +67,8 @@ def _text(value: object, field: str, *, maximum: int) -> str:
 
 
 def _identity_text(value: object, field: str, *, maximum: int) -> str:
+    if not isinstance(value, str) or value != value.strip():
+        raise EngineTextError(f"{field} must be a normalized identity")
     normalized = _text(value, field, maximum=maximum)
     if any(ord(char) < 32 or ord(char) == 127 for char in normalized):
         raise EngineTextError(f"{field} contains forbidden identity controls")
