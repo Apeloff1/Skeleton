@@ -578,6 +578,57 @@ async def get_result(
     return doc or {"error": "not found", "status": "unknown"}
 
 
+@router.get("/jobs")
+async def list_jobs(
+    limit: int = 5,
+    identity: dict = Depends(require_authenticated_identity),
+):
+    """Discover bounded owned job receipts after UI navigation or restart.
+
+    Never expose prompts or provider output in the listing. A "running" row
+    describes the *stored* last-known state, not proof that a worker survived
+    a backend restart. Only /result/{job_id} can read the full owned receipt.
+    """
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise HTTPException(422, "job discovery limit must be in [1, 20]")
+    scope = _private_scope(identity)
+    projection = {
+        "_id": 0, "job_id": 1, "status": 1,
+        "created_at": 1, "finished_at": 1,
+    }
+    try:
+        rows = await _db.discourse_jobs.find(
+            scope, projection,
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+    except Exception as exc:
+        raise HTTPException(503, "private job history unavailable") from exc
+    if not isinstance(rows, list):
+        raise HTTPException(503, "private job history is malformed")
+    safe: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        job_id = row.get("job_id")
+        state = row.get("status")
+        if (
+            not isinstance(job_id, str) or len(job_id) != 32
+            or any(char not in "0123456789abcdef" for char in job_id)
+            or state not in {"running", "done", "error"}
+        ):
+            continue
+        created = row.get("created_at")
+        if not isinstance(created, str) or len(created) > 80:
+            continue
+        safe.append({
+            "job_id": job_id,
+            "status": state,
+            "created_at": created,
+            # This is a last-known database state, never a worker heartbeat.
+            "worker_continuity_verified": False,
+        })
+    return {"jobs": safe, "count": len(safe)}
+
+
 @router.get("/history")
 async def history(
     limit: int = 20,
