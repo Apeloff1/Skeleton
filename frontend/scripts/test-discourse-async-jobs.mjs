@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  submitDiscourseJob, pollDiscourseJob, MAX_DISCOURSE_WAIT_MS,
+  submitDiscourseJob, pollDiscourseJob, discoverDiscourseJobs, MAX_DISCOURSE_WAIT_MS,
 } from '../src/features/discourse/discourseJob.ts';
 
 const JOB_ID = 'ab'.repeat(16);
@@ -223,4 +223,100 @@ test('the UI uses bounded asynchronous jobs and never a long synchronous request
   assert.match(source, /observer\.current\?\.abort\(\)/);
   assert.match(source, /Stop observing \(job may continue\)/);
   assert.doesNotMatch(source, /api\.post.*'\/api\/discourse\/deliberate'[\s,]/);
+});
+
+
+test('discover previous private jobs without submitting model work', async () => {
+  let gets = 0;
+  const transport = mockTransport({
+    post: async () => { throw Error('history recovery must not submit'); },
+    get: async (path, options) => {
+      gets++;
+      assert.equal(path, '/api/discourse/jobs?limit=5');
+      assert.equal(options.retries, 0);
+      assert.equal(options.timeoutMs, 8_000);
+      return ok({ jobs: [
+        { job_id: JOB_ID, status: 'running',
+          created_at: '2026-11-06T13:00:00Z', worker_continuity_verified: false },
+      ] });
+    },
+  });
+  const outcome = await discoverDiscourseJobs(transport);
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(outcome.jobs, [{
+    jobId: JOB_ID, status: 'running', createdAt: '2026-11-06T13:00:00Z',
+    workerContinuityVerified: false,
+  }]);
+  assert.equal(gets, 1);
+});
+
+test('unowned or malformed discovery identities cannot become recoverable jobs', async () => {
+  const transport = mockTransport({
+    post: async () => { throw Error('unexpected write'); },
+    get: async () => ok({ jobs: [
+      { job_id: JOB_ID, status: 'done', created_at: '2026-11-06T13:00:00Z',
+        worker_continuity_verified: false },
+      { job_id: JOB_ID, status: 'done', created_at: '2026-11-06T13:00:00Z',
+        worker_continuity_verified: false },
+      { job_id: 'not-a-job', status: 'done', created_at: '2026-11-06T13:00:00Z',
+        worker_continuity_verified: false },
+      { job_id: 'b'.repeat(32), status: 'done',
+        created_at: '2026-11-06T13:00:00Z', worker_continuity_verified: true },
+      { job_id: 'c'.repeat(32), status: 'not-real',
+        created_at: '2026-11-06T13:00:00Z', worker_continuity_verified: false },
+    ] }),
+  });
+  const outcome = await discoverDiscourseJobs(transport);
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.jobs.length, 1);
+  assert.equal(outcome.jobs[0].jobId, JOB_ID);
+});
+
+test('invalid or oversized discovery response is explicit error, not empty history', async () => {
+  for (const body of [{}, { jobs: null }, { jobs: [] }, { jobs: Array(6).fill({}) }]) {
+    const transport = mockTransport({
+      post: async () => { throw Error('unexpected write'); },
+      get: async () => ok(body),
+    });
+    const result = await discoverDiscourseJobs(transport);
+    if (Array.isArray(body.jobs) && body.jobs.length === 0) {
+      assert.deepEqual(result, { ok: true, jobs: [] });
+    } else {
+      assert.equal(result.ok, false);
+      assert.equal(result.error, 'invalid_job_discovery_response');
+    }
+  }
+});
+
+test('private job discovery does not silently reinterpret authentication failure', async () => {
+  const transport = mockTransport({
+    post: async () => { throw Error('unexpected write'); },
+    get: async () => ({ ok: false, status: 401, data: null, error: 'Authentication required' }),
+  });
+  const result = await discoverDiscourseJobs(transport);
+  assert.deepEqual(result, { ok: false, error: 'Authentication required' });
+});
+
+test('discovery cancellation prevents network access and stale state publication', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const transport = mockTransport({
+    post: async () => { throw Error('unexpected write'); },
+    get: async () => { throw Error('aborted request reached network'); },
+  });
+  const result = await discoverDiscourseJobs(transport, { signal: controller.signal });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'observation_cancelled');
+});
+
+test('UI recovers private receipts from server and clears state on auth changes', () => {
+  const ui = readFileSync(new URL('../app/discourse.tsx', import.meta.url), 'utf8');
+  assert.match(ui, /discoverDiscourseJobs\(api,/);
+  assert.match(ui, /subscribeApiSessionChanges\(/);
+  assert.match(ui, /sessionEpoch\.current \+= 1/);
+  assert.match(ui, /epoch !== sessionEpoch\.current/);
+  assert.match(ui, /setRecentJobs\(\[\]\)/);
+  assert.match(ui, /dc-private-job-history/);
+  assert.match(ui, /dc-recover-/);
+  assert.doesNotMatch(ui, /AsyncStorage\.setItem|sessionStorage\.setItem|SecureStore\.setItem/);
 });

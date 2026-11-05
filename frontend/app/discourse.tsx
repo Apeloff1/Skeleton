@@ -11,11 +11,11 @@ import {
   StyleSheet, SafeAreaView, Platform, KeyboardAvoidingView, Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import api from '../src/utils/apiClient';
+import api, { subscribeApiSessionChanges } from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 import {
-  pollDiscourseJob, submitDiscourseJob,
-  type DiscourseOutcome, type DiscourseResult,
+  discoverDiscourseJobs, pollDiscourseJob, submitDiscourseJob,
+  type DiscourseJobSummary, type DiscourseOutcome, type DiscourseResult,
 } from '../src/features/discourse/discourseJob';
 
 export default function DiscourseScreen() {
@@ -29,18 +29,57 @@ export default function DiscourseScreen() {
   const [jobId, setJobId] = React.useState<string | null>(null);
   const [canResume, setCanResume] = React.useState(false);
   const [progress, setProgress] = React.useState<string | null>(null);
+  const [recentJobs, setRecentJobs] = React.useState<DiscourseJobSummary[]>([]);
+  const [discoveryError, setDiscoveryError] = React.useState<string | null>(null);
+  const [discoveryBusy, setDiscoveryBusy] = React.useState(false);
   const observer = React.useRef<AbortController | null>(null);
+  const sessionEpoch = React.useRef(0);
   const mounted = React.useRef(true);
   const occupied = React.useRef(false);
 
+  const recoverRecentJobs = React.useCallback(async (signal?: AbortSignal) => {
+    if (!mounted.current || signal?.aborted) return;
+    const epoch = sessionEpoch.current;
+    setDiscoveryBusy(true);
+    const result = await discoverDiscourseJobs(api, { signal });
+    if (!mounted.current || signal?.aborted || epoch !== sessionEpoch.current) return;
+    if (result.ok) {
+      setRecentJobs(result.jobs);
+      setDiscoveryError(null);
+    } else {
+      setRecentJobs([]);
+      setDiscoveryError(result.error);
+    }
+    setDiscoveryBusy(false);
+  }, []);
+
   React.useEffect(() => {
     mounted.current = true;
+    const controller = new AbortController();
+    void recoverRecentJobs(controller.signal);
     return () => {
       mounted.current = false;
+      controller.abort();
       observer.current?.abort();
       observer.current = null;
     };
-  }, []);
+  }, [recoverRecentJobs]);
+
+  React.useEffect(() => subscribeApiSessionChanges(() => {
+    sessionEpoch.current += 1;
+    // A login/logout clears every displayed private prompt, verdict and
+    // receipt from the previous principal without relying on navigation.
+    observer.current?.abort();
+    setRes(null);
+    setJobId(null);
+    setCanResume(false);
+    setError(null);
+    setProgress(null);
+    setRecentJobs([]);
+    setDiscoveryError(null);
+    setDiscoveryBusy(false);
+    void recoverRecentJobs();
+  }), [recoverRecentJobs]);
 
   const beginObserve = React.useCallback(async (resumeId?: string) => {
     if (occupied.current) return;
@@ -164,6 +203,35 @@ export default function DiscourseScreen() {
             </TouchableOpacity>
           ) : null}
 
+          <View testID="dc-private-job-history" style={styles.jobHistory}>
+            <Text style={styles.label}>Previous private deliberations</Text>
+            <Text style={styles.hint}>
+              Retrieved from your authenticated account, not a shared device cache.
+              A stored running status does not confirm the worker survived a restart.
+            </Text>
+            <TouchableOpacity testID="dc-refresh-jobs" style={styles.secondaryCta}
+              disabled={busy || discoveryBusy}
+              onPress={() => { void recoverRecentJobs(); }}>
+              <Text style={styles.secondaryTxt}>
+                {discoveryBusy ? 'Checking private jobs…' : 'Refresh recent jobs'}
+              </Text>
+            </TouchableOpacity>
+            {discoveryError ? (
+              <Text style={styles.hint}>Private job history is unavailable: {discoveryError}</Text>
+            ) : null}
+            {recentJobs.map(job => (
+              <TouchableOpacity key={job.jobId}
+                testID={'dc-recover-' + job.jobId}
+                style={styles.secondaryCta} disabled={busy}
+                onPress={() => { void beginObserve(job.jobId); }}>
+                <Text style={styles.secondaryTxt}>
+                  {job.status === 'done' ? 'View saved result' : 'Check previous job'}
+                  {' · '}{job.jobId.slice(0, 10)}{' · '}{job.status}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           {res ? (
             <View testID="dc-result">
               <View style={styles.winner}>
@@ -232,6 +300,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11, paddingHorizontal: 12, alignItems: 'center', marginTop: 10 },
   secondaryTxt: { color: '#cbd5e1', fontWeight: '700', fontSize: 12 },
   modeHint: { color: '#86efac', fontSize: 12, marginTop: 6 },
+  jobHistory: { marginTop: 16, marginBottom: 18, paddingVertical: 12 },
   hint: { color: '#64748b', fontSize: 12, marginTop: 8, textAlign: 'center' },
   err: { color: '#fca5a5', fontSize: 13, marginTop: 12 },
   winner: { backgroundColor: '#0f2417', borderColor: '#22c55e', borderWidth: 1, borderRadius: 12, padding: 14, marginTop: 18 },

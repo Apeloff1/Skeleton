@@ -254,3 +254,59 @@ export async function submitDiscourseJob(
   ) return failure('invalid_admission_receipt');
   return pollDiscourseJob(transport, jobId, options);
 }
+
+
+/** Recovery lists contain identifiers and statuses only: never prompts or text. */
+export interface DiscourseJobSummary {
+  jobId: string;
+  status: 'running' | 'done' | 'error';
+  createdAt: string;
+  workerContinuityVerified: false;
+}
+export type JobDiscovery =
+  | { ok: true; jobs: DiscourseJobSummary[] }
+  | { ok: false; error: string };
+
+export async function discoverDiscourseJobs(
+  transport: DiscourseTransport, options: { signal?: AbortSignal } = {},
+): Promise<JobDiscovery> {
+  if (options.signal?.aborted) return { ok: false, error: 'observation_cancelled' };
+  let response: WireResult<{ jobs?: unknown }>;
+  try {
+    response = await transport.get<{ jobs?: unknown }>(
+      '/api/discourse/jobs?limit=5',
+      { signal: options.signal, timeoutMs: 8_000, retries: 0 },
+    );
+  } catch {
+    response = { ok: false, status: 0, data: null, error: 'network_error' };
+  }
+  if (options.signal?.aborted) return { ok: false, error: 'observation_cancelled' };
+  if (!response.ok) {
+    return { ok: false, error: boundedMessage(response.error, 'job_discovery_unavailable') };
+  }
+  const rows = response.data?.jobs;
+  if (!Array.isArray(rows) || rows.length > 5) {
+    return { ok: false, error: 'invalid_job_discovery_response' };
+  }
+  const jobs: DiscourseJobSummary[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const item = row as Record<string, unknown>;
+    const id = item.job_id;
+    const status = item.status;
+    const stamp = item.created_at;
+    if (
+      typeof id !== 'string' || !JOB_ID_PATTERN.test(id) || seen.has(id)
+      || (status !== 'running' && status !== 'done' && status !== 'error')
+      || typeof stamp !== 'string' || stamp.length < 1 || stamp.length > 80
+      || item.worker_continuity_verified !== false
+    ) continue;
+    seen.add(id);
+    jobs.push({
+      jobId: id, status, createdAt: stamp,
+      workerContinuityVerified: false,
+    });
+  }
+  return { ok: true, jobs };
+}
