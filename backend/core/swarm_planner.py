@@ -281,6 +281,7 @@ def plan_build(
         "build_id": build_id,
         "seed": seed,
         "platoon_size": platoon_size,
+        "genre": genre,
         "phase_count": len(phases),
         "lead_count": n_leads,
         "objectives": objectives,
@@ -330,6 +331,7 @@ def _plan_hash(plan: dict) -> str:
         "build_id": plan["build_id"],
         "seed": plan["seed"],
         "platoon_size": plan["platoon_size"],
+        "genre": plan["genre"],
         "objectives": plan["objectives"],
         "phases": [
             {"id": node["phase_id"], "workers": [worker["code"] for worker in node["workers"]]}
@@ -348,6 +350,11 @@ def verify_plan(plan: dict) -> dict:
     nodes = {n["id"]: n for n in plan.get("nodes", [])}
     edges = plan.get("edges", [])
     problems: list[str] = []
+    if len(nodes) != len(plan.get("nodes", [])):
+        problems.append("duplicate node identities")
+    for edge in edges:
+        if edge.get("from") not in nodes or edge.get("to") not in nodes:
+            problems.append("edge references an unknown node")
 
     # 1) acyclicity over the platoon dependency sub-graph
     phase_nodes = [n["phase_id"] for n in plan.get("nodes", []) if n["tier"] == "platoon"]
@@ -381,21 +388,54 @@ def verify_plan(plan: dict) -> dict:
     if unreachable:
         problems.append(f"{len(unreachable)} unreachable node(s) from director")
 
-    # 3) coverage
-    cov = plan.get("coverage", {})
-    if not cov.get("all_covered"):
-        problems.append("coverage incomplete")
+    # 3) Independently recompute expected phases from the plan's declared
+    # execution waves. Never trust a mutable coverage summary as proof.
+    expected_phases = [
+        phase for wave in plan.get("waves", []) for phase in wave.get("phases", [])
+    ]
+    expected_set = set(expected_phases)
+    actual_set = set(phase_nodes)
+    unique = (
+        bool(expected_phases)
+        and len(expected_phases) == len(expected_set)
+        and len(phase_nodes) == len(actual_set)
+        and len(expected_phases) == plan.get("phase_count")
+        and len(phase_nodes) == len(expected_phases)
+        and actual_set == expected_set
+    )
+    computed = _coverage(plan, expected_phases)
+    provided = plan.get("coverage", {})
+    coverage_ok = unique and computed["all_covered"] and provided == computed
+    if not coverage_ok:
+        problems.append("coverage incomplete or stale versus actual nodes")
 
-    # 4) every platoon has ≥1 worker
+    # 4) A platoon with missing/duplicated worker identities is not complete.
     for n in plan.get("nodes", []):
-        if n["tier"] == "platoon" and n.get("size", 0) < 1:
-            problems.append(f"platoon {n['id']} has no workers")
+        if n["tier"] != "platoon":
+            continue
+        worker_codes = [worker.get("code") for worker in n.get("workers", [])]
+        if (
+            n.get("size", 0) < 1
+            or n.get("size") != len(worker_codes)
+            or any(not isinstance(code, str) or not code for code in worker_codes)
+            or len(set(worker_codes)) != len(worker_codes)
+        ):
+            problems.append(f"platoon {n['id']} has invalid worker custody")
+
+    # 5) Rebuild the receipt from current plan contents. Changed objectives,
+    # participants, source identity or edges invalidate historical attestations.
+    try:
+        receipt_ok = plan.get("plan_hash") == _plan_hash(plan)
+    except (KeyError, TypeError, ValueError):
+        receipt_ok = False
+    if not receipt_ok:
+        problems.append("plan source receipt does not match current contents")
 
     return {
         "valid": not problems,
         "acyclic": acyclic,
         "fully_reachable": not unreachable,
-        "coverage_ok": bool(cov.get("all_covered")),
+        "coverage_ok": coverage_ok,
         "node_count": len(nodes),
         "edge_count": len(edges),
         "problems": problems,
