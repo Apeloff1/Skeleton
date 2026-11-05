@@ -13,6 +13,7 @@
     "skeleton/app/installer.py",
     "skeleton/app/setup_runtime.py",
     "skeleton/app/preloader.py",
+    "skeleton/app/install_source_contracts.py",
     "skeleton/app/assembly.py",
     "skeleton/app/first_install.py",
     "skeleton/app/cli.py",
