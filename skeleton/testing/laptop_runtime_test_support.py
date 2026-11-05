@@ -7,6 +7,8 @@ from __future__ import annotations
 import hashlib
 from types import SimpleNamespace
 
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import refuse
+
 MODEL="a"*64
 TOKENIZER="b"*64
 OUTPUT="hello"
@@ -69,6 +71,13 @@ class FakeWorker:
         key=(session,request_id,prompt,seed,temperature)
         prior=self.spine.receipts.get(key)
         if prior:return {**prior,"replayed":True}
+        # Mirror the production SQLite request-identity CAS: once the
+        # (session, request ID) pair commits, changed prompt or sampler
+        # parameters can NEVER issue a second native forward pass. This fake
+        # deliberately does not infer real device or source-rights approval.
+        for committed_session,committed_id,*_ in self.spine.receipts:
+            if committed_session==session and committed_id==request_id:
+                refuse("native request identity already committed with different input")
         self.generation_calls+=1
         result={"schema":"test-double-receipt-not-model-evidence",
                 "model_sha256":MODEL,"tokenizer_sha256":TOKENIZER,
