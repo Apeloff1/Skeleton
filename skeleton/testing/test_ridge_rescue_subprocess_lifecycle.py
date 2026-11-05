@@ -212,3 +212,35 @@ def test_interactive_export_and_backup_refresh_concurrent_save(tmp_path: Path):
         assert any(message.startswith(confirmation) for message in messages)
         assert any("Revision: 1" in message for message in messages)
         assert store.audit("shared")["audit_entries"] == 1
+
+
+def test_malformed_subprocess_action_never_advances_saved_revision(tmp_path: Path):
+    """Malformed external commands must not corrupt a valid restarted game."""
+    home = tmp_path / "isolated-save"
+    initial = _json(home, "new")
+    malformed = (
+        b"{",
+        b"null",
+        b"[]",
+        b'{"verb":"move","direction":"north","extra":true}',
+    )
+    for payload in malformed:
+        failed = _invoke(
+            home, "step", "--action", payload.decode("ascii"),
+            "--expected-head", initial["head"],
+        )
+        assert failed.returncode != 0
+        after = _json(home, "status")
+        assert after["head"] == initial["head"]
+        assert after["revision"] == 0
+        audit = _json(home, "audit")
+        assert audit["verified"] is True
+        assert audit["audit_entries"] == 0
+
+    action = initial["actions"][0]
+    advanced = _json(
+        home, "step", "--action", json.dumps(action),
+        "--expected-head", initial["head"],
+    )
+    assert advanced["revision"] == 1
+    assert _json(home, "audit")["audit_entries"] == 1
