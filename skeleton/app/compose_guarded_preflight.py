@@ -122,6 +122,32 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     # or resolve hostnames here because that would introduce network TOCTOU.
     if values[1] is not None and values[2] is not None and values[1] != values[2]:
         return None
+    # A claimed primary must not disappear from its own advertised voting
+    # topology. Treat membership as an observation only: no DNS resolution,
+    # authorization claim or automatic replica-set reconfiguration.
+    membership: list[object] = []
+    seen_hosts: set[str] = set()
+    for field in ("hosts", "passives", "arbiters"):
+        hosts = hello.get(field)
+        if hosts is None:
+            membership.append(None)
+            continue
+        if type(hosts) is not list or len(hosts) > 64:
+            return None
+        trusted: list[str] = []
+        for host in hosts:
+            if (type(host) is not str or not 1 <= len(host) <= 512
+                    or not host.isascii()
+                    or any(ord(ch) < 33 or ord(ch) > 126 for ch in host)
+                    or host in seen_hosts):
+                return None
+            seen_hosts.add(host)
+            trusted.append(host)
+        membership.append(tuple(sorted(trusted)))
+    if values[2] is not None and hello.get("hosts") is not None:
+        if values[2] not in membership[0]:
+            return None
+    values.extend(membership)
     election = hello.get("electionId")
     if election is not None:
         try:

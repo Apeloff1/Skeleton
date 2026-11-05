@@ -126,6 +126,64 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(FakeEpoch.instances, [])
         self.assertEqual(self.db.calls, 1)
 
+    async def test_primary_absent_from_advertised_hosts_denied(self):
+        self.db.hello.update({
+            "me": "mongo-a:27017", "primary": "mongo-a:27017",
+            "hosts": ["mongo-b:27017", "mongo-c:27017"],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+        self.assertEqual(FakeEpoch.instances, [])
+
+    async def test_malformed_membership_denied_before_epoch(self):
+        class HostileHost(str):
+            def __hash__(self):
+                raise AssertionError("untrusted host hash executed")
+
+        invalid = (
+            ["mongo-a:27017", "mongo-a:27017"],
+            ["mongo-a:27017", HostileHost("mongo-b:27017")],
+            ["mongo-a:27017", "bad\\nnode"],
+            ["mongo-a:27017"] * 65,
+            ["mongo-a:27017", 123],
+        )
+        for hosts in invalid:
+            with self.subTest(hosts=repr(hosts)):
+                self.db.hello["hosts"] = hosts
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+                self.assertEqual(FakeEpoch.instances, [])
+        self.db.hello.pop("hosts")
+
+    async def test_membership_rotation_during_epoch_denied(self):
+        class RotatingMembers(FakeDB):
+            async def command(self, name):
+                result = await super().command(name)
+                if name == "hello" and self.calls == 3:
+                    return {**result, "hosts": ["mongo-a:27017", "mongo-c:27017"]}
+                return result
+
+        self.db = RotatingMembers()
+        self.db.hello.update({
+            "me": "mongo-a:27017", "primary": "mongo-a:27017",
+            "hosts": ["mongo-a:27017", "mongo-b:27017"],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_primary_changed_during_preflight")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
+    async def test_valid_membership_remains_observation_only(self):
+        self.db.hello.update({
+            "me": "mongo-a:27017", "primary": "mongo-a:27017",
+            "hosts": ["mongo-b:27017", "mongo-a:27017"],
+            "arbiters": ["mongo-c:27017"],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertFalse(result["canonical_cluster_identity_verified"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_matching_primary_endpoints_are_observation_only(self):
         self.db.hello.update({"me": "mongo-a:27017", "primary": "mongo-a:27017"})
         result = await self.inspect()
