@@ -4456,7 +4456,7 @@ async def get_ai_providers() -> Dict[str, Any]:
                 row["artifact"] = allowed
         public_providers.append(row)
 
-    return {
+    result = {
         "providers": public_providers,
         "active": runtime["active"],
         "engine": "skeleton-engine",
@@ -4464,6 +4464,16 @@ async def get_ai_providers() -> Dict[str, Any]:
         "configured": True,
         "availability_observed": True,
     }
+    # A small allowlist lets the host doctor distinguish a broken guard from
+    # missing weights without exposing arbitrary engine error text or paths.
+    active = [row for row in runtime["providers"] if row.get("active") is True]
+    if (runtime["available"] is False and runtime["active"] == "local" and len(active) == 1
+            and active[0].get("id") == "local" and active[0].get("available") is False
+            and active[0].get("architecture_acknowledged") is True):
+        code = active[0].get("readiness_code")
+        if isinstance(code, str) and code in {"local_guard_unavailable", "local_guard_configuration_invalid"}:
+            result["active_readiness_code"] = code
+    return result
 
 
 @router.post("/quick-actions")
