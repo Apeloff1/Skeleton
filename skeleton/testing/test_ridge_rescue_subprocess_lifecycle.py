@@ -417,3 +417,35 @@ def test_mid_campaign_backup_restore_and_independent_ending_replay(tmp_path: Pat
         verified = _invoke(home, "verify-export", "--file", "-", stdin=export_bytes)
         assert verified.returncode == 0, verified.stderr.decode(errors="replace")
         assert json.loads(verified.stdout)["head"] == state["head"]
+
+
+def test_rejected_backup_cannot_replace_independent_playable_slot(tmp_path: Path):
+    """A failed cross-install restore must preserve both existing game histories."""
+    source_home = tmp_path / "source"
+    target_home = tmp_path / "target"
+    source = _json(source_home, "new")
+    target = _json(target_home, "new")
+    source = _json(source_home, "step", "--action",
+                   json.dumps(source["actions"][0]), "--expected-head", source["head"])
+    target = _json(target_home, "step", "--action",
+                   json.dumps(target["actions"][0]), "--expected-head", target["head"])
+    source_backup = Path(_json(source_home, "backup")["path"]).read_bytes()
+    assert source_backup
+    corrupted = bytearray(source_backup)
+    corrupted[len(corrupted) // 2] ^= 1
+    before = _json(target_home, "status")
+    for payload in (bytes(corrupted), b"{}", b""):
+        rejected = _invoke(target_home, "restore-backup", "--file", "-", stdin=payload)
+        assert rejected.returncode != 0
+        assert _json(target_home, "status")["head"] == before["head"]
+        assert _json(target_home, "audit")["verified"] is True
+    assert _json(source_home, "status")["head"] == source["head"]
+    assert _json(source_home, "audit")["verified"] is True
+    # A failed restore must not lock out subsequent valid user actions.
+    resumed = _json(target_home, "status")
+    if resumed["actions"]:
+        advanced = _json(target_home, "step", "--action",
+                         json.dumps(resumed["actions"][0]),
+                         "--expected-head", resumed["head"])
+        assert advanced["revision"] == resumed["revision"] + 1
+        assert _json(target_home, "audit")["verified"] is True
