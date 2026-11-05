@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import math
 import time
 import uuid
 from typing import Dict, List, Optional
@@ -81,47 +80,36 @@ def _subtasks(directive: str, n: int) -> List[str]:
 async def _worker(worker_id: int, focus: str, project: str, run_id: str, identity: dict) -> Dict:
     """Generate one account-bound finding and require acknowledged graph custody."""
     scope, owner_key = _owner_scope(identity)
-    recall, kda = [], None
-    recall_available = memory_written = False
+    # Legacy LAFS and Delta-KDA are shared process-wide and do not expose an
+    # owner/tenant filter. Never consult them for a private user's graph.
+    # Reuse only already-owned graph findings, with a fixed 3-row read bound.
+    recalled: list[str] = []
+    recall_available = False
     try:
-        from gameforge.lafs import lafs as _lafs
-        raw = await asyncio.to_thread(
-            _lafs.probability_search, focus, acquisition="efe", top_k=3
-        )
-        recall = raw if isinstance(raw, list) else []
+        from core.databases import core_db
+        cursor = core_db["swarm_graph"].find(
+            {"project": project, "type": "Finding", **scope},
+            {"_id": 0, "focus": 1},
+        ).sort("ts", -1)
+        rows = await cursor.to_list(3)
+        recalled = [
+            row["focus"][:128] for row in rows
+            if isinstance(row, dict) and isinstance(row.get("focus"), str)
+        ][:3]
         recall_available = True
-    except Exception:  # optional recall; do not pretend it ran
-        pass
-    try:
-        from gameforge.omega import delta_memory as _dm
-        memory_key = f"{owner_key}:{project}:{focus}"
-        kda = await asyncio.to_thread(_dm.read, memory_key)
-        await asyncio.to_thread(
-            _dm.write, memory_key,
-            f"worker-{worker_id} explored {focus}", modality="text"
-        )
-        memory_written = True
     except Exception:
+        # The durable finding still proceeds without optional context. A read
+        # outage is flagged in the result; it never grants cross-tenant reads.
         pass
-
-    paths = [
-        row["path"][:256] for row in recall[:3]
-        if isinstance(row, dict) and isinstance(row.get("path"), str)
-    ]
-    strength = kda.get("recall_strength") if isinstance(kda, dict) else None
-    if type(strength) not in (int, float, str, type(None)):
-        strength = None
-    elif type(strength) is float and not math.isfinite(strength):
-        strength = None
     finding = {
         "type": "Finding",
         "worker": worker_id,
         "focus": focus,
-        "recalled": paths,
-        "kda_recall_strength": strength,
-        "summary": f"Sub-agent {worker_id} synthesised '{focus}' from {len(paths)} canon sheet(s).",
+        "recalled": recalled,
+        "kda_recall_strength": None,
+        "summary": f"Sub-agent {worker_id} prepared '{focus}' with {len(recalled)} private graph finding(s).",
         "recall_available": recall_available,
-        "memory_written": memory_written,
+        "memory_mode": "owner_scoped_graph",
         "run_id": run_id,
     }
     node_id = f"{owner_key}:{project}:{run_id}:worker:{worker_id}"
