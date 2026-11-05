@@ -29,6 +29,7 @@ from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from .offline_io_pressure import IOPressureController, probe_io_pressure
 from .offline_cpu_throttle import CPUThrottleController, probe_cpu_throttle
 from .offline_swap_churn import SwapChurnController, probe_swap_counters
+from .offline_reclaim_pressure import ReclaimPressureController, probe_reclaim_counters
 from .offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
@@ -386,6 +387,7 @@ class FabricPlan:
     cpu_throttle_backpressure: bool = False
     swap_churn_backpressure: bool = False
     cpu_thermal_backpressure: bool = False
+    reclaim_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -403,6 +405,7 @@ class FabricPlan:
             "cpu_throttle_backpressure": self.cpu_throttle_backpressure,
             "swap_churn_backpressure": self.swap_churn_backpressure,
             "cpu_thermal_backpressure": self.cpu_thermal_backpressure,
+            "reclaim_backpressure": self.reclaim_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -418,33 +421,21 @@ class FabricPlan:
 
 
 def _open_source_at(root: Path, relative: Path) -> int:
-    """Anchor every directory component, including ancestors of the root.
-
-    A no-follow flag on the final root pathname does not protect its
-    ancestors from concurrent symlink replacement. Without native
-    descriptor-relative no-follow primitives, staging fails closed.
-    """
-    if (os.name != "posix" or not getattr(os, "O_NOFOLLOW", 0)
-            or not getattr(os, "O_DIRECTORY", 0)):
-        raise ResourceFabricError(
-            "descriptor-anchored no-follow source opening unavailable"
-        )
-    base = Path(root)
-    child = Path(relative)
-    if (not base.is_absolute() or child.is_absolute() or not child.parts
-            or any(part in {".", ".."} for part in child.parts)):
-        raise ResourceFabricError("unsafe descriptor-relative source path")
-    parent_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    parent_fd = os.open(base.anchor, parent_flags)
+    """Open beneath a stable root without following POSIX parent symlinks."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    if os.name != "posix":
+        return os.open(root / relative, flags)
+    parent_flags = (
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    parent_fd = os.open(root, parent_flags)
     try:
-        for component in (*base.parts[1:], *child.parts[:-1]):
+        for component in relative.parts[:-1]:
             child_fd = os.open(component, parent_flags, dir_fd=parent_fd)
             os.close(parent_fd)
             parent_fd = child_fd
-        return os.open(
-            child.parts[-1], os.O_RDONLY | os.O_NOFOLLOW,
-            dir_fd=parent_fd,
-        )
+        return os.open(relative.parts[-1], flags, dir_fd=parent_fd)
     finally:
         os.close(parent_fd)
 
@@ -479,11 +470,15 @@ class AdaptiveResourceFabric:
         self._cpu_throttle = CPUThrottleController()
         self._swap_churn = SwapChurnController()
         self._cpu_thermal = CPUThermalController()
+        self._reclaim = ReclaimPressureController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
         self._swap_churn.observe(
             probe_swap_counters(), physical_ram_bytes=hardware.total_ram_bytes,
+        )
+        self._reclaim.observe(
+            probe_reclaim_counters(), physical_ram_bytes=hardware.total_ram_bytes,
         )
         gpus = probe_gpu_resources()
         self._cgroup.sample(probe_cgroup_events())
@@ -528,6 +523,7 @@ class AdaptiveResourceFabric:
         cpu_throttle = self._cpu_throttle.snapshot()
         swap_churn = self._swap_churn.snapshot()
         cpu_thermal = self._cpu_thermal.snapshot()
+        reclaim = self._reclaim.snapshot()
         if readonly_stream and cgroup["oom_backpressure"]:
             raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
@@ -553,8 +549,17 @@ class AdaptiveResourceFabric:
         # On UMA systems it may be physically shared with the GPU, but without
         # an explicit driver API this is NOT a GPU-coherent allocation.
         staging = residency == "disk_chunks" or source_bytes > hw.read_chunk_bytes
+        # Pressure holds apply to the GLOBAL in-process slot budget, not
+        # merely to the stream count of each independently admitted batch.
+        # Otherwise eight simultaneous one-stream batches defeat the hold.
+        pressure_limited = bool(
+            cgroup["high_backpressure"] or io["congested"]
+            or cpu_throttle["backpressure"] or swap_churn["backpressure"]
+            or cpu_thermal["thermal_backpressure"] or reclaim["backpressure"]
+        )
+        effective_capacity = 1 if pressure_limited else hw.suggested_index_jobs
         # Planning does not reserve capacity: expose zero slots honestly.
-        headroom = max(0, hw.suggested_index_jobs - running)
+        headroom = max(0, effective_capacity - running)
         # Capacity follows measured headroom; ordinary 50%-used RAM must
         # not collapse a many-core machine to a single stream. Throttle
         # aggressively only as predictive pressure approaches saturation.
@@ -567,10 +572,7 @@ class AdaptiveResourceFabric:
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
-        if (cgroup["high_backpressure"] or io["congested"]
-                or cpu_throttle["backpressure"]
-                or swap_churn["backpressure"]
-                or cpu_thermal["thermal_backpressure"]):
+        if pressure_limited:
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -624,6 +626,7 @@ class AdaptiveResourceFabric:
             and requested_gpu_bytes <= budget
             and not cgroup["oom_backpressure"]
             and not (cgroup["high_backpressure"] and gpu.shared_with_system_ram)
+            and not (reclaim["backpressure"] and gpu.shared_with_system_ram)
         )
         reason = (
             "verified read-only host staging, SQLite spill when needed; "
@@ -639,6 +642,8 @@ class AdaptiveResourceFabric:
             reason += "; observed host swap page churn"
         if cpu_thermal["thermal_backpressure"]:
             reason += "; measured CPU thermal trip hold"
+        if reclaim["backpressure"]:
+            reason += "; observed inefficient kernel reclaim or major faults"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -657,6 +662,7 @@ class AdaptiveResourceFabric:
             "cpu_throttle_backpressure": cpu_throttle["backpressure"],
             "swap_churn_backpressure": swap_churn["backpressure"],
             "cpu_thermal_backpressure": cpu_thermal["thermal_backpressure"],
+            "reclaim_backpressure": reclaim["backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -667,7 +673,7 @@ class AdaptiveResourceFabric:
             requested_gpu_bytes=requested_gpu_bytes,
             dedicated_gpu_budget_bytes=budget,
             memory_pressure=round(ema, 6), reason=reason,
-            host_stream_capacity=hw.suggested_index_jobs,
+            host_stream_capacity=effective_capacity,
             available_stream_slots=headroom,
             readonly_stream=readonly_stream,
             thermal_holds=thermal_holds,
@@ -677,6 +683,7 @@ class AdaptiveResourceFabric:
             cpu_throttle_backpressure=bool(cpu_throttle["backpressure"]),
             swap_churn_backpressure=bool(swap_churn["backpressure"]),
             cpu_thermal_backpressure=bool(cpu_thermal["thermal_backpressure"]),
+            reclaim_backpressure=bool(reclaim["backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -722,10 +729,21 @@ class AdaptiveResourceFabric:
             thermal_holds = len(self._thermal_blocked)
             waiting_batches = len(self._wait_queue)
         result = snapshot.as_dict()
+        holds = (
+            self._cgroup.snapshot()["high_backpressure"]
+            or self._cgroup.snapshot()["oom_backpressure"]
+            or self._io.snapshot()["congested"]
+            or self._cpu_throttle.snapshot()["backpressure"]
+            or self._swap_churn.snapshot()["backpressure"]
+            or self._cpu_thermal.snapshot()["thermal_backpressure"]
+            or self._reclaim.snapshot()["backpressure"]
+        )
         result["controller"] = {
             "predictive_pressure": round(pressure or 0, 6),
             "observations": observations,
-            "adaptive_stream_budget": snapshot.hardware.suggested_index_jobs,
+            "adaptive_stream_budget": (
+                1 if holds else snapshot.hardware.suggested_index_jobs
+            ),
             "mode": "adaptive_deterministic_with_predictive_smoothing",
             "gpu_allocation_authority": "inference_backend_only",
             "onboard_readonly_staging": "host_mmap_page_cache",
@@ -743,6 +761,7 @@ class AdaptiveResourceFabric:
             "cpu_throttle": self._cpu_throttle.snapshot(),
             "swap_churn": self._swap_churn.snapshot(),
             "cpu_thermal": self._cpu_thermal.snapshot(),
+            "reclaim_pressure": self._reclaim.snapshot(),
         }
         return result
 
@@ -894,8 +913,16 @@ class AdaptiveResourceFabric:
                             with self._lock:
                                 self._stream_pressure_rechecks += 1
                             self._cgroup.sample(probe_cgroup_events())
+                            self._reclaim.observe(
+                                probe_reclaim_counters(),
+                                physical_ram_bytes=live.total_ram_bytes,
+                            )
                             if self._cgroup.snapshot()["oom_backpressure"]:
                                 raise LocalResourcePressure("cgroup OOM during staged read")
+                            if self._reclaim.snapshot()["backpressure"]:
+                                raise LocalResourcePressure(
+                                    "kernel reclaim or major faults during staged read"
+                                )
                             if live.available_ram_bytes < 2 * live.read_chunk_bytes:
                                 raise LocalResourcePressure(
                                     "physical RAM headroom fell during staged read"

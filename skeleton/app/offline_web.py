@@ -222,6 +222,15 @@ JAVASCRIPT = r"""'use strict';
               ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)'))
       ).join('\n') : 'GPU telemetry unavailable — no VRAM allocation assumed';
       const c = view.controller || {};
+      const reclaim = c.reclaim_pressure || {};
+      const reclaimStatus = reclaim.scope === 'unavailable' || !reclaim.scope ||
+        typeof reclaim.backpressure !== 'boolean'
+        ? 'not measured' : (reclaim.backpressure ? 'pressure hold' : 'no hold');
+      const pressurePct = typeof c.predictive_pressure === 'number' &&
+        Number.isFinite(c.predictive_pressure) &&
+        c.predictive_pressure >= 0 && c.predictive_pressure <= 1
+        ? (c.predictive_pressure * 100).toFixed(1) + '%'
+        : 'not measured';
       const throughput = typeof c.smoothed_read_bytes_per_second === 'number' ?
         (c.smoothed_read_bytes_per_second / 1048576).toFixed(2) + ' MiB/s' : 'not calibrated';
       get('resource-monitor').textContent =
@@ -230,7 +239,8 @@ JAVASCRIPT = r"""'use strict';
         '\nLocal disk ' + gib(h.free_disk_bytes) + ' / ' + gib(h.total_disk_bytes) +
         '\nCPU load ' + (h.cpu_load_ratio ?? 'unknown') +
         ' · worker budget ' + (c.adaptive_stream_budget ?? '?') +
-        '\nMemory pressure ' + ((c.predictive_pressure ?? 0) * 100).toFixed(1) + '%' +
+        '\nMemory pressure ' + pressurePct +
+        '\nKernel reclaim (' + (reclaim.scope || 'unavailable') + '): ' + reclaimStatus +
         '\n' + vram + '\nRead throughput: ' + throughput +
         '\nStaging: read-only host mmap / SQLite spill';
     } catch (error) {
@@ -681,6 +691,7 @@ JAVASCRIPT = r"""'use strict';
       'Placement ' + plan.residency + '\nStreams ' + plan.stream_count +
       '\nChunk bytes ' + plan.transfer_chunk_bytes +
       '\nRead-only staging ' + (plan.readonly_staging ? 'recommended' : 'optional') +
+      '\nKernel reclaim hold ' + (plan.reclaim_backpressure ? 'active' : 'not active') +
       '\nGPU transfer: backend qualification required';
   }));
   get('resource-stage').addEventListener('click', () => run(async () => {
