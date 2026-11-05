@@ -1,0 +1,41 @@
+{
+  "schema": "ai-reliability-case.v1",
+  "case": "02_missing_domain",
+  "domain": "citation_provenance",
+  "expected": "reject",
+  "record": {
+    "schema": "ai.reliability.fabric.v1",
+    "identity": {
+      "tenant": "local",
+      "subject": "operator",
+      "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scope": "local:operator"
+    },
+    "revision": 1,
+    "timing": {
+      "issued_ns": 100,
+      "observed_ns": 150,
+      "expires_ns": 200
+    },
+    "limits": {
+      "bytes": 1024,
+      "tokens": 512,
+      "operations": 16
+    },
+    "approval": {
+      "operator_approved": true,
+      "source_verified": true,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "details": {
+      "document_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "excerpt_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_id": "doc_001",
+      "cited": true,
+      "untrusted_as_instruction": false
+    }
+  },
+  "threat": "Fail closed on missing domain",
+  "independent_proof": "Operator, native GGUF, SQLite, device and exact-head workflows remain separately held",
+  "release_claim": false
+}

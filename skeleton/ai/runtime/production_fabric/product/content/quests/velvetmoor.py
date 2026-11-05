@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for velvetmoor."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('velvetmoor_arrival', (), (), ('arrival_record',)), Quest('velvetmoor_source', ('velvetmoor_arrival',), ('arrival_record',), ('source_proof',)), Quest('velvetmoor_witness', ('velvetmoor_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('velvetmoor_reconcile', ('velvetmoor_source', 'velvetmoor_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('velvetmoor_crossing', ('velvetmoor_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('velvetmoor_conclusion', ('velvetmoor_crossing',), ('crossing_pass',), ('ending_unlocked',)))

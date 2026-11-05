@@ -1,0 +1,12 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "04_attack",
+  "domain": "create",
+  "expected": "reject",
+  "payload": [],
+  "reason": "Refuse adversarial create variant 4",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational create contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

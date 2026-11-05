@@ -1,0 +1,14 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "13_attack",
+  "domain": "identity",
+  "expected": "reject",
+  "payload": {
+    "unknown_field": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  },
+  "reason": "Refuse adversarial identity variant 13",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational identity contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

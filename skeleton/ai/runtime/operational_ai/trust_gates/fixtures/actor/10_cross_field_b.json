@@ -1,0 +1,17 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "actor",
+  "expect": "reject",
+  "reason": "Model text cannot grant write/admin rights",
+  "payload": {
+    "tenant": "local",
+    "user": "operator",
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": "other:operator",
+    "rights": [
+      "inference"
+    ]
+  }
+}

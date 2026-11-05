@@ -1,0 +1,14 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "08_attack",
+  "domain": "strict_json",
+  "expected": "reject",
+  "payload": {
+    "raw": "not-json"
+  },
+  "reason": "Refuse adversarial strict_json variant 8",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational strict_json contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

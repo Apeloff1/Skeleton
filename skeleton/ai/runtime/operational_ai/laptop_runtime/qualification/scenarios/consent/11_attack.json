@@ -1,0 +1,23 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "11_attack",
+  "domain": "consent",
+  "expected": "reject",
+  "payload": {
+    "tenant": "local",
+    "source": "note",
+    "operator": "owner",
+    "now": 10,
+    "expires": 20,
+    "approved": null,
+    "verify_now": 12,
+    "target_tenant": "local",
+    "target_source": "note",
+    "repeat": false
+  },
+  "reason": "Refuse adversarial consent variant 11",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational consent contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

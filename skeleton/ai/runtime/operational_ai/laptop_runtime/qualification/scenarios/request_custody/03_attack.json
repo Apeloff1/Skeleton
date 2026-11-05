@@ -1,0 +1,22 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "03_attack",
+  "domain": "request_custody",
+  "expected": "reject",
+  "payload": {
+    "tenant": "local",
+    "subject": "owner",
+    "model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tokenizer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "session_id": "s_1",
+    "request_id": "r_1",
+    "prompt": "hello",
+    "seed": 5,
+    "temperature": 0.8
+  },
+  "reason": "Refuse adversarial request_custody variant 3",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational request_custody contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

@@ -1,0 +1,17 @@
+{
+  "case": "03_extra_field",
+  "gate": "replay",
+  "expect": "reject",
+  "reason": "Unrecognized authority fields denied",
+  "payload": {
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "request_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stored_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "revision": 1,
+    "replayed": true,
+    "has_generation": false,
+    "untrusted_override": "allow"
+  }
+}

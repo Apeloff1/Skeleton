@@ -1,0 +1,15 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "01_attack",
+  "domain": "turn",
+  "expected": "reject",
+  "payload": {
+    "request_id": "r_1",
+    "prompt": "hello"
+  },
+  "reason": "Refuse adversarial turn variant 1",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational turn contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}
