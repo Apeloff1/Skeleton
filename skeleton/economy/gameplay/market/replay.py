@@ -11,6 +11,9 @@ from __future__ import annotations
 from typing import Any, Callable, Iterable, Mapping
 
 from skeleton.economy.gameplay.market.exchange import PlayerMarket
+from skeleton.economy.gameplay.market.errors import MarketError
+
+MAX_SCRIPT_COMMANDS = 100_000
 from skeleton.simulation.economy.sim import EconomySimError
 
 
@@ -60,7 +63,9 @@ def run(
     """Apply ``script`` to a fresh market; refused commands yield ``{"refused": code}``."""
     market = build()
     results: list[Any] = []
-    for cmd in script:
+    for index, cmd in enumerate(script):
+        if index >= MAX_SCRIPT_COMMANDS:
+            raise MarketError("market replay script command budget exceeded")
         try:
             results.append(apply(market, cmd))
         except EconomySimError as exc:
@@ -71,7 +76,7 @@ def run(
 def fingerprint(
     build: Callable[[], PlayerMarket], script: Iterable[Mapping[str, Any]]
 ) -> str:
-    market, _ = run(build, list(script))
+    market, _ = run(build, script)
     return market.digest()
 
 
