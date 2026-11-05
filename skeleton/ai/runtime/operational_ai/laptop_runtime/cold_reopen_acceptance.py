@@ -16,6 +16,7 @@ from .identity import ActiveModel
 from .startup import activate_checked
 from .first_turn_acceptance import run as first_turn
 from .installed_witness import require_activated_source
+from .source_contract import valid_source_snapshot
 from .replay_probe import inspect_replay
 
 
@@ -101,7 +102,8 @@ def run(
         reopened_source = require_activated_source(
             second_worker, second_installed,
         )
-        if type(reopened_source) is not dict or reopened_source != source:
+        if (not valid_source_snapshot(reopened_source, first_principal)
+                or reopened_source != source):
             refuse("installed source changed across cold native restart")
         bound = ActiveModel.from_supervisor(second_worker)
         if (bound.tenant, bound.subject) != (tenant, subject):
@@ -129,7 +131,8 @@ def run(
         final_source = require_activated_source(
             second_worker, second_installed,
         )
-        if type(final_source) is not dict or final_source != source:
+        if (not valid_source_snapshot(final_source, bound)
+                or final_source != source):
             refuse("native source or resource lease changed after replay")
     return {
         "schema": "laptop-native-cold-reopen-e2e.v1",

@@ -112,6 +112,7 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m unittest discover -s skeleton/testing -p 'test_laptop_real_acceptance_*.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_laptop_cold_reopen_typed_source.py' -v
       - name: Keep source-only tests separate from device and release proof
         run: |
           python -c 'from skeleton.ai.runtime.operational_ai.laptop_runtime.identity import ActiveModel; assert not hasattr(ActiveModel, "release_certified")'
