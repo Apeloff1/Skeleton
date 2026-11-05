@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_celestial_navigation_glacial_fjord",
+  "genre": "celestial_navigation",
+  "biome": "glacial_fjord",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Glacial Fjord",
+    "landmark": "ice-locked archive",
+    "era": "the second settlement",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control thermal vents while fracturing ice destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "hopeful"
+  },
+  "premise": "Orla Rook, a navigator with expertise in orbital windows, instrument calibration and coordinate inference, must locate a missing relay before a transit corridor fails before fracturing ice reaches the ice-locked archive.",
+  "stakes": [
+    "Residents lose access to thermal vents",
+    "a misleading navigation syndicate gains authority without independent evidence",
+    "The ice-locked archive becomes inaccessible beyond blue tidal shelves"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured fracturing ice closes the main approach",
+      "goal": "Acquire an independent account of thermal vents",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a misleading navigation syndicate challenges Orla Rook's mandate",
+      "goal": "Apply orbital windows, instrument calibration and coordinate inference in blue tidal shelves",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of ice-locked archive",
+      "goal": "locate a missing relay before a transit corridor fails",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains ice-locked archive with auditable access to thermal vents"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain fuel and measurement variance without a misleading navigation syndicate"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over thermal vents persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "ice-locked archive",
+      "blue tidal shelves",
+      "ice load"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

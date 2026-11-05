@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_ion_wastes",
+  "title": "Ion Wastes: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010312246,
+  "width": 19,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 5,
+  "theme": "space",
+  "starting_health": 4
+}

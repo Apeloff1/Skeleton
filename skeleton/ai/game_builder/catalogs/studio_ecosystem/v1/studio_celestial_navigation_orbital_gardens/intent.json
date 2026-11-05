@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_orbital_gardens",
+  "title": "Orbital Gardens: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010315905,
+  "width": 21,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 12,
+  "theme": "space",
+  "starting_health": 5
+}

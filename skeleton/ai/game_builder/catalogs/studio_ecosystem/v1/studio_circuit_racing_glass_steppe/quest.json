@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "project_id": "studio_circuit_racing_glass_steppe",
+  "genre": "circuit_racing",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "objective": "restore access to a fair multi-region endurance series",
+  "quest_id": "studio_circuit_racing_glass_steppe:three-acts",
+  "mechanics_targets": [
+    "traction, cornering and regenerative braking",
+    "lap integrity"
+  ],
+  "stage_graph": [
+    {
+      "id": "investigate",
+      "prerequisites": [],
+      "site": "prismatic plains",
+      "verb": "survey",
+      "alternatives": [
+        "Document glass-shard gales without entering restricted ground",
+        "Find an independent route through prismatic plains"
+      ],
+      "evidence": [
+        "hazard_measurement",
+        "eyewitness_note"
+      ],
+      "failure_rule": "insufficient_safe_access",
+      "reward": "reliable_survey"
+    },
+    {
+      "id": "intervene",
+      "prerequisites": [
+        "investigate"
+      ],
+      "site": "shattered outpost",
+      "verb": "race",
+      "alternatives": [
+        "Prototype traction, cornering and regenerative braking around abrasion",
+        "Use ceramic heat tiles under open public supervision"
+      ],
+      "evidence": [
+        "resource_receipt",
+        "engineering_audit"
+      ],
+      "failure_rule": "overspend_or_unconsented_action",
+      "reward": "verified_repair_attempt"
+    },
+    {
+      "id": "ratify",
+      "prerequisites": [
+        "intervene"
+      ],
+      "site": "shared workshop near shattered outpost",
+      "verb": "publish",
+      "alternatives": [
+        "residents_vote",
+        "open_technical_governance"
+      ],
+      "evidence": [
+        "history_log",
+        "verified_outcome"
+      ],
+      "failure_rule": "missing_audit_receipt",
+      "reward": "branch_world_state"
+    }
+  ],
+  "branching": {
+    "commons": [
+      "verified_history",
+      "public_ledger"
+    ],
+    "cooperative": [
+      "verified_repair",
+      "local_consensus"
+    ],
+    "scarcity": [
+      "survival_proven"
+    ]
+  },
+  "resource_economy": {
+    "currency": "tires and battery state",
+    "secondary": "ceramic heat tiles",
+    "no_mint_without_supply": true,
+    "max_concurrent_quests": "runtime_resource_based"
+  },
+  "implementation_status": "authored_director_data_only"
+}
