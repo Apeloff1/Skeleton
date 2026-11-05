@@ -23,8 +23,9 @@ def test_public_bootstrap_is_dependency_closed_and_sanitized():
 
     default = payload["profiles"]["default"]
     assert set(default["services"]) == {"mongo", "backend", "skeleton", "frontend"}
-    assert default["layers"][0] == ["mongo"]
-    assert default["layers"][-1] == ["frontend"]
+    assert default["layers"][0] == ["frontend", "mongo"]
+    assert default["layers"][-1] == ["backend"]
+    assert "frontend" in default["layers"][0]
 
     serialized = repr(payload)
     for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):

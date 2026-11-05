@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "clockwork_sanctuary__machinist",
+  "chapter": 10,
+  "title": "Clockwork Sanctuary: The Machinist's Meridian Key",
+  "theme": "clockwork_sanctuary",
+  "discipline": "machinist",
+  "region": "Clockwork Sanctuary",
+  "premise": "In an overgrown observatory driven by silent brass escapements, the machinist must rebalance a failing mechanical relay using a portable phase regulator.",
+  "signal": "hour-wheel",
+  "key_name": "hour-wheel attunement",
+  "objective_name": "Meridian Key",
+  "ending": "Recover the Meridian Key and return with the stable field relay; Custodians of Dawn can finally verify the source testimony.",
+  "faction": "Custodians of Dawn",
+  "challenge": "Survive charged gearfall while evading the watchmaker automaton without sacrificing the stable field relay.",
+  "choice_yes": "Disclose evidence and ask Custodians of Dawn to witness the portable phase regulator.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to divert power from a shelter",
+  "tool": "portable phase regulator",
+  "reward": "stable field relay",
+  "enemy": "watchmaker automaton",
+  "chapter_links": [
+    "clockwork_sanctuary__diplomat",
+    "clockwork_sanctuary__herbalist"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}
