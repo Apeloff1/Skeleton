@@ -10,6 +10,7 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import secrets
+import shutil
 import stat
 from typing import BinaryIO, Callable, Iterator
 
@@ -129,6 +130,25 @@ def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None], *, max_
                 os.unlink(temp, dir_fd=fd)
             except FileNotFoundError:
                 pass
+
+
+def snapshot_regular(fd: int, name: str, *, max_bytes: int) -> str | None:
+    """Keep a private same-directory copy before a canonical shard overwrite.
+
+    A renamed/hardlinked canonical file would temporarily break readers or
+    violate single-link custody; bounded copy leaves the published file live.
+    """
+    try:
+        with read_regular(fd, name, max_bytes=max_bytes) as source:
+            backup = ".vault-backup-" + secrets.token_hex(16)
+            atomic_write(
+                fd, backup,
+                lambda destination: shutil.copyfileobj(source, destination, 1024 * 1024),
+                max_bytes=max_bytes,
+            )
+            return backup
+    except FileNotFoundError:
+        return None
 
 
 def unlink_regular(fd: int, name: str) -> None:
