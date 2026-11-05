@@ -164,12 +164,12 @@ async def deliberate(task: str, prompt: str, system: str = "",
         turns = await asyncio.gather(*[
             route_complete(task, chat_prompt, chat_sys, model=c["model"], use_cache=False)
             for c in candidates
-        ])
+        ], return_exceptions=True)
         round_turns = []
-        for c, t in zip(candidates, turns):
-            if t.get("content"):
-                c["content"] = t["content"]  # advance to latest position
-            round_turns.append({"model": c["model"], "content": c["content"]})
+        for candidate, turn in zip(candidates, turns):
+            if isinstance(turn, dict) and isinstance(turn.get("content"), str) and turn["content"].strip():
+                candidate["content"] = turn["content"][:MAX_MODEL_CONTENT_CHARS]
+            round_turns.append({"model": candidate["model"], "content": candidate["content"]})
         transcript.append({"round": r, "kind": "discussion", "turns": round_turns})
 
     # 2. DISCORD — each candidate red-teamed by a DIFFERENT panel model.
@@ -182,10 +182,14 @@ async def deliberate(task: str, prompt: str, system: str = "",
         crits = await asyncio.gather(*[
             route_complete("reasoning", cp, _CRITIC_SYS, model=cm, use_cache=False)
             for cm, cp in critic_prompts
-        ])
-        for c, cr in zip(candidates, crits):
-            c["critique"] = cr.get("content", "")
-            c["critic_model"] = cr.get("model")
+        ], return_exceptions=True)
+        for candidate, critique in zip(candidates, crits):
+            if isinstance(critique, dict):
+                content = critique.get("content", "")
+                candidate["critique"] = content[:2000] if isinstance(content, str) else ""
+                candidate["critic_model"] = critique.get("model")
+            else:
+                candidate["critique"] = ""
     else:
         for c in candidates:
             c["critique"] = ""
@@ -197,26 +201,40 @@ async def deliberate(task: str, prompt: str, system: str = "",
         for i, c in enumerate(candidates)
     )
     judge_prompt = f"BRIEF:\n{prompt}\n\nCANDIDATES:\n{panel_block}"
-    judged = await route_complete("reasoning", judge_prompt, _JUDGE_SYS,
-                                  model=judge_model, use_cache=False)
-    verdict = _extract_json(judged.get("content", ""))
+    try:
+        judged = await route_complete("reasoning", judge_prompt, _JUDGE_SYS,
+                                      model=judge_model, use_cache=False)
+    except Exception:
+        judged = None
+    verdict = _extract_json(judged.get("content", "")) if isinstance(judged, dict) else {}
 
     scores = verdict.get("scores") if isinstance(verdict.get("scores"), list) else []
     winner_idx = verdict.get("winner_index")
-    # Attach scores to candidates (tolerant).
-    for s in scores:
-        idx = s.get("index")
-        if isinstance(idx, int) and 0 <= idx < len(candidates):
-            q = max(0, min(100, int(s.get("quality", 0) or 0)))
-            f = max(0, min(100, int(s.get("fidelity", 0) or 0)))
-            candidates[idx]["quality"] = q
-            candidates[idx]["fidelity"] = f
-            candidates[idx]["score"] = round(q * 0.45 + f * 0.55, 1)  # fidelity-weighted
-            candidates[idx]["rationale"] = s.get("rationale", "")
-    # Pick winner: judge's choice if valid, else highest computed score, else first.
-    if not (isinstance(winner_idx, int) and 0 <= winner_idx < len(candidates)):
-        scored = [(c.get("score", 0), i) for i, c in enumerate(candidates)]
-        winner_idx = max(scored)[1] if scored else 0
+    for entry in scores[:MAX_PANEL * 2]:
+        if not isinstance(entry, dict):
+            continue
+        index = entry.get("index")
+        if type(index) is not int or not 0 <= index < len(candidates):
+            continue
+        quality = _score_int(entry.get("quality"))
+        fidelity = _score_int(entry.get("fidelity"))
+        if quality is None or fidelity is None:
+            continue
+        candidates[index]["quality"] = quality
+        candidates[index]["fidelity"] = fidelity
+        candidates[index]["score"] = round(quality * 0.45 + fidelity * 0.55, 1)
+        rationale = entry.get("rationale")
+        candidates[index]["rationale"] = rationale[:1000] if isinstance(rationale, str) else ""
+    scored = [(candidate["score"], index) for index, candidate in enumerate(candidates)
+              if "score" in candidate]
+    if not scored:
+        return {"error": "judge_scores_unavailable", "panel": panel,
+                "candidates": candidates, "judge_model": judge_model}
+    if (
+        type(winner_idx) is not int or not 0 <= winner_idx < len(candidates)
+        or "score" not in candidates[winner_idx]
+    ):
+        winner_idx = max(scored)[1]
 
     winner = candidates[winner_idx]
     result = {
@@ -228,7 +246,8 @@ async def deliberate(task: str, prompt: str, system: str = "",
         "winner_content": winner["content"],
         "winner_score": winner.get("score"),
         "judge_model": judge_model,
-        "judge_why": verdict.get("why", ""),
+        "judge_why": verdict.get("why", "")[:1000] if isinstance(verdict.get("why"), str) else "",
+        "judge_status": "reported_scores",
         "panel": panel,
         "candidates": candidates,
         "discord": do_discord,
@@ -244,13 +263,13 @@ async def deliberate(task: str, prompt: str, system: str = "",
 
 
 class DeliberateBody(BaseModel):
-    task: str = "creative"
-    prompt: str
-    system: str = ""
-    panel: list = []
-    judge_model: str = ""
+    task: str = Field(default="creative", min_length=1, max_length=128)
+    prompt: str = Field(..., max_length=MAX_PROMPT_CHARS)
+    system: str = Field(default="", max_length=MAX_SYSTEM_CHARS)
+    panel: list[str] = Field(default_factory=list, max_length=MAX_PANEL)
+    judge_model: str = Field(default="", max_length=128)
     discord: bool = True
-    rounds: int = 1
+    rounds: int = Field(default=1, ge=1, le=MAX_ROUNDS)
 
 
 @router.get("/panel")
@@ -267,7 +286,7 @@ async def get_panel():
 async def deliberate_endpoint(body: DeliberateBody):
     if len(body.prompt) < 4:
         return {"error": "prompt too short"}
-    if len(body.prompt) > 20_000:
+    if len(body.prompt) > MAX_PROMPT_CHARS:
         return {"error": "prompt exceeds 20k char limit"}
     return await deliberate(body.task, body.prompt, body.system,
                             body.panel or None, body.judge_model, body.discord, body.rounds)
@@ -292,6 +311,13 @@ async def deliberate_async(body: DeliberateBody):
     """Kick a deliberation in the background; poll /result/{job_id}."""
     if len(body.prompt) < 4:
         return {"error": "prompt too short"}
+    if len(body.prompt) > MAX_PROMPT_CHARS:
+        return {"error": "prompt exceeds 20k char limit"}
+    try:
+        _admit(body.task, body.prompt, body.system, body.panel or None, body.judge_model,
+               body.discord, body.rounds)
+    except ValueError as exc:
+        return {"error": str(exc)}
     did = uuid.uuid4().hex
     await _db.discourse_jobs.insert_one({
         "job_id": did, "status": "running", "task": body.task,
