@@ -65,7 +65,7 @@ def verify_backup(value: dict | str | bytes, original_source: bytes) -> tuple[di
     # Reject cyclic or excessively nested objects before any replay or slot write.
     try:
         envelope_size = len(canonical(value))
-    except (ValueError, TypeError, RecursionError) as exc:
+    except (ValueError, TypeError, RecursionError, OverflowError) as exc:
         raise BackupError("invalid backup object graph") from exc
     if envelope_size > MAX_BACKUP_BYTES:
         raise BackupError("backup exceeds byte budget")
