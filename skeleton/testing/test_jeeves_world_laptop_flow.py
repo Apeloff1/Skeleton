@@ -414,3 +414,30 @@ def test_cli_lease_permission_failure_has_specific_recovery(tmp_path, capsys, mo
     assert failure["next_action"] == (
         "inspect_custody_permissions_and_retry_without_removing_foreign_locks")
     assert not (tmp_path / "lighthouse.lock").exists()
+
+
+@pytest.mark.parametrize("failure_stage", [1, 2, 3, 4])
+def test_laptop_diagnostic_distinguishes_unavailable_custody_at_each_stage(
+        tmp_path, monkeypatch, failure_stage):
+    """Read-only diagnostics never prescribe source repair for lease permissions."""
+    flow, _, _, _ = ready(tmp_path)
+    flow.create_session("lighthouse", "player")
+    original = LaptopFlow._lock
+    calls = 0
+
+    def intermittent_lease(fd, world_id):
+        nonlocal calls
+        calls += 1
+        if calls == failure_stage:
+            raise CanonError("lease_unavailable")
+        return original(fd, world_id)
+
+    monkeypatch.setattr(LaptopFlow, "_lock", staticmethod(intermittent_lease))
+    report = flow.diagnose("lighthouse", "player")
+    assert report["next_action"] == (
+        "inspect_custody_permissions_without_removing_foreign_locks")
+    assert any(
+        stage.get("error") == "lease_unavailable"
+        for stage in report["checks"].values()
+    )
+    assert not (tmp_path / "lighthouse.lock").exists()
