@@ -334,6 +334,10 @@ def _read_dotenv(path: Path) -> dict[str, str]:
     an unlimited file, or block forever on a FIFO. This reader is read-only;
     secret permission repair is reserved for the setup lock owner.
     """
+    # Windows has no portable O_NOFOLLOW; the pre-open link check is paired
+    # with a post-open inode comparison and regular-file type admission.
+    if path.is_symlink():
+        raise ValueError("runtime .env must not be a symbolic link")
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
         descriptor = os.open(path, flags)
