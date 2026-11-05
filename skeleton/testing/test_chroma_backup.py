@@ -211,3 +211,39 @@ def test_symlink_or_existing_target_is_rejected(tmp_path, monkeypatch):
     with pytest.raises(chroma_backup.BackupRejected, match="link"):
         chroma_backup.backup_legacy_chroma(tmp_path / "backup")
     assert not (tmp_path / "backup").exists()
+
+
+def test_chroma_manifest_rejects_unbounded_tree_before_hashing(tmp_path, monkeypatch):
+    for i in range(3):
+        (tmp_path / f"file{i}.bin").write_bytes(b"ok")
+    monkeypatch.setattr(chroma_backup, "MAX_TREE_ENTRIES", 2)
+    with pytest.raises(chroma_backup.BackupRejected, match="tree entry"):
+        chroma_backup._manifest_files(tmp_path)
+
+
+def test_verify_manifest_fifo_is_rejected_without_blocking(tmp_path):
+    import os
+
+    if not hasattr(os, "mkfifo") or not hasattr(os, "O_NOFOLLOW"):
+        pytest.skip("descriptor nofollow FIFO checks unavailable")
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    os.mkfifo(backup / "manifest.json")
+    with pytest.raises(chroma_backup.BackupRejected, match="manifest"):
+        chroma_backup.verify_backup(backup)
+
+
+def test_chroma_manifest_byte_limit_rejects_before_publication(tmp_path, monkeypatch):
+    """A backup must not publish a manifest that verification cannot read."""
+    def fake_docker(*args):
+        if args[0] == "inspect":
+            return json.dumps(_existing())
+        (Path(args[2]) / ("asset-" + "x" * 120 + ".bin")).write_bytes(b"bounded")
+        return ""
+
+    monkeypatch.setattr(chroma_backup, "_docker", fake_docker)
+    monkeypatch.setattr(chroma_backup, "MAX_MANIFEST_BYTES", 512)
+    destination = tmp_path / "oversized-manifest"
+    with pytest.raises(chroma_backup.BackupRejected, match="manifest byte admission"):
+        chroma_backup.backup_legacy_chroma(destination)
+    assert not destination.exists()
