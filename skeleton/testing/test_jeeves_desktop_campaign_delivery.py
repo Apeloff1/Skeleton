@@ -49,7 +49,10 @@ D = "d" * 64
 
 class SourceAssemblyFixture(unittest.TestCase):
     def setUp(self):
-        temp = tempfile.TemporaryDirectory()
+        # The production no-follow root reader rejects group/world-writable
+        # ancestors (including /tmp), not just the final project directory.
+        # Use an owner-controlled home ancestor rather than weakening it.
+        temp = tempfile.TemporaryDirectory(dir=Path.home())
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         self.project = self.root / "project"
