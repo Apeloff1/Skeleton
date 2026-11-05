@@ -126,13 +126,20 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             continue
         if answer == "e":
             try:
-                write("Exported: " + str(store.export(slot)))
+                # Export reads the authoritative slot, not the menu snapshot.
+                # Refresh the visible state as well: another process may have
+                # finished a chapter while this player was at the prompt.
+                exported = store.export(slot)
+                current = store.load(slot)
+                write("Exported: " + str(exported))
             except (StoreError, CampaignError, OSError) as exc:
                 write("Export unavailable; saved game unchanged: " + str(exc))
             continue
         if answer == "b":
             try:
-                write("Backup created: " + str(store.backup(slot)))
+                backed_up = store.backup(slot)
+                current = store.load(slot)
+                write("Backup created: " + str(backed_up))
             except (StoreError, CampaignError, OSError) as exc:
                 write("Backup unavailable; saved game unchanged: " + str(exc))
             continue

@@ -182,3 +182,33 @@ def test_interactive_hint_refreshes_concurrent_save_without_consuming_turn(tmp_p
     assert result["revision"] == 1
     assert navigation_hint(advanced) in displayed
     assert player.audit("shared")["audit_entries"] == 1
+
+
+def test_interactive_export_and_backup_refresh_concurrent_save(tmp_path: Path):
+    """Read-only custody commands must refresh the next interactive menu."""
+    from skeleton.game.gameplay.ridge_rescue.consumer_cli import play
+    from skeleton.game.gameplay.ridge_rescue.consumer_store import SlotStore
+
+    for command, confirmation in (("e", "Exported:"), ("b", "Backup created:")):
+        root = tmp_path / command
+        store = SlotStore(root)
+        initial = store.new("shared")
+        messages: list[str] = []
+        commands = iter((command, "q"))
+        advanced = None
+
+        def read(_prompt: str) -> str:
+            nonlocal advanced
+            answer = next(commands)
+            if answer == command:
+                advanced = SlotStore(root).step(
+                    "shared", initial["actions"][0], expected_head=initial["head"]
+                )
+            return answer
+
+        final = play(store, "shared", read=read, write=messages.append)
+        assert advanced is not None
+        assert final["head"] == advanced["head"]
+        assert any(message.startswith(confirmation) for message in messages)
+        assert any("Revision: 1" in message for message in messages)
+        assert store.audit("shared")["audit_entries"] == 1
