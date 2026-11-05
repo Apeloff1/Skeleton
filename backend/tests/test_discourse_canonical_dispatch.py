@@ -20,6 +20,7 @@ def _row(provider: str, model: str, *, active: bool = False, selectable: bool = 
         "provider_id": provider,
         "model_id": model,
         "selectable": selectable,
+        "available": selectable,
         "active": active,
     }
 
