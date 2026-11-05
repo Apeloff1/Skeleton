@@ -118,3 +118,45 @@ def test_port_override_rejects_invalid_manifest_authority(
             manifest=replace(manifest, services=services),
             environ={"FRONTEND_PORT": "31999"},
         )
+
+
+@pytest.mark.parametrize(
+    "public_url",
+    [
+        "http://operator@localhost:3000",
+        "http://localhost:3000/?token=secret",
+        "http://localhost:3000/#private",
+        "http://remote.example:3000/",
+        "http://localhost:invalid/",
+        "http://localhost:99999/",
+        "http://localhost/",
+        "http://127.0.0.1:0/",
+        "http://localhost:3000/redirect",
+        "file:///tmp/unsafe",
+    ],
+)
+def test_default_public_endpoint_rejects_unsafe_manifest_url(
+    tmp_path: Path, public_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        public_service_urls(
+            tmp_path, manifest=replace(manifest, services=services), environ={}
+        )
+
+
+def test_safe_ipv6_loopback_default_is_retained(tmp_path: Path):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url="http://[::1]:3000/")
+        if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    urls = public_service_urls(
+        tmp_path, manifest=replace(manifest, services=services), environ={}
+    )
+    assert urls["frontend"] == "http://[::1]:3000/"
