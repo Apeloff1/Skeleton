@@ -29,7 +29,10 @@ from .desktop_patch_bundle import (
 )
 
 SCHEMA = "jeeves.workspace.mixed-project-work.v1"
-MAX_INPUT_BYTES = 32768
+# Match the actual already-enforced MAX_COMMITTED_PROPOSAL_BYTES in the
+# same GGUF/SQLite source-repair lane. Do not offer a larger alternate parser
+# path which bypasses its original bounded native model-output contract.
+MAX_INPUT_BYTES = 16384
 MAX_FILES = 24
 MAX_ALLOWED_KEYS = frozenset({"schema", "new_files", "existing_edits"})
 _NEW_KEYS = frozenset({"path", "content"})
