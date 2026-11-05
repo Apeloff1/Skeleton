@@ -90,6 +90,16 @@ def test_build_does_not_collapse_invalid_tenant_to_default(builds, tenant):
     assert builds.services.db.query("SELECT COUNT(*) FROM jobs")[0][0] == 0
 
 
+def test_direct_build_worker_failure_does_not_publish_job(builds, monkeypatch):
+    def unavailable(**kwargs):
+        raise RuntimeError("private worker failure")
+    monkeypatch.setattr(game_build_queue, "start_worker", unavailable)
+    response = _submit(builds)
+    assert response.status_code == 503
+    assert "private" not in response.text
+    assert builds.services.db.query("SELECT COUNT(*) FROM jobs")[0][0] == 0
+
+
 def test_unowned_or_wrong_kind_durable_rows_fail_closed_before_result_read(builds, monkeypatch):
     svc = builds.services.jobs
     legacy = svc.queue.enqueue("game.build", {"legacy": True})
@@ -193,7 +203,7 @@ def test_legacy_owned_replay_requires_exact_identity_and_recorded_body(builds):
                     idempotency_key="old")
 
 
-def test_build_project_link_requires_same_attested_actor_and_tenant(builds):
+def test_direct_build_cannot_bypass_project_session_admission(builds):
     from skeleton.contracts.projects import ProjectBrief
     from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
 
@@ -203,12 +213,10 @@ def test_build_project_link_requires_same_attested_actor_and_tenant(builds):
         denied = _submit(builds, actor=other_actor, tenant=tenant, project_id=project.project_id)
         assert denied.status_code == 422
     assert builds.services.db.query("SELECT COUNT(*) FROM builds")[0][0] == 0
-    accepted = _submit(builds, actor=actor, project_id=project.project_id)
-    assert accepted.status_code == 202, accepted.text
-    replay = _submit(builds, actor=actor, project_id=project.project_id)
-    assert replay.status_code == 202 and replay.json()["replayed"]
-    assert replay.json()["execution_id"] == accepted.json()["execution_id"]
-    assert builds.services.db.query("SELECT COUNT(*) FROM builds")[0][0] == 1
+    denied = _submit(builds, actor=actor, project_id=project.project_id)
+    assert denied.status_code == 422
+    assert "projects build route" in denied.text
+    assert builds.services.db.query("SELECT COUNT(*) FROM builds")[0][0] == 0
 
 
 def test_concurrent_project_retries_publish_one_build_and_fast_worker_stays_terminal(builds, monkeypatch):
