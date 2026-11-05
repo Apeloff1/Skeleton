@@ -25,7 +25,7 @@ class TestCanonicalNativeShape(unittest.TestCase):
         ))
         self.assertIsNone(validate_native_shape(
             n_ctx=128,max_new_tokens=1,n_threads=1,gpu_layers=0,
-            capacity_budget_bytes=1,capacity_slots=1,inference_ms=1,
+            capacity_budget_bytes=1,capacity_slots=1,inference_ms=100,
         ))
 
     def test_upper_shape_boundaries_are_typed(self):
@@ -62,7 +62,7 @@ class TestCanonicalNativeShape(unittest.TestCase):
             ("n_threads",(None,True,0,-1,65,"4")),
             ("gpu_layers",(None,True,-1,129,"0")),
             ("capacity_slots",(None,True,0,-1,65,"1")),
-            ("inference_ms",(None,True,0,-1,600001,"90")),
+            ("inference_ms",(None,True,0,-1,1,99,600001,"90")),
             ("capacity_budget_bytes",(None,True,0,-1,20000000001,"8000000000")),
         ):
             for value in bad:

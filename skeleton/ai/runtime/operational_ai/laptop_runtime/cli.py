@@ -43,6 +43,8 @@ def main(argv=None):
     p.add_argument("--context",type=int,default=2048)
     p.add_argument("--max-new-tokens",type=int,default=256)
     p.add_argument("--threads",type=int,default=4)
+    p.add_argument("--inference-ms",type=int,default=90000,
+                   help="Maximum native generation deadline, 100 to 600000 ms")
     p.add_argument("--gpu-layers",type=int,default=0)
     p.add_argument("--capacity-root",type=Path)
     p.add_argument("--capacity-budget-bytes",type=int,default=8000000000)
@@ -72,6 +74,7 @@ def main(argv=None):
             n_threads=args.threads, gpu_layers=args.gpu_layers,
             capacity_budget_bytes=args.capacity_budget_bytes,
             capacity_slots=args.capacity_slots,
+            inference_ms=args.inference_ms,
         )
         if type(args.port) is not int or not 1 <= args.port <= 65535:
             raise ContractViolation("finite loopback port required")
@@ -107,6 +110,7 @@ def main(argv=None):
                 gpu_layers=args.gpu_layers, capacity_root=args.capacity_root,
                 capacity_slots=args.capacity_slots,
                 capacity_budget_bytes=args.capacity_budget_bytes,
+                inference_ms=args.inference_ms,
             )
             print(json.dumps({
                 "status":"native-cold-reopen-sqlite-verified",
@@ -119,7 +123,8 @@ def main(argv=None):
             gpu_layers=args.gpu_layers,isolated=True,
             capacity_root=args.capacity_root,
             capacity_slots=args.capacity_slots,
-            capacity_budget_bytes=args.capacity_budget_bytes)
+            capacity_budget_bytes=args.capacity_budget_bytes,
+            inference_ms=args.inference_ms)
         with stack:
             if args.mode=="acceptance":
                 result=run_first_turn_acceptance(

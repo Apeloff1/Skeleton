@@ -27,7 +27,7 @@ def validate_native_shape(
         ("GPU offload layers", gpu_layers, 0, 128),
         ("capacity bytes", capacity_budget_bytes, 1, 20000000000),
         ("capacity slots", capacity_slots, 1, 64),
-        ("native inference timeout", inference_ms, 1, 600000),
+        ("native inference timeout", inference_ms, 100, 600000),
     ):
         nonnegative(value, maximum=high)
         if value < low:
