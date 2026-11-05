@@ -12,6 +12,7 @@ import json
 from typing import Any, BinaryIO, TextIO
 
 from .native_chat import NativeChatHold, NativeJeevesChat
+from .native_source_fence import NativeSourceFence
 
 
 class NativeReplHold(ValueError):
@@ -73,10 +74,18 @@ class NativeJeevesRepl:
         chat: NativeJeevesChat,
         *,
         limits: ReplLimits | None = None,
+        source_fence: NativeSourceFence | None = None,
     ) -> None:
         if not isinstance(chat, NativeJeevesChat):
             raise NativeReplHold("Jeeves native chat must own the REPL")
         self.chat = chat
+        if source_fence is not None and not isinstance(
+            source_fence, NativeSourceFence,
+        ):
+            raise NativeReplHold("canonical live native source fence required")
+        self.source_fence = source_fence
+        if source_fence is not None:
+            source_fence.assert_live(chat.worker)
         self.limits = limits or ReplLimits()
         if not isinstance(self.limits, ReplLimits):
             raise NativeReplHold("typed interactive limits required")
@@ -92,6 +101,14 @@ class NativeJeevesRepl:
             )
         self._turns = 0
         self._terminated = False
+
+    def _publish(self, target: TextIO, payload: dict[str, Any]) -> None:
+        # A native model can disappear or lose its capacity fence during a
+        # SQLite history read or a committed inference. Never publish the
+        # private result after its source lease or principal has changed.
+        if self.source_fence is not None:
+            self.source_fence.assert_live(self.chat.worker)
+        _write_json(target, payload)
 
     def _status(self) -> dict[str, Any]:
         return {
@@ -114,18 +131,20 @@ class NativeJeevesRepl:
             raise NativeReplHold("bounded binary input stream required")
         if not callable(getattr(target, "write", None)):
             raise NativeReplHold("JSON lines output stream required")
-        _write_json(target, {"status": "jeeves-native-chat-ready", **self._status()})
+        self._publish(target, {"status": "jeeves-native-chat-ready", **self._status()})
         try:
             while self._turns < self.limits.max_turns:
+                if self.source_fence is not None:
+                    self.source_fence.assert_live(self.chat.worker)
                 raw = source.readline(self.limits.max_input_bytes + 1)
                 if raw == b"":
                     self._terminated = True
-                    _write_json(target, {"status": "eof", **self._status()})
+                    self._publish(target, {"status": "eof", **self._status()})
                     return 0
                 message = _decode_message(raw, maximum=self.limits.max_input_bytes)
                 if message == ":quit":
                     self._terminated = True
-                    _write_json(target, {
+                    self._publish(target, {
                         "status": "session-preserved-for-resume",
                         **self._status(),
                     })
@@ -133,13 +152,13 @@ class NativeJeevesRepl:
                 if message == ":close":
                     self.chat.close()
                     self._terminated = True
-                    _write_json(target, {"status": "session-closed", **self._status()})
+                    self._publish(target, {"status": "session-closed", **self._status()})
                     return 0
                 if message == ":status":
-                    _write_json(target, {"status": "ready", **self._status()})
+                    self._publish(target, {"status": "ready", **self._status()})
                     continue
                 if message == ":help":
-                    _write_json(target, {
+                    self._publish(target, {
                         "status": "help",
                         "commands": [":status", ":history", ":close", ":quit", ":help"],
                         "escape_prefix": "::",
@@ -150,7 +169,7 @@ class NativeJeevesRepl:
                     history = self.chat.history(
                         maximum_messages=self.limits.max_history_messages,
                     )
-                    _write_json(target, {
+                    self._publish(target, {
                         "status": "explicit-history-export",
                         "history": list(history),
                         **self._status(),
@@ -165,12 +184,12 @@ class NativeJeevesRepl:
                 record = turn.to_record()
                 if len(turn.text.encode("utf-8", "strict")) > self.limits.max_answer_bytes:
                     raise NativeReplHold("committed model response exceeds REPL output limit")
-                _write_json(target, {
+                self._publish(target, {
                     "status": "committed-native-chat-turn",
                     **record,
                 })
             self._terminated = True
-            _write_json(target, {
+            self._publish(target, {
                 "status": "bounded-turn-cap-reached-session-preserved",
                 **self._status(),
             })

@@ -27,6 +27,7 @@ from skeleton.ai.runtime.operational_ai.authority.canonical import load_json
 
 from .native_durable_runtime import NativeDurableJeevesAgent
 from .native_checkpoint_journal import NativeSQLiteCheckpointer
+from .native_source_fence import NativeSourceFence
 from .runtime import RunInputs
 from .types import Budget, Goal
 from skeleton.jeeves.native_fabric.contracts import (
@@ -133,6 +134,7 @@ class NativeOperatorSession:
         self, worker: Any,*,approved: bool,
         limits:OperatorSessionLimits|None=None,
         monotonic:Callable[[],float]=time.monotonic,
+        source_fence:NativeSourceFence|None=None,
     ):
         if approved is not True:
             raise NativeOperatorSessionHold("explicit operator native approval required")
@@ -140,6 +142,13 @@ class NativeOperatorSession:
             raise NativeOperatorSessionHold("trusted monotonic clock required")
         self.identity=ActiveModel.from_supervisor(worker)
         self.worker=worker
+        if source_fence is not None and not isinstance(
+            source_fence, NativeSourceFence,
+        ):
+            raise NativeOperatorSessionHold("canonical native source fence required")
+        self.source_fence=source_fence
+        if source_fence is not None:
+            source_fence.assert_live(worker)
         self.limits=limits or OperatorSessionLimits()
         if not isinstance(self.limits,OperatorSessionLimits):
             raise NativeOperatorSessionHold("typed session budget required")
@@ -165,6 +174,8 @@ class NativeOperatorSession:
             raise NativeOperatorSessionHold("session already stopped")
         if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
             raise NativeOperatorSessionHold("operator session time budget exhausted")
+        if self.source_fence is not None:
+            self.source_fence.assert_live(self.worker)
 
     def _post_io(self) -> None:
         """Hold private SQLite or model output after a source/owner change.
