@@ -233,14 +233,21 @@ def write_shard(
             for row in rows:
                 if not isinstance(row, dict):
                     raise ValueError("vault rows must be JSON objects")
-                line = (
-                    json.dumps(
-                        row, separators=(",", ":"), ensure_ascii=False,
-                        default=_json_default, allow_nan=False,
-                    ) + "\n"
-                ).encode("utf-8")
-                if len(line) > _MAX_ROW_CHARS:
-                    raise ValueError("vault row exceeds line byte budget")
+                # Stream JSON encoding into a per-row cap: never construct
+                # an unbounded serialized string before checking its size.
+                fragments = []
+                row_bytes = 1  # final newline
+                encoder = json.JSONEncoder(
+                    separators=(",", ":"), ensure_ascii=False,
+                    default=_json_default, allow_nan=False,
+                )
+                for fragment in encoder.iterencode(row):
+                    piece = fragment.encode("utf-8")
+                    row_bytes += len(piece)
+                    if row_bytes > _MAX_ROW_CHARS:
+                        raise ValueError("vault row exceeds line byte budget")
+                    fragments.append(piece)
+                line = b"".join(fragments) + b"\n"
                 if count >= _MAX_SHARD_ROWS or raw_bytes + len(line) > _MAX_SHARD_SCAN_BYTES:
                     raise ValueError("vault write exceeds row/byte budget")
                 writer.write(line)
@@ -332,6 +339,8 @@ def iter_shard(name: str) -> Iterator[dict]:
                         if len(line) > _MAX_ROW_CHARS:
                             raise ValueError("vault row exceeds line byte budget")
                         encoded_len = len(line.encode("utf-8"))
+                        if encoded_len > _MAX_ROW_CHARS:
+                            raise ValueError("vault row exceeds UTF-8 byte budget")
                         total_bytes += encoded_len
                         if total_bytes > _MAX_SHARD_SCAN_BYTES:
                             raise ValueError("vault scan exceeds decompressed byte budget")
