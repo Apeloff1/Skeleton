@@ -21,10 +21,8 @@ import io
 import json
 import time
 import hashlib
-import tempfile
 import threading
 import re
-import stat
 from contextlib import contextmanager
 from itertools import islice
 from .vault_secure_fs import anchored_directory, ensure_directory, read_regular, atomic_write, unlink_regular, VaultPathError
