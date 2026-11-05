@@ -16,6 +16,7 @@ merges the leaf results. Everything streams onto the PROOD event bus.
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 import uuid
 from typing import Dict, List, Optional
@@ -82,6 +83,8 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
     strength = kda.get("recall_strength") if isinstance(kda, dict) else None
     if type(strength) not in (int, float, str, type(None)):
         strength = None
+    elif type(strength) is float and not math.isfinite(strength):
+        strength = None
     finding = {
         "type": "Finding",
         "worker": worker_id,
@@ -143,13 +146,21 @@ async def run_swarm(req: SwarmReq):
         _worker(index, focus, req.project, run_id)
         for index, focus in enumerate(foci)
     ], return_exceptions=True)
+    def _bound_receipt(index, result):
+        return (
+            isinstance(result, dict)
+            and result.get("persisted") is True
+            and result.get("run_id") == run_id
+            and result.get("node_id") == f"{req.project}:{run_id}:worker:{index}"
+        )
+
     successful = [
-        result for result in attempts
-        if isinstance(result, dict) and result.get("persisted") is True
+        result for index, result in enumerate(attempts)
+        if _bound_receipt(index, result)
     ]
     failed_workers = [
         index for index, result in enumerate(attempts)
-        if not isinstance(result, dict) or result.get("persisted") is not True
+        if not _bound_receipt(index, result)
     ]
     if failed_workers:
         return {
