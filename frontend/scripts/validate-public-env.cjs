@@ -9,6 +9,25 @@ const ENVIRONMENTS = ['development', 'staging', 'production'];
 const REQUIRED_URLS = ['EXPO_PUBLIC_BACKEND_URL', 'EXPO_PUBLIC_SKELETON_URL'];
 const SECRETISH = /(SECRET|TOKEN|PASSWORD|PRIVATE|API_KEY|_KEY$)/;
 
+/**
+ * WHATWG URL canonicalizes abbreviated/hex IPv4 and bracketed IPv6 before
+ * exposing hostname. Block the complete 127/8 range and its IPv4-mapped IPv6
+ * equivalent, not just 127.0.0.1. Leave local development unrestricted.
+ */
+function isLoopbackHostname(hostname) {
+  const host = hostname.toLowerCase().replace(/\.+$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (/^127(?:\.\d{1,3}){3}$/.test(host)) return true;
+
+  // Node's URL.hostname encloses IPv6 in brackets and normalizes zero runs.
+  const ipv6 = host.startsWith('[') && host.endsWith(']')
+    ? host.slice(1, -1)
+    : host;
+  if (ipv6 === '::1') return true;
+  const mapped = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(ipv6);
+  return mapped !== null && (Number.parseInt(mapped[1], 16) & 0xff00) === 0x7f00;
+}
+
 function validatePublicEnv(environment, env) {
   const problems = [];
   if (!ENVIRONMENTS.includes(environment)) {
@@ -21,8 +40,12 @@ function validatePublicEnv(environment, env) {
     let url;
     try { url = new URL(raw); } catch { problems.push(`${name} is not a valid URL`); continue; }
     if (!['http:', 'https:'].includes(url.protocol)) problems.push(`${name} must be http(s)`);
-    if (strict && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)) {
-      problems.push(`${name} must not point at localhost in ${environment}`);
+    // URL userinfo is shipped to every client, including in development builds.
+    if (url.username || url.password) {
+      problems.push(`${name} must not contain URL credentials (public client build)`);
+    }
+    if (strict && isLoopbackHostname(url.hostname)) {
+      problems.push(`${name} must not point at localhost or loopback in ${environment}`);
     }
     if (environment === 'production' && url.protocol !== 'https:') {
       problems.push(`${name} must use https in production`);
