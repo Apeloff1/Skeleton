@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+<<<<<<< HEAD
+=======
 import hmac
+>>>>>>> origin/main
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -68,6 +71,26 @@ def _regular(path: Path) -> None:
 
 
 def _files(root: Path) -> list[dict[str, object]]:
+<<<<<<< HEAD
+    gathered: list[dict[str, object]] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise OfflineKitError("kit contains symlinks")
+        if path.is_dir():
+            continue
+        _regular(path)
+        relative = path.relative_to(root).as_posix()
+        if relative == "manifest.json":
+            continue
+        _relative(relative)
+        gathered.append({
+            "path": relative,
+            "sha256": _hash(path),
+            "size_bytes": path.stat().st_size,
+        })
+        if len(gathered) > MAX_FILES:
+            raise OfflineKitError("too many kit files")
+=======
     """Inventory without sorting or materializing an untrusted directory tree."""
     gathered: list[dict[str, object]] = []
     pending = [root]
@@ -100,6 +123,7 @@ def _files(root: Path) -> list[dict[str, object]]:
                 if len(gathered) > MAX_FILES:
                     raise OfflineKitError("too many kit files")
     gathered.sort(key=lambda item: item["path"])
+>>>>>>> origin/main
     return gathered
 
 
@@ -208,6 +232,18 @@ def pack(
     return target
 
 
+<<<<<<< HEAD
+def verify(root: str | Path) -> dict[str, object]:
+    kit = Path(root).expanduser().resolve(strict=True)
+    if not kit.is_dir():
+        raise OfflineKitError("kit root must be a directory")
+    manifest_path = kit / "manifest.json"
+    _regular(manifest_path)
+    if manifest_path.stat().st_size > _MAX_MANIFEST_BYTES:
+        raise OfflineKitError("offline manifest exceeds size limit")
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+=======
 def _check_manifest_pin(raw: bytes, pin: str | None) -> None:
     """A separately distributed SHA-256 pin proves integrity, not publisher identity."""
     if pin is None:
@@ -246,6 +282,7 @@ def verify(
     _check_manifest_pin(manifest_bytes, expected_manifest_sha256)
     try:
         data = json.loads(manifest_bytes, object_pairs_hook=_reject_duplicate_keys)
+>>>>>>> origin/main
     except (OSError, ValueError, UnicodeError) as exc:
         raise OfflineKitError("invalid offline manifest") from exc
     if (
@@ -278,6 +315,29 @@ def verify(
             or item["size_bytes"] < 0
         ):
             raise OfflineKitError("invalid kit artifact digest or size")
+<<<<<<< HEAD
+    observed = _files(kit)
+    if provided != observed:
+        raise OfflineKitError("offline kit files differ from pinned manifest")
+    if not (kit / "offline_kit.py").is_file() or not (kit / "wheelhouse").is_dir():
+        raise OfflineKitError("missing offline bootstrapper or wheelhouse")
+    if _wheel_version(kit / "wheelhouse") != data["version"]:
+        raise OfflineKitError("pinned Skeleton wheel version mismatch")
+    if data["gguf_included"]:
+        deployment = kit / "model" / "deployment.json"
+        _regular(deployment)
+        try:
+            local = json.loads(deployment.read_text(encoding="utf-8"))
+            binary = kit / "runtime" / (
+                "llama-cli.exe" if data["environment"]["sys_platform"] == "win32" else "llama-cli"
+            )
+            if (
+                local["executable_sha256"] != _hash(binary)
+                or local["model_sha256"] != _hash(kit / "model" / "model.gguf")
+            ):
+                raise OfflineKitError("pinned local model artifacts differ")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+=======
     if provided != observed:
         raise OfflineKitError("offline kit files differ from pinned manifest")
     indexed = {entry["path"]: entry for entry in observed}
@@ -313,10 +373,14 @@ def verify(
             ):
                 raise OfflineKitError("pinned local model artifacts differ")
         except (ValueError, UnicodeError, KeyError, TypeError) as exc:
+>>>>>>> origin/main
             raise OfflineKitError("invalid bundled model deployment") from exc
     return data
 
 
+<<<<<<< HEAD
+def install(root: str | Path, destination: str | Path) -> Path:
+=======
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -865,15 +929,21 @@ def install(
     root: str | Path, destination: str | Path, *,
     expected_manifest_sha256: str | None = None,
 ) -> Path:
+>>>>>>> origin/main
     """Install into a new venv, rolling back incomplete local installations.
 
     A virtualenv is not relocatable, so the target path must remain stable
     from venv creation to first use. On failure, delete only that newly
     created target, never an existing operator installation or its parents.
     """
+<<<<<<< HEAD
+    kit = Path(root).expanduser().resolve(strict=True)
+    manifest = verify(kit)
+=======
     kit = Path(root).expanduser().absolute()
     manifest = (verify(kit) if expected_manifest_sha256 is None else
                 verify(kit, expected_manifest_sha256=expected_manifest_sha256))
+>>>>>>> origin/main
     if manifest["environment"] != _environment():
         raise OfflineKitError("bundle Python/OS/architecture differs from this host")
     target = Path(destination).expanduser().absolute()
@@ -882,10 +952,22 @@ def install(
     if not target.parent.is_dir() or target == kit or kit in target.parents:
         raise OfflineKitError("install outside the verified bundle into an existing parent")
 
+<<<<<<< HEAD
+    command = [
+        "-m", "pip", "--isolated", "install",
+        "--no-index", "--no-input", "--no-cache-dir",
+        "--disable-pip-version-check", "--only-binary=:all:",
+        "--find-links", str(kit / "wheelhouse"),
+        f"skeleton[local-inference]=={manifest['version']}",
+    ]
+    # Isolation is enforced at the package resolver, not claimed as an OS
+    # egress sandbox for arbitrary executable wheel-install hooks.
+=======
     # Isolation is enforced at the package resolver, not claimed as an OS
     # egress sandbox for arbitrary executable wheel-install hooks.
     parent_fd: int | None = None
     owned_identity: tuple[int, int] | None = None
+>>>>>>> origin/main
     env = dict(os.environ)
     env.update({
         "PIP_NO_INDEX": "1",
@@ -893,6 +975,23 @@ def install(
         "PYTHONNOUSERSITE": "1",
     })
     try:
+<<<<<<< HEAD
+        venv.EnvBuilder(with_pip=True, clear=False).create(target)
+        python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        subprocess.run([str(python), *command], check=True, env=env, shell=False)
+
+        # The verified source bundle must remain byte-identical while pip
+        # resolves it. An altered wheel or model invalidates the installation.
+        if verify(kit) != manifest:
+            raise OfflineKitError("offline kit changed during installation")
+        if manifest["gguf_included"]:
+            assets = target / "offline_model"
+            assets.mkdir()
+            shutil.copytree(kit / "model", assets / "model", symlinks=False)
+            shutil.copytree(kit / "runtime", assets / "runtime", symlinks=False)
+            # Verify copied identities, not merely the source kit hashes.
+            local = json.loads((assets / "model" / "deployment.json").read_text("utf-8"))
+=======
         parent_fd, owned_identity = _reserve_install_destination(target)
         _assert_install_identity(target, parent_fd, owned_identity)
         with tempfile.TemporaryDirectory(
@@ -925,10 +1024,25 @@ def install(
             # Verify copied identities from opened file descriptors, not
             # pathname hashes that can follow a concurrently swapped link.
             _assert_install_identity(target, parent_fd, owned_identity)
+>>>>>>> origin/main
             runtime_name = (
                 "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
                 else "llama-cli"
             )
+<<<<<<< HEAD
+            if (
+                _hash(assets / "model" / "model.gguf") != local["model_sha256"]
+                or _hash(assets / "runtime" / runtime_name) != local["executable_sha256"]
+            ):
+                raise OfflineKitError("copied model or local runtime digest differs")
+        # Validate the actual install, not only subprocess exit code.
+        if not python.is_file():
+            raise OfflineKitError("offline installation created no Python runtime")
+    except BaseException:
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        raise
+=======
             expected_assets = {
                 "model/deployment.json", "model/model.gguf",
                 "runtime/" + runtime_name,
@@ -978,6 +1092,7 @@ def install(
     finally:
         if parent_fd is not None:
             os.close(parent_fd)
+>>>>>>> origin/main
     return target
 
 
@@ -992,11 +1107,17 @@ def main(argv: list[str] | None = None) -> int:
     make.add_argument("--model-id", default="offline-local-model")
     check = commands.add_parser("verify")
     check.add_argument("--kit", default=".")
+<<<<<<< HEAD
+    setup = commands.add_parser("install")
+    setup.add_argument("--kit", default=".")
+    setup.add_argument("--destination", required=True)
+=======
     check.add_argument("--expected-manifest-sha256")
     setup = commands.add_parser("install")
     setup.add_argument("--kit", default=".")
     setup.add_argument("--destination", required=True)
     setup.add_argument("--expected-manifest-sha256")
+>>>>>>> origin/main
     args = parser.parse_args(argv)
     try:
         if args.command == "pack":
@@ -1004,11 +1125,18 @@ def main(argv: list[str] | None = None) -> int:
                         gguf=args.gguf, llama=args.llama, model_id=args.model_id)
             print(f"Offline kit staged: {root}")
         elif args.command == "verify":
+<<<<<<< HEAD
+            data = verify(args.kit)
+            print(f"Verified {len(data['files'])} pinned artifacts for Skeleton {data['version']}")
+        else:
+            target = install(args.kit, args.destination)
+=======
             data = verify(args.kit, expected_manifest_sha256=args.expected_manifest_sha256)
             print(f"Verified {len(data['files'])} pinned artifacts for Skeleton {data['version']}")
         else:
             target = install(args.kit, args.destination,
                              expected_manifest_sha256=args.expected_manifest_sha256)
+>>>>>>> origin/main
             print(f"Offline virtual environment installed: {target}")
             print("Start local AI: " + str(target / (
                 "Scripts/python.exe" if os.name == "nt" else "bin/python"

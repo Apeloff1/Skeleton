@@ -30,6 +30,8 @@ from skeleton.ai.runtime.game_project_capsule import (
 from skeleton.ai.runtime.gameplay_capabilities import (
     GameplayError, compile_level, generate_level,
 )
+<<<<<<< HEAD
+=======
 from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
     verify_play_session, render_play_session, render_play_frame,
@@ -50,6 +52,7 @@ from skeleton.ai.runtime.game_play_quest import (
     GameQuestError, pack_quest_overlay, verify_quest_overlay,
     resume_quest_overlay, fork_quest_overlay,
 )
+>>>>>>> origin/main
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -68,16 +71,27 @@ def _nonfinite(_: str) -> None:
     raise GameCapsuleError("nonfinite game project numbers are inadmissible")
 
 
+<<<<<<< HEAD
+def _read_json(path: Path) -> dict[str, Any]:
+=======
 def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any]:
+>>>>>>> origin/main
     if path.is_symlink() or not path.is_file():
         raise GameCapsuleError("game input must be an existing regular local file")
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(fd, "rb") as stream:
         info = os.fstat(stream.fileno())
+<<<<<<< HEAD
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_INPUT_BYTES:
+            raise GameCapsuleError("game project input exceeded local file budget")
+        data = stream.read(MAX_INPUT_BYTES + 1)
+    if len(data) > MAX_INPUT_BYTES:
+=======
         if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
             raise GameCapsuleError("game project input exceeded local file budget")
         data = stream.read(max_bytes + 1)
     if len(data) > max_bytes:
+>>>>>>> origin/main
         raise GameCapsuleError("game project input exceeded local file budget")
     try:
         value = json.loads(
@@ -151,6 +165,8 @@ def _parser() -> argparse.ArgumentParser:
         description="Author legally reviewed game project specifications across eras. No ROM/SDK output.",
     )
     operations = parser.add_mutually_exclusive_group(required=True)
+<<<<<<< HEAD
+=======
     operations.add_argument("--play-capsule", type=Path,
                             help="execute offline controller frames against a verified original capsule")
     operations.add_argument("--resume-play-session", type=Path,
@@ -197,6 +213,7 @@ def _parser() -> argparse.ArgumentParser:
                             help="append real gameplay frames and decisions to a verified quest save")
     operations.add_argument("--fork-quest-overlay", type=Path,
                             help="rewind a verified quest save and play alternate decisions")
+>>>>>>> origin/main
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -207,6 +224,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="verify portable project and recalculate scene digests")
     operations.add_argument("--demo-project", type=Path,
                             help="write a new small original portable game capsule")
+<<<<<<< HEAD
+=======
     parser.add_argument("--terminal-input-profile", type=Path,
                         help="strict local JSON keymap for accessible offline terminal controls")
     parser.add_argument("--terminal-max-frames", type=int,
@@ -241,6 +260,7 @@ def _parser() -> argparse.ArgumentParser:
                         help="per-frame craft and claim decisions for verified gameplay")
     parser.add_argument("--quest-output", type=Path,
                         help="exclusive new quest overlay save")
+>>>>>>> origin/main
     parser.add_argument("--output", type=Path,
                         help="exclusive new file for --compose")
     parser.add_argument("--seed", type=int, default=1729,
@@ -258,6 +278,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+<<<<<<< HEAD
+=======
     terminal = (args.terminal_play_capsule is not None
                 or args.terminal_resume_session is not None)
     playing = any(value is not None for value in (
@@ -358,6 +380,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 or needs_source != (args.session_capsule is not None)):
             print("play-session source, controls and output arguments mismatch", file=sys.stderr)
             return 2
+>>>>>>> origin/main
     if args.output is not None and args.compose is None:
         print("--output is supported only for --compose", file=sys.stderr)
         return 2
@@ -374,6 +397,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("--targets is only for --demo-project", file=sys.stderr)
         return 2
     try:
+<<<<<<< HEAD
+        if args.catalog:
+=======
         if bundling:
             if args.verify_play_bundle is not None:
                 bundle = _read_json(args.verify_play_bundle, max_bytes=MAX_RESULT_BYTES)
@@ -547,6 +573,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     report["fork_frame"] = args.at_frame
                     report["forked_from_session_sha256"] = parent_session["session_sha256"]
         elif args.catalog:
+>>>>>>> origin/main
             report = catalog_summary()
         elif args.plan:
             body = _read_json(args.plan)
@@ -595,7 +622,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             report = verify_game_capsule(_read_json(args.verify_capsule))
         print(json.dumps(report, sort_keys=True, ensure_ascii=True))
         return 0
+<<<<<<< HEAD
+    except (GameCapsuleError, GamePlatformError, GameRightsError,
+=======
     except (GameQuestError, GameChallengeError, GamePlayBundleError, GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
+>>>>>>> origin/main
             GameplayError, ValueError, TypeError, KeyError, OSError) as exc:
         print(
             "cross-era game project rejected: " + type(exc).__name__ + ": " + str(exc),

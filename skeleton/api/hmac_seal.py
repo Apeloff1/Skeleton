@@ -14,6 +14,10 @@ Secrets:
     Verify tries primary then every ring key (constant-time per candidate).
     Mint signs with primary (``GF_SEAL_SECRET``), else the first ring entry.
 
+<<<<<<< HEAD
+Empty/missing keyring+secret → fail closed (503).
+Missing/malformed/expired/bad signature → 401 AuthError (opaque).
+=======
     v2 domain-bound + nonce (Jenkins seal finding; see docs/contracts/request_seal.md)::
         v2.{principal}.{attester}.{domain}.{unix_expiry}.{nonce}.{hex_hmac_sha256(canonical, key)}
         canonical = "gf-seal/v2\n{principal}\n{attester}\n{domain}\n{unix_expiry}\n{nonce}"
@@ -23,6 +27,7 @@ Missing/malformed/expired/bad signature → 401 AuthError (opaque).
 v2: domain mismatch / replayed nonce → 401 AuthError (opaque).
 Legacy (3/4-part) seals: accepted except on ``GF_SEAL_LEGACY`` policy-denied domains
 (default ``sensitive``: rejected on ``realtime``; ``allow`` / ``deny`` also valid).
+>>>>>>> origin/main
 """
 
 from __future__ import annotations
@@ -30,11 +35,16 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+<<<<<<< HEAD
+import time
+from typing import Dict, List, Optional, Tuple
+=======
 import re
 import secrets
 import threading
 import time
 from typing import Dict, FrozenSet, List, Optional, Protocol, Tuple
+>>>>>>> origin/main
 
 from fastapi import Header, HTTPException
 
@@ -118,19 +128,28 @@ def mint_seal(
     secret: Optional[str] = None,
     principal: Optional[str] = None,
     now: Optional[float] = None,
+<<<<<<< HEAD
+) -> Optional[str]:
+    """Mint an ``x-gf-seal`` value.
+
+=======
     domain: Optional[str] = None,
 ) -> Optional[str]:
     """Mint an ``x-gf-seal`` value.
 
     With ``domain`` → v2 domain-bound single-use seal (:func:`mint_seal_v2`).
+>>>>>>> origin/main
     Without ``principal`` → #16 3-part wire.
     With ``principal`` → 4-part PrincipalAuth wire (signed with primary/ring key).
     Returns ``None`` if no secret/keyring available.
     """
     if not attester:
         return None
+<<<<<<< HEAD
+=======
     if domain is not None:
         return mint_seal_v2(attester, domain, ttl_secs, secret=secret, principal=principal, now=now)
+>>>>>>> origin/main
     ts = int(now if now is not None else time.time())
     expiry = ts + _require_ttl_secs(ttl_secs)
 
@@ -155,6 +174,8 @@ def mint_seal(
     return f"{attester}.{expiry}.{sig}"
 
 
+<<<<<<< HEAD
+=======
 # ---------------------------------------------------------------------------
 # v2: domain-bound seal + nonce replay protection
 # ---------------------------------------------------------------------------
@@ -333,12 +354,17 @@ def _verify_v2(
     return attester
 
 
+>>>>>>> origin/main
 def verify_seal(
     raw_header: Optional[str],
     *,
     secret: Optional[str] = None,
     keyring: Optional[str] = None,
     now: Optional[float] = None,
+<<<<<<< HEAD
+) -> str:
+    """Verify seal header; return attester. Raises AuthError on any auth failure."""
+=======
     domain: Optional[str] = None,
     replay_cache: Optional[ReplayCache] = None,
     legacy: Optional[str] = None,
@@ -351,6 +377,7 @@ def verify_seal(
     legacy seals are subject to ``GF_SEAL_LEGACY`` (``legacy=`` overrides).
     Default ``False`` keeps the pre-v2 helper semantics for direct callers.
     """
+>>>>>>> origin/main
     ring = load_keyring(secret=secret, keyring=keyring)
     # #16 path: secret-only callers still work when keyring env empty.
     if not ring:
@@ -364,6 +391,8 @@ def verify_seal(
 
     ts = int(now if now is not None else time.time())
 
+<<<<<<< HEAD
+=======
     if raw_header.startswith(V2_PREFIX):
         if enforce_domain and not domain:
             raise AuthError(_OPAQUE)  # unchartered path: a v2 seal binds nothing here
@@ -377,6 +406,7 @@ def verify_seal(
     if enforce_domain and not legacy_allowed(domain, legacy):
         raise AuthError(_OPAQUE)
 
+>>>>>>> origin/main
     def _legacy_ok() -> Optional[str]:
         parts = raw_header.rsplit(".", 2)
         if len(parts) != 3:

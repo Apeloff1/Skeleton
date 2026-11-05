@@ -22,7 +22,11 @@ class Collection:
             self.records[record["_id"]] = dict(record)
         return SimpleNamespace(inserted_id=record["_id"])
 
+<<<<<<< HEAD
+    async def find_one(self, query):
+=======
     async def find_one(self, query, **kwargs):
+>>>>>>> origin/main
         async with self.lock:
             record = self.records.get(query["_id"])
             if record is None or any(record.get(k) != v for k, v in query.items()):
@@ -44,6 +48,13 @@ class Database:
     def __init__(self):
         self.collection = Collection()
         self.received = None
+<<<<<<< HEAD
+
+    def get_collection(self, name, *, read_concern, write_concern):
+        assert name == "canonical_source_epochs"
+        assert read_concern.level == "majority"
+        assert write_concern.document.get("w") == "majority"
+=======
         self.concerns = []
 
     def get_collection(self, name, *, read_concern, read_preference, write_concern=None):
@@ -55,6 +66,7 @@ class Database:
         else:
             assert read_concern.level == "linearizable"
             assert write_concern is None
+>>>>>>> origin/main
         self.received = True
         return self.collection
 
@@ -88,6 +100,8 @@ async def test_durable_writer_epoch_requires_operator_migration_and_is_monotonic
 
 
 @pytest.mark.asyncio
+<<<<<<< HEAD
+=======
 async def test_epoch_reader_uses_linearizable_primary_and_a_server_deadline():
     database = Database()
     owner = MongoCanonicalSourceEpoch(database)
@@ -212,6 +226,7 @@ def test_epoch_identity_rejects_delimiter_and_invalid_unicode(tenant, actor):
 
 
 @pytest.mark.asyncio
+>>>>>>> origin/main
 async def test_reader_and_other_writers_reject_inflight_epoch():
     owner = epoch()
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")

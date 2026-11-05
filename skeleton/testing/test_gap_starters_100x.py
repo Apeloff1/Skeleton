@@ -1,7 +1,11 @@
 """100x extreme adversarial tests."""
 import pytest
 from skeleton.simulation.game.driving_sim_starter import DrivingSimulator, DrivingSimError
+<<<<<<< HEAD
+from skeleton.distributed.mesh.multiplayer_authority import SessionAuthority
+=======
 from skeleton.distributed.mesh.multiplayer_authority import MultiplayerError, SessionAuthority
+>>>>>>> origin/main
 
 def test_driving_100x_full():
     sim = DrivingSimulator(power=700, mass=1500)
@@ -9,7 +13,10 @@ def test_driving_100x_full():
     assert s.speed > 0
     assert s.thermal.engine_temp > 90
     assert len(s.tires) == 4
+<<<<<<< HEAD
+=======
     assert s.thermal.tire_temp == sum(t.temperature for t in s.tires) / 4.0
+>>>>>>> origin/main
     assert s.telemetry["steps"] == 1
     assert sim.export_telemetry()
 
@@ -20,6 +27,8 @@ def test_driving_long_run_thermal():
     assert sim.state.steps == 50
     assert sim.state.thermal.engine_temp > 90
 
+<<<<<<< HEAD
+=======
 def test_driving_tire_loading_and_reset():
     sim = DrivingSimulator()
     original = sim.state.tires
@@ -37,6 +46,7 @@ def test_driving_tire_loading_and_reset():
     assert all(a is not b for a, b in zip(original, sim.state.tires))
 
 
+>>>>>>> origin/main
 def test_multi_100x_predictive():
     auth = SessionAuthority("sess100x")
     g = auth.issue_grant("p1")
@@ -45,6 +55,8 @@ def test_multi_100x_predictive():
     assert len(g.interest_set) >= 0
     assert len(g.rollback_buffer) > 0
     assert len(g.distributed_rollback) > 0
+<<<<<<< HEAD
+=======
 
 def test_multi_predictive_rejects_unsafe_velocity_without_mutating_tick():
     auth = SessionAuthority("strict-predict")
@@ -68,3 +80,4 @@ def test_multi_predictive_velocity_is_bounded_and_rollback_preserved():
     assert auth.verify_grant("p1", grant.digest)
     with pytest.raises(MultiplayerError):
         auth.predictive_distributed_sync("unknown", "p2", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1)
+>>>>>>> origin/main

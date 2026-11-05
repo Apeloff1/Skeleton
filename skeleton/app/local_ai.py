@@ -47,6 +47,13 @@ def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
 
 
 def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
+<<<<<<< HEAD
+    """Admit a preinstalled local GGUF and llama.cpp executable by SHA-256."""
+    deployment = LocalModelDeployment.load(source)
+    return LlamaCppModel(deployment.llama_cpp_config(
+        rehash_artifacts_each_run=True,
+    ))
+=======
     """Admit a pinned GGUF; conservatively adapt M-series GPU launch profile.
 
     The llama.cpp binary alone owns Metal transfers and KV allocation. CPU,
@@ -72,6 +79,7 @@ def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
             )
         model.adaptive_metal_receipt = receipt.as_dict()
     return model
+>>>>>>> origin/main
 
 
 def inspect_local_model(backend: NativeRuntimeLocalModel) -> dict[str, object]:

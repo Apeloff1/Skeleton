@@ -66,7 +66,11 @@ async def health_check():
         "version": SYSTEM_VERSION,
         "services": {
             "api": "running",
+<<<<<<< HEAD
+            "database": "connected",
+=======
             "database": "not_checked",
+>>>>>>> origin/main
             "ai": "engine_managed"
         },
         "uptime": "operational",

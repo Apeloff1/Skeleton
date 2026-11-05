@@ -9,6 +9,10 @@ import pytest
 import skeleton.ai.runtime.inference as inference
 
 
+<<<<<<< HEAD
+@pytest.mark.parametrize("symbol", ["NativeTransformerModel", "build_native_transformer_adapter"])
+def test_native_exports_call_only_literal_trusted_module(symbol: str) -> None:
+=======
 @pytest.mark.parametrize(
     ("symbol", "module"),
     [
@@ -19,6 +23,7 @@ import skeleton.ai.runtime.inference as inference
     ],
 )
 def test_native_exports_call_only_literal_trusted_module(symbol: str, module: str) -> None:
+>>>>>>> origin/main
     marker = object()
     namespace = SimpleNamespace(**{symbol: marker})
     prior = inference.__dict__.get(symbol)
@@ -26,7 +31,11 @@ def test_native_exports_call_only_literal_trusted_module(symbol: str, module: st
     try:
         with patch.object(inference, "_inference_import_module", return_value=namespace) as loader:
             assert inference.__getattr__(symbol) is marker
+<<<<<<< HEAD
+            loader.assert_called_once_with(".native_transformer", inference.__name__)
+=======
             loader.assert_called_once_with(module, inference.__name__)
+>>>>>>> origin/main
     finally:
         if existed:
             inference.__dict__[symbol] = prior
@@ -42,9 +51,16 @@ def test_unregistered_native_export_cannot_trigger_module_load() -> None:
 
 
 def test_dispatch_table_targets_are_exactly_reviewed_native_implementation() -> None:
+<<<<<<< HEAD
+    assert set(inference._NATIVE_EXPORTS) == {
+        "NativeTransformerModel", "build_native_transformer_adapter",
+    }
+    assert set(inference._NATIVE_EXPORTS.values()) == {".native_transformer"}
+=======
     assert inference._NATIVE_EXPORTS == {
         "NativeTransformerModel": ".native_transformer",
         "build_native_transformer_adapter": ".native_transformer",
         "build_guarded_native_transformer_adapter": ".native_guard_binding",
         "native_transformer_guard_components": ".native_guard_binding",
     }
+>>>>>>> origin/main

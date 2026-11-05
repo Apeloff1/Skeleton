@@ -253,6 +253,8 @@ STORES: tuple[DurableStore, ...] = (
         notes="Cognitive execution journal. Distinct from retrieval.provenance.",
     ),
     DurableStore(
+<<<<<<< HEAD
+=======
         store_id="gameforge.b038.provenance",
         family="provenance_ledger",
         status="classified",
@@ -270,6 +272,7 @@ STORES: tuple[DurableStore, ...] = (
         notes="B038 generation provenance; in-process only, not restart-durable.",
     ),
     DurableStore(
+>>>>>>> origin/main
         store_id="cortex.gaming_provenance",
         family="provenance_ledger",
         status="classified",

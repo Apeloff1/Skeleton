@@ -60,6 +60,8 @@ class EngineExecutionCoordinatorError(RuntimeError):
     """Engine execution could not be scheduled or reconciled safely."""
 
 
+<<<<<<< HEAD
+=======
 class _PassiveRecoveryUnavailable(EngineExecutionCoordinatorError):
     """Passive checkpoint recovery could not complete without losing custody."""
 
@@ -71,6 +73,7 @@ class _PassiveRecoveryProvider:
         raise ProviderUnavailableError("provider is unavailable during passive recovery")
 
 
+>>>>>>> origin/main
 class _ExecutionDatabaseOwner:
     """Exclusive live coordinator custody over the existing database inode.
 
@@ -203,6 +206,11 @@ class EngineExecutionCoordinator:
             self._maintenance_task: asyncio.Task[None] | None = None
             self._shutdown_task: asyncio.Task[None] | None = None
             self._recovery_cursor: tuple[datetime, str] | None = None
+<<<<<<< HEAD
+            self._recovery_lock = asyncio.Lock()
+            self._recovery_scanned = 0
+            self._recovery_started = 0
+=======
             self._startup_waiter_scan = True
             self._admission_scan_epoch = 0
             self._waiter_scan_epoch = 0
@@ -210,6 +218,7 @@ class EngineExecutionCoordinator:
             self._recovery_scanned = 0
             self._recovery_started = 0
             self._admission_recovery_deferred = 0
+>>>>>>> origin/main
             self._recovery_error: str | None = None
             self._driver_failures = 0
             self._driver_finalization_failures = 0
@@ -382,10 +391,15 @@ class EngineExecutionCoordinator:
                 "maximum_recovery_drivers": 32,
                 "page_limit": 128,
                 "scan_in_progress": self._recovery_cursor is not None,
+<<<<<<< HEAD
+                "scanned": self._recovery_scanned,
+                "started": self._recovery_started,
+=======
                 "startup_waiter_scan": self._startup_waiter_scan,
                 "scanned": self._recovery_scanned,
                 "started": self._recovery_started,
                 "admission_deferred": self._admission_recovery_deferred,
+>>>>>>> origin/main
                 "last_error": self._recovery_error,
                 "driver_failures": self._driver_failures,
                 "driver_finalization_failures": self._driver_finalization_failures,
@@ -446,7 +460,10 @@ class EngineExecutionCoordinator:
                     pass
 
     async def recover(self) -> tuple[str, ...]:
+<<<<<<< HEAD
+=======
         self._startup_waiter_scan = True
+>>>>>>> origin/main
         recovered = await self._recover_pending(allow_starting=True, include_waiting=True)
         if self._maintenance_task is None and not self._closed:
             self._maintenance_task = asyncio.create_task(
@@ -455,6 +472,8 @@ class EngineExecutionCoordinator:
             )
         return recovered
 
+<<<<<<< HEAD
+=======
     def _schedule_admission_recovery_sweep(self) -> None:
         # A failed retry write has no durable marker to make a passive waiter
         # eligible. Finish the current keyset pass before scanning waiters
@@ -478,6 +497,7 @@ class EngineExecutionCoordinator:
             self._schedule_admission_recovery_sweep()
             raise _PassiveRecoveryUnavailable("checkpoint retry acknowledgement deferred") from exc
 
+>>>>>>> origin/main
     async def _recover_pending(
         self,
         *,
@@ -499,8 +519,12 @@ class EngineExecutionCoordinator:
         """Resume a bounded page without eagerly allocating every old driver.
 
         Interactive approval/input endpoints still resume waiting work directly.
+<<<<<<< HEAD
+        Periodic recovery never polls those unchanged checkpoints for input.
+=======
         Startup visits waiting checkpoints across bounded pages. Thereafter,
         only due admission retries or explicit cancellations revisit waiters.
+>>>>>>> origin/main
         Canonical turn/dispatch fencing remains responsible for effect replay.
         """
         if self._closed or self._supervision_faults:
@@ -510,8 +534,11 @@ class EngineExecutionCoordinator:
         if not available:
             return ()
         cursor = self._recovery_cursor
+<<<<<<< HEAD
+=======
         if cursor is None and include_waiting:
             self._waiter_scan_epoch = self._admission_scan_epoch
+>>>>>>> origin/main
         page = await asyncio.to_thread(
             self.service.repository.recoverable_page,
             limit=128,
@@ -545,8 +572,11 @@ class EngineExecutionCoordinator:
             self._recovery_started += 1
         if scanned == len(page) and len(page) < 128:
             self._recovery_cursor = None
+<<<<<<< HEAD
+=======
             if include_waiting:
                 self._startup_waiter_scan = self._admission_scan_epoch != self._waiter_scan_epoch
+>>>>>>> origin/main
         self._recovery_error = None
         return tuple(recovered)
 
@@ -708,7 +738,11 @@ class EngineExecutionCoordinator:
                         self._maintenance_stop.set()
             if not self._maintenance_stop.is_set():
                 try:
+<<<<<<< HEAD
+                    await self._recover_pending()
+=======
                     await self._recover_pending(include_waiting=self._startup_waiter_scan)
+>>>>>>> origin/main
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -745,16 +779,22 @@ class EngineExecutionCoordinator:
                 type(exc).__name__,
                 frames,
             )
+<<<<<<< HEAD
+=======
             # A failed passive recovery may already have a staged intent or an
             # unavailable meter. Keep it for a later retry rather than bypassing
             # the canonical metering path with an unmetered failure result.
             if isinstance(exc, _PassiveRecoveryUnavailable):
                 return
+>>>>>>> origin/main
             try:
                 await self._finalize_failure(
                     command.execution_request.execution_id,
                     "engine_coordinator_exception",
+<<<<<<< HEAD
+=======
                     preserve_staged=True,
+>>>>>>> origin/main
                 )
             except Exception:
                 self._driver_finalization_failures += 1
@@ -773,6 +813,12 @@ class EngineExecutionCoordinator:
         try:
             self.service.ensure_execution_admission(command)
         except EngineServiceError:
+<<<<<<< HEAD
+            await self._finalize_failure(
+                execution_id,
+                "execution_admission_denied",
+            )
+=======
             # A retained checkpoint can contain approved work, a cancellation,
             # or a deadline that must be reconciled through the normal metered
             # runtime. A transient admission denial is not permission to replace
@@ -798,12 +844,18 @@ class EngineExecutionCoordinator:
             # A checkpoint may have won the CAS race with failure finalization.
             # Persist its retry rather than losing a waiting execution.
             self._defer_checkpoint_recovery(execution_id)
+>>>>>>> origin/main
             return
         try:
             provider = self.provider_registry.require_for_context(
                 command.execution_request.context_policy,
             )
         except ProviderUnavailableError:
+<<<<<<< HEAD
+            await self._finalize_failure(
+                execution_id,
+                "provider_unavailable",
+=======
             # A retained checkpoint can still record a cancellation/deadline
             # or expose an unresolved approval. These paths never dispatch a
             # provider or tool, and never publish a staged result. Preserve
@@ -844,6 +896,7 @@ class EngineExecutionCoordinator:
                 execution_id,
                 "provider_unavailable",
                 preserve_staged=True,
+>>>>>>> origin/main
             )
             return
 
@@ -956,12 +1009,17 @@ class EngineExecutionCoordinator:
                     raise
             if self.service.repository.result(execution_id) is not None:
                 self.service.complete_execution_admission(execution_id)
+<<<<<<< HEAD
+        except asyncio.CancelledError:
+            raise
+=======
             else:
                 self._clear_checkpoint_recovery(execution_id)
         except asyncio.CancelledError:
             raise
         except _PassiveRecoveryUnavailable:
             raise
+>>>>>>> origin/main
         except Exception as exc:
             logging.getLogger(__name__).warning(
                 "Engine execution %s failed (%s); frames=%s",
@@ -978,9 +1036,12 @@ class EngineExecutionCoordinator:
         self,
         execution_id: str,
         error_code: str,
+<<<<<<< HEAD
+=======
         *,
         preserve_staged: bool = True,
         preserve_checkpoint: bool = False,
+>>>>>>> origin/main
     ) -> None:
         repository = self.service.repository
         existing = repository.result(execution_id)
@@ -992,8 +1053,11 @@ class EngineExecutionCoordinator:
             return
         if current.terminal:
             return
+<<<<<<< HEAD
+=======
         if preserve_checkpoint and current.checkpoint_version:
             return
+>>>>>>> origin/main
         now = datetime.now(timezone.utc)
         # A failed recovery may already own settled physical provider work.
         # Preserve its receipts and metered turns without writing another
@@ -1033,12 +1097,21 @@ class EngineExecutionCoordinator:
                 result,
                 expected_execution_version=current.version,
                 now=now,
+<<<<<<< HEAD
+=======
                 require_no_staged_intent=preserve_staged,
+>>>>>>> origin/main
             )
             self.service.complete_execution_admission(
                 execution_id,
                 now=now,
             )
+<<<<<<< HEAD
+        except Exception:
+            # A concurrent driver may have completed or advanced the execution.
+            # Re-read and leave durable reconciliation to the canonical state.
+            if repository.result(execution_id) is None:
+=======
         except Exception as exc:
             # A concurrent driver may have completed or advanced the execution.
             # Re-read and leave durable reconciliation to the canonical state.
@@ -1053,6 +1126,7 @@ class EngineExecutionCoordinator:
             if unfinished:
                 if preserve_checkpoint:
                     raise _PassiveRecoveryUnavailable("admission failure finalization deferred") from exc
+>>>>>>> origin/main
                 raise
 
 

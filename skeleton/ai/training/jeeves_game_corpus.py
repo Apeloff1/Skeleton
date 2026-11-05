@@ -14,10 +14,15 @@ from __future__ import annotations
 from collections import defaultdict
 import hashlib
 import json
+<<<<<<< HEAD
+from pathlib import Path
+import re
+=======
 import os
 from pathlib import Path
 import re
 import stat
+>>>>>>> origin/main
 from typing import Any
 
 from .jeeves_production_game_train import ProductionCheckpointError, _strict_json
@@ -63,6 +68,8 @@ def _safe_file(root: Path, name: Any) -> Path:
     return candidate
 
 
+<<<<<<< HEAD
+=======
 def _read_bounded_regular_file(path: Path, *, minimum: int, maximum: int, label: str) -> bytes:
     """Read a bounded file once and reject replacement during its admission."""
     def identity(value: os.stat_result) -> tuple[int, int, int, int, int]:
@@ -97,6 +104,7 @@ def _read_bounded_regular_file(path: Path, *, minimum: int, maximum: int, label:
     return raw
 
 
+>>>>>>> origin/main
 def _text(value: Any, *, label: str, minimum: int, maximum: int) -> str:
     if not isinstance(value, str) or not minimum <= len(value) <= maximum:
         raise ProductionCheckpointError(f"corpus {label} must contain {minimum}..{maximum} characters")
@@ -131,7 +139,11 @@ def _load_split(root: Path, *, filename: Any, digest: Any, split: str) -> list[d
     if not isinstance(digest, str) or not _HEX.fullmatch(digest):
         raise ProductionCheckpointError("corpus SHA-256 must be pinned in the manifest")
     source = _safe_file(root, filename)
+<<<<<<< HEAD
+    raw = source.read_bytes()
+=======
     raw = _read_bounded_regular_file(source, minimum=16, maximum=MAX_DATASET_BYTES, label="corpus file")
+>>>>>>> origin/main
     if _digest(raw) != digest:
         raise ProductionCheckpointError("corpus SHA-256 has changed since rights admission")
     records: list[dict[str, Any]] = []
@@ -188,6 +200,8 @@ def _split_contamination(a: str, b: str) -> bool:
     return bool(aa and bb and len(aa & bb) / min(len(aa), len(bb)) >= .85)
 
 
+<<<<<<< HEAD
+=======
 def _has_short_embedded_overlap(training: list[str], heldout: list[str]) -> bool:
     """Find short exact token spans that a six-gram index cannot retrieve.
 
@@ -225,6 +239,7 @@ def _has_short_embedded_overlap(training: list[str], heldout: list[str]) -> bool
     return False
 
 
+>>>>>>> origin/main
 def load_approved_corpus(manifest_path: Path) -> tuple[
     tuple[str, ...], dict[str, tuple[str, ...]], dict[str, Any],
 ]:
@@ -232,9 +247,13 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
     if (manifest_path.is_symlink() or not manifest_path.is_file()
             or not 16 <= manifest_path.stat().st_size <= 64 * 1024):
         raise ProductionCheckpointError("game corpus manifest must be a bounded regular file")
+<<<<<<< HEAD
+    manifest_raw = manifest_path.read_bytes()
+=======
     manifest_raw = _read_bounded_regular_file(
         manifest_path, minimum=16, maximum=64 * 1024, label="game corpus manifest",
     )
+>>>>>>> origin/main
     config = _strict_json(manifest_raw)
     if config.get("schema_version") != SCHEMA:
         raise ProductionCheckpointError("unsupported production game corpus schema")
@@ -300,8 +319,11 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
     for idx, grams in enumerate(train_sets):
         for gram in grams:
             train_index[gram].add(idx)
+<<<<<<< HEAD
+=======
     if _has_short_embedded_overlap(train_prompts, test_prompts):
         raise ProductionCheckpointError("near-duplicate prompt leaked between corpus splits")
+>>>>>>> origin/main
     for held_prompt in test_prompts:
         grams = _shingles(held_prompt)
         candidate_ids: set[int] = set()
@@ -320,11 +342,17 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
         for gram in _shingles(answer):
             answer_index[gram].add(idx)
     exact_training_answers = {_normalize(answer) for answer in training_answers}
+<<<<<<< HEAD
+    for answer in eval_answers:
+        if _normalize(answer) in exact_training_answers:
+            raise ProductionCheckpointError("held-out game design answer copied from training")
+=======
     if any(_normalize(answer) in exact_training_answers for answer in eval_answers):
         raise ProductionCheckpointError("held-out game design answer copied from training")
     if _has_short_embedded_overlap(training_answers, eval_answers):
         raise ProductionCheckpointError("held-out reference answer near-duplicates training")
     for answer in eval_answers:
+>>>>>>> origin/main
         candidates: set[int] = set()
         for gram in _shingles(answer):
             candidates.update(answer_index.get(gram, ()))
@@ -342,7 +370,11 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
     }
     receipt = {
         "schema_version": SCHEMA,
+<<<<<<< HEAD
+        "manifest_path": str(manifest_path.resolve()),
+=======
         "manifest_path": str(manifest_path.absolute()),
+>>>>>>> origin/main
         "manifest_sha256": _digest(manifest_raw),
         "train_sha256": config["train_sha256"],
         "heldout_sha256": config["heldout_sha256"],

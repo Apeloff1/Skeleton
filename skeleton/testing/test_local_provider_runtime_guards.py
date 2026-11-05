@@ -41,12 +41,15 @@ def _registry(tmp_path, monkeypatch, *, runtime=None):
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(path))
     monkeypatch.setenv("AI_LOCAL_MODEL_CACHE_SIZE", "0")
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "1")
+<<<<<<< HEAD
+=======
     # These functional tests intentionally exercise the documented, explicitly
     # acknowledged development-only local path. Production startup must still
     # fail closed without trusted guarded composition dependencies.
     monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
     monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "false")
     monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
+>>>>>>> origin/main
     for name in (
         "AI_SECONDARY_API_KEY",
         "AI_SECONDARY_BASE_URL",
@@ -55,6 +58,9 @@ def _registry(tmp_path, monkeypatch, *, runtime=None):
         "AI_TIMEOUT_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
+<<<<<<< HEAD
+    return ProviderRegistry.from_env(admission_runtime=runtime)
+=======
     return ProviderRegistry.from_env(admission_runtime=runtime, require_guarded_local=False)
 
 
@@ -62,6 +68,7 @@ def test_local_startup_never_infers_guard_authority_from_development_flags(tmp_p
     _registry(tmp_path, monkeypatch)
     with pytest.raises(ProviderUnavailableError, match="explicit development-only authorization"):
         ProviderRegistry.from_env()
+>>>>>>> origin/main
 
 
 def _durable_runtime(path):
@@ -336,7 +343,11 @@ async def test_local_neural_activation_admits_actual_utf8_input_targets(tmp_path
         NumpyRecurrentLM(model_id="byte-local", config=NeuralLMConfig(hidden_size=4, seed=5)),
         tmp_path / "weights.json",
     )
+<<<<<<< HEAD
+    registry = ProviderRegistry.from_env()
+=======
     registry = ProviderRegistry.from_env(require_guarded_local=False)
+>>>>>>> origin/main
     adapter = registry.require_active()
     original_infer = adapter.engine.model.infer
     calls = 0
@@ -386,7 +397,11 @@ def test_invalid_local_configuration_fails_closed(tmp_path, monkeypatch, field, 
     _registry(tmp_path, monkeypatch)
     monkeypatch.setenv(field, value)
     with pytest.raises(ProviderUnavailableError, match="integer|bounds"):
+<<<<<<< HEAD
+        ProviderRegistry.from_env()
+=======
         ProviderRegistry.from_env(require_guarded_local=False)
+>>>>>>> origin/main
 
 
 def test_local_activation_never_constructs_hosted_adapter_even_when_primary_credentials_exist(
@@ -399,7 +414,11 @@ def test_local_activation_never_constructs_hosted_adapter_even_when_primary_cred
         raise AssertionError("local mode must never construct a hosted adapter")
 
     monkeypatch.setattr(provider_runtime.OpenAIProviderAdapter, "__init__", forbidden)
+<<<<<<< HEAD
+    registry = ProviderRegistry.from_env()
+=======
     registry = ProviderRegistry.from_env(require_guarded_local=False)
+>>>>>>> origin/main
     assert registry.require_active().provider_id == "local"
     assert len(registry.statuses()) == 1
 

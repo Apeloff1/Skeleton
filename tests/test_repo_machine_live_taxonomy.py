@@ -46,6 +46,8 @@ def test_all_skeleton_top_level_directories_have_machine_placement() -> None:
     assert unclassified == []
 
 
+<<<<<<< HEAD
+=======
 def test_profiler_runtime_is_owned_by_platform_observability() -> None:
     config = load_machine_config(ROOT)
     placement = placement_for_path(config, "skeleton/perf_profiler/runtime.py")
@@ -54,6 +56,7 @@ def test_profiler_runtime_is_owned_by_platform_observability() -> None:
     )
 
 
+>>>>>>> origin/main
 def test_repaired_runtime_roots_have_expected_owners() -> None:
     config = load_machine_config(ROOT)
 

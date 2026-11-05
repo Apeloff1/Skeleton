@@ -40,12 +40,18 @@ class GatewayClient:
         seal_attester: str | None = None,
         seal_principal: str | None = None,
         seal_secret: str | None = None,
+<<<<<<< HEAD
+=======
         seal_domain: str | None = None,
+>>>>>>> origin/main
     ) -> None:
         """``seal=`` or ``seal_attester=`` enables ``x-gf-seal`` on every request.
 
         The secret comes from ``seal_secret=`` or ``GF_SEAL_SECRET``.
+<<<<<<< HEAD
+=======
         ``seal_domain=`` mints domain-bound single-use v2 seals (fresh per request).
+>>>>>>> origin/main
         """
         if not base_url:
             raise ValueError("base_url is required")
@@ -56,10 +62,14 @@ class GatewayClient:
         self._sleep = sleep or time.sleep
         if seal is None and seal_attester:
             seal = RequestSealer(
+<<<<<<< HEAD
+                seal_attester, principal=seal_principal, seal_secret=seal_secret
+=======
                 seal_attester,
                 principal=seal_principal,
                 seal_secret=seal_secret,
                 domain=seal_domain,
+>>>>>>> origin/main
             )
         self._seal = seal
         self.last_request_id: str | None = None

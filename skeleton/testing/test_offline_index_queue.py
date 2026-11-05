@@ -263,7 +263,11 @@ def test_expired_unreclaimed_worker_does_not_publish_document_index(
             assert documents.count() == 0
 
 
+<<<<<<< HEAD
+def test_queue_enforces_global_job_limit_without_losing_existing_jobs(
+=======
 def test_queue_admits_new_work_after_cancel_without_legacy_fixed_row_quota(
+>>>>>>> origin/main
     tmp_path: Path, monkeypatch,
 ) -> None:
     import skeleton.app.offline_index_queue as module
@@ -277,6 +281,9 @@ def test_queue_admits_new_work_after_cancel_without_legacy_fixed_row_quota(
         # Deduping existing accepted work is still allowed at the quota.
         assert queue.enqueue(source, library).job_id == original.job_id
         queue.cancel(original.job_id)
+<<<<<<< HEAD
+        with pytest.raises(OfflineQueueError, match="quota"):
+=======
         # Legacy MAX_STORED_JOBS is not an admission ceiling. Admission now
         # depends on measured local storage headroom; completed/cancelled
         # history must remain durable rather than being silently evicted.
@@ -305,6 +312,7 @@ def test_queue_storage_pressure_fails_closed_without_losing_cancelled_history(
 
         monkeypatch.setattr(module, "admit_resident_document", reject_write)
         with pytest.raises(OfflineQueueError, match="headroom"):
+>>>>>>> origin/main
             queue.enqueue(source, library)
         assert len(queue.list_jobs()) == 1
         assert queue.get(original.job_id).state == "cancelled"

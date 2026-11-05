@@ -1,11 +1,20 @@
+<<<<<<< HEAD
+# Request Seal contract (`x-gf-seal`) — v1 (wire format frozen)
+=======
 # Request Seal contract (`x-gf-seal`) — v1 (frozen) + v2 (domain-bound, single-use)
+>>>>>>> origin/main
 
 Owner: Internal Systems. Source of truth: `skeleton/api/hmac_seal.py`
 (`mint_seal`, `verify_seal`, `require_seal`, `load_keyring`) and
 `skeleton/api/middleware.py` (`RequestSealMiddleware`, installed by `install_gate`
+<<<<<<< HEAD
+inside `create_app`). This document describes existing behaviour; it does not
+change the wire format.
+=======
 inside `create_app`). v1 forms below are unchanged; v2 (see "Seal v2") adds
 domain binding and nonce replay protection (Jenkins seal finding: v1 seals had
 no domain binding and could be replayed until expiry).
+>>>>>>> origin/main
 
 ## Headers
 
@@ -33,6 +42,8 @@ Two forms are accepted. Signature is lowercase hex HMAC-SHA256 (64 chars).
 tries the legacy form first, then the principal form. The verified `attester`
 is exposed to handlers as `request.state.attester`.
 
+<<<<<<< HEAD
+=======
 ## Seal v2 (domain-bound, single-use)
 
 Wire (7 dot-separated fields, literal `v2` prefix):
@@ -97,6 +108,7 @@ v2 breaks nothing. Every other surface keeps accepting v1 until the SDK and
 service callers mint v2, so this ships without an outage; flip to `deny` once
 v1 traffic is gone.
 
+>>>>>>> origin/main
 ## Keys
 
 - `GF_SEAL_SECRET` — primary UTF-8 secret. Used to mint; kid `default`.
@@ -108,8 +120,13 @@ v1 traffic is gone.
 
 - Default TTL: **300 s** (`DEFAULT_TTL_SECS`); `mint_seal(attester, ttl_secs=300, principal=None)`.
 - Rejected when `now > unix_expiry`. **No clock-skew allowance.**
+<<<<<<< HEAD
+- No nonce: a seal is a bearer token reusable until expiry. Clients should mint
+  per request (or per short window) and must treat seals as secrets.
+=======
 - v1: no nonce, reusable until expiry (bearer token). Treat as secret.
 - v2: single use (nonce replay cache); mint one per request.
+>>>>>>> origin/main
 
 ## Errors
 
@@ -117,8 +134,11 @@ v1 traffic is gone.
 |---|---|---|
 | No signing key configured | `503 {"error":"seal_unavailable"}` | `503 "seal unavailable"` |
 | Missing / malformed / expired / bad signature | `401 {"error":"invalid_seal"}` | `401` (opaque) |
+<<<<<<< HEAD
+=======
 | v2 domain mismatch, replayed nonce, missing/bad nonce, expiry too far out, replay cache full | `401 {"error":"invalid_seal"}` | `401` (MAC/expiry/format only) |
 | v1 seal on a domain refused by `GF_SEAL_LEGACY` | `401 {"error":"invalid_seal"}` | n/a |
+>>>>>>> origin/main
 
 Failure reasons are deliberately opaque.
 
@@ -137,6 +157,8 @@ Use the reference minting algorithm above (or `mint_seal` server-side for
 internal callers). Send `x-gf-seal` and an `x-request-id` on every call; on 401
 re-mint once; on 503 surface "seal unavailable" (server misconfiguration).
 
+<<<<<<< HEAD
+=======
 Python SDK (`skeleton.client`): `RequestSealer(..., domain="projects")` /
 `GatewayClient(seal_attester=..., seal_domain="projects")` mint a fresh v2 seal
 on every request (never cached, since nonces are single-use); retries call the
@@ -153,6 +175,7 @@ connect. Without `domain=` the SDK still mints v1 (unchanged).
 4. Flip `GF_SEAL_LEGACY=deny`; later remove v1 verify.
 Rollback: `GF_SEAL_LEGACY=allow`.
 
+>>>>>>> origin/main
 ## App routes need BOTH seal and session
 
 `/api/v1/projects*` (skeleton.projects.v1, mounted in `create_app`) sits behind

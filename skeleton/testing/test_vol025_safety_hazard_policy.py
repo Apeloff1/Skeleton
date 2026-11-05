@@ -146,6 +146,16 @@ def test_safety_hazard_source_and_ai_mirror_are_byte_identical() -> None:
     assert source.read_bytes() == mirror.read_bytes()
 
 
+<<<<<<< HEAD
+def test_contract_init_source_and_ai_mirror_remain_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/contracts/__init__.py"
+    mirror = root / "skeleton/ai/runtime/contracts/__init__.py"
+
+    assert source.read_bytes() == mirror.read_bytes()
+=======
 def test_contract_init_source_and_ai_mirror_preserve_declared_facade() -> None:
     """Contract exports must retain exact parity without an ownership declaration."""
     import json
@@ -171,3 +181,4 @@ def test_contract_init_source_and_ai_mirror_preserve_declared_facade() -> None:
         source + b"\nfrom .execution_authority import ResourceBudget\n",
         manifest,
     )
+>>>>>>> origin/main

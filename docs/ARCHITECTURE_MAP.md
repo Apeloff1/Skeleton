@@ -105,11 +105,17 @@ architecture service graph no longer exactly matches the runtime manifest.
 Runtime dependency direction is intentionally small:
 
 ```text
+<<<<<<< HEAD
+mongo ───────► backend ───────► frontend
+   └─────────► skeleton ──────► frontend
+
+=======
 mongo ───────► backend
    └─────────► skeleton ──────► backend
 
 frontend (independent startup for /setup and diagnostics)
 frontend -- authenticated API calls --> backend / skeleton (when ready)
+>>>>>>> origin/main
 chroma  (optional data service)
 skeleton ──► native / Java acceleration (optional, fallback-safe)
 ```
@@ -568,6 +574,19 @@ incomplete execution-profile semantics.
 Startup, readiness, shutdown, upgrade, and crash behavior are now part of the
 structural contract under `runtime_lifecycle`.
 
+<<<<<<< HEAD
+Startup is dependency ordered:
+
+0. **data-foundation** — `mongo`, `chroma` (parallel); barrier: started-and-health-probe-eligible
+1. **core-services** — `skeleton`, `backend` (parallel); barrier: ready-before-dependent-product-start
+2. **product-shell** — `frontend` (serial); barrier: ready-after-backend-and-engine
+
+Shutdown is the inverse dependency order:
+
+0. **stop-product-admission** — `frontend` (parallel); stop new user mutations and preserve bounded resume state
+1. **drain-core-services** — `backend`, `skeleton` (parallel); stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence
+2. **stop-data-foundation** — `chroma`, `mongo` (parallel); fence writers, flush durable state, then stop stores
+=======
 Startup is dependency ordered for protected services, while the setup UI is independent:
 
 0. **diagnostics-and-data-foundation** — `frontend`, `mongo`, `chroma` (parallel); the `/setup` route may render when storage, engine, or backend is unhealthy, but may not claim their readiness.
@@ -582,6 +601,7 @@ Shutdown is the inverse dependency order:
 1. **drain-application-service** — `backend` (serial); stop application admission and drain requests/streams.
 2. **drain-engine-service** — `skeleton` (serial); checkpoint or terminalize operations and flush evidence.
 3. **stop-data-foundation** — `chroma`, `mongo` (parallel); fence writers, flush durable state, then stop stores.
+>>>>>>> origin/main
 
 The validator proves that each runtime node appears exactly once in both
 sequences, that every dependency is started before its consumer, and that every

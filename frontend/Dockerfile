@@ -37,13 +37,21 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+<<<<<<< HEAD
+    yarn export:web
+=======
     yarn export:web \
     && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html)
+>>>>>>> origin/main
 
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
 # surface. Keep the multi-platform index immutable for reproducible rebuilds.
+<<<<<<< HEAD
+FROM nginx:1.31-alpine-slim@sha256:ebd058041a732a2b2dc0b606e34572dd8e0034de6a4aa4d50d8c13a240ac6005 AS production
+=======
 FROM nginx:1.31-alpine-slim@sha256:f45171d36c76a8b2f5ef97108a3a8a2294248a6578a0a180edc2d78f7d2edc26 AS production
+>>>>>>> origin/main
 
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,

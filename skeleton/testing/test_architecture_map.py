@@ -455,7 +455,11 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "execution_hosts": 4,
         "execution_profiles": 10,
         "plane_execution": 27,
+<<<<<<< HEAD
+        "startup_groups": 4,
+=======
         "startup_groups": 3,
+>>>>>>> origin/main
         "shutdown_groups": 4,
     }
 
@@ -560,14 +564,26 @@ def test_structural_validator_rejects_startup_dependency_in_same_group() -> None
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
     broken = deepcopy(architecture)
     lifecycle = broken["structural_blueprint"]["runtime_lifecycle"]
+<<<<<<< HEAD
+=======
     # Backend still requires a healthy engine even though the diagnostic UI
     # does not. Mutate a real protected dependency rather than fabricating a
     # frontend dependency that the canonical manifest no longer declares.
+>>>>>>> origin/main
     application = next(
         group
         for group in lifecycle["startup_groups"]
         if group["id"] == "application-service"
     )
+<<<<<<< HEAD
+    product = next(
+        group
+        for group in lifecycle["startup_groups"]
+        if group["id"] == "product-shell"
+    )
+    application["nodes"].append("frontend")
+    product["nodes"].remove("frontend")
+=======
     engine = next(
         group
         for group in lifecycle["startup_groups"]
@@ -575,12 +591,19 @@ def test_structural_validator_rejects_startup_dependency_in_same_group() -> None
     )
     application["nodes"].remove("backend")
     engine["nodes"].append("backend")
+>>>>>>> origin/main
     zones = {zone["id"]: zone for zone in broken["zones"]}
     errors: list[str] = []
 
     _validate_structural_blueprint(broken, zones, REPO_ROOT, errors)
 
     assert any(
+<<<<<<< HEAD
+        "startup order violates runtime dependency frontend->backend" in error
+        or "startup order violates runtime dependency frontend->skeleton" in error
+        for error in errors
+    )
+=======
         "startup order violates runtime dependency backend->skeleton" in error
         for error in errors
     )
@@ -598,3 +621,4 @@ def test_setup_ui_starts_without_protected_service_dependency() -> None:
     assert startup_order["mongo"] < startup_order["skeleton"]
     assert startup_order["skeleton"] < startup_order["backend"]
     assert runtime_nodes["backend"]["depends_on"] == ["mongo", "skeleton"]
+>>>>>>> origin/main

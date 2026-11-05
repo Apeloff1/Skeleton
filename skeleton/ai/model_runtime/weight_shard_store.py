@@ -220,6 +220,8 @@ class WeightShardStore:
         return tuple(paths)
 
     @contextmanager
+<<<<<<< HEAD
+=======
     def open_sealed_pages(
         self, plan_digest: str, *, model_identity: ModelIdentity, max_bytes: int,
     ) -> Iterator[tuple[object, ...]]:
@@ -232,6 +234,7 @@ class WeightShardStore:
             yield pages
 
     @contextmanager
+>>>>>>> origin/main
     def open_verified(
         self, plan_digest: str, *, model_identity: ModelIdentity,
     ) -> Iterator[tuple[BinaryIO, ...]]:

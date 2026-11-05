@@ -17,12 +17,20 @@ import os
 import uuid
 from datetime import datetime, timezone, timedelta
 
+<<<<<<< HEAD
+from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel, Field
+
+from core.databases import client as _SHARED_MONGO_CLIENT
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+=======
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest, paid_amount_matches
+>>>>>>> origin/main
 
 router = project_router(prefix="/api", tags=["creator-economy"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
@@ -278,6 +286,10 @@ class PremiumCheckoutBody(BaseModel):
     origin_url: str = Field("", max_length=2000)
 
 
+<<<<<<< HEAD
+@router.post("/premium/checkout")
+async def premium_checkout(body: PremiumCheckoutBody, request: Request):
+=======
 def _premium_release_ready() -> bool:
     """Premium requires a durable, independently qualified delivery authority."""
     return False
@@ -294,6 +306,7 @@ async def premium_checkout(body: PremiumCheckoutBody, request: Request):
             "error": "Premium checkout is unavailable until payment and entitlement delivery can be verified.",
             "code": "premium_release_unavailable",
         })
+>>>>>>> origin/main
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     plan = body.plan if body.plan in PREMIUM_PLANS else "monthly"
@@ -323,6 +336,8 @@ async def premium_session_status(session_id: str, request: Request):
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn:
         return {"error": "unknown session"}
+<<<<<<< HEAD
+=======
     meta = txn.get("metadata")
     if (not isinstance(meta, dict) or meta.get("source") != "premium"
             or meta.get("plan") not in PREMIUM_PLANS
@@ -330,11 +345,21 @@ async def premium_session_status(session_id: str, request: Request):
             or not isinstance(meta.get("visitor_id"), str)
             or not meta["visitor_id"] or meta["visitor_id"] != txn.get("buyer_id")):
         return JSONResponse(status_code=409, content={"error": "payment_source_mismatch"})
+>>>>>>> origin/main
     sc = _checkout(str(request.base_url))
     try:
         status = await sc.get_checkout_status(session_id)
     except Exception:
         return {"error": "stripe_error", "payment_status": txn.get("payment_status")}
+<<<<<<< HEAD
+    await _db.payment_transactions.update_one(
+        {"session_id": session_id},
+        {"$set": {"status": status.status, "payment_status": status.payment_status, "updated_at": _now()}})
+    granted = False
+    if status.payment_status == "paid" and not txn.get("processed"):
+        meta = txn.get("metadata", {})
+        days = int(meta.get("days", 30))
+=======
     granted = False
     if status.payment_status == "paid":
         if not paid_amount_matches(txn, status.amount_total, status.currency):
@@ -353,6 +378,7 @@ async def premium_session_status(session_id: str, request: Request):
             {"session_id": session_id}, {"$set": {"status": status.status, "updated_at": _now()}})
     if status.payment_status == "paid" and not txn.get("processed"):
         days = int(meta["days"])
+>>>>>>> origin/main
         expires = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
         await _db.premium_entitlements.update_one(
             {"session_id": session_id},

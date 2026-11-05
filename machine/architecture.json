@@ -299,7 +299,14 @@
       "path": "frontend",
       "kind": "expo",
       "canonical": true,
+<<<<<<< HEAD
+      "depends_on": [
+        "backend",
+        "skeleton"
+      ]
+=======
       "depends_on": []
+>>>>>>> origin/main
     }
   ],
   "interfaces": [
@@ -1419,14 +1426,23 @@
       "startup_groups": [
         {
           "order": 0,
+<<<<<<< HEAD
+          "id": "data-foundation",
+          "nodes": [
+=======
           "id": "diagnostics-and-data-foundation",
           "nodes": [
             "frontend",
+>>>>>>> origin/main
             "mongo",
             "chroma"
           ],
           "mode": "parallel",
+<<<<<<< HEAD
+          "barrier": "started-and-health-probe-eligible"
+=======
           "barrier": "setup-ui-starts-independently; data-health-probes-do-not-gate-setup"
+>>>>>>> origin/main
         },
         {
           "order": 1,
@@ -1435,7 +1451,11 @@
             "skeleton"
           ],
           "mode": "serial",
+<<<<<<< HEAD
+          "barrier": "ready-before-application-start"
+=======
           "barrier": "engine-ready-before-dependent-application-start"
+>>>>>>> origin/main
         },
         {
           "order": 2,
@@ -1444,7 +1464,20 @@
             "backend"
           ],
           "mode": "serial",
+<<<<<<< HEAD
+          "barrier": "ready-before-dependent-product-start"
+        },
+        {
+          "order": 3,
+          "id": "product-shell",
+          "nodes": [
+            "frontend"
+          ],
+          "mode": "serial",
+          "barrier": "ready-after-backend-and-engine"
+=======
           "barrier": "backend-readiness-required-for-protected-product-actions"
+>>>>>>> origin/main
         }
       ],
       "readiness_rules": [
@@ -1452,7 +1485,11 @@
         "liveness proves process survival; readiness proves dependency-safe request admission",
         "degraded readiness must be explicit and cannot claim unavailable capability as healthy",
         "provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed",
+<<<<<<< HEAD
+        "product readiness requires both application and engine endpoints used by the shell"
+=======
         "protected product actions require both application and engine endpoints used by the shell; setup diagnostics do not"
+>>>>>>> origin/main
       ],
       "shutdown_groups": [
         {

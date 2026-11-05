@@ -15,9 +15,12 @@ from core.model_catalog import (
     ModelSelectionError,
     catalog_digest,
     catalog_from_inventory,
+<<<<<<< HEAD
+=======
     context_budget_for_selection,
     cooperation_context_budget,
     cooperation_context_selection,
+>>>>>>> origin/main
     model_catalog,
     readiness,
     resolve_selection,
@@ -40,6 +43,8 @@ def test_untrusted_readiness_code_fails_to_fixed_product_message() -> None:
     assert "private" not in str(result)
 
 
+<<<<<<< HEAD
+=======
 @pytest.mark.parametrize("code", ("local_guard_unavailable", "local_guard_configuration_invalid"))
 def test_local_guard_failure_has_an_explicit_safe_product_message(code: str) -> None:
     result = readiness(code)
@@ -67,6 +72,7 @@ def test_unconfigured_guard_surfaces_through_local_engine_inventory(monkeypatch)
     assert "safety components" in result["readiness"]["message"]
 
 
+>>>>>>> origin/main
 def test_model_selection_rejects_partial_identity() -> None:
     with pytest.raises(ModelSelectionError) as exc:
         resolve_selection(unavailable_catalog("engine_not_configured"), provider_id="local")
@@ -88,6 +94,8 @@ def test_digest_is_canonical_across_json_key_order() -> None:
 def test_invalid_actor_identity_does_not_query_engine() -> None:
     with pytest.raises(EngineProtocolError):
         asyncio.run(model_catalog(None, actor_id="", tenant_id="tenant"))
+<<<<<<< HEAD
+=======
 
 
 def _review_selection():
@@ -129,3 +137,4 @@ def test_multidraft_compilation_reserves_candidate_material_without_enlarging_co
     with pytest.raises(ModelSelectionError) as exc:
         cooperation_context_budget(tight, {"schema_version": "skeleton.ai.cooperation.v1", "draft_count": 3})
     assert exc.value.code == "cooperation_context_too_small"
+>>>>>>> origin/main

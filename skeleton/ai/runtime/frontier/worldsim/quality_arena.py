@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
+<<<<<<< HEAD
+from .navigation import NavGrid, reachability_report
+=======
 from .navigation import GateSpec, NavGrid, detect_softlocks, reachability_report
+>>>>>>> origin/main
 
 WEIGHTS = {"reachability": 0.35, "variety": 0.25, "performance": 0.2, "constraints": 0.2}
 
@@ -18,7 +22,10 @@ class WorldCandidate:
     objectives: tuple[tuple[int, int], ...]
     tile_kinds: tuple[str, ...]
     cost_ms: float
+<<<<<<< HEAD
+=======
     tile_rows: tuple[tuple[str, ...], ...] | None = None  # 2D tile grid; else tile_kinds reshaped
+>>>>>>> origin/main
 
 
 @dataclass(frozen=True)
@@ -28,6 +35,15 @@ class ArenaScore:
     parts: Mapping[str, float]
     passed: bool
     failures: tuple[str, ...]
+<<<<<<< HEAD
+
+
+def score(c: WorldCandidate, budget_ms: float,
+          constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None) -> ArenaScore:
+    rep = reachability_report(c.grid, c.spawn, c.objectives)
+    reach = 1.0 - (len(rep["unreachable"]) / len(c.objectives) if c.objectives else 0.0)
+    variety = len(set(c.tile_kinds)) / len(c.tile_kinds) if c.tile_kinds else 0.0
+=======
     warnings: tuple[str, ...] = ()  # non-failing notes, e.g. "tile_layout_fallback"
 
 
@@ -42,12 +58,20 @@ def score(c: WorldCandidate, budget_ms: float,
     reach = 1.0 - (len(rep["unreachable"]) / len(c.objectives) if c.objectives else 0.0)
     tiles, fallback = tile_layout(c, strict=strict_tiles)
     variety = structured_variety(tiles)
+>>>>>>> origin/main
     perf = 1.0 if c.cost_ms <= budget_ms else max(0.0, budget_ms / c.cost_ms)
     failed = tuple(sorted(n for n, f in (constraints or {}).items() if not f(c)))
     cons = 1.0 - (len(failed) / len(constraints) if constraints else 0.0)
     parts = {"reachability": round(reach, 6), "variety": round(variety, 6),
              "performance": round(perf, 6), "constraints": round(cons, 6)}
     fails = failed + (("unreachable_objectives",) if not rep["ok"] else ()) + (("over_budget",) if perf < 1 else ())
+<<<<<<< HEAD
+    return ArenaScore(c.world_id, round(sum(WEIGHTS[k] * v for k, v in parts.items()), 6), parts, not fails, fails)
+
+
+def rank(cands: Sequence[WorldCandidate], budget_ms: float, constraints: Any = None) -> list[ArenaScore]:
+    return sorted((score(c, budget_ms, constraints) for c in cands), key=lambda s: (-s.passed, -s.total, s.world_id))
+=======
     return ArenaScore(c.world_id, round(sum(WEIGHTS[k] * v for k, v in parts.items()), 6), parts, not fails, fails,
                       ("tile_layout_fallback",) if fallback else ())
 
@@ -100,6 +124,7 @@ def rank(cands: Sequence[WorldCandidate], budget_ms: float, constraints: Any = N
             s = ArenaScore(s.world_id, 0.0, s.parts, False, s.failures + gf, s.warnings)
         out.append(s)
     return sorted(out, key=lambda s: (-s.passed, -s.total, s.world_id))
+>>>>>>> origin/main
 
 
 # --- Pacing and encounter spacing (Wally review on #4268) ---
@@ -114,7 +139,11 @@ def pacing_score(intensity: Sequence[float], max_plateau: int = 3) -> float:
     plateaus = run = 0
     for a, b in zip(intensity, intensity[1:]):
         run = run + 1 if abs(a - b) < 1e-9 else 0
+<<<<<<< HEAD
+        if run >= max_plateau:
+=======
         if run == max_plateau:  # count each plateau run once, not every flat step
+>>>>>>> origin/main
             plateaus += 1
     peak_late = intensity.index(max(intensity)) >= len(intensity) // 2
     reliefs = sum(1 for a, b in zip(intensity, intensity[1:]) if b < a)
@@ -137,6 +166,10 @@ PACED_WEIGHTS = {"reachability": 0.3, "variety": 0.15, "performance": 0.15,
 
 def score_paced(c: WorldCandidate, budget_ms: float, intensity: Sequence[float],
                 encounters: Sequence[float], gap: tuple[float, float] = (2.0, 8.0),
+<<<<<<< HEAD
+                constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None) -> ArenaScore:
+    base = score(c, budget_ms, constraints)
+=======
                 constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None,
                 gates: GateSpec | None = None) -> ArenaScore:
     """Paced score. Reachability is a hard gate: any unreachable objective or
@@ -146,12 +179,16 @@ def score_paced(c: WorldCandidate, budget_ms: float, intensity: Sequence[float],
     if gate_fails or "unreachable_objectives" in base.failures:
         parts = dict(base.parts, pacing=0.0, encounter_spacing=0.0)
         return ArenaScore(c.world_id, 0.0, parts, False, base.failures + gate_fails, base.warnings)
+>>>>>>> origin/main
     parts = dict(base.parts)
     parts["pacing"] = pacing_score(intensity)
     parts["encounter_spacing"] = encounter_spacing_score(encounters, *gap)
     fails = base.failures + (("flat_pacing",) if parts["pacing"] < 0.5 else ()) \
         + (("encounter_spacing",) if parts["encounter_spacing"] < 0.5 else ())
     total = round(sum(PACED_WEIGHTS[k] * v for k, v in parts.items()), 6)
+<<<<<<< HEAD
+    return ArenaScore(c.world_id, total, parts, not fails, fails)
+=======
     return ArenaScore(c.world_id, total, parts, not fails, fails, base.warnings)
 
 
@@ -199,3 +236,4 @@ def score_structured(c: WorldCandidate, budget_ms: float, tiles: Sequence[Sequen
     parts["variety"] = structured_variety(tiles)
     return ArenaScore(c.world_id, round(sum(WEIGHTS[k] * v for k, v in parts.items()), 6),
                       parts, base.passed, base.failures)
+>>>>>>> origin/main

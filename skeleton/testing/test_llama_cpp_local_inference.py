@@ -79,10 +79,13 @@ if "SLOW_REQUEST" in prompt:
 if "OVERFLOW_REQUEST" in prompt:
     print("x" * 8192)
     raise SystemExit(0)
+<<<<<<< HEAD
+=======
 if "STDERR_FAILURE_REQUEST" in prompt:
     print("native error context: " + prompt, file=sys.stderr)
     print("private-token-piece-canary", file=sys.stderr)
     raise SystemExit(7)
+>>>>>>> origin/main
 if "INVALID_STRUCTURED_REQUEST" in prompt:
     print(json.dumps({"answer": 7}, sort_keys=True))
     raise SystemExit(0)
@@ -171,6 +174,8 @@ async def test_llama_cpp_executes_without_prompt_argv_or_provider_credentials(
 
 
 @pytest.mark.asyncio
+<<<<<<< HEAD
+=======
 async def test_native_failure_never_returns_or_logs_private_stderr(tmp_path: Path, caplog) -> None:
     backend = LlamaCppModel(_config(tmp_path))
     private_prompt_marker = "private-prompt-canary-49bc75"
@@ -197,6 +202,7 @@ async def test_provider_adapter_preserves_sanitized_native_failure(tmp_path: Pat
 
 
 @pytest.mark.asyncio
+>>>>>>> origin/main
 async def test_llama_cpp_preserves_governed_tool_call_contract(tmp_path: Path) -> None:
     backend = LlamaCppModel(_config(tmp_path))
     result = await LocalInferenceEngine(backend).generate(

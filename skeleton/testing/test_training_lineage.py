@@ -83,6 +83,12 @@ class TrainingLineageTests(unittest.TestCase):
         manifest = self.manifest()
         cursor = manifest.checkpoint_cursor(
             draw_index=10,
+<<<<<<< HEAD
+            dataset_offsets={"ds-a": 8, "ds-b": 2},
+        )
+        cursor.assert_compatible(manifest)
+        self.assertEqual(len(cursor.digest), 64)
+=======
             dataset_offsets=manifest.expected_dataset_offsets(draw_index=10),
         )
         cursor.assert_compatible(manifest)
@@ -91,6 +97,7 @@ class TrainingLineageTests(unittest.TestCase):
             manifest.checkpoint_cursor(
                 draw_index=10, dataset_offsets={"ds-a": 8, "ds-b": 2}
             )
+>>>>>>> origin/main
 
         altered = TrainingDataManifest(
             manifest_id=manifest.manifest_id,

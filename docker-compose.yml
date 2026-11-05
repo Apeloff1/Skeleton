@@ -158,7 +158,11 @@ services:
       skeleton:
         condition: service_healthy
     healthcheck:
+<<<<<<< HEAD
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=5).read()"]
+=======
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health/ready', timeout=5).read()"]
+>>>>>>> origin/main
       interval: 30s
       timeout: 10s
       retries: 3
@@ -189,10 +193,18 @@ services:
       - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}
       - NODE_ENV=${NODE_ENV:-development}
+<<<<<<< HEAD
+    depends_on:
+      backend:
+        condition: service_healthy
+      skeleton:
+        condition: service_healthy
+=======
     # First-run setup and diagnostics must start independently of backend
     # and engine. Even service_started would transitively block this UI:
     # backend requires a healthy engine, which requires healthy MongoDB.
     # Keep the backend/engine health fences unchanged; failed APIs stay closed.
+>>>>>>> origin/main
     networks:
       - tutolage
 

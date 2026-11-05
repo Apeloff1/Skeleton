@@ -56,12 +56,18 @@ Chroma container. Keep the backup outside the repository:
 ```bash
 docker stop tutolage-chroma
 python scripts/chroma_backup.py --output "$HOME/chroma-custody-backup"
+<<<<<<< HEAD
+=======
 python scripts/chroma_backup.py --verify "$HOME/chroma-custody-backup"
+>>>>>>> origin/main
 ```
 
 This reads the stopped container's `/data` and legacy
 `/chroma/chroma` mount separately, records bounded SHA-256 file manifests,
 rechecks container identity and mounts, and refuses existing destinations,
+<<<<<<< HEAD
+links, unsafe state and unexpected mounts. It does **not** remove the
+=======
 links, unsafe state and unexpected mounts. It rejects restarts during copying
 and uses no-replace publication so a concurrently created destination is not
 overwritten. Offline `--verify` rehashes both copied stores and rejects missing,
@@ -69,6 +75,7 @@ modified, extra or linked files. A matching unsigned manifest does not prove
 authenticity, SQLite consistency, source authority or safety of restoration.
 Use the supported Linux or WSL filesystem path for this procedure; native
 Windows ownership and ACL semantics have not been qualified. It does **not** remove the
+>>>>>>> origin/main
 container, change volume mounts, restore data, prove SQLite consistency or
 authorize `--full` startup. Verified restore, database integrity, writer
 fencing and recreation evidence remain mandatory before migration acceptance.
@@ -480,6 +487,8 @@ Legacy `/api/health` fields remain compatibility-stable; canonical Skeleton
 identity is attached there as `canonical_application` while new clients use
 `/api/app/bootstrap` as the source of truth.
 
+<<<<<<< HEAD
+=======
 The backend process liveness probe is `/api/health/live`. The declared backend
 readiness probe is `/api/health/ready`: it returns 503 while Mongo, required
 routes, or either build-vault check are unavailable. A temporary build-vault
@@ -500,6 +509,7 @@ contents. Vault health checks use bounded shared workers; if a filesystem call
 stalls, readiness fails while its worker remains occupied until the operating
 system returns the call.
 
+>>>>>>> origin/main
 ## Frontend endpoint boundary
 
 `frontend/src/utils/apiBase.ts` is the single endpoint resolver for browser and

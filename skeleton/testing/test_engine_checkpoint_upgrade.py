@@ -5,10 +5,15 @@ from datetime import timedelta
 import pytest
 
 from skeleton.api.engine_runtime import EngineExecutionCoordinator
+<<<<<<< HEAD
+from skeleton.contracts.ai_execution import AIExecutionResult, ExecutionState
+from skeleton.intelligence.execution_runtime import CognitiveExecutionError, CognitiveExecutionRuntime
+=======
 from skeleton.api.engine_service import EngineServiceError
 from skeleton.contracts.ai_execution import AIExecutionResult, ExecutionState
 from skeleton.intelligence.execution_runtime import CognitiveExecutionError, CognitiveExecutionRuntime
 from skeleton.persistence.execution_repository import ExecutionRepositoryConflict
+>>>>>>> origin/main
 from skeleton.provider_contract import ProviderToolCall
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 from skeleton.testing.test_engine_execution_coordinator import (
@@ -115,6 +120,8 @@ async def test_committed_legacy_result_is_replayed_when_provider_unavailable(tmp
     await coordinator.shutdown()
 
 
+<<<<<<< HEAD
+=======
 @pytest.mark.parametrize(
     ("kind", "status", "error"),
     [("cancel", "cancelled", "cancellation_requested"),
@@ -312,6 +319,7 @@ async def test_passive_recovery_meter_failure_does_not_bypass_metering(tmp_path,
     await coordinator.shutdown()
 
 
+>>>>>>> origin/main
 @pytest.mark.asyncio
 async def test_unbound_staged_result_is_not_published(tmp_path):
     service = _service(tmp_path)
@@ -328,7 +336,12 @@ async def test_unbound_staged_result_is_not_published(tmp_path):
     coordinator = EngineExecutionCoordinator(service, provider_registry=FakeRegistry(provider), tool_runtime=AsyncToolRuntime())
     await coordinator._execute(command)
     result = service.repository.result(current.execution_id)
+<<<<<<< HEAD
+    assert result.status == "failed" and result.usage["error_code"] == "provider_activation_binding_missing"
+    assert result.final_output is None
+=======
     assert result is None
     assert service.repository.finalization_intent(current.execution_id).result == staged
+>>>>>>> origin/main
     assert provider.requests == []
     await coordinator.shutdown()

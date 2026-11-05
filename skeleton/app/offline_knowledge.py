@@ -3,12 +3,19 @@
 This implements *searchable evidence retrieval*, not a claim that arbitrary
 generated model text is grounded. It deliberately never downloads, crawls,
 executes, follows stored file paths or interprets stored text as instructions.
+<<<<<<< HEAD
+Explicit operator-selected files use bounded regular-file admission.
+=======
 Explicit operator-selected files use safe, no-follow regular-file admission.
+>>>>>>> origin/main
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+<<<<<<< HEAD
+=======
 import codecs
+>>>>>>> origin/main
 from hashlib import sha256
 import math
 import os
@@ -20,6 +27,14 @@ from typing import Any
 
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+<<<<<<< HEAD
+
+
+MAX_DOCUMENT_BYTES = 65_536
+MAX_TITLE_BYTES = 200
+MAX_DOCUMENTS_PER_MODEL = 256
+MAX_CHUNKS_PER_MODEL = 4_096
+=======
 from .offline_resources import (
     LocalResourcePressure, probe_local_resources, admit_resident_document,
 )
@@ -41,11 +56,16 @@ MAX_DOCUMENT_BYTES = None
 MAX_TITLE_BYTES = 200
 MAX_DOCUMENTS_PER_MODEL = None
 MAX_CHUNKS_PER_MODEL = None
+>>>>>>> origin/main
 MAX_SEARCH_TOKENS = 24
 MAX_QUERY_BYTES = 1_024
 _CHUNK_CHARS = 600
 _CHUNK_OVERLAP = 80
+<<<<<<< HEAD
+_MAX_DOC_CHUNKS = 160
+=======
 _MAX_DOC_CHUNKS = None
+>>>>>>> origin/main
 _TERMS = re.compile(r"[^\W_]{2,}", re.UNICODE)
 _STOP = frozenset({
     "the", "and", "are", "for", "that", "this", "with", "from", "into",
@@ -57,7 +77,11 @@ _STOP = frozenset({
 
 
 def read_reference_file(path: Path) -> str:
+<<<<<<< HEAD
+    """Read one bounded local UTF-8 file through a stable regular-file handle.
+=======
     """Read UTF-8 through a stable regular-file handle without a size cap.
+>>>>>>> origin/main
 
     Inspect the path both before and after opening, bind the opened file to
     that identity, and reject any replacement or in-place change during read.
@@ -83,6 +107,11 @@ def read_reference_file(path: Path) -> str:
                     or (opened.st_dev, opened.st_ino) !=
                     (before.st_dev, before.st_ino)):
                 raise RuntimeContractError("reference changed during file admission")
+<<<<<<< HEAD
+            if not 1 <= opened.st_size <= MAX_DOCUMENT_BYTES:
+                raise RuntimeContractError("reference file exceeds the 64 KiB limit")
+            payload = source.read(MAX_DOCUMENT_BYTES + 1)
+=======
             if opened.st_size < 1:
                 raise RuntimeContractError("reference file is empty")
             try:
@@ -102,6 +131,7 @@ def read_reference_file(path: Path) -> str:
                 parts.append(decoder.decode(b"", final=True))
             except UnicodeError as exc:
                 raise RuntimeContractError("reference must be UTF-8 text") from exc
+>>>>>>> origin/main
             after = os.fstat(source.fileno())
             current = path.lstat()
             if (not stat.S_ISREG(current.st_mode)
@@ -114,9 +144,21 @@ def read_reference_file(path: Path) -> str:
         if isinstance(exc, RuntimeContractError):
             raise
         raise RuntimeContractError("reference path is not a readable regular file") from exc
+<<<<<<< HEAD
+    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES or len(payload) != opened.st_size:
+        raise RuntimeContractError("reference changed or exceeded size budget")
+    try:
+        text = payload.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise RuntimeContractError("reference must be UTF-8 text") from exc
+    if "\x00" in text:
+        raise RuntimeContractError("binary reference content is prohibited")
+    return text
+=======
     if byte_count != opened.st_size:
         raise RuntimeContractError("reference changed during file admission")
     return "".join(parts)
+>>>>>>> origin/main
 
 def _identity(value: str, label: str) -> str:
     if (not isinstance(value, str) or len(value) != 64
@@ -158,17 +200,24 @@ class LocalKnowledgeHit:
 
 
 class OfflineKnowledgeLibrary:
+<<<<<<< HEAD
+    """Bounded model-scoped documents stored in the existing local SQLite DB."""
+=======
     """Model-scoped documents stored in the existing local SQLite DB."""
+>>>>>>> origin/main
 
     def __init__(self, store: OfflineChatStore, model_digest: str,
                  tokenizer_digest: str) -> None:
         if not isinstance(store, OfflineChatStore):
             raise RuntimeContractError("a canonical local SQLite store is required")
         self.store = store
+<<<<<<< HEAD
+=======
         # PRAGMA exposes the actual SQLite volume (including WAL placement).
         # In-memory stores intentionally use the current local working volume.
         database = store._db.execute("PRAGMA database_list").fetchone()
         self._storage_path = database[2] if database and database[2] else "."
+>>>>>>> origin/main
         self.model_digest = _identity(model_digest, "model digest")
         self.tokenizer_digest = _identity(tokenizer_digest, "tokenizer digest")
         with store._lock:
@@ -204,6 +253,11 @@ class OfflineKnowledgeLibrary:
         if not isinstance(content, str) or not content.strip() or "\x00" in content:
             raise RuntimeContractError("reference document must be nonempty text")
         payload = content.encode("utf-8")
+<<<<<<< HEAD
+        if len(payload) > MAX_DOCUMENT_BYTES:
+            raise RuntimeContractError("reference document exceeds 64 KiB")
+=======
+>>>>>>> origin/main
         return payload
 
     @staticmethod
@@ -219,6 +273,11 @@ class OfflineKnowledgeLibrary:
             if end <= start:
                 raise RuntimeContractError("invalid reference chunk boundary")
             rows.append((start, end, content[start:end]))
+<<<<<<< HEAD
+            if len(rows) > _MAX_DOC_CHUNKS:
+                raise RuntimeContractError("reference document chunk budget exceeded")
+=======
+>>>>>>> origin/main
             if end == len(content):
                 break
             start = max(start + 1, end - _CHUNK_OVERLAP)
@@ -228,6 +287,9 @@ class OfflineKnowledgeLibrary:
         import secrets
         import time
 
+<<<<<<< HEAD
+        payload = self._validate(title, content)
+=======
         # The current model-scoped index materializes complete sources/chunks.
         # Admission therefore follows live RAM and free disk, not file count.
         _require_local_headroom(
@@ -237,6 +299,7 @@ class OfflineKnowledgeLibrary:
         _require_local_headroom(
             len(payload), write=True, storage_path=self._storage_path
         )
+>>>>>>> origin/main
         digest = sha256(payload).hexdigest()
         pieces = self._chunks(content)
         if not any(_terms(piece[2]) for piece in pieces):
@@ -256,8 +319,21 @@ class OfflineKnowledgeLibrary:
                     "document_id": row[0], "title": row[1], "sha256": digest,
                     "chunk_count": len(pieces), "reused": True,
                 }
+<<<<<<< HEAD
+            doc_count, chunk_count = self.store._db.execute(
+                "SELECT COUNT(*), COALESCE(SUM(("
+                "SELECT COUNT(*) FROM offline_document_chunks c "
+                "WHERE c.document_id=d.document_id)), 0) "
+                "FROM offline_documents d WHERE model_digest=? AND tokenizer_digest=?",
+                (self.model_digest, self.tokenizer_digest),
+            ).fetchone()
+            if (doc_count >= MAX_DOCUMENTS_PER_MODEL
+                    or chunk_count + len(pieces) > MAX_CHUNKS_PER_MODEL):
+                raise RuntimeContractError("local reference library is at capacity")
+=======
             # Local document and chunk counts follow available storage, not
             # hardcoded public-hosting quotas. Database errors roll back.
+>>>>>>> origin/main
             doc_id = secrets.token_urlsafe(18)
             self.store._db.execute(
                 "INSERT INTO offline_documents VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -285,6 +361,8 @@ class OfflineKnowledgeLibrary:
             if own_snapshot:
                 self.store._db.execute("BEGIN")
             try:
+<<<<<<< HEAD
+=======
                 # This legacy verifier materializes the whole model corpus.
                 # Check measured headroom before fetching a large snapshot.
                 source_bytes = self.store._db.execute(
@@ -296,6 +374,7 @@ class OfflineKnowledgeLibrary:
                 _require_local_headroom(
                     int(source_bytes) * 2, storage_path=self._storage_path
                 )
+>>>>>>> origin/main
                 documents = self.store._db.execute(
                     "SELECT document_id, title, content_digest, content_text, "
                     "created_ns FROM offline_documents "
@@ -315,6 +394,12 @@ class OfflineKnowledgeLibrary:
             finally:
                 if own_snapshot:
                     self.store._db.execute("ROLLBACK")
+<<<<<<< HEAD
+        if (len(documents) > MAX_DOCUMENTS_PER_MODEL
+                or len(chunks) > MAX_CHUNKS_PER_MODEL):
+            raise RuntimeContractError("local reference index is beyond its budget")
+=======
+>>>>>>> origin/main
         by_document: dict[str, list[tuple[Any, ...]]] = {}
         for chunk in chunks:
             by_document.setdefault(chunk[0], []).append(chunk)

@@ -221,6 +221,8 @@ class NativeLLMRuntime:
             weights_digest=self.model_digest,
         )
 
+<<<<<<< HEAD
+=======
     def spill_cpu_kv(self, cache: KVCache, store: object) -> str:
         """Persist an admitted CPU reference KV cache; no GPU tensor migration."""
         from .cpu_kv_spill import CpuKVSpillStore
@@ -235,6 +237,7 @@ class NativeLLMRuntime:
             raise RuntimeContractError("CpuKVSpillStore required")
         return store.restore(self, digest)
 
+>>>>>>> origin/main
     def estimate_kv_bytes(self, tokens: int) -> int:
         count = max(0, int(tokens))
         return count * self.model.n_layers * self.model.dim * 2 * 8 + count * 8
@@ -423,7 +426,10 @@ class NativeLLMRuntime:
         *,
         use_cache: bool = True,
         interrupt: Callable[[], None] | None = None,
+<<<<<<< HEAD
+=======
         cache: KVCache | None = None,
+>>>>>>> origin/main
     ) -> InferenceResult:
         """Run embeddings → position/RoPE → transformer blocks → LM head.
 
@@ -437,6 +443,8 @@ class NativeLLMRuntime:
             interrupt()
         if not isinstance(use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
+<<<<<<< HEAD
+=======
         if cache is not None:
             if not use_cache or not isinstance(cache, KVCache):
                 raise RuntimeContractError("explicit KV cache requires cache-enabled inference")
@@ -452,6 +460,7 @@ class NativeLLMRuntime:
                 )
             ):
                 raise RuntimeContractError("explicit KV cache has stale model ownership")
+>>>>>>> origin/main
         self.assert_model_unchanged()
         self._assert_execution_device()
         try:
@@ -476,10 +485,16 @@ class NativeLLMRuntime:
         window = sequence.token_ids[-self.limits.max_context:]
         binding = (self.model_digest, self.tokenizer.digest, self.architecture.digest,
                    self.device.digest, self.limits, self.device_policy)
+<<<<<<< HEAD
+        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
+        raw_logits = (self.model._logits_window(window, cache) if interrupt is None
+                      else self.model._logits_window(window, cache, interrupt=interrupt))
+=======
         active_cache = (cache if cache is not None else
                         KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None)
         raw_logits = (self.model._logits_window(window, active_cache) if interrupt is None
                       else self.model._logits_window(window, active_cache, interrupt=interrupt))
+>>>>>>> origin/main
         if interrupt is not None:
             interrupt()
         logits = tuple(float(value) for value in raw_logits)
@@ -499,7 +514,11 @@ class NativeLLMRuntime:
         return InferenceResult(
             prompt_sequence=sequence,
             logits=logits,
+<<<<<<< HEAD
+            cache_tokens=len(cache.tokens) if cache is not None else 0,
+=======
             cache_tokens=len(active_cache.tokens) if active_cache is not None else 0,
+>>>>>>> origin/main
             model_digest=self.model_digest,
             architecture_digest=self.architecture.digest,
         )

@@ -189,6 +189,12 @@ def test_transcript_declarations_must_match_issued_frame(changes):
     frame(session)
     before = local_state(session)
     segment = TranscriptSegment("conversation", 0, "declared text", 0, 0.25, True)
+<<<<<<< HEAD
+    with pytest.raises(MultimodalFoundationError):
+        session.submit_transcript(
+            replace(segment, **changes), extractor_ref="operator:human", command_id="bad-text"
+        )
+=======
     if type(changes.get("sequence")) is bool or type(changes.get("final")) is int:
         # Frozen typed declarations reject invalid primitive types before
         # reaching the session boundary, with no partial command publication.
@@ -200,6 +206,7 @@ def test_transcript_declarations_must_match_issued_frame(changes):
             session.submit_transcript(
                 replace(segment, **changes), extractor_ref="operator:human", command_id="bad-text"
             )
+>>>>>>> origin/main
     assert local_state(session) == before
 
 
@@ -656,9 +663,16 @@ def test_verified_corpus_issuance_cannot_be_downgraded_to_opaque_envelope():
         issued.modality,
         issued.mime_type,
         issued.content_digest,
+<<<<<<< HEAD
+        issued.size_bytes,
+        issued.sanitized_metadata,
+        issued.instruction_trusted,
+        issued.embedded_instruction_detected,
+=======
         issued.content_bytes,
         issued.embedded_instruction_detected,
         issued.sanitized_metadata,
+>>>>>>> origin/main
     )
     with pytest.raises(MultimodalFoundationError, match="validation evidence is missing"):
         session.corpus.get(rid)

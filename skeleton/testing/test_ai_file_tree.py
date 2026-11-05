@@ -33,6 +33,24 @@ def test_native_contract_export_overlay_is_declared_and_additive() -> None:
         b"]\n"
     )
     base = b"__all__ = []\n"
+<<<<<<< HEAD
+    assert _contract_export_mirror_valid(base, base + appendix, manifest)
+    assert not _contract_export_mirror_valid(
+        base, base + appendix + b"__import__('os').system('false')\n", manifest
+    )
+    assert not _contract_export_mirror_valid(
+        base, base + appendix.replace(b'"ResourceBudget"', b'"UnboundSymbol"'), manifest
+    )
+    assert not _contract_export_mirror_valid(
+        base, base + appendix.replace(b"ResourceBudget,", b"ResourceBudget as Unsafe,"), manifest
+    )
+    assert not _contract_export_mirror_valid(
+        b"__all__ = [1]\n", base + appendix, manifest
+    )
+    missing_owner = dict(manifest)
+    missing_owner["native_ai_owners"] = [
+        item for item in manifest["native_ai_owners"]
+=======
     # The current manifest deliberately owns execution authority in runtime/core;
     # no extra contract-export facade is declared. Test that policy first.
     assert not _contract_export_mirror_valid(base, base + appendix, manifest)
@@ -80,6 +98,7 @@ def test_native_contract_export_overlay_is_declared_and_additive() -> None:
     missing_owner = dict(declared_manifest)
     missing_owner["native_ai_owners"] = [
         item for item in declared_manifest["native_ai_owners"]
+>>>>>>> origin/main
         if item.get("path") != "skeleton/ai/runtime/contracts/execution_authority.py"
     ]
     assert not _contract_export_mirror_valid(base, base + appendix, missing_owner)

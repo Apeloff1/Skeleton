@@ -88,7 +88,11 @@ def test_real_decoded_image_binds_source_and_exact_pixels(format, mime):
     assert asset.sanitized_metadata["width"] == 3
     assert "system_prompt" not in asset.sanitized_metadata
     assert asset.instruction_trusted is False
+<<<<<<< HEAD
+    assert verify_verified_asset(asset, payload).digest == asset.digest
+=======
     assert verify_verified_asset(asset, payload).content_digest == asset.content_digest
+>>>>>>> origin/main
     assert intake.verify_verified_asset(asset, payload) == asset
     assert (
         intake.sanitize_verified(
@@ -163,6 +167,8 @@ def test_metadata_conflicts_and_invalid_values_publish_no_asset(metadata):
     assert intake._assets == {}
 
 
+<<<<<<< HEAD
+=======
 def test_verified_wave_accepts_matching_decoder_evidence_and_rejects_giant_claims():
     payload = _audio()
     metadata = {
@@ -189,6 +195,7 @@ def test_image_rejects_unrelated_audio_decoder_claim_without_publishing():
     assert intake._assets == {}
 
 
+>>>>>>> origin/main
 @pytest.mark.parametrize(
     "metadata",
     (
@@ -315,10 +322,16 @@ def test_invalid_or_expanded_limits_cannot_grant_decoder_authority(value):
 
 
 def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
+<<<<<<< HEAD
+    monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
+    with pytest.raises(MultimodalSanitizationError, match="truncated"):
+        _admit(_image())
+=======
     payload = _image()  # Build before simulating missing Pillow; image creation needs Pillow too.
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
     with pytest.raises(MultimodalSanitizationError, match="truncated"):
         _admit(payload)
+>>>>>>> origin/main
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", False)
     # A None sentinel triggers Python's normal ModuleNotFoundError path
     # without replacing the interpreter's global import primitive.
@@ -326,14 +339,22 @@ def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
     with monkeypatch.context() as missing:
         missing.setitem(sys.modules, "PIL", None)
         with pytest.raises(MultimodalSanitizationError, match="Pillow"):
+<<<<<<< HEAD
+            _admit(_image())
+=======
             _admit(payload)
+>>>>>>> origin/main
 
 
 def test_constructed_or_mutated_receipts_cannot_bypass_payload_verification():
     payload = _image()
     intake, asset = _admit(payload)
     forged = replace(asset, validation=replace(asset.validation, decoded_digest="0" * 64))
+<<<<<<< HEAD
+    with pytest.raises(MultimodalSanitizationError, match="drift"):
+=======
     with pytest.raises(MultimodalSanitizationError, match="differs from issued evidence"):
+>>>>>>> origin/main
         verify_verified_asset(forged, payload)
     object.__setattr__(asset.validation.limits, "max_pixels", 10**12)
     with pytest.raises(MultimodalSanitizationError, match="max_pixels"):

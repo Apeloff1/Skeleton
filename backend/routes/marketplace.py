@@ -26,14 +26,22 @@ import os
 import uuid
 from datetime import datetime, timezone
 
+<<<<<<< HEAD
+from fastapi import APIRouter, Query, Request
+=======
 from fastapi import APIRouter, HTTPException, Query, Request
+>>>>>>> origin/main
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.anti_farm import rate_ok
 from emergentintegrations.payments.stripe.checkout import (
+<<<<<<< HEAD
+    StripeCheckout, CheckoutSessionRequest,
+=======
     StripeCheckout, CheckoutSessionRequest, paid_amount_matches,
+>>>>>>> origin/main
 )
 
 router = project_router(prefix="/api", tags=["marketplace"])
@@ -62,6 +70,8 @@ def _marketplace_release_ready() -> bool:
     """
     return False
 
+<<<<<<< HEAD
+=======
 
 def _marketplace_order_is_bound(txn: dict) -> bool:
     """Require the persisted checkout identity before settling a game sale."""
@@ -81,6 +91,7 @@ def _same_marketplace_order(before: dict, after: dict) -> bool:
             and all(before.get(key) == after.get(key) for key in (
                 "session_id", "playable_id", "buyer_id", "amount", "currency", "metadata",
             )))
+>>>>>>> origin/main
 _GAME_LIGHT = {
     "_id": 0, "playable_id": 1, "title": 1, "genre": 1, "has_cover": 1, "asset_status": 1,
     "plays": 1, "playability_score": 1, "evaluation.overall": 1, "moderation_status": 1,
@@ -290,8 +301,13 @@ async def _finalize_purchase(txn: dict):
     """Idempotently record a paid purchase + bump listing aggregates."""
     if txn.get("processed"):
         return
+<<<<<<< HEAD
+    # Premium-pass sessions are finalized by the premium status endpoint, not here.
+    if (txn.get("metadata") or {}).get("source") == "premium":
+=======
     # Unknown or premium sessions cannot be turned into game purchases.
     if not _marketplace_order_is_bound(txn) or txn.get("payment_status") != "paid":
+>>>>>>> origin/main
         return
     pid = txn.get("playable_id")
     buyer = txn.get("buyer_id", "anon")
@@ -335,14 +351,26 @@ async def checkout_status(session_id: str, request: Request):
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn:
         return {"error": "unknown session"}
+<<<<<<< HEAD
+=======
     if not _marketplace_order_is_bound(txn):
         return JSONResponse(status_code=409, content={"error": "payment_source_mismatch"})
+>>>>>>> origin/main
     sc = _checkout(str(request.base_url))
     try:
         status = await sc.get_checkout_status(session_id)
     except Exception:
         return {"error": "stripe_error", "payment_status": txn.get("payment_status")}
 
+<<<<<<< HEAD
+    await _db.payment_transactions.update_one(
+        {"session_id": session_id},
+        {"$set": {"status": status.status, "payment_status": status.payment_status,
+                  "updated_at": _now()}})
+    if status.payment_status == "paid":
+        txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+        await _finalize_purchase(txn)
+=======
     if status.payment_status == "paid":
         if not paid_amount_matches(txn, status.amount_total, status.currency):
             return JSONResponse(status_code=409, content={"error": "payment_details_mismatch"})
@@ -364,6 +392,7 @@ async def checkout_status(session_id: str, request: Request):
         # Do not let an out-of-order unpaid response downgrade a paid order.
         await _db.payment_transactions.update_one(
             {"session_id": session_id}, {"$set": {"status": status.status, "updated_at": _now()}})
+>>>>>>> origin/main
     return {
         "session_id": session_id,
         "status": status.status,
@@ -376,14 +405,34 @@ async def checkout_status(session_id: str, request: Request):
 
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
+<<<<<<< HEAD
+    """Stripe webhook — the source of truth. Marks the transaction paid + records
+    the purchase on checkout.session.completed."""
+    if not STRIPE_API_KEY:
+        return {"received": False}
+=======
     """Settle an existing transaction only on an explicitly paid session event."""
     if not STRIPE_API_KEY:
         return JSONResponse(status_code=503, content={"received": False, "error": "payments_not_configured"})
+>>>>>>> origin/main
     body = await request.body()
     sig = request.headers.get("Stripe-Signature")
     sc = _checkout(str(request.base_url))
     try:
         ev = await sc.handle_webhook(body, sig)
+<<<<<<< HEAD
+    except Exception:
+        return {"received": False, "error": "webhook_rejected"}
+    if ev.session_id:
+        await _db.payment_transactions.update_one(
+            {"session_id": ev.session_id},
+            {"$set": {"payment_status": ev.payment_status or "unknown",
+                      "webhook_event": ev.event_type, "updated_at": _now()}})
+        if (ev.payment_status == "paid") or (ev.event_type == "checkout.session.completed"):
+            txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
+            if txn:
+                await _finalize_purchase(txn)
+=======
     except ValueError:
         return JSONResponse(status_code=400, content={"received": False, "error": "webhook_rejected"})
     except Exception:
@@ -416,6 +465,7 @@ async def stripe_webhook(request: Request):
                 or not paid_amount_matches(txn, getattr(ev, "amount_total", None), getattr(ev, "currency", None))):
             return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
         await _finalize_purchase(txn)
+>>>>>>> origin/main
     return {"received": True}
 
 

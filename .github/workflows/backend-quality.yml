@@ -56,10 +56,14 @@ jobs:
   ruff:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     runs-on: ubuntu-latest
+<<<<<<< HEAD
+    timeout-minutes: 45
+=======
     # Full fail-closed repository scans exceeded the prior 45-minute deadline
     # on exact-head run 41362780272 (cancelled during malware IOC scanning).
     # Preserve every existing security step and required ruff job name.
     timeout-minutes: 90
+>>>>>>> origin/main
     defaults:
       run:
         working-directory: backend

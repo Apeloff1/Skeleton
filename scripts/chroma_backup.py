@@ -9,14 +9,20 @@ A backup is evidence for a later, separately authorized migration.
 from __future__ import annotations
 
 import argparse
+<<<<<<< HEAD
+=======
 import ctypes
 import errno
+>>>>>>> origin/main
 import hashlib
 import json
 import os
 import stat
 import subprocess
+<<<<<<< HEAD
+=======
 import sys
+>>>>>>> origin/main
 import tempfile
 from pathlib import Path
 
@@ -24,7 +30,10 @@ SCHEMA = "skeleton.chroma.legacy-backup.v1"
 CONTAINER = "tutolage-chroma"
 MAX_FILES = 100_000
 MAX_BYTES = 100 * 1024 ** 3
+<<<<<<< HEAD
+=======
 MAX_MANIFEST_BYTES = 32 * 1024 ** 2
+>>>>>>> origin/main
 
 
 class BackupRejected(RuntimeError):
@@ -55,6 +64,15 @@ def _inspect(container: str) -> dict:
     if (info.get("Name") != "/" + container
             or state.get("Status") != "exited"
             or state.get("Running") is not False
+<<<<<<< HEAD
+            or state.get("Restarting") is not False):
+        raise BackupRejected("stop the exact Chroma container and all writers before backup")
+    mounts = info.get("Mounts") or []
+    legacy = [m for m in mounts if m.get("Destination") == "/chroma/chroma"]
+    if (len(legacy) != 1 or legacy[0].get("Type") != "volume"
+            or not isinstance(legacy[0].get("Name"), str)
+            or not legacy[0]["Name"] or any(m.get("Destination") == "/data" for m in mounts)):
+=======
             or state.get("Restarting") is not False
             or not isinstance(state.get("StartedAt"), str)
             or not isinstance(state.get("FinishedAt"), str)
@@ -70,6 +88,7 @@ def _inspect(container: str) -> dict:
                 m["Destination"] == "/data" or m["Destination"].startswith("/data/")
                 or m["Destination"].startswith("/chroma/chroma/")
                 for m in mounts)):
+>>>>>>> origin/main
         raise BackupRejected("unexpected Chroma persistence mounts; do not guess data authority")
     if not isinstance(info.get("Id"), str) or not info["Id"]:
         raise BackupRejected("missing immutable Chroma container identity")
@@ -78,6 +97,12 @@ def _inspect(container: str) -> dict:
         "image": str((info.get("Config") or {}).get("Image", "")),
         "volume": legacy[0]["Name"],
         "mounts": mounts,
+<<<<<<< HEAD
+    }
+
+
+def _manifest_files(root: Path) -> list[dict]:
+=======
         # A stop/start/stop cycle between inspections otherwise looks identical
         # and could make the two copies represent different database states.
         "started_at": state["StartedAt"],
@@ -120,6 +145,7 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
 
 
 def _manifest_files(root: Path, *, exclude_root_manifest: bool = False) -> list[dict]:
+>>>>>>> origin/main
     entries: list[dict] = []
     count = total = 0
     for path in sorted(root.rglob("*")):
@@ -128,8 +154,11 @@ def _manifest_files(root: Path, *, exclude_root_manifest: bool = False) -> list[
             raise BackupRejected("backed-up Chroma contains a link or special file")
         if stat.S_ISDIR(mode):
             continue
+<<<<<<< HEAD
+=======
         if exclude_root_manifest and path == root / "manifest.json":
             continue
+>>>>>>> origin/main
         count += 1
         if count > MAX_FILES:
             raise BackupRejected("Chroma backup exceeds file admission budget")
@@ -157,8 +186,13 @@ def backup_legacy_chroma(output: Path, *, container: str = CONTAINER) -> dict:
     completed backup is published, and the original container remains intact.
     """
     requested = Path(output).expanduser().absolute()
+<<<<<<< HEAD
+    if requested.parent.is_symlink():
+        raise BackupRejected("backup parent cannot be a symlink")
+=======
     if any(path.is_symlink() for path in (requested, *requested.parents)):
         raise BackupRejected("backup destination and its parents cannot be symlinks")
+>>>>>>> origin/main
     output = requested.resolve(strict=False)
     repository_root = Path(__file__).resolve().parents[1]
     if output == repository_root or repository_root in output.parents:
@@ -202,11 +236,20 @@ def backup_legacy_chroma(output: Path, *, container: str = CONTAINER) -> dict:
         )
         # Rename only after both copies, the second inspect and content hashes.
         # Keep evidence private; Docker cp may restore broad file permissions.
+<<<<<<< HEAD
+        staging.rename(output)
+=======
         _publish_no_replace(staging, output)
+>>>>>>> origin/main
         output.chmod(0o700)
         return manifest
 
 
+<<<<<<< HEAD
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", required=True, type=Path, help="NEW private directory outside the repository")
+=======
 def verify_backup(backup: Path) -> dict:
     """Recheck a custody backup without modifying it or contacting Docker.
 
@@ -263,13 +306,17 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output", type=Path, help="NEW private directory outside the repository")
     mode.add_argument("--verify", type=Path, help="recheck a completed custody backup without Docker")
+>>>>>>> origin/main
     parser.add_argument("--container", default=CONTAINER)
     args = parser.parse_args()
     os.umask(0o077)
     try:
+<<<<<<< HEAD
+=======
         if args.verify is not None:
             print(json.dumps(verify_backup(args.verify), sort_keys=True))
             return 0
+>>>>>>> origin/main
         result = backup_legacy_chroma(args.output, container=args.container)
     except BackupRejected as exc:
         parser.exit(2, "Chroma backup rejected: " + str(exc) + "\n")

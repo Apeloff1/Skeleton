@@ -17,11 +17,14 @@ export type EcosystemSession = {
 
 /** The transport returns null on failures and aborted/unauthorised reads.
  * Never let a missing or malformed session impersonate a successful response. */
+<<<<<<< HEAD
+=======
 function requireData<T>(result: { ok: boolean; data: T | null }): T {
   if (!result.ok || result.data == null) throw new Error('ecosystem_response_unavailable');
   return result.data;
 }
 
+>>>>>>> origin/main
 function requireSession(result: { ok: boolean; data: EcosystemSession | null }): EcosystemSession {
   const session = result.data;
   if (!result.ok || !session || typeof session.session_id !== 'string' || !session.session_id) {
@@ -47,7 +50,11 @@ export async function getSession(sessionId: string): Promise<EcosystemSession> {
 
 export async function exportGodot(sessionId: string): Promise<{ ok: boolean; files: { path: string; content: string }[] }> {
   const r = await api.get(`/api/ecosystem/session/${sessionId}/export`);
+<<<<<<< HEAD
+  return r.data;
+=======
   return requireData(r);
+>>>>>>> origin/main
 }
 
 export async function listSessions(limit = 20): Promise<{ count: number; sessions: EcosystemSession[] }> {
@@ -63,5 +70,9 @@ export async function ecosystemHealth(): Promise<Record<string, unknown>> {
 /** One-shot: create + run + return sealed result. */
 export async function buildGame(brief: string, era = 'ash'): Promise<EcosystemSession> {
   const created = await createSession(brief, era);
+<<<<<<< HEAD
+  if (!created.session_id) return created;
+=======
+>>>>>>> origin/main
   return runSession(created.session_id);
 }

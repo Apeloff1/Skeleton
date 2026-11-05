@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+<<<<<<< HEAD
+import subprocess
+
+=======
 import shutil
 import subprocess
 
 import pytest
 
+>>>>>>> origin/main
 from skeleton.app.installer import install_application
 from skeleton.app.preloader import PreloadCheck, PreloadReport, inspect_host
 from skeleton.app.setup_runtime import SetupResult
@@ -150,7 +155,11 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "& python $ArchivePreflight --archive $ArchivePath" in source
     assert "$PathBudgetViolations" in source
     assert "& git @ArchiveArgs" in source
+<<<<<<< HEAD
+    assert 'git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"' in source
+=======
     assert 'git -C $RepoRoot show "$($SourceCommit):skeleton/app/manifest.json"' in source
+>>>>>>> origin/main
     assert '$RuntimePaths = @($RuntimePaths | Select-Object -Unique)' in source
     assert 'Windows payload missing required assembly path' in source
     assert "Get-FileHash -Algorithm SHA256" in source
@@ -158,6 +167,8 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "ISCC.exe" in source
 
 
+<<<<<<< HEAD
+=======
 @pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
 @pytest.mark.parametrize("version_args", [[], ["-Version", "1.2.3"]])
 def test_invalid_installer_source_preserves_existing_outputs(tmp_path, version_args):
@@ -224,6 +235,7 @@ def test_installer_rejects_unsafe_source_version_before_cleanup(tmp_path):
     assert not (root / ".build" / "windows-installer").exists()
 
 
+>>>>>>> origin/main
 
 def test_windows_runtime_payload_respects_portable_path_budget():
     # The installer payload is created by git archive, so validate exactly the

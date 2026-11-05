@@ -102,6 +102,11 @@ class ServingResources:
     process_rss_bytes: int | None = None
     available_memory_bytes: int | None = None
     source: str = "unavailable"
+<<<<<<< HEAD
+
+    def __post_init__(self) -> None:
+        for name in ("memory_used_fraction", "cpu_load_fraction"):
+=======
     memory_stall_fraction: float | None = None
     memory_full_stall_fraction: float | None = None
     io_stall_fraction: float | None = None
@@ -115,21 +120,31 @@ class ServingResources:
 
     def __post_init__(self) -> None:
         for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction", "io_stall_fraction", "io_full_stall_fraction", "swap_used_fraction", "commit_used_fraction"):
+>>>>>>> origin/main
             value = getattr(self, name)
             if value is not None and (
                 isinstance(value, bool)
                 or not isinstance(value, (int, float))
                 or not math.isfinite(value)
                 or value < 0
+<<<<<<< HEAD
+                or (name == "memory_used_fraction" and value > 1)
+            ):
+                raise ValueError(f"{name} must be a finite non-negative resource measurement")
+        for name in ("process_rss_bytes", "available_memory_bytes"):
+=======
                 or (name != "cpu_load_fraction" and value > 1)
             ):
                 raise ValueError(f"{name} must be a finite non-negative resource measurement")
         for name in ("process_rss_bytes", "available_memory_bytes", "swap_available_bytes", "commit_available_bytes"):
+>>>>>>> origin/main
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative byte count")
         if not isinstance(self.source, str) or not self.source or len(self.source) > 256:
             raise ValueError("resource measurement source must be bounded")
+<<<<<<< HEAD
+=======
         if self.thermal_level not in {None, "normal", "elevated", "critical"} or (
             self.thermal_level is not None and type(self.thermal_level) is not str
         ):
@@ -150,6 +165,7 @@ class ServingResources:
             if value is not None
         )
         return min(bounds) if bounds else None
+>>>>>>> origin/main
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -195,6 +211,10 @@ class AdaptiveServingController:
         self._last_sample = None
 
     def observe(self, *, elapsed_ms: float, queue_wait_ms: float, failed: bool) -> None:
+<<<<<<< HEAD
+        self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, max(0.0, elapsed_ms))
+        self.queue_wait_ewma_ms = self._ewma(self.queue_wait_ewma_ms, max(0.0, queue_wait_ms))
+=======
         for name, value in (("elapsed_ms", elapsed_ms), ("queue_wait_ms", queue_wait_ms)):
             if (isinstance(value, bool) or not isinstance(value, (int, float))
                     or not math.isfinite(value) or value < 0):
@@ -203,6 +223,7 @@ class AdaptiveServingController:
             raise ValueError("failed must be boolean")
         self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, elapsed_ms)
         self.queue_wait_ewma_ms = self._ewma(self.queue_wait_ewma_ms, queue_wait_ms)
+>>>>>>> origin/main
         self.failure_ewma = self._ewma(self.failure_ewma, 1.0 if failed else 0.0)
         self.observations += 1
 
@@ -218,6 +239,14 @@ class AdaptiveServingController:
         policy = self.policy
         memory = resources.memory_used_fraction
         cpu = resources.cpu_load_fraction
+<<<<<<< HEAD
+        critical = memory is not None and memory >= min(
+            0.99, policy.memory_high_watermark + 0.05, policy.memory_shed_watermark,
+        )
+        reason = "within_operator_limits"
+        if critical:
+            reason = "memory_critical"
+=======
         partial_stall = resources.memory_stall_fraction
         full_stall = resources.memory_full_stall_fraction
         io_stall = resources.io_stall_fraction
@@ -262,6 +291,7 @@ class AdaptiveServingController:
             or (full_stall is not None and full_stall >= 0.03)
         ):
             reason = "memory_stall_pressure"
+>>>>>>> origin/main
         elif memory is not None and memory >= policy.memory_high_watermark:
             reason = "memory_pressure"
         elif cpu is not None and cpu >= 0.95:
@@ -275,6 +305,10 @@ class AdaptiveServingController:
         ):
             reason = "latency_pressure"
         pressured = reason != "within_operator_limits"
+<<<<<<< HEAD
+        healthy = (
+            (memory is None or memory <= policy.memory_low_watermark)
+=======
         # A wholly unavailable resource snapshot cannot certify recovery.
         capacity_observed = (
             memory is not None or partial_stall is not None or full_stall is not None
@@ -290,6 +324,7 @@ class AdaptiveServingController:
             and (io_full_stall is None or io_full_stall <= 0.01)
             and (commit_fraction is None or commit_fraction <= 0.80)
             and resources.thermal_level in {None, "normal"}
+>>>>>>> origin/main
             and (cpu is None or cpu < 0.85)
             and self.failure_ewma < 0.1
             and (self.latency_ewma_ms is None or self.latency_ewma_ms < policy.target_latency_ms * 0.85)

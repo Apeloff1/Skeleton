@@ -36,12 +36,16 @@ from skeleton.app.local_ai import (
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
+<<<<<<< HEAD
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
+=======
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
 from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
 from skeleton.app.offline_longform_virtual import (
     LongformVirtualMemory, LongformMemoryError,
 )
 from skeleton.app.offline_resources import LocalResourcePressure
+>>>>>>> origin/main
 from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
 from skeleton.app.offline_reference_read import (
     LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
@@ -139,7 +143,10 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         self.backend = backend
         self.database = Path(database)
+<<<<<<< HEAD
+=======
         self.resource_fabric = AdaptiveResourceFabric(self.database)
+>>>>>>> origin/main
         self.token = token
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
@@ -149,11 +156,15 @@ class OfflineHTTPApplication:
         self._active_session: str | None = None
         self._closing = False
         self._store = OfflineChatStore(database)
+<<<<<<< HEAD
+        try:
+=======
         self.longform = None
         try:
             self.longform = LongformVirtualMemory(
                 self.database.with_name(self.database.name + ".longform.sqlite3")
             )
+>>>>>>> origin/main
             self.knowledge = OfflineKnowledgeLibrary(
                 self._store, self.model_digest, self.tokenizer_digest
             )
@@ -161,8 +172,11 @@ class OfflineHTTPApplication:
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
         except BaseException:
+<<<<<<< HEAD
+=======
             if self.longform is not None:
                 self.longform.close()
+>>>>>>> origin/main
             self._store.close()
             raise
 
@@ -179,8 +193,11 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
+<<<<<<< HEAD
+=======
         if self.longform is not None:
             self.longform.close()
+>>>>>>> origin/main
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -440,6 +457,8 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+<<<<<<< HEAD
+=======
         if path == "/v1/resources" and method == "GET":
             try:
                 return 200, self.resource_fabric.monitor()
@@ -549,6 +568,7 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(
                     422, "longform virtual-memory operation rejected"
                 ) from exc
+>>>>>>> origin/main
         if path == "/v1/status" and method == "GET":
             with self._turn_lock:
                 active = next((t for t in self._turns.values()
@@ -566,9 +586,12 @@ class OfflineHTTPApplication:
                 "local_only": True, "ready": True,
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
+<<<<<<< HEAD
+=======
                 "adaptive_metal_launch": getattr(
                     self.backend, "adaptive_metal_receipt", None,
                 ),
+>>>>>>> origin/main
                 "model_digest": self.model_digest,
                 "tokenizer_digest": self.tokenizer_digest,
                 "session_list_limit": 100,
@@ -883,7 +906,11 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
             raise OfflineHTTPError(411, "numeric request length required")
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
+<<<<<<< HEAD
+            else MAX_DOCUMENT_BYTES * 6 + 8192 if path == "/v1/knowledge/documents"
+=======
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
+>>>>>>> origin/main
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)

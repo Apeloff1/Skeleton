@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from hashlib import sha256
+<<<<<<< HEAD
+=======
 import time
+>>>>>>> origin/main
 
 import pytest
 
@@ -15,7 +18,11 @@ from skeleton.context.pre_delivery_guard import (
     merkle_root, request_parts,
 )
 from skeleton.context.sealed_sandwich import (
+<<<<<<< HEAD
+    SealedContextBoundaryError, SealedContextReplayError,
+=======
     SealedContextBoundaryError, SealedContextError, SealedContextReplayError,
+>>>>>>> origin/main
 )
 
 
@@ -51,14 +58,22 @@ class _Authority:
             1, "tenant", "thread",
         )
         self.calls = 0
+<<<<<<< HEAD
+        self.drift = False
+=======
         self.drift_at = None
+>>>>>>> origin/main
         self.cross_tenant = False
 
     async def resolve(self, *, tenant_scope_id, context_id, request_digest):
         assert request_digest == "request-digest"
         self.calls += 1
         old = self.snapshot
+<<<<<<< HEAD
+        if self.drift and self.calls == 2:
+=======
         if self.drift_at == self.calls:
+>>>>>>> origin/main
             return TrustedContextSnapshot(
                 old.root, old.policy_sha256, old.snapshot_version + 1,
                 old.tenant_id, old.context_id,
@@ -88,13 +103,21 @@ def test_preflight_and_postflight_accept_unchanged_authority():
         request, tenant_scope_id="tenant", context_id="thread",
     ))
     assert answer.result.text == "ok" and engine.calls == 1
+<<<<<<< HEAD
+    assert authority.calls == 2 and answer.canonical_snapshot_version == 1
+=======
     assert authority.calls == 3 and answer.canonical_snapshot_version == 1
+>>>>>>> origin/main
 
 
 def test_concurrent_policy_or_thread_edit_suppresses_output():
     request, engine = _Request(), _Engine()
     authority = _Authority(request)
+<<<<<<< HEAD
+    authority.drift = True
+=======
     authority.drift_at = 3
+>>>>>>> origin/main
     with pytest.raises(SealedContextReplayError):
         asyncio.run(_service(engine, authority).generate(
             request, tenant_scope_id="tenant", context_id="thread",
@@ -102,6 +125,8 @@ def test_concurrent_policy_or_thread_edit_suppresses_output():
     assert engine.calls == 1
 
 
+<<<<<<< HEAD
+=======
 def test_revocation_during_review_denies_before_model_execution():
     request, engine = _Request(), _Engine()
     authority = _Authority(request)
@@ -129,6 +154,7 @@ def test_stalled_pre_dispatch_authority_is_bounded_and_fails_closed():
     assert engine.calls == 0
 
 
+>>>>>>> origin/main
 def test_cross_tenant_reader_denies_before_model_execution():
     request, engine = _Request(), _Engine()
     authority = _Authority(request)
@@ -148,6 +174,9 @@ def test_caller_cannot_supply_prepared_tensors_or_snapshot():
             request, tenant_scope_id="tenant", context_id="thread",
             prepared_input=object(),
         ))
+<<<<<<< HEAD
+    assert engine.calls == 0
+=======
     with pytest.raises(SealedContextBoundaryError):
         asyncio.run(service.generate(
             request, tenant_scope_id="tenant", context_id="thread",
@@ -277,3 +306,4 @@ def test_source_callback_failure_does_not_expose_private_context(read_number, er
     assert secret not in str(caught.value)
     assert secret not in "".join(traceback.format_exception(caught.value))
     assert engine.calls == int(read_number == 3)
+>>>>>>> origin/main

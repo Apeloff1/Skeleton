@@ -256,6 +256,8 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     )
 
 
+<<<<<<< HEAD
+=======
 @pytest.mark.parametrize("drafts,rounds", [(1, 1), (2, 1), (3, 1), (3, 2)])
 def test_multidraft_command_reserves_exact_attempts_without_multiplying_output_or_time(drafts, rounds):
     context = _context()
@@ -289,6 +291,7 @@ def test_multidraft_command_refuses_more_candidates_than_the_output_reserve_can_
         )
 
 
+>>>>>>> origin/main
 def test_command_from_context_uses_context_projection_over_legacy_text() -> None:
     context = _projected_context()
 

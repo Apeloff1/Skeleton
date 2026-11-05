@@ -2653,6 +2653,8 @@ class CostGovernor:
             evidence_refs=refs,
         )
         reasons = list(accounting.reasons)
+<<<<<<< HEAD
+=======
         # Quota capacity and operation budgets are independent of the
         # reservation estimate. A terminal charge exceeding that estimate
         # must remain durably accounted but cannot be accepted as qualified
@@ -2673,6 +2675,7 @@ class CostGovernor:
             reasons.append(
                 "reservation-estimate-overrun:" + ",".join(exceeded_estimate)
             )
+>>>>>>> origin/main
         if quota_completion.overrun:
             reasons.append(
                 "cost-overrun:"

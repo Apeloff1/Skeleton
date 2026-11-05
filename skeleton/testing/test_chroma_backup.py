@@ -5,7 +5,10 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
+<<<<<<< HEAD
+=======
 import sys
+>>>>>>> origin/main
 
 import pytest
 
@@ -19,10 +22,14 @@ def _existing(*, running: bool = False, identity: str = "c" * 64):
         "State": {
             "Status": "running" if running else "exited",
             "Running": running, "Restarting": False,
+<<<<<<< HEAD
+        },
+=======
             "StartedAt": "2026-10-31T00:00:00Z",
             "FinishedAt": "2026-10-31T00:01:00Z",
         },
         "RestartCount": 0,
+>>>>>>> origin/main
         "Config": {"Image": "chromadb/chroma:latest@sha256:reviewed"},
         "Mounts": [{"Destination": "/chroma/chroma", "Type": "volume", "Name": "skeleton_chroma_data"}],
     }]
@@ -57,10 +64,13 @@ def test_two_stopped_legacy_stores_are_backed_up_without_mutating_docker(tmp_pat
     assert all(x["sha256"] == sha256(b"known-backup-byte").hexdigest() for x in manifest["files"])
     assert json.loads((dest / "manifest.json").read_text()) == manifest
     assert dest.stat().st_mode & 0o077 == 0
+<<<<<<< HEAD
+=======
     verified = chroma_backup.verify_backup(dest)
     assert verified["matches_manifest"] is True
     assert verified["database_integrity_verified"] is False
     assert verified["migration_complete"] is False
+>>>>>>> origin/main
 
 
 def test_running_container_is_rejected_before_copy(tmp_path, monkeypatch):
@@ -90,6 +100,8 @@ def test_container_replacement_during_copy_rejects_completed_manifest(tmp_path, 
     assert not (tmp_path / "backup").exists()
 
 
+<<<<<<< HEAD
+=======
 def test_restart_between_copies_is_detected(tmp_path, monkeypatch):
     inspections = 0
     def fake_docker(*args):
@@ -196,6 +208,7 @@ def test_verify_cli_does_not_contact_docker(tmp_path, monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)["matches_manifest"] is True
 
 
+>>>>>>> origin/main
 def test_symlink_or_existing_target_is_rejected(tmp_path, monkeypatch):
     target = tmp_path / "target"
     target.mkdir()

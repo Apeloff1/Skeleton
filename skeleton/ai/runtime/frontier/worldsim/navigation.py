@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import heapq
+<<<<<<< HEAD
+=======
 from collections import deque
+>>>>>>> origin/main
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
@@ -119,9 +122,15 @@ def gated_states(grid: NavGrid, spec: GateSpec, start: Cell) -> dict[tuple[Cell,
         return {}
     s0 = (start, frozenset({spec.keys[start]}) if start in spec.keys else frozenset())
     prev: dict = {s0: None}
+<<<<<<< HEAD
+    queue = [s0]
+    while queue:
+        cell, held = state = queue.pop(0)
+=======
     queue = deque([s0])
     while queue:
         cell, held = state = queue.popleft()
+>>>>>>> origin/main
         for n in sorted(_gated_neighbors(grid, spec, cell, held)):
             nh = held | {spec.keys[n]} if n in spec.keys else held
             ns = (n, frozenset(nh))

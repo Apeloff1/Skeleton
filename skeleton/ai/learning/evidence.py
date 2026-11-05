@@ -610,12 +610,20 @@ class UpdateRecord:
         object.__setattr__(self, "target_id", _text("target_id", self.target_id, MAX_ID_CHARS))
         object.__setattr__(self, "timestamp", _non_negative("timestamp", self.timestamp))
         if self.previous_version is not None:
+<<<<<<< HEAD
+            object.__setattr__(
+                self,
+                "previous_version",
+                _positive_int("previous_version", self.previous_version),
+            )
+=======
             if (type(self.previous_version) is not int
                     or not 0 <= self.previous_version < self.version):
                 raise LearningEvidenceError(
                     "previous_version must identify an earlier nonnegative version",
                     context={"reason": "invalid_update"},
                 )
+>>>>>>> origin/main
         if not isinstance(self.reversible, bool):
             raise LearningEvidenceError(
                 "reversible must be boolean",
@@ -1354,7 +1362,11 @@ class LearningEvidenceStore:
         the immutable record before advancing the store version so validation
         failures cannot create version gaps.
         """
+<<<<<<< HEAD
+        previous = self._version if self._version > 0 else None
+=======
         previous = self._version
+>>>>>>> origin/main
         new_version = self._version + 1
         before_digest = (
             previous_state_digest

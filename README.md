@@ -68,12 +68,15 @@ deterministic; it does not call a model provider.
 
 ## First install
 
+<<<<<<< HEAD
+=======
 **Tester release is not ready.** The default local AI provider requires trusted
 guard components that the current Compose startup does not yet supply, so local
 chat remains unavailable even after model provisioning. Full-profile Chroma
 startup is blocked pending safe persistence recovery. The current revision has
 not been qualified on the target Windows laptop.
 
+>>>>>>> origin/main
 Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
 Start Docker before running the installer. Host Node/Yarn are optional; the
 container build supplies frontend dependencies. Initial dependency/image builds
@@ -115,6 +118,11 @@ uname -m
 cd ~
 git clone https://github.com/Apeloff1/Skeleton.git
 cd Skeleton
+<<<<<<< HEAD
+# While PR #4357 is open, select the current installation candidate:
+git switch --track origin/codex/consumer-runtime-readiness-2026-10-25
+=======
+>>>>>>> origin/main
 python3 -m venv .venv
 source .venv/bin/activate
 python scripts/install_app.py --production --start
@@ -122,10 +130,15 @@ python -m skeleton app doctor --live --studio --json
 ```
 
 The `uname -m` result must be `x86_64` for the pinned Linux model/runtime below.
+<<<<<<< HEAD
+The branch selection is for this unmerged candidate; default `main` does not yet
+contain all of PR #4357.
+=======
 PR #4357 has been merged; a fresh clone uses the default branch. The hosted
 Windows installer smoke test covered an earlier revision, not the current source
 or an installation on your laptop. Check the [current readiness report](docs/ai/CONSUMER_READINESS_2026-10-31.md)
 before using this path for a tester.
+>>>>>>> origin/main
 
 Open **http://localhost:3000/setup** first, then **http://localhost:3000/product**.
 The production flag serves the built web app through Nginx. Later commands must
@@ -158,10 +171,16 @@ There is no shared administrator password or automatic first-user elevation.
 
 ### Enable AI
 
+<<<<<<< HEAD
+For the optional pinned **Linux x86-64 glibc** CPU model/runtime, explicitly provision
+artifacts, select the deployment in private `.env`, and recreate the engine. Windows
+users following the WSL 2 instructions above run these commands in the Ubuntu shell:
+=======
 The pinned **Linux x86-64 glibc** CPU model/runtime can be prepared with the
 commands below, but the default Compose startup currently lacks the trusted guard
 bootstrap needed to activate local inference. Provisioning alone will not make
 local chat available. Windows users run these commands in the Ubuntu shell:
+>>>>>>> origin/main
 
 ```bash
 python scripts/provision_local_ai.py --target linux-x86_64-glibc \
@@ -210,7 +229,11 @@ Original-world completion tracks saved edits, positive simulation, measured revi
 a compiled desktop package, and source/package export preparation. The console
 editor reports approved cores, content and toolchain readiness separately.
 
+<<<<<<< HEAD
+Enable **Review and refine** in chat for a bounded plan, draft, critique and
+=======
 Enable **Review and refine** in chat for a bounded plan, one to three draft candidates, critique and
+>>>>>>> origin/main
 refinement workflow. The stages share the original request, source snapshot,
 deadline and resource allowance. Live progress and final details show actual
 provider receipts and model identities. Configure roles and recovery using the

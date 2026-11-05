@@ -8,10 +8,14 @@ client-supplied root or a model's own review into authority.
 
 from __future__ import annotations
 
+<<<<<<< HEAD
+from dataclasses import dataclass
+=======
 import asyncio
 from dataclasses import dataclass
 import math
 import time
+>>>>>>> origin/main
 from typing import Any, Protocol
 
 from skeleton.context.pre_delivery_guard import (
@@ -51,12 +55,27 @@ class CanonicalGuardedLocalService:
 
     def __init__(
         self, guard: GuardedLocalInference, *, snapshots: TrustedSnapshotReader,
+<<<<<<< HEAD
+=======
         source_timeout_seconds: float = 5.0,
+>>>>>>> origin/main
     ) -> None:
         if not isinstance(guard, GuardedLocalInference) or not callable(
             getattr(snapshots, "resolve", None)
         ):
             raise SealedContextError("guard and authoritative snapshot reader required")
+<<<<<<< HEAD
+        self.guard = guard
+        self.snapshots = snapshots
+
+    async def _read(
+        self, *, tenant_scope_id: str, context_id: str, request_digest: str
+    ) -> TrustedContextSnapshot:
+        snapshot = await self.snapshots.resolve(
+            tenant_scope_id=tenant_scope_id, context_id=context_id,
+            request_digest=request_digest,
+        )
+=======
         if (isinstance(source_timeout_seconds, bool)
                 or not isinstance(source_timeout_seconds, (int, float))
                 or not math.isfinite(source_timeout_seconds)
@@ -97,6 +116,7 @@ class CanonicalGuardedLocalService:
             raise SealedContextBoundaryError("canonical source authority unavailable") from None
         if deadline is not None and time.monotonic() >= deadline:
             raise SealedContextBoundaryError("local inference deadline elapsed during authority read")
+>>>>>>> origin/main
         if not isinstance(snapshot, TrustedContextSnapshot):
             raise SealedContextBoundaryError("snapshot reader returned unverified state")
         if snapshot.tenant_id != tenant_scope_id or snapshot.context_id != context_id:
@@ -114,7 +134,11 @@ class CanonicalGuardedLocalService:
         ):
             raise SealedContextBoundaryError("canonical guard scope or contract missing")
         if any(key in engine_options for key in (
+<<<<<<< HEAD
+            "snapshot", "tenant_scope_id", "contract", "prepared_input",
+=======
             "snapshot", "tenant_scope_id", "contract", "prepared_input", "_before_dispatch",
+>>>>>>> origin/main
         )):
             raise SealedContextBoundaryError("caller attempted to override guarded authority")
         digest = getattr(request, "digest", None)
@@ -122,6 +146,13 @@ class CanonicalGuardedLocalService:
             raise SealedContextError("request needs a deterministic input digest")
         before = await self._read(
             tenant_scope_id=tenant_scope_id, context_id=context_id,
+<<<<<<< HEAD
+            request_digest=digest,
+        )
+        result, receipt = await self.guard.generate(
+            request, snapshot=before, tenant_scope_id=tenant_scope_id,
+            contract=contract, **engine_options,
+=======
             request_digest=digest, deadline=engine_options.get("deadline"),
         )
 
@@ -136,12 +167,17 @@ class CanonicalGuardedLocalService:
         result, receipt = await self.guard.generate(
             request, snapshot=before, tenant_scope_id=tenant_scope_id,
             contract=contract, _before_dispatch=check_before_dispatch, **engine_options,
+>>>>>>> origin/main
         )
         # Local model generation happened, but no answer has been released.
         # Reject concurrent edits, revocations and policy/version changes.
         after = await self._read(
             tenant_scope_id=tenant_scope_id, context_id=context_id,
+<<<<<<< HEAD
+            request_digest=digest,
+=======
             request_digest=digest, deadline=engine_options.get("deadline"),
+>>>>>>> origin/main
         )
         if after != before:
             raise SealedContextReplayError("canonical context changed during local inference")

@@ -100,6 +100,8 @@ class AdmissionDecision:
     snapshot_digest: str
 
 
+<<<<<<< HEAD
+=======
 @dataclass(frozen=True, slots=True)
 class KVReclamationReceipt:
     """Deterministic cache reclamation, with no active or pinned KV eviction."""
@@ -110,6 +112,7 @@ class KVReclamationReceipt:
     snapshot_digest: str
 
 
+>>>>>>> origin/main
 class RuntimeAdmissionScheduler:
     """Stateful, deterministic and fail-closed local inference admission scheduler."""
 
@@ -306,6 +309,8 @@ class RuntimeAdmissionScheduler:
             self._active[request_id] = ScheduledRequest(active.request, active.kv_bytes, active.enqueue_sequence, pinned)
         self._sequence += 1
 
+<<<<<<< HEAD
+=======
     def trim_retained_kv(self, *, target_bytes: int) -> KVReclamationReceipt:
         """Atomically evict oldest unpinned retained KV to a measured byte target.
 
@@ -355,6 +360,7 @@ class RuntimeAdmissionScheduler:
         target = min(self.limits.kv_capacity_bytes, max(0, available_memory_bytes - reserve_bytes))
         return self.trim_retained_kv(target_bytes=target)
 
+>>>>>>> origin/main
     def capacity(self) -> dict[str, int]:
         kv_used = sum(entry.bytes for entry in self._kv.values())
         queued_tokens = sum(item.request.prompt_tokens + item.request.max_new_tokens for item in self._queued.values())
@@ -442,7 +448,10 @@ class RuntimeAdmissionScheduler:
 
 
 __all__ = [
+<<<<<<< HEAD
+=======
     "KVReclamationReceipt",
+>>>>>>> origin/main
     "AdmissionDecision",
     "AdmissionLimits",
     "RuntimeAdmissionScheduler",

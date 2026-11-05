@@ -123,6 +123,8 @@ def test_deployment_manifest_binds_relative_artifacts_and_hashes(tmp_path: Path)
     assert deployment.gguf_metadata_count == 1
 
 
+<<<<<<< HEAD
+=======
 def _deployment_with_adjacent_library(tmp_path: Path) -> tuple[Path, Path, Path]:
     manifest, runtime, _ = _deployment(tmp_path)
     library = runtime.parent / "libllama.so.0"
@@ -243,6 +245,7 @@ def test_pinned_bundle_refuses_hosts_without_no_follow_open(tmp_path: Path, monk
         LocalModelDeployment.load(manifest)
 
 
+>>>>>>> origin/main
 @pytest.mark.asyncio
 async def test_manifest_loads_directly_into_provider_neutral_adapter(tmp_path: Path) -> None:
     manifest, _, _ = _deployment(tmp_path)

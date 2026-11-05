@@ -9,10 +9,15 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 
+<<<<<<< HEAD
+
+def _doctor(monkeypatch, tmp_path, critical):
+=======
 import pytest
 
 
 def _doctor(monkeypatch, tmp_path, critical, *, providers=None):
+>>>>>>> origin/main
     install = importlib.import_module("skeleton.app.first_install")
     health = importlib.import_module("skeleton.app.health")
 
@@ -35,7 +40,11 @@ def _doctor(monkeypatch, tmp_path, critical, *, providers=None):
     def bounded(url, *, timeout, max_response_bytes=65536):
         if url.endswith("/api/health/registry"):
             return critical
+<<<<<<< HEAD
+        return {
+=======
         return providers if providers is not None else {
+>>>>>>> origin/main
             "engine": "skeleton-engine", "providers": [],
             "llm_available": False, "availability_observed": True,
         }
@@ -75,6 +84,8 @@ def test_first_install_accepts_observed_required_routes(monkeypatch, tmp_path):
     assert report["critical_routes"]["ready"] is True
 
 
+<<<<<<< HEAD
+=======
 @pytest.mark.parametrize("code", ["local_guard_unavailable", "local_guard_configuration_invalid"])
 def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeypatch, tmp_path, code):
     report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
@@ -106,6 +117,7 @@ def test_doctor_ignores_untrusted_or_contradictory_guard_codes(monkeypatch, tmp_
     assert "do-not-print" not in str(report)
 
 
+>>>>>>> origin/main
 def test_first_install_rejects_contradictory_ready_with_missing_routes(monkeypatch, tmp_path):
     report = _doctor(monkeypatch, tmp_path, {
         "critical_routes": {

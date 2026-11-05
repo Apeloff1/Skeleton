@@ -82,8 +82,13 @@ def main() -> int:
     require(len(mongo_specs) == 1, "canonical PyMongo version must be exactly pinned", failures)
     if len(mongo_specs) == 1:
         require(
+<<<<<<< HEAD
+            text.count('"' + mongo_specs[0] + '"') == 2,
+            "both Merge Readiness Python dependency installs must use canonical PyMongo pin",
+=======
             text.count('"' + mongo_specs[0] + '"') == 3,
             "all three Merge Readiness Python dependency installs must use canonical PyMongo pin",
+>>>>>>> origin/main
             failures,
         )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
@@ -113,8 +118,13 @@ def main() -> int:
         failures,
     )
     require(
+<<<<<<< HEAD
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
+        "all five Python setup sites must consume PYTHON_VERSION",
+=======
         text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 6,
         "all six Python setup sites must consume PYTHON_VERSION",
+>>>>>>> origin/main
         failures,
     )
     require(
@@ -155,6 +165,11 @@ def main() -> int:
         "legacy canonical unit runner must remain enabled",
         failures,
     )
+<<<<<<< HEAD
+    require(
+        "python -m pytest -q --noconftest -p pytest_asyncio.plugin skeleton/testing --tb=short" in normalized_unit,
+        "unit gate must run the complete canonical domain suite with the explicit asyncio plugin",
+=======
     # A successful stable Unit check is impossible unless every canonical domain
     # shard passed. Never silently reduce test discovery or change check identity.
     domain_suite = job_block(text, "domain_suite")
@@ -180,6 +195,7 @@ def main() -> int:
     require(
         (ROOT / "scripts/run_domain_suite_shard.py").is_file(),
         "canonical domain shard runner missing",
+>>>>>>> origin/main
         failures,
     )
     require(

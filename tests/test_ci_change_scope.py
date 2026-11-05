@@ -115,6 +115,8 @@ def test_frontend_ingress_changes_run_docker_regression(tmp_path: Path, changed_
     }
 
 
+<<<<<<< HEAD
+=======
 def test_large_pr_merge_does_not_drop_scoped_checks_on_broken_pipe(tmp_path: Path) -> None:
     """Over 4,000 changed paths must not turn true gates into false skips."""
     repo = tmp_path / "repo"
@@ -225,6 +227,7 @@ def test_mixed_known_and_unknown_path_keeps_every_lane(tmp_path: Path) -> None:
     assert set(_scope(repo, "pull_request").values()) == {"true"}
 
 
+>>>>>>> origin/main
 def test_reusable_ci_calls_the_shared_scope_script_once() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "bash scripts/ci_change_scope.sh" in ci
