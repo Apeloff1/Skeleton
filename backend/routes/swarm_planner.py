@@ -185,21 +185,31 @@ def execute_build(req: BuildReq) -> dict:
 @router.post("/execute/async")
 def execute_async(req: ExecuteReq) -> dict:
     """Async free-form execution (lifts the live phase cap)."""
-    job_id = scheduler.start_async(
-        "execute", build_id=req.build_id, phases=req.phases, objectives=req.objectives,
-        deps=req.deps, seed=req.seed, platoon_size=req.platoon_size,
-        game_ctx=req.game_ctx, rounds=req.rounds, persist=req.persist,
-    )
+    try:
+        job_id = scheduler.start_async(
+            "execute", build_id=req.build_id, phases=req.phases, objectives=req.objectives,
+            deps=req.deps, seed=req.seed, platoon_size=req.platoon_size,
+            game_ctx=req.game_ctx, rounds=req.rounds, persist=req.persist,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, "invalid swarm asynchronous job request") from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "swarm asynchronous admission unavailable") from exc
     return {"job_id": job_id, "status": "running"}
 
 
 @router.post("/execute-build/async")
 def execute_build_async(req: BuildReq) -> dict:
     """Async real-build execution — runs the full ladder without the online cap."""
-    job_id = scheduler.start_async(
-        "build", build_id=req.build_id, seed=req.seed,
-        platoon_size=req.platoon_size, rounds=req.rounds,
-    )
+    try:
+        job_id = scheduler.start_async(
+            "build", build_id=req.build_id, seed=req.seed,
+            platoon_size=req.platoon_size, rounds=req.rounds,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, "invalid asynchronous real-build request") from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "asynchronous real-build admission unavailable") from exc
     return {"job_id": job_id, "status": "running"}
 
 
@@ -207,7 +217,10 @@ def execute_build_async(req: BuildReq) -> dict:
 async def job(job_id: str) -> dict:
     from routes.galaxy_studio_state import load_build
 
-    j = scheduler.get_job(job_id)
+    try:
+        j = scheduler.get_job(job_id)
+    except RuntimeError as exc:
+        raise HTTPException(503, "swarm job history unavailable") from exc
     if not j or await load_build(j.get("build_id", "")) is None:
         raise HTTPException(404, "unknown job")
     return j
