@@ -222,3 +222,52 @@ def test_cli_corrupt_export_fails_before_creating_restore_slot(tmp_path, capsys)
     assert failure["next_action"] == "reject_export_and_restore_from_trusted_copy"
     assert not (tmp_path / "lighthouse.forged.session.json").exists()
     assert source_path.read_bytes() == source_before
+
+
+def test_session_writer_lease_permission_failure_is_typed_and_preserves_save(tmp_path, monkeypatch):
+    """A denied session lock must not advance the saved player revision."""
+    import errno
+    import os
+    from skeleton.jeeves.worlds import session as session_module
+
+    _compiled(tmp_path)
+    flow = LaptopFlow(tmp_path)
+    initial = flow.create_session("lighthouse", "save")
+    original_open = session_module.os.open
+
+    def deny_session_lock(path, flags, *args, **kwargs):
+        if path == "lighthouse.lock" and flags & os.O_EXCL:
+            raise PermissionError(errno.EACCES, "permission denied", path)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(session_module.os, "open", deny_session_lock)
+    with pytest.raises(CanonError) as exc:
+        flow.choose("lighthouse", "save", "rescue", initial["session_digest"])
+    assert exc.value.code == "lease_unavailable"
+    assert not (tmp_path / "lighthouse.lock").exists()
+    # Unpatch before inspecting: only the denied operation is under test.
+    monkeypatch.setattr(session_module.os, "open", original_open)
+    assert LaptopFlow(tmp_path).inspect_session("lighthouse", "save")["session_digest"] == initial["session_digest"]
+
+
+def test_session_lease_failure_does_not_delete_another_writers_lock(tmp_path, monkeypatch):
+    """A failed acquisition must never remove a preexisting foreign lease."""
+    import errno
+    from skeleton.jeeves.worlds import session as session_module
+
+    _compiled(tmp_path)
+    lock = tmp_path / "lighthouse.lock"
+    lock.write_bytes(b"foreign-writer-lease")
+    original_open = session_module.os.open
+
+    def deny_lock(path, flags, *args, **kwargs):
+        if path == "lighthouse.lock":
+            raise PermissionError(errno.EACCES, "permission denied", path)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(session_module.os, "open", deny_lock)
+    with pytest.raises(CanonError) as exc:
+        LaptopFlow(tmp_path).create_session("lighthouse", "blocked")
+    assert exc.value.code == "lease_unavailable"
+    assert lock.read_bytes() == b"foreign-writer-lease"
+    assert not (tmp_path / "lighthouse.blocked.session.json").exists()
