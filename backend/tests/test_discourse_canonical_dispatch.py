@@ -55,6 +55,9 @@ def test_multiple_providers_prioritized_over_multiple_same_vendor_models():
     assert result.mode == "cross_provider"
     assert result.provider_diverse is True
     assert result.independent_judge is True
+    assert result.available_models == (
+        "anthropic:other", "local:gguf", "openai:first", "openai:second"
+    )
 
 
 @pytest.mark.parametrize("requested", [
