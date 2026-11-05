@@ -104,7 +104,16 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     """
     if type(hello) is not dict or hello.get("isWritablePrimary") is not True:
         return None
-    # A writable primary must not simultaneously assert a secondary or\n    # arbiter role. Reject contradictory and non-boolean role flags before\n    # reading the canonical epoch; never coerce arbitrary driver values.\n    for role in ("secondary", "arbiterOnly"):\n        role_value = hello.get(role)\n        if role_value is not None and type(role_value) is not bool:\n            return None\n        if role_value is True:\n            return None\n    name = hello.get("setName")
+    # A writable primary must not simultaneously assert a secondary or
+    # arbiter role. Reject contradictory and non-boolean role flags before
+    # reading the canonical epoch; never coerce arbitrary driver values.
+    for role in ("secondary", "arbiterOnly"):
+        role_value = hello.get(role)
+        if role_value is not None and type(role_value) is not bool:
+            return None
+        if role_value is True:
+            return None
+    name = hello.get("setName")
     if (type(name) is not str or not 1 <= len(name) <= 128
             or not name.isascii()
             or any(ord(ch) < 33 or ord(ch) > 126 for ch in name)):
