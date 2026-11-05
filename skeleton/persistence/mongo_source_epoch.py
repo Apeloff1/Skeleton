@@ -437,8 +437,17 @@ def fence_memory_tombstone(method):
             memory_id, tenant_id=tenant_id, namespace=namespace,
             include_tombstoned=True,
         )
-        if current.tenant_id != tenant_id or current.namespace != namespace:
+        # The lookup result is not an authority to select a different actor.
+        # Validate exact scalar identities before comparisons or writer CAS:
+        # hostile string subclasses can override equality and forge scope.
+        if (type(tenant_id) is not str or type(namespace) is not str
+                or current is None
+                or type(getattr(current, "tenant_id", None)) is not str
+                or type(getattr(current, "namespace", None)) is not str
+                or type(getattr(current, "subject_id", None)) is not str
+                or current.tenant_id != tenant_id or current.namespace != namespace):
             raise MongoSourceEpochError("canonical memory tombstone scope changed")
+        epoch._key(tenant_id, current.subject_id)
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
             return await method(self, memory_id, *args, **kwargs)
 
