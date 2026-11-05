@@ -478,3 +478,247 @@ __all__ = [
     "PrivateCapsulePlan", "prepare_private_capsule",
     "publish_private_capsule",
 ]
+
+
+def _read_capsule_file(directory_fd: int, relative: str, max_bytes: int) -> bytes:
+    """Pin each selected directory and read a private regular inode exactly."""
+    parts = relative.split("/")
+    parent_fd = os.dup(directory_fd)
+    try:
+        for component in parts[:-1]:
+            opened = os.open(component, _DIR, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = opened
+            _dir(parent_fd)
+        fd = os.open(parts[-1], _READ, dir_fd=parent_fd)
+        try:
+            first = os.fstat(fd)
+            linked = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(first.st_mode)
+                or first.st_uid != os.getuid() or first.st_nlink != 1
+                or first.st_mode & 0o077
+                or not 1 <= first.st_size <= max_bytes
+                or (first.st_dev, first.st_ino, first.st_size)
+                != (linked.st_dev, linked.st_ino, linked.st_size)
+            ):
+                raise PrivateCapsuleHold("sealed capsule contains unsafe source inode")
+            buffer = bytearray()
+            while len(buffer) <= first.st_size:
+                part = os.read(fd, min(16384, first.st_size + 1 - len(buffer)))
+                if not part:
+                    break
+                buffer.extend(part)
+            second = os.fstat(fd)
+            again = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+            if (
+                len(buffer) != first.st_size
+                or (first.st_dev, first.st_ino, first.st_size, first.st_mtime_ns)
+                != (second.st_dev, second.st_ino, second.st_size, second.st_mtime_ns)
+                or (first.st_dev, first.st_ino, first.st_size)
+                != (again.st_dev, again.st_ino, again.st_size)
+            ):
+                raise PrivateCapsuleHold("source bytes changed while verifying sealed capsule")
+            return bytes(buffer)
+        finally:
+            os.close(fd)
+    finally:
+        os.close(parent_fd)
+
+
+def _capsule_tree(root_fd: int) -> tuple[set[str], set[str]]:
+    """Bounded descriptor walk that rejects symlinks, aliases and extra files."""
+    files: set[str] = set()
+    folders: set[str] = set()
+    pending: list[tuple[int, str]] = [(os.dup(root_fd), "")]
+    try:
+        while pending:
+            fd, prefix = pending.pop()
+            try:
+                _dir(fd)
+                names = os.listdir(fd)
+                if len(names) + len(files) + len(folders) > 512:
+                    raise PrivateCapsuleHold("unbounded or suspicious capsule tree")
+                for name in names:
+                    if type(name) is not str or not name or "/" in name:
+                        raise PrivateCapsuleHold("untrusted private source tree name")
+                    relative = prefix + name
+                    st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                    if st.st_uid != os.getuid() or st.st_mode & 0o077:
+                        raise PrivateCapsuleHold("shared or substituted capsule tree inode")
+                    if stat.S_ISDIR(st.st_mode):
+                        if len(folders) >= 256:
+                            raise PrivateCapsuleHold("capsule directory depth or count exceeded")
+                        folders.add(relative)
+                        opened = os.open(name, _DIR, dir_fd=fd)
+                        try:
+                            check = os.fstat(opened)
+                            if (check.st_dev, check.st_ino) != (st.st_dev, st.st_ino):
+                                raise PrivateCapsuleHold("private capsule directory replaced")
+                            pending.append((opened, relative + "/"))
+                            opened = None
+                        finally:
+                            if opened is not None:
+                                os.close(opened)
+                    elif stat.S_ISREG(st.st_mode):
+                        if st.st_nlink != 1:
+                            raise PrivateCapsuleHold("aliased capsule file denied")
+                        if len(files) >= MAX_CAPSULE_FILES + 1:
+                            raise PrivateCapsuleHold("unreviewed source files exceed capsule bound")
+                        files.add(relative)
+                    else:
+                        raise PrivateCapsuleHold("nonregular or symbolic capsule entry denied")
+            finally:
+                os.close(fd)
+        return files, folders
+    finally:
+        for fd, _ in pending:
+            os.close(fd)
+
+
+def _strict_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise PrivateCapsuleHold("duplicate private seal authority")
+        result[key] = value
+    return result
+
+
+def _nonfinite(_):
+    raise PrivateCapsuleHold("invalid nonfinite private seal")
+
+
+def verify_private_capsule(
+    destination: str | Path, *,
+    original_project_root: str,
+    expected_capsule_sha256: str,
+    expected_seal_sha256: str,
+) -> dict[str, object]:
+    """Cold-open *all* selected source and verify the final seal independently.
+
+    No project read, model call, Git, file write, source import, compilation or
+    test process. Human must separately approve any use of these inert files.
+    """
+    if (
+        type(original_project_root) is not str
+        or not Path(original_project_root).is_absolute()
+        or ".." in Path(original_project_root).parts
+        or not _sha(expected_capsule_sha256)
+        or not _sha(expected_seal_sha256)
+    ):
+        raise PrivateCapsuleHold("complete original root and SHA custody needed")
+    path = _new_destination(destination, original_project_root)
+    private_parent = _pinned_private_directory(path)
+    capsule_fd = None
+    try:
+        _identical_parent(path, private_parent)
+        capsule_fd = os.open(path.name, _DIR, dir_fd=private_parent)
+        _dir(capsule_fd)
+        before = os.fstat(capsule_fd)
+        current = os.stat(path.name, dir_fd=private_parent, follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (current.st_dev, current.st_ino):
+            raise PrivateCapsuleHold("private capsule directory changed")
+        raw = _read_capsule_file(capsule_fd, SEAL_NAME, 16384)
+        if _hash(raw) != expected_seal_sha256:
+            raise PrivateCapsuleHold("complete capsule seal not original approved bytes")
+        try:
+            seal = json.loads(
+                raw.decode("utf-8", "strict"), object_pairs_hook=_strict_pairs,
+                parse_constant=_nonfinite,
+            )
+        except (UnicodeError, ValueError, TypeError) as exc:
+            raise PrivateCapsuleHold("private completion seal malformed") from exc
+        keys = {
+            "schema", "status", "capsule_sha256",
+            "source_manifest_sha256", "patch_sha256", "python_graph_sha256",
+            "file_count", "files", "source_code_executed",
+            "original_checkout_modified", "full_project_or_device_qualified",
+            "release_certified",
+        }
+        if (
+            type(seal) is not dict or set(seal) != keys
+            or raw != _canonical(seal)
+            or seal["schema"] != SEAL_SCHEMA
+            or seal["status"] != "private-source-capsule-complete-unexecuted"
+            or seal["capsule_sha256"] != expected_capsule_sha256
+            or any(not _sha(seal[k]) for k in (
+                "source_manifest_sha256", "patch_sha256", "python_graph_sha256",
+            ))
+            or any(seal[k] is not False for k in (
+                "source_code_executed", "original_checkout_modified",
+                "full_project_or_device_qualified", "release_certified",
+            ))
+            or type(seal["file_count"]) is not int
+            or not 2 <= seal["file_count"] <= MAX_CAPSULE_FILES
+            or type(seal["files"]) is not list
+            or len(seal["files"]) != seal["file_count"]
+        ):
+            raise PrivateCapsuleHold("unqualified or altered source capsule seal")
+        approved = {}
+        total = 0
+        for row in seal["files"]:
+            if type(row) is not dict or set(row) != {
+                "path", "kind", "sha256", "bytes",
+            }:
+                raise PrivateCapsuleHold("unsupported source capsule file inventory")
+            name = row["path"]
+            try:
+                parts = _relative(name)
+            except (WorkspaceDeliveryHold, ValueError) as exc:
+                raise PrivateCapsuleHold("untrusted source path in seal") from exc
+            if (
+                name == SEAL_NAME or name.casefold() in approved
+                or not all(_allowed_name(p, directory=i < len(parts)-1)
+                           for i, p in enumerate(parts))
+                or row["kind"] not in ("selected-original", "new", "edit")
+                or not _sha(row["sha256"])
+                or type(row["bytes"]) is not int
+                or not 1 <= row["bytes"] <= 65536
+            ):
+                raise PrivateCapsuleHold("untrusted source file or digest in private seal")
+            total += row["bytes"]
+            if total > MAX_TOTAL_CAPSULE_BYTES:
+                raise PrivateCapsuleHold("capsule source aggregate exceeded")
+            approved[name.casefold()] = name
+            # Byte count is verified by exact read, not a directory listing.
+            data = _read_capsule_file(capsule_fd, name, row["bytes"])
+            if len(data) != row["bytes"] or _hash(data) != row["sha256"]:
+                raise PrivateCapsuleHold("sealed source file content differs")
+        paths = [row["path"] for row in seal["files"]]
+        if paths != sorted(paths, key=lambda x: (x.casefold(), x)):
+            raise PrivateCapsuleHold("source inventory must be canonical sorted order")
+        expected_files = set(paths) | {SEAL_NAME}
+        expected_dirs = {
+            "/".join(p.split("/")[:i])
+            for p in paths for i in range(1, len(p.split("/")))
+        }
+        actual_files, actual_dirs = _capsule_tree(capsule_fd)
+        if actual_files != expected_files or actual_dirs != expected_dirs:
+            raise PrivateCapsuleHold("capsule contains missing or unapproved tree entries")
+        _identical_parent(path, private_parent)
+        after = os.stat(path.name, dir_fd=private_parent, follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise PrivateCapsuleHold("private capsule replaced after cold verification")
+        # Recheck fixed seal after the full directory walk to catch late swaps.
+        if _read_capsule_file(capsule_fd, SEAL_NAME, 16384) != raw:
+            raise PrivateCapsuleHold("final seal changed during cold verification")
+        return {
+            "schema": SCHEMA,
+            "status": "cold-source-capsule-verified-unexecuted",
+            "capsule_sha256": expected_capsule_sha256,
+            "seal_sha256": expected_seal_sha256,
+            "source_manifest_sha256": seal["source_manifest_sha256"],
+            "patch_sha256": seal["patch_sha256"],
+            "file_count": len(paths),
+            "source_bytes": total,
+            "all_sealed_source_bytes_verified": True,
+            "original_project_modified": False,
+            "source_code_executed": False,
+            "all_source_dependencies_complete": False,
+            "release_certified": False,
+        }
+    finally:
+        if capsule_fd is not None:
+            os.close(capsule_fd)
+        os.close(private_parent)
