@@ -25,6 +25,15 @@ class ComposeTopologyCustodyTests(unittest.TestCase):
         self.assertEqual(_trusted_topology(hello), ("rs0", None, None, None, None))
         self.assertEqual(_trusted_topology(dict(hello)), _trusted_topology(hello))
 
+    def test_empty_advertised_voting_hosts_fail_closed(self):
+        # An explicit empty voting set cannot establish a primary identity.
+        # Omitted hosts remain observation-only for older server versions.
+        hello = {"setName": "rs0", "isWritablePrimary": True}
+        self.assertIsNotNone(_trusted_topology(hello))
+        self.assertIsNone(_trusted_topology({**hello, "hosts": []}))
+        self.assertIsNone(_trusted_topology({**hello, "hosts": [], "me": "mongo:27017"}))
+        self.assertIsNotNone(_trusted_topology({**hello, "hosts": ["mongo:27017"], "me": "mongo:27017"}))
+
     def test_hostile_fields_never_execute_user_defined_equality(self):
         for field, value in (
             ("setName", HostileString("rs0")),
