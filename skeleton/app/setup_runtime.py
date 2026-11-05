@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import stat
+from hashlib import sha256
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -223,6 +224,25 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
     if len(raw) > _MAX_ENV_BYTES:
         raise ValueError("runtime .env exceeds the 256 KiB input limit")
     return raw.decode("utf-8"), repaired_permissions
+
+
+
+def runtime_source_fingerprint(root: Path) -> str:
+    """Return a redacted identity for the exact bounded runtime source bytes.
+
+    The installer checks the same private environment file before and after
+    manifest resolution and Compose validation. This fence detects operator
+    edits and configuration swaps rather than starting with an unvalidated
+    port/credential set. It never chmods the file or includes secrets in
+    errors, logs or receipts.
+    """
+    try:
+        raw, _ = _read_existing_env(
+            root / ".env", label="runtime .env", private=False
+        )
+    except (OSError, UnicodeError, ValueError):
+        raise ValueError("runtime configuration source cannot be safely admitted") from None
+    return sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _atomic_write(path: Path, text: str) -> None:
