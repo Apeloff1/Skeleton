@@ -14,9 +14,18 @@ from .dispatcher import LaptopDispatcher
 from .run_once import generate_once
 from .server import LaptopHTTPServer
 from .startup import activate_checked
+from .preflight import validate_native_shape
+from .contracts import identifier
+
+class _RedactedArguments(argparse.ArgumentParser):
+    """Do not expose private command arguments in automatic usage errors."""
+
+    def error(self, message: str) -> None:
+        raise ContractViolation("invalid local AI command-line arguments")
+
 
 def main(argv=None):
-    p=argparse.ArgumentParser(description="Real first-usable offline AI laptop runtime")
+    p=_RedactedArguments(description="Real first-usable offline AI laptop runtime")
     p.add_argument("--model-root",type=Path,required=True)
     p.add_argument("--state-dir",type=Path,required=True)
     p.add_argument("--tenant",required=True)
@@ -34,8 +43,34 @@ def main(argv=None):
     p.add_argument("--capacity-root",type=Path)
     p.add_argument("--capacity-budget-bytes",type=int,default=8000000000)
     p.add_argument("--capacity-slots",type=int,default=1)
-    args=p.parse_args(argv)
     try:
+        args=p.parse_args(argv)
+        # Pure admission before reading private task bytes, source installer
+        # receipts, creating SQLite state, or starting an isolated GGUF.
+        identifier(args.tenant,"tenant")
+        identifier(args.subject,"subject")
+        for label, value in (
+            ("model root",args.model_root),
+            ("state directory",args.state_dir),
+            ("capacity root",args.capacity_root),
+        ):
+            if value is None and label == "capacity root":
+                continue
+            if (not isinstance(value,Path) or not value.is_absolute()
+                    or ".." in value.parts or chr(0) in str(value)):
+                raise ContractViolation("absolute canonical private "+label+" required")
+        if args.session is not None:
+            identifier(args.session,"session")
+        if args.request_id is not None:
+            identifier(args.request_id,"request ID")
+        validate_native_shape(
+            n_ctx=args.context, max_new_tokens=args.max_new_tokens,
+            n_threads=args.threads, gpu_layers=args.gpu_layers,
+            capacity_budget_bytes=args.capacity_budget_bytes,
+            capacity_slots=args.capacity_slots,
+        )
+        if type(args.port) is not int or not 1 <= args.port <= 65535:
+            raise ContractViolation("finite loopback port required")
         if args.mode=="once" and not args.prompt_stdin:
             raise ContractViolation("one-shot CLI requires explicit --prompt-stdin")
         if args.mode=="serve" and (args.prompt_stdin or args.session or args.request_id):
