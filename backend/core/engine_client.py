@@ -202,7 +202,10 @@ def _engine_origin(raw: str) -> str:
     """
     if not isinstance(raw, str) or raw != raw.strip() or len(raw) > 4096:
         raise EngineProtocolError("engine base_url must be normalized")
-    if any(ord(ch) < 33 or ord(ch) > 126 for ch in raw) or "\\" in raw:
+    if (
+        any(ord(ch) < 33 or ord(ch) > 126 for ch in raw)
+        or "\\" in raw or "?" in raw or "#" in raw
+    ):
         raise EngineProtocolError("engine base_url contains forbidden URL characters")
     try:
         parts = urlsplit(raw)
@@ -222,7 +225,7 @@ def _engine_origin(raw: str) -> str:
         or "@" in parts.netloc
     ):
         raise EngineProtocolError("engine base_url must be an origin without credentials or paths")
-    if not 1 <= (port or (443 if scheme == "https" else 80)) <= 65535:
+    if port is not None and not 1 <= port <= 65535:
         raise EngineProtocolError("engine base_url port is invalid")
     if ":" in host:
         try:
