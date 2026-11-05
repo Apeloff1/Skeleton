@@ -393,7 +393,7 @@ def fence_conversation_write(method):
         if epoch is None:
             return await method(self, *args, **kwargs)
         tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
-        if not isinstance(tenant_id, str) or not isinstance(actor_id, str):
+        if type(tenant_id) is not str or type(actor_id) is not str:
             raise MongoSourceEpochError("canonical conversation write actor missing")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
@@ -502,11 +502,11 @@ def fence_memento_write(method):
             tenant_id, actor_id = archive.binding.tenant_id, archive.binding.owner_id
         else:
             tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
-        if (not isinstance(tenant_id, str) or not isinstance(actor_id, str)
+        if (type(tenant_id) is not str or type(actor_id) is not str
                 or not tenant_id or not actor_id):
             raise MongoSourceEpochError("canonical memento mutation actor missing")
         if ("archive" not in kwargs and
-                (not isinstance(kwargs.get("thread_id"), str)
+                (type(kwargs.get("thread_id")) is not str
                  or not kwargs["thread_id"])):
             # Syntactically invalid no-write denials must not quarantine an
             # otherwise stable actor epoch merely by acquiring it.
