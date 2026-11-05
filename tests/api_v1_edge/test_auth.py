@@ -56,3 +56,7 @@ def test_enforce_policy_binding():
     assert e.value.code == "EDGE.AUTH.METHOD"
     assert a.enforce(RouteSpec("GET", "/x"), scope(authorization="Bearer " + tok)).subject == "s"
     assert a.enforce(RouteSpec("GET", "/x", auth="public"), scope(x_api_key="bad")).method == "anonymous"
+    spoof = a.enforce(RouteSpec("GET", "/x", auth="public"), scope(x_tenant_id="victim"))
+    assert spoof.subject == "anonymous" and spoof.tenant == "public"
+    verified = a.enforce(RouteSpec("GET", "/x", auth="public"), scope(x_api_key=tok, x_tenant_id="victim"))
+    assert verified.tenant == "t" and verified.method == "api_key"

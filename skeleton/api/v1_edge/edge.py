@@ -56,7 +56,8 @@ def build_v1_edge(app, cfg: EdgeConfig):
     health_ready = V1_PREFIX + "/health/ready"
 
     async def edge(scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(V1_PREFIX):
+        path = scope.get("path", "")
+        if scope["type"] != "http" or not (path == V1_PREFIX or path.startswith(V1_PREFIX + "/")):
             return await app(scope, receive, send)
         path, method = scope["path"], scope["method"].upper()
         rid = request_id(header(scope, "x-request-id"))

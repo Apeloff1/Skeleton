@@ -10,8 +10,11 @@ def err(r):
 
 
 def test_passthrough_outside_v1(env):
-    r = env["client"].get("/other")
-    assert r.status_code == 200 and "x-request-id" not in r.headers
+    for path in ("/other", "/api/v1evil", "/api/v1-private", "/api/v10/projects"):
+        r = env["client"].get(path)
+        assert r.status_code == 200 and r.json()["path"] == path
+        assert "x-request-id" not in r.headers
+    assert env["client"].get("/api/v1/nope").status_code == 404
 
 
 def test_public_route_security_headers_trace(env):
