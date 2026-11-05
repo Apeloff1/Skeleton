@@ -1,0 +1,15 @@
+{
+  "case": "00_baseline",
+  "gate": "cancel",
+  "expect": "accept",
+  "reason": "Canonical explicitly bounded source record",
+  "payload": {
+    "request_id": "req_001",
+    "state": "cancelled",
+    "now_ns": 1000000,
+    "deadline_ns": 2000000,
+    "generated_tokens": 4,
+    "acked": true,
+    "backend_active": false
+  }
+}

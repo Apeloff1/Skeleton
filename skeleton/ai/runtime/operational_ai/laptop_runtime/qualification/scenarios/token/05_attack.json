@@ -1,0 +1,12 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "05_attack",
+  "domain": "token",
+  "expected": "reject",
+  "payload": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "reason": "Refuse adversarial token variant 5",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational token contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

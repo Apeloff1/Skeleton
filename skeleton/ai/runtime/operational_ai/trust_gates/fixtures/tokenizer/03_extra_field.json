@@ -1,0 +1,17 @@
+{
+  "case": "03_extra_field",
+  "gate": "tokenizer",
+  "expect": "reject",
+  "reason": "Unknown properties may not be silently accepted",
+  "payload": {
+    "model_id": "local-gguf",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "vocab_size": 4096,
+    "bos_id": 1,
+    "eos_id": 2,
+    "unk_id": 3,
+    "context_window": 2048,
+    "normalization": "byte-exact",
+    "untrusted_override": "allow"
+  }
+}

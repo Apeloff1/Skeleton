@@ -1,0 +1,18 @@
+{
+  "case": "03_extra_field",
+  "gate": "grant",
+  "expect": "reject",
+  "reason": "Unknown properties may not be silently accepted",
+  "payload": {
+    "actor_id": "operator",
+    "tool_id": "read_text",
+    "expires_at": 2000000,
+    "now": 1000000,
+    "nonce": "nonce_001",
+    "rights": [
+      "read"
+    ],
+    "scope": "operator:read_text",
+    "untrusted_override": "allow"
+  }
+}

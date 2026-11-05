@@ -1,0 +1,18 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "artifact",
+  "expect": "reject",
+  "reason": "Shard sum equals declared model bytes",
+  "payload": {
+    "model_id": "local-gguf",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 201,
+    "shard_bytes": [
+      100,
+      100
+    ],
+    "license": "operator-reviewed-license",
+    "approved": true,
+    "source": "offline-manifest-v1"
+  }
+}

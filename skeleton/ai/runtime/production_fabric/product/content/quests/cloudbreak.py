@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for cloudbreak."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('cloudbreak_arrival', (), (), ('arrival_record',)), Quest('cloudbreak_source', ('cloudbreak_arrival',), ('arrival_record',), ('source_proof',)), Quest('cloudbreak_witness', ('cloudbreak_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('cloudbreak_reconcile', ('cloudbreak_source', 'cloudbreak_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('cloudbreak_crossing', ('cloudbreak_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('cloudbreak_conclusion', ('cloudbreak_crossing',), ('crossing_pass',), ('ending_unlocked',)))

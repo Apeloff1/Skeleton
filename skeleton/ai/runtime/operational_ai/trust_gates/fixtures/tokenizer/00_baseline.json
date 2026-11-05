@@ -1,0 +1,16 @@
+{
+  "case": "00_baseline",
+  "gate": "tokenizer",
+  "expect": "accept",
+  "reason": "Canonical, explicitly bounded record",
+  "payload": {
+    "model_id": "local-gguf",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "vocab_size": 4096,
+    "bos_id": 1,
+    "eos_id": 2,
+    "unk_id": 3,
+    "context_window": 2048,
+    "normalization": "byte-exact"
+  }
+}

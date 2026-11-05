@@ -135,6 +135,10 @@ jobs:
         env:
           PYTHONPATH: "."
         run: python tests/run_unit.py
+      - name: Verify restart-safe local AI work-order contracts
+        run: python scripts/check_ai_work_orders.py
+      - name: Verify offline cognition exact-source and signed-work contracts
+        run: python scripts/check_offline_cognition.py --full
       - name: Verify legacy tests preserve tracked source
         run: git diff --exit-code
 

@@ -1,0 +1,41 @@
+{
+  "schema": "ai-reliability-case.v1",
+  "case": "12_boolean_token_limit",
+  "domain": "outbox_ack",
+  "expected": "reject",
+  "record": {
+    "schema": "ai.reliability.fabric.v1",
+    "domain": "outbox_ack",
+    "identity": {
+      "tenant": "local",
+      "subject": "operator",
+      "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scope": "local:operator"
+    },
+    "revision": 1,
+    "timing": {
+      "issued_ns": 100,
+      "observed_ns": 150,
+      "expires_ns": 200
+    },
+    "limits": {
+      "bytes": 1024,
+      "tokens": true,
+      "operations": 16
+    },
+    "approval": {
+      "operator_approved": true,
+      "source_verified": true,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "details": {
+      "event_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ack_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "delivered": true,
+      "duplicate": false
+    }
+  },
+  "threat": "Refuse boolean token limit",
+  "independent_proof": "Only actual model, rights, device, SQLite and final SHA can prove external claims",
+  "release_claim": false
+}

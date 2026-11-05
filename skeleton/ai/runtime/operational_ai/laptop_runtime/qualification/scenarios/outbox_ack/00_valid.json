@@ -1,0 +1,15 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "00_valid",
+  "domain": "outbox_ack",
+  "expected": "accept",
+  "payload": {
+    "event_key": "turn_s1_r1",
+    "event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "reason": "Explicit caller-owned bounded input",
+  "threat": "operator-bound-nominal",
+  "authority_boundary": "Operational outbox_ack contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

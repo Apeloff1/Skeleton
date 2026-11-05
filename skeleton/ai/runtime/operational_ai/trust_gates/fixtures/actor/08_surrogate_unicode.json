@@ -1,0 +1,17 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "actor",
+  "expect": "reject",
+  "reason": "Invalid surrogate must not enter canonical request",
+  "payload": {
+    "tenant": "\ud800",
+    "user": "operator",
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": "local:operator",
+    "rights": [
+      "inference"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "00_valid",
+  "domain": "turn",
+  "expected": "accept",
+  "payload": {
+    "session_id": "s_1",
+    "request_id": "r_1",
+    "prompt": "hello"
+  },
+  "reason": "Explicit caller-owned bounded input",
+  "threat": "operator-bound-nominal",
+  "authority_boundary": "Operational turn contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

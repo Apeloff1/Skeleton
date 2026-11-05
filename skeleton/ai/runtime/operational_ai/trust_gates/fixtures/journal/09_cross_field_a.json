@@ -1,0 +1,15 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "journal",
+  "expect": "reject",
+  "reason": "Genesis previous digest is zero",
+  "payload": {
+    "stream": "chat_001",
+    "sequence": 1,
+    "prev_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "event_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "kind": "inference.completed",
+    "payload_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "epoch": 1
+  }
+}
