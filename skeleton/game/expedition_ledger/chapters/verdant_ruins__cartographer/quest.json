@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "verdant_ruins__cartographer",
+  "chapter": 43,
+  "title": "Verdant Ruins: The Cartographer's Civic Seed",
+  "theme": "verdant_ruins",
+  "discipline": "cartographer",
+  "region": "Verdant Ruins",
+  "premise": "In a forest city reclaimed by root-powered civic machines, the cartographer must chart hidden passages before nightfall using a living contour chart.",
+  "signal": "root drum",
+  "key_name": "root drum attunement",
+  "objective_name": "Civic Seed",
+  "ending": "Recover the Civic Seed and return with the charted evacuation line; Green Assembly can finally verify the source testimony.",
+  "faction": "Green Assembly",
+  "challenge": "Survive spore plume while evading the canopy defender without sacrificing the charted evacuation line.",
+  "choice_yes": "Disclose evidence and ask Green Assembly to witness the living contour chart.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to publish an unsafe shortcut",
+  "tool": "living contour chart",
+  "reward": "charted evacuation line",
+  "enemy": "canopy defender",
+  "chapter_links": [
+    "copper_tundra__navigator",
+    "verdant_ruins__diplomat"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

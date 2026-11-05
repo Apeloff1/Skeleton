@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import sqlite3
 from typing import Any, Literal, Optional
@@ -34,6 +35,8 @@ from skeleton.contracts.projects import (
     _ID,
 )
 from skeleton.app_services.job_api import IdempotencyMismatch
+from skeleton.api.charter_gate import require_charter
+from skeleton.api.hmac_seal import require_seal
 from skeleton.persistence.app_foundation.projects_v1 import (
     BuildLinkConflict,
     CreateIdempotencyMismatch,
@@ -49,6 +52,7 @@ PROJECT_ERROR_NAME_CONFLICT = "PROJECT.NAME_CONFLICT"
 PROJECT_ERROR_UNAVAILABLE = "PROJECT.UNAVAILABLE"
 PROJECT_ERROR_IDEMPOTENCY_MISMATCH = "PROJECT.IDEMPOTENCY_MISMATCH"
 GAME_BUILD_KIND = "game.build"
+_FORGE_BUILD_GATE = require_charter("forge", "run")
 ERROR_STATUS = {
     PROJECT_ERROR_INVALID: 400,
     PROJECT_ERROR_UNAUTHENTICATED: 401,
@@ -138,6 +142,38 @@ def _reject_scope_fields(data: dict, who: SessionPrincipal) -> None:
         raise ProjectHTTPError(PROJECT_ERROR_INVALID, "tenant_id is derived from the session")
 
 
+def _authorize_build(request: Request) -> None:
+    # Project access alone does not grant the separate forge/run capability.
+    attester = require_seal(request.headers.get("x-gf-seal"))
+    # A client header is not an authenticated source of governance weight.
+    _FORGE_BUILD_GATE(attester=attester, x_gf_actor_weight=None)
+
+
+def _build_options(options: dict) -> dict:
+    """Allow only bounded, public executor settings; never accept host paths."""
+    from skeleton.forge.playtest import PLAYTEST_MODES
+    from skeleton.forge.repair import REPAIR_MODES
+
+    allowed = {"era", "archetype", "playtest", "repair_mode", "max_rounds", "deadline_s", "include_files"}
+    if set(options) - allowed:
+        raise ProjectHTTPError(PROJECT_ERROR_INVALID, "unsupported build option")
+    for key in ("era", "archetype"):
+        if key in options and (not isinstance(options[key], str) or len(options[key]) > 64):
+            raise ProjectHTTPError(PROJECT_ERROR_INVALID, f"{key} must be text up to 64 chars")
+    for key, valid in (("playtest", PLAYTEST_MODES), ("repair_mode", REPAIR_MODES)):
+        if key in options and (not isinstance(options[key], str) or options[key] not in valid):
+            raise ProjectHTTPError(PROJECT_ERROR_INVALID, f"invalid {key}")
+    if "max_rounds" in options and (type(options["max_rounds"]) is not int or not 1 <= options["max_rounds"] <= 3):
+        raise ProjectHTTPError(PROJECT_ERROR_INVALID, "max_rounds must be from 1 to 3")
+    if "include_files" in options and type(options["include_files"]) is not bool:
+        raise ProjectHTTPError(PROJECT_ERROR_INVALID, "include_files must be boolean")
+    if "deadline_s" in options:
+        raw = options["deadline_s"]
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not 0 < raw <= 120 or not math.isfinite(raw):
+            raise ProjectHTTPError(PROJECT_ERROR_INVALID, "deadline_s must be within (0, 120]")
+    return dict(options)
+
+
 def build_router(services_dep=get_app_services) -> APIRouter:
     router = APIRouter(prefix="/projects", tags=["projects-v1"])
 
@@ -215,7 +251,7 @@ def build_router(services_dep=get_app_services) -> APIRouter:
     async def start_or_link_build(project_id: str, request: Request,
                                   svc: AppServices = Depends(services_dep)):
         who = await _auth(request, svc)
-        _project_or_404(svc, who, project_id)
+        project = _project_or_404(svc, who, project_id)
         data = await _json_body(request, {"schema_version", "target", "options", "idempotency_key",
                                           "execution_id", "actor_id", "tenant_id"})
         _reject_scope_fields(data, who)
@@ -235,27 +271,46 @@ def build_router(services_dep=get_app_services) -> APIRouter:
         target, options, key = data.get("target", ""), data.get("options", {}), data.get("idempotency_key")
         if not isinstance(target, str) or len(target) > 64:
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "target must be text up to 64 chars")
+        if target not in {"", "godot", "json", "yaml"}:
+            raise ProjectHTTPError(PROJECT_ERROR_INVALID, "target must be godot, json, or yaml")
         if not isinstance(options, dict):
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "options must be an object")
         if key is not None and (not isinstance(key, str) or not key or len(key) > 128):
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "idempotency_key must be 1..128 chars")
+        _authorize_build(request)
+        options = _build_options(options)
+        from skeleton.forge.game_build_queue import handle_game_build
+        from skeleton.app_services.job_api import request_hash
+
+        # Establish a live worker before publishing another job. If a prior
+        # worker is still stopping, return a recoverable error without creating
+        # a build the caller cannot identify.
+        svc.jobs.register_handler(GAME_BUILD_KIND, handle_game_build)
+        try:
+            svc.jobs.start_worker()
+        except RuntimeError:
+            raise ProjectHTTPError(PROJECT_ERROR_UNAVAILABLE, "build worker unavailable; retry shortly") from None
+
+        # Preserve the request digest used by earlier versions while binding
+        # the server-owned project brief and authorization to the worker input.
+        request_digest = request_hash(GAME_BUILD_KIND, {"target": target, "options": options})
         try:
             handle = svc.jobs.enqueue(
-                GAME_BUILD_KIND, {"target": target, "options": options},
+                GAME_BUILD_KIND, {"target": target, "options": options,
+                                  "brief": project.brief.as_dict(), "project_build_authorized": True,
+                                  "project_build_session_id": who.session_id},
                 actor_id=who.user_id, tenant_id=_tenant(), project_id=project_id,
                 idempotency_key=f"{project_id}:{key}" if key else None,
-                correlation_id=request.headers.get("x-request-id") or None)
+                correlation_id=request.headers.get("x-request-id") or None,
+                timeout_s=float(options.get("deadline_s", 120)), request_digest=request_digest)
         except IdempotencyMismatch:
             raise ProjectHTTPError(PROJECT_ERROR_IDEMPOTENCY_MISMATCH,
                                    "idempotency_key was already used with a different target/options")
+        except BuildLinkConflict:
+            raise ProjectHTTPError(PROJECT_ERROR_BUILD_CONFLICT, "project build limit reached")
         b = svc.builds.get_build(handle.execution_id)
-        if not handle.replayed:
-            try:
-                store.link(who.user_id, _tenant(), project_id, b.build_id)
-            except BuildLinkConflict:
-                svc.jobs.cancel(handle.job_id)
-                raise ProjectHTTPError(PROJECT_ERROR_BUILD_CONFLICT, "project build limit reached")
-            b = svc.builds.get_build(handle.execution_id)
+        if b is None:
+            raise ProjectHTTPError(PROJECT_ERROR_UNAVAILABLE, "project build unavailable")
         return JSONResponse(status_code=202, content=build_out(b, replayed=handle.replayed))
 
     @router.get("/{project_id}/builds")
