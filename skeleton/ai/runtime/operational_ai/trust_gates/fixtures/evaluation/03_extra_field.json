@@ -1,0 +1,17 @@
+{
+  "case": "03_extra_field",
+  "gate": "evaluation",
+  "expect": "reject",
+  "reason": "Unrecognized authority fields denied",
+  "payload": {
+    "suite_id": "native_adversarial_v1",
+    "dataset_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "samples": 50,
+    "passes": 45,
+    "failures": 4,
+    "empty_errors": 1,
+    "approved": true,
+    "untrusted_override": "allow"
+  }
+}

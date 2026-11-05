@@ -1,0 +1,16 @@
+{
+  "case": "01_valid_variant",
+  "gate": "replay",
+  "expect": "accept",
+  "reason": "Alternative permitted operation",
+  "payload": {
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "request_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stored_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "revision": 2,
+    "replayed": true,
+    "has_generation": false
+  }
+}

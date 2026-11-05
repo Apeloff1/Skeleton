@@ -1,0 +1,12 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "10_attack",
+  "domain": "seed",
+  "expected": "reject",
+  "payload": 100000000000000000000,
+  "reason": "Refuse adversarial seed variant 10",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational seed contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

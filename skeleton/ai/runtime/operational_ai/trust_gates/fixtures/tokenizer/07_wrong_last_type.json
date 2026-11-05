@@ -1,0 +1,18 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "tokenizer",
+  "expect": "reject",
+  "reason": "No arbitrary object as a typed value",
+  "payload": {
+    "model_id": "local-gguf",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "vocab_size": 4096,
+    "bos_id": 1,
+    "eos_id": 2,
+    "unk_id": 3,
+    "context_window": 2048,
+    "normalization": {
+      "untrusted": true
+    }
+  }
+}
