@@ -24,6 +24,10 @@ import hashlib
 import tempfile
 import threading
 import re
+import stat
+from contextlib import contextmanager
+from itertools import islice
+from .vault_secure_fs import anchored_directory, ensure_directory, read_regular, atomic_write, unlink_regular, VaultPathError
 from pathlib import Path
 from typing import Iterable, Iterator, Any
 
@@ -74,17 +78,11 @@ def _json_default(obj: Any):
 
 # ── Paths ────────────────────────────────────────────────────────────
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
+    """Initialize only descriptor-anchored directories; do not follow links."""
     try:
-        p = Path(preferred)
-        p.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(prefix=".health-probe-", dir=p) as probe:
-            probe.write(b"ok")
-            probe.flush()
-        return p
-    except Exception:
-        fp = Path(fallback)
-        fp.mkdir(parents=True, exist_ok=True)
-        return fp
+        return ensure_directory(Path(preferred))
+    except (OSError, VaultPathError):
+        return ensure_directory(Path(fallback))
 
 
 # Route imports must not create directories or read on-disk vault manifests.
@@ -93,6 +91,7 @@ VAULT_ROOT = Path(os.environ.get("HYPERSCALE_VAULT_DIR", "/app/backend/data/vaul
 SCRATCH_ROOT = Path(os.environ.get("HYPERSCALE_SCRATCH_DIR", "/tmp/hyperscale_scratch"))
 _STORAGE_LOCK = threading.Lock()
 _STORAGE_READY = False
+_STORAGE_IDENTITY: dict[bool, tuple[int, int]] = {}
 
 def _ensure_storage() -> None:
     global VAULT_ROOT, SCRATCH_ROOT, _MANIFEST_FILE, _STORAGE_READY
@@ -105,12 +104,27 @@ def _ensure_storage() -> None:
         scratch = _resolve_writable_dir(str(SCRATCH_ROOT), "/tmp/hyperscale_scratch")
         VAULT_ROOT, SCRATCH_ROOT = vault, scratch
         _MANIFEST_FILE = vault / "_manifest.json"
+        # Bind all later opens to these exact directory inodes, even when
+        # a parent path is renamed and replaced by another real directory.
+        with anchored_directory(vault) as fd:
+            info = os.fstat(fd)
+            _STORAGE_IDENTITY[False] = (info.st_dev, info.st_ino)
+        with anchored_directory(scratch) as fd:
+            info = os.fstat(fd)
+            _STORAGE_IDENTITY[True] = (info.st_dev, info.st_ino)
         _load_manifest()
         _STORAGE_READY = True
 
 _COMPRESSION_LEVEL = int(os.environ.get("HYPERSCALE_ZSTD_LEVEL", "21"))
 _COMPRESSOR = _CodecProxy("c")
 _DECOMPRESSOR = _CodecProxy("d")
+
+_MAX_SHARD_SCAN_BYTES = 512 * 1024 * 1024
+_MAX_COMPRESSED_BYTES = 512 * 1024 * 1024
+_MAX_ROW_CHARS = 1 * 1024 * 1024
+_MAX_SHARD_ROWS = 1_000_000
+_MAX_PAGE_LIMIT = 1_000
+_MAX_PAGE_OFFSET = 1_000_000
 
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -120,22 +134,59 @@ _MANIFEST: dict[str, dict] = {}
 _MANIFEST_FILE = VAULT_ROOT / "_manifest.json"
 
 
+@contextmanager
+def _storage_fd(scratch: bool = False):
+    root = SCRATCH_ROOT if scratch else VAULT_ROOT
+    with anchored_directory(root) as fd:
+        info = os.fstat(fd)
+        if _STORAGE_IDENTITY.get(scratch) != (info.st_dev, info.st_ino):
+            raise VaultPathError("vault storage directory identity changed")
+        yield fd
+
+
+def _unique_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate vault JSON field")
+        result[key] = value
+    return result
+
+
+def _deny_nonfinite(value):
+    raise ValueError("vault JSON contains nonfinite number")
+
+
 def _load_manifest() -> None:
     global _MANIFEST
-    if _MANIFEST_FILE.exists():
+    with _storage_fd() as directory:
         try:
-            _MANIFEST = json.loads(_MANIFEST_FILE.read_text())
-        except Exception:
+            with read_regular(directory, "_manifest.json", max_bytes=8 * 1024 * 1024) as stream:
+                data = json.loads(
+                    stream.read().decode("utf-8"),
+                    object_pairs_hook=_unique_pairs,
+                    parse_constant=_deny_nonfinite,
+                )
+        except FileNotFoundError:
             _MANIFEST = {}
-    else:
-        _MANIFEST = {}
+            return
+    if not isinstance(data, dict) or any(
+        not isinstance(name, str) or not isinstance(entry, dict)
+        for name, entry in data.items()
+    ):
+        raise ValueError("invalid vault manifest structure")
+    _MANIFEST = data
 
 
 def _save_manifest() -> None:
     _ensure_storage()
-    tmp = _MANIFEST_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(_MANIFEST, separators=(",", ":")))
-    tmp.replace(_MANIFEST_FILE)
+    payload = json.dumps(
+        _MANIFEST, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+    ).encode("utf-8")
+    if len(payload) > 8 * 1024 * 1024:
+        raise ValueError("vault manifest exceeds byte budget")
+    with _storage_fd() as directory:
+        atomic_write(directory, "_manifest.json", lambda fh: fh.write(payload))
 
 
 # No on-disk manifest reads during import.
@@ -154,24 +205,11 @@ def _safe_name(name: str) -> str:
 
 
 def _shard_path(name: str, scratch: bool = False) -> Path:
-    """Return a path that is guaranteed to stay inside the vault/scratch root.
-    CodeQL path-injection mitigation: normalize, then verify containment.
-    """
+    """Construct a logical shard name; actual I/O is directory-fd anchored."""
     safe = _safe_name(name)
     _ensure_storage()
-    root = (SCRATCH_ROOT if scratch else VAULT_ROOT).resolve()
-    # Build candidate, normalize, then prove it is under root.
-    candidate = (root / f"{safe}.jsonl.zst").resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError as exc:
-        raise ValueError("invalid shard path") from exc
-    # Extra explicit prefix check for static analysis.
-    root_str = str(root)
-    cand_str = str(candidate)
-    if not cand_str.startswith(root_str):
-        raise ValueError("path escapes root")
-    return candidate
+    root = SCRATCH_ROOT if scratch else VAULT_ROOT
+    return root / f"{safe}.jsonl.zst"
 
 
 # ── Core write/read ───────────────────────────────────────────────
