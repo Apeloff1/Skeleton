@@ -2653,6 +2653,26 @@ class CostGovernor:
             evidence_refs=refs,
         )
         reasons = list(accounting.reasons)
+        # Quota capacity and operation budgets are independent of the
+        # reservation estimate. A terminal charge exceeding that estimate
+        # must remain durably accounted but cannot be accepted as qualified
+        # cost evidence, even when the tenant still has spare quota.
+        estimated = quota_reservation.estimate
+        actual = quota_completion.actual
+        exceeded_estimate = tuple(
+            field for field in (
+                "input_tokens", "output_tokens", "cost_usd",
+                "tool_calls", "artifact_bytes", "storage_bytes",
+            )
+            if float(getattr(actual, field)) > (
+                float(getattr(estimated, field))
+                + (1e-12 if field == "cost_usd" else 0.0)
+            )
+        )
+        if exceeded_estimate:
+            reasons.append(
+                "reservation-estimate-overrun:" + ",".join(exceeded_estimate)
+            )
         if quota_completion.overrun:
             reasons.append(
                 "cost-overrun:"

@@ -778,4 +778,4 @@ def test_commit_timestamp_matches_staleness_clock_sample() -> None:
     update = store.record_observation(_observation(observed_at=NOW))
 
     assert update.timestamp == NOW
-    assert update.previous_version is None
+    assert update.previous_version == 0
