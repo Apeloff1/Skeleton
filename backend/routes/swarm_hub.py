@@ -24,7 +24,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from routes.galaxy_studio_access import visible_build_rows
 
 from core.swarm_agents import SWARM_DOMAINS, BY_ID, BY_CATEGORY, find_relevant, pick_balanced
@@ -127,18 +127,33 @@ class SeedReq(BaseModel):
     # A NaN previously bypassed the `> 200` check and crashed in the seeder.
     target_multiplier: float = Field(default=1.0, gt=0, le=200, allow_inf_nan=False)
     force: bool = False
-    subset: list[str] | None = None
+    subset: list[str] | None = Field(default=None, max_length=200)
+
+    @field_validator("subset")
+    @classmethod
+    def validate_known_subset(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        allowed = {agent["id"] for agent in SWARM_DOMAINS}
+        if any(item not in allowed for item in value):
+            raise ValueError("seed subset must contain only known swarm agent IDs")
+        return value
 
 
 @router.post("/micro-dbs/seed")
 def micro_db_seed(req: SeedReq) -> dict:
     # Lazy import to keep router boot light
     from seeds.hyperscale_micro_dbs import seed_all
-    return seed_all(
-        target_multiplier=req.target_multiplier,
-        force=req.force,
-        subset=req.subset,
-    )
+    try:
+        return seed_all(
+            target_multiplier=req.target_multiplier,
+            force=req.force,
+            subset=req.subset,
+        )
+    except ValueError as exc:
+        # Direct model_construct and internal callers cannot turn malformed
+        # budgets or subsets into an uncaught server-side exception.
+        raise HTTPException(422, str(exc)) from exc
 
 
 # ── Discourse ──────────────────────────────────────────────────────────
