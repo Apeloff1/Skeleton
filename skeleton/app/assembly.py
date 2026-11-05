@@ -472,6 +472,15 @@ def runtime_manifest(
                     or url.username is not None or url.password is not None
                     or url.query or url.fragment):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+            # Reject ambiguous route normalization before exposing the URL to
+            # the browser, reverse proxy, or readiness probes. A different
+            # interpretation of encoded separators or dot segments can route
+            # an otherwise local health request to the wrong application path.
+            path_segments = url.path.split("/")
+            if (url.path.startswith("//") or "//" in url.path
+                    or any(segment in {".", ".."} for segment in path_segments)
+                    or any(char in url.path for char in ("%", "?", "#"))):
+                raise ValueError(f"{service.name} has an unsafe public URL path")
             # A malformed or out-of-range embedded port must never be silently
             # replaced by an operator override: that would admit an invalid
             # packaged endpoint as though its transport contract were valid.
