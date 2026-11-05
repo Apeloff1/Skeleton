@@ -220,6 +220,18 @@ class WeightShardStore:
         return tuple(paths)
 
     @contextmanager
+    def open_sealed_pages(
+        self, plan_digest: str, *, model_identity: ModelIdentity, max_bytes: int,
+    ) -> Iterator[tuple[object, ...]]:
+        """Publish Linux read-only shared pages only after full shard verification."""
+        from .sealed_weight_pages import open_sealed_weight_pages
+
+        with open_sealed_weight_pages(
+            self, plan_digest, model_identity=model_identity, max_bytes=max_bytes
+        ) as pages:
+            yield pages
+
+    @contextmanager
     def open_verified(
         self, plan_digest: str, *, model_identity: ModelIdentity,
     ) -> Iterator[tuple[BinaryIO, ...]]:
