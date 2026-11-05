@@ -71,3 +71,18 @@ def test_port_override_rejects_unsafe_packaged_url(tmp_path: Path, invalid_url: 
             tmp_path, manifest=replace(manifest, services=services),
             environ={"FRONTEND_PORT": "31999"},
         )
+
+
+@pytest.mark.parametrize("control", [chr(0), chr(9), chr(10), chr(13), chr(31), chr(127)])
+def test_port_override_rejects_control_characters(tmp_path: Path, control: str):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url="http://localhost:3000/" + control + "ready")
+        if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="unsafe public URL"):
+        public_service_urls(
+            tmp_path, manifest=replace(manifest, services=services),
+            environ={"FRONTEND_PORT": "31999"},
+        )
