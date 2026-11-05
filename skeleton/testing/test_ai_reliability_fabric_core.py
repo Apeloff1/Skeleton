@@ -17,6 +17,10 @@ class FabricCore(unittest.TestCase):
     def test_surrogate_never_canonical(self):
         with self.assertRaises(Rejected):
             canonical({"x":"\ud800"})
+    def test_escaped_lone_surrogate_rejected_before_trust(self):
+        with self.assertRaises(Rejected):
+            strict_json(b'{"x":"\\ud800"}')
+
     def test_full_forty_gate_matrix(self):
         rows=run_all()
         self.assertEqual(sum(x["cases"] for x in rows),880)

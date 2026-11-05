@@ -17,6 +17,12 @@ class QuotaCases(unittest.TestCase):
         with self.assertRaises(Rejected):
             bank.release_without_effect("tenant","r",effect_absent=False)
         self.assertEqual(bank.commit("tenant","r",prompt=4,output=3)["charged_tokens"],7)
+    def test_zero_cost_reservation_fails_closed(self):
+        bank=Quota(tenant_ceiling=20,global_ceiling=20)
+        with self.assertRaises(Rejected):
+            bank.reserve("tenant","empty",prompt=0,output=0)
+        self.assertEqual(bank.snapshot()["pending_count"],0)
+
     def test_overcharge_does_not_clear_reservation(self):
         bank=Quota(tenant_ceiling=20,global_ceiling=20)
         bank.reserve("tenant","r",prompt=4,output=4)
