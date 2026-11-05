@@ -577,7 +577,7 @@ def test_runtime_probes_use_configured_ports_including_ready_route(monkeypatch):
     )
     assert len(results) >= 3
     assert ("frontend", "http://localhost:3300/") in seen
-    assert ("backend", "http://localhost:8101/api/health") in seen
+    assert ("backend", "http://localhost:8101/api/health/ready") in seen
     assert ("skeleton", "http://localhost:8110/api/v1/health/live") in seen
     assert ("application", "http://localhost:8101/api/app/ready") in seen
 
