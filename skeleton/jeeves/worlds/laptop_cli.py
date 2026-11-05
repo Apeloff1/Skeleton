@@ -105,6 +105,7 @@ def run(argv: list[str]) -> int:
                 command.add_argument("--export-file", required=True)
     args = parser.parse_args(argv)
     parsed_input = None
+    input_loaded = False
     try:
         # Validate untrusted JSON before constructing stores. Invalid input must
         # never initialize or modify canonical custody directories.
@@ -116,6 +117,7 @@ def run(argv: list[str]) -> int:
             "session-restore-check": "export_file",
         }.get(args.action)
         parsed_input = _file(getattr(args, input_path)) if input_path else None
+        input_loaded = True
         flow = LaptopFlow(args.store)
         if args.action == "propose":
             result = flow.propose(parsed_input)
@@ -163,7 +165,7 @@ def run(argv: list[str]) -> int:
             # Input-path errors and custody failures require different operator
             # actions. Never advise replacing a brief file when the canonical
             # store is inaccessible, or treat a failed write as invalid JSON.
-            if input_path and parsed_input is None:
+            if input_path and not input_loaded:
                 code = {
                     errno.ELOOP: "input_symlink_disallowed",
                     errno.ENOENT: "input_missing",
