@@ -369,9 +369,10 @@ class PrivateSelectedSourceCapsuleTests(unittest.TestCase):
 
     def test_source_closure_digest_mutation_cannot_publish(self):
         plan = self.prepare()
-        mutated = replace(plan, python_closure_sha256="0"*64)
-        with self.assertRaises(ValueError):
-            self.publish(mutated)
+        # Identity tampering is rejected at dataclass construction, before any
+        # publication API can receive an invalid source-closure grant.
+        with self.assertRaises(capsule.PrivateCapsuleHold):
+            replace(plan, python_closure_sha256="0"*64)
         self.assertFalse(self.output.exists())
 
 

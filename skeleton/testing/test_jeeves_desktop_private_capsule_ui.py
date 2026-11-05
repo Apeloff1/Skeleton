@@ -177,7 +177,10 @@ class SourceCapsuleDesktopUIContractTests(unittest.TestCase):
     def test_ui_accepts_new_capsule_digest_but_never_auto_approves(self):
         view, plan = fake_window()
         view._capsule_plan = None
-        view._queue.put(("capsule-reviewed", view._epoch, "src/dependency.py", plan))
+        view._queue.put((
+            "capsule-reviewed", view._epoch, "src/dependency.py", plan,
+            plan.public_review(),
+        ))
         ui.PortablePatchWindow._poll(view)
         self.assertIs(view._capsule_plan, plan)
         self.assertEqual(view._capsule_source_selection, "src/dependency.py")
