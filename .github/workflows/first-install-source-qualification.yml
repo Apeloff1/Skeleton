@@ -17,6 +17,7 @@ on:
       - 'skeleton/app/**'
       - 'skeleton/testing/test_app_assembly.py'
       - 'skeleton/testing/test_app_installer.py'
+      - 'skeleton/testing/test_app_installer_epoch.py'
       - 'skeleton/testing/test_app_offline_install_quarantine.py'
       - 'skeleton/testing/test_app_offline_delivery_archive.py'
       - 'skeleton/app/offline_delivery_archive.py'
@@ -72,7 +73,7 @@ jobs:
       - name: Verify Python syntax at the exact head
         run: |
           python -m compileall -q skeleton/app
-          python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py
+          python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
           python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
       - name: Qualify actual first-install assembly and required source inputs
         run: python scripts/check_app_assembly.py
@@ -82,6 +83,7 @@ jobs:
             skeleton/testing/test_app_install_source_contracts.py \
             skeleton/testing/test_app_assembly.py \
             skeleton/testing/test_app_installer.py \
+            skeleton/testing/test_app_installer_epoch.py \
             skeleton/testing/test_app_compose_parity.py \
             skeleton/testing/test_app_assembly_source_paths.py \
             skeleton/testing/test_app_offline_install_quarantine.py \
