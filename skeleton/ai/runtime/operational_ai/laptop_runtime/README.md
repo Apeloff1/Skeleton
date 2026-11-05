@@ -114,3 +114,11 @@ attach an exact UTF-8 excerpt to a later native prompt. Source indexing has
 no model tool authority, follows no symlinks, excludes protected control and
 credential paths, and labels incomplete budget-limited searches. Full
 boundaries: `docs/ai/JEEVES_LOCAL_SOURCE_DISCOVERY.md`.
+
+## Existing-file edit candidates
+
+The desktop reviews model-proposed changes to existing source, verifies
+original content hashes, shows full unified diffs, and permits an operator
+to stage a single inert no-clobber sibling candidate per full SHA approval.
+It NEVER overwrites the original; explicit editor/Git application is
+separate. `docs/ai/JEEVES_EXISTING_SOURCE_EDIT_REVIEW.md`.

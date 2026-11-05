@@ -188,6 +188,14 @@ class JeevesWindow(tk.Tk):
             command=self._search_sources,
         ).grid(row=2, column=0, sticky="w", pady=(4, 0))
         ttk.Button(
+            attachment_bar, text="Insert existing-edit format",
+            command=self._existing_edit_format,
+        ).grid(row=2, column=1, sticky="e", padx=4, pady=(4, 0))
+        ttk.Button(
+            attachment_bar, text="Review existing-file edits",
+            command=self._existing_edits,
+        ).grid(row=2, column=2, sticky="e", pady=(4, 0))
+        ttk.Button(
             attachment_bar, text="Clear attached files", command=self._clear_attachments,
         ).grid(row=0, column=2, padx=4)
         ttk.Checkbutton(
@@ -346,6 +354,27 @@ class JeevesWindow(tk.Tk):
     def _search_sources(self):
         from .desktop_source_search_ui import SourceSearchWindow
         SourceSearchWindow(self)
+
+    def _existing_edits(self):
+        from .desktop_existing_edit_ui import ExistingEditWindow
+        ExistingEditWindow(self, source_text=self._last_answer or "")
+
+    def _existing_edit_format(self):
+        self.prompt.insert(
+            "end",
+            "\n\nReturn only a strict JSON object with schema "
+            "'jeeves.workspace.existing-file-edits.v1' and files: "
+            "an array of objects containing path, expected_sha256, "
+            "and replacement. Each path must name an EXISTING regular "
+            "project file, expected_sha256 must be its current full "
+            "SHA-256 from the operator's source inventory, and replacement "
+            "must contain the COMPLETE proposed source text. No markdown "
+            "fences or other fields. You have no permission to execute, "
+            "overwrite, delete, rename, deploy or write source files. "
+            "Your output will be inspected as untrusted proposal data; "
+            "a human may separately approve an INERT sibling candidate.",
+        )
+        self.prompt.focus_set()
 
     def _insert_proposal_format(self):
         self.prompt.insert(
