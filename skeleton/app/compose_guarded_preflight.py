@@ -201,9 +201,9 @@ async def inspect_compose_mongo_epoch(
             final_epoch = await epoch.read_epoch(
                 tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
             )
-        if (type(first_epoch) is not int or first_epoch < 2
-                or first_epoch % 2 or final_epoch != first_epoch
-                or type(final_epoch) is not int):
+        if (type(first_epoch) is not int or type(final_epoch) is not int
+                or first_epoch < 2 or first_epoch % 2
+                or final_epoch != first_epoch):
             return _result("canonical_actor_epoch_changed_during_preflight",
                            replica_set=True, authenticated=True)
         # The second linearizable read can itself span an election or a
