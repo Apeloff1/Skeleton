@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from pathlib import PurePosixPath
 from typing import Any, Mapping
 
@@ -80,10 +81,17 @@ def require_non_negative_int(value: Any, *, field: str, maximum: int | None = No
 
 
 def normalize_relpath(value: Any, *, field: str = "path") -> str:
-    """Return a normalized, relative POSIX path or raise."""
-    if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
-        raise DeliveryError(f"{field} must be a non-empty POSIX path")
+    """Return a bounded relative POSIX path with no invisible control aliases."""
+    if (type(value) is not str or not value or len(value) > 4096
+            or "\x00" in value or "\\" in value
+            or any(char in value for char in (":", "%", "?", "#"))
+            or unicodedata.normalize("NFC", value) != value
+            or any(unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+                   for char in value)):
+        raise DeliveryError(f"{field} must be a bounded, printable POSIX path")
     path = PurePosixPath(value)
+    if len(path.parts) > 128:
+        raise DeliveryError(f"{field} has too many components")
     if path.is_absolute():
         raise DeliveryError(f"{field} must be relative")
     parts = [p for p in path.parts if p not in ("", ".")]
