@@ -268,6 +268,28 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
     return world
 
 
+def verify_studio_release_evidence(files: dict[str, bytes]) -> None:
+    """Require the independently pinned, hashed studio release-denial receipt.
+
+    Used only after all source entries have been admitted and hashed by the
+    original package verifier or the source-only archive inspector. A studio
+    package never grants commercial rights or native device qualification.
+    """
+    if "studio/consumer_gate.json" not in files:
+        raise DualRuntimeVerificationError("studio consumer evidence missing")
+    consumer = _json(files["studio/consumer_gate.json"], _MAX_MANIFEST)
+    evidence = consumer.get("evidence")
+    if (consumer.get("schema") != "skeleton.game_builder.consumer_review.v1"
+            or consumer.get("status") != "release-blocked"
+            or consumer.get("not_a_legal_opinion") is not True
+            or type(evidence) is not dict
+            or any(evidence.get(key) is not False for key in (
+                "approved_for_publication", "rights_reviewed",
+                "human_playtested", "platform_hardware_tested",
+            ))):
+        raise DualRuntimeVerificationError("studio consumer release fence invalid")
+
+
 def _assert_original_root(root: str | Path | int, descriptor: int) -> None:
     """Reject a package pathname that no longer resolves to the verified inode.
 
@@ -369,20 +391,7 @@ def verify_exported_package(
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package changed during verification")
         if studio:
-            # The consumer release block is authenticated by the same manifest
-            # pin and every-file SHA inventory as the playable proof. It cannot
-            # be omitted or turned into a publication claim by a schema bump.
-            consumer = _json(files["studio/consumer_gate.json"], _MAX_MANIFEST)
-            evidence = consumer.get("evidence")
-            if (consumer.get("schema") != "skeleton.game_builder.consumer_review.v1"
-                    or consumer.get("status") != "release-blocked"
-                    or consumer.get("not_a_legal_opinion") is not True
-                    or type(evidence) is not dict
-                    or any(evidence.get(key) is not False for key in (
-                        "approved_for_publication", "rights_reviewed",
-                        "human_playtested", "platform_hardware_tested",
-                    ))):
-                raise DualRuntimeVerificationError("studio consumer release fence invalid")
+            verify_studio_release_evidence(files)
         if files["godot/proof.json"] != files["proof/verified_solution.json"]:
             raise DualRuntimeVerificationError("browser and Godot proofs differ")
         native = _json(files["godot/world.json"], _MAX_BYTES)
