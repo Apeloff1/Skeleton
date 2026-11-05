@@ -160,6 +160,19 @@ class NativeOperatorSession:
         if self._monotonic()-self._started >= self.limits.maximum_wall_seconds:
             raise NativeOperatorSessionHold("operator session time budget exhausted")
 
+    def _post_io(self) -> None:
+        """Do not disclose a stale checkpoint, transcript or model answer.
+
+        Once a private state read or native call has crossed the principal
+        boundary, any identity or clock failure permanently closes this
+        process-local operator session. SQLite is still the sole durable owner.
+        """
+        try:
+            self._valid_worker()
+        except BaseException:
+            self._closed=True
+            raise
+
     def _reserve(self,cmd:OperatorCommand):
         self._valid_worker()
         if cmd.operation not in ("start","resume"):
@@ -246,7 +259,7 @@ class NativeOperatorSession:
                 }
             if cmd.operation=="status":
                 journal=NativeSQLiteCheckpointer(self.worker)
-                return {
+                report={
                     "schema":"jeeves.native_operator_command_result.v1",
                     "operation":"status","status":"active",
                     "installed_model_sha256":self.identity.model_sha256,
@@ -259,19 +272,26 @@ class NativeOperatorSession:
                     "actual_model_forward_pass_by_status":False,
                     "release_certified":False,
                 }
+                self._post_io()
+                return report
             inputs=self._inputs(cmd)
             if cmd.operation in ("start","resume"):
                 self._reserve(cmd)
             runner=NativeDurableJeevesAgent(self.worker)
             if cmd.operation=="inspect":
-                return runner.inspect(inputs)
+                report=runner.inspect(inputs)
+                self._post_io()
+                return report
             if cmd.operation=="replay":
-                return runner.replay_terminal(inputs)
+                report=runner.replay_terminal(inputs)
+                self._post_io()
+                return report
             try:
                 if cmd.operation=="start":
                     result=runner.run(inputs)
                 else:
                     result=runner.resume_operator_approved(inputs)
+                self._post_io()
             except BaseException:
                 # A native call may have committed or become uncertain. Never
                 # admit another command in this process after any such failure.
