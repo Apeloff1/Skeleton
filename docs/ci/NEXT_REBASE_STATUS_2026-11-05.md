@@ -1,7 +1,8 @@
-# Ongoing Rebase Status — 2026-11-05
+# Ongoing Rebase Status — 2026-11-05 (update)
 
-- #4675: branch update initiated / unstable (not dirty)
-- #4676, #4683, #4687, #4764: updates in progress
-- Previously conflicted (#4628, #4636, #4674): documentation branches ready for manual exact-head rebase
+- #4628: still merge conflict on automated update. Manual exact-head rebase required (see fix/studio-d-first-playable-rebase-20261105).
+- #4649: unstable (branch update previously initiated).
+- #4675: updated.
+- Other heads: updates in progress or documentation ready.
 
-All gates, floors, and expected-SHA rules remain binding. No automatic conflict resolution.
+All gates preserved. No automatic resolution.
