@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_salt_dunes",
+  "title": "Salt Dunes: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610300120,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 6
+}

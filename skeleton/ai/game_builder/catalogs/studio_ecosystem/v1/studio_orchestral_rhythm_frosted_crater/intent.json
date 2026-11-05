@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_frosted_crater",
+  "title": "Frosted Crater: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010310319,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 5
+}

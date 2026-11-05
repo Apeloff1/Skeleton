@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "project_id": "studio_orchestral_rhythm_luminous_marsh",
+  "genre": "orchestral_rhythm",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "sound_design": {
+    "acoustics": "marsh frog pulses",
+    "genre": "orchestral_rhythm",
+    "tempo_bpm": 89,
+    "meter": "7/8",
+    "tonality": "suspended",
+    "rendered": false
+  },
+  "sound_layers": [
+    {
+      "id": "ambient",
+      "trigger": "outdoor_luminous_marsh",
+      "source": "Original environmental Foley emphasizing marsh frog pulses",
+      "spatial": "outdoor_binaural",
+      "ducking": "below_dialogue"
+    },
+    {
+      "id": "mechanic",
+      "trigger": "perform",
+      "source": "Percussive feedback to meter shifts and synchronized phrase entries",
+      "spatial": "diegetic_close",
+      "ducking": "below_warning"
+    },
+    {
+      "id": "risk",
+      "trigger": "bioluminescent flooding",
+      "source": "Nonverbal hazard escalation for slow flood rise",
+      "spatial": "wide_dynamic",
+      "ducking": "priority_warning"
+    },
+    {
+      "id": "resolution",
+      "trigger": "verified_branch",
+      "source": "Original acoustic theme varying with ensemble credits stewardship",
+      "spatial": "narrative_bus",
+      "ducking": "dialogue_priority"
+    }
+  ],
+  "dialogue_voice": {
+    "casts": [
+      "protagonist",
+      "witness",
+      "technician",
+      "rival"
+    ],
+    "performance_requirement": "new_original_voice_material",
+    "localized_content": "not_recorded"
+  },
+  "audio_accessibility": [
+    "complete_captions",
+    "no_audio_only_navigation",
+    "adjustable_mixer",
+    "dynamic_range_modes"
+  ],
+  "audio_processing": {
+    "cpu_budget": "runtime_measured",
+    "compression": "hardware_profile_adaptive",
+    "sample_quality": "audited_per_target"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_sunken_metro",
+  "title": "Sunken Metro: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010310393,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 3
+}

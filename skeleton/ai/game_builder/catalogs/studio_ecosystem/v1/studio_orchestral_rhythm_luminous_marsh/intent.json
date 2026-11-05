@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_luminous_marsh",
+  "title": "Luminous Marsh: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010310208,
+  "width": 25,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 6
+}
