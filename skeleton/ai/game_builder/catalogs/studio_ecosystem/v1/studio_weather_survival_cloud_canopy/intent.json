@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_cloud_canopy",
+  "title": "Cloud Canopy: Stormline",
+  "subtitle": "Original stormline design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010316628,
+  "width": 27,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 12,
+  "theme": "forest",
+  "starting_health": 4
+}
