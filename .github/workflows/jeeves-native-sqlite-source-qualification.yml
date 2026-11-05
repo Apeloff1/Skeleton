@@ -88,8 +88,7 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_cli_timeout_and_redaction.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_source_fence*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_source_fence.py' -v
-          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_repl_source_fence.py' -v
-          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_repl.py' -v
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_repl*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_postio.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_resource_shape.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_cli_*.py' -v

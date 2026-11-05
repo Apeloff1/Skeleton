@@ -48,12 +48,27 @@ def _write_json(out: TextIO, value: dict[str, Any]) -> None:
 
 
 def _decode_message(raw: bytes, *, maximum: int) -> str:
-    if type(raw) is not bytes or not 1 <= len(raw) <= maximum + 1:
+    """Remove exactly one wire record delimiter, never prompt whitespace.
+
+    The maximum counts UTF-8 task bytes, not line framing bytes. Accept
+    bounded LF, CRLF or final EOF records; do not strip an extra terminal
+    CR from a deliberately supplied prompt or silently truncate Unicode.
+    """
+    if (type(maximum) is not int or not 1 <= maximum <= 1048576
+            or type(raw) is not bytes or not raw
+            or len(raw) > maximum + 2):
         raise NativeReplHold("invalid interactive input byte limit")
-    if len(raw) > maximum:
+    payload = raw
+    if payload.endswith(b"\n"):
+        payload = payload[:-1]
+        if payload.endswith(b"\r"):
+            payload = payload[:-1]
+    if b"\n" in payload:
+        raise NativeReplHold("one prompt per interactive input record")
+    if not 1 <= len(payload) <= maximum:
         raise NativeReplHold("interactive message exceeds configured limit")
     try:
-        text = raw.decode("utf-8", "strict").rstrip("\r\n")
+        text = payload.decode("utf-8", "strict")
     except UnicodeError as exc:
         raise NativeReplHold("interactive message must be UTF-8") from exc
     if chr(0) in text:
@@ -136,7 +151,7 @@ class NativeJeevesRepl:
             while self._turns < self.limits.max_turns:
                 if self.source_fence is not None:
                     self.source_fence.assert_live(self.chat.worker)
-                raw = source.readline(self.limits.max_input_bytes + 1)
+                raw = source.readline(self.limits.max_input_bytes + 3)
                 if raw == b"":
                     self._terminated = True
                     self._publish(target, {"status": "eof", **self._status()})
