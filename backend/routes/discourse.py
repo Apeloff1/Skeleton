@@ -24,7 +24,7 @@ from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/discourse", tags=["discourse"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
-PROJ = {"_id": 0}
+PROJ = {"_id": 0, "run_token": 0}
 
 # Historical planning labels kept for import compatibility only. These
 # names DO NOT confer execution authority: live panels come from the engine.
@@ -40,6 +40,8 @@ MAX_JUDGE_PROMPT_CHARS = 39_200
 MAX_ASYNC_DELIBERATIONS = 16
 MAX_ASYNC_PER_OWNER = 2
 MAX_ASYNC_PER_TENANT = 6
+JOB_HEARTBEAT_INTERVAL_SECONDS = 15
+MAX_JOB_HEARTBEAT_AGE_SECONDS = 120
 _ACTIVE_DELIBERATIONS: set[str] = set()
 _ACTIVE_JOB_SCOPES: dict[str, tuple[str, str]] = {}
 _ACTIVE_LOCK = threading.Lock()
@@ -434,10 +436,80 @@ async def deliberate_endpoint(
                             identity=scope)
 
 
-async def _run_bg(did: str, body: "DeliberateBody", identity: dict):
+def _observed_job_state(record: dict, *, now: datetime | None = None) -> dict:
+    """A stored 'running' label does not prove a process survived restart.
+
+    Return an honest *unconfirmed* observation after heartbeat expiry. Never
+    mutate the durable row or submit another paid execution from a status read.
+    """
+    result = dict(record)
+    result.pop("run_token", None)
+    result.pop("tenant_id", None)
+    result.pop("owner_id", None)
+    if result.get("status") != "running":
+        return result
+    timestamp = record.get("heartbeat_at") or record.get("created_at")
+    try:
+        if not isinstance(timestamp, str) or len(timestamp) > 80:
+            raise ValueError("missing bounded heartbeat")
+        observed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if observed.tzinfo is None:
+            raise ValueError("naive worker heartbeat")
+        age = ((now or datetime.now(timezone.utc)) - observed).total_seconds()
+        if not -60 <= age <= MAX_JOB_HEARTBEAT_AGE_SECONDS:
+            raise ValueError("stale worker heartbeat")
+    except (ValueError, OverflowError, TypeError):
+        result["status"] = "unconfirmed"
+        result["error"] = "job_worker_continuity_unknown"
+    result["worker_continuity_verified"] = False
+    return result
+
+
+async def _renew_job_heartbeat(
+    did: str, scope: dict[str, str], run_token: str,
+    stop: asyncio.Event, *, interval_s: float = JOB_HEARTBEAT_INTERVAL_SECONDS,
+) -> None:
+    """Refresh a bounded worker lease; loss of DB evidence fails closed.
+
+    Job execution itself is not restarted by this loop. A terminal record is
+    published by the original worker with the same run-token CAS.
+    """
+    while not stop.is_set():
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=interval_s)
+            return
+        except asyncio.TimeoutError:
+            pass
+        try:
+            receipt = await _db.discourse_jobs.update_one(
+                {"job_id": did, **scope, "run_token": run_token, "status": "running"},
+                {"$set": {"heartbeat_at": datetime.now(timezone.utc).isoformat()}},
+                upsert=False,
+            )
+            if (
+                getattr(receipt, "acknowledged", False) is not True
+                or getattr(receipt, "matched_count", 0) != 1
+            ):
+                return
+        except Exception:
+            # A reader will stop trusting stale evidence after expiry.
+            return
+
+
+async def _run_bg(
+    did: str, body: "DeliberateBody", identity: dict, run_token: str | None = None,
+):
     """Persist terminal job state; release local admission quota on all paths."""
+    stop_heartbeat = asyncio.Event()
+    heartbeat_task: asyncio.Task | None = None
     try:
         scope = _private_scope(identity)
+        fenced_query = {"job_id": did, **scope}
+        if run_token is not None:
+            fenced_query["run_token"] = run_token
+            heartbeat_task = asyncio.create_task(
+                _renew_job_heartbeat(did, scope, run_token, stop_heartbeat)
+            )
         try:
             result = await deliberate(
                 body.task, body.prompt, body.system,
@@ -446,8 +518,9 @@ async def _run_bg(did: str, body: "DeliberateBody", identity: dict):
             )
             result["job_id"] = did
             result["status"] = "error" if result.get("error") else "done"
+            result["finished_at"] = datetime.now(timezone.utc).isoformat()
             acknowledgement = await _db.discourse_jobs.update_one(
-                {"job_id": did, **scope}, {"$set": result}, upsert=False,
+                {**fenced_query, "status": "running"}, {"$set": result}, upsert=False,
             )
             if (
                 getattr(acknowledgement, "acknowledged", False) is not True
@@ -458,17 +531,23 @@ async def _run_bg(did: str, body: "DeliberateBody", identity: dict):
             try:
                 # Never relabel an unconfirmed success as a committed result.
                 await _db.discourse_jobs.update_one(
-                    {"job_id": did, **scope},
+                    {**fenced_query, "status": "running"},
                     {"$set": {
                         "status": "error", "error": "deliberation_failed",
                         "finished_at": datetime.now(timezone.utc).isoformat(),
                     }}, upsert=False,
                 )
             except Exception:
-                # At this point persistence is unavailable. There is no honest
-                # durable result; a restart-safe recovery loop is out of scope.
+                # The original execution is unconfirmed; no automatic replay
+                # or fabricated terminal status is permitted.
                 pass
     finally:
+        stop_heartbeat.set()
+        if heartbeat_task is not None:
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
         with _ACTIVE_LOCK:
             _ACTIVE_DELIBERATIONS.discard(did)
             _ACTIVE_JOB_SCOPES.pop(did, None)
@@ -521,9 +600,12 @@ async def deliberate_async(
         _ACTIVE_DELIBERATIONS.add(did)
         _ACTIVE_JOB_SCOPES[did] = owner_scope
 
+    run_token = uuid.uuid4().hex
     try:
         stored = await _db.discourse_jobs.insert_one({
-            "job_id": did, "status": "running", "task": body.task,
+            "job_id": did, "run_token": run_token,
+            "heartbeat_at": datetime.now(timezone.utc).isoformat(),
+            "status": "running", "task": body.task,
             "prompt": body.prompt[:2000], "rounds": body.rounds,
             "created_at": datetime.now(timezone.utc).isoformat(),
             **scope,
@@ -536,7 +618,7 @@ async def deliberate_async(
             _ACTIVE_JOB_SCOPES.pop(did, None)
         raise HTTPException(503, "deliberation job persistence unavailable") from exc
 
-    coroutine = _run_bg(did, body, scope)
+    coroutine = _run_bg(did, body, scope, run_token)
     try:
         asyncio.create_task(coroutine)
     except Exception as exc:
@@ -546,7 +628,7 @@ async def deliberate_async(
             _ACTIVE_JOB_SCOPES.pop(did, None)
         try:
             await _db.discourse_jobs.update_one(
-                {"job_id": did, **scope},
+                {"job_id": did, **scope, "run_token": run_token, "status": "running"},
                 {"$set": {"status": "error", "error": "worker_start_failed"}},
                 upsert=False,
             )
@@ -575,7 +657,9 @@ async def get_result(
         )
     except Exception as exc:
         raise HTTPException(503, "deliberation job history unavailable") from exc
-    return doc or {"error": "not found", "status": "unknown"}
+    return _observed_job_state(doc) if isinstance(doc, dict) else {
+        "error": "not found", "status": "unknown"
+    }
 
 
 @router.get("/jobs")
