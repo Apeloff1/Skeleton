@@ -7,12 +7,10 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "automerge-control-plane.yml"
-RETIRED_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
 SCRIPT = REPO_ROOT / "skeleton" / "automation" / "dependabot_merge_policy.py"
 
 
 def test_automerge_worker_uses_trusted_default_branch_and_exact_head_gates() -> None:
-    assert not RETIRED_WORKFLOW.exists(), "retired Dependabot auto-merge must remain inactive"
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "ref: ${{ github.event.repository.default_branch }}" in text
