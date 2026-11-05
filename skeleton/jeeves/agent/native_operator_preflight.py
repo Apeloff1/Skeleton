@@ -36,6 +36,11 @@ class OperatorAdmission:
     resume_run: bool = False
     inspect_run: bool = False
     replay_result: bool = False
+    context_tokens: int = 4096
+    output_tokens: int = 1024
+    native_threads: int = 4
+    gpu_layers: int = 0
+    capacity_budget_bytes: int = 8000000000
 
     @property
     def source_material_enabled(self) -> bool:
@@ -54,7 +59,8 @@ class OperatorAdmission:
             "operator_resume_requested": self.resume_run,
             "read_only_inspection": self.inspect_run,
             "terminal_replay_requested": self.replay_result,
-            "may_activate_native": True,
+            "may_activate_native": False,
+            "operator_resource_shape_admissible": True,
             "signed_source_required": self.source_material_enabled,
             "explicit_readonly_source_tool": self.enable_source_tool,
             "maximum_sources": self.max_sources,
@@ -84,6 +90,11 @@ def check_operator_admission(
     resume_run: bool = False,
     inspect_run: bool = False,
     replay_result: bool = False,
+    context_tokens: int = 4096,
+    output_tokens: int = 1024,
+    native_threads: int = 4,
+    gpu_layers: int = 0,
+    capacity_budget_bytes: int = 8000000000,
 ) -> OperatorAdmission:
     """Reject structurally unsound operator input before model startup."""
     if type(mode) is not str or mode not in ("agent", "chat", "repl", "durable-agent"):
@@ -134,6 +145,20 @@ def check_operator_admission(
         or not math.isfinite(max_wall_seconds)
         or not 0 < max_wall_seconds <= 86400):
         raise NativeOperatorHold("invalid bounded wall clock budget")
+    # Structural preflight happens before private task reads and GGUF activation.
+    # Reported budgets never substitute for trusted resource and source evidence.
+    for label, value, minimum, maximum in (
+        ("context", context_tokens, 128, 131072),
+        ("output token budget", output_tokens, 1, 8192),
+        ("native threads", native_threads, 1, 64),
+        ("GPU layer limit", gpu_layers, 0, 128),
+        ("capacity budget", capacity_budget_bytes, 1, 20000000000),
+    ):
+        if type(value) is not int or not minimum <= value <= maximum:
+            raise NativeOperatorHold("invalid finite native " + label)
+    if output_tokens >= context_tokens:
+        raise NativeOperatorHold("native output must fit reserved context")
+
     if enable_source_tool and (mode != "agent" or source_root is None):
         raise NativeOperatorHold("source tool requires agent mode and signed source custody")
     if mode == "agent" and source_root is not None and not enable_source_tool:
@@ -154,6 +179,11 @@ def check_operator_admission(
         resume_run=resume_run,
         inspect_run=inspect_run,
         replay_result=replay_result,
+        context_tokens=context_tokens,
+        output_tokens=output_tokens,
+        native_threads=native_threads,
+        gpu_layers=gpu_layers,
+        capacity_budget_bytes=capacity_budget_bytes,
     )
 
 
