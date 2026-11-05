@@ -9,7 +9,7 @@ executes Docker, interprets Dockerfile RUN commands, or reads secret content.
 from __future__ import annotations
 
 import glob
-import os
+import itertools
 from pathlib import Path, PurePosixPath
 import shlex
 import stat
@@ -44,6 +44,8 @@ def _source_path_error(context: Path, relative: str) -> str | None:
         or "$" in relative
     ):
         return "unsupported COPY source path"
+    if relative == ".":
+        return None
     parts = PurePosixPath(relative).parts
     if ".." in parts or not parts or parts[0] == "/":
         return "COPY source escapes its build context"
@@ -54,6 +56,8 @@ def _safe_existing_source(context: Path, candidate: Path) -> bool:
     """Admit only actual existing regular files or directories, never links."""
     try:
         candidate.relative_to(context)
+        if stat.S_ISLNK(context.lstat().st_mode):
+            return False
         relative = candidate.relative_to(context)
         current = context
         for part in relative.parts:
@@ -149,7 +153,7 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
         if pending:
             issues.append(f"{scope}: incomplete Dockerfile line continuation")
         for line in logical:
-            if not line.startswith(("COPY ", "COPY\t")):
+            if line.split(maxsplit=1)[0].upper() != "COPY":
                 continue
             sources = _copy_sources(line)
             if sources is None:
@@ -162,7 +166,9 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
                     continue
                 # glob requires checking matches as well as boundaries. Limit
                 # the matches before inspecting files to bound preflight I/O.
-                matches = glob.glob(str(context / relative))
+                matches = list(itertools.islice(
+                    glob.iglob(str(context / relative)), MAX_MATCHES_PER_SOURCE + 1
+                ))
                 if not matches:
                     issues.append(f"{scope}: required Docker COPY input missing: {relative}")
                     continue
