@@ -95,6 +95,48 @@ def _authenticated_principals(response: object) -> tuple[tuple[str, str], ...] |
     return tuple(sorted(principals))
 
 
+def _trusted_topology(hello: object) -> tuple[object, ...] | None:
+    """Snapshot only inert Mongo hello scalars before cross-await comparisons.
+
+    Never invoke equality, string conversion or hashing on arbitrary driver
+    values. Optional fields may be absent on older Mongo versions; malformed
+    present fields invalidate the observation.
+    """
+    if type(hello) is not dict or hello.get("isWritablePrimary") is not True:
+        return None
+    name = hello.get("setName")
+    if (type(name) is not str or not 1 <= len(name) <= 128
+            or not name.isascii()
+            or any(ord(ch) < 33 or ord(ch) > 126 for ch in name)):
+        return None
+    values: list[object] = [name]
+    for field in ("me", "primary"):
+        value = hello.get(field)
+        if value is not None and (type(value) is not str or not value
+                                  or len(value) > 512 or not value.isascii()
+                                  or any(ord(ch) < 33 or ord(ch) > 126 for ch in value)):
+            return None
+        values.append(value)
+    election = hello.get("electionId")
+    if election is not None:
+        try:
+            from bson.objectid import ObjectId
+        except ImportError:
+            return None
+        if type(election) is ObjectId:
+            election = election.binary
+        elif type(election) is not str or not election or len(election) > 128:
+            return None
+        elif not election.isascii() or any(ord(ch) < 33 or ord(ch) > 126 for ch in election):
+            return None
+    values.append(election)
+    version = hello.get("setVersion")
+    if version is not None and (type(version) is not int or version < 0):
+        return None
+    values.append(version)
+    return tuple(values)
+
+
 async def inspect_compose_mongo_epoch(
     database: Any, *, tenant_id: str, actor_id: str, context_id: str,
 ) -> dict[str, object]:
@@ -112,18 +154,12 @@ async def inspect_compose_mongo_epoch(
             hello = await database.command("hello")
     except Exception:
         return _result("mongo_primary_probe_unavailable")
-    if (type(hello) is not dict
-            or type(hello.get("setName")) is not str
-            or not 1 <= len(hello["setName"]) <= 128
-            or not hello["setName"].isascii()
-            or any(ord(ch) < 33 or ord(ch) > 126 for ch in hello["setName"])
-            or hello.get("isWritablePrimary") is not True):
+    initial_topology = _trusted_topology(hello)
+    if initial_topology is None:
         return _result("mongo_replica_set_primary_required")
     # These fields are the stable parts of a primary observation. A changed
     # election, host or replica-set identity during preflight invalidates
     # the read window. No field here is a cryptographic cluster identity.
-    topology_fields = ("setName", "me", "primary", "electionId", "setVersion")
-    initial_topology = tuple(hello.get(field) for field in topology_fields)
     # A healthy unauthenticated replica set is not an acceptable canonical
     # custody authority. Inspect the current connection without publishing
     # usernames, role names, credentials or raw server responses.
@@ -146,10 +182,7 @@ async def inspect_compose_mongo_epoch(
         # read, never claiming a continuous lock or complete writer inventory.
         async with asyncio.timeout(3.0):
             last_hello = await database.command("hello")
-        if (type(last_hello) is not dict
-                or last_hello.get("isWritablePrimary") is not True
-                or tuple(last_hello.get(field) for field in topology_fields)
-                != initial_topology):
+        if _trusted_topology(last_hello) != initial_topology:
             return _result("mongo_primary_changed_during_preflight",
                            replica_set=True, authenticated=True)
         # Authentication may rotate while the epoch read is in flight. A
@@ -174,10 +207,7 @@ async def inspect_compose_mongo_epoch(
         async with asyncio.timeout(3.0):
             post_hello = await database.command("hello")
             post_auth = await database.command("connectionStatus")
-        if (type(post_hello) is not dict
-                or post_hello.get("isWritablePrimary") is not True
-                or tuple(post_hello.get(field) for field in topology_fields)
-                != initial_topology):
+        if _trusted_topology(post_hello) != initial_topology:
             return _result("mongo_primary_changed_during_final_epoch_read",
                            replica_set=True, authenticated=False)
         if _authenticated_principals(post_auth) != initial_users:
