@@ -8,9 +8,12 @@ def comparison(**kw):
 def evidence(**kw):
  v=dict(claim_digest=claim().digest,comparison=comparison(),replay_digest=S("replay"),replayer_id="ACTOR.REPLAY",researcher_id="ACTOR.RESEARCH",robustness_digest=S("robust"),security_digest=S("security"),latency_digest=S("latency"),cost_digest=S("cost"),operations_digest=S("ops"));v.update(kw);return QualificationEvidence(**v)
 def test_supported_independent_claim_qualifies():assert evidence().qualified
-def test_contamination_unchecked_cannot_qualify():assert not evidence(comparison=comparison(contamination_checked=False)).qualified
-def test_weak_baseline_result_cannot_qualify():assert not evidence(comparison=comparison(candidate_score=.7)).qualified
-def test_statistically_unsupported_effect_cannot_qualify():assert not evidence(comparison=comparison(confidence_low=-.01)).qualified
+def test_contamination_unchecked_cannot_qualify():
+ with pytest.raises(QualificationError,match="not statistically supported"):evidence(comparison=comparison(contamination_checked=False))
+def test_weak_baseline_result_cannot_qualify():
+ with pytest.raises(QualificationError,match="not statistically supported"):evidence(comparison=comparison(candidate_score=.7))
+def test_statistically_unsupported_effect_cannot_qualify():
+ with pytest.raises(QualificationError,match="not statistically supported"):evidence(comparison=comparison(confidence_low=-.01))
 def test_self_replay_rejected():
  with pytest.raises(QualificationError,match="independent"):evidence(replayer_id="ACTOR.RESEARCH")
 def test_comparison_must_bind_exact_claim():

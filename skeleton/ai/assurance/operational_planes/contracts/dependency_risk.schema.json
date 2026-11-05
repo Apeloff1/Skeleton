@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/dependency_risk.schema.json",
+  "title": "release.dependency_risk observation contract",
+  "description": "Reject unresolved dependency risk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unpatched_critical_dependencies",
+        "unapproved_dependency_changes"
+      ],
+      "properties": {
+        "unpatched_critical_dependencies": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unpatched_critical_dependencies"
+        },
+        "unapproved_dependency_changes": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unapproved_dependency_changes"
+        }
+      }
+    }
+  }
+}
