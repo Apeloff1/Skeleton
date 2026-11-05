@@ -389,3 +389,18 @@ uncertain work never auto-retries. Read-only cold verification reopens
 the journal hash chain and each private escrow without model startup or
 project modifications. No source text appears on stdout and no generated
 code executes. See `docs/ai/JEEVES_NATIVE_SOURCE_CAMPAIGNS.md`.
+
+## Merge real local GGUF campaign outputs into one cross-task source patch
+
+`desktop_campaign_delivery_cli` and `scripts/jeeves_campaign_delivery.py`
+now close the multi-task production loop after a COMPLETE native SQLite
+coding campaign. Each saved private GGUF source escrow is independently
+cold-checked against its exact job SHA, current original project sources,
+model identity and audit chain. Distinct new/edit source entries are joined
+under a single canonical original source manifest, source patch, and
+cross-task Python dependency graph. Duplicate/colliding paths, source drift
+and incomplete jobs hold rather than choosing a model output. A separate
+operator SHA approval can publish ONE privately staged source tree or ONE
+inert Git patch, using the existing no-clobber/cold-verification publishers.
+No source body appears on stdout and no original project is modified.
+See `docs/ai/JEEVES_NATIVE_CAMPAIGN_SOURCE_ASSEMBLY.md`.
