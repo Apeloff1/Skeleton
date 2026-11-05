@@ -161,3 +161,20 @@ running model. GPU layers remain zero by default because this source-only
 planner has no verified VRAM/backend capability reading. Device-pressure,
 swap, native cancellation and real Windows/WSL2 readiness still require
 physical qualification.
+
+## Bounded native request watchdog and cross-session custody
+
+Each source-bound native response is matched against the exact issued
+operation. A committed turn must retain its original SQLite session, request
+ID, model hash and authoritative receipt; the UTF-8 answer SHA-256 is checked
+before the window displays the text. A reply from an old worker cannot be
+displayed after disconnect/reconnect. The private GUI and model are separate
+processes, with no automatic replay of uncertain effects.
+
+Each explicit turn has a watchdog capped at 660 seconds and normally
+scheduled for native inference deadline plus 45 seconds of IPC/teardown
+allowance. Read-only/control operations have a 30-second timeout. A timed-out
+child is terminally revoked: the UI retains the original request ID for
+manual committed-state reconciliation and does **not** regenerate a task
+automatically. A source-revocation or partial response cannot be promoted
+into a successful desktop turn.

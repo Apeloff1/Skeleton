@@ -81,3 +81,11 @@ Do not use a model output as authorization to overwrite old sources, execute
 unknown scripts, create GitHub workflow files, inspect private credentials,
 enable network fetching or merge unreviewed source changes. This workbench
 does not provide those capabilities.
+
+## Protected local control directories
+
+Model-generated new-file proposals may not create paths in `.github`,
+`.git`, `.ssh`, `.gnupg`, `.vscode`, `.idea`, or
+`.devcontainer`, even if those files do not have executable extensions.
+This prevents a source proposal from becoming a hidden future workflow,
+editor or development-environment control instruction.

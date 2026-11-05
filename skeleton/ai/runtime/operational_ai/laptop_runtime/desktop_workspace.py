@@ -34,7 +34,8 @@ _ALLOWED = frozenset({
     ".ps1", ".xml", ".ini", ".cfg",
 })
 _BLOCK_PARTS = frozenset({
-    ".git", ".hg", ".svn", ".ssh", ".gnupg", "node_modules",
+    ".git", ".github", ".hg", ".svn", ".ssh", ".gnupg",
+    ".vscode", ".idea", ".devcontainer", "node_modules",
     "__pycache__", ".venv", "venv", "secrets", "credentials",
 })
 
