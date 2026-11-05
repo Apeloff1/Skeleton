@@ -140,3 +140,24 @@ Detailed source contract, usage and limitation notes:
 
 Source-only qualification of this file writer cannot establish model
 correctness or consumer-device readiness.
+
+## Effective CPU/RAM admission and live capacity
+
+Before connecting, click **Suggest measured CPU/RAM profile**. This
+read-only operator action verifies the installed GGUF source and rights
+receipt, observes actual available host RAM, free state storage and the
+effective process cgroup v1/v2 memory/CPU limits, and selects conservative
+CPU-only native settings. It reserves room for operating-system RAM, model
+weight bytes, a bounded KV-cache estimate and native scratch memory.
+Unknown or conflicting metrics and insufficient available resources are
+refused rather than represented as successful model admission. These figures
+are estimates, not proven allocator footprints, and never substitute for the
+native capacity broker or isolated GGUF activation.
+
+The **Live capacity** button, available only while the native child is
+connected, asks the same source-checked supervisor for its actual capacity,
+model circuit and service metrics. It never performs inference or modifies a
+running model. GPU layers remain zero by default because this source-only
+planner has no verified VRAM/backend capability reading. Device-pressure,
+swap, native cancellation and real Windows/WSL2 readiness still require
+physical qualification.

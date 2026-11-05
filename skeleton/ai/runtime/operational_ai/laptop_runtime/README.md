@@ -81,3 +81,11 @@ new file at a time with a no-clobber SHA-256 manifest. It never lets model
 output overwrite existing files, execute code, create workflow authority or
 acquire a filesystem tool. Use the complete guide at
 `docs/ai/JEEVES_WORKSPACE_NEW_FILE_DELIVERY.md`.
+
+## Hardware-aware advisory startup
+
+The desktop may inspect the installed model, host memory and effective
+cgroup v1/v2 CPU/RAM limits **before** real startup, then propose CPU-only
+resource bounds. This is read-only advisory sizing, not GPU/VRAM detection
+or certification. A connected operator can inspect actual supervisor
+capacity/circuit statistics without invoking generation.

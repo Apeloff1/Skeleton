@@ -111,6 +111,16 @@ class DesktopHost:
                     commands_processed=self._commands,
                     physical_device_qualified=False,
                 ), False
+            if op == "telemetry":
+                # Only the already active, source-checked supervisor provides
+                # the runtime state. No model generation or extra store.
+                from .budget_observer import inspect as observe_runtime
+                observed = observe_runtime(self.worker)
+                self._live()
+                return self._public(
+                    "observed-runtime-capacity", observed=observed,
+                    physical_device_qualified=False,
+                ), False
             if op == "new":
                 self.chat = self._chat_class(self.worker, source_fence=self.source)
                 self._live()
