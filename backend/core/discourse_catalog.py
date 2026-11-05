@@ -37,7 +37,11 @@ class DeclaredPanel:
 
 
 def _model_row(item: object) -> DeclaredModel | None:
-    if not isinstance(item, Mapping) or item.get("selectable") is not True:
+    if (
+        not isinstance(item, Mapping)
+        or item.get("available") is not True
+        or item.get("selectable") is not True
+    ):
         return None
     provider = item.get("provider_id")
     model = item.get("model_id")
