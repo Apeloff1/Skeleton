@@ -70,6 +70,11 @@ export default function DiscourseScreen() {
     // A login/logout clears every displayed private prompt, verdict and
     // receipt from the previous principal without relying on navigation.
     observer.current?.abort();
+    // Detach BEFORE abort completion can resolve: an old account's response
+    // must never pass the observer identity check after login/logout.
+    observer.current = null;
+    occupied.current = false;
+    setBusy(false);
     setRes(null);
     setJobId(null);
     setCanResume(false);
@@ -139,8 +144,10 @@ export default function DiscourseScreen() {
       }
       setBusy(false);
     }
-    if (observer.current === controller) observer.current = null;
-    occupied.current = false;
+    if (observer.current === controller) {
+      observer.current = null;
+      occupied.current = false;
+    }
   }, [prompt, discord]);
 
   const run = React.useCallback(() => {
