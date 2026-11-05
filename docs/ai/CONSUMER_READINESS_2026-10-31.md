@@ -68,10 +68,15 @@ its own exact-head installer run and real deployment qualification.
   verification as pending while the masterplan and accountability records carry
   an older signed verification. Reconcile the linked records through an auditable
   requalification or revocation; a changed status alone is not evidence.
-- Compose gates frontend startup on backend and engine health. When a required
-  backend dependency stays unhealthy during initial startup, the setup page may
-  not start to display the failure; use the installer output and service logs.
-  A changed startup graph requires qualification on the real deployment.
+- The first-run frontend has **no Compose startup dependency** on the backend
+  or guarded AI engine. Waiting even for backend `service_started` would
+  transitively require a healthy engine (and MongoDB), hiding setup diagnostics
+  precisely when guard bootstrap fails. Backend/engine health dependencies
+  remain enforced, and API calls still fail closed when unavailable. This
+  change does not enable protected inference, bypass authorization, or certify
+  any unhealthy dependency. Operators still need installer output and service
+  logs if frontend startup itself fails. The modified Compose graph requires
+  real clean-host and Windows/WSL2 qualification.
 
 The earlier VM deployment used older application images and does not qualify
 the current source. Passing focused checks, a healthy process, or a model file
