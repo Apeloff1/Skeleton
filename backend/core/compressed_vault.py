@@ -288,14 +288,23 @@ def write_shard(
                 try:
                     _save_manifest()
                 except BaseException:
-                    if old_entry is None:
-                        _MANIFEST.pop(name, None)
-                    else:
-                        _MANIFEST[name] = old_entry
-                    # Restore the *previous bytes*, not merely a pointer to
-                    # an already replaced file. If restore itself fails, keep
-                    # the backup for forensic/manual recovery rather than
-                    # cleaning up the last good content.
+                    # A write can publish the manifest and *then* fail during
+                    # fsync. Re-read the disk state before deciding whether
+                    # rolling back the file would corrupt a committed record.
+                    try:
+                        _load_manifest()
+                    except BaseException:
+                        backup_name = None  # preserve last good bytes for recovery
+                        raise
+                    observed = _MANIFEST.get(name)
+                    if observed == entry:
+                        backup_name = None  # ambiguous durability; keep backup
+                        raise
+                    if observed != old_entry:
+                        backup_name = None
+                        raise VaultPathError("vault manifest changed during transaction")
+                    # Roll back only after proving the disk manifest still
+                    # references the old bytes (or no shard on first write).
                     if backup_name is not None:
                         previous = backup_name
                         backup_name = None
@@ -442,7 +451,16 @@ def delete_shard(name: str) -> bool:
     try:
         _save_manifest()
     except BaseException:
-        _MANIFEST[name] = old_entry
+        # Manifest publication may have completed before a late fsync error.
+        # Synchronize the in-memory state with the observed disk manifest,
+        # leaving bytes untouched when the transaction result is ambiguous.
+        try:
+            _load_manifest()
+        except BaseException:
+            _MANIFEST[name] = old_entry
+            raise
+        if _MANIFEST.get(name) not in (None, old_entry):
+            raise VaultPathError("vault manifest changed during deletion")
         raise
     try:
         with _storage_fd() as directory:
