@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "world_trade_route",
+  "domain": "world",
+  "stages": [
+    {
+      "key": "discover_trade_route",
+      "evidence": "world:trade_route:discover:proof",
+      "grants": "world:trade_route:stage:1",
+      "risk": 3,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_trade_route",
+      "evidence": "world:trade_route:prepare:proof",
+      "grants": "world:trade_route:stage:2",
+      "risk": 4,
+      "sequence": 1,
+      "requires_previous_grant": "world:trade_route:stage:1"
+    },
+    {
+      "key": "execute_trade_route",
+      "evidence": "world:trade_route:execute:proof",
+      "grants": "world:trade_route:stage:3",
+      "risk": 5,
+      "sequence": 2,
+      "requires_previous_grant": "world:trade_route:stage:2"
+    },
+    {
+      "key": "resolve_trade_route",
+      "evidence": "world:trade_route:resolve:proof",
+      "grants": "world:trade_route:stage:4",
+      "risk": 6,
+      "sequence": 3,
+      "requires_previous_grant": "world:trade_route:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "world_trade_route:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "world:trade_route:discover:proof"
+      ]
+    },
+    {
+      "id": "world_trade_route:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "world:trade_route:prepare:proof"
+      ]
+    },
+    {
+      "id": "world_trade_route:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "world:trade_route:execute:proof"
+      ]
+    },
+    {
+      "id": "world_trade_route:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "world:trade_route:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

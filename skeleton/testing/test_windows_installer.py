@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 import subprocess
+
+import pytest
 
 from skeleton.app.installer import install_application
 from skeleton.app.preloader import PreloadCheck, PreloadReport, inspect_host
@@ -147,12 +150,78 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "& python $ArchivePreflight --archive $ArchivePath" in source
     assert "$PathBudgetViolations" in source
     assert "& git @ArchiveArgs" in source
-    assert 'git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"' in source
+    assert 'git -C $RepoRoot show "$($SourceCommit):skeleton/app/manifest.json"' in source
     assert '$RuntimePaths = @($RuntimePaths | Select-Object -Unique)' in source
     assert 'Windows payload missing required assembly path' in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
     assert "ISCC.exe" in source
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
+@pytest.mark.parametrize("version_args", [[], ["-Version", "1.2.3"]])
+def test_invalid_installer_source_preserves_existing_outputs(tmp_path, version_args):
+    """A bad revision must fail before cleaning build or release artifacts."""
+    root = tmp_path / "source"
+    script_dir = root / "scripts" / "windows"
+    script_dir.mkdir(parents=True)
+    shutil.copyfile("scripts/windows/build_installer.ps1", script_dir / "build_installer.ps1")
+    build_marker = root / ".build" / "windows-installer" / "keep.txt"
+    output_marker = root / "dist" / "windows" / "old-installer.exe"
+    for marker in (build_marker, output_marker):
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("preserve", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    result = subprocess.run(
+        ["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1"),
+         "-SourceRef", "refs/heads/does-not-exist", *version_args],
+        cwd=root, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "Unable to resolve SourceRef to a commit" in result.stderr
+    assert build_marker.read_text(encoding="utf-8") == "preserve"
+    assert output_marker.read_text(encoding="utf-8") == "preserve"
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
+@pytest.mark.parametrize("existing_suffix", ["", ".sha256"])
+def test_installer_output_collision_preserves_existing_release(tmp_path, existing_suffix):
+    root = tmp_path / "source"
+    script_dir = root / "scripts" / "windows"
+    script_dir.mkdir(parents=True)
+    shutil.copyfile("scripts/windows/build_installer.ps1", script_dir / "build_installer.ps1")
+    (root / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "pyproject.toml"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=Installer Test", "-c",
+                    "user.email=installer@example.invalid", "commit", "-qm", "fixture"], check=True)
+    output = root / "dist" / "windows" / f"Skeleton-Setup-1.2.3-windows-x64.exe{existing_suffix}"
+    output.parent.mkdir(parents=True)
+    output.write_text("preserve", encoding="utf-8")
+    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1")],
+                            cwd=root, capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert "Installer output already exists" in result.stderr
+    assert output.read_text(encoding="utf-8") == "preserve"
+    assert not (root / ".build" / "windows-installer").exists()
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
+def test_installer_rejects_unsafe_source_version_before_cleanup(tmp_path):
+    root = tmp_path / "source"
+    script_dir = root / "scripts" / "windows"
+    script_dir.mkdir(parents=True)
+    shutil.copyfile("scripts/windows/build_installer.ps1", script_dir / "build_installer.ps1")
+    (root / "pyproject.toml").write_text('[project]\nversion = "1.2.3/escape"\n', encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "pyproject.toml"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=Installer Test", "-c",
+                    "user.email=installer@example.invalid", "commit", "-qm", "fixture"], check=True)
+    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1")],
+                            cwd=root, capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert "filename-safe" in result.stderr
+    assert not (root / ".build" / "windows-installer").exists()
 
 
 

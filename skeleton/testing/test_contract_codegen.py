@@ -10,3 +10,11 @@ def test_generated_identifiers_reject_injection():
 def test_unknown_target_rejected():
  import pytest
  with pytest.raises(ValueError):generate_code(GenerationSpec("v1","shell",("x",)))
+
+def test_legacy_python_target_preserves_identifier_guard():
+ import pytest
+ with pytest.raises(ValueError,match="unsafe generated identifier"):generate_code(GenerationSpec("v1","python",("x\npass",)))
+
+def test_contract_version_cannot_inject_generated_code():
+ import pytest
+ with pytest.raises(ValueError,match="unsafe contract version"):generate_code(GenerationSpec("v1\nimport os","python",("x",)))

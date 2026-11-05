@@ -1,0 +1,36 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "copper_tundra__cartographer",
+  "chapter": 36,
+  "region": "Copper Tundra",
+  "visual_motif": "iceblue and raw copper",
+  "rows": [
+    "#############",
+    "#S.K.H.O.R.E#",
+    "#...C...?...#",
+    "#....#......#",
+    "#...X....M..#",
+    "#...#.......#",
+    "#..F...L....#",
+    "#..#......#.#",
+    "#############"
+  ],
+  "entry_rule": "S",
+  "unlock_rule": "K>O>E",
+  "symbols": {
+    "#": "impassable",
+    ".": "floor",
+    "S": "start",
+    "K": "source key",
+    "H": "hazard",
+    "O": "objective",
+    "R": "recharge",
+    "E": "exit",
+    "C": "cache",
+    "?": "choice",
+    "X": "guardian",
+    "M": "medicine",
+    "F": "faction",
+    "L": "lore"
+  }
+}
