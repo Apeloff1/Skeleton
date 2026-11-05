@@ -194,7 +194,7 @@ def ingest_authorized_sources(source_root,manifest,*,scope,observed_at):
     integer(observed_at,minimum=1)
     if not manifest.issued_at<=observed_at<manifest.expires_at:
         refuse("signed source approval expired before file read")
-    if type(source_root) not in (str,Path):
+    if not isinstance(source_root,(str,Path)):
         refuse("trusted absolute source root required")
     path=os.fspath(source_root)
     if not os.path.isabs(path) or "\x00" in path:
