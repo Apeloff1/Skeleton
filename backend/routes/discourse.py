@@ -26,7 +26,8 @@ router = APIRouter(prefix="/api/discourse", tags=["discourse"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
 PROJ = {"_id": 0}
 
-# Default provider-diverse panel + judge (one strong model per vendor).
+# Historical planning labels kept for import compatibility only. These
+# names DO NOT confer execution authority: live panels come from the engine.
 DEFAULT_PANEL = ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"]
 DEFAULT_JUDGE = "o3"
 MAX_PANEL = 5
@@ -351,7 +352,7 @@ async def get_panel(identity: dict = Depends(require_authenticated_identity)):
         "default_panel": [m.key for m in panel.models],
         "default_judge": panel.judge.key,
         "max_panel": MAX_PANEL,
-        "available_models": list(dict.fromkeys(
+        "available_models": list(panel.available_models) or list(dict.fromkeys(
             [m.key for m in panel.models] + [panel.judge.key]
         )),
         "available": True,
