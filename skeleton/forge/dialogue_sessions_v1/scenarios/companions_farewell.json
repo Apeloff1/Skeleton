@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "companions_farewell",
+  "domain": "companions",
+  "role": "farewell",
+  "rapport_threshold": 38,
+  "rapport_gain": 8,
+  "stress_increment": 6,
+  "steps": [
+    {
+      "id": "companions_farewell:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "companions_farewell:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "companions_farewell:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "companions_farewell:proof-1"
+    },
+    {
+      "id": "companions_farewell:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "companions_farewell:proof-2"
+    },
+    {
+      "id": "companions_farewell:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "companions_farewell:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}
