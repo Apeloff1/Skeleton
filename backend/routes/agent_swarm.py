@@ -22,7 +22,7 @@ import uuid
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from routes.gameforge_auth import require_authenticated_identity
 
@@ -31,6 +31,17 @@ router = APIRouter(prefix="/api/swarm-dag", tags=["swarm-dag"])
 _STOP = {"the", "a", "an", "and", "or", "of", "to", "for", "with", "build", "make",
          "create", "add", "game", "please", "then", "into", "that"}
 
+
+
+def _project_id(project: str) -> str:
+    if (
+        not isinstance(project, str)
+        or not 1 <= len(project.strip()) <= 200
+        or project != project.strip()
+        or any(ord(char) < 32 or ord(char) == 127 for char in project)
+    ):
+        raise ValueError("project must be bounded printable non-empty text")
+    return project
 
 def _owner_scope(identity: dict) -> tuple[dict[str, str], str]:
     """Require a normalized account/tenant principal before any graph access.
@@ -45,7 +56,8 @@ def _owner_scope(identity: dict) -> tuple[dict[str, str], str]:
         not isinstance(value, str)
         or not 1 <= len(value) <= 256
         or value != value.strip()
-        or any(ord(ch) < 32 for ch in value)
+        or value == "anonymous"
+        or any(ord(ch) < 32 or 0xD800 <= ord(ch) <= 0xDFFF for ch in value)
         for value in (tenant, owner)
     ):
         raise HTTPException(403, "Swarm graph identity is unavailable")
@@ -59,6 +71,11 @@ class SwarmReq(BaseModel):
     directive: str = Field(..., min_length=3, max_length=10000)
     workers: int = Field(4, ge=1, le=32)              # parallel sub-agents (fan-out)
     project: str = Field("swarm", min_length=1, max_length=200)
+
+    @field_validator("project")
+    @classmethod
+    def valid_project(cls, value: str) -> str:
+        return _project_id(value)
 
 
 def _subtasks(directive: str, n: int) -> List[str]:
@@ -74,7 +91,7 @@ def _subtasks(directive: str, n: int) -> List[str]:
         if token not in _STOP and len(token) > 2
     ]
     unique = list(dict.fromkeys(tokens)) or ["core"]
-    return [unique[i % len(unique)] for i in range(n)]
+    return [unique[i % len(unique)][:128] for i in range(n)]
 
 
 async def _worker(worker_id: int, focus: str, project: str, run_id: str, identity: dict) -> Dict:
@@ -143,8 +160,10 @@ async def swarm_graph(
 ):
     """Query only this account's graph, denying unowned legacy records."""
     scope, _owner_key = _owner_scope(identity)
-    if not isinstance(project, str) or not 1 <= len(project.strip()) <= 200:
-        raise HTTPException(422, "invalid project identity")
+    try:
+        _project_id(project)
+    except ValueError as exc:
+        raise HTTPException(422, "invalid project identity") from exc
     if type(limit) is not int or not 1 <= limit <= 100:
         raise HTTPException(422, "graph limit must be an integer in [1, 100]")
     try:
@@ -157,13 +176,31 @@ async def swarm_graph(
     return {"ok": True, "project": project, "nodes": rows, "count": len(rows)}
 
 
+MAX_CONCURRENT_SWARM_RUNS = 8
+# Thread-backed, nonblocking admission avoids sharing asyncio semaphores
+# across ASGI workers and prevents unbounded 32-worker fanout per request.
+import threading
+_RUN_ADMISSION = threading.BoundedSemaphore(MAX_CONCURRENT_SWARM_RUNS)
+
+
 @router.post("/run")
 async def run_swarm(
     req: SwarmReq,
     identity: dict = Depends(require_authenticated_identity),
 ):
-    """Only account-owned, acknowledged graph writes make a run successful."""
+    """Admit bounded private swarm work; always release capacity."""
     scope, owner_key = _owner_scope(identity)
+    _project_id(req.project)
+    if not _RUN_ADMISSION.acquire(blocking=False):
+        raise HTTPException(503, "swarm worker admission at capacity")
+    try:
+        return await _run_swarm_scoped(req, scope, owner_key)
+    finally:
+        _RUN_ADMISSION.release()
+
+
+async def _run_swarm_scoped(req: SwarmReq, scope: dict[str, str], owner_key: str):
+    """Only account-owned, acknowledged graph writes make a run successful."""
     run_id = uuid.uuid4().hex
     foci = _subtasks(req.directive, req.workers)
     start = time.monotonic()
