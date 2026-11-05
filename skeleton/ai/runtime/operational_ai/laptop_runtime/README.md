@@ -345,3 +345,17 @@ symlinks, malformed seals or changed SHA-256 receipts; neither CLI executes
 or claims to test any generated code. Run the scripts
 `jeeves_native_capsule.py` and `jeeves_verify_private_capsule.py`.
 Documentation: `docs/ai/JEEVES_PRIVATE_SELECTED_SOURCE_CAPSULE.md`.
+
+## Selected original Python import closure for private source capsules
+
+The **private selected-source capsule** now checks actual Python AST imports
+across both reviewed original code replacements and operator-selected
+unchanged project modules. Exact present modules are SHA-linked by original
+versus changed provenance; external, dynamic and unselected sources remain
+explicitly unverified. Invalid relative imports, malformed selected Python
+and ambiguous Python module identities stop staging. The exact closure SHA
+enters the overall capsule digest and final owner-private completion seal;
+an independent cold verifier reparses the sealed source bytes before
+accepting the original receipt. The Tk workbench displays the linked and
+unknown import counts during source review without running model code.
+See `docs/ai/JEEVES_SELECTED_PROJECT_SOURCE_CLOSURE.md`.
