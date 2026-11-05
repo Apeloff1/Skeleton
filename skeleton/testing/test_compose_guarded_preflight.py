@@ -101,6 +101,27 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["canonical_writer_inventory_verified"])
         self.assertFalse(result["guarded_local_ai_ready"])
 
+    async def test_primary_self_identity_must_be_in_advertised_hosts(self):
+        # The primary field may be omitted by a server. A contradictory
+        # self-identity must still fail before any canonical epoch read.
+        self.db.hello.update({
+            "me": "mongo-a:27017",
+            "hosts": ["mongo-b:27017", "mongo-c:27017"],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(FakeEpoch.instances, [])
+
+    async def test_primary_self_identity_present_in_hosts_is_observation_only(self):
+        self.db.hello.update({
+            "me": "mongo-a:27017",
+            "hosts": ["mongo-a:27017", "mongo-b:27017"],
+        })
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_primary_and_stable_epoch_only_prove_mongo_preflight(self):
         result = await self.inspect()
         self.assertEqual(result["schema_version"], SCHEMA)
