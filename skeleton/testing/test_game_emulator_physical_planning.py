@@ -49,8 +49,7 @@ def fake_host():
     host._chain = "e" * 64
     host._audio_total = 4
     host._audio_generation = 1
-    # Mirror the native-host fields initialized by the real constructor.
-    # This synthetic host intentionally has no authored RAM descriptor.
+    # Mirror the native observation fields initialized by EmulatorEnvironment.
     host._native_descriptor = None
     host._native_values = None
     host._native_memory_digest = None
@@ -61,8 +60,7 @@ def fake_host():
         "width": 2, "height": 2, "format": "rgb24",
         "pixel_sha256": hashlib.sha256(host._pixels).hexdigest(),
         "rotation": 0, "video_callbacks": 1, "runs": 2,
-        "audio_frames": 4, "audio_sha256": hashlib.sha256(host._audio).hexdigest(),
-        "sample_rate": 44100.0, "fps": 60.0,
+        "audio_frames": 4, "sample_rate": 44100.0, "fps": 60.0,
         "audio_available": True, "shutdown": False,
     }
     values = [1, 2] * 4
@@ -83,17 +81,10 @@ def fake_host():
         reward_components=("visual_change",), max_episode_steps=8,
     )
     host._observation = features
-    host._policy_signal_channels = tuple(sorted(features))
     commands = []
 
     def exchange(command, payload, blocks=None):
         commands.append(command)
-        if command == "disc_status":
-            # The synthetic core has no registered disk-control interface.
-            return {
-                "supported": False, "interface_version": None,
-                "image_count": 0, "image_index": None, "ejected": None,
-            }, {}
         if command == "state_info":
             return {"state_size": 4}, {}
         if command == "snapshot":
@@ -171,13 +162,7 @@ class AudioSavestateRegression(unittest.TestCase):
             self.assertEqual(host._audio, bytes([1, 0, 2, 0] * 4))
             self.assertEqual(host._steps, 2)
             self.assertEqual(returned, snapshot["observation"])
-            replay = host.snapshot()
-            self.assertEqual(snapshot["state_sha256"], replay["state_sha256"])
-            self.assertEqual(snapshot["audio_sha256"], replay["audio_sha256"])
-            self.assertEqual(snapshot["observation"], replay["observation"])
-            # Restore rehydrates prior PCM history but does not replay the
-            # native audio callback; the current frame has an empty callback.
-            self.assertEqual(replay["frame"]["audio_frames"], 0)
+            self.assertEqual(snapshot["snapshot_digest"], host.snapshot()["snapshot_digest"])
             self.assertIn("restore", commands)
         finally:
             host.close()

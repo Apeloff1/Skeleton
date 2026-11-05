@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/artifact_policy.schema.json",
+  "title": "release.artifact_policy observation contract",
+  "description": "Require approved artifacts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unapproved_artifacts",
+        "missing_artifact_signatures"
+      ],
+      "properties": {
+        "unapproved_artifacts": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unapproved_artifacts"
+        },
+        "missing_artifact_signatures": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for missing_artifact_signatures"
+        }
+      }
+    }
+  }
+}
