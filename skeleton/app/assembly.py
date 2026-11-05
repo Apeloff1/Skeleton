@@ -504,7 +504,7 @@ def backend_python_image_errors(source: str) -> tuple[str, ...]:
         if not line.startswith("FROM python:"):
             continue
         match = re.fullmatch(
-            r"FROM python:(\\d+)\\.(\\d+)-alpine@sha256:([0-9a-f]{64}) AS (builder|runtime-source|production)",
+            r"FROM python:(\d+)\.(\d+)-alpine@sha256:([0-9a-f]{64}) AS (builder|runtime-source|production)",
             line,
         )
         if match is None:
@@ -521,7 +521,7 @@ def backend_python_image_errors(source: str) -> tuple[str, ...]:
         errors.append("backend Python image stages must share the same pinned Python/Alpine ABI")
 
     guard = re.search(
-        r"sys\\.version_info\\[:2\\]\\s*<\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)",
+        r"sys\.version_info\[:2\]\s*<\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
         source,
     )
     if guard is None:
