@@ -1,0 +1,16 @@
+{
+  "case": "00_baseline",
+  "gate": "checkpoint",
+  "expect": "accept",
+  "reason": "Canonical explicitly bounded source record",
+  "payload": {
+    "model_id": "local-gguf",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "gguf-v3",
+    "bytes": 5000,
+    "max_bytes": 100000000,
+    "step": 1,
+    "approved": true
+  }
+}

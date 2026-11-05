@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/nowhere.gd" id="1_gone"]
+
+[sub_resource type="BoxMesh" id="cloth_mesh"]
+
+[node name="Level" type="Node3D"]
+
+[node name="Heavy" type="RigidBody3D" parent="."]
+mass = 0.0
+script = ExtResource("1_gone")
+
+[node name="Shape" type="CollisionShape3D" parent="Heavy"]
+shape = SubResource("not_declared")
+
+[node name="Cloth" type="SoftBody3D" parent="."]
+mesh = SubResource("cloth_mesh")
+total_mass = 1.0

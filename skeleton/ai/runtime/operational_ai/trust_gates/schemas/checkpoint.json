@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "fields": {
+    "model_id": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "model_sha": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "format": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "native-v1",
+        "gguf-v3",
+        "unrecognized"
+      ]
+    },
+    "bytes": {
+      "type": "int",
+      "min": 1,
+      "max": 20000000000
+    },
+    "max_bytes": {
+      "type": "int",
+      "min": 1,
+      "max": 20000000000
+    },
+    "step": {
+      "type": "int",
+      "min": 1,
+      "max": 1000000000
+    },
+    "approved": {
+      "type": "bool"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "tool",
+  "expect": "reject",
+  "reason": "Only read-only tools are admitted",
+  "payload": {
+    "grant_id": "g_001",
+    "tool_id": "read_text",
+    "args": {
+      "path": "docs/README.md",
+      "byte_limit": 1024
+    },
+    "risk": "high",
+    "approved": true,
+    "request_id": "r_001"
+  }
+}

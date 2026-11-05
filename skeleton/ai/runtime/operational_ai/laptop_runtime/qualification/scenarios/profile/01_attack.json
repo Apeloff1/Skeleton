@@ -1,0 +1,20 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "01_attack",
+  "domain": "profile",
+  "expected": "reject",
+  "payload": {
+    "n_ctx": 1,
+    "max_new_tokens": 256,
+    "threads": 4,
+    "gpu_layers": 0,
+    "capacity_slots": 1,
+    "capacity_budget_bytes": 8000000000,
+    "inference_ms": 90000
+  },
+  "reason": "Refuse adversarial profile variant 1",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational profile contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

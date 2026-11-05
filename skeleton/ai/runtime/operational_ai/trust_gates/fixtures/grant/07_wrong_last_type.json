@@ -1,0 +1,19 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "grant",
+  "expect": "reject",
+  "reason": "No arbitrary object as a typed value",
+  "payload": {
+    "actor_id": "operator",
+    "tool_id": "read_text",
+    "expires_at": 2000000,
+    "now": 1000000,
+    "nonce": "nonce_001",
+    "rights": [
+      "read"
+    ],
+    "scope": {
+      "untrusted": true
+    }
+  }
+}

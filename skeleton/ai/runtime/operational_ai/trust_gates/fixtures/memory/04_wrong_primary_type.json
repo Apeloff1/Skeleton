@@ -1,0 +1,15 @@
+{
+  "case": "04_wrong_primary_type",
+  "gate": "memory",
+  "expect": "reject",
+  "reason": "Implicit identity coercion denied",
+  "payload": {
+    "tenant": 17,
+    "source_tenant": "local",
+    "source_id": "note_001",
+    "approved": true,
+    "revision": 1,
+    "expires_at": 2000000,
+    "now": 1000000
+  }
+}

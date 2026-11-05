@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/message_backlog.schema.json",
+  "title": "transport.message_backlog observation contract",
+  "description": "Prevent stale transport queues",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transport_backlog",
+        "oldest_message_age_seconds"
+      ],
+      "properties": {
+        "transport_backlog": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "Upper bound for transport_backlog"
+        },
+        "oldest_message_age_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180,
+          "description": "Upper bound for oldest_message_age_seconds"
+        }
+      }
+    }
+  }
+}

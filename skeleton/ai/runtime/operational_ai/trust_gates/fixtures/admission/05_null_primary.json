@@ -1,0 +1,15 @@
+{
+  "case": "05_null_primary",
+  "gate": "admission",
+  "expect": "reject",
+  "reason": "No null identity or resource",
+  "payload": {
+    "tenant": null,
+    "deadline_ns": 2000000,
+    "now_ns": 1000000,
+    "queue_depth": 4,
+    "queue_ceiling": 16,
+    "requested_tokens": 128,
+    "token_ceiling": 2048
+  }
+}

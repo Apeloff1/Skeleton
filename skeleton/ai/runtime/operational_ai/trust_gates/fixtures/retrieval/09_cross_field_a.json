@@ -1,0 +1,15 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "retrieval",
+  "expect": "reject",
+  "reason": "Exact UTF-8 byte spans bind excerpts",
+  "payload": {
+    "source_id": "doc_001",
+    "text": "hello world",
+    "span_start": 0,
+    "span_end": 5,
+    "excerpt": "world",
+    "source_sha": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+    "approved": true
+  }
+}

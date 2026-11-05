@@ -1,0 +1,17 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "transport",
+  "expect": "reject",
+  "reason": "Typed values are not arbitrary objects",
+  "payload": {
+    "host": "127.0.0.1",
+    "method": "POST",
+    "auth_type": "bearer",
+    "token_bytes": 64,
+    "body_bytes": 128,
+    "body_ceiling": 262144,
+    "content_type": {
+      "untrusted": true
+    }
+  }
+}
