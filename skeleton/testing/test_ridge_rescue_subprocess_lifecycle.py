@@ -356,3 +356,64 @@ def test_exponent_overflow_action_rejected_without_save_mutation(tmp_path: Path)
                       "--expected-head", initial["head"])
     assert committed["revision"] == 1
     assert _json(home, "audit")["verified"] is True
+
+
+
+def test_mid_campaign_backup_restore_and_independent_ending_replay(tmp_path: Path):
+    """A real process may resume from a mid-campaign backup and earn the same ending.
+
+    This crosses separate SQLite stores and interpreter boundaries rather than
+    merely checking that an exported snapshot can be decoded.
+    """
+    original_home = tmp_path / "original"
+    recovered_home = tmp_path / "recovered"
+    state = _json(original_home, "new")
+    sequence = acceptance_actions("protect") + LAST_SIGNAL
+    midpoint = len(sequence) // 2
+    assert 0 < midpoint < len(sequence)
+
+    for action in sequence[:midpoint]:
+        state = _json(original_home, "step", "--action", json.dumps(action),
+                      "--expected-head", state["head"])
+    assert state["revision"] == midpoint
+    mid_head = state["head"]
+    backup = _json(original_home, "backup")
+    backup_bytes = Path(backup["path"]).read_bytes()
+
+    # Recovery is intentionally performed in a separate private data root.
+    restored_process = _invoke(recovered_home, "restore-backup",
+                               "--file", "-", stdin=backup_bytes)
+    assert restored_process.returncode == 0, (
+        restored_process.stdout.decode(errors="replace"),
+        restored_process.stderr.decode(errors="replace"),
+    )
+    restored = _json(recovered_home, "status")
+    assert restored["head"] == mid_head
+    assert restored["revision"] == midpoint
+    assert _json(recovered_home, "audit")["audit_entries"] == midpoint
+
+    # Both stores must produce exactly the same deterministic head at every
+    # subsequent turn, despite having independent SQLite connections/files.
+    for revision, action in enumerate(sequence[midpoint:], midpoint + 1):
+        original = _json(original_home, "step", "--action", json.dumps(action),
+                         "--expected-head", state["head"])
+        recovered = _json(recovered_home, "step", "--action", json.dumps(action),
+                          "--expected-head", restored["head"])
+        assert original["head"] == recovered["head"]
+        assert original["revision"] == recovered["revision"] == revision
+        assert original["status"] == recovered["status"]
+        state, restored = original, recovered
+
+    assert state["status"] == "completed"
+    assert restored["status"] == "completed"
+    assert state["index"] == restored["index"] == 2
+    for home in (original_home, recovered_home):
+        audit = _json(home, "audit")
+        assert audit["verified"] is True
+        assert audit["audit_entries"] == len(sequence)
+        assert audit["head"] == state["head"]
+        exported = _json(home, "export")
+        export_bytes = Path(exported["path"]).read_bytes()
+        verified = _invoke(home, "verify-export", "--file", "-", stdin=export_bytes)
+        assert verified.returncode == 0, verified.stderr.decode(errors="replace")
+        assert json.loads(verified.stdout)["head"] == state["head"]
