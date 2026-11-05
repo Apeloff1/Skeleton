@@ -263,3 +263,49 @@ def test_preflight_has_one_canonical_image_build_input_gate():
     ]
     assert len(image_checks) == 1, "duplicate source scan masks gate identity and increases startup cost"
     assert image_checks[0].ok, image_checks[0].message
+
+
+def test_source_epoch_fences_same_bytes_different_inode(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("JWT_SECRET=redacted-local-fixture\n", encoding="utf-8")
+    original = runtime_source_fingerprint(tmp_path)
+    replacement = tmp_path / ".replacement"
+    replacement.write_bytes(env.read_bytes())
+    os.replace(replacement, env)
+    assert original != runtime_source_fingerprint(tmp_path)
+
+
+def test_source_epoch_fences_same_inode_metadata_rewrite(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("JWT_SECRET=redacted-local-fixture\n", encoding="utf-8")
+    original = runtime_source_fingerprint(tmp_path)
+    stat_before = env.stat()
+    os.utime(env, ns=(
+        stat_before.st_atime_ns, stat_before.st_mtime_ns + 2_000_000_000,
+    ))
+    assert env.read_bytes() == b"JWT_SECRET=redacted-local-fixture\n"
+    assert original != runtime_source_fingerprint(tmp_path)
+
+
+def test_identical_byte_replacement_after_compose_config_denies_docker_start(
+    tmp_path, monkeypatch,
+):
+    env = _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+    seen = []
+
+    def runner(command, **kwargs):
+        seen.append(command[-1])
+        if command[-1] == "config":
+            replacement = tmp_path / "operator-equivalent-env"
+            replacement.write_bytes(env.read_bytes())
+            os.replace(replacement, env)
+        return _completed(command)
+
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False, runner=runner,
+    )
+    assert receipt.ok is False
+    assert seen == ["config"]
+    assert receipt.phases[-1].name == "runtime-source-epoch"
+    assert "redacted-local-fixture" not in repr(receipt.to_dict())
