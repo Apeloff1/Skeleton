@@ -139,6 +139,25 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     if version is not None and (type(version) is not int or version < 0):
         return None
     values.append(version)
+    # A primary can retain its election identifier while its topology
+    # generation changes. Snapshot the generation as inert exact types.
+    topology = hello.get("topologyVersion")
+    if topology is not None:
+        if type(topology) is not dict or set(topology) != {"processId", "counter"}:
+            return None
+        try:
+            from bson.objectid import ObjectId
+        except ImportError:
+            return None
+        process = topology["processId"]
+        counter = topology["counter"]
+        if type(process) is not ObjectId or type(counter) is not int:
+            return None
+        if not 0 <= counter < (1 << 63):
+            return None
+        values.extend((process.binary, counter))
+    else:
+        values.extend((None, None))
     return tuple(values)
 
 
