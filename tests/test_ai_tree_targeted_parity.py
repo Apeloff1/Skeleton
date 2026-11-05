@@ -31,3 +31,12 @@ def test_mass_build_is_explicitly_retained_not_promoted():
     assert len(owned) == 1
     assert "owner" in owned[0] and "reason" in owned[0]
     assert all(item.get("destination") != "skeleton/mass_build" for item in manifest["mappings"])
+
+
+def test_manifest_retained_root_count_matches_governed_catalog():
+    manifest = json.loads((ROOT / "machine" / "ai_file_tree.json").read_text(encoding="utf-8"))
+    assert manifest["pre_move_readiness"]["retained_outside_ai_tree_count"] == len(
+        manifest["retained_outside_ai_tree"]
+    )
+    assert manifest["implementation_signoff"]["signed"] is False
+    assert manifest["verification_signoff"]["signed"] is False
