@@ -185,10 +185,14 @@ def main(argv: list[str] | None = None) -> int:
                     # retrieval is instead an explicitly granted host tool.
                     attach_signed_native_evidence(worker, source_provider)
             if args.mode == "repl":
-                chat = NativeJeevesChat(worker, session_id=args.session)
+                chat = NativeJeevesChat(
+                    worker, session_id=args.session, source_fence=source_fence,
+                )
                 return NativeJeevesRepl(chat, source_fence=source_fence).serve(sys.stdin.buffer, sys.stdout)
             if args.mode == "chat":
-                chat = NativeJeevesChat(worker, session_id=args.session)
+                chat = NativeJeevesChat(
+                    worker, session_id=args.session, source_fence=source_fence,
+                )
                 turn = chat.turn(task, request_id=args.request_id)
                 source_fence.assert_live(worker)
                 sys.stdout.write(json.dumps({
