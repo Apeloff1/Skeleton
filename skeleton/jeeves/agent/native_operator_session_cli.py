@@ -61,6 +61,8 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--maximum-reserved-model-calls",type=int,default=128)
     parser.add_argument("--maximum-reserved-output-tokens",type=int,default=131072)
     parser.add_argument("--maximum-wall-seconds",type=float,default=3600)
+    parser.add_argument("--maximum-result-bytes",type=int,default=262144)
+    parser.add_argument("--maximum-session-result-bytes",type=int,default=8388608)
     try:
         args=parser.parse_args(argv)
         if args.approve_native is not True or args.commands_stdin is not True:
@@ -84,6 +86,8 @@ def main(argv:list[str]|None=None)->int:
             maximum_reserved_model_calls=args.maximum_reserved_model_calls,
             maximum_reserved_output_tokens=args.maximum_reserved_output_tokens,
             maximum_wall_seconds=args.maximum_wall_seconds,
+            maximum_result_bytes=args.maximum_result_bytes,
+            maximum_session_result_bytes=args.maximum_session_result_bytes,
         )
         if (type(args.max_output_tokens) is not int
             or not 1<=args.max_output_tokens<=8192
