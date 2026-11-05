@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_glass_steppe",
+  "title": "Glass Steppe: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610301707,
+  "width": 23,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 3
+}

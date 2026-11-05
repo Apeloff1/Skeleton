@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_glacial_fjord",
+  "title": "Glacial Fjord: Outer Settlement",
+  "subtitle": "Original outer settlement design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010311116,
+  "width": 21,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 6
+}

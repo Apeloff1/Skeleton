@@ -1,0 +1,68 @@
+{
+  "project_id": "studio_stealth_route_orbital_gardens",
+  "genre": "stealth_route",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.verification.v1",
+  "stage": "design_intake",
+  "preview_expectation": {
+    "compiler": "compile_original_game",
+    "must_demonstrate": "winning_replay_proof",
+    "genre_target_qualified": false
+  },
+  "quality_gates": [
+    {
+      "id": "world",
+      "criterion": "Routes remain solvable despite life-support imbalance",
+      "status": "not_tested"
+    },
+    {
+      "id": "economy",
+      "criterion": "hydroponic nutrients cannot appear from zero inventory",
+      "status": "not_tested"
+    },
+    {
+      "id": "canon",
+      "criterion": "Every ending corresponds to a recorded quest branch",
+      "status": "not_tested"
+    },
+    {
+      "id": "assets",
+      "criterion": "Geometry, shaders and sound made from original or authorized sources",
+      "status": "not_tested"
+    },
+    {
+      "id": "hardware",
+      "criterion": "CPU/GPU/RAM/disk-adaptive streaming and stress qualification",
+      "status": "not_tested"
+    },
+    {
+      "id": "security",
+      "criterion": "Editor operations remain authorized and fail closed",
+      "status": "not_tested"
+    },
+    {
+      "id": "accessibility",
+      "criterion": "Captions, controls and contrast reviewed on target devices",
+      "status": "not_tested"
+    },
+    {
+      "id": "native",
+      "criterion": "Install, playthrough, save/restore, provenance and signature tests",
+      "status": "not_tested"
+    }
+  ],
+  "release_blockers": [
+    "engine_specific_implementation",
+    "native_device_qualification",
+    "asset_rights_review",
+    "adversarial_playtest",
+    "sound_art_delivery",
+    "security_and_ci_certification"
+  ],
+  "authorities": {
+    "review": "human_or_policy_authorized_review_required",
+    "evidence": "new_real_receipts_only",
+    "claims": "unverified_until_tested"
+  }
+}

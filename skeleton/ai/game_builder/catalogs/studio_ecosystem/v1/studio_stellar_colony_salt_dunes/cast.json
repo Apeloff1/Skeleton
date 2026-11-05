@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_stellar_colony_salt_dunes",
+  "genre": "stellar_colony",
+  "biome": "salt_dunes",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Noa Nara",
+    "role": "habitat architect",
+    "public_goal": "stabilize a remote outpost without sacrificing its inhabitants",
+    "private_burden": "An earlier salt storms report ignored by peers",
+    "abilities": [
+      "life-support energy allocation and modular construction",
+      "construct"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Vero Juno",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of buried aqueduct",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Kira Kest",
+      "role": "Maintainer of brine reservoirs",
+      "knows": "Repair topology under salt corrosion",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Orla Hale",
+      "role": "contested operations director",
+      "organization": "a privatized oxygen allocator",
+      "goal": "Exclusive access to brine reservoirs",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of oxygen and heat reserves",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over brine reservoirs",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

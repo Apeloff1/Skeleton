@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_orbital_gardens",
+  "title": "Orbital Gardens: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610301724,
+  "width": 25,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 4
+}

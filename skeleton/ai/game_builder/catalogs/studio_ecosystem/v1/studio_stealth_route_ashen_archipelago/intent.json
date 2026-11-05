@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_ashen_archipelago",
+  "title": "Ashen Archipelago: Stealth Route",
+  "subtitle": "An original stealth route brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610300291,
+  "width": 23,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_ion_wastes",
+  "title": "Ion Wastes: Stealth Route",
+  "subtitle": "An original stealth route brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610300342,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 5
+}
