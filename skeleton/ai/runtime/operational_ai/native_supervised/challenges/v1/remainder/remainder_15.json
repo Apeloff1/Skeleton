@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "remainder_15",
+  "domain": "remainder",
+  "ordinal": 15,
+  "arguments": {
+    "index": 15,
+    "a": 205,
+    "b": 4,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 15: Compute the remainder when 205 is divided by 4.",
+  "expected": "1",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

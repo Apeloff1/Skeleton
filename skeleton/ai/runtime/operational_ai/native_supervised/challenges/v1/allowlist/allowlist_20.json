@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "allowlist_20",
+  "domain": "allowlist",
+  "ordinal": 20,
+  "arguments": {
+    "index": 20,
+    "a": 240,
+    "b": 9,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 20: A sandbox grants read only. Is operation read authorized? allow or deny.",
+  "expected": "allow",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "initials_01",
+  "domain": "initials",
+  "ordinal": 1,
+  "arguments": {
+    "index": 1,
+    "a": 107,
+    "b": 3,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 1: Give uppercase initials of: cedar river oslo.",
+  "expected": "CRO",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "slug_22",
+  "domain": "slug",
+  "ordinal": 22,
+  "arguments": {
+    "index": 22,
+    "a": 254,
+    "b": 11,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 22: Convert 'marble Review 22' to a lowercase hyphenated slug.",
+  "expected": "marble-review-22",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

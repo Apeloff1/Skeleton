@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "csv_row_01",
+  "domain": "csv_row",
+  "ordinal": 1,
+  "arguments": {
+    "index": 1,
+    "a": 107,
+    "b": 3,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 1: Return a CSV row with city then integer count: Oslo and 107.",
+  "expected": "Oslo,107",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

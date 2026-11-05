@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "evidence_match_01",
+  "domain": "evidence_match",
+  "ordinal": 1,
+  "arguments": {
+    "index": 1,
+    "a": 107,
+    "b": 3,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 1: Observed digest prefix 0000006b, pinned prefix 0000006c. Reply match or mismatch.",
+  "expected": "mismatch",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "retry_decision_12",
+  "domain": "retry_decision",
+  "ordinal": 12,
+  "arguments": {
+    "index": 12,
+    "a": 184,
+    "b": 14,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 12: For status pre_admission_503, permit retry only for pre-admission transient errors. Answer retry or hold.",
+  "expected": "retry",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

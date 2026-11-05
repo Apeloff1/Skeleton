@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_reverse_22",
+  "domain": "list_reverse",
+  "ordinal": 22,
+  "arguments": {
+    "index": 22,
+    "a": 254,
+    "b": 11,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 22: Reverse these three labels, comma-separated: marble,north,node22.",
+  "expected": "node22,north,marble",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
