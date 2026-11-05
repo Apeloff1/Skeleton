@@ -408,6 +408,21 @@ def test_windows_payload_covers_manifest_and_docker_copy_inputs():
     assert "Windows payload lacks required app/Docker inputs" in source
 
 
+def test_windows_archive_includes_root_engine_docker_allowlist():
+    """The installed engine must use its reviewed context policy, not fallback."""
+    from pathlib import Path
+
+    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    manifest = Path("skeleton/app/manifest.json").read_text(encoding="utf-8")
+    assert '"Dockerfile.dockerignore",' in source
+    assert '"Dockerfile.dockerignore"' in manifest
+    assert '"backend/Dockerfile.dockerignore"' in manifest
+    assert '"frontend/.dockerignore"' in manifest
+    assert "/Dockerfile.dockerignore" in workflow
+    assert "skeleton/app/install_source_contracts.py" in manifest
+
+
 def test_host_preload_rejects_stopped_docker_daemon(monkeypatch, tmp_path):
     from skeleton.app.preloader import inspect_host
     from subprocess import CompletedProcess
