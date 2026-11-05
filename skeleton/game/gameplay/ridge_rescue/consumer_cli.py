@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 
@@ -39,7 +40,7 @@ def _strict_action_json(payload: str) -> dict:
 
     def finite_float(value: str) -> float:
         number = float(value)
-        if not __import__("math").isfinite(number):
+        if not math.isfinite(number):
             raise ValueError("non-finite action JSON number: " + value)
         return number
 
