@@ -76,6 +76,11 @@ jobs:
             skeleton/testing/test_app_assembly.py \
             skeleton/testing/test_app_installer.py \
             skeleton/testing/test_app_compose_parity.py \
+            skeleton/testing/test_app_assembly_source_paths.py \
+            skeleton/testing/test_app_offline_install_quarantine.py \
+            skeleton/testing/test_app_offline_install_preflight.py \
+            skeleton/testing/test_app_offline_install_reconciliation.py \
+            skeleton/testing/test_first_install_required_routes.py \
             skeleton/testing/test_windows_installer.py
       - name: Verify construction and provider-owner contracts
         run: |
