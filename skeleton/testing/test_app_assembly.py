@@ -1002,3 +1002,157 @@ def test_python_image_unpinned_stage_is_rejected():
     assert changed != source
     errors = backend_python_image_errors(changed)
     assert any("digest-pinned Alpine stage" in error for error in errors)
+
+
+# The runtime diagnostic path must enforce the same private-file input
+# boundaries as setup, without chmod'ing or rewriting a user's credentials.
+
+def test_runtime_env_reader_accepts_valid_simple_values_without_mutation(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        'FRONTEND_PORT=3300\nCORS_ORIGINS="http://localhost:3300"\n',
+        encoding="utf-8",
+    )
+    before = env_path.stat()
+    assert _read_dotenv(env_path) == {
+        "FRONTEND_PORT": "3300",
+        "CORS_ORIGINS": "http://localhost:3300",
+    }
+    after = env_path.stat()
+    assert (before.st_dev, before.st_ino, before.st_mode, before.st_size) == (
+        after.st_dev, after.st_ino, after.st_mode, after.st_size,
+    )
+    assert os.path.exists(env_path)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"F" * (256 * 1024 + 1),
+        b"\xff\xfeinvalid",
+    ],
+)
+def test_runtime_env_reader_rejects_oversize_and_invalid_utf8(tmp_path, payload):
+    from skeleton.app.assembly import _read_dotenv
+
+    (tmp_path / ".env").write_bytes(payload)
+    with pytest.raises(ValueError, match="runtime .env"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_symlink_without_following(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    secret = tmp_path / "operator-secret"
+    secret.write_text("JWT_SECRET=must-remain-outside\n", encoding="utf-8")
+    target = tmp_path / ".env"
+    try:
+        target.symlink_to(secret)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation not supported on this host")
+    with pytest.raises(ValueError, match="symbolic link|safely opened"):
+        _read_dotenv(target)
+    assert secret.read_text(encoding="utf-8") == "JWT_SECRET=must-remain-outside\n"
+
+
+def test_runtime_env_reader_rejects_hardlinked_credentials(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    original = tmp_path / "operator-secret"
+    original.write_text("JWT_SECRET=must-remain-outside\n", encoding="utf-8")
+    try:
+        os.link(original, tmp_path / ".env")
+    except (OSError, NotImplementedError):
+        pytest.skip("hardlink creation not supported on this host")
+    if os.name == "nt":
+        pytest.skip("Windows hardlink identity policy is governed by ACLs")
+    with pytest.raises(ValueError, match="unlinked regular file"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_directory(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    (tmp_path / ".env").mkdir()
+    with pytest.raises(ValueError, match="runtime .env"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_fifo_without_waiting(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("named pipes are unavailable")
+    os.mkfifo(tmp_path / ".env")
+    with pytest.raises(ValueError, match="unlinked regular file"):
+        _read_dotenv(tmp_path / ".env")
+
+
+@pytest.mark.parametrize("source_kind", ["oversize", "invalid-utf8", "directory"])
+def test_runtime_preflight_fails_closed_on_invalid_env_source(tmp_path, source_kind):
+    from skeleton.app.assembly import preflight
+
+    env = tmp_path / ".env"
+    if source_kind == "oversize":
+        env.write_bytes(b"A" * (256 * 1024 + 1))
+    elif source_kind == "invalid-utf8":
+        env.write_bytes(b"\xff\xfe")
+    else:
+        env.mkdir()
+
+    checks = preflight(tmp_path, runtime=True, environ={})
+    indexed = {check.code: check for check in checks}
+    assert indexed["env:source"].ok is False
+    assert indexed["runtime:ports"].ok is False
+    assert not checks_ok(checks)
+    assert "unsafe" in indexed["runtime:ports"].message
+    assert "A" * 64 not in repr(checks)
+
+
+def test_runtime_doctor_does_not_network_probe_when_env_source_is_unsafe(
+    tmp_path, monkeypatch
+):
+    from skeleton.app import first_install
+    from skeleton.app.preloader import PreloadReport
+
+    (tmp_path / ".env").write_bytes(b"Z" * (256 * 1024 + 1))
+    host = PreloadReport(
+        root=tmp_path, platform="test", python="3.11", checks=(),
+    )
+    monkeypatch.setattr(first_install, "inspect_host", lambda _root: host)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("unsafe runtime environment must suppress every live probe")
+
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_application", forbidden
+    )
+    monkeypatch.setattr(first_install, "critical_backend_route_report", forbidden)
+    report = first_install.first_install_report(
+        tmp_path, live=True, environ={},
+    )
+
+    assert report["configuration_ready"] is False
+    assert report["services_ready"] is None
+    assert report["ai"]["observed"] is False
+    assert report["critical_routes"]["observed"] is False
+    assert any(
+        check["code"] == "env:source" and not check["ok"]
+        for check in report["checks"]["configuration"]
+    )
+    assert any("private runtime .env is unsafe" in step for step in report["next_steps"])
+    assert "ZZZZ" not in repr(report)
+
+
+def test_runtime_env_reader_missing_source_returns_empty(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    assert _read_dotenv(tmp_path / ".env") == {}
