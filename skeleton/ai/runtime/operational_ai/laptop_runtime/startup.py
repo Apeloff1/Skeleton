@@ -28,7 +28,7 @@ def activate_checked(*,model_root,state_dir,tenant,subject,
         refuse("impossible local native resource configuration")
     if type(isolated) is not bool or not isolated:
         refuse("first-laptop-use requires a killable isolated native backend")
-    if type(model_root) not in (str,Path) or type(state_dir) not in (str,Path):
+    if not isinstance(model_root,(str,Path)) or not isinstance(state_dir,(str,Path)):
         refuse("explicit local model and state paths required")
     # Each hash is read from the *actual installed bytes* in the source-bound
     # installer receipt before any model backend can be activated.

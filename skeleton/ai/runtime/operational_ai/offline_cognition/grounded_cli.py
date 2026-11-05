@@ -43,7 +43,7 @@ def _environment_key():
 
 
 def _read_private_manifest(path):
-    if type(path) is not Path or not path.is_absolute():
+    if not isinstance(path,Path) or not path.is_absolute():
         refuse("signed source manifest path must be absolute")
     flags=os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK
     from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.path_policy import open_private_root

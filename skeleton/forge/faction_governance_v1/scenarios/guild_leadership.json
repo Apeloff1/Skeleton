@@ -1,0 +1,79 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "guild_leadership",
+  "domain": "guild",
+  "topic": "leadership",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 3,
+  "approval": 2,
+  "commands": [
+    {
+      "id": "guild_leadership:open",
+      "action": "open",
+      "proposal": "guild_leadership",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "guild_leadership:vote:0",
+      "action": "cast",
+      "proposal": "guild_leadership",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "guild_leadership:vote:1",
+      "action": "cast",
+      "proposal": "guild_leadership",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "guild_leadership:vote:2",
+      "action": "cast",
+      "proposal": "guild_leadership",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "guild_leadership:finalize",
+      "action": "finalize",
+      "proposal": "guild_leadership",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 4
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 3,
+    "yes": 3,
+    "final_version": 5
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}
