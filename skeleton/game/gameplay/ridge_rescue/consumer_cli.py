@@ -21,6 +21,7 @@ from .schema import parse_world
 # Pasted or malformed commands must not crash a consumer or consume a turn.
 MAX_TERMINAL_INPUT = 128
 MAX_MENU_DIGITS = 8
+MAX_ACTION_JSON_BYTES = 4096
 
 
 def _action_index(answer: str, available: int) -> int | None:
@@ -235,6 +236,8 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "step":
                 if not args.action or not args.expected_head:
                     raise StoreError("--action and --expected-head required")
+                if len(args.action.encode("utf-8")) > MAX_ACTION_JSON_BYTES:
+                    raise StoreError("action JSON exceeds byte budget")
                 result = store.step(args.slot, json.loads(args.action), expected_head=args.expected_head)
             elif args.command == "retry":
                 if not args.expected_head:
