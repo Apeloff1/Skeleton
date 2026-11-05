@@ -309,3 +309,95 @@ def test_identical_byte_replacement_after_compose_config_denies_docker_start(
     assert seen == ["config"]
     assert receipt.phases[-1].name == "runtime-source-epoch"
     assert "redacted-local-fixture" not in repr(receipt.to_dict())
+
+
+def test_setup_ui_recovery_rejects_same_byte_epoch_swap_before_probe(
+    tmp_path, monkeypatch,
+):
+    env = _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_local_setup",
+        lambda *args, **kwargs: pytest.fail(
+            "changed config must prevent setup availability probe"
+        ),
+    )
+    commands = []
+
+    def runner(command, **kwargs):
+        action = command[-1]
+        commands.append(action)
+        if action == "up" and commands.count("up") == 1:
+            return subprocess.CompletedProcess(command, 9)
+        if action == "up" and commands.count("up") == 2:
+            replacement = tmp_path / "operator-replacement"
+            replacement.write_bytes(env.read_bytes())
+            os.replace(replacement, env)
+        return _completed(command)
+
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False, runner=runner,
+    )
+    assert receipt.ok is False
+    assert commands == ["config", "up", "up"]
+    assert receipt.phases[-1].name == "runtime-source-epoch"
+    assert not any(p.name == "setup-ui-availability" for p in receipt.phases)
+
+
+def test_setup_ui_probe_mutating_private_epoch_never_attests_availability(
+    tmp_path, monkeypatch,
+):
+    env = _prepare(monkeypatch, tmp_path)
+    commands = []
+
+    def runner(command, **kwargs):
+        action = command[-1]
+        commands.append(action)
+        if action == "up" and commands.count("up") == 1:
+            return subprocess.CompletedProcess(command, 9)
+        return _completed(command)
+
+    def mutating_probe(*args, **kwargs):
+        replacement = tmp_path / "late-source-replacement"
+        replacement.write_bytes(env.read_bytes())
+        os.replace(replacement, env)
+        return type("Probe", (), {"ok": True, "detail": "local setup"})()
+
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_local_setup", mutating_probe,
+    )
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False, runner=runner,
+    )
+    assert receipt.ok is False
+    assert commands == ["config", "up", "up"]
+    assert receipt.phases[-1].name == "runtime-source-epoch"
+    assert not any(p.name == "setup-ui-availability" for p in receipt.phases)
+
+
+def test_stable_setup_ui_recovery_does_not_promote_protected_stack(
+    tmp_path, monkeypatch,
+):
+    _prepare(monkeypatch, tmp_path)
+    commands = []
+
+    def runner(command, **kwargs):
+        action = command[-1]
+        commands.append(action)
+        if action == "up" and commands.count("up") == 1:
+            return subprocess.CompletedProcess(command, 9)
+        return _completed(command)
+
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_local_setup",
+        lambda *args, **kwargs: type(
+            "Probe", (), {"ok": True, "detail": "local setup available"},
+        )(),
+    )
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False, runner=runner,
+    )
+    assert commands == ["config", "up", "up"]
+    assert receipt.ok is False
+    assert any(p.name == "setup-ui-availability" and p.ok for p in receipt.phases)
+    assert any(p.name == "start" and not p.ok and p.required for p in receipt.phases)

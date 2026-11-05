@@ -340,9 +340,13 @@ def install_application(
         # A failed protected-stack start must remain a required failure. When
         # the canonical frontend is independently startable, attempt only its
         # diagnostic surface; never remove backend/engine health fences or
-        # promote setup liveness into full application readiness.
+        # promote setup liveness into full application readiness. The same
+        # admitted private configuration epoch fences recovery and its probe.
         frontend = manifest.service("frontend")
         if not frontend.depends_on:
+            if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                phases.append(_runtime_source_rejection())
+                return InstallReceipt(root=root, phases=tuple(phases))
             diagnostic_manifest = replace(
                 manifest,
                 default_services=("frontend",),
@@ -356,6 +360,9 @@ def install_application(
                 timeout=900.0,
                 env=compose_env,
             )
+            if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                phases.append(_runtime_source_rejection())
+                return InstallReceipt(root=root, phases=tuple(phases))
             phases.append(
                 InstallPhase(
                     "setup-ui-recovery", recovery.ok,
@@ -374,6 +381,9 @@ def install_application(
                     ),
                     timeout=2.0,
                 )
+                if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                    phases.append(_runtime_source_rejection())
+                    return InstallReceipt(root=root, phases=tuple(phases))
                 phases.append(
                     InstallPhase(
                         "setup-ui-availability", probe.ok,
