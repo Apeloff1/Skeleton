@@ -1,0 +1,9 @@
+{
+  "tier": "dev",
+  "replicas": 1,
+  "health": {"path": "/healthz", "expect_status": [200], "max_latency_ms": 1500},
+  "rollout": {"strategy": "rolling", "max_unavailable": 1, "bake_seconds": 0},
+  "resources": {"cpu_millicores": 500, "memory_mib": 512},
+  "database": {"url": "secret://skeleton/db-url", "pool_size": 5},
+  "features": {"gameforge": true, "telemetry": true}
+}

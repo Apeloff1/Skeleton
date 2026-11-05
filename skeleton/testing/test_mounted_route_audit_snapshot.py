@@ -50,8 +50,14 @@ def test_mounted_route_audit_is_import_free(monkeypatch) -> None:
 
 def test_mounted_route_audit_locks_swarm_family_and_cockpit() -> None:
     payload = mounted_route_audit_snapshot()
-    assert len(payload["routes"]) == 88
-    assert len(payload["missing_from_architecture"]) == 88
+    # Lock the complete current mounted inventory while preserving explicit
+    # visibility of every undocumented route. A new route must update this
+    # source-backed census, not disappear from the architecture gap report.
+    assert len(payload["routes"]) == 111
+    keys = [row["key"] for row in payload["routes"]]
+    assert len(keys) == len(set(keys))
+    assert len(payload["missing_from_architecture"]) == 111
+    assert set(payload["missing_from_architecture"]) == set(keys)
     assert payload["protected_mismatch"] == []
     sources = {row["source"] for row in payload["routes"]}
     assert "cockpit" in sources
