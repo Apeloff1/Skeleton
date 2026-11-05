@@ -53,7 +53,12 @@ def ensure_directory(path: Path) -> Path:
             try:
                 next_fd = os.open(part, flags, dir_fd=fd)
             except FileNotFoundError:
-                os.mkdir(part, 0o700, dir_fd=fd)
+                try:
+                    os.mkdir(part, 0o700, dir_fd=fd)
+                except FileExistsError:
+                    # Another process created this component concurrently.
+                    # The descriptor reopen still rejects symlinks/unsafe types.
+                    pass
                 next_fd = os.open(part, flags, dir_fd=fd)
             os.close(fd)
             fd = next_fd
