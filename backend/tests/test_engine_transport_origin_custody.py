@@ -105,3 +105,71 @@ async def test_engine_transport_does_not_inherit_proxy_or_redirect_settings(monk
     assert requests[0].url.port == 8001
     assert requests[0].headers["authorization"] == "Bearer " + _TOKEN
     assert "/api/v1/engine/" in requests[0].url.path
+
+
+
+@pytest.mark.parametrize("value", [
+    "value\nx-forwarded-host: evil.example",
+    "abc\r\nAuthorization: other",
+    "subj\tb",
+    "unicode-🔑",
+    "x" * 513,
+])
+def test_service_principal_header_rejected_at_config_boundary(value):
+    with pytest.raises(engine.EngineProtocolError, match="service_principal"):
+        engine.EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_TOKEN,
+            service_principal=value,
+        )
+
+
+@pytest.mark.parametrize("token", [
+    "x" * 31, "x" * 4097, "x" * 32 + "\n", "x" * 32 + "\r",
+    "x" * 16 + " " + "x" * 16, "🔑" * 32,
+])
+def test_service_token_must_be_printable_ascii_without_whitespace(token):
+    with pytest.raises(engine.EngineProtocolError, match="service token"):
+        engine.EngineClientConfig(base_url="http://skeleton:8001", service_token=token)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("trace", [
+    "trace\nAuthorization: Bearer attacker",
+    "trace\r\nHost: attacker.example",
+    "\u2028separator",
+    "trace\tinvalid",
+])
+async def test_invalid_trace_header_rejected_without_network_calls(trace):
+    connected = []
+    async def handler(request):
+        connected.append(request)
+        return httpx.Response(200, json={})
+    client = engine.EngineClient(
+        engine.EngineClientConfig(base_url="http://skeleton:8001", service_token=_TOKEN),
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(engine.EngineProtocolError, match="trace_id"):
+        await client.status(
+            "exec-header-test", actor_id="actor", tenant_id="tenant", trace_id=trace,
+        )
+    assert connected == []
+
+
+@pytest.mark.parametrize("timeout", [10 ** 1000, 1e999, float("inf"), float("nan")])
+def test_engine_timeout_nonfinite_or_overflow_fails_before_transport(timeout):
+    with pytest.raises(engine.EngineProtocolError):
+        engine.EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_TOKEN,
+            request_timeout_s=timeout,
+        )
+
+
+def test_positive_finite_timeout_preserves_existing_contract():
+    config = engine.EngineClientConfig(
+        base_url="http://skeleton:8001",
+        service_token=_TOKEN,
+        request_timeout_s=15.0,
+    )
+    assert config.request_timeout_s == 15.0
