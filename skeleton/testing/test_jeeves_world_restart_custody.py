@@ -91,3 +91,50 @@ def test_restart_diagnostic_reports_session_lease_permission_failure(tmp_path, m
     )
     assert "acceptance" not in report["checks"]
     assert LaptopFlow(tmp_path).inspect_session("lighthouse", "save")["revision"] == 0
+
+
+def test_diagnostic_refuses_mixed_session_revisions(tmp_path, monkeypatch):
+    """A concurrently advanced save cannot be reported as a green handoff."""
+    _compiled(tmp_path)
+    flow = LaptopFlow(tmp_path)
+    initial = flow.create_session("lighthouse", "save")
+    original_acceptance = flow.acceptance
+
+    def advance_before_acceptance(world_id, slot=None):
+        flow.choose("lighthouse", "save", "rescue", initial["session_digest"])
+        return original_acceptance(world_id, slot)
+
+    monkeypatch.setattr(flow, "acceptance", advance_before_acceptance)
+    report = flow.diagnose("lighthouse", "save")
+    assert report["checks"]["source"] == {"ok": True}
+    assert report["checks"]["builder"] == {"ok": True}
+    assert report["checks"]["session"]["session_digest"] == initial["session_digest"]
+    assert report["checks"]["acceptance"] == {
+        "ok": False, "error": "laptop_diagnostic_source_changed"
+    }
+    assert report["next_action"] == "restart_diagnostic_after_source_change"
+    assert LaptopFlow(tmp_path).inspect_session("lighthouse", "save")["revision"] == 1
+
+
+def test_diagnostic_never_repairs_corrupted_builder_or_mutates_save(tmp_path):
+    """Read-only recovery must preserve the original bytes and player revision."""
+    receipt = _compiled(tmp_path)
+    flow = LaptopFlow(tmp_path)
+    initial = flow.create_session("lighthouse", "save")
+    builder = tmp_path / receipt["builder_file"]
+    corrupt = builder.read_bytes() + b"\\n"
+    builder.write_bytes(corrupt)
+
+    report = LaptopFlow(tmp_path).diagnose("lighthouse", "save")
+    assert report["checks"]["source"] == {"ok": True}
+    assert report["checks"]["review"] == {"ok": True}
+    assert report["checks"]["builder"] == {
+        "ok": False, "error": "laptop_builder_mismatch"
+    }
+    assert "session" not in report["checks"]
+    assert "acceptance" not in report["checks"]
+    assert report["next_action"] == "compile_and_verify_reviewed_source"
+    assert builder.read_bytes() == corrupt
+    assert LaptopFlow(tmp_path).sessions.inspect("lighthouse", "save")[
+        "session_digest"
+    ] == initial["session_digest"]
