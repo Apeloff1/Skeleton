@@ -123,16 +123,11 @@ def _di_after_ei():
         return core.instruction() + core.instruction() + core.instruction()
 
     def check(core, cycles):
-<<<<<<< HEAD
-        _verify(cycles == 12 and core.pc == 0x103 and core.ime is False
-                and core.ime_delay == 0 and core.memory[0xFF0F] & 1,
-=======
         # _verify requires a literal bool. The pending IF bit is an int;
         # without bool(), a successful final `and` operand is integer 1,
         # which incorrectly fails the identity-based oracle.
         _verify(cycles == 12 and core.pc == 0x103 and core.ime is False
                 and core.ime_delay == 0 and bool(core.memory[0xFF0F] & 1),
->>>>>>> origin/main
                 "DI failed to cancel pending EI or incorrectly serviced IRQ")
 
     return _replay("di_cancels_pending_ei", m, op, check)
@@ -200,20 +195,12 @@ def _joypad_wake():
         _verify(core.stopped and core.divider == divider, "STOP oscillator advanced despite missing joypad input")
         core.write(0xFF00, 0x10)
         core.set_buttons(("a",))
-<<<<<<< HEAD
-        _verify(not core.stopped and core.memory[0xFF0F] & 0x10, "physical joypad failed to raise IF and wake CPU")
-=======
         _verify(not core.stopped and bool(core.memory[0xFF0F] & 0x10), "physical joypad failed to raise IF and wake CPU")
->>>>>>> origin/main
         return before + 4
 
     def check(core, cycles):
         _verify(cycles == 8 and core.pc == 0x102 and not core.stopped
-<<<<<<< HEAD
-                and core.memory[0xFF0F] & 0x10, "STOP joypad wake evidence differs")
-=======
                 and bool(core.memory[0xFF0F] & 0x10), "STOP joypad wake evidence differs")
->>>>>>> origin/main
 
     return _replay("stop_frozen_until_joypad_edge", m, op, check)
 

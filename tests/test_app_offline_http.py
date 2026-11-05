@@ -78,8 +78,6 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conn.close()
         return status, json.loads(raw_response), headers_received
 
-<<<<<<< HEAD
-=======
     def test_mac_longform_virtual_memory_requires_approval_and_verifies_pages(self) -> None:
         root = self.folder / "longform-books"
         root.mkdir()
@@ -230,7 +228,6 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         status, _, _ = self._request("POST", "/v1/resources/stage", request)
         self.assertEqual(status, 422)
 
->>>>>>> origin/main
     def test_native_local_http_roundtrip_and_exactly_once_retry(self) -> None:
         status, health, _ = self._request("GET", "/v1/status")
         self.assertEqual(status, 200)

@@ -97,8 +97,6 @@ class ArchitectureOwnershipTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
-<<<<<<< HEAD
-=======
     def test_gap_bindings_match_canonical_record(self) -> None:
         root = self._fixture()
         graph_path = root / "machine/architecture_ownership.json"
@@ -159,7 +157,6 @@ class ArchitectureOwnershipTests(unittest.TestCase):
                     MODULE.validate(root)
                 target[key] = []
 
->>>>>>> origin/main
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,8 +12,6 @@ function detail(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value.slice(0, 2000) : fallback;
 }
 
-<<<<<<< HEAD
-=======
 function localGuardIssue(data: Record<string, unknown> | null): { message: string; action: string } | null {
   if (!data || data.available !== false || !data.models || typeof data.models !== 'object' || Array.isArray(data.models)
       || !data.checks || typeof data.checks !== 'object' || Array.isArray(data.checks)) return null;
@@ -35,7 +33,6 @@ function localGuardIssue(data: Record<string, unknown> | null): { message: strin
   return null;
 }
 
->>>>>>> origin/main
 /** Each verdict belongs to its observed owner; service health never implies AI readiness. */
 export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadiness> {
   const healthPromise = probeAppHealth(2500, signal).catch(() => null);
@@ -81,10 +78,7 @@ export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadine
     const data = response?.ok && response.data?.schema_version === schemas[id] && typeof response.data.available === 'boolean' ? response.data : null;
     const signIn = authData !== null && authData.authenticated !== true || response?.status === 401 || response?.status === 403;
     const roleBlocked = id === 'crawler' && data?.available === true && !['editor', 'admin'].includes(account.role);
-<<<<<<< HEAD
-=======
     const guardIssue = id === 'chat' ? localGuardIssue(data) : null;
->>>>>>> origin/main
     const readyText = id === 'crawler' ? 'Crawler storage and engine admission are reachable. Network access, rights and run limits are checked separately for each capture.'
       : id === 'dragon' ? 'Dragon reference storage and measured local practice are ready. Approval and role permissions remain separate.'
       : 'The conversation store, engine and configured model are ready.';
@@ -92,13 +86,8 @@ export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadine
       : id === 'dragon' ? 'Dragon persistence or reference practice prerequisites need operator setup. Open Review & practice for the observed checks.'
       : 'AI chat prerequisites are incomplete. Open AI chat for the model catalog or run host diagnostics.';
     checks.push({ id, label, status: signIn ? 'sign_in' : roleBlocked ? 'blocked' : data?.available === true ? 'ready' : data ? 'blocked' : 'unknown',
-<<<<<<< HEAD
-      message: signIn ? 'Sign in to inspect this capability.' : roleBlocked ? 'Capture infrastructure is ready. An editor or administrator role is required to create or run captures; a viewer can inspect existing sources.' : detail(data?.message, data ? data.available ? readyText : blockedText : 'Readiness has not been observed. Refresh after the application is running.'),
-      action: roleBlocked ? 'Ask the configured installation owner to assign an editor role through the existing administrator controls.' : detail(data?.action, id === 'dragon' ? 'Configure private Dragon persistence and enable the operator-approved empty-store bootstrap, then inspect Review & practice.' : id === 'chat' ? 'python -m skeleton app check --runtime' : 'Check database and engine storage admission configuration.') });
-=======
       message: signIn ? 'Sign in to inspect this capability.' : roleBlocked ? 'Capture infrastructure is ready. An editor or administrator role is required to create or run captures; a viewer can inspect existing sources.' : guardIssue?.message || detail(data?.message, data ? data.available ? readyText : blockedText : 'Readiness has not been observed. Refresh after the application is running.'),
       action: roleBlocked ? 'Ask the configured installation owner to assign an editor role through the existing administrator controls.' : guardIssue?.action || detail(data?.action, id === 'dragon' ? 'Configure private Dragon persistence and enable the operator-approved empty-store bootstrap, then inspect Review & practice.' : id === 'chat' ? 'python -m skeleton app check --runtime' : 'Check database and engine storage admission configuration.') });
->>>>>>> origin/main
   }
   return { observedAt: Date.now(), accountEpoch: epoch, checks, health };
 }

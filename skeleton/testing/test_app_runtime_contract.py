@@ -40,12 +40,9 @@ def test_runtime_status_aggregates_backend_engine_and_mongo(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", FakeDB())
     monkeypatch.setattr(runtime, "_probe_engine", fake_engine)
-<<<<<<< HEAD
-=======
     async def healthy_backend(_probe, _timeout):
         return {"name": "backend", "ok": True, "status": 200, "latency_ms": 1, "detail": "healthy"}
     monkeypatch.setattr(runtime, "_probe_backend", healthy_backend)
->>>>>>> origin/main
 
     monkeypatch.setattr(
         runtime,
@@ -132,12 +129,9 @@ def test_product_readiness_unavailable_never_reports_healthy(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", HealthyDB())
     monkeypatch.setattr(runtime, "_probe_engine", healthy_engine)
-<<<<<<< HEAD
-=======
     async def healthy_backend(_probe, _timeout):
         return {"name": "backend", "ok": True, "status": 200, "latency_ms": 1, "detail": "healthy"}
     monkeypatch.setattr(runtime, "_probe_backend", healthy_backend)
->>>>>>> origin/main
     monkeypatch.setattr(runtime, "public_readiness", unavailable_readiness)
 
     payload = asyncio.run(runtime._runtime_status(500))
@@ -148,8 +142,6 @@ def test_product_readiness_unavailable_never_reports_healthy(monkeypatch):
     assert "readiness provider unavailable" not in json.dumps(payload)
 
 
-<<<<<<< HEAD
-=======
 def test_runtime_status_refuses_missing_or_unready_backend_probe(monkeypatch):
     runtime = _runtime_module()
     async def healthy_engine(_timeout):
@@ -174,7 +166,6 @@ def test_runtime_status_refuses_missing_or_unready_backend_probe(monkeypatch):
     assert ready["ok"] is True and ready["services"][0]["ok"] is True
 
 
->>>>>>> origin/main
 def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):
     runtime = _runtime_module()
 

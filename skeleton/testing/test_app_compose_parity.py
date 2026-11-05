@@ -62,22 +62,13 @@ def test_compose_only_dependency_edge_is_rejected() -> None:
 def test_missing_compose_dependency_edge_is_rejected() -> None:
     manifest = _manifest()
     compose_model = _compose_model_from_manifest(manifest)
-<<<<<<< HEAD
-    frontend = compose_model["services"]["frontend"]
-    del frontend["depends_on"]["skeleton"]
-=======
     backend = compose_model["services"]["backend"]
     del backend["depends_on"]["skeleton"]
->>>>>>> origin/main
 
     errors = parity_errors(manifest, compose_model)
 
     assert errors == [
-<<<<<<< HEAD
-        "frontend: depends_on drift: manifest=['backend', 'skeleton'] compose=['backend']"
-=======
         "backend: depends_on drift: manifest=['mongo', 'skeleton'] compose=['mongo']"
->>>>>>> origin/main
     ]
 
 
@@ -119,8 +110,6 @@ def test_service_set_drift_is_rejected() -> None:
 
     assert "compose is missing manifest services: ['chroma']" in errors
     assert "compose has services absent from manifest: ['ghost']" in errors
-<<<<<<< HEAD
-=======
 
 
 def test_frontend_compose_dependency_regression_is_rejected() -> None:
@@ -135,4 +124,3 @@ def test_frontend_compose_dependency_regression_is_rejected() -> None:
     assert parity_errors(manifest, compose_model) == [
         "frontend: depends_on drift: manifest=[] compose=['backend']"
     ]
->>>>>>> origin/main

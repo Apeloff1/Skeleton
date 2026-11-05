@@ -142,11 +142,8 @@ class JobService:
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
         self.visibility_timeout_s = visibility_timeout_s
         self._handlers: dict[str, Handler] = {}
-<<<<<<< HEAD
-=======
         self._worker_lock = threading.Lock()
         self._worker: Optional[JobWorker] = None
->>>>>>> origin/main
 
     # ---- registry -------------------------------------------------------
     def register_handler(self, kind: str, fn: Handler) -> None:
@@ -157,8 +154,6 @@ class JobService:
     def handler_kinds(self) -> tuple[str, ...]:
         return tuple(self._handlers)
 
-<<<<<<< HEAD
-=======
     def start_worker(self, *, poll_s: float = 1.0) -> "JobWorker":
         """Start one worker for this service, including injected app services."""
         with self._worker_lock:
@@ -173,7 +168,6 @@ class JobService:
                 return not self._worker.running
             return True
 
->>>>>>> origin/main
     # ---- producer -------------------------------------------------------
     def enqueue(self, kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
                 project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
@@ -208,14 +202,11 @@ class JobService:
             def prepare_payload(connection, job_id):
                 build = self.builds.create_build(project_id, str(payload.get("target", "")),
                                                  job_id=job_id, transaction=connection)
-<<<<<<< HEAD
-=======
                 # Link before publishing the queued job, in the same durable
                 # transaction. A live worker cannot claim an unlinked build.
                 if ProjectsV1Store(self.db).link(actor_id, tenant_id, project_id,
                                                  build.build_id, transaction=connection) is None:
                     raise ValueError("project is not owned by the actor and tenant")
->>>>>>> origin/main
                 prepared = dict(payload)
                 prepared["build_id"] = build.build_id
                 return prepared, build.build_id
@@ -264,13 +255,6 @@ class JobService:
         return JobResult(status, None, None)
 
     def cancel(self, job_id: str) -> bool:
-<<<<<<< HEAD
-        r = self._row(job_id)
-        ok = self.queue.cancel(job_id)
-        if ok and r["execution_id"] and r["execution_id"] != job_id:
-            self.builds.set_status(r["execution_id"], "cancelled")
-        return ok
-=======
         # Publish the job and its build projection together. A running worker
         # must not observe a cancelled job with a still-runnable projection.
         with self.db.tx() as c:
@@ -293,7 +277,6 @@ class JobService:
                     # another job's build to hide a corrupt association.
                     _log.error("cancelled job %s has no matching build projection", job_id)
             return changed
->>>>>>> origin/main
 
     def get_by_execution(self, execution_id: str) -> Optional[str]:
         rows = self.db.query("SELECT job_id FROM jobs WHERE execution_id=?", (execution_id,))
@@ -310,14 +293,6 @@ class JobService:
         except Exception:  # sinks never break jobs
             _log.debug("job event sink failed", exc_info=True)
 
-<<<<<<< HEAD
-    def _sync_build(self, r, status: str, **kw) -> None:
-        if r["execution_id"] and r["execution_id"] != r["job_id"]:
-            try:
-                self.builds.set_status(r["execution_id"], status, **kw)
-            except KeyError:
-                pass
-=======
     def _sync_build(self, r, status: str, *, worker_id: Optional[str] = None,
                     result: Optional[Mapping[str, Any]] = None, error: str = "") -> bool:
         """Fence a build projection to the exact current job attempt and lease."""
@@ -347,7 +322,6 @@ class JobService:
         live = c.execute("SELECT attempts FROM jobs WHERE job_id=?", (r["job_id"],)).fetchone()
         if live is None or live["attempts"] != r["attempts"]:
             raise LeaseLost(r["job_id"])
->>>>>>> origin/main
 
     def run_once(self, worker_id: str) -> Optional[str]:
         kinds = list(self._handlers)
@@ -365,12 +339,8 @@ class JobService:
             c.execute("UPDATE jobs SET started_at=COALESCE(started_at, ?) WHERE job_id=?", (now, job.job_id))
         r = self._row(job.job_id)
         ctx = JobContext(self, r, worker_id, lease)
-<<<<<<< HEAD
-        self._sync_build(r, "running")
-=======
         if not self._sync_build(r, "running", worker_id=worker_id):
             return job.job_id
->>>>>>> origin/main
         self._emit("build.started", ctx, {"attempt": job.attempts})
         try:
             result = dict(self._handlers[job.kind](ctx, dict(job.payload)) or {})
@@ -383,12 +353,6 @@ class JobService:
             self._finish_failed(job.job_id, worker_id, r, ctx, "handler_error", safe_exception_text(exc))
             return job.job_id
         try:
-<<<<<<< HEAD
-            self.queue.complete(job.job_id, worker_id, result)
-        except LeaseLost:
-            return job.job_id
-        self._sync_build(r, "succeeded", result=result)
-=======
             # Commit the terminal queue record and build projection together.
             # A crash or storage failure cannot publish one without the other.
             with self.db.tx() as c:
@@ -397,21 +361,11 @@ class JobService:
                 self._write_build_projection(c, r, "succeeded", result=result)
         except LeaseLost:
             return job.job_id
->>>>>>> origin/main
         self._emit("build.completed", ctx, {"result": result})
         return job.job_id
 
     def _finish_failed(self, job_id, worker_id, r, ctx, code, message) -> None:
         try:
-<<<<<<< HEAD
-            done = self.queue.fail(job_id, worker_id, message, retry_delay_s=5.0)
-        except LeaseLost:
-            return
-        final = done.status == "dead"
-        with self.db.tx() as c:
-            c.execute("UPDATE jobs SET error_code=? WHERE job_id=?", (code, job_id))
-        self._sync_build(r, "failed" if final else "queued", error=message)
-=======
             # Retry and terminal failure transitions share the queue owner and
             # the build projection in one transaction, with exact attempt scope.
             with self.db.tx() as c:
@@ -422,7 +376,6 @@ class JobService:
                 self._write_build_projection(c, r, "failed" if final else "queued", error=message)
         except LeaseLost:
             return
->>>>>>> origin/main
         self._emit("build.failed", ctx, {"error": {"code": code, "message": message}, "will_retry": not final})
 
 
@@ -436,12 +389,6 @@ class JobWorker:
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> "JobWorker":
-<<<<<<< HEAD
-        if self._thread is None or not self._thread.is_alive():
-            self._stop.clear()
-            self._thread = threading.Thread(target=self._loop, name=f"job-worker-{self.worker_id}", daemon=True)
-            self._thread.start()
-=======
         if self._thread is not None and self._thread.is_alive():
             if self._stop.is_set():
                 raise RuntimeError("job worker is still stopping")
@@ -449,7 +396,6 @@ class JobWorker:
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name=f"job-worker-{self.worker_id}", daemon=True)
         self._thread.start()
->>>>>>> origin/main
         return self
 
     def stop(self, timeout: Optional[float] = None) -> None:
@@ -480,10 +426,6 @@ class JobWorker:
 # ---- process-wide default (lazy) ----------------------------------------
 _lock = threading.Lock()
 _service: Optional[JobService] = None
-<<<<<<< HEAD
-_worker: Optional[JobWorker] = None
-=======
->>>>>>> origin/main
 
 
 def get_job_service() -> JobService:
@@ -497,19 +439,11 @@ def get_job_service() -> JobService:
 
 def set_job_service(svc: Optional[JobService]) -> None:
     """Test/composition hook."""
-<<<<<<< HEAD
-    global _service, _worker
-    with _lock:
-        if _worker is not None:
-            _worker.stop(0)
-        _service, _worker = svc, None
-=======
     global _service
     with _lock:
         previous, _service = _service, svc
     if previous is not None and previous is not svc:
         previous.stop_worker(0)
->>>>>>> origin/main
 
 
 def register_handler(kind: str, fn: Handler) -> None:
@@ -544,16 +478,7 @@ def cancel(job_id: str) -> bool:
 
 def start_worker(*, poll_s: float = 1.0) -> JobWorker:
     """Start (idempotently) the process-wide background worker thread."""
-<<<<<<< HEAD
-    global _worker
-    svc = get_job_service()
-    with _lock:
-        if _worker is None:
-            _worker = JobWorker(svc, poll_s=poll_s)
-        return _worker.start()
-=======
     return get_job_service().start_worker(poll_s=poll_s)
->>>>>>> origin/main
 
 
 __all__ = [

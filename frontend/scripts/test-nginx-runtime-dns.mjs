@@ -57,12 +57,8 @@ test('production ingress starts without upstream DNS and recovers after service 
       assert.equal(response.headers.get(key), value, key);
     }
   }
-<<<<<<< HEAD
-  function startResponder(service, revision) {
-=======
   function startResponder(service, revision, status = 200) {
     assert.ok([200, 503].includes(status), 'mock upstream status must be explicitly permitted');
->>>>>>> origin/main
     const name = `${network}-${service}-${revision}`;
     const config = join(scratch, `${service}-${revision}.conf`);
     writeFileSync(config, `pid /run/nginx.pid;
@@ -72,11 +68,7 @@ http {
   server {
     listen 8001;
     default_type application/json;
-<<<<<<< HEAD
-    return 200 '{"service":"${service}","revision":"${revision}","uri":"$request_uri","host":"$http_host","protocol":"$server_protocol","forwardedProto":"$http_x_forwarded_proto"}';
-=======
     return ${status} '{"service":"${service}","revision":"${revision}","uri":"$request_uri","host":"$http_host","protocol":"$server_protocol","forwardedProto":"$http_x_forwarded_proto"}';
->>>>>>> origin/main
   }
 }
 `);
@@ -140,11 +132,7 @@ http {
       const setup = await request('/setup');
       assert.equal(setup.status, 200);
       assertHeaders(setup);
-<<<<<<< HEAD
-      assert.equal(setup.headers.get('cache-control'), 'no-cache');
-=======
       assert.equal(setup.headers.get('cache-control'), 'no-store');
->>>>>>> origin/main
       assert.match(await setup.text(), /<!doctype html>/i);
       for (const path of ['/api/dns-probe?phase=missing', '/api/v1/models?phase=missing']) {
         const response = await request(path);
@@ -154,8 +142,6 @@ http {
       }
     });
 
-<<<<<<< HEAD
-=======
     // DNS can resolve successfully while protected services fail their own
     // readiness checks. Static setup must stay usable without promoting either
     // API response to success, including after a failed guarded engine boot.
@@ -180,7 +166,6 @@ http {
     });
     docker('rm', '-f', unhealthyBackend, unhealthyEngine);
 
->>>>>>> origin/main
     const backend = startResponder('backend', 'first');
     startResponder('skeleton', 'first');
     await t.test('new DNS records recover every API route without rewriting paths or queries', async () => {

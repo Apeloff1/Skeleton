@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-=======
 import ast
->>>>>>> origin/main
 import json
 
 import pytest
@@ -43,8 +40,6 @@ _ROW_KEYS = {
 }
 
 
-<<<<<<< HEAD
-=======
 
 def test_boot_phase_parser_requires_real_dispatch_and_phase_methods() -> None:
     from skeleton.app.runtime.audit_parse import genesis_boot_phase_order
@@ -69,7 +64,6 @@ class Genesis:
     ))) == []
 
 
->>>>>>> origin/main
 def test_genesis_boot_audit_is_import_free(monkeypatch) -> None:
     called = False
 

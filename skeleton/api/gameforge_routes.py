@@ -15,30 +15,18 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from skeleton.api.charter_gate import require_charter
-<<<<<<< HEAD
-from skeleton.api.command_routes import router as command_router
-from skeleton.api.idempotency import IdempotencyGuard
-from skeleton.api.server import get_state
-
-router = APIRouter()
-router.include_router(command_router)
-=======
 from skeleton.api.idempotency import IdempotencyGuard
 
 router = APIRouter()
->>>>>>> origin/main
 _idempotency = IdempotencyGuard()
 
 
 def _state():
-<<<<<<< HEAD
-=======
     # Resolve the mounted application state only when an unmounted legacy
     # handler is explicitly invoked. Importing this module must not import
     # the application factory or the canonical command router.
     from skeleton.api.server import get_state
 
->>>>>>> origin/main
     return get_state()
 
 

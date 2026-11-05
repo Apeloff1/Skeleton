@@ -31,10 +31,6 @@ class StreamPlan:
 
 
 def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, int],
-<<<<<<< HEAD
-              budget: StreamBudget) -> StreamPlan:
-    """Load nearest-first within radius under memory and per-tick load budgets."""
-=======
               budget: StreamBudget, heading: tuple[float, float] | None = None,
               path: Iterable[CellId] = (), ahead_bias: float = 1.5,
               behind_radius: int | None = None, path_lookahead: int = 2) -> StreamPlan:
@@ -48,7 +44,6 @@ def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, 
         return plan_tick_directed(focus, heading or (0.0, 0.0), resident, sizes, budget,
                                   ahead_bias=ahead_bias, path=path, behind_radius=behind_radius,
                                   path_lookahead=path_lookahead)
->>>>>>> origin/main
     fx, fy = focus
     dist = lambda c: max(abs(c[0] - fx), abs(c[1] - fy))  # noqa: E731
     wanted = sorted((c for c in sizes if dist(c) <= budget.radius), key=lambda c: (dist(c), c))
@@ -66,8 +61,6 @@ def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, 
         else:
             deferred.append(c)
     return StreamPlan(tuple(load), tuple(unload), tuple(deferred), used)
-<<<<<<< HEAD
-=======
 
 
 # --- Heading-aware prioritisation (Wally LD review on #4268, note 7) ---
@@ -139,4 +132,3 @@ def plan_tick_directed(focus: CellId, heading: tuple[float, float], resident: It
         else:
             deferred.append(c)
     return StreamPlan(tuple(load), tuple(unload), tuple(deferred), used)
->>>>>>> origin/main

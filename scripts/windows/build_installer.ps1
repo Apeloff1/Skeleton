@@ -7,15 +7,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-<<<<<<< HEAD
-$PyProjectPath = Join-Path $RepoRoot "pyproject.toml"
-$BuildRoot = Join-Path $RepoRoot ".build\windows-installer"
-$OutputDir = Join-Path $RepoRoot "dist\windows"
-=======
 $BuildRoot = Join-Path $RepoRoot ".build\windows-installer"
 $OutputDir = Join-Path $RepoRoot "dist\windows"
 $StagedOutputDir = Join-Path $BuildRoot "output"
->>>>>>> origin/main
 $ShortDrive = "W:"
 # Do not use Join-Path against the virtual drive until SUBST has created it.
 # PowerShell validates PSDrive existence during Join-Path resolution.
@@ -27,29 +21,6 @@ $ArchivePath = "$ShortDrive\source.zip"
 # The compiled entrypoints and installer recipe must come from the archived
 # SourceRef, not potentially divergent files in the working checkout.
 
-<<<<<<< HEAD
-if (-not $Version) {
-    $PyProject = Get-Content -Raw -LiteralPath $PyProjectPath
-    if ($PyProject -notmatch '(?ms)^\[project\].*?^version\s*=\s*"([^"]+)"') {
-        throw "Unable to resolve [project].version from pyproject.toml"
-    }
-    $Version = $Matches[1]
-}
-
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:[.-].*)?$') {
-    throw "Installer version must begin with numeric major.minor.patch: $Version"
-}
-
-$NumericVersion = ($Version -split '[.-]')[0..2] -join '.'
-$VersionInfoVersion = "$NumericVersion.0"
-
-foreach ($Path in @($BuildRoot, $OutputDir)) {
-    if (Test-Path -LiteralPath $Path) {
-        Remove-Item -LiteralPath $Path -Recurse -Force
-    }
-}
-New-Item -ItemType Directory -Force -Path $BuildRoot, $OutputDir | Out-Null
-=======
 # SourceRef may point to a different revision than the working checkout.
 # Validate it even when -Version is explicit, before touching build output.
 $SourceCommit = & git -C $RepoRoot rev-parse --verify --end-of-options "$($SourceRef)^{commit}"
@@ -82,18 +53,14 @@ $PublishedHash = "$PublishedInstaller.sha256"
 if ((Test-Path -LiteralPath $PublishedInstaller) -or (Test-Path -LiteralPath $PublishedHash)) {
     throw "Installer output already exists for version $Version. Move or archive both files explicitly before rebuilding."
 }
->>>>>>> origin/main
 
 if (Test-Path $ShortDrive) {
     throw "Temporary build drive $ShortDrive is already in use"
 }
-<<<<<<< HEAD
-=======
 if (Test-Path -LiteralPath $BuildRoot) {
     Remove-Item -LiteralPath $BuildRoot -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path $BuildRoot, $StagedOutputDir | Out-Null
->>>>>>> origin/main
 & subst $ShortDrive $BuildRoot
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
     throw "Unable to create short Windows build drive $ShortDrive"
@@ -106,11 +73,7 @@ New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherW
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
 # Read the assembly contract from the exact archived ref. All declared required
 # paths must be carried into the installable payload, not just the five services.
-<<<<<<< HEAD
-$SourceManifestText = & git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"
-=======
 $SourceManifestText = & git -C $RepoRoot show "$($SourceCommit):skeleton/app/manifest.json"
->>>>>>> origin/main
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to load application assembly manifest from SourceRef $SourceRef"
 }
@@ -174,11 +137,7 @@ $ArchiveArgs = @(
     "archive",
     "--format=zip",
     "--output=$ArchivePath",
-<<<<<<< HEAD
-    $SourceRef,
-=======
     $SourceCommit,
->>>>>>> origin/main
     "--"
 ) + $RuntimePaths
 & git @ArchiveArgs
@@ -416,11 +375,7 @@ $InnoArgs = @(
     "/DAppVersion=$Version",
     "/DVersionInfoVersion=$VersionInfoVersion",
     "/DPayloadDir=$PayloadDir",
-<<<<<<< HEAD
-    "/DOutputDir=$OutputDir",
-=======
     "/DOutputDir=$StagedOutputDir",
->>>>>>> origin/main
     $InstallerScript
 )
 & $Iscc @InnoArgs
@@ -428,11 +383,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compilation failed"
 }
 
-<<<<<<< HEAD
-$Installer = Get-ChildItem -LiteralPath $OutputDir -Filter "Skeleton-Setup-*-windows-x64.exe" |
-=======
 $Installer = Get-ChildItem -LiteralPath $StagedOutputDir -Filter "Skeleton-Setup-*-windows-x64.exe" |
->>>>>>> origin/main
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
 if (-not $Installer) {
@@ -443,8 +394,6 @@ $Hash = Get-FileHash -Algorithm SHA256 -LiteralPath $Installer.FullName
 $HashPath = "$($Installer.FullName).sha256"
 "$($Hash.Hash.ToLowerInvariant())  $($Installer.Name)" | Set-Content -LiteralPath $HashPath -Encoding ascii
 
-<<<<<<< HEAD
-=======
 # Never overwrite an existing release or checksum. File.Move without the
 # overwrite option also refuses a collision that appears after the early check.
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -459,7 +408,6 @@ try {
 }
 $Installer = Get-Item -LiteralPath $PublishedInstaller
 
->>>>>>> origin/main
 Write-Host ""
 Write-Host "Windows installer built successfully:"
 Write-Host "  $($Installer.FullName)"

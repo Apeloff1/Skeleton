@@ -8,8 +8,6 @@ and Mongo services. This guide covers installation, optional local weights,
 durable chat and bounded web capture. It does not certify production deployment,
 every-console compatibility, studio mastery or automatic improvement in quality.
 
-<<<<<<< HEAD
-=======
 **Local chat is currently blocked:** default Compose startup does not supply the
 trusted components required by the local inference guard. Preparing a model does
 not resolve that missing bootstrap. A consumer installation has not been qualified
@@ -23,7 +21,6 @@ and inspect the [guard readiness requirements](../qa/GUARDED_LOCAL_READINESS_202
 before retrying. The shared Mongo source fence requires primary-bound linearizable
 reads; the default standalone Mongo deployment does not provide that authority.
 
->>>>>>> origin/main
 ## Start the application
 
 From the repository root, with Python and Docker Compose installed and the
@@ -55,16 +52,11 @@ operating on an existing Chroma installation, follow the
 [Chroma persistence and recovery warning](../APP_ASSEMBLY.md#application-surfaces).
 The default profile does not require Chroma for bounded lexical retrieval.
 
-<<<<<<< HEAD
-Open `http://localhost:3000/setup` with the default ports. The setup page remains
-readable before login and when the API is unavailable. It observes capabilities
-=======
 Open `http://localhost:3000/setup` with the default ports. Once the frontend has
 started, the setup page remains readable before login and when the API is
 unavailable. Compose currently waits for healthy backend and engine services
 before starting that frontend; if startup never reaches it, use installer output
 and service logs. The page observes capabilities
->>>>>>> origin/main
 separately and provides commands to copy into the host terminal. Create an
 account through the existing login screen. A healthy application can have an
 unconfigured AI model; the page reports that condition explicitly.
@@ -108,11 +100,7 @@ that `docker compose version` works there and `uname -m` reports `x86_64`.
 Keep the repository, `.venv`, model and private configuration in the Ubuntu
 Linux filesystem, such as `~/Skeleton`; do not use an `/mnt/c` checkout for this
 recipe. The [Windows first-install commands](../../README.md#windows-with-wsl-2)
-<<<<<<< HEAD
-select the current candidate and run the installer inside Ubuntu. Open the published
-=======
 run the installer from a fresh default-branch checkout inside Ubuntu. Open the published
->>>>>>> origin/main
 `http://localhost:3000/setup` address from a Windows browser.
 
 Create a private UTF-8 password file **outside** the repository. For example,
@@ -204,13 +192,6 @@ database. A preserved hosted key is reused unless a new key source is supplied.
 
 Portable GGUF executables must be Linux ELF64 for amd64 or arm64. The override
 selects the matching container platform, which Docker must support. Adjacent
-<<<<<<< HEAD
-`lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime;
-the helper does not discover arbitrary system dependencies or establish an
-independent shared-library execution pin. Mixed executable architectures in one
-catalog are rejected. The engine still performs model activation and resource
-admission at startup.
-=======
 `lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime.
 When a deployment declares an adjacent-library inventory, the helper verifies
 its exact names and digests before preparing the read-only file bindings. Legacy
@@ -218,7 +199,6 @@ manifests without an inventory keep their previous behavior; they do not gain
 library pins automatically. Mixed executable architectures in one catalog are
 rejected. The engine still performs model activation and resource admission at
 startup.
->>>>>>> origin/main
 
 ## Activate the reproducible local CPU model
 
@@ -226,14 +206,9 @@ The optional acquisition recipe uses Qwen3-0.6B-Q8_0, an Apache-2.0 model, and
 llama.cpp b11429, an MIT runtime. Both artifacts have fixed URLs, exact byte
 counts and SHA256 values in `scripts/provision_local_ai.py`. The runtime recipe
 targets Linux x86_64 with glibc, including the canonical engine container. This
-<<<<<<< HEAD
-small model provides a usable integration path; useful complex planning still
-depends on model capability and measured results.
-=======
 small model is intended for local integration; the default Compose local guard
 bootstrap is incomplete, so preparing these files alone does not enable chat.
 Useful complex planning depends on model capability and measured results.
->>>>>>> origin/main
 
 Explicitly download and prepare approximately 657 MB of artifacts:
 
@@ -286,12 +261,6 @@ activation/capacity checks still apply. Existing installations must match the
 requested context and are never rewritten; use a fresh destination when changing it.
 The deployment uses two CPU threads, no GPU,
 finite execution deadlines and the explicit completion-chat profile. The model
-<<<<<<< HEAD
-and executable are rehashed by the canonical activation/inference owner. The
-provisioning receipt additionally records acquired library digests. The current
-runtime independently pins the executable and model; it does not establish a
-separate immutable shared-library execution closure.
-=======
 and executable are rehashed by the canonical activation/inference owner. Newly
 provisioned manifests also record digests for every extracted adjacent runtime
 library. The runtime checks that flat inventory at activation and around process
@@ -304,7 +273,6 @@ These checks do not prove which objects the operating-system loader actually
 mapped, pin system libraries, or eliminate file changes between a check and
 process loading. They do not attest GGUF tokenizer behavior or make the guarded
 local provider operational.
->>>>>>> origin/main
 
 For another compatible installed GGUF/runtime, use the existing
 `python -m skeleton app prepare-local-model --help`. Modern `llama-completion`

@@ -123,8 +123,6 @@ def test_module_level_api_and_background_worker(svc):
         assert job_api.get_result(h.job_id).result == {"done": True}
     finally:
         job_api.set_job_service(None)
-<<<<<<< HEAD
-=======
 
 
 def test_application_close_keeps_database_open_if_worker_is_stuck(tmp_path):
@@ -152,4 +150,3 @@ def test_application_close_keeps_database_open_if_worker_is_stuck(tmp_path):
         release.set()
         worker.stop(5)
         services.close()
->>>>>>> origin/main

@@ -87,11 +87,7 @@ def test_protected_provider_uses_guard_for_result_and_cache_hit():
         one = await adapter.generate(request)
         two = await adapter.generate(request)
         assert one.provider == "local" and two.provider == "local"
-<<<<<<< HEAD
-        assert authority.calls == 4
-=======
         assert authority.calls == 6
->>>>>>> origin/main
         assert adapter.status()["guard_required"] is True
     asyncio.run(scenario())
 
@@ -143,11 +139,7 @@ def test_provider_rejects_rewritten_delivery_receipt():
         service.generate = tamper
         with pytest.raises(ProviderPolicyError, match="receipt"):
             await adapter.generate(request)
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
     asyncio.run(scenario())
 
 
@@ -213,11 +205,7 @@ def test_direct_engine_cache_and_preparation_cannot_bypass_protected_mode():
         # but only while the guarded preflight and postflight are both valid.
         await adapter.generate(request)
         await adapter.generate(request)
-<<<<<<< HEAD
-        assert authority.calls == 4
-=======
         assert authority.calls == 6
->>>>>>> origin/main
         with pytest.raises(ProviderPolicyError):
             await engine.generate(native, tenant_scope_id="tenant")
     asyncio.run(scenario())
@@ -248,8 +236,6 @@ def test_guard_permit_rejects_inherited_child_task():
     asyncio.run(scenario())
 
 
-<<<<<<< HEAD
-=======
 def test_native_preparation_copies_context_but_cannot_dispatch_from_worker():
     from contextvars import ContextVar
     import threading
@@ -295,7 +281,6 @@ def test_native_preparation_copies_context_but_cannot_dispatch_from_worker():
     asyncio.run(scenario())
 
 
->>>>>>> origin/main
 def test_guards_from_different_composition_roots_cannot_rebind_engine():
     engine, _, _, _, request = fixture()
     from skeleton.context.pre_delivery_guard import GuardedLocalInference, ReviewVerdict
@@ -328,11 +313,7 @@ def test_guarded_provider_stream_yields_only_after_verified_generation():
         _, authority, _, adapter, request = fixture()
         chunks = [delta async for delta in adapter.stream(request)]
         assert chunks
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
         assert all(chunk is not None for chunk in chunks)
 
     asyncio.run(scenario())
@@ -377,11 +358,7 @@ def test_protected_stream_only_emits_verified_buffered_result():
     async def scenario():
         _, authority, _, adapter, request = fixture()
         events = [event async for event in adapter.stream(request)]
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
         assert [item.sequence for item in events] == list(range(len(events)))
         assert len(events) >= 3
         assert events[0].text is not None
@@ -408,11 +385,7 @@ def test_forged_guarded_receipt_blocks_stream_first_byte():
             async for event in adapter.stream(request):
                 emitted.append(event)
         assert emitted == []
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
     asyncio.run(scenario())
 
 
@@ -433,22 +406,14 @@ def test_provider_requires_token_sequence_commitment_before_delivery():
         service.generate = remove_token_proof
         with pytest.raises(ProviderPolicyError, match="receipt"):
             await adapter.generate(request)
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
 
         emitted = []
         with pytest.raises(ProviderPolicyError, match="receipt"):
             async for delta in adapter.stream(request):
                 emitted.append(delta)
         assert emitted == []
-<<<<<<< HEAD
-        assert authority.calls == 4
-=======
         assert authority.calls == 6
->>>>>>> origin/main
 
     asyncio.run(scenario())
 
@@ -460,11 +425,7 @@ def test_protected_stream_emits_only_after_complete_verified_generation():
     async def scenario():
         _, authority, _, adapter, request = fixture()
         deltas = [delta async for delta in adapter.stream(request)]
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
         assert deltas
         assert deltas[0].kind == ProviderDeltaKind.TEXT
         assert deltas[0].text is not None
@@ -506,10 +467,6 @@ def test_protected_stream_forged_receipt_never_yields_a_partial_delta():
             async for delta in adapter.stream(request):
                 observed.append(delta)
         assert observed == []
-<<<<<<< HEAD
-        assert authority.calls == 2
-=======
         assert authority.calls == 3
->>>>>>> origin/main
 
     asyncio.run(scenario())

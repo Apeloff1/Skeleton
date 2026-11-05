@@ -111,8 +111,6 @@ jobs:
             --input requirements.txt \
             --sbom-ref dist/release-sbom.cdx.json
 
-<<<<<<< HEAD
-=======
       - name: Verify native Assembly payload in wheel
         working-directory: source-a
         shell: bash
@@ -141,7 +139,6 @@ jobs:
                       raise SystemExit(f"native Assembly wheel payload empty: {name}")
           PY
 
->>>>>>> origin/main
       - name: Build release B from clean checkout
         working-directory: source-b
         shell: bash

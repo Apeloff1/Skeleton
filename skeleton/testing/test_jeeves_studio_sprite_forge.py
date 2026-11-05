@@ -215,10 +215,7 @@ class PersistentSpriteExportTests(unittest.TestCase):
                 "sprites/hero-idle.tres",
                 "sprites/hero-idle.tscn",
                 "jeeves_sprite_receipt.json",
-<<<<<<< HEAD
-=======
                 "assets/catalog.json",
->>>>>>> origin/main
             })
             self.assertIn(
                 b'SpriteFrames', archive.read("sprites/hero-idle.tres"),
@@ -226,12 +223,9 @@ class PersistentSpriteExportTests(unittest.TestCase):
             self.assertIn(
                 b'AnimatedSprite2D', archive.read("sprites/hero-idle.tscn"),
             )
-<<<<<<< HEAD
-=======
             # The exporter also emits its source-bound asset catalog; the
             # archive inventory must include it rather than silently drop it.
             self.assertIsInstance(json.loads(archive.read("assets/catalog.json")), dict)
->>>>>>> origin/main
             proof = json.loads(archive.read("jeeves_sprite_receipt.json"))
             asset = json.loads(archive.read("sprites/hero-idle.json"))
             image = archive.read("sprites/hero-idle.png")
@@ -257,12 +251,8 @@ class PersistentSpriteExportTests(unittest.TestCase):
         self.assertEqual(len(list(self.export_root.iterdir())), 1)
 
     def test_no_sprite_record_means_no_synthetic_image(self):
-<<<<<<< HEAD
-        with self.assertRaises(StudioSpriteError):
-=======
         # The source store rejects missing graph evidence before sprite compilation.
         with self.assertRaisesRegex(CreatorSourceError, "unresolved sources"):
->>>>>>> origin/main
             self.export()
         self.assertEqual(list(self.export_root.iterdir()), [])
 

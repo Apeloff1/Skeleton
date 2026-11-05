@@ -420,8 +420,6 @@ __all__ += [
     "SafetyHazardSeverity",
     "make_safety_hazard_id",
 ]
-<<<<<<< HEAD
-=======
 
 from .execution_authority import (
     AdmissionReceipt,
@@ -462,4 +460,3 @@ __all__ += [
     "validate_authority_attenuation",
     "verify_authority_receipt_chain",
 ]
->>>>>>> origin/main

@@ -175,14 +175,11 @@ def first_install_report(
                 observed=True,
                 scope="Canonical AI readiness projection; no inference or model quality claim.",
             )
-<<<<<<< HEAD
-=======
             code = status.get("active_readiness_code")
             if (provider == "local" and status["llm_available"] is False
                     and status.get("active") == "local" and isinstance(code, str)
                     and code in {"local_guard_unavailable", "local_guard_configuration_invalid"}):
                 ai["readiness_code"] = code
->>>>>>> origin/main
         else:
             ai["scope"] = (
                 "Canonical AI readiness could not be observed; configuration does not establish availability."
@@ -211,9 +208,6 @@ def first_install_report(
         next_steps.append(
             "Inspect backend /api/health/registry critical_routes and backend boot logs; required application routes are missing or unverified."
         )
-<<<<<<< HEAD
-    if not configured or ai["available"] is False:
-=======
     if ai.get("readiness_code") == "local_guard_unavailable":
         next_steps.append(
             "The required trusted local AI guard is unavailable. Preparing or replacing model weights alone will not enable local chat; see docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md."
@@ -223,7 +217,6 @@ def first_install_report(
             "The required local AI guard configuration is invalid. Review the engine configuration and docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md; do not disable the guard."
         )
     if not configured or (ai["available"] is False and "readiness_code" not in ai):
->>>>>>> origin/main
         next_steps.append(
             "Configure genuine trained local weights or the engine-owned hosted provider in .env; see docs/APP_ASSEMBLY.md. Restart the engine after changes."
         )

@@ -2,11 +2,8 @@
 from __future__ import annotations
 
 import json
-<<<<<<< HEAD
-=======
 import hashlib
 import os
->>>>>>> origin/main
 import stat
 from pathlib import Path
 
@@ -117,8 +114,6 @@ def test_local_artifact_is_read_only_bound_without_claiming_readiness(
     assert mounts[0]["read_only"] is True
     assert mounts[0]["bind"]["create_host_path"] is False
     assert model.read_bytes() == b"{\"example\":true}"
-<<<<<<< HEAD
-=======
 
 
 def _pinned_runtime_deployment(root: Path) -> tuple[Path, Path, Path, Path]:
@@ -210,4 +205,3 @@ def test_portable_catalog_counts_shared_host_files_at_each_distinct_target(tmp_p
     catalog.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(config.ConfigurationError, match="artifact byte budget"):
         config._prepared_local_sources(options, force=False, dry_run=True)
->>>>>>> origin/main

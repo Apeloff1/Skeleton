@@ -212,8 +212,6 @@ def test_semantic_audit_rejects_nul_in_document_identity(
     )
     with pytest.raises(OfflineAuditError, match="invalid fields"):
         audit_database(library, "library")
-<<<<<<< HEAD
-=======
 
 
 def test_semantic_audit_verifies_disk_offload_and_rejects_chunk_forgery(
@@ -256,4 +254,3 @@ def test_semantic_audit_rejects_orphaned_disk_chunks_and_fts(
     _change(library, "INSERT INTO offline_document_chunk_fts(rowid, body) VALUES (999999, 'orphan')")
     with pytest.raises(OfflineAuditError, match="orphaned disk chunk FTS5"):
         audit_database(library, "library")
->>>>>>> origin/main

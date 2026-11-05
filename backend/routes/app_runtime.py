@@ -170,13 +170,6 @@ def app_bootstrap() -> dict[str, object]:
     return public_bootstrap_payload()
 
 
-<<<<<<< HEAD
-async def _collect_runtime_status(timeout_ms: int) -> dict[str, object]:
-    timeout_ms = max(250, min(int(timeout_ms), 10_000))
-    bootstrap = public_bootstrap_payload()
-    timeout_s = timeout_ms / 1000.0
-    engine, mongo = await asyncio.gather(
-=======
 async def _probe_backend(readiness_probe, timeout_s: float) -> dict[str, object]:
     started = time.monotonic()
     ok = False
@@ -203,22 +196,11 @@ async def _collect_runtime_status(timeout_ms: int, *, readiness_probe=None) -> d
     timeout_s = timeout_ms / 1000.0
     backend, engine, mongo = await asyncio.gather(
         _probe_backend(readiness_probe, timeout_s),
->>>>>>> origin/main
         _probe_engine(timeout_s),
         _probe_mongo(timeout_s),
     )
     services = [
-<<<<<<< HEAD
-        {
-            "name": "backend",
-            "ok": True,
-            "status": 200,
-            "latency_ms": 0,
-            "detail": "healthy",
-        },
-=======
         backend,
->>>>>>> origin/main
         engine,
         mongo,
     ]
@@ -273,17 +255,10 @@ def _unobserved_status(detail: str) -> dict[str, object]:
         "services": [
             {
                 "name": name,
-<<<<<<< HEAD
-                "ok": name == "backend",
-                "status": 200 if name == "backend" else None,
-                "latency_ms": 0,
-                "detail": "healthy" if name == "backend" else detail,
-=======
                 "ok": False,
                 "status": None,
                 "latency_ms": 0,
                 "detail": detail,
->>>>>>> origin/main
             }
             for name in ("backend", "skeleton", "mongo")
         ],
@@ -323,13 +298,9 @@ async def _runtime_status(timeout_ms: int, *, state=None) -> dict[str, object]:
         if not task.done() and observation["key"] != key:
             return _unobserved_status("observation pending for changed configuration")
     if observation is None or observation["task"].done():
-<<<<<<< HEAD
-        task = asyncio.create_task(_collect_runtime_status(timeout_ms))
-=======
         task = asyncio.create_task(_collect_runtime_status(
             timeout_ms, readiness_probe=getattr(state, "backend_readiness_probe", None)
         ))
->>>>>>> origin/main
         observation = {"task": task, "completed_at": None, "key": key}
         state._public_runtime_observation = observation
 

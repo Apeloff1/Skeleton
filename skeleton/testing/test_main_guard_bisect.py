@@ -7,14 +7,10 @@ from pathlib import Path
 
 import pytest
 
-<<<<<<< HEAD
-from skeleton.main_guard.bisect import BisectError, bisect, classify_returncode, render_bisect_markdown
-=======
 from skeleton.main_guard.bisect import (
     BAD, GOOD, BisectError, BisectStep, _verified_bisect_head,
     bisect, classify_returncode, render_bisect_markdown,
 )
->>>>>>> origin/main
 from skeleton.testing.main_guard_test_support import commit, git, init_repo
 
 CHECK = [sys.executable, "-c", "import pathlib,sys; sys.exit(1 if 'BROKEN' in pathlib.Path('app.txt').read_text() else 0)"]
@@ -43,8 +39,6 @@ def test_finds_first_bad_commit_and_restores_head(tmp_path: Path, strategy: str,
     assert not (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "BISECT_LOG").exists()
 
 
-<<<<<<< HEAD
-=======
 def test_git_strategy_rejects_an_unverified_bad_endpoint(tmp_path: Path) -> None:
     # All eight commits are good: Git bisect treats the supplied bad SHA as
     # a caller assertion. The product must not certify it without running the
@@ -58,7 +52,6 @@ def test_git_strategy_rejects_an_unverified_bad_endpoint(tmp_path: Path) -> None
     assert not (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "BISECT_LOG").exists()
 
 
->>>>>>> origin/main
 def test_rejects_good_that_is_not_ancestor(tmp_path: Path) -> None:
     repo, shas = _history(tmp_path, 3)
     with pytest.raises(BisectError):
@@ -91,8 +84,6 @@ def test_classify_returncode() -> None:
     assert classify_returncode(1) == "bad"
     assert classify_returncode(125) == "skip"
     assert classify_returncode(None, timed_out=True) == "skip"
-<<<<<<< HEAD
-=======
 
 
 def test_bisect_head_fallback_requires_proven_adjacent_boundary() -> None:
@@ -107,4 +98,3 @@ def test_bisect_head_fallback_requires_proven_adjacent_boundary() -> None:
     assert _verified_bisect_head(_Git(), [earlier, bad], good, [good_step, bad_step]) == bad
     assert _verified_bisect_head(_Git(), [bad], good, [bad_step]) == bad
     assert _verified_bisect_head(_Git(), [earlier, bad], good, [good_step]) is None
->>>>>>> origin/main

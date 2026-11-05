@@ -9,12 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from contextlib import nullcontext
-<<<<<<< HEAD
-import hashlib
-import json
-import re
-from typing import Any, Callable, Mapping, Protocol, Sequence
-=======
 from contextvars import copy_context
 import asyncio
 import hashlib
@@ -24,7 +18,6 @@ import re
 import threading
 import time
 from typing import Any, Awaitable, Callable, Mapping, Protocol, Sequence
->>>>>>> origin/main
 
 from skeleton.context.delivery_regex import match_delivery_regex, validate_delivery_regex
 from skeleton.context.delivery_schema import (
@@ -201,8 +194,6 @@ class ReviewVerdict:
     reason_code: str
 
 
-<<<<<<< HEAD
-=======
 @dataclass(frozen=True, slots=True)
 class _PreflightEvidence:
     root: str
@@ -215,7 +206,6 @@ class _PreflightEvidence:
     native_schema: str | None
 
 
->>>>>>> origin/main
 class BoundedAdversarialReviewer(Protocol):
     def __call__(self, untrusted_text: str, context_sha256: str) -> ReviewVerdict: ...
 
@@ -265,11 +255,6 @@ class GuardedLocalInference:
         projection_attestor: Callable[[Any, str, str], bool] | None = None,
         tokenizer_identity_attestor: Callable[[], bool] | None = None,
         require_token_echo: bool = True,
-<<<<<<< HEAD
-    ) -> None:
-        if not hasattr(engine, "generate") or not callable(reviewer):
-            raise SealedContextError("local engine and independent reviewer are required")
-=======
         review_timeout_seconds: float = 5.0,
         native_timeout_seconds: float = 5.0,
     ) -> None:
@@ -285,7 +270,6 @@ class GuardedLocalInference:
                 or not math.isfinite(native_timeout_seconds)
                 or not 0 < native_timeout_seconds <= 30):
             raise SealedContextError("native verification timeout must be finite and within 30 seconds")
->>>>>>> origin/main
         self.engine = engine
         self.reviewer = reviewer
         self.tokenize = tokenize
@@ -294,8 +278,6 @@ class GuardedLocalInference:
         self.projection_attestor = projection_attestor
         self.tokenizer_identity_attestor = tokenizer_identity_attestor
         self.require_token_echo = require_token_echo
-<<<<<<< HEAD
-=======
         self.review_timeout_seconds = float(review_timeout_seconds)
         self.native_timeout_seconds = float(native_timeout_seconds)
         # A stuck reviewer retains its slot until the underlying call returns.
@@ -315,7 +297,6 @@ class GuardedLocalInference:
             # messages and chained tracebacks. Guard-owned validation below
             # still emits its distinct integrity and boundary reason codes.
             raise SealedContextBoundaryError("native verification callback unavailable") from None
->>>>>>> origin/main
 
     def _attest_tokenizer_identity(self) -> None:
         verifier = self.tokenizer_identity_attestor
@@ -323,19 +304,6 @@ class GuardedLocalInference:
             return
         try:
             verified = verifier()
-<<<<<<< HEAD
-        except Exception as exc:
-            raise SealedContextBoundaryError("native tokenizer identity verification unavailable") from exc
-        if verified is not True:
-            raise SealedContextIntegrityError("native tokenizer identity changed")
-
-    def preflight(
-        self, request: Any, *, snapshot: TrustedContextSnapshot,
-        tenant_scope_id: str, contract: DeliveryContract,
-    ) -> tuple[str, str | None, str, str | None]:
-        if contract.format == "json":
-            _schema_snapshot(contract.json_schema)
-=======
         except Exception:
             raise SealedContextBoundaryError("native tokenizer identity verification unavailable") from None
         if verified is not True:
@@ -350,7 +318,6 @@ class GuardedLocalInference:
             _schema_snapshot(getattr(request, "structured_output_schema", None))
             if delivery_schema is not None and contract.require_sampler_enforcement else None
         )
->>>>>>> origin/main
         self._attest_tokenizer_identity()
         if snapshot.tenant_id != tenant_scope_id:
             raise SealedContextBoundaryError("context snapshot crossed tenant boundary")
@@ -366,26 +333,16 @@ class GuardedLocalInference:
         # Checking only the generic user-facing representation can miss
         # provider-specific formatting or special-token insertion.
         native_renderer = getattr(self.engine.model, "_render_prompt", None)
-<<<<<<< HEAD
-        rendered = native_renderer(request) if callable(native_renderer) else request.rendered_input
-=======
         rendered = self._native_callback(native_renderer, request) if callable(native_renderer) else request.rendered_input
->>>>>>> origin/main
         if not isinstance(rendered, str):
             raise SealedContextError("local rendered prompt must be text")
         # A lossless tokenizer echo is not evidence that a native renderer kept
         # every instruction/history segment. Demand a separately trusted
         # projection attestor whenever the backend changes prompt formatting.
         if callable(native_renderer) and rendered != request.rendered_input:
-<<<<<<< HEAD
-            if self.projection_attestor is None or not self.projection_attestor(
-                request, rendered, actual_root
-            ):
-=======
             if self.projection_attestor is None or self._native_callback(
                 self.projection_attestor, request, rendered, actual_root
             ) is not True:
->>>>>>> origin/main
                 raise SealedContextIntegrityError(
                     "native prompt projection did not attest exact context preservation"
                 )
@@ -398,25 +355,13 @@ class GuardedLocalInference:
         if self.require_token_echo and (self.tokenize is None or self.detokenize is None):
             raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
         if self.tokenize is not None and self.detokenize is not None:
-<<<<<<< HEAD
-            tokens = self.tokenize(rendered)
-            token_sequence_digest = _token_id_digest(tokens)
-            if self.detokenize(tokens).encode("utf-8", errors="strict") != encoded:
-=======
             tokens = self._native_callback(self.tokenize, rendered)
             token_sequence_digest = _token_id_digest(tokens)
             if self._native_callback(self.detokenize, tokens).encode("utf-8", errors="strict") != encoded:
->>>>>>> origin/main
                 raise SealedContextIntegrityError("native tokenizer round trip changed input bytes")
             token_digest = _hash(encoded)
         untrusted = "\n".join(text for _, text in request.history) + "\n" + request.prompt
         context_sha = _hash(untrusted.encode("utf-8", errors="strict"))
-<<<<<<< HEAD
-        verdict = self.reviewer(untrusted, context_sha)
-        if (not isinstance(verdict, ReviewVerdict) or not verdict.allowed
-                or verdict.context_sha256 != context_sha or not verdict.reviewer_id
-                or not verdict.reason_code):
-=======
         return _PreflightEvidence(actual_root, token_digest, token_sequence_digest,
                                   untrusted, context_sha, getattr(request, "digest", None),
                                   delivery_schema, native_schema)
@@ -431,7 +376,6 @@ class GuardedLocalInference:
                 or len(verdict.reviewer_id) > 256
                 or not isinstance(verdict.reason_code, str) or not verdict.reason_code.strip()
                 or len(verdict.reason_code) > 256):
->>>>>>> origin/main
             raise SealedContextBoundaryError("adversarial review declined or was unbound")
         if contract.format != "text" and contract.require_sampler_enforcement:
             if contract.format == "json" and contract.json_schema is not None:
@@ -441,56 +385,6 @@ class GuardedLocalInference:
                     raise SealedContextBoundaryError(
                         "native JSON sampler request is not bound to delivery schema"
                     )
-<<<<<<< HEAD
-            if self.sampler_support is None or not self.sampler_support(self.engine.model, contract):
-                raise SealedContextBoundaryError("local sampler lacks required grammar constraint")
-        return actual_root, token_digest, verdict.reviewer_id, token_sequence_digest
-
-    async def generate(
-        self, request: Any, *, snapshot: TrustedContextSnapshot,
-        tenant_scope_id: str, contract: DeliveryContract = DeliveryContract(),
-        **engine_options: Any,
-    ) -> tuple[Any, PreDeliveryReceipt]:
-        pinned_schema = _schema_snapshot(contract.json_schema) if contract.format == "json" else None
-        pinned_native_schema = (
-            _schema_snapshot(getattr(request, "structured_output_schema", None))
-            if pinned_schema is not None and contract.require_sampler_enforcement else None
-        )
-        root, token_echo, reviewer_id, admitted_token_ids = self.preflight(
-            request, snapshot=snapshot, tenant_scope_id=tenant_scope_id, contract=contract,
-        )
-        if "tenant_scope_id" in engine_options or "prepared_input" in engine_options:
-            raise SealedContextBoundaryError("caller cannot override verified local scopes")
-        # Protected LocalInferenceEngine refuses direct/cached/batched work
-        # without this task-local permit, minted only after the preflight.
-        # Other engines retain the portable adapter contract.
-        if getattr(self.engine, "require_guarded_context", False):
-            admit = getattr(self.engine, "_verified_guard_scope", None)
-            if not callable(admit):
-                raise SealedContextBoundaryError("protected engine lacks verified scope")
-            scope = admit(
-                request, context_root=root, token_echo=token_echo,
-                reviewer_id=reviewer_id, guard_identity=self,
-            )
-        else:
-            scope = nullcontext()
-        with scope:
-            # The actual prepared tokens and cache admission are both within
-            # the exact verified request scope; clients supply no tensors.
-            prepare = getattr(self.engine, "prepare_input", None)
-            if callable(prepare):
-                prepared = prepare(
-                    request, scope_id=engine_options.get("scope_id"),
-                    tenant_scope_id=tenant_scope_id,
-                )
-                if prepared is not None:
-                    engine_options["prepared_input"] = prepared
-            result = await self.engine.generate(
-                request, tenant_scope_id=tenant_scope_id, **engine_options,
-            )
-        # A backend or tokenizer may change while the native worker is busy.
-        # A second identity proof must succeed before releasing any bytes.
-=======
             if self.sampler_support is None or self._native_callback(self.sampler_support, self.engine.model, contract) is not True:
                 raise SealedContextBoundaryError("local sampler lacks required grammar constraint")
         return evidence.root, evidence.token_echo, verdict.reviewer_id, evidence.token_sequence_digest
@@ -647,19 +541,12 @@ class GuardedLocalInference:
     ) -> tuple[Any, PreDeliveryReceipt]:
         """Validate native output without blocking the asyncio event loop."""
         root, token_echo, admitted_token_ids = evidence.root, evidence.token_echo, evidence.token_sequence_digest
->>>>>>> origin/main
         self._attest_tokenizer_identity()
         after_parts = request_parts(request)
         if merkle_root(after_parts) != root:
             raise SealedContextIntegrityError("local input mutated during generation")
         native_renderer = getattr(self.engine.model, "_render_prompt", None)
-<<<<<<< HEAD
-        after_rendered = (
-            native_renderer(request) if callable(native_renderer) else request.rendered_input
-        )
-=======
         after_rendered = self._native_callback(native_renderer, request) if callable(native_renderer) else request.rendered_input
->>>>>>> origin/main
         if not isinstance(after_rendered, str):
             raise SealedContextIntegrityError("local renderer changed during inference")
         after_bytes = after_rendered.encode("utf-8", errors="strict")
@@ -669,30 +556,6 @@ class GuardedLocalInference:
         if admitted_token_ids is not None:
             if self.tokenize is None or self.detokenize is None:
                 raise SealedContextBoundaryError("admitted tokenizer is no longer available")
-<<<<<<< HEAD
-            after_tokens = self.tokenize(after_rendered)
-            if _token_id_digest(after_tokens) != admitted_token_ids:
-                raise SealedContextIntegrityError("native token ID sequence changed during inference")
-            if self.detokenize(after_tokens).encode("utf-8", errors="strict") != after_bytes:
-                raise SealedContextIntegrityError("native tokenizer echo changed during inference")
-        # Preflight attestation cannot be assumed to remain valid after native
-        # work. A backend can replace its projection or grammar configuration
-        # while inference is running; no output is released on such drift.
-        if callable(native_renderer) and after_rendered != request.rendered_input:
-            if self.projection_attestor is None or self.projection_attestor(
-                request, after_rendered, root
-            ) is not True:
-                raise SealedContextIntegrityError(
-                    "native prompt projection attestation changed during inference"
-                )
-        if contract.format != "text" and contract.require_sampler_enforcement:
-            if self.sampler_support is None or self.sampler_support(
-                self.engine.model, contract
-            ) is not True:
-                raise SealedContextBoundaryError(
-                    "native sampler grammar is no longer attested at delivery"
-                )
-=======
             after_tokens = self._native_callback(self.tokenize, after_rendered)
             if _token_id_digest(after_tokens) != admitted_token_ids:
                 raise SealedContextIntegrityError("native token ID sequence changed during inference")
@@ -706,7 +569,6 @@ class GuardedLocalInference:
         if contract.format != "text" and contract.require_sampler_enforcement:
             if self.sampler_support is None or self._native_callback(self.sampler_support, self.engine.model, contract) is not True:
                 raise SealedContextBoundaryError("native sampler grammar is no longer attested at delivery")
->>>>>>> origin/main
         text = getattr(result, "text", None)
         if not isinstance(text, str):
             raise SealedContextError("local model did not produce text")
@@ -714,21 +576,6 @@ class GuardedLocalInference:
             if _schema_snapshot(contract.json_schema) != pinned_schema:
                 raise SealedContextIntegrityError("delivery schema mutated during inference")
             if pinned_native_schema is not None and (
-<<<<<<< HEAD
-                _schema_snapshot(getattr(request, "structured_output_schema", None))
-                != pinned_native_schema
-            ):
-                raise SealedContextIntegrityError("native sampler schema mutated during inference")
-            parse_and_validate_delivery_json(
-                text, json.loads(pinned_schema) if pinned_schema is not None else None,
-            )
-        elif contract.format == "regex":
-            match_delivery_regex(text, contract.pattern)
-        return result, PreDeliveryReceipt(
-            root, token_echo, reviewer_id, request.digest, _hash(text.encode("utf-8")),
-            admitted_token_ids,
-        )
-=======
                 _schema_snapshot(getattr(request, "structured_output_schema", None)) != pinned_native_schema
             ):
                 raise SealedContextIntegrityError("native sampler schema mutated during inference")
@@ -835,4 +682,3 @@ class GuardedLocalInference:
         self._assert_request_matches_evidence(request, contract, evidence)
         remaining_timeout(self.native_timeout_seconds)
         return delivery
->>>>>>> origin/main

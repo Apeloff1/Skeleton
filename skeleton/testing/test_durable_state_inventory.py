@@ -125,8 +125,6 @@ def test_vault_worm_audit_and_sqlite_collection_fail_closed_on_corruption() -> N
     assert cognition.corruption_policy == "fail_closed"
 
 
-<<<<<<< HEAD
-=======
 def test_gameforge_b038_provenance_is_classified_as_in_memory() -> None:
     store = require_store("gameforge.b038.provenance")
     assert store.family == "provenance_ledger"
@@ -137,7 +135,6 @@ def test_gameforge_b038_provenance_is_classified_as_in_memory() -> None:
     assert store.recovery_policy == "none"
 
 
->>>>>>> origin/main
 def test_unknown_store_id_fails_closed() -> None:
     with pytest.raises(UnknownDurableStoreError, match="unknown durable store: physics.world"):
         require_store("physics.world")

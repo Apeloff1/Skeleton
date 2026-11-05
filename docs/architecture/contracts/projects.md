@@ -58,13 +58,6 @@ A start is `POST` without `execution_id`:
 
 | Field | Rule |
 |-------|------|
-<<<<<<< HEAD
-| `target` | string, at most 64 characters, default `""` |
-| `options` | object, default `{}` |
-| `idempotency_key` | optional string, 1..128 characters |
-
-The handler calls `job_api.enqueue("game.build", {"target", "options"}, ...)`. The `game.build` worker runs `build_playable_game` (#4119); this route does not call `Forge.materialise` itself. `x-request-id` is the correlation id. The effective idempotency key is `{tenant}:{actor}:game.build:{project_id}:{key}`. The same key with the same target and options returns 202 and the original build with `replayed: true`. A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See [`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
-=======
 | `target` | `godot`, `json`, `yaml`, or empty for the Godot default |
 | `options` | object, default `{}`; see allowed fields below |
 | `idempotency_key` | optional string, 1..128 characters |
@@ -91,7 +84,6 @@ playable console build. The default deadline is 120 seconds.
 target and options returns 202 and the original build with `replayed: true`.
 A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See
 [`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
->>>>>>> origin/main
 
 `Build` is:
 
@@ -100,18 +92,12 @@ schema_version, schema_id, build_id, execution_id, project_id, status,
 target, job_id, result, error, created_at, updated_at, replayed
 ```
 
-<<<<<<< HEAD
-`schema_id` is `skeleton.projects.v1`. `execution_id` equals `build_id`. `status` is `pending`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`. A start returns `queued` once the job is enqueued. `job_id` is a string or null. `result` is an object. `error` is a string. Timestamps are RFC3339 UTC ending in `Z`.
-
-The new build id is appended to `build_ids`. A 65th link is `PROJECT.BUILD_CONFLICT` (HTTP 409) and the job just enqueued is cancelled. An `execution_id` already linked for another tenant is the same code.
-=======
 `schema_id` is `skeleton.projects.v1`. `execution_id` equals `build_id`. `status` is `pending`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`. A newly accepted job can already have advanced by the time the response is read. `job_id` is a string or null. `result` is an object. `error` is a string. Timestamps are RFC3339 UTC ending in `Z`.
 
 The new build id is appended to `build_ids` in the same transaction that
 creates and publishes the job. A 65th link is `PROJECT.BUILD_CONFLICT` (HTTP
 409); no job or build is published. An `execution_id` already linked for another
 tenant is the same code.
->>>>>>> origin/main
 
 A link is `POST` with `execution_id` and without `target`, `options`, or `idempotency_key`. Combining them is `PROJECT.INVALID`. The response is `ProjectBuildLink`:
 

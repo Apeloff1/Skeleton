@@ -29,26 +29,6 @@ if [ "${EVENT_NAME:-}" != "pull_request" ] || ! git rev-parse --verify -q HEAD^2
   exit 0
 fi
 
-<<<<<<< HEAD
-changed="$(git diff --name-only HEAD^1 HEAD)"
-if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/(ci|merge-readiness)\.yml|\.github/ci/|pyproject\.toml|requirements[^/]*\.txt)'; then
-  all
-  exit 0
-fi
-
-has() {
-  if printf '%s\n' "$changed" | grep -Eq "$1"; then
-    echo true
-  else
-    echo false
-  fi
-}
-
-out "frontend=$(has '^frontend/')"
-out "backend=$(has '^backend/')"
-out "python=$(has '^(skeleton/|tests/|scripts/|java-accelerators/)')"
-out "docker=$(has '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$|^frontend/(nginx\.conf|scripts/test-nginx-runtime-dns\.mjs)$')"
-=======
 # Consume the entire NUL-delimited Git diff. This is bounded in memory,
 # handles arbitrary legal filenames, and propagates producer errors via pipefail.
 # Never exit a grep early: that would SIGPIPE the diff producer on large PRs.
@@ -93,4 +73,3 @@ git diff --name-only -z HEAD^1 HEAD | {
     out "docker=$docker"
   fi
 }
->>>>>>> origin/main
