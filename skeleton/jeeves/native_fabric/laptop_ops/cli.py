@@ -6,7 +6,7 @@ import sys
 from .contracts import LaptopGateHold, canonical
 from .policy import DEFAULT_LIMITS
 from .redaction import diagnostic
-from .runner import evaluate_domain, list_domains
+from .runner import domain_coverage, evaluate_domain, list_domains
 from .strict_json import record
 
 
@@ -21,8 +21,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.list_domains:
             if args.json_stdin:
                 raise LaptopGateHold("list mode never reads operator evidence")
+            coverage = domain_coverage()
             data = {"schema": "jeeves.laptop_ops.domains.v1",
-                    "domains": list_domains(), "release_certified": False}
+                    "domains": list_domains(),
+                    "coverage": coverage,
+                    "source_contracts_complete": all(
+                        entry["source_contract_present"] for entry in coverage
+                    ),
+                    "native_inference_witnessed": False,
+                    "device_qualified": False,
+                    "release_certified": False}
         else:
             if not args.json_stdin:
                 raise LaptopGateHold("explicit bounded evidence stdin required")
