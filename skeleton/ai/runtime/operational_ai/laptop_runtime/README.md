@@ -329,3 +329,19 @@ action needs both full operator-approved hashes plus
 Neither operation starts a model, executes source, changes
 the original project or invokes Git.
 `docs/ai/JEEVES_NATIVE_ESCROW_TO_STAGE.md`.
+
+## Cold private selected-source capsule and independent verification
+
+`desktop_native_capsule_cli` extends the saved original GGUF proposal
+with **explicitly selected, unchanged source dependencies** (1–48). After
+cold-checking escrow, exact live project source, static parser and Python
+import graph, it can inspect a digest-bound combined source snapshot without
+writing. Separately approved `publish` creates a brand-new private 0700
+directory holding both the selected unchanged project files and final reviewed
+new/edited source, then writes the final seal last. No original project source,
+Git state or model session is changed. `desktop_capsule_verifier_cli`
+independently reopens all private source bytes and ensures no extra files,
+symlinks, malformed seals or changed SHA-256 receipts; neither CLI executes
+or claims to test any generated code. Run the scripts
+`jeeves_native_capsule.py` and `jeeves_verify_private_capsule.py`.
+Documentation: `docs/ai/JEEVES_PRIVATE_SELECTED_SOURCE_CAPSULE.md`.
