@@ -232,6 +232,10 @@ class JeevesWindow(tk.Tk):
             command=self._existing_edits,
         ).grid(row=2, column=2, sticky="e", pady=(4, 0))
         ttk.Button(
+            attachment_bar, text="Build reviewed Git patch",
+            command=self._patch_delivery,
+        ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Button(
             attachment_bar, text="Clear attached files", command=self._clear_attachments,
         ).grid(row=0, column=2, padx=4)
         ttk.Checkbutton(
@@ -436,6 +440,13 @@ class JeevesWindow(tk.Tk):
     def _existing_edits(self):
         from .desktop_existing_edit_ui import ExistingEditWindow
         ExistingEditWindow(self, source_text=self._last_answer or "")
+
+    def _patch_delivery(self):
+        # A real local GGUF may author suggestions; only an operator may
+        # inspect exact original file bytes and export an inert reviewed
+        # patch outside the project. No model tool or Git write is granted.
+        from .desktop_patch_ui import PortablePatchWindow
+        PortablePatchWindow(self, source_text=self._last_answer or "")
 
     def _existing_edit_format(self):
         self.prompt.insert(
