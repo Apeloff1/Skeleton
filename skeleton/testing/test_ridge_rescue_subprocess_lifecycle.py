@@ -244,3 +244,59 @@ def test_malformed_subprocess_action_never_advances_saved_revision(tmp_path: Pat
     )
     assert advanced["revision"] == 1
     assert _json(home, "audit")["audit_entries"] == 1
+
+
+def test_interactive_eof_preserves_committed_turn_and_restart(tmp_path: Path):
+    """A closed terminal must quit cleanly without rolling back the last turn."""
+    from skeleton.game.gameplay.ridge_rescue.consumer_cli import play
+    from skeleton.game.gameplay.ridge_rescue.consumer_store import SlotStore
+
+    root = tmp_path / "closed-terminal"
+    store = SlotStore(root)
+    initial = store.new("shared")
+    responses = iter(("0",))
+
+    def read(_prompt: str) -> str:
+        try:
+            return next(responses)
+        except StopIteration:
+            raise EOFError from None
+
+    displayed: list[str] = []
+    result = play(store, "shared", read=read, write=displayed.append)
+    assert result["revision"] == 1
+    assert result["head"] != initial["head"]
+    restarted = SlotStore(root).load("shared")
+    assert restarted["head"] == result["head"]
+    assert restarted["revision"] == 1
+    assert SlotStore(root).audit("shared")["audit_entries"] == 1
+
+
+def test_interactive_stale_number_is_rejected_and_new_state_displayed(tmp_path: Path):
+    """A menu choice from an old revision cannot replay against another writer."""
+    from skeleton.game.gameplay.ridge_rescue.consumer_cli import play
+    from skeleton.game.gameplay.ridge_rescue.consumer_store import SlotStore
+
+    root = tmp_path / "concurrent-menu"
+    store = SlotStore(root)
+    initial = store.new("shared")
+    responses = iter(("0", "q"))
+    messages: list[str] = []
+    advanced = None
+
+    def read(_prompt: str) -> str:
+        nonlocal advanced
+        answer = next(responses)
+        if answer == "0":
+            advanced = SlotStore(root).step(
+                "shared", initial["actions"][0], expected_head=initial["head"]
+            )
+        return answer
+
+    final = play(store, "shared", read=read, write=messages.append)
+    assert advanced is not None
+    assert final["head"] == advanced["head"]
+    assert final["revision"] == 1
+    assert any("Action not saved; refreshing authoritative slot:" in m for m in messages)
+    assert any("Revision: 1" in m for m in messages)
+    assert SlotStore(root).audit("shared")["audit_entries"] == 1
