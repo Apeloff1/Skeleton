@@ -162,3 +162,15 @@ SQLite-committed repair turn, and stops on uncertainty or exhausted
 budget. A passing proposal must still receive **new independent human
 review** before any source patch export. Details:
 `docs/ai/JEEVES_NATIVE_SOURCE_SELF_REPAIR.md`.
+
+## Privately staged final source files (no checkout writes)
+
+In addition to one inert Git patch, the operator can now choose
+**Stage reviewed SOURCE files privately** after checking both
+full SHA-256 approvals. It creates a NEW owner-private `0700`
+directory outside the project, containing the actual changed
+`0600` UTF-8 source files, a canonical hash manifest and a
+last-written completion seal. Incomplete or tampered stages
+never count as qualified. The original checkout remains
+unchanged, and staged files are not executed or merged.
+See `docs/ai/JEEVES_PRIVATE_SOURCE_OVERLAY_STAGING.md`.

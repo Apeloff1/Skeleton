@@ -66,7 +66,8 @@ class SourceRepairWindow(tk.Toplevel):
             root,
             text=(
                 "The SAME installed local GGUF and existing committed SQLite "
-                "session may propose source text and repair syntax errors up "
+                "session can propose NEW and EXISTING source together and "
+                "repair syntax errors up "
                 "to an operator-approved finite limit. Every attempt has a "
                 "NEW unique SQLite request ID. No source files, tool grants, "
                 "Git branches or private patch exports are created here."
@@ -133,7 +134,7 @@ class SourceRepairWindow(tk.Toplevel):
         ttk.Label(budgets, text="Required proposal schema").pack(side="left")
         ttk.Combobox(
             budgets, textvariable=self.source_format,
-            values=("new-files", "existing-edits"),
+            values=("new-files", "existing-edits", "mixed-work"),
             width=18, state="readonly",
         ).pack(side="left", padx=7)
         ttk.Label(budgets, text="Maximum committed native turns").pack(

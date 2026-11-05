@@ -237,3 +237,28 @@ accepting source work; stale or untrusted source holds instead of
 being retried. Existing-file edits can now use independently verified
 original SHA-256 values without a manual hash-entry prerequisite.
 `docs/ai/JEEVES_OPERATOR_PROJECT_SOURCE_CONTEXT.md`.
+
+## Mixed new/existing source generation
+
+The native source-repair GUI includes **mixed-work**, allowing
+one local GGUF SQLite turn to propose new source files plus
+independently SHA-verified changes to existing files. The
+decoder rejects unexpected authority, duplicate paths and
+mismatched original hashes; the exact result passes through
+existing new-file/edit reviewers, the static parser and a
+fresh operator-approved Git patch export. No direct source
+writes, Git tool grants or automatic publication are added.
+`docs/ai/JEEVES_NATIVE_MIXED_PROJECT_WORK.md`.
+
+## Sealed private source-overlay stage
+
+The Git patch review window now offers an explicit standalone
+**Stage reviewed SOURCE files privately** action. It renders
+the exact final new/edited source into a brand-new owner-private
+`0700` folder with `0600` files and hash manifest, writing
+the complete seal **last**. The original project is revalidated
+before staging and never modified; the product never executes
+model-generated source, runs Git, or grants the model arbitrary
+writes. Incomplete/tampered stages fail verification. The strict
+mixed-work parser now enforces the native 16 KiB reply ceiling.
+`docs/ai/JEEVES_PRIVATE_SOURCE_OVERLAY_STAGING.md`.

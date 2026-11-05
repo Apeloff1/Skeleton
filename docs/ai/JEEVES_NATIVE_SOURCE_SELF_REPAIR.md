@@ -129,3 +129,15 @@ to invent original edit SHA-256 values. The source manifest is
 included in the final human-only receipt; no model filesystem
 permission, direct file overwrite or Git commit is granted. See
 `docs/ai/JEEVES_OPERATOR_PROJECT_SOURCE_CONTEXT.md`.
+
+## Mixed new+existing project work in one real local GGUF response
+
+Choose **`mixed-work`** to propose new source files AND edits
+to existing project files in one SQLite-committed native response.
+This combines the original strict new-file and old-file hash
+reviewers without extending model permissions. It works with
+the operator-selected exact original source context and
+bounded self-repair turns. After verification, the mixed
+response opens a fresh human-only Git patch review, not an
+automatic application or branch push. Full schema and
+operator flow: `docs/ai/JEEVES_NATIVE_MIXED_PROJECT_WORK.md`.
