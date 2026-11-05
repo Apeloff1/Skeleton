@@ -24,6 +24,26 @@ MAX_MENU_DIGITS = 8
 MAX_ACTION_JSON_BYTES = 4096
 
 
+def _strict_action_json(payload: str) -> dict:
+    """Reject duplicate keys and non-finite values before any save mutation."""
+    def unique_pairs(pairs: list[tuple[str, object]]) -> dict:
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate action JSON key: " + key)
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> None:
+        raise ValueError("non-finite action JSON number: " + value)
+
+    action = json.loads(payload, object_pairs_hook=unique_pairs,
+                        parse_constant=reject_constant)
+    if not isinstance(action, dict):
+        raise ValueError("action JSON must be an object")
+    return action
+
+
 def _action_index(answer: str, available: int) -> int | None:
     """Decode only bounded ASCII menu choices; never parse giant integers."""
     if (not answer or len(answer) > MAX_MENU_DIGITS or
@@ -238,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
                     raise StoreError("--action and --expected-head required")
                 if len(args.action.encode("utf-8")) > MAX_ACTION_JSON_BYTES:
                     raise StoreError("action JSON exceeds byte budget")
-                result = store.step(args.slot, json.loads(args.action), expected_head=args.expected_head)
+                result = store.step(args.slot, _strict_action_json(args.action), expected_head=args.expected_head)
             elif args.command == "retry":
                 if not args.expected_head:
                     raise StoreError("--expected-head required")

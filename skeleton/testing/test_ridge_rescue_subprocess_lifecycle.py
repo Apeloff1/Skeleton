@@ -319,3 +319,22 @@ def test_oversized_action_json_is_rejected_before_parsing_and_preserves_save(tmp
                      "--expected-head", initial["head"])
     assert advanced["revision"] == 1
     assert _json(home, "audit")["verified"] is True
+
+
+def test_ambiguous_action_json_rejected_without_mutating_save(tmp_path: Path):
+    home = tmp_path / "strict-json"
+    initial = _json(home, "new")
+    invalid = ('{"verb":"move","verb":"rest"}',
+               '{"verb":"move","distance":NaN}',
+               '{"verb":"move","distance":Infinity}',
+               '{"verb":"move","nested":{"x":1,"x":2}}')
+    for payload in invalid:
+        failed = _invoke(home, "step", "--action", payload,
+                         "--expected-head", initial["head"])
+        assert failed.returncode != 0
+        assert _json(home, "status")["head"] == initial["head"]
+        assert _json(home, "audit")["audit_entries"] == 0
+    committed = _json(home, "step", "--action", json.dumps(initial["actions"][0]),
+                      "--expected-head", initial["head"])
+    assert committed["revision"] == 1
+    assert _json(home, "audit")["verified"] is True
