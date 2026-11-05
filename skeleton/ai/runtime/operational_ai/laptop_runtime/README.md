@@ -156,3 +156,9 @@ sequentially through one connected GGUF and the original sealed SQLite
 work journal. Each run ID is minted and approved before inference.
 No automatic retry/resume or source write is granted.
 `docs/ai/JEEVES_SERIAL_DURABLE_WORK_BATCHES.md`.
+
+
+A serial work batch now holds an **exclusive native bridge lease for its
+entire source-approved manifest**. Other desktop request threads are refused
+before IPC, including other batches; the pressure watchdog retains terminal
+revocation authority. No automatic native retries or source/tool escalation.

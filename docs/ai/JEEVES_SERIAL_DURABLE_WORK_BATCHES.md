@@ -109,3 +109,20 @@ single-worker sequential execution, per-task IDs, failed native holds,
 manual stop, canonical receipt verification, no shell/network operations
 and no implicit retries. This is **not** proof of actual licensed-GGUF
 inference, Windows 11/WSL2 operation, hardware pressure or release.
+
+
+## Whole-batch exclusive native lease
+
+The private desktop bridge now locks the **entire** reviewed work sequence,
+not merely each individual SQLite IPC request. A second thread's chat,
+agent, history, source status or durable request is denied before writing
+a frame while the batch owner holds this lease. A second batch also cannot
+start concurrently. The same operator-owned runner thread alone may submit
+the approved individual work orders. A pressure watchdog can still revoke
+the native child; its abort path does not wait on the batch lock.
+
+This closes an important race where an ordinary GUI request could previously
+run between two individually valid durable tasks and alter model/SQLite
+state before the following task. The lease is in-process and held only by
+the already authenticated desktop bridge; it is **not** a distributed
+scheduler, cross-device lock or hardware qualification.
