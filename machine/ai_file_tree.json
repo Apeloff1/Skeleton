@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "legacy B081-B100 bulk-build policy and security corpus",
+      "reason": "Source-bound mass-build security, provenance, policy and release-gate modules remain a separately owned legacy batch corpus; explicitly retained outside the canonical AI-tree mirror until contract and import ownership are reviewed. This classification does not grant runtime promotion or release authority."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
