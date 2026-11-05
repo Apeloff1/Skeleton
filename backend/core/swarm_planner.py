@@ -112,6 +112,8 @@ def plan_build(
     Returns a JSON-serialisable plan with director/leads/platoons/workers,
     dependency edges, topological waves and a coverage proof.
     """
+    if not isinstance(build_id, str) or not 1 <= len(build_id.strip()) <= 128:
+        raise ValueError("build_id must be a bounded non-empty string")
     # None selects canonical defaults; an explicitly empty request must never
     # manufacture 100 phases or invent a sequential dependency chain.
     if phases is None:
@@ -136,12 +138,15 @@ def plan_build(
     if type(platoon_size) is not int or platoon_size < 1:
         raise ValueError("platoon_size must be a positive integer")
     platoon_size = max(MIN_PLATOON, min(MAX_PLATOON, platoon_size))
-    if type(seed) is not int:
-        raise ValueError("seed must be an integer")
+    if type(seed) is not int or not -(2 ** 63) <= seed < 2 ** 63:
+        raise ValueError("seed must be a signed 64-bit integer")
     if game_ctx is None:
         game_ctx = {}
     if not isinstance(game_ctx, dict):
         raise ValueError("game context must be an object")
+    genre = game_ctx.get("genre", "")
+    if not isinstance(genre, str) or len(genre) > 256:
+        raise ValueError("game context genre must be bounded text")
     if objectives is None:
         objectives = ["ship a complete, polished, original game"]
     elif not isinstance(objectives, (list, tuple)):
@@ -158,11 +163,13 @@ def plan_build(
     elif not isinstance(deps, dict):
         raise ValueError("dependencies must be a phase-to-list mapping")
     else:
+        if any(not isinstance(key, str) for key in deps):
+            raise ValueError("dependency keys must be phase identifiers")
         unknown = set(deps) - set(phases)
         if unknown:
             raise ValueError(f"dependencies name unknown phases: {sorted(unknown)[:5]}")
         for phase, required in deps.items():
-            if not isinstance(required, (list, tuple)) or any(
+            if (not isinstance(required, (list, tuple)) or len(required) > len(phases)) or any(
                 not isinstance(dep, str) for dep in required
             ):
                 raise ValueError(f"invalid dependency list for phase {phase}")
