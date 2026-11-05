@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_naval_navigation_orbital_gardens",
+  "genre": "naval_navigation",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Kela Oriel",
+    "role": "captain",
+    "skill": "route and tide planning",
+    "goal": "reconnect isolated trading ports",
+    "fear": "Failing the communities cut off by life-support imbalance",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Talas Fen",
+      "role": "local witness",
+      "knows": "The original operating records of the ring garden habitat",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Jori Alto",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to hydroponic nutrients",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of hydroponic nutrients",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

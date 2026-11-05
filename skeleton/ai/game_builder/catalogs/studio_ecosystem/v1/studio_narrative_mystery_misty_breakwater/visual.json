@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_narrative_mystery_misty_breakwater",
+  "genre": "narrative_mystery",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "art_direction": {
+    "architecture": "historic sea wall",
+    "biome_palette": [
+      "#10293D",
+      "#356F91",
+      "#7BC6D5",
+      "#E8F7F8"
+    ],
+    "materials": [
+      "mist-channel locks",
+      "fog horns"
+    ],
+    "style": "original_high_readability_modular",
+    "reference_rights": "no_external_asset_ingestion"
+  },
+  "jobs": [
+    {
+      "id": "hero_silhouette",
+      "kind": "character",
+      "recipe": "Original investigator silhouette, visible gear for evidence synthesis",
+      "lodding": "mobile_desktop_adaptive_requirement"
+    },
+    {
+      "id": "world_tiles",
+      "kind": "environment",
+      "recipe": "Modular mist-channel locks surfaces with low-visibility tides state overlays",
+      "lodding": "streamed_chunks_requirement"
+    },
+    {
+      "id": "landmark_kit",
+      "kind": "architecture",
+      "recipe": "Reusable trim, portals and silhouette of historic sea wall",
+      "lodding": "impostor_fallback_requirement"
+    },
+    {
+      "id": "interface",
+      "kind": "ui",
+      "recipe": "Readable fog horns and reputation status with colour-independent cues",
+      "lodding": "device_scale_requirement"
+    },
+    {
+      "id": "effect",
+      "kind": "vfx",
+      "recipe": "Authorable volumetric response to low-visibility tides",
+      "lodding": "particle_budget_requirement"
+    }
+  ],
+  "deliverables": "recipes_only_no_meshes_or_textures_yet",
+  "accessibility": {
+    "contrast": "WCAG_target_not_tested",
+    "photosensitive": "exclude_unbounded_flash"
+  },
+  "engine_ownership": "existing_studio_asset_pipeline"
+}

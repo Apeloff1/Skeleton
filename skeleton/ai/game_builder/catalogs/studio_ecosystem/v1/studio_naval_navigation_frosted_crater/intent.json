@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_frosted_crater",
+  "title": "Frosted Crater: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610301895,
+  "width": 23,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 4
+}

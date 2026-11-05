@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_narrative_mystery_glacial_fjord",
+  "title": "Glacial Fjord: Narrative Mystery",
+  "subtitle": "An original narrative mystery brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610301298,
+  "width": 21,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 5
+}

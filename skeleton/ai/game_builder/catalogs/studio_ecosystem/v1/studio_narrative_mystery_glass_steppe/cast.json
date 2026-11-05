@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_narrative_mystery_glass_steppe",
+  "genre": "narrative_mystery",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Tavi Bell",
+    "role": "investigator",
+    "skill": "evidence synthesis",
+    "goal": "reconstruct an erased civic record",
+    "fear": "Failing the communities cut off by glass-shard gales",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Sen Daro",
+      "role": "local witness",
+      "knows": "The original operating records of the shattered outpost",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Fen Rowan",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to ceramic heat tiles",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of ceramic heat tiles",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}
