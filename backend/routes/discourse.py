@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.discourse_catalog import DeclaredModel, PanelUnavailable, tenant_panel
 from routes.llm_router import route_complete, MODEL_CATALOG
 from routes.gameforge_auth import require_authenticated_identity
 
@@ -119,18 +120,30 @@ def _admit(task: str, prompt: str, system: str, panel: list | None,
     if not isinstance(judge_model, str) or len(judge_model) > 128:
         raise ValueError("judge model identifier is invalid")
     if panel is None or panel == []:
-        models = list(DEFAULT_PANEL)
+        models = []
     elif isinstance(panel, (list, tuple)) and 1 <= len(panel) <= MAX_PANEL:
-        if any(not isinstance(model, str) or model not in MODEL_CATALOG for model in panel):
-            raise ValueError("panel contains an unavailable model")
+        if any(
+            not isinstance(model, str) or not 1 <= len(model) <= 384
+            or model != model.strip() for model in panel
+        ):
+            raise ValueError("panel requires declared model identities")
         models = list(panel)
     else:
         raise ValueError("panel exceeds model budget")
     if len(set(models)) != len(models):
         raise ValueError("panel must contain distinct model identifiers")
-    if judge_model and judge_model not in MODEL_CATALOG:
-        raise ValueError("judge model is unavailable")
-    return models, judge_model or DEFAULT_JUDGE
+    return models, judge_model
+
+
+async def _run_model(task: str, prompt: str, system: str,
+                     model: DeclaredModel, scope: dict[str, str]) -> dict:
+    """Execute one exact tenant-authorized canonical selection, never a legacy pin."""
+    return await route_complete(
+        task, prompt, system, use_cache=False,
+        provider_id=model.provider_id, model_id=model.model_id,
+        actor_id=scope["owner_id"], tenant_id=scope["tenant_id"],
+        data_class="internal",
+    )
 
 
 def _score_int(value: object) -> int | None:
@@ -163,19 +176,33 @@ async def deliberate(task: str, prompt: str, system: str = "",
     except ValueError as exc:
         return {"error": str(exc)}
     scope = _private_scope(identity)
+    try:
+        declared = await tenant_panel(
+            tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
+            selected=panel or None, judge_key=judge_model or None, maximum=MAX_PANEL,
+        )
+    except PanelUnavailable as exc:
+        return {"error": "model_panel_unavailable", "reason": str(exc)}
 
+    panel = [model.key for model in declared.models]
+    judge_model = declared.judge.key
+    catalog_index = {model.key: model for model in declared.models}
     drafts = await asyncio.gather(*[
-        route_complete(task, prompt, system, model=m, use_cache=False) for m in panel
+        _run_model(task, prompt, system, model, scope)
+        for model in declared.models
     ], return_exceptions=True)
     candidates = []
-    for model, result in zip(panel, drafts):
-        if not isinstance(result, dict) or not isinstance(result.get("content"), str):
+    for chosen, result in zip(declared.models, drafts):
+        if not isinstance(result, dict) or result.get("error") or not isinstance(result.get("content"), str):
             continue
         if result["content"].strip():
             candidates.append({
-                "model": model, "provider": MODEL_CATALOG.get(model, {}).get("provider"),
+                "model": chosen.key, "provider": chosen.provider_id, "model_id": chosen.model_id,
                 "content": result["content"][:MAX_MODEL_CONTENT_CHARS],
                 "latency_ms": result.get("latency_ms", 0),
+                "execution_id": result.get("execution_id"),
+                "operation_id": result.get("operation_id"),
+                "verification": result.get("verification"),
             })
     if not candidates:
         return {"error": "all panel models failed", "panel": panel}
@@ -193,7 +220,7 @@ async def deliberate(task: str, prompt: str, system: str = "",
             "strongest ideas, rebut the weak ones, and improve YOUR own proposal. Be specific.")
         chat_prompt = f"BRIEF:\n{prompt}\n\nROUND {r - 1} TABLE:\n{table}\n\nYour refined contribution:"
         turns = await asyncio.gather(*[
-            route_complete(task, chat_prompt, chat_sys, model=c["model"], use_cache=False)
+            _run_model(task, chat_prompt, chat_sys, catalog_index[c["model"]], scope)
             for c in candidates
         ], return_exceptions=True)
         round_turns = []
@@ -207,11 +234,11 @@ async def deliberate(task: str, prompt: str, system: str = "",
     if do_discord and len(candidates) > 1:
         critic_prompts = []
         for i, c in enumerate(candidates):
-            critic_model = candidates[(i + 1) % len(candidates)]["model"]
+            critic_model = catalog_index[candidates[(i + 1) % len(candidates)]["model"]]
             cp = f"BRIEF:\n{prompt}\n\nDRAFT TO CRITIQUE:\n{c['content'][:6000]}"
             critic_prompts.append((critic_model, cp))
         crits = await asyncio.gather(*[
-            route_complete("reasoning", cp, _CRITIC_SYS, model=cm, use_cache=False)
+            _run_model("reasoning", cp, _CRITIC_SYS, cm, scope)
             for cm, cp in critic_prompts
         ], return_exceptions=True)
         for candidate, critique in zip(candidates, crits):
@@ -233,8 +260,7 @@ async def deliberate(task: str, prompt: str, system: str = "",
     )
     judge_prompt = f"BRIEF:\n{prompt}\n\nCANDIDATES:\n{panel_block}"
     try:
-        judged = await route_complete("reasoning", judge_prompt, _JUDGE_SYS,
-                                      model=judge_model, use_cache=False)
+        judged = await _run_model("reasoning", judge_prompt, _JUDGE_SYS, declared.judge, scope)
     except Exception:
         judged = None
     verdict = _extract_json(judged.get("content", "")) if isinstance(judged, dict) else {}
@@ -278,7 +304,16 @@ async def deliberate(task: str, prompt: str, system: str = "",
         "winner_score": winner.get("score"),
         "judge_model": judge_model,
         "judge_why": verdict.get("why", "")[:1000] if isinstance(verdict.get("why"), str) else "",
-        "judge_status": "reported_scores",
+        "judge_status": (
+            "self_scored" if len(candidates) == 1 and
+            declared.judge.key == candidates[0]["model"] else "reported_scores"
+        ),
+        "selection_source": declared.source,
+        "deliberation_mode": (
+            "single_model_self_review" if len(candidates) == 1 else declared.mode
+        ),
+        "provider_diverse": len({candidate["provider"] for candidate in candidates}) > 1,
+        "independent_judge": declared.independent_judge,
         "panel": panel,
         "candidates": candidates,
         "discord": do_discord,
@@ -311,12 +346,30 @@ class DeliberateBody(BaseModel):
 
 
 @router.get("/panel")
-async def get_panel():
+async def get_panel(identity: dict = Depends(require_authenticated_identity)):
+    scope = _private_scope(identity)
+    try:
+        panel = await tenant_panel(
+            tenant_id=scope["tenant_id"], actor_id=scope["owner_id"], maximum=MAX_PANEL,
+        )
+    except PanelUnavailable as exc:
+        return {
+            "default_panel": [], "default_judge": None, "max_panel": MAX_PANEL,
+            "available_models": [], "available": False, "readiness": str(exc),
+            "selection_source": "tenant_model_inventory",
+        }
     return {
-        "default_panel": DEFAULT_PANEL,
-        "default_judge": DEFAULT_JUDGE,
+        "default_panel": [m.key for m in panel.models],
+        "default_judge": panel.judge.key,
         "max_panel": MAX_PANEL,
-        "available_models": list(MODEL_CATALOG.keys()),
+        "available_models": list(dict.fromkeys(
+            [m.key for m in panel.models] + [panel.judge.key]
+        )),
+        "available": True,
+        "selection_source": panel.source,
+        "deliberation_mode": panel.mode,
+        "provider_diverse": panel.provider_diverse,
+        "independent_judge": panel.independent_judge,
     }
 
 
@@ -392,6 +445,14 @@ async def deliberate_async(
     except ValueError as exc:
         return {"error": str(exc)}
     scope = _private_scope(identity)
+    try:
+        await tenant_panel(
+            tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
+            selected=body.panel or None, judge_key=body.judge_model or None,
+            maximum=MAX_PANEL,
+        )
+    except PanelUnavailable as exc:
+        return {"error": "model_panel_unavailable", "reason": str(exc)}
 
     with _ACTIVE_LOCK:
         if len(_ACTIVE_DELIBERATIONS) >= MAX_ASYNC_DELIBERATIONS:
