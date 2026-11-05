@@ -46,7 +46,10 @@ def catalog(
         version=version,
         messages=values,
         critical_keys=critical,
-        reviewed_critical_keys=critical,
+        reviewed_critical_keys=tuple(sorted(set(critical) | {
+            key for key in values
+            if key.startswith(("authority.", "operation.", "recovery.", "safety.", "security."))
+        })),
     )
 
 
