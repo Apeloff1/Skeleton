@@ -94,7 +94,7 @@ def _reject_unsafe_existing(fd: int, name: str) -> None:
         raise VaultPathError("vault destination is a link or non-regular file")
 
 
-def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None]) -> int:
+def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None], *, max_bytes: int | None = None) -> int:
     """Publish complete bytes under a fresh private name, then fsync and rename.
 
     A failing writer never truncates an existing destination. The directory
@@ -114,6 +114,8 @@ def atomic_write(fd: int, name: str, writer: Callable[[BinaryIO], None]) -> int:
                 handle.flush()
         os.fsync(opened)
         written = os.fstat(opened).st_size
+        if max_bytes is not None and written > max_bytes:
+            raise VaultPathError("vault output exceeds compressed byte budget")
         _reject_unsafe_existing(fd, name)
         os.replace(temp, name, src_dir_fd=fd, dst_dir_fd=fd)
         published = True
