@@ -342,6 +342,13 @@ def _read_dotenv(path: Path) -> dict[str, str]:
     try:
         before = path.lstat()
     except FileNotFoundError:
+        # A missing .env is legitimate on first launch, but only while its
+        # containing directory remains the one admitted above.
+        parent_after_missing = path.parent.lstat()
+        if (not stat.S_ISDIR(parent_after_missing.st_mode)
+                or (parent_after_missing.st_dev, parent_after_missing.st_ino)
+                != (parent_before.st_dev, parent_before.st_ino)):
+            raise ValueError("private runtime environment parent changed during admission")
         return values
     if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
         raise ValueError("private runtime environment must be an unlinked regular file")

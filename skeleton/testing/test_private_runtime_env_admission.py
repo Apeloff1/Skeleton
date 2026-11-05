@@ -179,3 +179,32 @@ def test_private_env_rejects_parent_replacement_after_read(tmp_path: Path, monke
     monkeypatch.setattr(Path, "lstat", replacing_parent_lstat)
     with pytest.raises(ValueError, match="parent changed"):
         _read_dotenv(path)
+
+
+def test_missing_private_env_rejects_parent_replacement_during_admission(tmp_path, monkeypatch):
+    """An absent .env must not mask a swapped installation directory."""
+    from pathlib import Path
+    from unittest.mock import patch
+    import skeleton.app.assembly as assembly
+
+    parent = tmp_path / "install"
+    parent.mkdir()
+    alternate = tmp_path / "alternate"
+    alternate.mkdir()
+    target = parent / ".env"
+    original_lstat = Path.lstat
+    calls = 0
+
+    def swapped_lstat(path):
+        nonlocal calls
+        if path == target:
+            calls += 1
+            parent.rename(tmp_path / "old-install")
+            alternate.rename(parent)
+            raise FileNotFoundError(str(path))
+        return original_lstat(path)
+
+    with patch.object(Path, "lstat", swapped_lstat):
+        with pytest.raises(ValueError, match="parent changed during admission"):
+            assembly._read_dotenv(target)
+    assert calls == 1
