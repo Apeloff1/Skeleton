@@ -130,6 +130,12 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     # A writable primary must not simultaneously assert a secondary or
     # arbiter role. Reject contradictory and non-boolean role flags before
     # reading the canonical epoch; never coerce arbitrary driver values.
+    # Legacy hello fields can coexist with modern primary flags. A server
+    # claiming writable-primary while explicitly denying legacy primary
+    # status is contradictory; do not use it as an epoch authority.
+    legacy_primary = hello.get("ismaster")
+    if legacy_primary is not None and legacy_primary is not True:
+        return None
     for role in ("secondary", "arbiterOnly"):
         role_value = hello.get(role)
         if role_value is not None and type(role_value) is not bool:
