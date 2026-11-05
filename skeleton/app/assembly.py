@@ -719,8 +719,23 @@ def preflight(
         if source_ok:
             try:
                 runtime_manifest(manifest, root=root, environ=values)
+            except (OSError, UnicodeError):
+                # A swapped, unreadable or linked file between the first and
+                # second admission pass is not verified port configuration.
+                checks.append(
+                    AssemblyCheck(
+                        "runtime:ports", False,
+                        "runtime configuration changed during port verification",
+                    )
+                )
             except ValueError as exc:
-                checks.append(AssemblyCheck("runtime:ports", False, str(exc)))
+                # Port-validation errors are fixed contract messages; never
+                # include the contents of .env or arbitrary filesystem errors.
+                if str(exc).startswith(("FRONTEND_PORT ", "BACKEND_PORT ", "SKELETON_PORT ", "MONGO_PORT ", "CHROMA_PORT ")):
+                    detail = str(exc)
+                else:
+                    detail = "runtime configuration invalid or changed during port verification"
+                checks.append(AssemblyCheck("runtime:ports", False, detail))
         else:
             checks.append(
                 AssemblyCheck(
