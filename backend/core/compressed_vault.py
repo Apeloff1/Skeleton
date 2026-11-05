@@ -23,6 +23,8 @@ import time
 import hashlib
 import threading
 import re
+import stat
+from functools import wraps
 from contextlib import contextmanager
 from itertools import islice
 from .vault_secure_fs import anchored_directory, ensure_directory, read_regular, atomic_write, unlink_regular, snapshot_regular, VaultPathError
@@ -142,6 +144,41 @@ def _storage_fd(scratch: bool = False):
         yield fd
 
 
+_MUTATION_LOCK = threading.RLock()
+
+
+@contextmanager
+def _exclusive_vault_mutation():
+    """Serialize writes/deletes across threads and processes, fail closed.
+
+    A fresh manifest read after the lock prevents writers from publishing over
+    stale metadata left by a different worker or process.
+    """
+    _ensure_storage()
+    with _MUTATION_LOCK:
+        with _storage_fd() as directory:
+            flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+            lock_fd = os.open(".vault-mutation.lock", flags, 0o600, dir_fd=directory)
+            try:
+                info = os.fstat(lock_fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise VaultPathError("vault mutation lock is not a private regular file")
+                import fcntl  # POSIX descriptor custody: unsupported platforms fail closed.
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                _load_manifest()
+                yield
+            finally:
+                os.close(lock_fd)
+
+
+def _serialized_mutation(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with _exclusive_vault_mutation():
+            return function(*args, **kwargs)
+    return wrapped
+
+
 def _unique_pairs(pairs):
     result = {}
     for key, value in pairs:
@@ -214,6 +251,7 @@ def _shard_path(name: str, scratch: bool = False) -> Path:
 
 
 # ── Core write/read ───────────────────────────────────────────────
+@_serialized_mutation
 def write_shard(
     name: str,
     rows: Iterable[dict[str, Any]],
@@ -440,6 +478,7 @@ def purge_cache() -> int:
     return n
 
 
+@_serialized_mutation
 def delete_shard(name: str) -> bool:
     _ensure_storage()
     name = _safe_name(name)
