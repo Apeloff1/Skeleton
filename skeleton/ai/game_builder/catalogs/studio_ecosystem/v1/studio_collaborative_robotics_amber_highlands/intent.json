@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_amber_highlands",
+  "title": "Amber Highlands: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010317980,
+  "width": 27,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 4
+}

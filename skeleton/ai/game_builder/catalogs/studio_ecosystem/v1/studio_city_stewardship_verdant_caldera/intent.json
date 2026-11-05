@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_verdant_caldera",
+  "title": "Verdant Caldera: City Stewardship",
+  "subtitle": "An original city stewardship brief in Verdant Caldera; prototype maps are not full genre implementations.",
+  "seed": 202610303482,
+  "width": 21,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 5
+}

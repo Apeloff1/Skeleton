@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_glacial_fjord",
+  "title": "Glacial Fjord: City Stewardship",
+  "subtitle": "An original city stewardship brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610303346,
+  "width": 21,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 5
+}

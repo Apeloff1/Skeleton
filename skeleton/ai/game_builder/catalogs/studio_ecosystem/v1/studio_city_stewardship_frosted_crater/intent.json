@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_frosted_crater",
+  "title": "Frosted Crater: City Stewardship",
+  "subtitle": "An original city stewardship brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610303431,
+  "width": 23,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 6
+}

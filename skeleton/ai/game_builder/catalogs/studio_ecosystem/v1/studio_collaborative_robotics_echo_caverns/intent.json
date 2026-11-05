@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_echo_caverns",
+  "title": "Echo Caverns: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010318017,
+  "width": 19,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 12,
+  "theme": "arcade",
+  "starting_health": 5
+}

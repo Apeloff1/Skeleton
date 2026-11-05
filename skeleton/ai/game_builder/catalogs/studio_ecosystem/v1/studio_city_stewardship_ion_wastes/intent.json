@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_ion_wastes",
+  "title": "Ion Wastes: City Stewardship",
+  "subtitle": "An original city stewardship brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610303414,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "space",
+  "starting_health": 5
+}

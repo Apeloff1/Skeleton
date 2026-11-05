@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_cloud_canopy",
+  "title": "Cloud Canopy: City Stewardship",
+  "subtitle": "An original city stewardship brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610303397,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "forest",
+  "starting_health": 4
+}

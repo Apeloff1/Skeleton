@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_ashen_archipelago",
+  "title": "Ashen Archipelago: City Stewardship",
+  "subtitle": "An original city stewardship brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610303363,
+  "width": 23,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 6
+}

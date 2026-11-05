@@ -1,0 +1,117 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "project_id": "studio_collaborative_robotics_copper_mesa",
+  "genre": "collaborative_robotics",
+  "biome": "copper_mesa",
+  "release_certified": false,
+  "art_direction": {
+    "original_design": true,
+    "location": "Copper Mesa",
+    "terrain": "dry ravines",
+    "theme": "desert",
+    "light_model": "reactive_dust_squalls",
+    "palette": [
+      "#402A1D",
+      "#B46E43",
+      "#F1C57E",
+      "#FFF5DF"
+    ],
+    "character_silhouette": "tools for motion planning, fleet arbitration and sensor fusion"
+  },
+  "asset_recipes": [
+    {
+      "id": "primary_character",
+      "type": "rigged_character",
+      "description": "Readable roboticist with equipment used in coordinate",
+      "inputs": [
+        "silhouette",
+        "joint_limit",
+        "outfit_palette"
+      ],
+      "deliverables": [
+        "body_mesh",
+        "rig",
+        "collision_volume",
+        "lod_chain"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "biome_kit",
+      "type": "procedural_geometry",
+      "description": "Reusable dry ravines modular kit showing radiative heat damage",
+      "inputs": [
+        "terrain_profile",
+        "materials",
+        "collision_shape"
+      ],
+      "deliverables": [
+        "scene_prefabs",
+        "atlased_materials",
+        "lod_chain"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "landmark_interior",
+      "type": "architectural_environment",
+      "description": "Navigable original interior of abandoned observatory",
+      "inputs": [
+        "functional_layout",
+        "interior_lighting",
+        "landmark_history"
+      ],
+      "deliverables": [
+        "modular_rooms",
+        "streaming_cells",
+        "occlusion_data"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "interactive_tool",
+      "type": "action_prop",
+      "description": "Original battery and tool wear tool for motion planning, fleet arbitration and sensor fusion",
+      "inputs": [
+        "interaction_envelope",
+        "animation_state",
+        "accessibility_icon"
+      ],
+      "deliverables": [
+        "mesh",
+        "tool_state",
+        "interaction_sound"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "hazard_vfx",
+      "type": "climate_system",
+      "description": "Scoped dust squalls field with measured radiative heat response",
+      "inputs": [
+        "physical_state",
+        "resource_budget",
+        "fallback_mode"
+      ],
+      "deliverables": [
+        "effects_shaders",
+        "telemetry",
+        "low_end_fallback"
+      ],
+      "status": "not_created"
+    }
+  ],
+  "runtime_requirements": {
+    "physical_ram": "sample_live_capacity",
+    "gpu_memory": "adaptive_budget",
+    "virtual_ram": "spill_and_rehydrate_with_integrity",
+    "disk": "bounded_content_addressed_cache",
+    "streaming": "camera_and_scene_priority",
+    "quality": "dynamic_lod_with_fidelity_receipts"
+  },
+  "legal_review": {
+    "external_source": "none",
+    "license_evidence": "originality_review_pending"
+  },
+  "asset_owner": "existing_studio_asset_pipeline"
+}
