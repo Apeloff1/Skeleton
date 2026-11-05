@@ -127,3 +127,63 @@ def test_byte_limits_reject_oversized_rows_and_scans(isolated_storage, monkeypat
 def test_invalid_paging_is_rejected(isolated_storage, limit, offset):
     with pytest.raises(ValueError):
         isolated_storage.read_shard("safe", limit=limit, offset=offset)
+
+
+
+def _reject_manifest_write():
+    raise RuntimeError("manifest publication interrupted")
+
+
+def test_failed_manifest_write_restores_previous_shard_bytes(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    target = vault.VAULT_ROOT / "stable.jsonl.zst"
+    before = target.read_bytes()
+    original_manifest = (vault.VAULT_ROOT / "_manifest.json").read_bytes()
+    monkeypatch.setattr(vault, "_save_manifest", _reject_manifest_write)
+
+    with pytest.raises(RuntimeError, match="manifest publication interrupted"):
+        vault.write_shard("stable", [{"value": "after"}], domain="testing")
+
+    assert target.read_bytes() == before
+    assert (vault.VAULT_ROOT / "_manifest.json").read_bytes() == original_manifest
+    assert vault.read_shard("stable") == [{"value": "before"}]
+    assert not list(vault.VAULT_ROOT.glob(".vault-backup-*"))
+    assert not list(vault.VAULT_ROOT.glob(".vault-part-*"))
+
+
+def test_failed_manifest_on_new_shard_removes_unreferenced_file(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.list_shards()
+    monkeypatch.setattr(vault, "_save_manifest", _reject_manifest_write)
+    with pytest.raises(RuntimeError, match="manifest publication interrupted"):
+        vault.write_shard("never", [{"value": 1}], domain="testing")
+    assert not (vault.VAULT_ROOT / "never.jsonl.zst").exists()
+    assert vault.get_shard_entry("never") is None
+
+
+def test_failed_delete_manifest_preserves_original_shard(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    target = vault.VAULT_ROOT / "stable.jsonl.zst"
+    before = target.read_bytes()
+    original_manifest = (vault.VAULT_ROOT / "_manifest.json").read_bytes()
+    monkeypatch.setattr(vault, "_save_manifest", _reject_manifest_write)
+
+    with pytest.raises(RuntimeError, match="manifest publication interrupted"):
+        vault.delete_shard("stable")
+
+    assert target.read_bytes() == before
+    assert (vault.VAULT_ROOT / "_manifest.json").read_bytes() == original_manifest
+    assert vault.read_shard("stable") == [{"value": "before"}]
+
+
+def test_successful_overwrite_and_delete_reconcile_bytes_and_manifest(isolated_storage):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    vault.write_shard("stable", [{"value": "after"}], domain="testing")
+    assert vault.read_shard("stable") == [{"value": "after"}]
+    assert not list(vault.VAULT_ROOT.glob(".vault-backup-*"))
+    assert vault.delete_shard("stable") is True
+    assert vault.get_shard_entry("stable") is None
+    assert not (vault.VAULT_ROOT / "stable.jsonl.zst").exists()
