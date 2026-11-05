@@ -337,13 +337,13 @@ class EngineClientConfig:
             raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
-                base_url=raw_url.strip(),
-                service_token=raw_token.strip(),
+                # Do not silently strip malformed URL/header bytes.
+                # Invalid operator settings must fail at the same authority
+                # boundary as direct EngineClientConfig construction.
+                base_url=raw_url,
+                service_token=raw_token,
                 service_principal=(
-                    os.getenv(
-                        "SKL_ENGINE_SERVICE_PRINCIPAL",
-                        "codedock-backend",
-                    ).strip()
+                    os.getenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend")
                     or "codedock-backend"
                 ),
                 request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
