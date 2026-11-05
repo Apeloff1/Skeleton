@@ -27,6 +27,9 @@ from .desktop_existing_edits import _read_original, ExistingEditHold
 from .desktop_patch_bundle import PortablePatchPlan, revalidate_live_sources
 from .desktop_patch_export import _pinned_private_directory, _identical_parent
 from .desktop_source_graph import analyze_python_source_graph
+from .desktop_capsule_source_closure import (
+    ClosureSource, analyze_capsule_source_closure,
+)
 from .desktop_source_qualification import require_parseable_patch
 
 SCHEMA = "jeeves.workspace.private-selected-source-capsule.v1"
@@ -117,6 +120,7 @@ class PrivateCapsulePlan:
     total_bytes: int
     static_status: str
     python_graph_sha256: str
+    python_closure_sha256: str
 
     def __post_init__(self):
         if type(self.patch) is not PortablePatchPlan:
@@ -149,14 +153,21 @@ class PrivateCapsulePlan:
             or self.total_bytes > MAX_TOTAL_CAPSULE_BYTES
             or self.static_status not in ("parse-clean", "mixed-unverified")
             or not _sha(self.python_graph_sha256)
+            or not _sha(self.python_closure_sha256)
             or not _sha(self.capsule_sha256)
             or self.capsule_sha256 != _capsule_digest(
-                self.patch, self.originals, self.python_graph_sha256,
+                self.patch, self.originals,
+                self.python_graph_sha256, self.python_closure_sha256,
             )
         ):
             raise PrivateCapsuleHold("selected project capsule identity changed")
+        if _closure(self.patch, self.originals).graph_sha256 != self.python_closure_sha256:
+            raise PrivateCapsuleHold("selected original/import source closure changed")
 
     def public_review(self) -> dict[str, object]:
+        closure = _closure(self.patch, self.originals)
+        if closure.graph_sha256 != self.python_closure_sha256:
+            raise PrivateCapsuleHold("public capsule review lacks exact source closure")
         return {
             "schema": SCHEMA,
             "status": "private-selected-source-capsule-planned-no-write",
@@ -164,6 +175,11 @@ class PrivateCapsulePlan:
             "source_manifest_sha256": self.patch.manifest_sha256,
             "patch_sha256": self.patch.patch_sha256,
             "python_graph_sha256": self.python_graph_sha256,
+            "python_closure_sha256": self.python_closure_sha256,
+            "selected_python_closure_status": closure.status,
+            "linked_original_imports": closure.linked_original_count,
+            "linked_review_change_imports": closure.linked_change_count,
+            "unverified_external_or_unselected_imports": closure.unverified_count,
             "static_source_status": self.static_status,
             "original_dependency_count": len(self.originals),
             "change_count": len(self.patch.entries),
@@ -179,9 +195,28 @@ class PrivateCapsulePlan:
         }
 
 
+def _closure(
+    patch: PortablePatchPlan, originals: tuple[FrozenSource, ...],
+):
+    sources = tuple(
+        [ClosureSource(
+            item.path, "selected-original", item.source, item.digest,
+        ) for item in originals]
+        + [ClosureSource(
+            item.path, item.kind,
+            item.replacement_text.encode("utf-8", "strict"),
+            item.replacement_sha256,
+        ) for item in patch.entries]
+    )
+    return analyze_capsule_source_closure(
+        sources, source_manifest_sha256=patch.manifest_sha256,
+        source_patch_sha256=patch.patch_sha256,
+    )
+
+
 def _capsule_digest(
     patch: PortablePatchPlan, originals: tuple[FrozenSource, ...],
-    python_graph_sha256: str,
+    python_graph_sha256: str, python_closure_sha256: str,
 ) -> str:
     return _hash(_canonical({
         "schema": SCHEMA,
@@ -190,6 +225,7 @@ def _capsule_digest(
         "source_manifest_sha256": patch.manifest_sha256,
         "patch_sha256": patch.patch_sha256,
         "python_graph_sha256": python_graph_sha256,
+        "python_closure_sha256": python_closure_sha256,
         "originals": [
             {
                 "path": s.path, "sha256": s.digest,
@@ -247,11 +283,12 @@ def prepare_private_capsule(
     finally:
         os.close(root_fd)
     selected = tuple(originals)
+    closure = _closure(patch, selected)
     planned = PrivateCapsulePlan(
         patch=patch,
         originals=selected,
         capsule_sha256=_capsule_digest(
-            patch, selected, graph.graph_sha256,
+            patch, selected, graph.graph_sha256, closure.graph_sha256,
         ),
         original_bytes=total,
         total_bytes=total + sum(
@@ -259,6 +296,7 @@ def prepare_private_capsule(
         ),
         static_status=static.status,
         python_graph_sha256=graph.graph_sha256,
+        python_closure_sha256=closure.graph_sha256,
     )
     revalidate_live_sources(patch)
     _revalidate_selected(planned)
@@ -414,6 +452,9 @@ def publish_private_capsule(
         or graph.graph_sha256 != plan.python_graph_sha256
     ):
         raise PrivateCapsuleHold("source parser or import graph changed since review")
+    closure = _closure(plan.patch, plan.originals)
+    if closure.graph_sha256 != plan.python_closure_sha256:
+        raise PrivateCapsuleHold("source closure diverged before private publication")
     _revalidate_selected(plan)
     revalidate_live_sources(plan.patch)
     parent = _pinned_private_directory(path)
@@ -454,6 +495,8 @@ def publish_private_capsule(
             "source_manifest_sha256": plan.patch.manifest_sha256,
             "patch_sha256": plan.patch.patch_sha256,
             "python_graph_sha256": plan.python_graph_sha256,
+            "python_closure_sha256": plan.python_closure_sha256,
+            "unverified_source_import_count": closure.unverified_count,
             "file_count": len(rows),
             "files": rows,
             "source_code_executed": False,
@@ -473,6 +516,8 @@ def publish_private_capsule(
             "seal_sha256": _hash(seal),
             "source_manifest_sha256": plan.patch.manifest_sha256,
             "patch_sha256": plan.patch.patch_sha256,
+            "python_closure_sha256": plan.python_closure_sha256,
+            "unverified_source_import_count": closure.unverified_count,
             "file_count": len(rows),
             "source_bytes": plan.total_bytes,
             "private_file_mode": "0600",
@@ -492,7 +537,7 @@ def publish_private_capsule(
 __all__ = [
     "SCHEMA", "SEAL_SCHEMA", "PrivateCapsuleHold", "FrozenSource",
     "PrivateCapsulePlan", "prepare_private_capsule",
-    "publish_private_capsule",
+    "publish_private_capsule", "verify_private_capsule",
 ]
 
 
@@ -653,6 +698,7 @@ def verify_private_capsule(
         keys = {
             "schema", "status", "capsule_sha256",
             "source_manifest_sha256", "patch_sha256", "python_graph_sha256",
+            "python_closure_sha256", "unverified_source_import_count",
             "file_count", "files", "source_code_executed",
             "original_checkout_modified", "full_project_or_device_qualified",
             "release_certified",
@@ -665,11 +711,14 @@ def verify_private_capsule(
             or seal["capsule_sha256"] != expected_capsule_sha256
             or any(not _sha(seal[k]) for k in (
                 "source_manifest_sha256", "patch_sha256", "python_graph_sha256",
+                "python_closure_sha256",
             ))
             or any(seal[k] is not False for k in (
                 "source_code_executed", "original_checkout_modified",
                 "full_project_or_device_qualified", "release_certified",
             ))
+            or type(seal["unverified_source_import_count"]) is not int
+            or not 0 <= seal["unverified_source_import_count"] <= 2048
             or type(seal["file_count"]) is not int
             or not 2 <= seal["file_count"] <= MAX_CAPSULE_FILES
             or type(seal["files"]) is not list
@@ -678,6 +727,7 @@ def verify_private_capsule(
             raise PrivateCapsuleHold("unqualified or altered source capsule seal")
         approved = {}
         total = 0
+        source_records = []
         for row in seal["files"]:
             if type(row) is not dict or set(row) != {
                 "path", "kind", "sha256", "bytes",
@@ -706,6 +756,19 @@ def verify_private_capsule(
             data = _read_capsule_file(capsule_fd, name, row["bytes"])
             if len(data) != row["bytes"] or _hash(data) != row["sha256"]:
                 raise PrivateCapsuleHold("sealed source file content differs")
+            source_records.append(ClosureSource(
+                name, row["kind"], data, row["sha256"],
+            ))
+        closure = analyze_capsule_source_closure(
+            tuple(source_records),
+            source_manifest_sha256=seal["source_manifest_sha256"],
+            source_patch_sha256=seal["patch_sha256"],
+        )
+        if (
+            closure.graph_sha256 != seal["python_closure_sha256"]
+            or closure.unverified_count != seal["unverified_source_import_count"]
+        ):
+            raise PrivateCapsuleHold("sealed original/import graph differs from source")
         paths = [row["path"] for row in seal["files"]]
         if paths != sorted(paths, key=lambda x: (x.casefold(), x)):
             raise PrivateCapsuleHold("source inventory must be canonical sorted order")
@@ -740,6 +803,9 @@ def verify_private_capsule(
             "seal_sha256": expected_seal_sha256,
             "source_manifest_sha256": seal["source_manifest_sha256"],
             "patch_sha256": seal["patch_sha256"],
+            "python_closure_sha256": closure.graph_sha256,
+            "linked_original_source_imports": closure.linked_original_count,
+            "unverified_external_or_unselected_imports": closure.unverified_count,
             "file_count": len(paths),
             "source_bytes": total,
             "all_sealed_source_bytes_verified": True,
