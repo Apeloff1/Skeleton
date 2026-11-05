@@ -25,21 +25,35 @@ class BM25:
         self.b=number(b,minimum=0,maximum=1)
         self.documents={}
         self.tokens={}
-        self.df=Counter()
+        self._df_by_scope={}
+        self._count_by_scope=Counter()
+        self._total_lengths_by_scope=Counter()
+        total_bytes=0
         for doc in documents:
             if type(doc) is not IndexedDocument or doc.document_id in self.documents:
                 refuse("duplicate/invalid index document")
+            total_bytes+=len(doc.text.encode("utf-8","strict"))
+            if total_bytes>64*1024*1024:
+                refuse("lexical source corpus exceeds 64 MiB private laptop budget")
             self.documents[doc.document_id]=doc
             counter=Counter(words(doc.text,maximum=262144))
             self.tokens[doc.document_id]=counter
-            self.df.update(counter.keys())
-        self.average=sum(sum(t.values()) for t in self.tokens.values())/len(self.tokens)
+            self._df_by_scope.setdefault(doc.scope,Counter()).update(counter.keys())
+            self._count_by_scope[doc.scope]+=1
+            self._total_lengths_by_scope[doc.scope]+=sum(counter.values())
+        self._average_by_scope={
+            scope:self._total_lengths_by_scope[scope]/count
+            for scope,count in self._count_by_scope.items()
+        }
     def search(self,query,*,scope,limit=10):
         identifier(scope)
         integer(limit,minimum=1,maximum=1000)
         query_tokens=tuple(words(query))
         if not query_tokens:refuse("search query has no terms")
-        count=len(self.documents)
+        count=self._count_by_scope.get(scope,0)
+        if count==0:return ()
+        df=self._df_by_scope[scope]
+        average=self._average_by_scope[scope]
         results=[]
         for key,doc in self.documents.items():
             if doc.scope!=scope:continue
@@ -49,8 +63,8 @@ class BM25:
             for term in set(query_tokens):
                 tf=tokens.get(term,0)
                 if not tf:continue
-                idf=math.log(1+(count-self.df[term]+0.5)/(self.df[term]+0.5))
-                denominator=tf+self.k1*(1-self.b+self.b*length/max(1,self.average))
+                idf=math.log(1+(count-df[term]+0.5)/(df[term]+0.5))
+                denominator=tf+self.k1*(1-self.b+self.b*length/max(1,average))
                 score+=idf*(tf*(self.k1+1)/denominator)
             if score>0:results.append((key,score))
         results.sort(key=lambda x:(-x[1],x[0]))
