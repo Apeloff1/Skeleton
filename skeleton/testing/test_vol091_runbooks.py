@@ -69,7 +69,7 @@ def steps():
     )
 
 
-def book(version="V1", ordered_steps=None):
+def book(version="V01", ordered_steps=None):
     return Runbook(
         "RUNBOOK.QUEUE.RECOVERY",
         version,
@@ -275,7 +275,7 @@ def test_unreachable_steps_are_rejected():
     with pytest.raises(RunbookError, match="unreachable"):
         Runbook(
             "RUNBOOK.X",
-            "V1",
+            "V01",
             "OWNER.OPS",
             "Read only.",
             "STEP.START",
@@ -313,7 +313,7 @@ def test_reachable_nonterminating_cycle_is_rejected():
     with pytest.raises(RunbookError, match="path to stop or escalation"):
         Runbook(
             "RUNBOOK.LOOP",
-            "V1",
+            "V01",
             "OWNER.OPS",
             "Read only.",
             "STEP.START",
@@ -350,7 +350,7 @@ def test_cycle_with_exit_to_terminal_is_allowed():
     )
     assert Runbook(
         "RUNBOOK.RETRY",
-        "V1",
+        "V01",
         "OWNER.OPS",
         "Read only.",
         "STEP.START",
@@ -363,7 +363,7 @@ def test_runbook_version_identity_is_immutable():
     registry.register(book())
     changed = Runbook(
         "RUNBOOK.QUEUE.RECOVERY",
-        "V1",
+        "V01",
         "OWNER.OTHER",
         "Read only.",
         "STEP.OBSERVE",
@@ -382,14 +382,14 @@ def test_registry_registration_is_idempotent():
 
 def test_drill_must_bind_exact_runbook_id_version_and_digest():
     registry = RunbookRegistry()
-    one = book("V1")
-    two = book("V2")
+    one = book("V01")
+    two = book("V02")
     registry.register(one)
     registry.register(two)
 
     with pytest.raises(RunbookError, match="exact runbook version"):
         registry.record_validation(
-            validation(one, runbook_version="V2")
+            validation(one, runbook_version="V02")
         )
     with pytest.raises(RunbookError, match="exact runbook version"):
         registry.record_validation(
@@ -427,14 +427,14 @@ def test_validation_digest_binds_validator_time_and_incident():
 
 def test_passed_drill_validates_only_exact_runbook_version():
     registry = RunbookRegistry()
-    one = book("V1")
-    two = book("V2")
+    one = book("V01")
+    two = book("V02")
     registry.register(one)
     registry.register(two)
     registry.record_validation(validation(one))
 
-    assert registry.validated(one.runbook_id, "V1") is True
-    assert registry.validated(two.runbook_id, "V2") is False
+    assert registry.validated(one.runbook_id, "V01") is True
+    assert registry.validated(two.runbook_id, "V02") is False
 
 
 def test_failed_drill_does_not_validate():
@@ -498,8 +498,8 @@ def test_validation_listing_is_chronological_and_version_scoped():
 def test_registry_digest_is_order_independent():
     first = RunbookRegistry()
     second = RunbookRegistry()
-    one = book("V1")
-    two = book("V2")
+    one = book("V01")
+    two = book("V02")
     first.register(one)
     first.register(two)
     second.register(two)
