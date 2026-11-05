@@ -26,10 +26,11 @@ import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from core.databases import client as _SHARED_MONGO_CLIENT
 from routes.llm_router import route_complete, MODEL_CATALOG
+from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/discourse", tags=["discourse"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
@@ -47,6 +48,25 @@ MAX_MODEL_CONTENT_CHARS = 12_000
 MAX_ASYNC_DELIBERATIONS = 16
 _ACTIVE_DELIBERATIONS: set[str] = set()
 _ACTIVE_LOCK = threading.Lock()
+
+
+def _private_scope(identity: dict) -> dict[str, str]:
+    """Bind every private discourse operation to a real tenant/account."""
+    if not isinstance(identity, dict) or identity.get("dev_mode"):
+        raise HTTPException(401, "Authenticated discourse identity required")
+    tenant = identity.get("tenant_id")
+    owner = identity.get("owner_id")
+    if any(
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 256
+        or value != value.strip()
+        or value == "anonymous"
+        or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in value)
+        for value in (tenant, owner)
+    ):
+        raise HTTPException(403, "Private discourse authority unavailable")
+    return {"tenant_id": tenant, "owner_id": owner}
+
 
 
 def _extract_json(text: str) -> dict:
@@ -135,12 +155,14 @@ _JUDGE_SYS = ("You are an impartial head judge. Score each candidate on QUALITY 
 
 async def deliberate(task: str, prompt: str, system: str = "",
                      panel: list = None, judge_model: str = "",
-                     do_discord: bool = True, rounds: int = 1) -> dict:
-    """Run bounded deliberation without reporting ungrounded judge verdicts."""
+                     do_discord: bool = True, rounds: int = 1,
+                     *, identity: dict | None = None) -> dict:
+    """Run a bounded, authenticated deliberation with owner-bound receipts."""
     try:
         panel, judge_model = _admit(task, prompt, system, panel, judge_model, do_discord, rounds)
     except ValueError as exc:
         return {"error": str(exc)}
+    scope = _private_scope(identity)
 
     drafts = await asyncio.gather(*[
         route_complete(task, prompt, system, model=m, use_cache=False) for m in panel
@@ -265,7 +287,7 @@ async def deliberate(task: str, prompt: str, system: str = "",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        receipt = await _db.discourse_log.insert_one(dict(result))
+        receipt = await _db.discourse_log.insert_one({**result, **scope})
         if getattr(receipt, "acknowledged", False) is not True:
             raise RuntimeError("deliberation write was not acknowledged")
     except Exception:
@@ -299,35 +321,45 @@ async def get_panel():
 
 
 @router.post("/deliberate")
-async def deliberate_endpoint(body: DeliberateBody):
+async def deliberate_endpoint(
+    body: DeliberateBody,
+    identity: dict = Depends(require_authenticated_identity),
+):
     if len(body.prompt) < 4:
         return {"error": "prompt too short"}
     if len(body.prompt) > MAX_PROMPT_CHARS:
         return {"error": "prompt exceeds 20k char limit"}
+    scope = _private_scope(identity)
     return await deliberate(body.task, body.prompt, body.system,
-                            body.panel or None, body.judge_model, body.discord, body.rounds)
+                            body.panel or None, body.judge_model, body.discord, body.rounds,
+                            identity=scope)
 
 
-async def _run_bg(did: str, body: "DeliberateBody"):
+async def _run_bg(did: str, body: "DeliberateBody", identity: dict):
     """Persist terminal job state; release local admission quota on all paths."""
     try:
+        scope = _private_scope(identity)
         try:
             result = await deliberate(
                 body.task, body.prompt, body.system,
                 body.panel or None, body.judge_model, body.discord, body.rounds,
+                identity=scope,
             )
             result["job_id"] = did
             result["status"] = "error" if result.get("error") else "done"
             acknowledgement = await _db.discourse_jobs.update_one(
-                {"job_id": did}, {"$set": result}, upsert=False,
+                {"job_id": did, **scope}, {"$set": result}, upsert=False,
             )
-            if getattr(acknowledgement, "acknowledged", False) is not True:
-                raise RuntimeError("job completion was not acknowledged")
+            if (
+                getattr(acknowledgement, "acknowledged", False) is not True
+                or getattr(acknowledgement, "matched_count", 0) != 1
+            ):
+                raise RuntimeError("job completion was not matched and acknowledged")
         except Exception:
             try:
                 # Never relabel an unconfirmed success as a committed result.
                 await _db.discourse_jobs.update_one(
-                    {"job_id": did},
+                    {"job_id": did, **scope},
                     {"$set": {
                         "status": "error", "error": "deliberation_failed",
                         "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -343,7 +375,10 @@ async def _run_bg(did: str, body: "DeliberateBody"):
 
 
 @router.post("/deliberate/async")
-async def deliberate_async(body: DeliberateBody):
+async def deliberate_async(
+    body: DeliberateBody,
+    identity: dict = Depends(require_authenticated_identity),
+):
     """Admit a bounded, durably recorded panel before background execution."""
     if len(body.prompt) < 4:
         return {"error": "prompt too short"}
@@ -356,6 +391,7 @@ async def deliberate_async(body: DeliberateBody):
         )
     except ValueError as exc:
         return {"error": str(exc)}
+    scope = _private_scope(identity)
 
     with _ACTIVE_LOCK:
         if len(_ACTIVE_DELIBERATIONS) >= MAX_ASYNC_DELIBERATIONS:
@@ -368,6 +404,7 @@ async def deliberate_async(body: DeliberateBody):
             "job_id": did, "status": "running", "task": body.task,
             "prompt": body.prompt[:2000], "rounds": body.rounds,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            **scope,
         })
         if getattr(stored, "acknowledged", False) is not True:
             raise RuntimeError("asynchronous admission was not acknowledged")
@@ -376,7 +413,7 @@ async def deliberate_async(body: DeliberateBody):
             _ACTIVE_DELIBERATIONS.discard(did)
         raise HTTPException(503, "deliberation job persistence unavailable") from exc
 
-    coroutine = _run_bg(did, body)
+    coroutine = _run_bg(did, body, scope)
     try:
         asyncio.create_task(coroutine)
     except Exception as exc:
@@ -385,7 +422,7 @@ async def deliberate_async(body: DeliberateBody):
             _ACTIVE_DELIBERATIONS.discard(did)
         try:
             await _db.discourse_jobs.update_one(
-                {"job_id": did},
+                {"job_id": did, **scope},
                 {"$set": {"status": "error", "error": "worker_start_failed"}},
                 upsert=False,
             )
@@ -397,26 +434,37 @@ async def deliberate_async(body: DeliberateBody):
 
 
 @router.get("/result/{job_id}")
-async def get_result(job_id: str):
+async def get_result(
+    job_id: str,
+    identity: dict = Depends(require_authenticated_identity),
+):
     if (
         not isinstance(job_id, str) or len(job_id) != 32
         or any(char not in "0123456789abcdef" for char in job_id)
     ):
         return {"error": "not found", "status": "unknown"}
+    scope = _private_scope(identity)
     try:
-        doc = await _db.discourse_jobs.find_one({"job_id": job_id}, PROJ)
+        doc = await _db.discourse_jobs.find_one(
+            {"job_id": job_id, **scope},
+            {**PROJ, "owner_id": 0, "tenant_id": 0},
+        )
     except Exception as exc:
         raise HTTPException(503, "deliberation job history unavailable") from exc
     return doc or {"error": "not found", "status": "unknown"}
 
 
 @router.get("/history")
-async def history(limit: int = 20):
+async def history(
+    limit: int = 20,
+    identity: dict = Depends(require_authenticated_identity),
+):
     if type(limit) is not int or not 1 <= limit <= 100:
         raise HTTPException(422, "history limit must be in [1, 100]")
+    scope = _private_scope(identity)
     try:
         items = await _db.discourse_log.find(
-            {}, {**PROJ, "candidates": 0},
+            scope, {**PROJ, "candidates": 0, "owner_id": 0, "tenant_id": 0},
         ).sort("created_at", -1).limit(limit).to_list(limit)
     except Exception as exc:
         raise HTTPException(503, "deliberation history unavailable") from exc
