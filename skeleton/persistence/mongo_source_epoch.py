@@ -148,7 +148,7 @@ class MongoCanonicalSourceEpoch:
                 or doc["phase"] != "stable"
                 or doc.get("writer_token") is not None
                 or type(doc.get("epoch")) is not int or doc["epoch"] < 2
-                or doc["epoch"] % 2):
+                or doc["epoch"] >= (1 << 63) or doc["epoch"] % 2):
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
         return doc["epoch"]
 
@@ -211,7 +211,7 @@ class MongoCanonicalSourceEpoch:
         """
         key = self._key(tenant_id, actor_id)
         if (type(expected_epoch) is not int or expected_epoch < 2
-                or expected_epoch % 2 != 0):
+                or expected_epoch % 2 != 0 or expected_epoch >= (1 << 63) - 1):
             raise MongoSourceEpochError("revocation requires a stable expected epoch")
         # Reject hostile scalar subclasses before equality or Mongo encoding.
         # A string subclass can override __eq__ and falsely claim admission.
@@ -320,7 +320,8 @@ class MongoCanonicalSourceEpoch:
             from pymongo import ReturnDocument
             acquired = await self._bounded_mutation(self._collection.find_one_and_update(
                 {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                 "phase": "stable", "writer_token": None},
+                 "phase": "stable", "writer_token": None,
+                 "epoch": {"$gte": 2, "$lt": (1 << 63) - 2}},
                 {"$inc": {"epoch": 1},
                  "$set": {"phase": "writing", "writer_token": token}},
                 return_document=ReturnDocument.AFTER,
@@ -338,7 +339,8 @@ class MongoCanonicalSourceEpoch:
                 or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
                 or type(acquired.get("epoch")) is not int
-                or acquired["epoch"] < 3 or acquired["epoch"] % 2 != 1):
+                or acquired["epoch"] < 3 or acquired["epoch"] >= (1 << 63) - 1
+                or acquired["epoch"] % 2 != 1):
             raise MongoSourceEpochError("canonical writer epoch not owned")
         binding = _BoundWriter(tenant_id, actor_id, task, token)
         scope = self._active.set(binding)
