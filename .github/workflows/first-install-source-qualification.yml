@@ -17,6 +17,11 @@ on:
       - 'skeleton/app/**'
       - 'skeleton/testing/test_app_assembly.py'
       - 'skeleton/testing/test_app_installer.py'
+      - 'skeleton/testing/test_app_offline_install_quarantine.py'
+      - 'skeleton/testing/test_app_studio_journey.py'
+      - 'skeleton/testing/test_dual_runtime_verify.py'
+      - 'skeleton/ai/game_builder/dual_runtime_verify.py'
+      - 'skeleton/ai/game_builder/original_game_studio.py'
       - 'skeleton/testing/test_app_install_source_contracts.py'
       - 'skeleton/testing/test_app_compose_parity.py'
       - 'skeleton/testing/test_windows_installer.py'
@@ -78,6 +83,8 @@ jobs:
             skeleton/testing/test_app_compose_parity.py \
             skeleton/testing/test_app_assembly_source_paths.py \
             skeleton/testing/test_app_offline_install_quarantine.py \
+            skeleton/testing/test_dual_runtime_verify.py \
+            skeleton/testing/test_app_studio_journey.py \
             skeleton/testing/test_app_offline_install_preflight.py \
             skeleton/testing/test_app_offline_install_reconciliation.py \
             skeleton/testing/test_first_install_required_routes.py \
