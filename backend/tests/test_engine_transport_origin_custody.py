@@ -173,3 +173,36 @@ def test_positive_finite_timeout_preserves_existing_contract():
         request_timeout_s=15.0,
     )
     assert config.request_timeout_s == 15.0
+
+
+
+@pytest.mark.parametrize("setting,value", [
+    ("SKELETON_INTERNAL_URL", " http://skeleton:8001"),
+    ("SKELETON_INTERNAL_URL", "http://skeleton:8001 "),
+    ("SKELETON_INTERNAL_URL", "http://skeleton:8001\n"),
+    ("SKL_ENGINE_SERVICE_TOKEN", _TOKEN + " "),
+    ("SKL_ENGINE_SERVICE_TOKEN", "\n" + _TOKEN),
+    ("SKL_ENGINE_SERVICE_TOKEN", _TOKEN + "\r"),
+    ("SKL_ENGINE_SERVICE_PRINCIPAL", "operator\nInjected: header"),
+    ("SKL_ENGINE_SERVICE_PRINCIPAL", " operator"),
+])
+def test_operator_environment_never_normalizes_malformed_engine_authority(
+    monkeypatch, setting, value,
+):
+    monkeypatch.setenv("SKELETON_INTERNAL_URL", "http://skeleton:8001")
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_TOKEN", _TOKEN)
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend")
+    monkeypatch.setenv(setting, value)
+    with pytest.raises(engine.EngineProtocolError):
+        engine.EngineClientConfig.from_env()
+
+
+def test_normalized_operator_environment_still_produces_exact_origin(monkeypatch):
+    monkeypatch.setenv("SKELETON_INTERNAL_URL", "http://skeleton:8001/")
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_TOKEN", _TOKEN)
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend")
+    result = engine.EngineClientConfig.from_env()
+    assert result is not None
+    assert result.base_url == "http://skeleton:8001"
+    assert result.service_token == _TOKEN
+    assert result.service_principal == "codedock-backend"
