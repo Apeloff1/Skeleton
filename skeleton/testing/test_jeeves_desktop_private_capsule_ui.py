@@ -51,7 +51,7 @@ def fake_window(*, manifest="a" * 64, patch="b" * 64,
         expected_patch=mock.Mock(),
         progress=mock.Mock(), status=mock.Mock(),
         _buttons=mock.Mock(), _invalidate=mock.Mock(),
-        _queue=Queue(), after=mock.Mock(),
+        _queue=Queue(), after=mock.Mock(), _poll=mock.Mock(),
     )
     view.expected_manifest.get.return_value = manifest
     view.expected_patch.get.return_value = patch
