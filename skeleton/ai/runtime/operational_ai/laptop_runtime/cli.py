@@ -100,6 +100,16 @@ def main(argv=None):
             # UTF-8 validation still rejects empty and whitespace-only input.
             message=utf8(raw.decode("utf-8","strict"),maximum=32768)
         if args.mode=="cold-reopen":
+            published=[False]
+            def publish_cold(worker,installed,report):
+                guard=LocalSourceFence(
+                    worker,installed,tenant=args.tenant,subject=args.subject,
+                )
+                emit_native_jsonl(worker,guard,{
+                    "status":"native-cold-reopen-sqlite-verified",
+                    "evidence":report,"release_certified":False,
+                },sys.stdout,maximum_result_bytes=65536)
+                published[0]=True
             # Two canonical, independently source-approved GGUF startups.
             # First context is closed before reading the same SQLite commit
             # from the second; no model-generated text or prompt is printed.
@@ -112,11 +122,12 @@ def main(argv=None):
                 capacity_slots=args.capacity_slots,
                 capacity_budget_bytes=args.capacity_budget_bytes,
                 inference_ms=args.inference_ms,
+                publisher=publish_cold,
             )
-            print(json.dumps({
-                "status":"native-cold-reopen-sqlite-verified",
-                "evidence":report,"release_certified":False,
-            },sort_keys=True,ensure_ascii=False))
+            if published[0] is not True:
+                raise ContractViolation(
+                    "cold native result not published through live source"
+                )
             return 0
         stack,worker,installed=activate_checked(model_root=args.model_root,state_dir=args.state_dir,
             tenant=args.tenant,subject=args.subject,n_ctx=args.context,

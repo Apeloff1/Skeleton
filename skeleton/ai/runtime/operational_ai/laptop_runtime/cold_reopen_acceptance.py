@@ -9,6 +9,7 @@ network provider, memory/tool grant or implicit recovery is permitted.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from .contracts import identifier, utf8, refuse
 from .preflight import validate_native_shape
@@ -27,6 +28,8 @@ def run(
     gpu_layers: int = 0, capacity_root: Path | None = None,
     capacity_slots: int = 1, capacity_budget_bytes: int = 8_000_000_000,
     inference_ms: int = 90000,
+    publisher: Callable[[object, object, dict[str, object]], None]
+    | None = None,
 ) -> dict[str, object]:
     """Witness one native turn, terminate it, then replay after cold startup.
 
@@ -36,6 +39,8 @@ def run(
     """
     if approved is not True:
         refuse("explicit native cold-reopen acceptance approval required")
+    if publisher is not None and not callable(publisher):
+        refuse("native output publisher must be callable")
     if (not isinstance(model_root, Path) or not model_root.is_absolute()
             or ".." in model_root.parts or chr(0) in str(model_root)):
         refuse("absolute private installed model root required")
@@ -134,20 +139,25 @@ def run(
         if (not valid_source_snapshot(final_source, bound)
                 or final_source != source):
             refuse("native source or resource lease changed after replay")
-    return {
-        "schema": "laptop-native-cold-reopen-e2e.v1",
-        "session_id": session, "request_id": request,
-        "model_sha256": first["model_sha256"],
-        "tokenizer_sha256": first["tokenizer_sha256"],
-        "output_sha256": digest,
-        "first_turn_generated_tokens": first["generated_tokens"],
-        "source_verified_twice": True,
-        "sqlite_replay_after_cold_reopen": True,
-        "second_generation_attempted": False,
-        "private_prompt_disclosed": False,
-        "physical_device_qualified": False,
-        "release_certified": False,
-    }
+        record = {
+            "schema": "laptop-native-cold-reopen-e2e.v1",
+            "session_id": session, "request_id": request,
+            "model_sha256": first["model_sha256"],
+            "tokenizer_sha256": first["tokenizer_sha256"],
+            "output_sha256": digest,
+            "first_turn_generated_tokens": first["generated_tokens"],
+            "source_verified_twice": True,
+            "sqlite_replay_after_cold_reopen": True,
+            "second_generation_attempted": False,
+            "private_prompt_disclosed": False,
+            "physical_device_qualified": False,
+            "release_certified": False,
+        }
+        # The second live, independently admitted native worker owns
+        # publication. Output after stack teardown is not source-verified.
+        if publisher is not None:
+            publisher(second_worker, second_installed, record)
+        return record
 
 
 __all__ = ["run"]

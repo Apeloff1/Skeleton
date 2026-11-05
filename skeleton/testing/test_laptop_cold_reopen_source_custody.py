@@ -183,6 +183,42 @@ class ColdSourceCustodyTests(unittest.TestCase):
         self.assertEqual(rig.count,2)
         self.assertEqual(rig.second.generation_calls,0)
 
+    def test_callback_runs_before_second_worker_closes(self):
+        rig=SyntheticColdRig()
+        seen=[]
+        def publish(worker,receipt,report):
+            seen.append(report["schema"])
+            self.assertIs(worker,rig.second)
+            self.assertEqual(rig.second.generation_calls,0)
+            self.assertNotIn("closed_2",rig.order)
+            self.assertTrue(report["sqlite_replay_after_cold_reopen"])
+        with rig.patch():
+            report=cold_reopen_acceptance.run(**OPTS,publisher=publish)
+        self.assertEqual(seen,["laptop-native-cold-reopen-e2e.v1"])
+        self.assertEqual(rig.first.generation_calls,1)
+        self.assertEqual(rig.second.generation_calls,0)
+        self.assertEqual(rig.order[-1],"closed_2")
+        self.assertFalse(report["release_certified"])
+
+    def test_invalid_publisher_never_activates_native(self):
+        rig=SyntheticColdRig()
+        with rig.patch():
+            with self.assertRaises(ContractViolation):
+                cold_reopen_acceptance.run(**OPTS,publisher=object())
+        self.assertEqual(rig.count,0)
+
+    def test_failed_publication_closes_second_worker_without_retry(self):
+        rig=SyntheticColdRig()
+        def refuse_write(worker,receipt,report):
+            raise RuntimeError("synthetic sink unavailable")
+        with rig.patch():
+            with self.assertRaises(RuntimeError):
+                cold_reopen_acceptance.run(**OPTS,publisher=refuse_write)
+        self.assertEqual(rig.count,2)
+        self.assertEqual(rig.first.generation_calls,1)
+        self.assertEqual(rig.second.generation_calls,0)
+        self.assertEqual(rig.order[-1],"closed_2")
+
 
 if __name__=="__main__":
     unittest.main()
