@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "mana",
+  "domain": "arcane",
+  "initial": 35,
+  "capacity": 120,
+  "events": [
+    {
+      "id": "mana:gain:1",
+      "action": "gain",
+      "amount": 6,
+      "tick": 1
+    },
+    {
+      "id": "mana:spend:2",
+      "action": "spend",
+      "amount": 8,
+      "tick": 2
+    },
+    {
+      "id": "mana:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "mana:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "mana:decay:5",
+      "action": "decay",
+      "amount": 0,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      120
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for arcane simulation with bounded energy units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}
