@@ -85,6 +85,49 @@ class SessionAuthority:
         """Preserve the original public multiplayer sync API."""
         self.distributed_sync(player_id, peer_id, pos, lag)
 
+    def sync_peer(self, player_id: str, peer_id: str,
+                  pos: tuple[float, float, float], lag_ms: int) -> None:
+        """Legacy peer-sync entrypoint; enforce the canonical grant and lag policy."""
+        self.distributed_sync(player_id, peer_id, pos, lag_ms)
+
+    def predictive_sync(self, player_id: str, peer_id: str,
+                        pos: tuple[float, float, float], lag_ms: int) -> None:
+        """Predict peers through the same grant-checked bounded rollback transport."""
+        self.distributed_sync(player_id, peer_id, pos, lag_ms)
+
+    def predictive_distributed_sync(
+        self, player_id: str, peer_id: str,
+        pos: tuple[float, float, float],
+        velocity: tuple[float, float, float], lag_ms: int,
+    ) -> None:
+        """Bounded velocity prediction using the authenticated rollback transport.
+
+        Validate the complete input before any tick or peer-state mutation.
+        A lag above the anti-cheat threshold is recorded by distributed_sync,
+        but never extends the prediction horizon beyond the safe limit.
+        """
+        grant = self.grants.get(player_id)
+        if grant is None or not self.verify_grant(player_id, grant.digest):
+            raise MultiplayerError("no active grant")
+        if type(peer_id) is not str or not 1 <= len(peer_id) <= 128:
+            raise MultiplayerError("invalid peer identity")
+        if (type(lag_ms) is not int or lag_ms < 0
+                or type(pos) not in (tuple, list) or len(pos) != 3
+                or type(velocity) not in (tuple, list) or len(velocity) != 3):
+            raise MultiplayerError("invalid predictive sync input")
+        if any(type(value) not in (int, float) or not math.isfinite(value)
+               for value in (*pos, *velocity)):
+            raise MultiplayerError("non-finite predictive sync input")
+        horizon_s = min(lag_ms, _MAX_LAG_MS) / 1000.0
+        predicted = tuple(
+            float(point) + float(speed) * horizon_s
+            for point, speed in zip(pos, velocity)
+        )
+        if any(not math.isfinite(value) for value in predicted):
+            raise MultiplayerError("predictive position outside finite range")
+        self.distributed_sync(player_id, peer_id, tuple(pos), lag_ms)
+        self.grants[player_id].peers[peer_id].predicted = predicted
+
     def verify(self, player_id: str, digest: str) -> bool:
         return self.verify_grant(player_id, digest)
 
@@ -116,9 +159,9 @@ class SessionAuthority:
             raise MultiplayerError("invalid peer position")
         if not isinstance(lag_ms, int) or lag_ms < 0:
             raise MultiplayerError("invalid peer lag")
-        if lag_ms > _MAX_LAG_MS:
-            grant.peers.get(peer_id, PeerState(peer_id)).cheat_score += 0.2
         peer = grant.peers.setdefault(peer_id, PeerState(peer_id))
+        if lag_ms > _MAX_LAG_MS:
+            peer.cheat_score += 0.2
         dx = pos[0] - peer.position[0]
         peer.predicted = (pos[0] + dx * 0.6, pos[1], pos[2])
         peer.position = pos
