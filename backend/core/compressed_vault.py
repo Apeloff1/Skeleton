@@ -303,9 +303,26 @@ def write_shard(
             directory, shard_path.name, max_bytes=_MAX_COMPRESSED_BYTES,
         )
         try:
-            compressed_bytes = atomic_write(
-                directory, shard_path.name, _compress, max_bytes=_MAX_COMPRESSED_BYTES,
-            )
+            try:
+                compressed_bytes = atomic_write(
+                    directory, shard_path.name, _compress, max_bytes=_MAX_COMPRESSED_BYTES,
+                )
+            except BaseException:
+                # A directory fsync can fail after os.replace succeeded.
+                # Restore the old data before reporting the failed write,
+                # even when the manifest has not yet been touched.
+                if backup_name is not None:
+                    previous = backup_name
+                    backup_name = None
+                    os.replace(previous, shard_path.name,
+                               src_dir_fd=directory, dst_dir_fd=directory)
+                    os.fsync(directory)
+                else:
+                    try:
+                        unlink_regular(directory, shard_path.name)
+                    except FileNotFoundError:
+                        pass
+                raise
             entry = {
                 "name": name,
                 "domain": domain,
@@ -505,9 +522,21 @@ def delete_shard(name: str) -> bool:
         with _storage_fd() as directory:
             unlink_regular(directory, f"{name}.jsonl.zst")
     except BaseException:
-        # Preserve the entry if the data remains but cannot be removed.
-        _MANIFEST[name] = old_entry
-        _save_manifest()
+        # os.unlink can succeed and the directory fsync fail afterward.
+        # Reviving the metadata for an already absent file would make a
+        # dangling trusted manifest entry. Restore it only when a safe,
+        # regular, single-link shard still exists at the held directory.
+        with _storage_fd() as directory:
+            try:
+                with read_regular(directory, f"{name}.jsonl.zst",
+                                  max_bytes=_MAX_COMPRESSED_BYTES):
+                    pass
+            except FileNotFoundError:
+                # The deletion already happened; keep the committed manifest.
+                pass
+            else:
+                _MANIFEST[name] = old_entry
+                _save_manifest()
         raise
     with _CACHE_LOCK:
         _CACHE.pop(name, None)
