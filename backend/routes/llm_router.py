@@ -195,9 +195,47 @@ GAME_TASKS = {
     },
 }
 
-DEFAULT_TIMEOUT_S = float(os.environ.get("LLM_ROUTER_TIMEOUT_S", "60"))
-CACHE_TTL_S = int(os.environ.get("LLM_ROUTER_CACHE_TTL_S", "3600"))
-CACHE_MAX = int(os.environ.get("LLM_ROUTER_CACHE_MAX", "512"))
+_CONFIG_ISSUES: list[str] = []
+
+
+def _env_bounded_float(name: str, default: float, *, minimum: float, maximum: float) -> float:
+    """Malformed environment overrides must not remove the router at boot."""
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        value = float("nan")
+    if not math.isfinite(value) or not minimum <= value <= maximum:
+        _CONFIG_ISSUES.append(name + " is invalid; using safe default")
+        return default
+    return value
+
+
+def _env_bounded_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw, 10)
+    except (TypeError, ValueError, OverflowError):
+        value = minimum - 1
+    if not minimum <= value <= maximum:
+        _CONFIG_ISSUES.append(name + " is invalid; using safe default")
+        return default
+    return value
+
+
+DEFAULT_TIMEOUT_S = _env_bounded_float(
+    "LLM_ROUTER_TIMEOUT_S", 60.0, minimum=0.01, maximum=300.0,
+)
+CACHE_TTL_S = _env_bounded_int(
+    "LLM_ROUTER_CACHE_TTL_S", 3600, minimum=0, maximum=86_400,
+)
+CACHE_MAX = _env_bounded_int(
+    "LLM_ROUTER_CACHE_MAX", 512, minimum=0, maximum=2_048,
+)
 
 
 def _engine_available() -> bool:
@@ -287,6 +325,8 @@ class _LRUCache:
         self._d: "OrderedDict[str, tuple]" = OrderedDict()
 
     def get(self, key):
+        if self.ttl <= 0 or self.maxsize <= 0:
+            return None
         item = self._d.get(key)
         if not item:
             return None
@@ -298,6 +338,8 @@ class _LRUCache:
         return val
 
     def set(self, key, val):
+        if self.ttl <= 0 or self.maxsize <= 0:
+            return
         self._d[key] = (time.monotonic(), val)
         self._d.move_to_end(key)
         while len(self._d) > self.maxsize:
@@ -386,8 +428,14 @@ async def route_complete(
     routes pass authenticated tenant/actor scope. A returned idempotency key can
     reconcile an uncertain execution without dispatching a replacement turn.
     """
-    task = (task or "default").lower()
     _STATS["calls"] += 1
+    if not isinstance(task, str):
+        return {
+            "content": "", "provider": "skeleton-engine", "model": "engine-routed",
+            "cached": False, "task": "default",
+            "error": "The completion request is invalid.", "error_code": "request_invalid",
+        }
+    task = (task or "default").lower()
     public = {
         "content": "",
         "provider": "skeleton-engine",
@@ -405,11 +453,32 @@ async def route_complete(
             "error_code": "model_pinning_unavailable",
         }
     timeout_s = DEFAULT_TIMEOUT_S if timeout_s is None else timeout_s
+    try:
+        validated_timeout = float(timeout_s) if type(timeout_s) in (int, float) else float("nan")
+    except (TypeError, ValueError, OverflowError):
+        validated_timeout = float("nan")
     if (
-        not isinstance(timeout_s, (int, float))
-        or isinstance(timeout_s, bool)
-        or not math.isfinite(timeout_s)
-        or not 0 < timeout_s <= 300
+        not math.isfinite(validated_timeout)
+        or not 0 < validated_timeout <= 300
+        or type(use_cache) is not bool
+        or not isinstance(tenant_id, str)
+        or not 1 <= len(tenant_id) <= 512
+        or tenant_id != tenant_id.strip()
+        or not isinstance(actor_id, str)
+        or not 1 <= len(actor_id) <= 512
+        or actor_id != actor_id.strip()
+        or not isinstance(idempotency_key, (str, type(None)))
+        or (isinstance(idempotency_key, str)
+            and (not 1 <= len(idempotency_key) <= 1024
+                 or idempotency_key != idempotency_key.strip()))
+        or not isinstance(model, str)
+        or (provider_id is None) != (model_id is None)
+        or (provider_id is not None and
+            (not isinstance(provider_id, str) or not 1 <= len(provider_id) <= 128))
+        or (model_id is not None and
+            (not isinstance(model_id, str) or not 1 <= len(model_id) <= 256))
+        or (max_output_tokens is not None and
+            (type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 131072))
         or not isinstance(prompt, str)
         or not prompt.strip()
         or len(prompt) > 40_000
@@ -623,6 +692,10 @@ async def get_policy(user=Depends(require_role("viewer"))):
         "provider": {**_provider_status(), "available": catalog["available"]},
         "key_configured": _engine_available(),
         "cache": {"ttl_s": CACHE_TTL_S, "max": CACHE_MAX, "size": len(_CACHE._d)},
+        "configuration": {
+            "safe_defaults_applied": bool(_CONFIG_ISSUES),
+            "issues": list(_CONFIG_ISSUES),
+        },
     }
 
 
