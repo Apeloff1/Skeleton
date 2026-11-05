@@ -33,6 +33,7 @@ jobs:
           sparse-checkout: |
             /.github/workflows/windows-installer.yml
             /.dockerignore
+            /Dockerfile.dockerignore
             /.env.example
             /Dockerfile
             /README.md
