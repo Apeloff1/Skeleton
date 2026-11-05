@@ -653,6 +653,21 @@ def preflight(
             )
         )
 
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    build_errors = build_source_errors(root)
+    checks.append(
+        AssemblyCheck(
+            code="image:build-inputs",
+            ok=not build_errors,
+            message=(
+                "all declared Docker COPY inputs and context exclusions are present"
+                if not build_errors
+                else "; ".join(build_errors[:6])
+            ),
+        )
+    )
+
     backend_dockerfile = root / "backend/Dockerfile"
     try:
         # Small, bounded, source-only inspection; no Docker invocation and
