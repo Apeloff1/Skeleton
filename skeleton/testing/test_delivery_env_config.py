@@ -56,3 +56,22 @@ def test_load_layers_rejects_non_objects():
         load_layers({"dev": "[]"})
     with pytest.raises(DeliveryError):
         load_layers({"dev": "{"})
+
+
+@pytest.mark.parametrize("payload, fragment", [
+    ('{"tier":"dev","tier":"production"}', "duplicate"),
+    ('{"health":{"path":"/safe","path":"/other"}}', "duplicate"),
+    ('{"tier":"dev","replicas":NaN}', "non-finite"),
+    ('{"tier":"dev","replicas":Infinity}', "non-finite"),
+    ('{"tier":"dev","replicas":-Infinity}', "non-finite"),
+])
+def test_load_layers_rejects_ambiguous_or_nonfinite_json(payload, fragment):
+    with pytest.raises(DeliveryError, match=fragment):
+        load_layers({"dev": payload})
+
+
+def test_load_layers_rejects_oversized_untrusted_json():
+    from skeleton.build.delivery.env_config import MAX_LAYER_BYTES
+
+    with pytest.raises(DeliveryError, match="exceeds"):
+        load_layers({"dev": " " * (MAX_LAYER_BYTES + 1)})

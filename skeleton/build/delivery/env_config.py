@@ -19,6 +19,7 @@ TIERS = ("dev", "staging", "production")
 REQUIRED_KEYS = ("tier", "replicas", "health", "rollout")
 MAX_DEPTH = 8
 MAX_REPLICAS = 512
+MAX_LAYER_BYTES = 256_000
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any], *, _depth: int = 0) -> dict[str, Any]:
@@ -103,13 +104,30 @@ def resolve(name: str, layers: Mapping[str, Mapping[str, Any]]) -> EnvironmentCo
     return EnvironmentConfig(name, values, sha256_json(values), tuple(lineage))
 
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON keys at every nesting level."""
+    obj: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise DeliveryError(f"duplicate deployment config key {key!r}")
+        obj[key] = value
+    return obj
+
+
+def _reject_nonfinite(value: str) -> None:
+    raise DeliveryError(f"non-finite deployment config number {value}")
+
+
 def load_layers(texts: Mapping[str, str]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for name, text in texts.items():
         require_env_name(name)
+        if type(text) is not str or len(text) > MAX_LAYER_BYTES:
+            raise DeliveryError(f"{name}: config layer exceeds {MAX_LAYER_BYTES} characters")
         try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
+            data = json.loads(text, object_pairs_hook=_unique_object,
+                              parse_constant=_reject_nonfinite)
+        except (json.JSONDecodeError, RecursionError) as exc:
             raise DeliveryError(f"{name}: invalid JSON: {exc}") from exc
         if not isinstance(data, dict):
             raise DeliveryError(f"{name}: config must be a JSON object")
