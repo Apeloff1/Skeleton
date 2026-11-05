@@ -1,0 +1,44 @@
+{
+  "schema": "skeleton.game.harbor.dialogue-board.v1",
+  "source_id": "lantern-quay",
+  "speaker": "merchant",
+  "required_flag_for_delivery": "dock_pass",
+  "nodes": [
+    {
+      "id": "merchant_intro",
+      "requires": [],
+      "min_trust": 0,
+      "choices": [
+        {
+          "id": "permit",
+          "trust_delta": 2,
+          "grant_flag": "dock_pass"
+        },
+        {
+          "id": "decline",
+          "trust_delta": -1,
+          "grant_flag": "refused"
+        }
+      ]
+    },
+    {
+      "id": "merchant_followup",
+      "requires": [
+        "dock_pass"
+      ],
+      "min_trust": 1,
+      "choices": [
+        {
+          "id": "volunteer",
+          "trust_delta": 2,
+          "grant_flag": "rescue_volunteer"
+        },
+        {
+          "id": "farewell",
+          "trust_delta": 0,
+          "grant_flag": "safe_departure"
+        }
+      ]
+    }
+  ]
+}

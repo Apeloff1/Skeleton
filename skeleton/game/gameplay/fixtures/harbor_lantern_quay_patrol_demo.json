@@ -1,0 +1,76 @@
+[
+  {
+    "op": "move",
+    "direction": "east"
+  },
+  {
+    "op": "gather"
+  },
+  {
+    "op": "gather"
+  },
+  {
+    "op": "collect",
+    "objective": "tide_registry"
+  },
+  {
+    "op": "move",
+    "direction": "east"
+  },
+  {
+    "op": "gather"
+  },
+  {
+    "op": "move",
+    "direction": "west"
+  },
+  {
+    "op": "move",
+    "direction": "west"
+  },
+  {
+    "op": "move",
+    "direction": "south"
+  },
+  {
+    "op": "move",
+    "direction": "south"
+  },
+  {
+    "op": "gather"
+  },
+  {
+    "op": "craft",
+    "recipe": "lantern"
+  },
+  {
+    "op": "craft",
+    "recipe": "ration"
+  },
+  {
+    "op": "move",
+    "direction": "east"
+  },
+  {
+    "op": "move",
+    "direction": "east"
+  },
+  {
+    "op": "move",
+    "direction": "east"
+  },
+  {
+    "op": "move",
+    "direction": "east"
+  },
+  {
+    "op": "collect",
+    "objective": "dock_manifest"
+  },
+  {
+    "op": "deliver"
+  },
+  {
+    "op": "extract"
+  }
+]
