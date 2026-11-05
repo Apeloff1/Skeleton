@@ -40,10 +40,13 @@ def test_job_block_returns_empty_for_missing_job() -> None:
 def test_removing_full_domain_suite_fails_readiness_contract(tmp_path, monkeypatch, capsys) -> None:
     workflow = contract.WORKFLOW.read_text(encoding="utf-8")
     assert contract.main() == 0
-    damaged = workflow.replace("skeleton/testing --tb=short", "skeleton/testing/test_engine_v3.py --tb=short")
+    # Mutation must target the active eight-shard command, not a retired monolithic runner.
+    runner = "python scripts/run_domain_suite_shard.py --index ${{ matrix.shard }} --count 8"
+    assert workflow.count(runner) == 1
+    damaged = workflow.replace(runner, "python scripts/run_domain_suite_shard.py --index 0 --count 8")
     assert damaged != workflow
     path = tmp_path / "merge-readiness.yml"
     path.write_text(damaged, encoding="utf-8")
     monkeypatch.setattr(contract, "WORKFLOW", path)
     assert contract.main() == 1
-    assert "complete canonical domain suite" in capsys.readouterr().out
+    assert "canonical domain shard runner must execute every static matrix partition" in capsys.readouterr().out

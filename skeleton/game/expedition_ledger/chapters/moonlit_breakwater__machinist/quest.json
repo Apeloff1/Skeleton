@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "moonlit_breakwater__machinist",
+  "chapter": 31,
+  "title": "Moonlit Breakwater: The Machinist's Harbor Charter",
+  "theme": "moonlit_breakwater",
+  "discipline": "machinist",
+  "region": "Moonlit Breakwater",
+  "premise": "In a drowned port exposed at the edge of the lunar tide, the machinist must rebalance a failing mechanical relay using a portable phase regulator.",
+  "signal": "harbor mirror",
+  "key_name": "harbor mirror attunement",
+  "objective_name": "Harbor Charter",
+  "ending": "Recover the Harbor Charter and return with the stable field relay; Night Harbor Guild can finally verify the source testimony.",
+  "faction": "Night Harbor Guild",
+  "challenge": "Survive undertow gate while evading the lighthouse revenant without sacrificing the stable field relay.",
+  "choice_yes": "Disclose evidence and ask Night Harbor Guild to witness the portable phase regulator.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to divert power from a shelter",
+  "tool": "portable phase regulator",
+  "reward": "stable field relay",
+  "enemy": "lighthouse revenant",
+  "chapter_links": [
+    "moonlit_breakwater__diplomat",
+    "moonlit_breakwater__herbalist"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

@@ -60,6 +60,17 @@ class EngineExecutionCoordinatorError(RuntimeError):
     """Engine execution could not be scheduled or reconciled safely."""
 
 
+class _PassiveRecoveryUnavailable(EngineExecutionCoordinatorError):
+    """Passive checkpoint recovery could not complete without losing custody."""
+
+
+class _PassiveRecoveryProvider:
+    """Fail-closed placeholder for provider-free checkpoint observation."""
+
+    async def generate(self, *_args, **_kwargs):
+        raise ProviderUnavailableError("provider is unavailable during passive recovery")
+
+
 class _ExecutionDatabaseOwner:
     """Exclusive live coordinator custody over the existing database inode.
 
@@ -192,9 +203,13 @@ class EngineExecutionCoordinator:
             self._maintenance_task: asyncio.Task[None] | None = None
             self._shutdown_task: asyncio.Task[None] | None = None
             self._recovery_cursor: tuple[datetime, str] | None = None
+            self._startup_waiter_scan = True
+            self._admission_scan_epoch = 0
+            self._waiter_scan_epoch = 0
             self._recovery_lock = asyncio.Lock()
             self._recovery_scanned = 0
             self._recovery_started = 0
+            self._admission_recovery_deferred = 0
             self._recovery_error: str | None = None
             self._driver_failures = 0
             self._driver_finalization_failures = 0
@@ -367,8 +382,10 @@ class EngineExecutionCoordinator:
                 "maximum_recovery_drivers": 32,
                 "page_limit": 128,
                 "scan_in_progress": self._recovery_cursor is not None,
+                "startup_waiter_scan": self._startup_waiter_scan,
                 "scanned": self._recovery_scanned,
                 "started": self._recovery_started,
+                "admission_deferred": self._admission_recovery_deferred,
                 "last_error": self._recovery_error,
                 "driver_failures": self._driver_failures,
                 "driver_finalization_failures": self._driver_finalization_failures,
@@ -429,6 +446,7 @@ class EngineExecutionCoordinator:
                     pass
 
     async def recover(self) -> tuple[str, ...]:
+        self._startup_waiter_scan = True
         recovered = await self._recover_pending(allow_starting=True, include_waiting=True)
         if self._maintenance_task is None and not self._closed:
             self._maintenance_task = asyncio.create_task(
@@ -436,6 +454,29 @@ class EngineExecutionCoordinator:
                 name="engine-runtime-maintenance",
             )
         return recovered
+
+    def _schedule_admission_recovery_sweep(self) -> None:
+        # A failed retry write has no durable marker to make a passive waiter
+        # eligible. Finish the current keyset pass before scanning waiters
+        # again; rewinding here could starve later pages during an outage.
+        # Restart also performs this bounded sweep, so a process crash does not
+        # lose the only way to rediscover an unmarked retained checkpoint.
+        self._admission_scan_epoch += 1
+        self._startup_waiter_scan = True
+
+    def _defer_checkpoint_recovery(self, execution_id: str) -> None:
+        try:
+            self.service.repository.defer_checkpoint_admission(execution_id)
+        except Exception as exc:
+            self._schedule_admission_recovery_sweep()
+            raise _PassiveRecoveryUnavailable("checkpoint retry persistence deferred") from exc
+
+    def _clear_checkpoint_recovery(self, execution_id: str) -> None:
+        try:
+            self.service.repository.clear_checkpoint_admission_deferral(execution_id)
+        except Exception as exc:
+            self._schedule_admission_recovery_sweep()
+            raise _PassiveRecoveryUnavailable("checkpoint retry acknowledgement deferred") from exc
 
     async def _recover_pending(
         self,
@@ -458,7 +499,8 @@ class EngineExecutionCoordinator:
         """Resume a bounded page without eagerly allocating every old driver.
 
         Interactive approval/input endpoints still resume waiting work directly.
-        Periodic recovery never polls those unchanged checkpoints for input.
+        Startup visits waiting checkpoints across bounded pages. Thereafter,
+        only due admission retries or explicit cancellations revisit waiters.
         Canonical turn/dispatch fencing remains responsible for effect replay.
         """
         if self._closed or self._supervision_faults:
@@ -468,6 +510,8 @@ class EngineExecutionCoordinator:
         if not available:
             return ()
         cursor = self._recovery_cursor
+        if cursor is None and include_waiting:
+            self._waiter_scan_epoch = self._admission_scan_epoch
         page = await asyncio.to_thread(
             self.service.repository.recoverable_page,
             limit=128,
@@ -501,6 +545,8 @@ class EngineExecutionCoordinator:
             self._recovery_started += 1
         if scanned == len(page) and len(page) < 128:
             self._recovery_cursor = None
+            if include_waiting:
+                self._startup_waiter_scan = self._admission_scan_epoch != self._waiter_scan_epoch
         self._recovery_error = None
         return tuple(recovered)
 
@@ -662,7 +708,7 @@ class EngineExecutionCoordinator:
                         self._maintenance_stop.set()
             if not self._maintenance_stop.is_set():
                 try:
-                    await self._recover_pending()
+                    await self._recover_pending(include_waiting=self._startup_waiter_scan)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -699,10 +745,16 @@ class EngineExecutionCoordinator:
                 type(exc).__name__,
                 frames,
             )
+            # A failed passive recovery may already have a staged intent or an
+            # unavailable meter. Keep it for a later retry rather than bypassing
+            # the canonical metering path with an unmetered failure result.
+            if isinstance(exc, _PassiveRecoveryUnavailable):
+                return
             try:
                 await self._finalize_failure(
                     command.execution_request.execution_id,
                     "engine_coordinator_exception",
+                    preserve_staged=True,
                 )
             except Exception:
                 self._driver_finalization_failures += 1
@@ -721,19 +773,77 @@ class EngineExecutionCoordinator:
         try:
             self.service.ensure_execution_admission(command)
         except EngineServiceError:
-            await self._finalize_failure(
-                execution_id,
-                "execution_admission_denied",
-            )
+            # A retained checkpoint can contain approved work, a cancellation,
+            # or a deadline that must be reconciled through the normal metered
+            # runtime. A transient admission denial is not permission to replace
+            # that durable state with an unmetered terminal failure.
+            try:
+                retained = self.service.repository.latest_checkpoint(execution_id)
+            except Exception as exc:
+                self._schedule_admission_recovery_sweep()
+                raise _PassiveRecoveryUnavailable("admission checkpoint inspection deferred") from exc
+            if retained is not None:
+                self._defer_checkpoint_recovery(execution_id)
+                self._admission_recovery_deferred += 1
+                return
+            try:
+                await self._finalize_failure(
+                    execution_id,
+                    "execution_admission_denied",
+                    preserve_checkpoint=True,
+                )
+            except _PassiveRecoveryUnavailable:
+                self._schedule_admission_recovery_sweep()
+                raise
+            # A checkpoint may have won the CAS race with failure finalization.
+            # Persist its retry rather than losing a waiting execution.
+            self._defer_checkpoint_recovery(execution_id)
             return
         try:
             provider = self.provider_registry.require_for_context(
                 command.execution_request.context_policy,
             )
         except ProviderUnavailableError:
+            # A retained checkpoint can still record a cancellation/deadline
+            # or expose an unresolved approval. These paths never dispatch a
+            # provider or tool, and never publish a staged result. Preserve
+            # normal storage metering and admission completion on terminality.
+            if self.service.repository.latest_checkpoint(execution_id) is not None:
+                passive_runtime = CognitiveExecutionRuntime(
+                    self.service.repository,
+                    _PassiveRecoveryProvider(),
+                    self.tool_runtime,
+                    storage_meter=(
+                        lambda resource_id, write_id, payload, meter_now=None: (
+                            self.service.meter_execution_storage(
+                                command, resource_id, write_id, payload, now=meter_now,
+                            )
+                        )
+                    ),
+                )
+                try:
+                    recovered = passive_runtime.recover_passively(
+                        execution_id,
+                        approval_refs=self.service.active_approval_refs(execution_id),
+                    )
+                except Exception as exc:
+                    self._defer_checkpoint_recovery(execution_id)
+                    raise _PassiveRecoveryUnavailable("passive checkpoint recovery deferred") from exc
+                if recovered is not None:
+                    if recovered.result is not None:
+                        self.service.complete_execution_admission(execution_id)
+                    else:
+                        self._clear_checkpoint_recovery(execution_id)
+                    return
+                # Existing approved work or a staged finalization must be
+                # retried only after the original provider is available. Do
+                # not convert an outage into a destructive terminal failure.
+                self._defer_checkpoint_recovery(execution_id)
+                return
             await self._finalize_failure(
                 execution_id,
                 "provider_unavailable",
+                preserve_staged=True,
             )
             return
 
@@ -846,7 +956,11 @@ class EngineExecutionCoordinator:
                     raise
             if self.service.repository.result(execution_id) is not None:
                 self.service.complete_execution_admission(execution_id)
+            else:
+                self._clear_checkpoint_recovery(execution_id)
         except asyncio.CancelledError:
+            raise
+        except _PassiveRecoveryUnavailable:
             raise
         except Exception as exc:
             logging.getLogger(__name__).warning(
@@ -864,6 +978,9 @@ class EngineExecutionCoordinator:
         self,
         execution_id: str,
         error_code: str,
+        *,
+        preserve_staged: bool = True,
+        preserve_checkpoint: bool = False,
     ) -> None:
         repository = self.service.repository
         existing = repository.result(execution_id)
@@ -874,6 +991,8 @@ class EngineExecutionCoordinator:
         except Exception:
             return
         if current.terminal:
+            return
+        if preserve_checkpoint and current.checkpoint_version:
             return
         now = datetime.now(timezone.utc)
         # A failed recovery may already own settled physical provider work.
@@ -914,15 +1033,26 @@ class EngineExecutionCoordinator:
                 result,
                 expected_execution_version=current.version,
                 now=now,
+                require_no_staged_intent=preserve_staged,
             )
             self.service.complete_execution_admission(
                 execution_id,
                 now=now,
             )
-        except Exception:
+        except Exception as exc:
             # A concurrent driver may have completed or advanced the execution.
             # Re-read and leave durable reconciliation to the canonical state.
-            if repository.result(execution_id) is None:
+            try:
+                unfinished = (repository.result(execution_id) is None
+                              and not (preserve_checkpoint and repository.latest_checkpoint(execution_id) is not None)
+                              and not (preserve_staged and repository.finalization_intent(execution_id) is not None))
+            except Exception as reread_exc:
+                if preserve_checkpoint:
+                    raise _PassiveRecoveryUnavailable("admission failure reconciliation deferred") from reread_exc
+                raise
+            if unfinished:
+                if preserve_checkpoint:
+                    raise _PassiveRecoveryUnavailable("admission failure finalization deferred") from exc
                 raise
 
 
