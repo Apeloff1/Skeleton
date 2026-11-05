@@ -64,9 +64,12 @@ def _extract_json(text: str) -> dict:
         raise ValueError("nonfinite judge JSON number")
 
     decoder = json.JSONDecoder(object_pairs_hook=unique_pairs, parse_constant=finite_constant)
-    starts = [0]
-    starts.extend(i for i, char in enumerate(trimmed) if char == "{" and i > 0)
-    for pos in starts[:64]:
+    # Parse the first complete outer object only. Retrying nested braces after
+    # a malformed/duplicate-key outer document could salvage a forged inner
+    # score object and silently weaken the fail-closed parser.
+    start = trimmed.find("{")
+    starts = [0] + ([start] if start > 0 else [])
+    for pos in starts:
         try:
             value, _ = decoder.raw_decode(trimmed[pos:])
         except ValueError:
