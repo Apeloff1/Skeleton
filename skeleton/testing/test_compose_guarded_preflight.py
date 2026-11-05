@@ -101,6 +101,19 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["canonical_writer_inventory_verified"])
         self.assertFalse(result["guarded_local_ai_ready"])
 
+    async def test_contradictory_legacy_primary_flag_denied_before_epoch(self):
+        for legacy in (False, 0, "true", [], {}):
+            with self.subTest(legacy=repr(legacy)):
+                self.db.hello["ismaster"] = legacy
+                result = await self.inspect()
+                self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+                self.assertFalse(result["guarded_local_ai_ready"])
+                self.assertEqual(FakeEpoch.instances, [])
+        self.db.hello["ismaster"] = True
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_epoch_observed_only")
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_primary_self_identity_must_be_in_advertised_hosts(self):
         # The primary field may be omitted by a server. A contradictory
         # self-identity must still fail before any canonical epoch read.
