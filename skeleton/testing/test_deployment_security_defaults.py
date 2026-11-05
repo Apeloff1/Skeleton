@@ -85,7 +85,7 @@ def test_compose_healthchecks_use_runtime_available_tools_and_canonical_routes()
     assert "python" in skeleton
     assert "http://127.0.0.1:8001/api/v1/health/live" in skeleton
     assert "python" in backend
-    assert "http://127.0.0.1:8001/api/health" in backend
+    assert "http://127.0.0.1:8001/api/health/ready" in backend
     assert '"curl"' not in backend
     assert "http://localhost:8001/health" not in skeleton
 
