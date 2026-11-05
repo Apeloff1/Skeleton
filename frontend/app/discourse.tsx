@@ -1,9 +1,9 @@
 /**
  * /discourse — Discourse & Discord (multi-AI debate for the creative process).
  *
- * A panel of provider-diverse models drafts candidates (discourse), each is
- * red-teamed by another model (discord), then a judge scores every candidate on
- * QUALITY + FIDELITY and the winner is selected. Shows the full transcript.
+ * The authenticated canonical engine selects ready models. One available
+ * model is labeled self-review instead of fabricated cross-provider consensus.
+ * Work is admitted once and the UI observes its durable status independently.
  */
 import React from 'react';
 import {
@@ -13,15 +13,10 @@ import {
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
-
-interface Candidate {
-  model: string; provider?: string; content: string; critique?: string;
-  quality?: number; fidelity?: number; score?: number; rationale?: string;
-}
-interface Result {
-  winner_index: number; winner_model: string; winner_content: string; winner_score?: number;
-  judge_model: string; judge_why?: string; panel: string[]; candidates: Candidate[]; error?: string;
-}
+import {
+  pollDiscourseJob, submitDiscourseJob,
+  type DiscourseOutcome, type DiscourseResult,
+} from '../src/features/discourse/discourseJob';
 
 export default function DiscourseScreen() {
   const router = useRouter();
@@ -29,22 +24,95 @@ export default function DiscourseScreen() {
   const [prompt, setPrompt] = React.useState('Design one original core mechanic for a calm puzzle game about light.');
   const [discord, setDiscord] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
-  const [res, setRes] = React.useState<Result | null>(null);
+  const [res, setRes] = React.useState<DiscourseResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [jobId, setJobId] = React.useState<string | null>(null);
+  const [canResume, setCanResume] = React.useState(false);
+  const [progress, setProgress] = React.useState<string | null>(null);
+  const observer = React.useRef<AbortController | null>(null);
+  const mounted = React.useRef(true);
+  const occupied = React.useRef(false);
 
-  const run = React.useCallback(async () => {
-    if (prompt.trim().length < 4 || busy) return;
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      observer.current?.abort();
+      observer.current = null;
+    };
+  }, []);
+
+  const beginObserve = React.useCallback(async (resumeId?: string) => {
+    if (occupied.current) return;
+    if (!resumeId && (prompt.trim().length < 4 || prompt.length > 20_000)) {
+      setError('Enter a prompt between 4 and 20,000 characters.');
+      return;
+    }
+    occupied.current = true;
+    observer.current?.abort();
+    const controller = new AbortController();
+    observer.current = controller;
+    setBusy(true);
+    setError(null);
+    setRes(null);
+    setCanResume(false);
+    setProgress(resumeId ? 'Reconnecting to the existing job…' : 'Submitting one private job…');
+    if (!resumeId) setJobId(null);
+
+    const onProgress = (update: { status: 'submitting' | 'running'; jobId: string | null; attempts: number }) => {
+      if (!mounted.current || observer.current !== controller) return;
+      if (update.jobId) setJobId(update.jobId);
+      setProgress(update.status === 'submitting'
+        ? 'Submitting your job…'
+        : 'Observing model execution (check ' + update.attempts + ')…');
+    };
+
+    let outcome: DiscourseOutcome;
+    try {
+      if (resumeId) {
+        outcome = await pollDiscourseJob(api, resumeId, {
+          signal: controller.signal, onProgress,
+        });
+      } else {
+        outcome = await submitDiscourseJob(api, {
+          task: 'creative', prompt: prompt.trim(), discord,
+        }, {
+          signal: controller.signal, onProgress,
+        });
+      }
+    } catch {
+      // No automatic POST replay: a transport error may hide committed work.
+      outcome = { ok: false, jobId: resumeId || null,
+        error: 'observation_unavailable', recoverable: !!resumeId };
+    }
+    if (mounted.current && observer.current === controller) {
+      if (outcome.ok) {
+        setJobId(outcome.jobId);
+        setRes(outcome.result);
+        setProgress(null);
+      } else {
+        setJobId(outcome.jobId);
+        setError(outcome.error === 'admission_unconfirmed_do_not_retry'
+          ? 'The server did not confirm admission. Do not resubmit until you check job history.'
+          : outcome.error);
+        setCanResume(outcome.recoverable && !!outcome.jobId);
+        setProgress(null);
+      }
+      setBusy(false);
+    }
+    if (observer.current === controller) observer.current = null;
+    occupied.current = false;
+  }, [prompt, discord]);
+
+  const run = React.useCallback(() => {
     haptics.selection();
-    setBusy(true); setError(null); setRes(null);
-    // Deliberation makes 4-6 sequential LLM calls and legitimately runs 30-90s;
-    // override the default 15s apiClient timeout so the panel can actually return.
-    const r = await api.post<Result>('/api/discourse/deliberate',
-      { task: 'creative', prompt, discord },
-      { timeoutMs: 180_000, retries: 0 });
-    if (r.ok && r.data && !r.data.error) setRes(r.data);
-    else setError((r.data && r.data.error) || r.error || `HTTP ${r.status}`);
-    setBusy(false);
-  }, [prompt, discord, busy, haptics]);
+    void beginObserve();
+  }, [beginObserve, haptics]);
+
+  const resume = React.useCallback(() => {
+    if (jobId && canResume) void beginObserve(jobId);
+  }, [beginObserve, canResume, jobId]);
+
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -67,6 +135,8 @@ export default function DiscourseScreen() {
             placeholder="What should the AI panel deliberate?"
             placeholderTextColor="#475569"
             multiline
+            maxLength={20_000}
+            editable={!busy}
           />
           <View style={styles.row}>
             <Text style={styles.discordLbl}>⚔️ Discord (cross red-team critique)</Text>
@@ -77,13 +147,38 @@ export default function DiscourseScreen() {
               <View style={styles.busyRow}><ActivityIndicator color="#fff" /><Text style={styles.ctaTxt}>  Panel deliberating…</Text></View>
             ) : <Text style={styles.ctaTxt}>Deliberate →</Text>}
           </TouchableOpacity>
-          {busy ? <Text style={styles.hint}>Multiple AIs draft, critique, then a judge picks the highest quality & fidelity (can take ~30-60s).</Text> : null}
+          {busy ? (
+            <View>
+              <Text style={styles.hint}>{progress || 'Observing an admitted private job…'}</Text>
+              <TouchableOpacity testID="dc-stop-observing" style={styles.secondaryCta}
+                onPress={() => observer.current?.abort()}>
+                <Text style={styles.secondaryTxt}>Stop observing (job may continue)</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {jobId ? <Text testID="dc-job-id" style={styles.hint}>Job: {jobId}</Text> : null}
           {error ? <Text style={styles.err}>{error}</Text> : null}
+          {!busy && canResume && jobId ? (
+            <TouchableOpacity testID="dc-resume" style={styles.secondaryCta} onPress={resume}>
+              <Text style={styles.secondaryTxt}>Resume checking this job</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {res ? (
             <View testID="dc-result">
               <View style={styles.winner}>
-                <Text style={styles.winnerTag}>🏆 WINNER · {res.winner_model} · {res.winner_score ?? '—'}/100</Text>
+                <Text style={styles.winnerTag}>
+                  {res.deliberation_mode === 'single_model_self_review' ? 'Single-model review' : '🏆 WINNER'} · {res.winner_model} · {res.winner_score ?? '—'}/100
+                </Text>
+                {res.deliberation_mode ? (
+                  <Text style={styles.modeHint}>
+                    {res.deliberation_mode === 'cross_provider'
+                      ? 'Multiple authorized providers participated.'
+                      : res.deliberation_mode === 'multiple_models_one_provider'
+                        ? 'Multiple authorized models from one provider participated.'
+                        : 'Only one authorized model was available; no independent model consensus is claimed.'}
+                  </Text>
+                ) : null}
                 <Text style={styles.winnerTxt}>{res.winner_content}</Text>
                 {res.judge_why ? <Text style={styles.judgeWhy}>Judge ({res.judge_model}): {res.judge_why}</Text> : null}
               </View>
@@ -133,6 +228,10 @@ const styles = StyleSheet.create({
   cta: { backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 14 },
   busyRow: { flexDirection: 'row', alignItems: 'center' },
   ctaTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  secondaryCta: { borderColor: '#64748b', borderWidth: 1, borderRadius: 10,
+    paddingVertical: 11, paddingHorizontal: 12, alignItems: 'center', marginTop: 10 },
+  secondaryTxt: { color: '#cbd5e1', fontWeight: '700', fontSize: 12 },
+  modeHint: { color: '#86efac', fontSize: 12, marginTop: 6 },
   hint: { color: '#64748b', fontSize: 12, marginTop: 8, textAlign: 'center' },
   err: { color: '#fca5a5', fontSize: 13, marginTop: 12 },
   winner: { backgroundColor: '#0f2417', borderColor: '#22c55e', borderWidth: 1, borderRadius: 12, padding: 14, marginTop: 18 },
