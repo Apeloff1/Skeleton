@@ -150,6 +150,6 @@ def test_interactive_journal_refreshes_concurrent_save_without_consuming_turn(tm
     assert advanced is not None
     assert result["head"] == advanced["head"]
     assert result["revision"] == 1
-    assert any("recent" in line.lower() or "turn" in line.lower()
-               for line in displayed)
+    from skeleton.game.gameplay.ridge_rescue.consumer_experience import recent_events
+    assert recent_events(advanced) in displayed
     assert player.audit("shared")["audit_entries"] == 1
