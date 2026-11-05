@@ -105,7 +105,7 @@ EXPOSE 8001
 # Use the Python standard library for health checks so the production image
 # does not need curl/apt packages solely for probing the local service.
 HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=10).read()" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health/ready', timeout=10).read()" || exit 1
 
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
 
