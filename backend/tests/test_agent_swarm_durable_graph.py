@@ -31,6 +31,7 @@ def _fake_worker_return(index, focus, project, run_id):
     return {
         "type": "Finding", "worker": index, "focus": focus,
         "node_id": f"{project}:{run_id}:worker:{index}",
+        "run_id": run_id,
         "recalled": [], "persisted": True,
     }
 
@@ -111,3 +112,22 @@ def test_graph_history_rejects_unbounded_limits(limit):
     with pytest.raises(HTTPException) as exc:
         asyncio.run(swarm.swarm_graph("game1", limit))
     assert exc.value.status_code == 422
+
+
+def test_unbound_or_forged_worker_receipt_blocks_durable_merge(monkeypatch):
+    async def fake_worker(index, focus, project, run_id):
+        return {
+            "worker": index,
+            "run_id": "different-run",
+            "node_id": f"{project}:{run_id}:worker:{index}",
+            "focus": focus,
+            "persisted": True,
+        }
+
+    monkeypatch.setattr(swarm, "_worker", fake_worker)
+    result = asyncio.run(swarm.run_swarm(swarm.SwarmReq(
+        directive="Build game runtime", workers=2
+    )))
+    assert result["ok"] is False
+    assert result["failed_workers"] == [0, 1]
+    assert result["merge"] is None
