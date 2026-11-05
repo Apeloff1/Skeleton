@@ -209,8 +209,7 @@ class NativeOperatorSession:
             ),
         )
 
-    @staticmethod
-    def _result(result,*,operation):
+    def _result(self,result,*,operation):
         return {
             "schema":"jeeves.native_operator_command_result.v1",
             "operation":operation,"run_id":result.run_id,
@@ -224,7 +223,8 @@ class NativeOperatorSession:
                 "tool_calls":result.usage.tool_calls,
             },
             **({"answer":result.answer} if result.success else {}),
-            "native_model_sha256":None,
+            "native_model_sha256":self.identity.model_sha256,
+            "native_tokenizer_sha256":self.identity.tokenizer_sha256,
             "real_hardware_qualified":False,
             "release_certified":False,
         }

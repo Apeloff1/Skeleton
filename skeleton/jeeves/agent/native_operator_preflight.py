@@ -73,6 +73,33 @@ class OperatorAdmission:
         }
 
 
+def check_native_resource_shape(
+    *,
+    context_tokens: int,
+    output_tokens: int,
+    native_threads: int,
+    gpu_layers: int,
+    capacity_budget_bytes: int,
+) -> None:
+    """Validate finite requested shape before loading any local model.
+
+    One shared check applies to both the single-task and the long-running
+    durable operator CLI. These are structural limits, not observed host
+    telemetry, model-source rights, installed receipt or native execution proof.
+    """
+    for label, value, minimum, maximum in (
+        ("context", context_tokens, 128, 131072),
+        ("output token budget", output_tokens, 1, 8192),
+        ("native threads", native_threads, 1, 64),
+        ("GPU layer limit", gpu_layers, 0, 128),
+        ("capacity budget", capacity_budget_bytes, 1, 20000000000),
+    ):
+        if type(value) is not int or not minimum <= value <= maximum:
+            raise NativeOperatorHold("invalid finite native " + label)
+    if output_tokens >= context_tokens:
+        raise NativeOperatorHold("native output must fit reserved context")
+
+
 def check_operator_admission(
     *,
     mode: str,
@@ -145,19 +172,13 @@ def check_operator_admission(
         or not math.isfinite(max_wall_seconds)
         or not 0 < max_wall_seconds <= 86400):
         raise NativeOperatorHold("invalid bounded wall clock budget")
-    # Structural preflight happens before private task reads and GGUF activation.
-    # Reported budgets never substitute for trusted resource and source evidence.
-    for label, value, minimum, maximum in (
-        ("context", context_tokens, 128, 131072),
-        ("output token budget", output_tokens, 1, 8192),
-        ("native threads", native_threads, 1, 64),
-        ("GPU layer limit", gpu_layers, 0, 128),
-        ("capacity budget", capacity_budget_bytes, 1, 20000000000),
-    ):
-        if type(value) is not int or not minimum <= value <= maximum:
-            raise NativeOperatorHold("invalid finite native " + label)
-    if output_tokens >= context_tokens:
-        raise NativeOperatorHold("native output must fit reserved context")
+    check_native_resource_shape(
+        context_tokens=context_tokens,
+        output_tokens=output_tokens,
+        native_threads=native_threads,
+        gpu_layers=gpu_layers,
+        capacity_budget_bytes=capacity_budget_bytes,
+    )
 
     if enable_source_tool and (mode != "agent" or source_root is None):
         raise NativeOperatorHold("source tool requires agent mode and signed source custody")
@@ -187,4 +208,4 @@ def check_operator_admission(
     )
 
 
-__all__ = ["NativeOperatorHold", "OperatorAdmission", "check_operator_admission"]
+__all__ = ["NativeOperatorHold", "OperatorAdmission", "check_operator_admission", "check_native_resource_shape"]
