@@ -373,3 +373,19 @@ existing cold capsule verifier. Archive contents and private paths never
 enter stdout; a SHA alone is not an authenticity signature, and no full
 project or release completion is claimed.
 See `docs/ai/JEEVES_PORTABLE_PRIVATE_SOURCE_CAPSULE.md`.
+
+## Real native GGUF/SQLite multi-task coding campaigns
+
+`desktop_native_campaign_cli` and `scripts/jeeves_native_campaign.py`
+now compose existing real native GGUF source generation and canonical SQLite
+sessions with the existing verified original source work and no-clobber
+private proposal escrow. A finite 1–12 task campaign has an immutable
+SHA-reviewed manifest, explicit dependency order, cumulative token/deadline
+limits, preflight of EVERY private target and independently consented
+campaign/native/private-storage grants. Before each actual native request,
+a new owner-private no-clobber audit journal fsyncs the exact ATTEMPT;
+only cold-verified saved source yields a SAVED receipt. Interrupted or
+uncertain work never auto-retries. Read-only cold verification reopens
+the journal hash chain and each private escrow without model startup or
+project modifications. No source text appears on stdout and no generated
+code executes. See `docs/ai/JEEVES_NATIVE_SOURCE_CAMPAIGNS.md`.
