@@ -4,7 +4,6 @@ name: Sealed Context Guard
 # replacement for Backend Quality, Merge Readiness or release certification.
 on:
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'skeleton/ai/runtime/inference/local.py'
@@ -55,6 +54,64 @@ on:
       - 'skeleton/testing/test_delivery_*.py'
       - 'skeleton/testing/test_sealed_*.py'
       - 'pyproject.toml'
+      - 'scripts/check_ai_file_tree.py'
+      - 'tests/test_ai_tree_syntax_membership_fail_closed.py'
+      - '.github/workflows/jeeves-integrated-source-qualification.yml'
+      - '.github/workflows/jeeves-laptop-dispatcher-source-tests.yml'
+      - '.github/workflows/jeeves-native-sqlite-source-qualification.yml'
+      - 'jeeves-desktop.sh'
+      - 'machine/ai_file_tree.json'
+      - 'machine/jeeves_source_ci_trigger_registry.json'
+      - 'scripts/check_jeeves_source_ci_scope.py'
+      - 'scripts/launch_jeeves_desktop.py'
+      - 'scripts/run_ai_laptop_native_e2e.py'
+      - 'skeleton/ai/agents/jeeves/**'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/**'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/cli.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/client.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/client_cli.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/cold_reopen_acceptance.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/dispatcher.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/first_turn_acceptance.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/installed_witness.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/replay_probe.py'
+      - 'skeleton/ai/runtime/operational_ai/laptop_runtime/turn_bridge.py'
+      - 'skeleton/ai/runtime/operational_ai/offline_cognition/families/duplicate_filter/evidence.py'
+      - 'skeleton/ai/runtime/production_fabric/product/**'
+      - 'skeleton/ai/runtime/production_fabric/product/cli.py'
+      - 'skeleton/jeeves/**'
+      - 'skeleton/jeeves/agent/native_*.py'
+      - 'skeleton/jeeves/agent/runtime.py'
+      - 'skeleton/testing/test_ai_flight_context_admission.py'
+      - 'skeleton/testing/test_ai_flight_http.py'
+      - 'skeleton/testing/test_ai_git_knowledge.py'
+      - 'skeleton/testing/test_ai_knowledge_plane.py'
+      - 'skeleton/testing/test_ai_native_daemon.py'
+      - 'skeleton/testing/test_ai_native_daemon_ops.py'
+      - 'skeleton/testing/test_jeeves_architecture_and_evidence_window.py'
+      - 'skeleton/testing/test_jeeves_desktop_*.py'
+      - 'skeleton/testing/test_jeeves_native_*.py'
+      - 'skeleton/testing/test_jeeves_native_durable_cli.py'
+      - 'skeleton/testing/test_jeeves_native_preload_admission.py'
+      - 'skeleton/testing/test_jeeves_private_batch_recovery.py'
+      - 'skeleton/testing/test_jeeves_single_provider_*.py'
+      - 'skeleton/testing/test_laptop_client_*.py'
+      - 'skeleton/testing/test_laptop_cold_reopen_*.py'
+      - 'skeleton/testing/test_laptop_dispatcher_*.py'
+      - 'skeleton/testing/test_laptop_exact_prompt_custody.py'
+      - 'skeleton/testing/test_laptop_inference_deadline_fence.py'
+      - 'skeleton/testing/test_laptop_once_*.py'
+      - 'skeleton/testing/test_laptop_real_acceptance_*.py'
+      - 'skeleton/testing/test_laptop_real_device_harness.py'
+      - 'skeleton/testing/test_laptop_replay_probe_*.py'
+      - 'skeleton/testing/test_laptop_runtime_*.py'
+      - 'skeleton/testing/test_laptop_runtime_dispatcher.py'
+      - 'skeleton/testing/test_laptop_runtime_http.py'
+      - 'skeleton/testing/test_laptop_runtime_turn_bridge.py'
+      - 'skeleton/testing/test_laptop_turnbridge_*.py'
+      - 'skeleton/testing/test_offline_cognition_duplicate_filter_evidence.py'
+      - 'tests/test_ci_portable_native_ai_fixtures.py'
+      - 'tests/test_jeeves_source_ci_scope.py'
       - '.github/workflows/sealed-context-guard.yml'
   push:
     branches:
@@ -69,7 +126,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  jeeves-source-scope:
+    name: Exact-head Jeeves source qualification admission
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sealed: ${{ steps.scope.outputs.sealed }}
+      integrated: ${{ steps.scope.outputs.integrated }}
+      sqlite: ${{ steps.scope.outputs.sqlite }}
+      laptop: ${{ steps.scope.outputs.laptop }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Validate strict CI admission ceiling and source-scope contracts
+        run: |
+          python scripts/check_ci_workflow_tiers.py
+          python -m unittest discover -s tests -p 'test_jeeves_source_ci_scope.py' -v
+      - name: Classify the exact GitHub merge-tree delta with no untrusted shell
+        id: scope
+        run: python scripts/check_jeeves_source_ci_scope.py
+
+  jeeves-integrated-source:
+    name: Jeeves integrated source-only qualification
+    needs: jeeves-source-scope
+    if: ${{ needs.jeeves-source-scope.outputs.integrated == 'true' }}
+    uses: ./.github/workflows/jeeves-integrated-source-qualification.yml
+    permissions:
+      contents: read
+
+  jeeves-sqlite-source:
+    name: Jeeves sqlite source-only qualification
+    needs: jeeves-source-scope
+    if: ${{ needs.jeeves-source-scope.outputs.sqlite == 'true' }}
+    uses: ./.github/workflows/jeeves-native-sqlite-source-qualification.yml
+    permissions:
+      contents: read
+
+  jeeves-laptop-source:
+    name: Jeeves laptop source-only qualification
+    needs: jeeves-source-scope
+    if: ${{ needs.jeeves-source-scope.outputs.laptop == 'true' }}
+    uses: ./.github/workflows/jeeves-laptop-dispatcher-source-tests.yml
+    permissions:
+      contents: read
   focused-inference-guard:
+    needs: jeeves-source-scope
+    if: ${{ always() && needs.jeeves-source-scope.result != 'failure' && (github.event_name != 'pull_request' || needs.jeeves-source-scope.outputs.sealed == 'true') }}
     name: Exact-head local inference and delivery contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -85,6 +193,8 @@ jobs:
       - name: Compile changed production boundaries
         run: |
           python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
+      - name: Verify AI-tree syntax and tracked-member integrity regressions
+        run: python -m pytest -q tests/test_ai_tree_syntax_membership_fail_closed.py
       - name: Verify canonical metadata and AI-tree parity
         run: |
           python scripts/check_root_package_metadata_parity.py

@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "agriculture_root_crops",
+  "domain": "agriculture",
+  "commodity": "root_crops",
+  "pricing": {
+    "base": 11,
+    "markup_percent": 115,
+    "tariff": 2,
+    "capacity": 94
+  },
+  "initial": {
+    "stock": 46,
+    "treasury": 3726,
+    "holdings": 0,
+    "wallet": 3726,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "agriculture_root_crops:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "agriculture_root_crops:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "agriculture_root_crops:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

@@ -1,37 +1,15 @@
 name: Jeeves native SQLite source qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/jeeves/agent/native_*.py"
-      - "skeleton/ai/agents/jeeves/**"
-      - "skeleton/jeeves/agent/runtime.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/**"
-      - "skeleton/ai/runtime/production_fabric/product/**"
-      - "skeleton/ai/runtime/operational_ai/offline_cognition/families/duplicate_filter/evidence.py"
-      - "skeleton/testing/test_jeeves_architecture_and_evidence_window.py"
-      - "skeleton/testing/test_jeeves_desktop_*.py"
-      - "skeleton/testing/test_jeeves_private_batch_recovery.py"
-      - "skeleton/testing/test_jeeves_native_preload_admission.py"
-      - "scripts/launch_jeeves_desktop.py"
-      - "jeeves-desktop.sh"
-      - "scripts/run_ai_laptop_native_e2e.py"
-      - "skeleton/testing/test_laptop_real_device_harness.py"
-      - "skeleton/testing/test_jeeves_native_*.py"
-      - "skeleton/testing/test_jeeves_single_provider_*.py"
-      - "skeleton/testing/test_laptop_runtime_*.py"
-      - "skeleton/testing/test_laptop_once_*.py"
-      - "skeleton/testing/test_laptop_real_acceptance_*.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/installed_witness.py"
-      - ".github/workflows/jeeves-native-sqlite-source-qualification.yml"
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: jeeves-native-sqlite-source-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: jeeves-native-sqlite-source-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   source_contracts:
