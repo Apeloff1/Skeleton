@@ -22,7 +22,7 @@ from skeleton.app.assembly import (
     runtime_manifest,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
-from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment
+from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment, runtime_source_fingerprint
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -119,6 +119,28 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
         # runtime when the optional provider key or signing seed is missing.
         detail += "; advisories: " + "; ".join(result.warnings)
     return InstallPhase("setup-runtime", True, detail)
+
+
+def _runtime_source_stable(root: Path, admitted_digest: str) -> bool:
+    """Check private .env custody without reading values into receipts.
+
+    This is an epoch fence, not a filesystem transaction: arbitrary external
+    writers may still race Docker. Any *observed* mutation denies qualification
+    and prevents follow-up admission with stale startup inputs.
+    """
+    try:
+        return runtime_source_fingerprint(root) == admitted_digest
+    except (OSError, ValueError, UnicodeError):
+        return False
+
+
+def _runtime_source_rejection() -> InstallPhase:
+    return InstallPhase(
+        "runtime-source-epoch",
+        False,
+        "private runtime configuration changed or became unsafe during installation; "
+        "services and readiness are not qualified; preserve .env and retry preflight",
+    )
 
 
 def install_application(
@@ -224,7 +246,28 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
-    manifest = runtime_manifest(manifest, root=root)
+    admitted_digest: str | None = None
+    if start:
+        try:
+            # A fresh installed runtime must have a bounded private source.
+            # No bypass for a missing or replaced .env, including bundled EXEs.
+            admitted_digest = runtime_source_fingerprint(root)
+        except (OSError, ValueError, UnicodeError):
+            phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
+    try:
+        manifest = runtime_manifest(manifest, root=root)
+    except (OSError, ValueError, UnicodeError):
+        phases.append(
+            InstallPhase(
+                "runtime-manifest", False,
+                "runtime port configuration invalid, unreadable or changed after preflight",
+            )
+        )
+        return InstallReceipt(root=root, phases=tuple(phases))
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
 
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
@@ -241,11 +284,19 @@ def install_application(
     phases.append(compose_validate)
     if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
+    if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
         host_urls = public_service_urls(root, manifest=manifest)
-    except ValueError as exc:
-        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+    except (OSError, ValueError, UnicodeError):
+        phases.append(
+            InstallPhase("public-endpoints", False, "public endpoint configuration unsafe or invalid")
+        )
+        return InstallReceipt(root=root, phases=tuple(phases))
+    if not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
         return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
@@ -277,6 +328,12 @@ def install_application(
         phases.append(InstallPhase("start", ok, detail))
     except (OSError, subprocess.SubprocessError) as exc:
         phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
+
+    # Even an apparently successful Compose exit cannot attest a startup
+    # whose private configuration changed during process execution.
+    if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
 
     full_start_ok = phases[-1].ok
     if not full_start_ok:
@@ -382,6 +439,9 @@ def install_application(
                     ),
                 )
             )
+
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
 
     return InstallReceipt(root=root, phases=tuple(phases))
 
