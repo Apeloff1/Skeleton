@@ -20,12 +20,13 @@
 import os
 import re
 import json
+import math
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from core.databases import client as _SHARED_MONGO_CLIENT
 from routes.llm_router import route_complete, MODEL_CATALOG
 
@@ -38,30 +39,77 @@ DEFAULT_PANEL = ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"]
 DEFAULT_JUDGE = "o3"
 MAX_PANEL = 5
 MAX_ROUNDS = 4  # group-chat discussion rounds (round 1 = independent drafts)
+MAX_PROMPT_CHARS = 20_000
+MAX_SYSTEM_CHARS = 8_000
+MAX_JUDGE_REPLY_CHARS = 32_768
+MAX_MODEL_CONTENT_CHARS = 12_000
 
 
 def _extract_json(text: str) -> dict:
-    if not text:
+    """A judge must return a bounded, duplicate-free, finite JSON object."""
+    if not isinstance(text, str) or len(text) > MAX_JUDGE_REPLY_CHARS:
         return {}
-    t = re.sub(r"```(?:json)?", "", text).strip().strip("`").strip()
-    try:
-        return json.loads(t)
-    except Exception:
-        pass
-    s = t.find("{")
-    if s == -1:
-        return {}
-    depth = 0
-    for i in range(s, len(t)):
-        if t[i] == "{": depth += 1
-        elif t[i] == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(t[s:i + 1])
-                except Exception:
-                    return {}
+    fence = chr(96) * 3
+    trimmed = re.sub(re.escape(fence) + r"(?:json)?", "", text).strip().strip(chr(96)).strip()
+
+    def unique_pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate judge JSON key")
+            result[key] = value
+        return result
+
+    def finite_constant(_token):
+        raise ValueError("nonfinite judge JSON number")
+
+    decoder = json.JSONDecoder(object_pairs_hook=unique_pairs, parse_constant=finite_constant)
+    starts = [0]
+    starts.extend(i for i, char in enumerate(trimmed) if char == "{" and i > 0)
+    for pos in starts[:64]:
+        try:
+            value, _ = decoder.raw_decode(trimmed[pos:])
+        except ValueError:
+            continue
+        if isinstance(value, dict):
+            return value
     return {}
+
+
+def _admit(task: str, prompt: str, system: str, panel: list | None,
+           judge_model: str, do_discord: bool, rounds: int) -> tuple[list[str], str]:
+    """Preflight direct and HTTP callers before spending provider tokens."""
+    if not isinstance(prompt, str) or not 4 <= len(prompt) <= MAX_PROMPT_CHARS:
+        raise ValueError("prompt must contain 4-20000 characters")
+    if not isinstance(task, str) or not 1 <= len(task) <= 128:
+        raise ValueError("task must be bounded non-empty text")
+    if not isinstance(system, str) or len(system) > MAX_SYSTEM_CHARS:
+        raise ValueError("system prompt exceeds size limit")
+    if type(rounds) is not int or not 1 <= rounds <= MAX_ROUNDS:
+        raise ValueError("round count must be between 1 and 4")
+    if type(do_discord) is not bool:
+        raise ValueError("discord flag must be boolean")
+    if not isinstance(judge_model, str) or len(judge_model) > 128:
+        raise ValueError("judge model identifier is invalid")
+    if panel is None or panel == []:
+        models = list(DEFAULT_PANEL)
+    elif isinstance(panel, (list, tuple)) and 1 <= len(panel) <= MAX_PANEL:
+        if any(not isinstance(model, str) or model not in MODEL_CATALOG for model in panel):
+            raise ValueError("panel contains an unavailable model")
+        models = list(panel)
+    else:
+        raise ValueError("panel exceeds model budget")
+    if len(set(models)) != len(models):
+        raise ValueError("panel must contain distinct model identifiers")
+    if judge_model and judge_model not in MODEL_CATALOG:
+        raise ValueError("judge model is unavailable")
+    return models, judge_model or DEFAULT_JUDGE
+
+
+def _score_int(value: object) -> int | None:
+    if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100:
+        return None
+    return int(value)
 
 
 _CRITIC_SYS = ("You are a ruthless but fair senior critic. Red-team the draft: list its "
@@ -79,22 +127,25 @@ _JUDGE_SYS = ("You are an impartial head judge. Score each candidate on QUALITY 
 async def deliberate(task: str, prompt: str, system: str = "",
                      panel: list = None, judge_model: str = "",
                      do_discord: bool = True, rounds: int = 1) -> dict:
-    """Run discourse → (group-chat rounds) → discord → judgement. Never raises."""
-    panel = [m for m in (panel or DEFAULT_PANEL) if m in MODEL_CATALOG][:MAX_PANEL]
-    if not panel:
-        panel = DEFAULT_PANEL
-    judge_model = judge_model if judge_model in MODEL_CATALOG else DEFAULT_JUDGE
-    rounds = max(1, min(int(rounds or 1), MAX_ROUNDS))
+    """Run bounded deliberation without reporting ungrounded judge verdicts."""
+    try:
+        panel, judge_model = _admit(task, prompt, system, panel, judge_model, do_discord, rounds)
+    except ValueError as exc:
+        return {"error": str(exc)}
 
-    # ROUND 1 — DISCOURSE: independent drafts across the panel (parallel).
     drafts = await asyncio.gather(*[
         route_complete(task, prompt, system, model=m, use_cache=False) for m in panel
-    ])
+    ], return_exceptions=True)
     candidates = []
-    for m, d in zip(panel, drafts):
-        if d.get("content"):
-            candidates.append({"model": m, "provider": MODEL_CATALOG.get(m, {}).get("provider"),
-                               "content": d["content"], "latency_ms": d.get("latency_ms", 0)})
+    for model, result in zip(panel, drafts):
+        if not isinstance(result, dict) or not isinstance(result.get("content"), str):
+            continue
+        if result["content"].strip():
+            candidates.append({
+                "model": model, "provider": MODEL_CATALOG.get(model, {}).get("provider"),
+                "content": result["content"][:MAX_MODEL_CONTENT_CHARS],
+                "latency_ms": result.get("latency_ms", 0),
+            })
     if not candidates:
         return {"error": "all panel models failed", "panel": panel}
     transcript = [{"round": 1, "kind": "draft",
