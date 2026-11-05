@@ -117,6 +117,11 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
                                   or any(ord(ch) < 33 or ord(ch) > 126 for ch in value)):
             return None
         values.append(value)
+    # A primary claiming two distinct endpoints cannot establish a stable
+    # writer authority. Reject it before observing an epoch; never normalize
+    # or resolve hostnames here because that would introduce network TOCTOU.
+    if values[1] is not None and values[2] is not None and values[1] != values[2]:
+        return None
     election = hello.get("electionId")
     if election is not None:
         try:
