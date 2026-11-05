@@ -402,8 +402,6 @@ def test_job_timeout_is_the_builder_deadline(monkeypatch, fallback_queue):
     assert seen == [30.0, 45.0]
 
 
-<<<<<<< HEAD
-=======
 @pytest.mark.parametrize("payload", [
     {"brief": "A small platformer", "binary": "/untrusted/program", "playtest": "require"},
     {"options": {"binary": "/untrusted/program", "playtest": "require"}},
@@ -638,7 +636,6 @@ def test_old_project_queue_entry_without_charter_admission_fails_closed(tmp_path
         svc.close()
 
 
->>>>>>> origin/main
 def test_trailing_heartbeat_timeout_keeps_the_result(monkeypatch):
     from skeleton.forge.game_build_queue import JobTimeout, handle_game_build
 

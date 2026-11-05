@@ -1,10 +1,6 @@
 """Sales stay closed until runtime qualification and buyer delivery exist."""
 from copy import deepcopy
 from types import SimpleNamespace
-<<<<<<< HEAD
-
-from routes import marketplace, playable_access
-=======
 from unittest.mock import AsyncMock
 
 import asyncio
@@ -12,18 +8,14 @@ import pytest
 
 from emergentintegrations.payments.stripe import checkout as stripe_facade
 from routes import creator_economy, marketplace, playable_access
->>>>>>> origin/main
 from backend.tests.test_playable_private_creation import project_boundary
 from backend.tests.test_private_memory_boundary import memory_boundary
 
 
-<<<<<<< HEAD
-=======
 def _sale_metadata():
     return {"source": "marketplace", "playable_id": "owned-game", "buyer_id": "alice@example.test"}
 
 
->>>>>>> origin/main
 def test_new_sales_fail_closed_after_private_project_authorization(project_boundary, monkeypatch):
     client, headers, users, database = project_boundary
     game = {"playable_id": "owned-game", "owner_id": "alice@example.test", "tenant_id": "tenant-a"}
@@ -58,11 +50,7 @@ def test_existing_listings_and_payment_status_remain_available(project_boundary,
     game = {"playable_id": "owned-game", "owner_id": "alice@example.test", "tenant_id": "tenant-a"}
     database.playables.rows.append({**game, "title": "Existing game"})
     database.marketplace_listings.rows.append({**game, "active": True, "price_usd": 4.99, "created_at": "2026-01-01"})
-<<<<<<< HEAD
-    database.payment_transactions.rows.append({**game, "session_id": "existing-session", "payment_status": "initiated"})
-=======
     database.payment_transactions.rows.append({**game, "session_id": "existing-session", "payment_status": "initiated", "buyer_id": "alice@example.test", "metadata": _sale_metadata()})
->>>>>>> origin/main
     monkeypatch.setattr(marketplace, "_db", playable_access.scoped_database(database))
     monkeypatch.setattr(marketplace, "STRIPE_API_KEY", "test-key")
     calls = []
@@ -81,8 +69,6 @@ def test_existing_listings_and_payment_status_remain_available(project_boundary,
     assert calls == ["existing-session"]
     assert client.get("/api/marketplace/checkout/status/existing-session", headers=headers["bob"]).json() == {"error": "unknown session"}
     assert calls == ["existing-session"]
-<<<<<<< HEAD
-=======
 
 
 def test_signed_completed_event_without_payment_status_does_not_imply_paid(monkeypatch):
@@ -412,4 +398,3 @@ def test_new_premium_checkout_is_blocked_before_provider_or_storage(project_boun
     assert response.status_code == 503
     assert response.json()["code"] == "premium_release_unavailable"
     assert all(not collection.writes for collection in database.collections.values())
->>>>>>> origin/main

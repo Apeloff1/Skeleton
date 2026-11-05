@@ -341,8 +341,6 @@ class GitBisectRun:
             )
             output = f"{proc.stdout}\n{proc.stderr}"
             result.steps = _read_steps(steps_log)
-<<<<<<< HEAD
-=======
             # Git trusts the caller's bad endpoint. Its summary is not proof
             # that this test command actually fails at that commit. Check it
             # in a disposable worktree before accepting any unique culprit.
@@ -359,7 +357,6 @@ class GitBisectRun:
                     self.git.run("worktree", "prune", check=False)
                 if endpoint_probe.outcome != BAD:
                     raise BisectError("test command does not fail at declared bad endpoint")
->>>>>>> origin/main
             match = _FIRST_BAD.search(output)
             if match:
                 result.first_bad = self.git.commit(match.group(1))
@@ -368,9 +365,6 @@ class GitBisectRun:
                 if could:
                     shas = [s for s in could.group(1).split() if s]
                     result.candidates = self.git.commits(shas)
-<<<<<<< HEAD
-                elif proc.returncode != 0:
-=======
                 elif proc.returncode == 0:
                     # Git may change its human-readable success wording. The
                     # fallback still requires a proven adjacent good/bad pair.
@@ -391,7 +385,6 @@ class GitBisectRun:
                         if predecessor == good_sha or good_witness:
                             result.first_bad = self.git.commit(bad_sha)
                 else:
->>>>>>> origin/main
                     raise BisectError("git bisect run failed: " + (output.strip().splitlines() or ["?"])[-1])
         finally:
             self._restore(head_before, branch_before)
@@ -417,8 +410,6 @@ class GitBisectRun:
             )
 
 
-<<<<<<< HEAD
-=======
 def _verified_bisect_head(git: Git, candidates: Sequence[str], good_sha: str,
                           steps: Sequence[BisectStep]) -> str | None:
     """Recover a first-bad SHA only from a uniquely proven git-bisect boundary.
@@ -442,7 +433,6 @@ def _verified_bisect_head(git: Git, candidates: Sequence[str], good_sha: str,
     return head
 
 
->>>>>>> origin/main
 def _read_steps(path: Path) -> list[BisectStep]:
     steps: list[BisectStep] = []
     try:

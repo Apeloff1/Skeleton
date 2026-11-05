@@ -4,11 +4,8 @@ from dataclasses import dataclass, replace
 import asyncio
 import hashlib
 import json
-<<<<<<< HEAD
-=======
 import threading
 import time
->>>>>>> origin/main
 
 import pytest
 
@@ -112,8 +109,6 @@ def test_adversarial_reviewer_block_is_fail_closed():
     assert engine.calls == 0
 
 
-<<<<<<< HEAD
-=======
 @pytest.mark.parametrize("allowed,reviewer_id,reason", [
     (1, "reviewer", "pass"), ("yes", "reviewer", "pass"),
     (True, 7, "pass"), (True, "reviewer", "  "),
@@ -270,7 +265,6 @@ def test_reviewer_worker_start_failure_does_not_dispatch_or_leak_capacity(monkey
     assert engine.calls == 1
 
 
->>>>>>> origin/main
 def test_tokenizer_roundtrip_and_missing_sampler_rejected():
     req = Request("policy", (), "valid")
     engine = Engine()
@@ -587,11 +581,7 @@ def test_native_projection_attestation_revoked_after_native_generation_withholds
         asyncio.run(guard.generate(
             req, snapshot=snapshot(req), tenant_scope_id="tenant",
         ))
-<<<<<<< HEAD
-    assert engine.calls == 1 and state["checks"] == 2
-=======
     assert engine.calls == 1 and state["checks"] == 3
->>>>>>> origin/main
 
 
 def test_native_grammar_and_projection_positive_recheck_required_on_success():
@@ -627,11 +617,7 @@ def test_native_grammar_and_projection_positive_recheck_required_on_success():
     ))
     assert output.text == '{"ok":true}'
     assert receipt.context_root == snapshot(req).root
-<<<<<<< HEAD
-    assert calls == {"sampler": 2, "projection": 2}
-=======
     assert calls == {"sampler": 2, "projection": 3}
->>>>>>> origin/main
 
 
 def test_native_token_mapping_drift_blocks_delivery_even_with_identical_text():
@@ -685,8 +671,6 @@ def test_token_ids_exceeding_native_uint64_are_rejected_before_model_execution()
             request, snapshot=snapshot(request), tenant_scope_id="tenant",
         ))
     assert engine.calls == 0
-<<<<<<< HEAD
-=======
 
 
 @pytest.mark.parametrize("timeout", [True, None, 0, -1, 31, float("nan"), float("inf")])
@@ -973,4 +957,3 @@ def test_reviewer_failure_never_exposes_private_input_or_leaks_capacity(synchron
     guard.reviewer = reviewer
     result, _ = asyncio.run(guard.generate(request, snapshot=snapshot(request), tenant_scope_id="tenant"))
     assert result.text and engine.calls == 1
->>>>>>> origin/main

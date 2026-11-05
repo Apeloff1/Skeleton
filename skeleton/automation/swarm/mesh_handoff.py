@@ -2,12 +2,6 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-from skeleton.automation.swarm.mesh import Mesh
-from skeleton.automation.agents.mesh import AgentMesh
-from skeleton.automation.swarm.handoff import HandoffRegistry, TaskEnvelope
-
-=======
 from typing import TYPE_CHECKING
 
 from skeleton.automation.swarm.mesh import Mesh
@@ -16,7 +10,6 @@ from skeleton.automation.swarm.handoff import HandoffRegistry, TaskEnvelope
 if TYPE_CHECKING:
     from skeleton.automation.agents.mesh import AgentMesh
 
->>>>>>> origin/main
 
 class MeshHandoffAdapter:
     """Route tasks before creating envelopes, avoiding unassignable orphans.

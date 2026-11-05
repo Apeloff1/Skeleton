@@ -78,14 +78,8 @@ concurrency:
 jobs:
   frontier-reference:
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    # Both focused regression batches must finish; a 20-minute ceiling
-    # canceled the second batch despite 981 passes in the first.
-    # No coverage, dependency, or release gate is skipped.
-=======
     # Compile and run the first focused batch; the full studio batch runs
     # in two separate required matrix partitions below.
->>>>>>> origin/main
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -105,34 +99,6 @@ jobs:
       - name: Focused regression proof
         run: |
           python -m pytest -q tests/test_game_frontier*.py
-<<<<<<< HEAD
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -q --noconftest \
-            skeleton/testing/test_game_production_quality.py \
-            skeleton/testing/test_game_production_deep_quality.py \
-            skeleton/testing/test_game_production_frontier_quality.py \
-            skeleton/testing/test_game_production_studio_quality.py \
-            skeleton/testing/test_game_production_advanced_quality.py \
-            skeleton/testing/test_game_production_expanded_quality.py \
-            skeleton/testing/test_game_frontier_studio_authoring.py \
-            skeleton/testing/test_game_frontier_studio_second_fifty.py \
-            skeleton/testing/test_game_frontier_studio_authoring_next50.py \
-            skeleton/testing/test_game_frontier_studio_authoring_hundred.py \
-            skeleton/testing/test_game_frontier_studio_authoring_500.py \
-            skeleton/testing/test_game_frontier_studio_production_5000.py \
-            skeleton/testing/test_game_frontier_studio_production_50000.py \
-            skeleton/testing/test_game_frontier_studio_production_500000.py \
-            skeleton/testing/test_game_frontier_studio_production_5000000.py \
-            skeleton/testing/test_game_frontier_studio_production_50000000.py \
-            skeleton/testing/test_game_frontier_studio_production_500000000.py \
-            skeleton/testing/test_game_frontier_studio_production_5000000000.py \
-            skeleton/testing/test_game_frontier_studio_production_50000000000.py \
-            skeleton/testing/test_game_frontier_studio_production_500000000000.py \
-            skeleton/testing/test_game_frontier_studio_production_5000000000000.py \
-            skeleton/testing/test_game_frontier_studio_production_50000000000000.py \
-            skeleton/testing/test_game_frontier_book_curriculum_operational.py \
-            skeleton/testing/test_game_frontier_studio_epic_routes.py \
-            skeleton/testing/test_game_frontier_studio_epic_lod.py
-=======
 
 
   # Every canonical studio regression module is required exactly once.
@@ -224,7 +190,6 @@ jobs:
               ;;
             *) echo "Invalid required studio partition: $PARTITION" >&2; exit 64 ;;
           esac
->>>>>>> origin/main
 
   godot4-native-smoke:
     # No new root Actions admission: retain the pinned real-Godot checks as a reusable job.

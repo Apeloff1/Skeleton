@@ -8,11 +8,6 @@ existing TinyTransformer without changing its internals.
 from __future__ import annotations
 
 from dataclasses import dataclass
-<<<<<<< HEAD
-from typing import Callable, Iterable, Sequence, TypeVar
-
-T = TypeVar("T")
-=======
 from itertools import islice
 import math
 from typing import Callable, Iterable, Sequence, TypeVar
@@ -21,7 +16,6 @@ T = TypeVar("T")
 _MAX_DRAFT_MODELS = 8
 _MAX_LOOKAHEAD_TOKENS = 2048
 _MAX_PREFIX_TOKENS = 16_384
->>>>>>> origin/main
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,15 +34,9 @@ class SpeculativeDecoder:
     """Draft/verify coordinator with bounded proposal batches."""
 
     def __init__(self, max_proposals: int = 8) -> None:
-<<<<<<< HEAD
-        if max_proposals < 1:
-            raise ValueError("max_proposals must be positive")
-        self.max_proposals = int(max_proposals)
-=======
         if type(max_proposals) is not int or not 1 <= max_proposals <= 256:
             raise ValueError("max_proposals must be an integer in [1, 256]")
         self.max_proposals = max_proposals
->>>>>>> origin/main
 
     def decode(
         self,
@@ -59,13 +47,9 @@ class SpeculativeDecoder:
         steps: int | None = None,
     ) -> SpeculationResult:
         n = self.max_proposals if steps is None else max(0, min(self.max_proposals, int(steps)))
-<<<<<<< HEAD
-        proposals = tuple(draft(prefix, n))[:n]
-=======
         # Never exhaust an arbitrary proposal iterable before applying the
         # admission bound: it may be infinite or perform expensive work.
         proposals = tuple(islice(draft(prefix, n), n)) if n else ()
->>>>>>> origin/main
         accepted: list[T] = []
         rejected: list[T] = []
         context = list(prefix)
@@ -229,17 +213,10 @@ def cooperative_speculative(
 class GrammarBudgetLogitProcessor:
     """Neuro-Symbolic Grammar & Hardware-Budget Constrained Logit Masker.
 
-<<<<<<< HEAD
-    Applies hard masks (-1e9) and soft domain biases to raw token logits during
-    generation to enforce:
-      - allowed/banned token vocabularies (e.g., GDScript syntax or ROM assembly tokens),
-      - non-repeating n-gram diversity constraints,
-=======
     Applies hard masks (-inf) and soft domain biases to raw token logits during
     generation to enforce:
       - allowed/banned token vocabularies (e.g., GDScript syntax or ROM assembly tokens),
       - soft penalties for repeating n-grams,
->>>>>>> origin/main
       - required keyword urgency boosting as remaining token budget shrinks,
       - hardware tile/sprite/palette token affinity.
     """
@@ -263,11 +240,6 @@ class GrammarBudgetLogitProcessor:
             else None
         )
         self.banned_ids: set[int] = {self.stoi[t] for t in (banned_tokens or ()) if t in self.stoi}
-<<<<<<< HEAD
-        self.required_ids: list[int] = [self.stoi[t] for t in (required_tokens or ()) if t in self.stoi]
-        self.boost_ids: set[int] = {self.stoi[t] for t in (domain_boost_tokens or ()) if t in self.stoi}
-        self.boost_bias = float(boost_bias)
-=======
         self.required_ids: list[int] = list(dict.fromkeys(
             self.stoi[t] for t in (required_tokens or ()) if t in self.stoi
         ))
@@ -275,7 +247,6 @@ class GrammarBudgetLogitProcessor:
         self.boost_bias = float(boost_bias)
         if not math.isfinite(self.boost_bias):
             raise ValueError("grammar boost_bias must be finite")
->>>>>>> origin/main
         self.no_repeat_ngram_size = max(0, int(no_repeat_ngram_size))
 
     def process(
@@ -287,28 +258,16 @@ class GrammarBudgetLogitProcessor:
     ) -> list[float]:
         out = [float(x) for x in logits]
         vocab = len(out)
-<<<<<<< HEAD
-        if not vocab:
-            return out
-=======
         if not vocab or vocab != len(self.itos):
             raise ValueError("grammar logits must match the nonempty vocabulary")
         if any(math.isnan(value) or value == math.inf for value in out):
             raise ValueError("grammar logits contain NaN or positive infinity")
         if type(steps_remaining) is not int or steps_remaining < 1:
             raise ValueError("remaining grammar budget must be a positive integer")
->>>>>>> origin/main
 
         if self.allowed_ids is not None:
             for i in range(vocab):
                 if i not in self.allowed_ids:
-<<<<<<< HEAD
-                    out[i] = -1e9
-
-        for b_id in self.banned_ids:
-            if 0 <= b_id < vocab:
-                out[b_id] = -1e9
-=======
                     out[i] = -math.inf
 
         for b_id in self.banned_ids:
@@ -320,7 +279,6 @@ class GrammarBudgetLogitProcessor:
             for token in self.required_ids
         ):
             raise ValueError("required grammar tokens conflict with allowed or banned tokens")
->>>>>>> origin/main
 
         # Block repeating n-grams
         n = self.no_repeat_ngram_size
@@ -340,11 +298,7 @@ class GrammarBudgetLogitProcessor:
 
         # Boost domain-relevant tokens
         for b_id in self.boost_ids:
-<<<<<<< HEAD
-            if 0 <= b_id < vocab and out[b_id] > -1e8:
-=======
             if 0 <= b_id < vocab and math.isfinite(out[b_id]):
->>>>>>> origin/main
                 out[b_id] += self.boost_bias
 
         # Escalate urgency for unsatisfied required tokens as budget runs out
@@ -352,33 +306,18 @@ class GrammarBudgetLogitProcessor:
             seen = set(int(x) for x in generated_ids)
             missing = [r_id for r_id in self.required_ids if r_id not in seen and 0 <= r_id < vocab]
             if missing:
-<<<<<<< HEAD
-=======
                 if steps_remaining < len(missing):
                     raise ValueError("remaining budget cannot satisfy required grammar tokens")
->>>>>>> origin/main
                 urgency = self.boost_bias * (1.0 + float(len(missing)) / max(1.0, float(steps_remaining)))
                 if steps_remaining <= len(missing):
                     # Force next token from missing required set when budget is tight
                     for i in range(vocab):
                         if i not in missing:
-<<<<<<< HEAD
-                            out[i] = -1e9
-=======
                             out[i] = -math.inf
->>>>>>> origin/main
                         else:
                             out[i] += urgency
                 else:
                     for r_id in missing:
-<<<<<<< HEAD
-                        if out[r_id] > -1e8:
-                            out[r_id] += urgency
-
-        # Ensure at least one finite unmasked candidate exists
-        if all(x <= -1e8 for x in out):
-            return [float(x) for x in logits]
-=======
                         if math.isfinite(out[r_id]):
                             out[r_id] += urgency
 
@@ -387,7 +326,6 @@ class GrammarBudgetLogitProcessor:
             raise ValueError("grammar constraints mask every token")
         if any(math.isnan(value) or value == math.inf for value in out):
             raise ValueError("grammar biases exceeded finite logit bounds")
->>>>>>> origin/main
         return out
 
 
@@ -403,15 +341,6 @@ def lookahead_jacobi_decode(
 ) -> dict[str, object]:
     """Multi-Branch Lookahead Jacobi Speculative Decoding with N-gram Trajectory Cache.
 
-<<<<<<< HEAD
-    Combines parallel multi-draft tree proposals with Jacobi fixed-point
-    lookahead iterations and an online n-gram trajectory cache populated from
-    every Jacobi verification step, accelerating structured game/code/ROM
-    generation while preserving exact verifier greedy/constrained validity.
-    """
-    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
-        raise ValueError("n must be a nonnegative integer")
-=======
     Combines multiple draft branches with Jacobi fixed-point
     lookahead iterations and an online n-gram trajectory cache populated from
     Jacobi verification steps. Published tokens follow the verifier's greedy
@@ -422,24 +351,10 @@ def lookahead_jacobi_decode(
         raise ValueError(f"n must be an integer in [0, {_MAX_LOOKAHEAD_TOKENS}]")
     if isinstance(drafts, (list, tuple)) and len(drafts) > _MAX_DRAFT_MODELS:
         raise ValueError(f"at most {_MAX_DRAFT_MODELS} draft models are allowed")
->>>>>>> origin/main
     draft_list = [drafts] if not isinstance(drafts, (list, tuple)) else list(drafts)
     draft_list = [d for d in draft_list if d is not None]
     if not draft_list:
         draft_list = [verifier]
-<<<<<<< HEAD
-    vocab = int(getattr(verifier, "V", -1))
-    for d in draft_list:
-        if int(getattr(d, "V", -2)) != vocab:
-            raise ValueError("all draft models must share vocabulary size V with verifier")
-
-    context = [int(t) for t in prefix]
-    if not context:
-        raise ValueError("lookahead context must be non-empty")
-
-    win = max(1, min(8, int(lookahead_window)))
-    iters = max(1, min(6, int(max_jacobi_iters)))
-=======
     vocab = getattr(verifier, "V", None)
     if type(vocab) is not int or vocab <= 0:
         raise ValueError("verifier vocabulary size must be a positive integer")
@@ -457,7 +372,6 @@ def lookahead_jacobi_decode(
     if type(max_jacobi_iters) is not int or not 1 <= max_jacobi_iters <= 6:
         raise ValueError("max_jacobi_iters must be an integer in [1, 6]")
     win, iters = lookahead_window, max_jacobi_iters
->>>>>>> origin/main
     ngram_pool: dict[tuple[int, int], list[int]] = {}
     published: list[int] = []
     total_proposed = 0
@@ -469,14 +383,6 @@ def lookahead_jacobi_decode(
         ctx_len = int(getattr(model, "ctx", 6) or 6)
         w_seq = [int(x) for x in seq][-ctx_len:] or [0]
         raw_logits = list(model._logits(w_seq))
-<<<<<<< HEAD
-        if logit_processor is not None:
-            raw_logits = logit_processor.process(
-                raw_logits,
-                published + list(seq[len(prefix):]),
-                steps_remaining=max(1, rem),
-            )
-=======
         if len(raw_logits) != vocab or any(
             not isinstance(value, (int, float)) or isinstance(value, bool)
             or math.isnan(value) or value == math.inf for value in raw_logits
@@ -494,7 +400,6 @@ def lookahead_jacobi_decode(
             raise ValueError("lookahead policy masks every token or changes the vocabulary")
         if any(math.isnan(value) or value == math.inf for value in raw_logits):
             raise ValueError("lookahead policy produced non-finite logits")
->>>>>>> origin/main
         return max(range(len(raw_logits)), key=lambda idx: (raw_logits[idx], -idx))
 
     while len(published) < n:
@@ -508,11 +413,7 @@ def lookahead_jacobi_decode(
             if cached_cont:
                 candidate_branches.append((-1, list(cached_cont[:room])))
 
-<<<<<<< HEAD
-        # Branches 0..K-1: Draft models with Jacobi parallel refinement
-=======
         # Branches 0..K-1: Draft models with bounded Jacobi refinement
->>>>>>> origin/main
         for d_idx, d_model in enumerate(draft_list):
             cur = list(context)
             guess: list[int] = []
@@ -544,10 +445,6 @@ def lookahead_jacobi_decode(
         # Verify all candidate branches against the authoritative verifier and pick longest accepted prefix
         best_branch_id = 0
         best_accepted: list[int] = []
-<<<<<<< HEAD
-        fallback_tok: int | None = None
-=======
->>>>>>> origin/main
 
         for b_id, branch_tokens in candidate_branches:
             total_proposed += len(branch_tokens)
@@ -562,11 +459,6 @@ def lookahead_jacobi_decode(
                     acc.append(b_tok)
                     v_cursor.append(b_tok)
                 else:
-<<<<<<< HEAD
-                    if fallback_tok is None:
-                        fallback_tok = v_tok
-=======
->>>>>>> origin/main
                     break
             if len(acc) > len(best_accepted):
                 best_accepted = acc
@@ -580,15 +472,10 @@ def lookahead_jacobi_decode(
                     context.append(tok)
                     published.append(tok)
         if len(best_accepted) < room and len(published) < n:
-<<<<<<< HEAD
-            if fallback_tok is None:
-                fallback_tok = _select_token(verifier, context, n - len(published))
-=======
             # A different branch may have rejected earlier at a different
             # prefix. Recompute from the actual accepted context so a stale
             # fallback can never become an authoritative output token.
             fallback_tok = _select_token(verifier, context, n - len(published))
->>>>>>> origin/main
             context.append(fallback_tok)
             published.append(fallback_tok)
 

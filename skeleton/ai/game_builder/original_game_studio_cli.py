@@ -60,9 +60,6 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-<<<<<<< HEAD
-    args = parser().parse_args(argv)
-=======
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0] == "inspect-receipt":
         from .offline_receipt_inspect_cli import main as inspect_main
@@ -80,7 +77,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .dual_runtime_verify_cli import main as verify_main
         return verify_main(arguments[1:])
     args = parser().parse_args(arguments)
->>>>>>> origin/main
     if not args.trusted_local_operator:
         print("error: external operator authorization acknowledgement required", file=sys.stderr)
         return 2

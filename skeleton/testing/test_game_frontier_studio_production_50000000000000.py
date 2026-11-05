@@ -142,12 +142,6 @@ class FiftyTrillionEpicVariations(unittest.TestCase):
         args = {**arguments(name),
                 "epic_layers": [l.layer_id for l in clones]}
         candidate = execute_authoring(initial, name, args)
-<<<<<<< HEAD
-        self.assertEqual(8, len(candidate.layers))
-        for old, new in zip(initial.layers, candidate.layers):
-            self.assertNotEqual(old.data, new.data)
-        self.assertEqual(8, len(initial.layers))
-=======
         self.assertEqual(len(initial.layers), len(candidate.layers))
         self.assertEqual(len(original.layers) + len(clones), len(initial.layers))
         selected_ids = {layer.layer_id, *(item.layer_id for item in clones)}
@@ -159,7 +153,6 @@ class FiftyTrillionEpicVariations(unittest.TestCase):
             else:
                 # An Epic edit must never mutate an unselected source layer.
                 self.assertEqual(old.data, new.data)
->>>>>>> origin/main
         self.assertEqual(layer.data, initial.layers[0].data)
         with self.assertRaises(StudioError):
             execute_authoring(initial, name, {

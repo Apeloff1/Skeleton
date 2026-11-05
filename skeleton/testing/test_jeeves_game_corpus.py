@@ -3,14 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-<<<<<<< HEAD
-from pathlib import Path
-import tempfile
-import unittest
-
-from skeleton.ai.training.jeeves_game_corpus import (
-    FAMILIES, RIGHTS_SCHEMA, SCHEMA, load_approved_corpus,
-=======
 import os
 from pathlib import Path
 import tempfile
@@ -19,7 +11,6 @@ from unittest.mock import patch
 
 from skeleton.ai.training.jeeves_game_corpus import (
     FAMILIES, RIGHTS_SCHEMA, SCHEMA, _read_bounded_regular_file, load_approved_corpus,
->>>>>>> origin/main
 )
 from skeleton.ai.training.jeeves_production_game_train import ProductionCheckpointError
 
@@ -116,8 +107,6 @@ class JeevesGameCorpusTests(unittest.TestCase):
             "Repair a forest bridge", "Negotiate peace with strangers near the harbor."
         ))
 
-<<<<<<< HEAD
-=======
     def test_loader_rejects_short_embedded_prompts_in_either_split(self) -> None:
         for short_is_heldout in (True, False):
             with self.subTest(short_is_heldout=short_is_heldout), tempfile.TemporaryDirectory() as d:
@@ -138,7 +127,6 @@ class JeevesGameCorpusTests(unittest.TestCase):
                 with self.assertRaisesRegex(ProductionCheckpointError, "answer near-duplicates"):
                     load_approved_corpus(regenerate())
 
->>>>>>> origin/main
     def test_file_modification_invalidates_admission_sha(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -149,8 +137,6 @@ class JeevesGameCorpusTests(unittest.TestCase):
             with self.assertRaisesRegex(ProductionCheckpointError, "SHA-256"):
                 load_approved_corpus(path)
 
-<<<<<<< HEAD
-=======
     def test_manifest_receipt_binds_the_bytes_loaded(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             _, _, regenerate = self._fixtures(Path(temp))
@@ -160,7 +146,6 @@ class JeevesGameCorpusTests(unittest.TestCase):
             self.assertEqual(receipt["manifest_sha256"], expected)
             self.assertEqual(receipt["manifest_path"], str(manifest.absolute()))
 
->>>>>>> origin/main
     def test_rights_denial_never_enters_training(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -249,8 +234,6 @@ class JeevesGameCorpusTests(unittest.TestCase):
                 load_approved_corpus(path)
 
 
-<<<<<<< HEAD
-=======
 class BoundedCorpusSnapshotTests(unittest.TestCase):
     def _read(self, path: Path) -> bytes:
         return _read_bounded_regular_file(path, minimum=16, maximum=64, label="test corpus")
@@ -328,6 +311,5 @@ class BoundedCorpusSnapshotTests(unittest.TestCase):
                 self._read(link)
 
 
->>>>>>> origin/main
 if __name__ == "__main__":
     unittest.main()

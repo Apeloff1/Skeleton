@@ -1,15 +1,5 @@
 # Guarded local inference readiness — 2026-10-28
 
-<<<<<<< HEAD
-The sealed-context guard is available only through explicit trusted application
-composition. The normal local provider path does not enable this protection by
-default. **Docker Compose and the Dockerfile do not supply the required trusted
-bootstrap**, so this deployment must not be described as protected local
-inference or certified as satisfying the sealed-context guard contract.
-
-Guarded activation requires a pinned canonical instruction digest, canonical
-Mongo conversation and memory owners sharing a majority-durable source epoch,
-=======
 # Later status (2026-11-02)
 
 The initial review covered the October 28 candidate. The current source
@@ -73,7 +63,6 @@ inference.
 Guarded activation requires a pinned canonical instruction digest, canonical
 Mongo conversation and memory owners sharing a majority-durable source epoch
 with primary-bound linearizable reads,
->>>>>>> origin/main
 an authorized per-execution snapshot reader, an independently administered
 bounded reviewer, and a tokenizer tied to the exact activated native model.
 The application owner must install these before engine startup via the trusted
@@ -83,32 +72,16 @@ The registry and deployment activation paths also require integration of the
 tokenizer binding with the same backend instance they create; a generic GGUF
 CLI tokenizer cannot be assumed to satisfy this identity requirement.
 
-<<<<<<< HEAD
-An explicitly required guard fails closed when its trusted components are
-missing. That behavior and the opt-in protected path do not prove the default
-installation is protected. Enabling the guard by default before the real
-authorities are configured would disable local inference, not complete the
-security integration. The existing regression expecting mandatory default-on
-remains a release blocker until the production composition is implemented and
-verified end to end.
-=======
 The guard fails closed when its trusted components are missing. Production
 composition still needs end-to-end qualification. The default standalone Mongo
 service cannot provide the linearizable epoch reader; there is no fallback to a
 potentially stale majority snapshot. Moving to a replica set requires a separate
 qualified migration that preserves existing source data and writer custody.
->>>>>>> origin/main
 
 Generic transfer-policy and admission decision identifiers can be present for
 legacy local inference. They are not evidence of a sealed-context review or a
 native execution receipt.
 
-<<<<<<< HEAD
-The current reviewer and tokenizer calls run synchronously on the event loop;
-the protected route does not yet enforce an independent resource or time
-limit around those calls. Multi-model catalog activation and its exact native
-tokenizer bindings also require production qualification.
-=======
 Asynchronous guarded generation bounds the independent reviewer and native
 verification/preparation callbacks with separate single daemon-worker slots per
 guard. Each has a five-second default timeout capped by the caller deadline.
@@ -120,19 +93,11 @@ delivery checks still do not constitute an atomic cross-process revocation
 fence. Multi-model catalog activation and exact native tokenizer bindings
 require production qualification. Native child-process failure messages no
 longer expose raw stderr that may contain prompt text.
->>>>>>> origin/main
 
 Existing checkpoints that only contain the older `local_provider_binding`, or
 no provider binding, do not establish the newer route, verifier, cooperation
 and tenant identities. Unfinished work that would need execution therefore
 fails closed after upgrade rather than reconstructing an unverifiable binding.
-<<<<<<< HEAD
-Committed results remain readable, cancellation and deadline termination are
-preserved when the configured provider is available, and an unresolved approval
-can remain observable without executing its tool. Approval does not authorize
-resuming unbound work. A staged but uncommitted result remains subject to the
-provider binding check; it is not treated as an already committed result.
-=======
 Committed results remain readable. Cancellation, deadlines and unresolved
 approvals can be recovered without an available provider; approved tool work
 and staged results remain retained until the original provider can be checked.
@@ -140,4 +105,3 @@ A staged result is never treated as an already committed result. If admission
 completion fails after a terminal result commits, current maintenance scans
 nonterminal executions and does not independently retry completion; a durable
 completion outbox or equivalent reconciliation remains required.
->>>>>>> origin/main

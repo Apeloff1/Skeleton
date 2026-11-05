@@ -247,10 +247,7 @@ class RankedMillionBookLibrary(unittest.TestCase):
             self.assertTrue((Path(temp)/CAMPAIGN_BOOK_PATHS[0]).is_file())
             data=json.loads(Path(result["ranking_file"]).read_text())
             self.assertEqual("rendered_export_batch_only",data["scope"])
-<<<<<<< HEAD
-=======
             self.assertEqual(result["scope"],data["scope"])
->>>>>>> origin/main
             self.assertEqual(2,len(data["ranking"]["quality"]))
             self.assertEqual(2,len(data["ranking"]["length"]))
 

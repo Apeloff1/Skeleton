@@ -33,10 +33,7 @@ _INSTRUCTION_PATTERN = re.compile(
     r"ignore\s+(?:all\s+)?previous\s+instructions?"
     r"|system\s+prompt"
     r"|developer\s+message"
-<<<<<<< HEAD
-=======
     r"|(?:system|developer)\s*:\s*(?:override|ignore|follow)\b"
->>>>>>> origin/main
     r"|follow\s+(?:these|the)\s+instructions?"
     r"|override\s+(?:the\s+)?(?:system|developer|policy)"
     r")\b"
@@ -140,8 +137,6 @@ def _sanitize_metadata(metadata: Mapping[str, object]) -> dict[str, object]:
     return dict(sorted(result.items()))
 
 
-<<<<<<< HEAD
-=======
 def _verify_declared_media_metadata(
     metadata: Mapping[str, object], measurement: MediaValidationReceipt,
 ) -> None:
@@ -184,7 +179,6 @@ def _verify_declared_media_metadata(
             raise MultimodalSanitizationError("declared media metadata conflicts with decoded source")
 
 
->>>>>>> origin/main
 def _detect_embedded_instruction(
     payload: bytes,
     metadata: Mapping[str, object],
@@ -306,11 +300,7 @@ class MultimodalIntake:
                 "authority_scope",
             )
         ):
-<<<<<<< HEAD
-            raise MultimodalSanitizationError("asset id already bound to different source semantics")
-=======
             raise MultimodalSanitizationError("asset identity conflict: asset id already bound to different source semantics")
->>>>>>> origin/main
         if prior is None and len(self._assets) >= self.max_assets:
             raise MultimodalSanitizationError("asset registry capacity exceeded")
         return candidate
@@ -355,10 +345,7 @@ class MultimodalIntake:
             )
         except MediaValidationError as exc:
             raise MultimodalSanitizationError(str(exc)) from exc
-<<<<<<< HEAD
-=======
         _verify_declared_media_metadata({} if metadata is None else metadata, measurement)
->>>>>>> origin/main
         verified = VerifiedMultimodalAsset(
             asset_id=candidate.asset_id,
             modality=candidate.modality,
@@ -377,17 +364,10 @@ class MultimodalIntake:
         self._assets[candidate.asset_id] = verified
         return verified
 
-<<<<<<< HEAD
-    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> None:
-        if self._assets.get(getattr(asset, "asset_id", None)) is not asset:
-            raise MultimodalSanitizationError("verified asset was not issued by this intake")
-        verify_verified_asset(asset, source)
-=======
     def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> VerifiedMultimodalAsset:
         if self._assets.get(getattr(asset, "asset_id", None)) is not asset:
             raise MultimodalSanitizationError("verified asset was not issued by this intake")
         return verify_verified_asset(asset, source)
->>>>>>> origin/main
 
     def safe_sanitize(self, **kwargs) -> MultimodalAsset:
         try:
@@ -425,11 +405,7 @@ class VerifiedMultimodalAsset(MultimodalAsset):
             raise MultimodalSanitizationError("decoder receipt and source identity differ")
 
 
-<<<<<<< HEAD
-def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None:
-=======
 def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> VerifiedMultimodalAsset:
->>>>>>> origin/main
     if not isinstance(asset, VerifiedMultimodalAsset):
         raise MultimodalSanitizationError("typed verified asset is required")
     if not isinstance(source, bytes) or len(source) != asset.content_bytes:
@@ -443,12 +419,6 @@ def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> Veri
             mime_type=asset.mime_type,
             limits=asset.validation.limits,
         )
-<<<<<<< HEAD
-    except (MediaValidationError, AttributeError, TypeError) as exc:
-        raise MultimodalSanitizationError("verified source cannot be decoded") from exc
-    if measured.as_dict() != asset.validation.as_dict() or asset.instruction_trusted:
-        raise MultimodalSanitizationError("actual decoded source differs from issued evidence")
-=======
     except MediaValidationError as exc:
         # Preserve a bounded policy-field diagnostic, never decoder payload data.
         if "max_pixels" in str(exc):
@@ -459,7 +429,6 @@ def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> Veri
     if measured.as_dict() != asset.validation.as_dict() or asset.instruction_trusted:
         raise MultimodalSanitizationError("actual decoded source differs from issued evidence")
     return asset
->>>>>>> origin/main
 
 
 _INSTRUCTION_PATTERNS = (re.compile(_INSTRUCTION_PATTERN.pattern.encode()),)

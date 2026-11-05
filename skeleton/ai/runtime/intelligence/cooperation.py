@@ -44,10 +44,7 @@ def normalize_cooperation_policy(value: object) -> dict[str, object] | None:
     if not isinstance(value, Mapping) or set(value) - {
         "schema_version",
         "review_rounds",
-<<<<<<< HEAD
-=======
         "draft_count",
->>>>>>> origin/main
         "max_stage_output_tokens",
         "roles",
     }:
@@ -55,10 +52,7 @@ def normalize_cooperation_policy(value: object) -> dict[str, object] | None:
     if value.get("schema_version") != SCHEMA:
         raise CooperationPolicyError("unsupported cooperation policy schema")
     rounds = _integer(value.get("review_rounds", 1), "review_rounds", 1, 3)
-<<<<<<< HEAD
-=======
     drafts = _integer(value.get("draft_count", 1), "draft_count", 1, 3)
->>>>>>> origin/main
     output = _integer(value.get("max_stage_output_tokens", 512), "max_stage_output_tokens", 64, 4096)
     roles = value.get("roles", {})
     if not isinstance(roles, Mapping) or set(roles) - ROLES:
@@ -80,39 +74,28 @@ def normalize_cooperation_policy(value: object) -> dict[str, object] | None:
                 raise CooperationPolicyError(f"cooperation {name} is invalid")
             pair[name] = text
         normalized[str(role)] = pair
-<<<<<<< HEAD
-    return {
-=======
     policy: dict[str, object] = {
->>>>>>> origin/main
         "schema_version": SCHEMA,
         "review_rounds": rounds,
         "max_stage_output_tokens": output,
         "roles": normalized,
     }
-<<<<<<< HEAD
-=======
     # Retain the original v1 bytes and checkpoint identity for one draft.
     # Only explicitly requested additional candidates change the policy.
     if drafts > 1:
         policy["draft_count"] = drafts
     return policy
->>>>>>> origin/main
 
 
 def cooperation_stages(policy: Mapping[str, object]) -> tuple[tuple[str, str], ...]:
     normalized = normalize_cooperation_policy(policy)
     assert normalized is not None
-<<<<<<< HEAD
-    stages = [("plan", "plan"), ("draft", "draft")]
-=======
     drafts = int(normalized.get("draft_count", 1))
     stages = [("plan", "plan")]
     if drafts == 1:
         stages.append(("draft", "draft"))
     else:
         stages.extend((f"draft:{index}", "draft") for index in range(1, drafts + 1))
->>>>>>> origin/main
     for index in range(1, int(normalized["review_rounds"]) + 1):
         stages.extend(((f"critique:{index}", "critique"), (f"refine:{index}", "refine")))
     return tuple(stages)
@@ -263,8 +246,6 @@ def stage_prompt(state: Mapping[str, object]) -> str:
         for row in (latest_plan, latest_draft, latest_critique if role == "refine" else None)
         if row is not None
     ]
-<<<<<<< HEAD
-=======
     if int(policy.get("draft_count", 1)) > 1:
         # Siblings receive the same immutable brief/history and public plan.
         # A prior candidate's content must never leak into a later candidate.
@@ -296,7 +277,6 @@ def stage_prompt(state: Mapping[str, object]) -> str:
                 "resolve applicable critique while preserving the original request, constraints and source facts. "
                 "Do not include internal stage narration or claim unobserved execution."
             )
->>>>>>> origin/main
     material = {
         "original_request": state["brief"],
         "original_request_digest": state["brief_digest"],
@@ -324,11 +304,7 @@ def cooperation_summary(state: Mapping[str, object]) -> dict[str, object]:
     stages = cooperation_stages(policy)
     artifacts = state.get("artifacts", [])
     assert isinstance(artifacts, list)
-<<<<<<< HEAD
-    return {
-=======
     summary: dict[str, object] = {
->>>>>>> origin/main
         "schema_version": SCHEMA,
         "policy_digest": state["policy_digest"],
         "brief_digest": state["brief_digest"],
@@ -353,13 +329,10 @@ def cooperation_summary(state: Mapping[str, object]) -> dict[str, object]:
         ],
         "independent_review_certified": False,
     }
-<<<<<<< HEAD
-=======
     drafts = int(policy.get("draft_count", 1))
     if drafts > 1:
         summary["draft_count"] = drafts
     return summary
->>>>>>> origin/main
 
 
 def validate_cooperation_summary(
@@ -375,11 +348,7 @@ def validate_cooperation_summary(
     normalized = normalize_cooperation_policy(policy)
     if not isinstance(summary, Mapping) or normalized is None or summary.get("schema_version") != SCHEMA:
         raise CooperationPolicyError("cooperation result summary is invalid")
-<<<<<<< HEAD
-    if set(summary) != {
-=======
     expected_fields = {
->>>>>>> origin/main
         "schema_version",
         "policy_digest",
         "brief_digest",
@@ -389,12 +358,6 @@ def validate_cooperation_summary(
         "complete",
         "artifacts",
         "independent_review_certified",
-<<<<<<< HEAD
-    }:
-        raise CooperationPolicyError("cooperation result contains unapproved fields")
-    _integer(summary.get("total_stages"), "total_stages", 4, 8)
-    _integer(summary.get("completed_stages"), "completed_stages", 0, 8)
-=======
     }
     drafts = int(normalized.get("draft_count", 1))
     if drafts > 1:
@@ -405,7 +368,6 @@ def validate_cooperation_summary(
         raise CooperationPolicyError("cooperation result contains unapproved fields")
     _integer(summary.get("total_stages"), "total_stages", 4, 10)
     _integer(summary.get("completed_stages"), "completed_stages", 0, 10)
->>>>>>> origin/main
     stages = cooperation_stages(normalized)
     artifacts = summary.get("artifacts")
     if (

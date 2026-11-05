@@ -42,8 +42,6 @@ class WebhookEvent:
     event_type: str
     session_id: str | None
     payment_status: str | None
-<<<<<<< HEAD
-=======
     amount_total: int | None = None
     currency: str | None = None
 
@@ -67,7 +65,6 @@ def paid_amount_matches(transaction: Mapping[str, Any], amount_total: Any, curre
     except (InvalidOperation, ValueError, OverflowError):
         return False
     return 0 < cents <= 50_000_00 and cents == amount_total
->>>>>>> origin/main
 
 
 class StripeCheckout:
@@ -110,11 +107,7 @@ class StripeCheckout:
         return CheckoutStatus(
             status=str(getattr(session, "status", "") or "unknown"),
             payment_status=str(getattr(session, "payment_status", "") or "unknown"),
-<<<<<<< HEAD
-            amount_total=int(amount) if isinstance(amount, int) else None,
-=======
             amount_total=amount if type(amount) is int else None,
->>>>>>> origin/main
             currency=(str(getattr(session, "currency", "") or "") or None),
         )
 
@@ -130,9 +123,6 @@ class StripeCheckout:
                 payload, signature, self.webhook_secret
             )
 
-<<<<<<< HEAD
-        event = await asyncio.to_thread(_construct)
-=======
         try:
             event = await asyncio.to_thread(_construct)
         except Exception as exc:
@@ -141,7 +131,6 @@ class StripeCheckout:
                     or isinstance(signature_error, type) and isinstance(exc, signature_error)):
                 raise ValueError("webhook verification failed") from exc
             raise
->>>>>>> origin/main
         event_type = str(event.get("type") or "")
         data = event.get("data") if isinstance(event, Mapping) else None
         obj = data.get("object") if isinstance(data, Mapping) else None
@@ -149,20 +138,12 @@ class StripeCheckout:
             obj = {}
         session_id = obj.get("id") if str(obj.get("object") or "") == "checkout.session" else None
         payment_status = obj.get("payment_status")
-<<<<<<< HEAD
-        if event_type == "checkout.session.completed" and not payment_status:
-            payment_status = "paid"
-=======
->>>>>>> origin/main
         return WebhookEvent(
             event_type=event_type,
             session_id=str(session_id) if isinstance(session_id, str) else None,
             payment_status=str(payment_status) if isinstance(payment_status, str) else None,
-<<<<<<< HEAD
-=======
             amount_total=obj.get("amount_total") if type(obj.get("amount_total")) is int else None,
             currency=obj.get("currency") if isinstance(obj.get("currency"), str) else None,
->>>>>>> origin/main
         )
 
 

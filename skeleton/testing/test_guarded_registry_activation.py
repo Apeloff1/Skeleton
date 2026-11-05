@@ -34,8 +34,6 @@ def test_retained_local_provider_never_becomes_unprotected_fallback(local_config
     registry = ProviderRegistry.from_env(retain_unavailable=True)
     with pytest.raises(ProviderUnavailableError):
         registry.require_active()
-<<<<<<< HEAD
-=======
     status = registry.statuses()[0]
     assert status["available"] is False
     assert status["readiness_code"] == "local_guard_unavailable"
@@ -50,7 +48,6 @@ def test_retained_invalid_guard_configuration_has_an_actionable_status(
     assert registry.statuses()[0]["readiness_code"] == "local_guard_configuration_invalid"
     with pytest.raises(ProviderUnavailableError):
         registry.require_active()
->>>>>>> origin/main
 
 
 @pytest.mark.parametrize("guard", ("0", "false"))

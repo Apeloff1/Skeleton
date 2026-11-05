@@ -63,8 +63,6 @@ HTML = r"""<!doctype html>
       <button id="reference-rollback" class="secondary">Roll back last write</button>
       <div id="knowledge-hits" class="knowledge-hits" aria-live="polite"></div>
     </section>
-<<<<<<< HEAD
-=======
     <section class="knowledge-section" aria-label="Local hardware resource monitor">
       <div class="heading"><span>Hardware &amp; memory fabric</span>
         <button id="resource-refresh" class="small" type="button" disabled>Refresh</button>
@@ -105,7 +103,6 @@ HTML = r"""<!doctype html>
         <pre id="longform-work-status" aria-live="polite">No active work cursor.</pre>
       </details>
     </section>
->>>>>>> origin/main
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
       <button id="export" class="secondary">Export backup</button>
@@ -188,10 +185,6 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
-<<<<<<< HEAD
-    network: new AbortController(),
-  };
-=======
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
     longformImportPending: null,
@@ -226,7 +219,6 @@ JAVASCRIPT = r"""'use strict';
       if (state.connected) get('resource-monitor').textContent = 'Resource telemetry unavailable.';
     }
   }
->>>>>>> origin/main
   const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
@@ -257,8 +249,6 @@ JAVASCRIPT = r"""'use strict';
     get('send').disabled = locked || working || !state.session;
     get('connect').disabled = state.busy || state.connected;
     get('disconnect').disabled = !state.connected && !state.token;
-<<<<<<< HEAD
-=======
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
     get('longform-ingest').disabled = locked || state.busy;
@@ -267,7 +257,6 @@ JAVASCRIPT = r"""'use strict';
     get('longform-work-start').disabled = locked || state.busy || !state.longformSourceId;
     get('longform-work-resume').disabled = locked || state.busy;
     get('longform-work-next').disabled = locked || state.busy || !state.longformWork;
->>>>>>> origin/main
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -294,8 +283,6 @@ JAVASCRIPT = r"""'use strict';
     state.timer = null;
   }
   function lock() {
-<<<<<<< HEAD
-=======
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
@@ -308,7 +295,6 @@ JAVASCRIPT = r"""'use strict';
     state.longformPendingRequest = null;
     state.longformImportPending = null;
     get('longform-import-id').value = '';
->>>>>>> origin/main
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -344,14 +330,10 @@ JAVASCRIPT = r"""'use strict';
     const timeout = new AbortController();
     const cancel = () => timeout.abort();
     network.signal.addEventListener('abort', cancel, {once: true});
-<<<<<<< HEAD
-    const timer = setTimeout(cancel, 15000);
-=======
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
       setTimeout(cancel, 15000);
->>>>>>> origin/main
     let response;
     try {
       response = await fetch(path, {
@@ -370,11 +352,7 @@ JAVASCRIPT = r"""'use strict';
       if (error.name === 'AbortError') throw new Error('The connection timed out. The server may still be working.');
       throw error;
     } finally {
-<<<<<<< HEAD
-      clearTimeout(timer);
-=======
       if (timer !== null) clearTimeout(timer);
->>>>>>> origin/main
       network.signal.removeEventListener('abort', cancel);
     }
   }
@@ -652,12 +630,9 @@ JAVASCRIPT = r"""'use strict';
     get('budget').value = String(state.health.default_output_tokens);
     get('budget').max = String(state.health.max_output_tokens);
     await loadSessions(); await loadDocuments();
-<<<<<<< HEAD
-=======
     await refreshResources();
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = setInterval(refreshResources, 10000);
->>>>>>> origin/main
     if (state.health.active_turn) {
       const activeTurn = state.health.active_turn;
       await selectSession(activeTurn.session_id);
@@ -666,8 +641,6 @@ JAVASCRIPT = r"""'use strict';
     } else status('Connected locally. Choose a conversation or create a new one.');
   }));
   get('disconnect').addEventListener('click', lock);
-<<<<<<< HEAD
-=======
   get('resource-refresh').addEventListener('click', refreshResources);
   get('resource-plan').addEventListener('click', () => run(async () => {
     const source_bytes = Number(get('resource-bytes').value);
@@ -783,7 +756,6 @@ JAVASCRIPT = r"""'use strict';
       (result.replayed ? '\nOriginal delivery recovered.' : '\nPage committed.') +
       '\nPage: ' + result.text.slice(0, 2000);
   }));
->>>>>>> origin/main
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
     if (bytes(system) > 4096) throw new Error('Instructions exceed 4096 UTF-8 bytes.');

@@ -555,8 +555,6 @@ def provision(args) -> dict:
     else:
         files = _reuse_runtime(*runtime_source, target / "runtime")
     model.chmod(0o444)
-<<<<<<< HEAD
-=======
     # Pin every extracted adjacent shared-library name and digest. This is a
     # file inventory, not a claim about system libraries or tokenizer identity.
     runtime_libraries = {
@@ -567,17 +565,13 @@ def provision(args) -> dict:
     }
     if not runtime_libraries:
         raise ValueError("Pinned runtime archive has no adjacent shared libraries.")
->>>>>>> origin/main
     manifest = {
         "schema_version": DEPLOYMENT_SCHEMA,
         "runtime_kind": "llama.cpp-cli",
         "model_id": MODEL_IDS[profile],
         "executable_path": "runtime/llama-completion",
         "executable_sha256": EXECUTABLE_SHA256,
-<<<<<<< HEAD
-=======
         "runtime_libraries": runtime_libraries,
->>>>>>> origin/main
         "model_path": recipe["filename"],
         "model_sha256": recipe["sha256"],
         "config": {

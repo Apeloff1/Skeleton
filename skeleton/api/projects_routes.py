@@ -12,10 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-<<<<<<< HEAD
-=======
 import math
->>>>>>> origin/main
 import os
 import sqlite3
 from typing import Any, Literal, Optional
@@ -38,11 +35,8 @@ from skeleton.contracts.projects import (
     _ID,
 )
 from skeleton.app_services.job_api import IdempotencyMismatch
-<<<<<<< HEAD
-=======
 from skeleton.api.charter_gate import require_charter
 from skeleton.api.hmac_seal import require_seal
->>>>>>> origin/main
 from skeleton.persistence.app_foundation.projects_v1 import (
     BuildLinkConflict,
     CreateIdempotencyMismatch,
@@ -58,10 +52,7 @@ PROJECT_ERROR_NAME_CONFLICT = "PROJECT.NAME_CONFLICT"
 PROJECT_ERROR_UNAVAILABLE = "PROJECT.UNAVAILABLE"
 PROJECT_ERROR_IDEMPOTENCY_MISMATCH = "PROJECT.IDEMPOTENCY_MISMATCH"
 GAME_BUILD_KIND = "game.build"
-<<<<<<< HEAD
-=======
 _FORGE_BUILD_GATE = require_charter("forge", "run")
->>>>>>> origin/main
 ERROR_STATUS = {
     PROJECT_ERROR_INVALID: 400,
     PROJECT_ERROR_UNAUTHENTICATED: 401,
@@ -151,8 +142,6 @@ def _reject_scope_fields(data: dict, who: SessionPrincipal) -> None:
         raise ProjectHTTPError(PROJECT_ERROR_INVALID, "tenant_id is derived from the session")
 
 
-<<<<<<< HEAD
-=======
 def _authorize_build(request: Request) -> None:
     # Project access alone does not grant the separate forge/run capability.
     attester = require_seal(request.headers.get("x-gf-seal"))
@@ -185,7 +174,6 @@ def _build_options(options: dict) -> dict:
     return dict(options)
 
 
->>>>>>> origin/main
 def build_router(services_dep=get_app_services) -> APIRouter:
     router = APIRouter(prefix="/projects", tags=["projects-v1"])
 
@@ -263,11 +251,7 @@ def build_router(services_dep=get_app_services) -> APIRouter:
     async def start_or_link_build(project_id: str, request: Request,
                                   svc: AppServices = Depends(services_dep)):
         who = await _auth(request, svc)
-<<<<<<< HEAD
-        _project_or_404(svc, who, project_id)
-=======
         project = _project_or_404(svc, who, project_id)
->>>>>>> origin/main
         data = await _json_body(request, {"schema_version", "target", "options", "idempotency_key",
                                           "execution_id", "actor_id", "tenant_id"})
         _reject_scope_fields(data, who)
@@ -287,34 +271,12 @@ def build_router(services_dep=get_app_services) -> APIRouter:
         target, options, key = data.get("target", ""), data.get("options", {}), data.get("idempotency_key")
         if not isinstance(target, str) or len(target) > 64:
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "target must be text up to 64 chars")
-<<<<<<< HEAD
-=======
         if target not in {"", "godot", "json", "yaml"}:
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "target must be godot, json, or yaml")
->>>>>>> origin/main
         if not isinstance(options, dict):
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "options must be an object")
         if key is not None and (not isinstance(key, str) or not key or len(key) > 128):
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "idempotency_key must be 1..128 chars")
-<<<<<<< HEAD
-        try:
-            handle = svc.jobs.enqueue(
-                GAME_BUILD_KIND, {"target": target, "options": options},
-                actor_id=who.user_id, tenant_id=_tenant(), project_id=project_id,
-                idempotency_key=f"{project_id}:{key}" if key else None,
-                correlation_id=request.headers.get("x-request-id") or None)
-        except IdempotencyMismatch:
-            raise ProjectHTTPError(PROJECT_ERROR_IDEMPOTENCY_MISMATCH,
-                                   "idempotency_key was already used with a different target/options")
-        b = svc.builds.get_build(handle.execution_id)
-        if not handle.replayed:
-            try:
-                store.link(who.user_id, _tenant(), project_id, b.build_id)
-            except BuildLinkConflict:
-                svc.jobs.cancel(handle.job_id)
-                raise ProjectHTTPError(PROJECT_ERROR_BUILD_CONFLICT, "project build limit reached")
-            b = svc.builds.get_build(handle.execution_id)
-=======
         _authorize_build(request)
         options = _build_options(options)
         from skeleton.forge.game_build_queue import handle_game_build
@@ -349,7 +311,6 @@ def build_router(services_dep=get_app_services) -> APIRouter:
         b = svc.builds.get_build(handle.execution_id)
         if b is None:
             raise ProjectHTTPError(PROJECT_ERROR_UNAVAILABLE, "project build unavailable")
->>>>>>> origin/main
         return JSONResponse(status_code=202, content=build_out(b, replayed=handle.replayed))
 
     @router.get("/{project_id}/builds")

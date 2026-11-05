@@ -331,11 +331,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "platform"
-<<<<<<< HEAD
-prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/storage/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
-=======
 prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/storage/", "skeleton/observability/", "skeleton/perf_profiler/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
->>>>>>> origin/main
 owner = "platform-runtime"
 criticality = "high"
 purpose = "State, storage, networking, native execution, observability and resilience substrate."

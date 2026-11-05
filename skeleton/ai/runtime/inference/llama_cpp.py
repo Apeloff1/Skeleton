@@ -17,10 +17,7 @@ import os
 import re
 import shutil
 import signal
-<<<<<<< HEAD
-=======
 import stat
->>>>>>> origin/main
 import struct
 import subprocess
 import tempfile
@@ -37,10 +34,7 @@ from skeleton.skills.tool_contract import (
     validate_json_value,
 )
 
-<<<<<<< HEAD
-=======
 from .kv_placement import observe_native_kv_placement
->>>>>>> origin/main
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -74,12 +68,9 @@ QWEN3_COMPLETION_CHAT_TEMPLATE = (
 _CHATML_CONTENT_DELIMITERS = ("<|im_start|>", "<|im_end|>", "<|endoftext|>")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-<<<<<<< HEAD
-=======
 _RUNTIME_LIBRARY_NAME = re.compile(r"^lib[A-Za-z0-9_+.-]{1,120}\.so(?:\.[A-Za-z0-9_+.-]+)?$")
 _MAX_RUNTIME_LIBRARIES = 128
 _MAX_RUNTIME_LIBRARY_BYTES = 128 * 1024 * 1024
->>>>>>> origin/main
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _PROVIDER_SECRET_NAMES = {
     "OPENAI" + "_API_KEY",
@@ -108,10 +99,7 @@ _INHERITED_ENV_ALLOWLIST = {
     "OMP_NUM_THREADS",
     "GGML_CUDA_ENABLE_UNIFIED_MEMORY",
 }
-<<<<<<< HEAD
-=======
 _PINNED_RUNTIME_ENV_ALLOWLIST = _INHERITED_ENV_ALLOWLIST - {"LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"}
->>>>>>> origin/main
 _MANAGED_LONG_FLAGS = {
     "--model",
     "--prompt",
@@ -124,13 +112,10 @@ _MANAGED_LONG_FLAGS = {
     "--threads",
     "--batch-size",
     "--gpu-layers",
-<<<<<<< HEAD
-=======
     "--kv-offload",
     "--no-kv-offload",
     "--cache-type-k",
     "--cache-type-v",
->>>>>>> origin/main
     "--grammar",
     "--grammar-file",
     "--json-schema",
@@ -146,13 +131,10 @@ _MANAGED_SHORT_FLAGS = (
     "-b",
     "-bf",
     "-ngl",
-<<<<<<< HEAD
-=======
     "-kvo",
     "-nkvo",
     "-ctk",
     "-ctv",
->>>>>>> origin/main
     "-j",
     "-jf",
     "-s",
@@ -282,12 +264,9 @@ class LlamaCppConfig:
     threads: int | None = None
     batch_size: int | None = None
     gpu_layers: int | None = None
-<<<<<<< HEAD
-=======
     kv_cache_location: str = "backend"
     kv_cache_type_k: str | None = None
     kv_cache_type_v: str | None = None
->>>>>>> origin/main
     temperature: float = 0.0
     extra_args: tuple[str, ...] = ()
     environment: Mapping[str, str] = field(default_factory=dict)
@@ -296,12 +275,9 @@ class LlamaCppConfig:
     output_framing: str = "raw"
     runtime_scratch_bytes: int = 512 * 1024 * 1024
     kv_bytes_per_token: int | None = None
-<<<<<<< HEAD
-=======
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
->>>>>>> origin/main
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -348,8 +324,6 @@ class LlamaCppConfig:
             "llama_completion_eog",
         }:
             raise ValueError("output_framing must be raw or llama_completion_eog")
-<<<<<<< HEAD
-=======
         if type(self.kv_cache_location) is not str or self.kv_cache_location not in {
             "backend", "host",
         }:
@@ -363,7 +337,6 @@ class LlamaCppConfig:
                 raise ValueError(
                     f"{name} requires explicit f16, q8_0 or q4_0"
                 )
->>>>>>> origin/main
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
@@ -392,8 +365,6 @@ class LlamaCppConfig:
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 
-<<<<<<< HEAD
-=======
         if not isinstance(self.runtime_libraries, (tuple, list)) or len(self.runtime_libraries) > _MAX_RUNTIME_LIBRARIES:
             raise ValueError("runtime library inventory exceeds its bound")
         libraries: dict[str, str] = {}
@@ -407,21 +378,17 @@ class LlamaCppConfig:
             libraries[name] = digest
         object.__setattr__(self, "runtime_libraries", tuple(sorted(libraries.items())))
 
->>>>>>> origin/main
         normalized_env: dict[str, str] = {}
         for key, value in dict(self.environment).items():
             if not isinstance(key, str) or not _ENV_KEY.fullmatch(key):
                 raise ValueError(f"invalid environment key {key!r}")
             if key in _PROVIDER_SECRET_NAMES or key in _PROXY_NAMES or key.startswith("LLAMA_ARG_"):
                 raise ValueError(f"forbidden environment key {key}")
-<<<<<<< HEAD
-=======
             if libraries and (key.startswith(("LD_", "DYLD_"))
                               or key in {"GLIBC_TUNABLES", "GGML_BACKEND_PATH"}):
                 raise ValueError(f"pinned runtime forbids loader environment override {key}")
             if libraries and key not in _PINNED_RUNTIME_ENV_ALLOWLIST:
                 raise ValueError(f"pinned runtime forbids unrecognized environment override {key}")
->>>>>>> origin/main
             if not isinstance(value, str) or "\x00" in value:
                 raise ValueError(f"invalid environment value for {key}")
             normalized_env[key] = value
@@ -855,8 +822,6 @@ def _stat_matches(identity: ArtifactIdentity) -> bool:
     )
 
 
-<<<<<<< HEAD
-=======
 def _runtime_library_names(directory: Path) -> set[str]:
     """Inspect a flat provisioned runtime; nested loader search paths fail closed."""
     try:
@@ -918,7 +883,6 @@ def _runtime_library_identities(
     return tuple(identities)
 
 
->>>>>>> origin/main
 def _approx_tokens(text: str) -> int:
     return len(_TOKEN.findall(text))
 
@@ -969,28 +933,22 @@ class LlamaCppModel:
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
             raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
-<<<<<<< HEAD
-=======
         if self.config.runtime_libraries and (
             _runtime_library_names(Path(self._runtime.path).parent)
             != {name for name, _ in self.config.runtime_libraries}
             or not all(_stat_matches(identity) for identity in self._runtime_libraries)
         ):
             raise LlamaCppRuntimeError("activated adjacent runtime library inventory changed")
->>>>>>> origin/main
 
     def __init__(self, config: LlamaCppConfig) -> None:
         if not isinstance(config, LlamaCppConfig):
             raise TypeError("config must be LlamaCppConfig")
         self.config = config
         self._runtime = _identity(config.executable, executable=True, reject_symlink=False)
-<<<<<<< HEAD
-=======
         self._runtime_libraries = (
             _runtime_library_identities(Path(self._runtime.path).parent, config.runtime_libraries)
             if config.runtime_libraries else ()
         )
->>>>>>> origin/main
         self._model = _identity(
             config.model_path,
             executable=False,
@@ -1003,8 +961,6 @@ class LlamaCppModel:
         self._draining_processes: set[int] = set()
         self._spawning_processes = 0
         self._processes_started = 0
-<<<<<<< HEAD
-=======
         self._inference_admitted = False
         self._resource_profile_bound = False
         self._resource_preflight: Callable[[], None] | None = None
@@ -1014,7 +970,6 @@ class LlamaCppModel:
         self._resource_lease_bound = False
         self._last_kv_observation: dict[str, Any] | None = None
         self._kv_by_execution_receipt: dict[str, dict[str, Any]] = {}
->>>>>>> origin/main
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -1030,8 +985,6 @@ class LlamaCppModel:
         )
         self._admitted_model_id = self.model_id
 
-<<<<<<< HEAD
-=======
     def activate_prelaunch_resource_profile(
         self, profile: LlamaCppConfig,
     ) -> None:
@@ -1145,7 +1098,6 @@ class LlamaCppModel:
             self._resource_lease_factory = factory
             self._resource_lease_bound = True
 
->>>>>>> origin/main
     @property
     def model_digest(self) -> str:
         return self._model.sha256
@@ -1166,12 +1118,9 @@ class LlamaCppModel:
             "threads": self.config.threads,
             "batch_size": self.config.batch_size,
             "gpu_layers": self.config.gpu_layers,
-<<<<<<< HEAD
-=======
             "kv_cache_location": self.config.kv_cache_location,
             "kv_cache_type_k": self.config.kv_cache_type_k,
             "kv_cache_type_v": self.config.kv_cache_type_v,
->>>>>>> origin/main
             "temperature": float(self.config.temperature),
             "extra_args": list(self.config.extra_args),
             "output_framing": self.config.output_framing,
@@ -1189,11 +1138,8 @@ class LlamaCppModel:
             "kv_bytes_per_token": self.config.kv_bytes_per_token,
             "seed_policy": "uint32_mod_4294967295_without_random_sentinel",
         }
-<<<<<<< HEAD
-=======
         if self.config.runtime_libraries:
             profile["adjacent_runtime_libraries"] = dict(self.config.runtime_libraries)
->>>>>>> origin/main
         native_chat_profile = self._native_chat_profile()
         if native_chat_profile is not None:
             # A corrected role renderer must not reuse a generation cached
@@ -1237,13 +1183,10 @@ class LlamaCppModel:
                     self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound
                 ),
                 "memory_estimate_source": self.memory_estimate_source,
-<<<<<<< HEAD
-=======
                 "adjacent_runtime_library_pins": len(self.config.runtime_libraries),
                 "system_library_closure_verified": False,
                 "resource_preflight_bound": self._resource_preflight_bound,
                 "resource_preflight_checks": self._resource_preflight_checks,
->>>>>>> origin/main
             }
 
     @property
@@ -1285,25 +1228,18 @@ class LlamaCppModel:
                 interrupt()
             if not _stat_matches(identity):
                 raise LlamaCppRuntimeError(f"{label} artifact identity changed")
-<<<<<<< HEAD
-            if self.config.rehash_artifacts_each_run:
-=======
             if self.config.rehash_artifacts_each_run or (label == "runtime" and self.config.runtime_libraries):
->>>>>>> origin/main
                 observed = _sha256_file(Path(identity.path), interrupt=interrupt)
                 if observed != identity.sha256:
                     raise LlamaCppRuntimeError(f"{label} artifact digest changed")
                 if not _stat_matches(identity):
                     raise LlamaCppRuntimeError(f"{label} artifact changed during admission")
-<<<<<<< HEAD
-=======
         if self.config.runtime_libraries:
             observed = _runtime_library_identities(
                 Path(self._runtime.path).parent, self.config.runtime_libraries, interrupt=interrupt,
             )
             if observed != self._runtime_libraries:
                 raise LlamaCppRuntimeError("runtime library file identity changed")
->>>>>>> origin/main
         observed_header = inspect_gguf(Path(self._model.path))
         if observed_header != self._gguf_header:
             raise LlamaCppRuntimeError("GGUF fixed header changed")
@@ -1511,15 +1447,12 @@ class LlamaCppModel:
             command.extend(("-b", str(self.config.batch_size)))
         if self.config.gpu_layers is not None:
             command.extend(("-ngl", str(self.config.gpu_layers)))
-<<<<<<< HEAD
-=======
         if self.config.kv_cache_location == "host":
             command.append("--no-kv-offload")
         if self.config.kv_cache_type_k is not None:
             command.extend(("--cache-type-k", self.config.kv_cache_type_k))
         if self.config.kv_cache_type_v is not None:
             command.extend(("--cache-type-v", self.config.kv_cache_type_v))
->>>>>>> origin/main
         if schema_file is not None:
             command.extend(("--json-schema-file", str(schema_file)))
         if self._native_chat_profile() is None:
@@ -1540,15 +1473,12 @@ class LlamaCppModel:
             and key not in _PROXY_NAMES
         }
         env.update(dict(self.config.environment))
-<<<<<<< HEAD
-=======
         if self.config.runtime_libraries:
             # Do not let ambient search paths override the bundled files.
             # System libraries and dlopen behavior remain outside this check.
             for key in tuple(env):
                 if key not in _PINNED_RUNTIME_ENV_ALLOWLIST:
                     env.pop(key, None)
->>>>>>> origin/main
         for key in _PROVIDER_SECRET_NAMES | _PROXY_NAMES:
             env.pop(key, None)
         return env
@@ -1737,8 +1667,6 @@ class LlamaCppModel:
             raise TypeError("cancel must be threading.Event")
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled before launch")
-<<<<<<< HEAD
-=======
         with self._process_lock:
             # Freeze profile before prompt hashing or artifact checks begin.
             # This prevents a digest/config race with late resource retuning.
@@ -1750,7 +1678,6 @@ class LlamaCppModel:
         if resource_guard is not None:
             # No prompt or child process is constructed before this check.
             resource_guard()
->>>>>>> origin/main
         started = time.monotonic()
 
         def interrupt() -> None:
@@ -1806,11 +1733,6 @@ class LlamaCppModel:
                 raise LocalInferenceCancelled("local generation cancelled before launch")
 
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
-<<<<<<< HEAD
-                with self._process_lock:
-                    self._spawning_processes += 1
-                try:
-=======
                 release_lease: Callable[[], None] | None = None
                 with self._process_lock:
                     self._spawning_processes += 1
@@ -1830,7 +1752,6 @@ class LlamaCppModel:
                             raise LlamaCppRuntimeError(
                                 "Metal lease did not provide release callback"
                             )
->>>>>>> origin/main
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
@@ -1844,17 +1765,12 @@ class LlamaCppModel:
                         creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                     )
                 except BaseException:
-<<<<<<< HEAD
-                    with self._process_lock:
-                        self._spawning_processes -= 1
-=======
                     try:
                         if release_lease is not None:
                             release_lease()
                     finally:
                         with self._process_lock:
                             self._spawning_processes -= 1
->>>>>>> origin/main
                     raise
                 with self._process_lock:
                     self._spawning_processes -= 1
@@ -1895,14 +1811,11 @@ class LlamaCppModel:
                             pump_errors.append(exc)
 
                 stop_output_end: int | None = None
-<<<<<<< HEAD
-=======
                 # An M-chip may lose unified-memory headroom *during*
                 # long-running decoding. Probe at a bounded cadence while
                 # the child is live; the existing finally block reliably
                 # terminates/drains it if pressure admission fails.
                 next_resource_sample = time.monotonic() + 1.0
->>>>>>> origin/main
                 stop_markers = tuple(marker.encode("utf-8") for marker in request.stop)
                 stop_tail = b""
                 stop_scanned = 0
@@ -1923,9 +1836,6 @@ class LlamaCppModel:
                     while process.poll() is None:
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
-<<<<<<< HEAD
-                        if time.monotonic() - started > float(self.config.timeout_seconds):
-=======
                         now = time.monotonic()
                         if resource_guard is not None and now >= next_resource_sample:
                             with self._process_lock:
@@ -1935,7 +1845,6 @@ class LlamaCppModel:
                             resource_guard()
                             next_resource_sample = time.monotonic() + 1.0
                         if now - started > float(self.config.timeout_seconds):
->>>>>>> origin/main
                             timed_out = True
                             break
                         if stdout_overflow_event.is_set():
@@ -1968,20 +1877,6 @@ class LlamaCppModel:
                             self._draining_processes.add(process.pid)
                             if process.poll() is None:
                                 self._termination_requests += 1
-<<<<<<< HEAD
-                    self._terminate(process)
-                    for pump in pumps:
-                        while pump.is_alive():
-                            pump.join(timeout=0.25)
-                    if process.stdout is not None:
-                        process.stdout.close()
-                    if process.stderr is not None:
-                        process.stderr.close()
-                    with self._process_lock:
-                        self._active_processes.discard(process.pid)
-                        self._draining_processes.discard(process.pid)
-                        self._processes_exited += 1
-=======
                     try:
                         self._terminate(process)
                         for pump in pumps:
@@ -1998,7 +1893,6 @@ class LlamaCppModel:
                             self._processes_exited += 1
                         if release_lease is not None:
                             release_lease()
->>>>>>> origin/main
                 return_code = process.poll()
                 if return_code is None:
                     raise LlamaCppRuntimeError("local runtime could not be terminated")
@@ -2030,10 +1924,6 @@ class LlamaCppModel:
             if len(stderr_bytes) > self.config.max_stderr_bytes:
                 raise LlamaCppRuntimeError("local runtime stderr exceeded configured bound")
             if return_code != 0 and stop_output_end is None:
-<<<<<<< HEAD
-                diagnostic = stderr_bytes.decode("utf-8", errors="replace").strip()[-4096:]
-                raise LlamaCppRuntimeError(f"local runtime exited with code {return_code}: {diagnostic}")
-=======
                 # Native runtimes may echo prompt bytes, token pieces, file
                 # paths or other private context to stderr, including during
                 # failures. Exceptions can reach provider clients and logs, so
@@ -2046,7 +1936,6 @@ class LlamaCppModel:
                     "native llama.cpp reported GPU KV buffers despite the "
                     "pinned host-only KV placement request"
                 )
->>>>>>> origin/main
 
             self._assert_artifacts_stable(interrupt=interrupt)
             if self.execution_profile_digest != execution_profile:
@@ -2085,11 +1974,7 @@ class LlamaCppModel:
             response_id = (
                 "local:llama:" + self.runtime_digest + ":" + self.model_digest + ":" + response_digest
             )
-<<<<<<< HEAD
-            return LocalInferenceResult(
-=======
             result = LocalInferenceResult(
->>>>>>> origin/main
                 text=text,
                 model_id=self.model_id,
                 model_digest=self.model_digest,
@@ -2102,11 +1987,8 @@ class LlamaCppModel:
                         "schema": "skeleton.llama-cpp.execution-receipt.v1",
                         "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
                         "output_framing": self.config.output_framing,
-<<<<<<< HEAD
-=======
                         "kv_cache_location_requested": self.config.kv_cache_location,
                         "native_kv_observation": kv_observation,
->>>>>>> origin/main
                         "request": request.digest,
                         "execution_profile": execution_profile,
                         "response_id": response_id,
@@ -2130,8 +2012,6 @@ class LlamaCppModel:
                 structured_output=structured,
                 latency_ms=(time.monotonic() - started) * 1000.0,
             )
-<<<<<<< HEAD
-=======
             if result.execution_receipt_digest is None:
                 raise LlamaCppRuntimeError("native result lacks execution receipt")
             with self._process_lock:
@@ -2144,7 +2024,6 @@ class LlamaCppModel:
                         next(iter(self._kv_by_execution_receipt))
                     )
             return result
->>>>>>> origin/main
 
 
 def build_llama_cpp_adapter(

@@ -33,13 +33,10 @@ class JobTimeout(Exception):
     pass
 
 
-<<<<<<< HEAD
-=======
 class GameBuildFailed(RuntimeError):
     """A build request or its result could not be accepted safely."""
 
 
->>>>>>> origin/main
 @dataclass(frozen=True)
 class JobHandle:
     job_id: str
@@ -94,28 +91,6 @@ def _builder_deadline_s(body: Mapping[str, Any], options: Mapping[str, Any], ctx
     raw_timeout = getattr(ctx, "timeout_s", None)
     if raw_timeout is None:
         raw_timeout = DEFAULT_TIMEOUT_S
-<<<<<<< HEAD
-    try:
-        timeout_s = float(raw_timeout)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("timeout_s must be a number of seconds") from exc
-    raw = body.get("deadline_s", None)
-    if raw is None:
-        raw = options.get("deadline_s", None)
-    if raw is None:
-        return timeout_s
-    if isinstance(raw, bool):
-        raise ValueError("deadline_s must be a number of seconds")
-    try:
-        asked = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("deadline_s must be a number of seconds") from exc
-    if asked < 0:
-        raise ValueError("deadline_s must be a number of seconds")
-    return min(asked, timeout_s)
-
-
-=======
     if (isinstance(raw_timeout, bool) or not isinstance(raw_timeout, (int, float))
             or not 0 < raw_timeout <= 6 * 3600):
         raise GameBuildFailed("Invalid game build time budget")
@@ -190,7 +165,6 @@ def _recheck_project_admission(ctx: Any, body: Mapping[str, Any]) -> None:
         raise GameBuildFailed("Project build authorization is unavailable") from None
 
 
->>>>>>> origin/main
 def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     """``game.build`` handler. Projects and ``/api/v1/game/build`` share it."""
     from skeleton.forge.game_builder import build_playable_game, public_payload
@@ -198,9 +172,6 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     ctx.progress(0.05, "compiling brief")
     ctx.heartbeat()
     body = dict(payload or {})
-<<<<<<< HEAD
-    options = body.get("options") if isinstance(body.get("options"), Mapping) else {}
-=======
     options = body.get("options", {})
     if not isinstance(options, Mapping):
         raise GameBuildFailed("Invalid game build options")
@@ -211,7 +182,6 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     # Never execute an executable chosen by a request, even after an upgrade.
     if "binary" in body or "binary" in options:
         raise GameBuildFailed("Custom game build executables are not permitted")
->>>>>>> origin/main
 
     def on_progress(fraction: float, message: str) -> None:
         ctx.progress(0.1 + 0.85 * max(0.0, min(1.0, float(fraction))), message)
@@ -220,8 +190,6 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     deadline_s = _builder_deadline_s(body, options, ctx)
     playtest = body.get("playtest", options.get("playtest", "off"))
     rounds = body.get("max_rounds", options.get("max_rounds", 3))
-<<<<<<< HEAD
-=======
     if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 3:
         raise GameBuildFailed("Invalid game build round limit")
     target = body.get("target", "")
@@ -231,30 +199,17 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
         target = "godot"
     if not isinstance(target, str) or target not in {"godot", "json", "yaml"}:
         raise GameBuildFailed("Unsupported game build target")
->>>>>>> origin/main
     kwargs: dict[str, Any] = {
         "era": body.get("era") or options.get("era") or None,
         "repair_mode": str(body.get("repair_mode") or options.get("repair_mode") or "apply"),
         "playtest_mode": str(playtest or "off"),
-<<<<<<< HEAD
-        "max_rounds": int(rounds),
-        "binary": body.get("binary") or options.get("binary"),
-=======
         "max_rounds": rounds,
->>>>>>> origin/main
         "actor_id": getattr(ctx, "actor_id", None) or None,
         "tenant_id": getattr(ctx, "tenant_id", None) or None,
         "execution_id": getattr(ctx, "execution_id", None) or None,
         "project_id": getattr(ctx, "project_id", None) or None,
         "deadline_s": deadline_s,
         "on_progress": on_progress,
-<<<<<<< HEAD
-        "target": str(body.get("target") or options.get("target") or "godot"),
-    }
-    if "archetype" in body or "archetype" in options:
-        kwargs["archetype"] = body.get("archetype", options.get("archetype")) or None
-    result = build_playable_game(_brief_from_job_payload(body), **kwargs)
-=======
         "target": target,
     }
     if "archetype" in body or "archetype" in options:
@@ -270,7 +225,6 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
             or not isinstance(result.get("stubbed"), list)
             or any(not isinstance(item, str) for item in result["stubbed"])):
         raise GameBuildFailed("Game build did not complete successfully")
->>>>>>> origin/main
     try:
         ctx.progress(1.0, "complete" if result.get("ok") else "failed")
         ctx.heartbeat()

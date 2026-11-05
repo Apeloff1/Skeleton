@@ -43,14 +43,6 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
-<<<<<<< HEAD
-        t = p / ".w_probe"
-        t.write_text("ok"); t.unlink(missing_ok=True)
-        return p
-    except Exception:
-        fp = Path(fallback)
-        fp.mkdir(parents=True, exist_ok=True)
-=======
         with tempfile.NamedTemporaryFile(prefix=".health-probe-", dir=p) as probe:
             probe.write(b"ok")
             probe.flush()
@@ -62,7 +54,6 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
         with tempfile.NamedTemporaryFile(prefix=".health-probe-", dir=fp) as probe:
             probe.write(b"ok")
             probe.flush()
->>>>>>> origin/main
         return fp
 
 
@@ -83,17 +74,10 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
 # eviction). Compression keeps space cost low (~10:1, ~190 MB per 31k-file
 # build). If disk pressure becomes a problem we can add TTL cleanup or
 # move shards to S3. NEVER ship /tmp default again.
-<<<<<<< HEAD
-BUILDS_ROOT = _resolve_writable_dir(
-    os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/data/builds_vault"),
-    "/tmp/galaxy_builds_vault",
-)
-=======
 _PREFERRED_BUILDS_ROOT = os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/data/builds_vault")
 BUILDS_ROOT = _resolve_writable_dir(_PREFERRED_BUILDS_ROOT, "/tmp/galaxy_builds_vault")
 # Fallback remains available for diagnostics, but cannot certify durable builds.
 BUILDS_VAULT_FALLBACK = BUILDS_ROOT.resolve() != Path(_PREFERRED_BUILDS_ROOT).resolve()
->>>>>>> origin/main
 
 _ZLEVEL = int(os.environ.get("GALAXY_BUILDS_ZSTD_LEVEL", "10"))  # balance speed vs ratio
 # One compressor per thread — zstd ctxs aren't thread-safe.

@@ -670,8 +670,6 @@
       ],
       "source": "machine/ai_runtime_schemas.json",
       "migration_required_for_breaking_change": true
-<<<<<<< HEAD
-=======
     },
     {
       "schema_id": "SCHEMA-RuntimeLearningCheckpointControl",
@@ -867,7 +865,6 @@
       ],
       "source": "machine/ai_runtime_schemas.json",
       "migration_required_for_breaking_change": true
->>>>>>> origin/main
     }
   ]
 }

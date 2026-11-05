@@ -90,10 +90,7 @@ def _workspace(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def _library(conn: sqlite3.Connection) -> dict[str, int]:
-<<<<<<< HEAD
-=======
     from .offline_disk_index import verify_chunks
->>>>>>> origin/main
     from .offline_library import MAX_DOCUMENT_BYTES
 
     records = _rows(
@@ -106,14 +103,6 @@ def _library(conn: sqlite3.Connection) -> dict[str, int]:
         "SELECT rowid, body FROM offline_document_fts ORDER BY rowid",
     )
     by_id = {rowid: body for rowid, body in fts}
-<<<<<<< HEAD
-    if len(by_id) != len(fts) or len(fts) != len(records):
-        raise OfflineAuditError("FTS5 document count or identity does not match source rows")
-    total_bytes = 0
-    for docid, root, relative, digest, body, size in records:
-        if (
-            type(docid) is not int or docid not in by_id
-=======
     if len(by_id) != len(fts):
         raise OfflineAuditError("FTS5 document count or identity does not match source rows")
     # Disk-offloaded documents intentionally have no whole-document FTS row.
@@ -134,26 +123,12 @@ def _library(conn: sqlite3.Connection) -> dict[str, int]:
     for docid, root, relative, digest, body, size in records:
         if (
             type(docid) is not int
->>>>>>> origin/main
             or not isinstance(root, str) or not root
             or not isinstance(relative, str) or not relative
             or relative.startswith("/") or "\x00" in relative
             or ".." in Path(relative).parts
             or not isinstance(digest, str) or not _HEX.fullmatch(digest)
             or not isinstance(body, str)
-<<<<<<< HEAD
-            or type(size) is not int or size < 0 or size > MAX_DOCUMENT_BYTES
-        ):
-            raise OfflineAuditError("local document index row has invalid fields")
-        raw = body.encode("utf-8")
-        if (
-            len(raw) != size
-            or hashlib.sha256(raw).hexdigest() != digest
-            or by_id[docid] != body
-        ):
-            raise OfflineAuditError("local document or FTS5 projection failed integrity validation")
-        total_bytes += size
-=======
             or type(size) is not int or size < 0
             or (MAX_DOCUMENT_BYTES is not None and size > MAX_DOCUMENT_BYTES)
         ):
@@ -180,7 +155,6 @@ def _library(conn: sqlite3.Connection) -> dict[str, int]:
     document_ids = {row[0] for row in records}
     if any(rowid not in document_ids for rowid in by_id):
         raise OfflineAuditError("orphaned whole-document FTS5 projection")
->>>>>>> origin/main
     return {"documents": len(records), "indexed_bytes": total_bytes}
 
 

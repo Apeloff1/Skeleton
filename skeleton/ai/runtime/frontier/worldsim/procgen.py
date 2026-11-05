@@ -45,9 +45,6 @@ def generate(gen: Generator, seed: int, params: Mapping[str, Any],
     return GenerationResult(seed, art, not failed, failed, digest(art))
 
 
-<<<<<<< HEAD
-def _distance(a: Mapping[str, Any], b: Mapping[str, Any]) -> float:
-=======
 def _is_layout(art: Mapping[str, Any]) -> bool:
     rows = art.get("rows")
     return isinstance(rows, (list, tuple)) and bool(rows) and all(isinstance(r, str) for r in rows)
@@ -57,7 +54,6 @@ def _distance(a: Mapping[str, Any], b: Mapping[str, Any]) -> float:
     """Structural distance for grid layouts (``rows``), key-wise for other artifacts."""
     if _is_layout(a) and _is_layout(b):
         return structural_distance(layout_features(a["rows"]), layout_features(b["rows"]))
->>>>>>> origin/main
     keys = set(a) | set(b)
     if not keys:
         return 0.0
@@ -79,10 +75,6 @@ def measure(results: Sequence[GenerationResult]) -> BatchMetrics:
         return BatchMetrics(0, 0.0, 0.0, 0.0)
     pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
     mpd = (sum(_distance(results[i].artifact, results[j].artifact) for i, j in pairs) / len(pairs)) if pairs else 0.0
-<<<<<<< HEAD
-    return BatchMetrics(n, sum(r.valid for r in results) / n,
-                        len({r.digest for r in results}) / n, round(mpd, 6))
-=======
     if all(_is_layout(r.artifact) for r in results):
         # grids: share of structurally distinct layouts, not unique byte digests
         diversity = measure_structural(results).distinct_layouts
@@ -182,4 +174,3 @@ def measure_structural(results: Sequence[GenerationResult], key: str = "rows",
     nearest = [min(d[(min(i, j), max(i, j))] for j in range(n) if j != i) for i in range(n)]
     return StructuralMetrics(n, round(sum(d.values()) / len(d), 6), min(d.values()),
                              round(sum(x >= threshold for x in nearest) / n, 6))
->>>>>>> origin/main

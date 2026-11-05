@@ -120,9 +120,6 @@ class FiveHundredThousandSourceProductions(unittest.TestCase):
         self.assertEqual(base.placements,result.placements[:len(base.placements)])
         self.assertEqual(len(base.placements)+4,len(result.placements))
         self.assertEqual(len(base.events)+4,len(result.events))
-<<<<<<< HEAD
-        self.assertTrue(any(a.z>0 for a in result.placements[len(base.placements):]))
-=======
         # Audio-cue direction 7 rotates newly authored cast; it does not
         # raise actors into a different Z plane. Compare with the same
         # undirected expansion to assert the exact direction contract.
@@ -135,7 +132,6 @@ class FiveHundredThousandSourceProductions(unittest.TestCase):
             self.assertEqual((before.x,before.y,before.z),
                              (after.x,after.y,after.z))
             self.assertEqual((before.facing_deg+180)%360,after.facing_deg)
->>>>>>> origin/main
 
     def test_original_story_gets_a_reachable_directed_side_stage(self):
         base=original_project()

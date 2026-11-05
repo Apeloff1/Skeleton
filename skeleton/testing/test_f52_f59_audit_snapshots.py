@@ -86,20 +86,12 @@ def test_allow_list_audit_locks_target_and_curve_sites(monkeypatch) -> None:
         "skeleton.api.routes:pipeline_game_logic",
         "skeleton.api.routes:forge_materialise",
         "skeleton.api.routes:forge_archetype",
-<<<<<<< HEAD
-        "skeleton.api.routes:gameforge_run",
-        "skeleton.api.routes:gameforge_intake",
-=======
         "skeleton.api.routes:run_gameforge_adapter",
->>>>>>> origin/main
         "skeleton.application.runtime_commands:_run_handler",
     ]
     rows = {row["key"]: row for row in payload["usages"]}
     assert rows["skeleton.api.routes:pipeline_game_logic"]["catalog"] == "PROGRESSION_CURVES"
-<<<<<<< HEAD
-=======
     assert rows["skeleton.api.routes:run_gameforge_adapter"]["catalog"] == "MATERIALISE_TARGETS"
->>>>>>> origin/main
     assert rows["skeleton.application.runtime_commands:_run_handler"]["catalog"] == "MATERIALISE_TARGETS"
 
 

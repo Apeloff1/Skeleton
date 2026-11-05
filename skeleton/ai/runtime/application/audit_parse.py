@@ -105,26 +105,6 @@ def parse_genesis_tree() -> ast.AST | None:
 
 
 def genesis_boot_phase_order(tree: ast.AST | None = None) -> list[str]:
-<<<<<<< HEAD
-    parsed = tree if tree is not None else parse_genesis_tree()
-    if parsed is None:
-        return []
-    for node in parsed.body if isinstance(parsed, ast.Module) else []:
-        if not isinstance(node, ast.ClassDef) or node.name != "Genesis":
-            continue
-        for item in node.body:
-            if not isinstance(item, ast.FunctionDef) or item.name != "boot":
-                continue
-            phases: list[str] = []
-            for stmt in item.body:
-                call = stmt.value if isinstance(stmt, ast.Expr) else None
-                if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
-                    continue
-                attr = call.func.attr
-                if attr.startswith("_phase_") and len(attr) > 7:
-                    phases.append(attr[7:])
-            return phases
-=======
     """Read direct calls or the statically proven BOOT_PHASES dispatch loop.
 
     The current Genesis boot uses a bounded named phase catalogue rather than
@@ -195,7 +175,6 @@ def genesis_boot_phase_order(tree: ast.AST | None = None) -> list[str]:
             for child in ast.walk(steps)
         )
         return catalog if binds_phases and iterates_catalog else []
->>>>>>> origin/main
     return []
 
 
@@ -1505,8 +1484,6 @@ def _idempotency_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool
     return replay, remember
 
 
-<<<<<<< HEAD
-=======
 def _idempotency_wrapper_verified(tree: ast.Module) -> bool:
     """Recognize the shared guard only when both replay and completion exist."""
     for node in tree.body:
@@ -1558,7 +1535,6 @@ def _queued_build_idempotency_verified(fn: ast.FunctionDef | ast.AsyncFunctionDe
     )
 
 
->>>>>>> origin/main
 def idempotency_handler_rows() -> list[dict[str, object]]:
     modules = (
         ("skeleton.api.routes", "/api/v1"),
@@ -1569,16 +1545,11 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
         tree = parse_module_tree(module)
         if tree is None or not isinstance(tree, ast.Module):
             continue
-<<<<<<< HEAD
-=======
         guarded_wrapper = _idempotency_wrapper_verified(tree)
->>>>>>> origin/main
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             replay, remember = _idempotency_attrs(node)
-<<<<<<< HEAD
-=======
             if module == "skeleton.api.routes" and node.name == "game_build" and _queued_build_idempotency_verified(node):
                 replay, remember = True, True
             if guarded_wrapper and any(
@@ -1586,7 +1557,6 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
                 for decorator in node.decorator_list
             ):
                 replay, remember = True, True
->>>>>>> origin/main
             if not replay and not remember:
                 continue
             for decorator in node.decorator_list:

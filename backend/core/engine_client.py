@@ -593,11 +593,7 @@ def command_from_context(
         raise TypeError("context must be ContextEnvelope")
     normalized_cooperation = None
     if cooperation is not None:
-<<<<<<< HEAD
-        from skeleton.intelligence.cooperation import normalize_cooperation_policy
-=======
         from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
->>>>>>> origin/main
 
         try:
             normalized_cooperation = normalize_cooperation_policy(cooperation)
@@ -605,16 +601,10 @@ def command_from_context(
             raise EngineProtocolError("cooperation policy is invalid") from exc
         if tools:
             raise EngineProtocolError("cooperative text review cannot execute tools")
-<<<<<<< HEAD
-        max_model_turns = max(
-            _positive_int(max_model_turns, "max_model_turns", maximum=64),
-            2 + 2 * normalized_cooperation["review_rounds"],
-=======
         cooperation_stage_count = len(cooperation_stages(normalized_cooperation))
         max_model_turns = max(
             _positive_int(max_model_turns, "max_model_turns", maximum=64),
             cooperation_stage_count,
->>>>>>> origin/main
         )
     actor = _text(actor_id, "actor_id", maximum=512)
     cap = _text(capability, "capability", maximum=256)
@@ -898,11 +888,7 @@ def command_from_context(
     if normalized_cooperation is not None:
         # Each finite stage is admitted once; this increases neither aggregate
         # output tokens nor the operation's original wall/cost allowance.
-<<<<<<< HEAD
-        resource_budget["max_provider_attempts"] = 2 + 2 * normalized_cooperation["review_rounds"]
-=======
         resource_budget["max_provider_attempts"] = cooperation_stage_count
->>>>>>> origin/main
         if resolved_output_tokens < 64 * resource_budget["max_provider_attempts"]:
             raise EngineProtocolError("output allowance cannot cover every cooperation stage")
         resource_budget["max_input_tokens"] = input_capacity * resource_budget["max_provider_attempts"]
