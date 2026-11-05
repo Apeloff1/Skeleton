@@ -135,3 +135,75 @@ def test_owner_scope_cannot_reuse_another_users_receipt(monkeypatch):
     assert result["ok"] is False
     assert result["failed_workers"] == [0, 1]
     assert result["merge"] is None
+
+
+
+def test_active_run_capacity_fails_before_graph_access(monkeypatch):
+    class Saturated:
+        def __init__(self):
+            self.releases = 0
+        def acquire(self, *, blocking):
+            assert blocking is False
+            return False
+        def release(self):
+            self.releases += 1
+            raise AssertionError("non-admitted run must not release a slot")
+
+    limiter = Saturated()
+    monkeypatch.setattr(swarm, "_RUN_ADMISSION", limiter)
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(swarm.run_swarm(
+            swarm.SwarmReq(directive="Build an original game", workers=32),
+            identity=ALICE,
+        ))
+    assert error.value.status_code == 503
+    assert limiter.releases == 0
+
+
+def test_success_and_failure_always_release_run_capacity(monkeypatch):
+    class Limiter:
+        active = 0
+        def acquire(self, *, blocking):
+            assert blocking is False
+            self.active += 1
+            return True
+        def release(self):
+            self.active -= 1
+
+    limiter = Limiter()
+    monkeypatch.setattr(swarm, "_RUN_ADMISSION", limiter)
+
+    async def failing(_req, _scope, _owner_key):
+        raise RuntimeError("worker failed")
+    monkeypatch.setattr(swarm, "_run_swarm_scoped", failing)
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(swarm.run_swarm(
+            swarm.SwarmReq(directive="Build game runtime"),
+            identity=ALICE,
+        ))
+    assert limiter.active == 0
+
+
+@pytest.mark.parametrize("project", ["", " ", "\x00", " game", "game\nnext", "x" * 201])
+def test_project_names_must_be_bounded_printable_text(project):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        swarm.SwarmReq(directive="Build an original game", project=project)
+
+
+def test_large_directive_does_not_amplify_single_focus_across_32_workers():
+    directive = "a" * 10000
+    foci = swarm._subtasks(directive, 32)
+    assert len(foci) == 32
+    assert max(map(len, foci)) <= 128
+
+
+def test_project_route_rejects_malformed_direct_model_without_dispatch(monkeypatch):
+    async def forbidden(_req, _scope, _owner_key):
+        raise AssertionError("invalid project reached worker")
+    monkeypatch.setattr(swarm, "_run_swarm_scoped", forbidden)
+    body = swarm.SwarmReq.model_construct(directive="Build a game", project="bad\nproject", workers=1)
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(swarm.run_swarm(body, identity=ALICE))
+    assert error.value.status_code == 422
