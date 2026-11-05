@@ -18,6 +18,8 @@ on:
       - 'skeleton/testing/test_app_assembly.py'
       - 'skeleton/testing/test_app_installer.py'
       - 'skeleton/testing/test_app_offline_install_quarantine.py'
+      - 'skeleton/testing/test_app_offline_delivery_archive.py'
+      - 'skeleton/app/offline_delivery_archive.py'
       - 'skeleton/testing/test_app_studio_journey.py'
       - 'skeleton/testing/test_dual_runtime_verify.py'
       - 'skeleton/ai/game_builder/dual_runtime_verify.py'
@@ -83,6 +85,7 @@ jobs:
             skeleton/testing/test_app_compose_parity.py \
             skeleton/testing/test_app_assembly_source_paths.py \
             skeleton/testing/test_app_offline_install_quarantine.py \
+            skeleton/testing/test_app_offline_delivery_archive.py \
             skeleton/testing/test_dual_runtime_verify.py \
             skeleton/testing/test_app_studio_journey.py \
             skeleton/testing/test_app_offline_install_preflight.py \
