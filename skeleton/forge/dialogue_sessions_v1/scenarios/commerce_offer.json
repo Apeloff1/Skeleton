@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "commerce_offer",
+  "domain": "commerce",
+  "role": "offer",
+  "rapport_threshold": 18,
+  "rapport_gain": 4,
+  "stress_increment": 2,
+  "steps": [
+    {
+      "id": "commerce_offer:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "commerce_offer:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "commerce_offer:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "commerce_offer:proof-1"
+    },
+    {
+      "id": "commerce_offer:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "commerce_offer:proof-2"
+    },
+    {
+      "id": "commerce_offer:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "commerce_offer:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}

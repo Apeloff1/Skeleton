@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/prompt_injection.schema.json",
+  "title": "security.prompt_injection observation contract",
+  "description": "Block injected tool authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "untrusted_instruction_execs",
+        "unverified_tool_authorizations"
+      ],
+      "properties": {
+        "untrusted_instruction_execs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for untrusted_instruction_execs"
+        },
+        "unverified_tool_authorizations": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unverified_tool_authorizations"
+        }
+      }
+    }
+  }
+}
