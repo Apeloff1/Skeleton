@@ -19,6 +19,7 @@ from skeleton.provider_runtime import ProviderProtocolViolationError, ProviderRe
 from .artifact import LocalModelArtifactError, load_local_model_artifact
 from .deployment import LocalModelDeployment, LocalModelDeploymentError, _resolve
 from .local import LocalInferenceEngine, LocalModelAdapter, sample_serving_resources
+from .llama_cpp import LlamaCppRuntimeError, _runtime_library_identities
 
 CATALOG_SCHEMA = "skeleton.local_model.catalog.v1"
 _MAX_CATALOG_BYTES = 1024 * 1024
@@ -214,6 +215,15 @@ class LocalModelCatalog:
                     )
                     for artifact in (deployment.model_path, deployment.executable_path):
                         referenced[artifact] = artifact.stat().st_size
+                    # Count every distinct admitted library path globally, not
+                    # merely against each deployment's individual limit.
+                    # Different filenames are distinct paths even if their
+                    # contents or underlying host inodes happen to match.
+                    if deployment.runtime_libraries:
+                        for library in _runtime_library_identities(
+                            deployment.executable_path.parent, deployment.runtime_libraries,
+                        ):
+                            referenced[Path(library.path)] = library.size_bytes
                 else:
                     resident_bytes += source_bytes
                 _verify_source(entry_path, expected_digest, source_bytes)
@@ -221,7 +231,7 @@ class LocalModelCatalog:
                     raise LocalModelCatalogError("local catalog exceeds its declared referenced-artifact byte budget")
                 entry_digest = hashlib.sha256(json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
                 entries.append(LocalModelCatalogEntry(model_id, kind, entry_path, expected_digest, source_bytes, entry_digest, deployment))
-        except (OSError, TypeError, ValueError, LocalModelDeploymentError) as exc:
+        except (OSError, TypeError, ValueError, LocalModelDeploymentError, LlamaCppRuntimeError) as exc:
             raise LocalModelCatalogError("local catalog source preflight failed") from exc
         if primary not in seen or (verifier is not None and verifier not in seen):
             raise LocalModelCatalogError("local catalog primary and verifier must name configured entries")
