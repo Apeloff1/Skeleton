@@ -298,60 +298,63 @@ def _cache_evict_if_needed() -> None:
 
 
 def _load_full(name: str) -> list[dict]:
-    _ensure_storage()
-    name = _safe_name(name)
-    if name not in _MANIFEST:
-        raise KeyError(f"Shard '{name}' not in manifest")
-    path = _shard_path(name)
-    if not path.exists():
-        raise FileNotFoundError(f"Archive missing on disk: {path}")
-    with path.open("rb") as fh:
-        with _DECOMPRESSOR.stream_reader(fh) as zr:
-            data = zr.read()
-    rows: list[dict] = []
-    for line in data.splitlines():
-        if not line:
-            continue
-        try:
-            rows.append(json.loads(line))
-        except Exception:
-            continue
-    return rows
+    """Compatibility helper; bounded scanner, never unbounded zr.read()."""
+    return list(iter_shard(name))
 
 
 def read_shard(name: str, limit: int = 50, offset: int = 0) -> list[dict]:
-    name = _safe_name(name)
-    with _CACHE_LOCK:
-        cached = _CACHE.get(name)
-        if cached is not None:
-            _CACHE[name] = (time.time(), cached[1])
-            rows = cached[1]
-        else:
-            rows = _load_full(name)
-            size_est = sum(len(json.dumps(r)) for r in rows[:32]) * max(len(rows) // 32, 1)
-            _CACHE[name] = (time.time(), rows)
-            _CACHE_SIZE_EST[name] = size_est
-            _cache_evict_if_needed()
-    return rows[offset : offset + limit]
+    """Read only the requested bounded page; do not cache a whole archive."""
+    _safe_name(name)
+    if type(limit) is not int or not 0 <= limit <= _MAX_PAGE_LIMIT:
+        raise ValueError("vault page limit is outside allowed bounds")
+    if type(offset) is not int or not 0 <= offset <= _MAX_PAGE_OFFSET:
+        raise ValueError("vault page offset is outside allowed bounds")
+    if limit == 0:
+        return []
+    return list(islice(iter_shard(name), offset, offset + limit))
 
 
 def iter_shard(name: str) -> Iterator[dict]:
+    """Stream JSONL through a bounded, symlink-proof descriptor."""
     _ensure_storage()
     name = _safe_name(name)
     if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
-    path = _shard_path(name)
-    with open(path, "rb") as fh:
-        with _DECOMPRESSOR.stream_reader(fh) as zr:
-            buf = io.TextIOWrapper(zr, encoding="utf-8")
-            for line in buf:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    yield json.loads(line)
-                except Exception:
-                    continue
+    shard_name = f"{name}.jsonl.zst"
+    total_bytes = 0
+    total_rows = 0
+    with _storage_fd() as directory:
+        with read_regular(directory, shard_name, max_bytes=_MAX_COMPRESSED_BYTES) as stream:
+            with _DECOMPRESSOR.stream_reader(stream) as decoder:
+                with io.TextIOWrapper(decoder, encoding="utf-8") as lines:
+                    while True:
+                        line = lines.readline(_MAX_ROW_CHARS + 1)
+                        if not line:
+                            break
+                        if len(line) > _MAX_ROW_CHARS:
+                            raise ValueError("vault row exceeds line byte budget")
+                        encoded_len = len(line.encode("utf-8"))
+                        total_bytes += encoded_len
+                        if total_bytes > _MAX_SHARD_SCAN_BYTES:
+                            raise ValueError("vault scan exceeds decompressed byte budget")
+                        if not line.endswith("\n"):
+                            raise ValueError("vault JSONL contains truncated row")
+                        if not line.strip():
+                            continue
+                        if total_rows >= _MAX_SHARD_ROWS:
+                            raise ValueError("vault scan exceeds row count budget")
+                        try:
+                            row = json.loads(
+                                line,
+                                object_pairs_hook=_unique_pairs,
+                                parse_constant=_deny_nonfinite,
+                            )
+                        except ValueError as exc:
+                            raise ValueError("vault JSONL contains corrupt row") from exc
+                        if not isinstance(row, dict):
+                            raise ValueError("vault JSONL row is not an object")
+                        total_rows += 1
+                        yield row
 
 
 def sample_shard(name: str, k: int = 5) -> list[dict]:
