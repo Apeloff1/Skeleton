@@ -13,6 +13,7 @@
     "skeleton/app/installer.py",
     "skeleton/app/setup_runtime.py",
     "skeleton/app/preloader.py",
+    "skeleton/app/install_source_contracts.py",
     "skeleton/app/assembly.py",
     "skeleton/app/first_install.py",
     "skeleton/app/cli.py",
@@ -45,6 +46,9 @@
   "invariants": [
     "Reuse the existing application assembly, Docker Compose supervisor, provider boundary and canonical data stores; create no service or model executor.",
     "The repository-local bootstrap must import only the standard library before installing canonical Python metadata.",
+    "Read-only host preload must reject incompatible pinned backend Python images, missing Docker COPY inputs, linked context sources, unbounded source manifests and missing private-file context exclusions before setup mutates .env.",
+    "Windows staged payload must include the root per-Dockerfile engine context policy as well as backend and frontend context exclusions; default .dockerignore is not an authorized substitute.",
+    "Runtime configuration diagnostics must reject linked, non-regular, oversized, malformed or replaced private .env sources without altering secrets or dispatching live service probes.",
     "A first install generates private stable Mongo, JWT and engine-service credentials; valid existing credentials are preserved unless the operator explicitly requests rotation.",
     "Receipts, diagnostics and subprocess failures contain no credential values or rendered Compose environment.",
     "Default local mode is unavailable until a genuine trained model is configured; healthy application services do not establish AI or crawler readiness.",
