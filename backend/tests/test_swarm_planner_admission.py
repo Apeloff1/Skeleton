@@ -76,3 +76,26 @@ def test_plan_receipt_binds_build_identity_and_objectives():
     assert a["plan_hash"] != c["plan_hash"]
     assert a["plan_hash"] == same["plan_hash"]
     assert planner.verify_plan(a)["valid"] is True
+
+
+@pytest.mark.parametrize("build_id", ["", " ", 42, "a" * 129])
+def test_build_identity_is_bounded(build_id):
+    with pytest.raises(ValueError, match="build_id"):
+        planner.plan_build(build_id, phases=["a"])
+
+
+@pytest.mark.parametrize("context", [{"genre": "a" * 257}, {"genre": {"malformed": True}}])
+def test_genre_source_is_bounded_before_hashing(context):
+    with pytest.raises(ValueError, match="genre"):
+        planner.plan_build("b", phases=["a"], game_ctx=context)
+
+
+@pytest.mark.parametrize("seed", [float("nan"), 2 ** 64, True, "3"])
+def test_invalid_seed_type_or_range_is_rejected(seed):
+    with pytest.raises(ValueError, match="seed"):
+        planner.plan_build("b", phases=["a"], seed=seed)
+
+
+def test_mixed_type_dependency_keys_have_controlled_error():
+    with pytest.raises(ValueError, match="keys"):
+        planner.plan_build("b", phases=["a"], deps={1: [], "other": []})
