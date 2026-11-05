@@ -18,7 +18,7 @@ from skeleton.ai.runtime.operational_ai.laptop_runtime.session_adapter import cr
 from skeleton.ai.runtime.operational_ai.laptop_runtime.session_policy import new_request_id
 from skeleton.ai.runtime.operational_ai.laptop_runtime.turn_bridge import TurnBridge
 from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import (
-    identifier, nonnegative, number, utf8,
+    ContractViolation, identifier, nonnegative, number, utf8,
 )
 
 from .native_receipt_boundary import receive_committed_turn
@@ -119,9 +119,19 @@ class NativeJeevesChat:
         if committed is None:
             # Native exceptions retain their uncertain SQLite pending lease.
             # Never reissue that request automatically after a crash.
-            fresh = self.bridge.turn(
-                self.session_id, id_, prompt, seed=seed, temperature=temperature,
-            )
+            try:
+                fresh = self.bridge.turn(
+                    self.session_id, id_, prompt, seed=seed,
+                    temperature=temperature,
+                )
+            except ContractViolation as exc:
+                # The lower native bridge now proves the independent SQLite
+                # commit before returning. Preserve that fail-closed hold at
+                # the public Jeeves chat boundary, without broad exception
+                # swallowing or a second native call on an uncertain result.
+                raise NativeChatHold(
+                    "native chat turn lacks an approved durable receipt"
+                ) from exc
             committed = self.worker.spine.replay(
                 self.session_id, id_, prompt, seed=seed, temperature=temperature,
             )
