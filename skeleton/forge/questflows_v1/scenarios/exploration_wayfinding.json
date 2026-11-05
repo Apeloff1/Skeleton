@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "exploration_wayfinding",
+  "domain": "exploration",
+  "stages": [
+    {
+      "key": "discover_wayfinding",
+      "evidence": "exploration:wayfinding:discover:proof",
+      "grants": "exploration:wayfinding:stage:1",
+      "risk": 3,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_wayfinding",
+      "evidence": "exploration:wayfinding:prepare:proof",
+      "grants": "exploration:wayfinding:stage:2",
+      "risk": 4,
+      "sequence": 1,
+      "requires_previous_grant": "exploration:wayfinding:stage:1"
+    },
+    {
+      "key": "execute_wayfinding",
+      "evidence": "exploration:wayfinding:execute:proof",
+      "grants": "exploration:wayfinding:stage:3",
+      "risk": 5,
+      "sequence": 2,
+      "requires_previous_grant": "exploration:wayfinding:stage:2"
+    },
+    {
+      "key": "resolve_wayfinding",
+      "evidence": "exploration:wayfinding:resolve:proof",
+      "grants": "exploration:wayfinding:stage:4",
+      "risk": 6,
+      "sequence": 3,
+      "requires_previous_grant": "exploration:wayfinding:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "exploration_wayfinding:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "exploration:wayfinding:discover:proof"
+      ]
+    },
+    {
+      "id": "exploration_wayfinding:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "exploration:wayfinding:prepare:proof"
+      ]
+    },
+    {
+      "id": "exploration_wayfinding:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "exploration:wayfinding:execute:proof"
+      ]
+    },
+    {
+      "id": "exploration_wayfinding:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "exploration:wayfinding:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
