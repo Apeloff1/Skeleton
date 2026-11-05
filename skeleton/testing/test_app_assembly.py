@@ -1156,3 +1156,62 @@ def test_runtime_env_reader_missing_source_returns_empty(tmp_path):
     from skeleton.app.assembly import _read_dotenv
 
     assert _read_dotenv(tmp_path / ".env") == {}
+
+
+
+def test_app_status_hides_unsafe_runtime_config_error(monkeypatch, capsys):
+    from skeleton.app import cli
+
+    def unsafe():
+        raise ValueError("private operator secret material must not be logged")
+
+    monkeypatch.setattr(cli, "runtime_manifest", unsafe)
+    assert cli._print_status(as_json=True) == 2
+    serialized = capsys.readouterr().out
+    import json
+
+    value = json.loads(serialized)
+    assert value["ok"] is False
+    assert value["code"] == "runtime_configuration_unavailable"
+    assert "private operator secret material" not in serialized
+
+
+def test_first_install_studio_drops_live_token_after_unsafe_env(tmp_path, monkeypatch):
+    from skeleton.app import first_install, studio_readiness
+    from skeleton.app.preloader import PreloadReport
+
+    (tmp_path / ".env").write_bytes(b"Q" * (256 * 1024 + 1))
+    monkeypatch.setattr(
+        first_install,
+        "inspect_host",
+        lambda _root: PreloadReport(
+            root=tmp_path, platform="test", python="3.11", checks=()
+        ),
+    )
+    observed: list[tuple[object, object]] = []
+
+    def fake_studio(*_args, **kwargs):
+        observed.append((kwargs["live"], kwargs["auth_token_file"]))
+        return {
+            "local_host": {"observed": False},
+            "server": {"observed": False, "crawler": {"observed": False}},
+        }
+
+    monkeypatch.setattr(studio_readiness, "studio_readiness_report", fake_studio)
+    report = first_install.first_install_report(
+        tmp_path,
+        live=True,
+        studio=True,
+        auth_token_file=tmp_path / "private-operator-token",
+        environ={},
+    )
+    assert observed == [(False, None)]
+    assert report["configuration_ready"] is False
+    assert report["crawler"]["observed"] is False
+
+
+def test_new_install_contract_module_is_required_in_windows_payload():
+    from skeleton.app.assembly import load_manifest
+
+    manifest = load_manifest()
+    assert "skeleton/app/install_source_contracts.py" in manifest.required_paths
