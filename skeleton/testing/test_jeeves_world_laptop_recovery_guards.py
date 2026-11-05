@@ -128,3 +128,27 @@ def test_corrupted_compiled_artifacts_reject_restore_without_slot_creation(
         "lighthouse", "restored", imported=exported))
     assert not (tmp_path / "lighthouse.restored.session.json").exists()
     assert not (tmp_path / "lighthouse.lock").exists()
+
+
+def test_html_corruption_blocks_portable_restore_until_deterministic_recompile(tmp_path):
+    flow, _, reviewed, receipt = ready(tmp_path)
+    initial = flow.create_session("lighthouse", "source")
+    flow.choose("lighthouse", "source", "rescue", initial["session_digest"])
+    exported = flow.export_session("lighthouse", "source")
+    source_slot = tmp_path / "lighthouse.source.session.json"
+    source_bytes = source_slot.read_bytes()
+    html = tmp_path / receipt["html_file"]
+    original_html = html.read_bytes()
+    html.write_bytes(original_html + b"\n<!-- modified after review -->\n")
+    assert_denied("laptop_html_mismatch", lambda: flow.preflight_restore(
+        "lighthouse", exported))
+    assert_denied("laptop_html_mismatch", lambda: flow.create_session(
+        "lighthouse", "recovered", imported=exported))
+    assert not (tmp_path / "lighthouse.recovered.session.json").exists()
+    assert source_slot.read_bytes() == source_bytes
+    assert not (tmp_path / "lighthouse.lock").exists()
+    rebuilt = flow.compile("lighthouse", reviewed["source_digest"])
+    assert rebuilt == receipt
+    assert html.read_bytes() == original_html
+    assert flow.preflight_restore("lighthouse", exported)["restorable"] is True
+    assert source_slot.read_bytes() == source_bytes
