@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 import os
+import json
 from pathlib import Path
 
 import pytest
@@ -187,3 +188,43 @@ def test_successful_overwrite_and_delete_reconcile_bytes_and_manifest(isolated_s
     assert vault.delete_shard("stable") is True
     assert vault.get_shard_entry("stable") is None
     assert not (vault.VAULT_ROOT / "stable.jsonl.zst").exists()
+
+
+
+def test_late_manifest_fsync_failure_preserves_consistent_overwrite(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    save = vault._save_manifest
+
+    def fail_after_commit():
+        save()
+        raise OSError("fsync failure after manifest publication")
+
+    monkeypatch.setattr(vault, "_save_manifest", fail_after_commit)
+    with pytest.raises(OSError, match="fsync failure"):
+        vault.write_shard("stable", [{"value": "after"}], domain="testing")
+
+    on_disk = json.loads((vault.VAULT_ROOT / "_manifest.json").read_text())
+    assert vault._MANIFEST == on_disk
+    assert vault.read_shard("stable") == [{"value": "after"}]
+
+
+def test_late_manifest_fsync_failure_preserves_consistent_delete(isolated_storage, monkeypatch):
+    vault = isolated_storage
+    vault.write_shard("stable", [{"value": "before"}], domain="testing")
+    save = vault._save_manifest
+
+    def fail_after_commit():
+        save()
+        raise OSError("fsync failure after manifest publication")
+
+    monkeypatch.setattr(vault, "_save_manifest", fail_after_commit)
+    with pytest.raises(OSError, match="fsync failure"):
+        vault.delete_shard("stable")
+
+    on_disk = json.loads((vault.VAULT_ROOT / "_manifest.json").read_text())
+    assert vault._MANIFEST == on_disk
+    assert vault.get_shard_entry("stable") is None
+    # After uncertain publication, the data is conservatively retained for
+    # recovery rather than deleted while the caller sees an error.
+    assert (vault.VAULT_ROOT / "stable.jsonl.zst").exists()
