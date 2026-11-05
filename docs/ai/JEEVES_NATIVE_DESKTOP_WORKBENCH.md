@@ -244,3 +244,15 @@ inspection/replay** before displaying a result.
 **Important:** The model must actually be approved and installed locally.
 The source-level interface cannot certify physical CPU/GPU performance,
 Windows 11/WSL2 installation, legal rights, native cancellation, or release.
+
+## Search existing project source without model tools
+
+Choose **Search project sources** to open the finite read-only project index.
+It scans explicit operator-selected regular code/text files using pinned
+local directory/file descriptors and finite depth, bytes, count and time
+bounds. Search may match source text or the relative filename. The UI
+presents exact hashed UTF-8 excerpts with line ranges, then requires a
+separate **Attach selected exact snippet** action before a subsequent chat,
+agent or durable-work prompt can use that text as untrusted reference data.
+No search results are silently uploaded, memorized, executed or written back.
+See `docs/ai/JEEVES_LOCAL_SOURCE_DISCOVERY.md`.

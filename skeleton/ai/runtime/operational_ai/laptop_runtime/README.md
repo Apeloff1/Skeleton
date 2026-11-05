@@ -106,3 +106,11 @@ desktop's native work-order controls. They delegate to the existing
 `NativeDurableJeevesAgent` under one source-fenced GGUF worker and original
 run/task/budget/tenant/model journal identity. No automatic resume or new
 memory database is created; uncertain pending native effects fail closed.
+
+## Operator-only project source discovery
+
+Search a bounded local code tree with **Search project sources** and manually
+attach an exact UTF-8 excerpt to a later native prompt. Source indexing has
+no model tool authority, follows no symlinks, excludes protected control and
+credential paths, and labels incomplete budget-limited searches. Full
+boundaries: `docs/ai/JEEVES_LOCAL_SOURCE_DISCOVERY.md`.
