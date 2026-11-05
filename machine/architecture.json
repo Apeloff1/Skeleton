@@ -299,10 +299,7 @@
       "path": "frontend",
       "kind": "expo",
       "canonical": true,
-      "depends_on": [
-        "backend",
-        "skeleton"
-      ]
+      "depends_on": []
     }
   ],
   "interfaces": [
@@ -1422,13 +1419,14 @@
       "startup_groups": [
         {
           "order": 0,
-          "id": "data-foundation",
+          "id": "diagnostics-and-data-foundation",
           "nodes": [
+            "frontend",
             "mongo",
             "chroma"
           ],
           "mode": "parallel",
-          "barrier": "started-and-health-probe-eligible"
+          "barrier": "setup-ui-starts-independently; data-health-probes-do-not-gate-setup"
         },
         {
           "order": 1,
@@ -1437,7 +1435,7 @@
             "skeleton"
           ],
           "mode": "serial",
-          "barrier": "ready-before-application-start"
+          "barrier": "engine-ready-before-dependent-application-start"
         },
         {
           "order": 2,
@@ -1446,16 +1444,7 @@
             "backend"
           ],
           "mode": "serial",
-          "barrier": "ready-before-dependent-product-start"
-        },
-        {
-          "order": 3,
-          "id": "product-shell",
-          "nodes": [
-            "frontend"
-          ],
-          "mode": "serial",
-          "barrier": "ready-after-backend-and-engine"
+          "barrier": "backend-readiness-required-for-protected-product-actions"
         }
       ],
       "readiness_rules": [
@@ -1463,7 +1452,7 @@
         "liveness proves process survival; readiness proves dependency-safe request admission",
         "degraded readiness must be explicit and cannot claim unavailable capability as healthy",
         "provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed",
-        "product readiness requires both application and engine endpoints used by the shell"
+        "protected product actions require both application and engine endpoints used by the shell; setup diagnostics do not"
       ],
       "shutdown_groups": [
         {

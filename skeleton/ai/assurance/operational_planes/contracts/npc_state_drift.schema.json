@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/npc_state_drift.schema.json",
+  "title": "gameworld.npc_state_drift observation contract",
+  "description": "Protect NPC continuity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "npc_state_conflicts",
+        "canon_violations"
+      ],
+      "properties": {
+        "npc_state_conflicts": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for npc_state_conflicts"
+        },
+        "canon_violations": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for canon_violations"
+        }
+      }
+    }
+  }
+}
