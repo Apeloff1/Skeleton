@@ -37,8 +37,8 @@ def idempotency_audit_snapshot() -> dict[str, object]:
         "kind": IDEMPOTENCY_AUDIT_KIND,
         "handlers": rows,
         "keys": [str(row["key"]) for row in rows],
-        "missing_remember": [str(row["key"]) for row in rows if row["replay"] and not row["remember"]],
-        "missing_replay": [str(row["key"]) for row in rows if row["remember"] and not row["replay"]],
+        "missing_remember": [str(row["key"]) for row in rows if not row["remember"]],
+        "missing_replay": [str(row["key"]) for row in rows if not row["replay"]],
     }
 
 
