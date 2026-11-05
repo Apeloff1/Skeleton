@@ -89,7 +89,13 @@ def verify_backup(value: dict | str | bytes, original_source: bytes) -> tuple[di
         if not isinstance(entry, dict) or set(entry) != {"prior_head", "next_head", "action"}:
             raise BackupError("malformed backup action")
         action = entry["action"]
-        if not isinstance(action, dict) or len(canonical(action)) > MAX_BACKUP_ACTION_BYTES:
+        if not isinstance(action, dict):
+            raise BackupError("malformed backup action object")
+        try:
+            action_size = len(canonical(action))
+        except (ValueError, TypeError, RecursionError, OverflowError) as exc:
+            raise BackupError("invalid backup action object graph") from exc
+        if action_size > MAX_BACKUP_ACTION_BYTES:
             raise BackupError("oversized backup action")
         prior = replay["head"]
         if entry["prior_head"] != prior:
