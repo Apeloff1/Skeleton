@@ -320,3 +320,40 @@ test('UI recovers private receipts from server and clears state on auth changes'
   assert.match(ui, /dc-recover-/);
   assert.doesNotMatch(ui, /AsyncStorage\.setItem|sessionStorage\.setItem|SecureStore\.setItem/);
 });
+
+
+test('expired worker evidence is recoverable without starting a replacement model job', async () => {
+  let calls = 0;
+  const transport = mockTransport({
+    post: async () => { throw Error('never replay an unconfirmed paid model job'); },
+    get: async (path, opts) => {
+      calls++;
+      assert.equal(path, '/api/discourse/result/' + JOB_ID);
+      assert.equal(opts.retries, 0);
+      return ok({
+        status: 'unconfirmed',
+        error: 'job_worker_continuity_unknown',
+        job_id: JOB_ID,
+      });
+    },
+  });
+  const outcome = await pollDiscourseJob(transport, JOB_ID);
+  assert.deepEqual(outcome, {
+    ok: false, jobId: JOB_ID,
+    error: 'job_worker_continuity_unknown', recoverable: true,
+  });
+  assert.equal(calls, 1);
+});
+
+test('unconfirmed status is not mistaken for a completed consensus', async () => {
+  const transport = mockTransport({
+    post: async () => { throw Error('unexpected POST'); },
+    get: async () => ok({
+      ...terminal(), status: 'unconfirmed', error: 'job_worker_continuity_unknown',
+    }),
+  });
+  const outcome = await pollDiscourseJob(transport, JOB_ID);
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.error, 'job_worker_continuity_unknown');
+  assert.equal(outcome.recoverable, true);
+});

@@ -191,6 +191,10 @@ export async function pollDiscourseJob(
       if (record.status === 'error') {
         return failure(boundedMessage(record.error, 'deliberation_failed'), jobId);
       }
+      if (record.status === 'unconfirmed') {
+        // No replay: the original worker may still be completing elsewhere.
+        return failure('job_worker_continuity_unknown', jobId, true);
+      }
       if (record.status !== 'running' && record.status !== 'queued') {
         return failure('unknown_job_state', jobId);
       }
