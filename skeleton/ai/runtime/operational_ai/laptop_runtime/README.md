@@ -148,3 +148,11 @@ replanning and model verification using the existing
 `StrictJeevesAgentRuntime` against the same one installed GGUF and SQLite
 owner. It cannot raise tool permissions, start other providers or stage
 persistent memory. `docs/ai/JEEVES_ADVANCED_NATIVE_REASONING.md`.
+
+## Serial durable native work
+
+Operator-approved `jeeves.desktop.durable-work-batch.v1` tasks run
+sequentially through one connected GGUF and the original sealed SQLite
+work journal. Each run ID is minted and approved before inference.
+No automatic retry/resume or source write is granted.
+`docs/ai/JEEVES_SERIAL_DURABLE_WORK_BATCHES.md`.
