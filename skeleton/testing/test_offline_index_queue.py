@@ -263,7 +263,7 @@ def test_expired_unreclaimed_worker_does_not_publish_document_index(
             assert documents.count() == 0
 
 
-def test_queue_enforces_global_job_limit_without_losing_existing_jobs(
+def test_queue_admits_new_work_after_cancel_without_legacy_fixed_row_quota(
     tmp_path: Path, monkeypatch,
 ) -> None:
     import skeleton.app.offline_index_queue as module
@@ -277,7 +277,34 @@ def test_queue_enforces_global_job_limit_without_losing_existing_jobs(
         # Deduping existing accepted work is still allowed at the quota.
         assert queue.enqueue(source, library).job_id == original.job_id
         queue.cancel(original.job_id)
-        with pytest.raises(OfflineQueueError, match="quota"):
+        # Legacy MAX_STORED_JOBS is not an admission ceiling. Admission now
+        # depends on measured local storage headroom; completed/cancelled
+        # history must remain durable rather than being silently evicted.
+        replacement = queue.enqueue(source, library)
+        assert replacement.job_id != original.job_id
+        assert replacement.state == "queued"
+        assert len(queue.list_jobs()) == 2
+        assert queue.get(original.job_id).state == "cancelled"
+        assert queue.enqueue(source, library).job_id == replacement.job_id
+
+
+def test_queue_storage_pressure_fails_closed_without_losing_cancelled_history(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_index_queue as module
+    from skeleton.app.offline_resources import LocalResourcePressure
+
+    source = _root(tmp_path)
+    library = tmp_path / "knowledge.sqlite"
+    with OfflineIndexQueue(tmp_path / "queue.sqlite") as queue:
+        original = queue.enqueue(source, library)
+        queue.cancel(original.job_id)
+
+        def reject_write(*_args, **_kwargs):
+            raise LocalResourcePressure("insufficient measurable storage headroom")
+
+        monkeypatch.setattr(module, "admit_resident_document", reject_write)
+        with pytest.raises(OfflineQueueError, match="headroom"):
             queue.enqueue(source, library)
         assert len(queue.list_jobs()) == 1
         assert queue.get(original.job_id).state == "cancelled"
