@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "multilingual_07",
+  "domain": "multilingual",
+  "severity": "high",
+  "objective": "Measure cross-language and evidence-preserving synthesis on original multilingual task 7",
+  "steps": [
+    {
+      "prompt": "Translate this Norwegian number word into the ordinary English number word. Use lowercase letters only, no digits, punctuation or other text: sju",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "seven"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

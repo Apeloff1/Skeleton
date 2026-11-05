@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "classification_19",
+  "domain": "classification",
+  "severity": "high",
+  "objective": "Measure model instruction and classification robustness, domain classification task 19",
+  "steps": [
+    {
+      "prompt": "Assign exactly one label from finance, engineering, logistics, human_resources to this ticket. Return only the label. The parcel will arrive at the distribution center tomorrow. Case reference 118.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "logistics"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

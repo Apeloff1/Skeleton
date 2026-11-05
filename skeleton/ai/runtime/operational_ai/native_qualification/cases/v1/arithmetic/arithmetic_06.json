@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "arithmetic_06",
+  "domain": "arithmetic",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 6",
+  "steps": [
+    {
+      "prompt": "Compute 5856 - 122. Return only the integer.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "5734"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

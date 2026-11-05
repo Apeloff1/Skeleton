@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "fractions_20",
+  "domain": "fractions",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 20",
+  "steps": [
+    {
+      "prompt": "Add 1 to 154/144, reduce to lowest terms, and output a/b only.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "149/72"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

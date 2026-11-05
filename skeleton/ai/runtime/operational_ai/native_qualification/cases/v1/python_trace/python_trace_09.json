@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "python_trace_09",
+  "domain": "python_trace",
+  "severity": "high",
+  "objective": "Measure Python program interpretation and finite logical inference python_trace case 9",
+  "steps": [
+    {
+      "prompt": "Mentally run this Python 3 program without executing external code. Return exactly what the print call emits on one line. Program:\nx = 69\ny = 5\nprint(x // y)",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "13"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

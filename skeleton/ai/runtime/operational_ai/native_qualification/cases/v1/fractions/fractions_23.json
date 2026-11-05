@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "fractions_23",
+  "domain": "fractions",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 23",
+  "steps": [
+    {
+      "prompt": "Add 1 to 175/162, reduce to lowest terms, and output a/b only.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "337/162"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

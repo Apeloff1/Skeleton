@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "citations_22",
+  "domain": "citations",
+  "severity": "critical",
+  "objective": "Evaluate offline grounding, exact source attribution and untrusted evidence boundary 22",
+  "steps": [
+    {
+      "prompt": "Use the exact two original fictional evidence snippets below. Which source identifies the color of the Granite sample? Answer in one short sentence naming the color teal, and cite the correct identifier in square brackets. Never cite the distractor.\n[source_121] The Granite sample's recorded color is teal.\n[source_321] The unrelated Granite shipment's weight is 26 kilograms.",
+      "checks": [
+        {
+          "kind": "contains",
+          "expected": "teal"
+        },
+        {
+          "kind": "citation_label",
+          "expected": "source_121"
+        },
+        {
+          "kind": "not_contains",
+          "expected": "[source_321]"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

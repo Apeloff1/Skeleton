@@ -1,0 +1,28 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "extraction_20",
+  "domain": "extraction",
+  "severity": "high",
+  "objective": "Quantify native model extraction and data transformation fidelity for extraction trial 20",
+  "steps": [
+    {
+      "prompt": "Extract ticket, owner, priority and amount from this fictional record. Return exactly one valid JSON object with only those keys, with amount as integer. No Markdown. Fictional operations memo: ticket REQ-3019; owner Hana; priority medium; amount 367 credits.",
+      "checks": [
+        {
+          "kind": "json_equals",
+          "expected": {
+            "ticket": "REQ-3019",
+            "owner": "Hana",
+            "priority": "medium",
+            "amount": 367
+          }
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

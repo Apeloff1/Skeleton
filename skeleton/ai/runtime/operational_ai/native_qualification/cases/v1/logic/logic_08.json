@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "logic_08",
+  "domain": "logic",
+  "severity": "high",
+  "objective": "Measure Python program interpretation and finite logical inference logic case 8",
+  "steps": [
+    {
+      "prompt": "Evaluate the finite Boolean statement. Answer exactly TRUE or FALSE, no justification. Is (9 is divisible by 3) XOR (15 is divisible by 5) true?",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "FALSE"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}
