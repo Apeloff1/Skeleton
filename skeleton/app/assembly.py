@@ -394,6 +394,19 @@ def runtime_manifest(
                 or url.fragment
             ):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+            # Reject malformed authorities before rebuilding the URL. In particular,
+            # urlsplit accepts invalid port text until .port is accessed and can
+            # otherwise silently discard a malformed authority on replacement.
+            try:
+                original_port = url.port
+            except ValueError as exc:
+                raise ValueError(
+                    f"{service.name} has an invalid public URL port; override rejected"
+                ) from exc
+            if original_port is None or not 1 <= original_port <= 65535:
+                raise ValueError(
+                    f"{service.name} requires a valid public URL port; override rejected"
+                )
             host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"
