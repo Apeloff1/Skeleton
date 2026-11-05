@@ -1,0 +1,38 @@
+[
+  {
+    "kind": "interact",
+    "tick": 0,
+    "npc_id": "mira_keeper",
+    "interaction_id": "ask_for_lens",
+    "player_id": "player"
+  },
+  {
+    "kind": "interact",
+    "tick": 0,
+    "npc_id": "sol_dockwright",
+    "interaction_id": "repair_lens",
+    "player_id": "player"
+  },
+  {
+    "kind": "advance",
+    "tick": 8
+  },
+  {
+    "kind": "interact",
+    "tick": 8,
+    "npc_id": "mira_keeper",
+    "interaction_id": "restore_beacon",
+    "player_id": "player"
+  },
+  {
+    "kind": "advance",
+    "tick": 12
+  },
+  {
+    "kind": "interact",
+    "tick": 12,
+    "npc_id": "sol_dockwright",
+    "interaction_id": "open_tide_gate",
+    "player_id": "player"
+  }
+]
