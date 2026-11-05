@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import random
 from typing import Any
 
@@ -111,18 +112,62 @@ def plan_build(
     Returns a JSON-serialisable plan with director/leads/platoons/workers,
     dependency edges, topological waves and a coverage proof.
     """
-    phases = list(phases or DEFAULT_PHASES)
+    # None selects canonical defaults; an explicitly empty request must never
+    # manufacture 100 phases or invent a sequential dependency chain.
+    if phases is None:
+        phases = list(DEFAULT_PHASES)
+    elif not isinstance(phases, (list, tuple)):
+        raise ValueError("phases must be a list of phase identifiers")
+    else:
+        phases = list(phases)
     if not phases:
         raise ValueError("at least one phase is required")
     if len(phases) > MAX_PHASES:
         raise ValueError(f"too many phases (max {MAX_PHASES})")
+    if any(
+        not isinstance(phase, str)
+        or not 1 <= len(phase.strip()) <= 128
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in phase)
+        for phase in phases
+    ):
+        raise ValueError("phase ids must be bounded non-empty strings")
     if len(set(phases)) != len(phases):
         raise ValueError("duplicate phase ids are not allowed")
+    if type(platoon_size) is not int or platoon_size < 1:
+        raise ValueError("platoon_size must be a positive integer")
     platoon_size = max(MIN_PLATOON, min(MAX_PLATOON, platoon_size))
-    game_ctx = game_ctx or {}
-    objectives = objectives or ["ship a complete, polished, original game"]
+    if type(seed) is not int:
+        raise ValueError("seed must be an integer")
+    if game_ctx is None:
+        game_ctx = {}
+    if not isinstance(game_ctx, dict):
+        raise ValueError("game context must be an object")
+    if objectives is None:
+        objectives = ["ship a complete, polished, original game"]
+    elif not isinstance(objectives, (list, tuple)):
+        raise ValueError("objectives must be a list of text")
+    else:
+        objectives = list(objectives)
+    if not 1 <= len(objectives) <= 100 or any(
+        not isinstance(obj, str) or not 1 <= len(obj.strip()) <= 512 for obj in objectives
+    ):
+        raise ValueError("objectives must contain bounded non-empty text")
 
-    deps = deps or _default_chain_deps(phases)
+    if deps is None:
+        deps = _default_chain_deps(phases)
+    elif not isinstance(deps, dict):
+        raise ValueError("dependencies must be a phase-to-list mapping")
+    else:
+        unknown = set(deps) - set(phases)
+        if unknown:
+            raise ValueError(f"dependencies name unknown phases: {sorted(unknown)[:5]}")
+        for phase, required in deps.items():
+            if not isinstance(required, (list, tuple)) or any(
+                not isinstance(dep, str) for dep in required
+            ):
+                raise ValueError(f"invalid dependency list for phase {phase}")
+            if len(set(required)) != len(required):
+                raise ValueError(f"duplicate dependencies for phase {phase}")
     waves = topo_waves(phases, deps)
     depth_of: dict[str, int] = {}
     for w_idx, wave in enumerate(waves):
@@ -268,12 +313,27 @@ def _coverage(plan: dict, phases: list[str]) -> dict:
 
 
 def _plan_hash(plan: dict) -> str:
-    basis = "|".join(
-        f"{n['id']}:{','.join(w['code'] for w in n.get('workers', []))}"
-        for n in plan["nodes"] if n["tier"] == "platoon"
+    """Versioned, unambiguous identity for a fully specified build plan.
+
+    Former hashes covered only worker codes, DAG edges and seed. Distinct
+    builds or changed objectives could therefore share the same receipt ID.
+    """
+    basis = {
+        "schema": "swarm-plan-v2",
+        "build_id": plan["build_id"],
+        "seed": plan["seed"],
+        "platoon_size": plan["platoon_size"],
+        "objectives": plan["objectives"],
+        "phases": [
+            {"id": node["phase_id"], "workers": [worker["code"] for worker in node["workers"]]}
+            for node in plan["nodes"] if node["tier"] == "platoon"
+        ],
+        "edges": plan["edges"],
+    }
+    encoded = json.dumps(
+        basis, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     )
-    basis += "||" + "|".join(f"{e['from']}->{e['to']}" for e in plan["edges"])
-    return hashlib.sha256(f"{plan['seed']}::{basis}".encode()).hexdigest()[:16]
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
 
 
 def verify_plan(plan: dict) -> dict:
