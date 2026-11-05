@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "verdant_ruins__diplomat",
+  "chapter": 44,
+  "title": "Verdant Ruins: The Diplomat's Civic Seed",
+  "theme": "verdant_ruins",
+  "discipline": "diplomat",
+  "region": "Verdant Ruins",
+  "premise": "In a forest city reclaimed by root-powered civic machines, the diplomat must negotiate a route across a disputed threshold using a sealed bilingual accord.",
+  "signal": "root drum",
+  "key_name": "root drum attunement",
+  "objective_name": "Civic Seed",
+  "ending": "Recover the Civic Seed and return with the mutual passage covenant; Green Assembly can finally verify the source testimony.",
+  "faction": "Green Assembly",
+  "challenge": "Survive spore plume while evading the canopy defender without sacrificing the mutual passage covenant.",
+  "choice_yes": "Disclose evidence and ask Green Assembly to witness the sealed bilingual accord.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to reveal the faction's old promise",
+  "tool": "sealed bilingual accord",
+  "reward": "mutual passage covenant",
+  "enemy": "canopy defender",
+  "chapter_links": [
+    "verdant_ruins__cartographer",
+    "verdant_ruins__machinist"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

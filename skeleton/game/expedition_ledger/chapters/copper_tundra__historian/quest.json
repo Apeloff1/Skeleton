@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "copper_tundra__historian",
+  "chapter": 41,
+  "title": "Copper Tundra: The Historian's Aurora Register",
+  "theme": "copper_tundra",
+  "discipline": "historian",
+  "region": "Copper Tundra",
+  "premise": "In a magnetized polar steppe threaded by buried power rails, the historian must recover lost testimony without rewriting it using a chronicle decoding slate.",
+  "signal": "aurora compass",
+  "key_name": "aurora compass attunement",
+  "objective_name": "Aurora Register",
+  "ending": "Recover the Aurora Register and return with the unaltered historical account; Polar Surveyors can finally verify the source testimony.",
+  "faction": "Polar Surveyors",
+  "challenge": "Survive conductive frost while evading the rail colossus without sacrificing the unaltered historical account.",
+  "choice_yes": "Disclose evidence and ask Polar Surveyors to witness the chronicle decoding slate.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to reveal a compromising record",
+  "tool": "chronicle decoding slate",
+  "reward": "unaltered historical account",
+  "enemy": "rail colossus",
+  "chapter_links": [
+    "copper_tundra__sentinel",
+    "copper_tundra__navigator"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}
