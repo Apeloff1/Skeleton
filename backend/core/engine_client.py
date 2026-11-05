@@ -18,6 +18,7 @@ import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -25,7 +26,7 @@ import re
 from skeleton.contracts.runtime_optimization import validate_runtime_policy_patch
 from time import monotonic
 from typing import Any, Mapping, Sequence
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -191,6 +192,74 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     return dict(value)
 
 
+
+def _engine_origin(raw: str) -> str:
+    """Resolve one strict authority, never a redirecting/path-bearing token sink.
+
+    This is trusted operator configuration, not general-purpose web crawling.
+    Reject userinfo, fragments, query, origin-relative escapes and ambiguous
+    host spellings before any internal service bearer token can be sent.
+    """
+    if not isinstance(raw, str) or raw != raw.strip() or len(raw) > 4096:
+        raise EngineProtocolError("engine base_url must be normalized")
+    if (
+        any(ord(ch) < 33 or ord(ch) > 126 for ch in raw)
+        or "\\" in raw or "?" in raw or "#" in raw
+    ):
+        raise EngineProtocolError("engine base_url contains forbidden URL characters")
+    try:
+        parts = urlsplit(raw)
+        scheme = parts.scheme.lower()
+        host = parts.hostname
+        port = parts.port
+    except ValueError as exc:
+        raise EngineProtocolError("engine base_url is invalid") from exc
+    if (
+        scheme not in {"http", "https"}
+        or not parts.netloc
+        or not host
+        or parts.username is not None or parts.password is not None
+        or parts.query or parts.fragment
+        or parts.path not in {"", "/"}
+        or "%" in parts.netloc
+        or "@" in parts.netloc
+    ):
+        raise EngineProtocolError("engine base_url must be an origin without credentials or paths")
+    if port is not None and not 1 <= port <= 65535:
+        raise EngineProtocolError("engine base_url port is invalid")
+    if ":" in host:
+        try:
+            address = ipaddress.IPv6Address(host)
+        except ValueError as exc:
+            raise EngineProtocolError("engine base_url IPv6 authority is invalid") from exc
+        authority = "[" + address.compressed + "]"
+    else:
+        if (
+            len(host) > 253
+            or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?", host)
+            or ".." in host
+            or any(label.startswith("-") or label.endswith("-") or len(label) > 63
+                   for label in host.split("."))
+        ):
+            raise EngineProtocolError("engine base_url host is invalid")
+        authority = host.lower()
+    if port is not None:
+        authority += ":" + str(port)
+    return scheme + "://" + authority
+
+
+def _header_text(value: object, name: str, *, maximum: int) -> str:
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= maximum
+        or value != value.strip()
+        or any(not 33 <= ord(char) <= 126 for char in value)
+    ):
+        raise EngineProtocolError(name + " must be normalized printable ASCII")
+    return value
+
+
+
 @dataclass(frozen=True, slots=True)
 class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
@@ -206,21 +275,20 @@ class EngineClientConfig:
     max_poll_attempts: int = 2400
 
     def __post_init__(self) -> None:
-        base = _text(self.base_url.rstrip("/"), "base_url", maximum=4096)
-        if not (base.startswith("http://") or base.startswith("https://")):
-            raise EngineProtocolError("engine base_url must use http or https")
+        base = _engine_origin(self.base_url)
         object.__setattr__(self, "base_url", base)
         token = self.service_token
         if token is not None:
-            if not isinstance(token, str) or token != token.strip() or len(token) < 32 or len(token) > 4096:
+            if not isinstance(token, str) or len(token) < 32:
                 raise EngineProtocolError(
                     "engine service token must be normalized and at least 32 characters"
                 )
+            _header_text(token, "engine service token", maximum=4096)
             object.__setattr__(self, "service_token", token)
         object.__setattr__(
             self,
             "service_principal",
-            _text(self.service_principal, "service_principal", maximum=512),
+            _header_text(self.service_principal, "service_principal", maximum=512),
         )
         object.__setattr__(
             self,
@@ -1100,11 +1168,9 @@ class EngineClient:
             # expand before the application can apply its response ceiling.
             "accept-encoding": "identity",
         }
-        if trace_id:
-            headers["x-trace-id"] = _text(
-                trace_id,
-                "trace_id",
-                maximum=512,
+        if trace_id is not None:
+            headers["x-trace-id"] = _header_text(
+                trace_id, "trace_id", maximum=512,
             )
         return headers
 
@@ -1138,6 +1204,9 @@ class EngineClient:
                     timeout=timeout,
                     transport=self._transport,
                     follow_redirects=False,
+                    # Internal service credentials must never transit an
+                    # ambient HTTP_PROXY, HTTPS_PROXY or ALL_PROXY.
+                    trust_env=False,
                 ) as client:
                     async with client.stream(
                         method,
