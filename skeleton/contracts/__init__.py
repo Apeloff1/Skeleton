@@ -420,3 +420,43 @@ __all__ += [
     "SafetyHazardSeverity",
     "make_safety_hazard_id",
 ]
+
+from .execution_authority import (
+    AdmissionReceipt,
+    AuthorityConsumptionReceipt,
+    AuthorityEffect,
+    AuthorityEvidenceBundle,
+    AuthorityRevocationReceipt,
+    AuthorityStateCheckpoint,
+    EXECUTION_AUTHORITY_SCHEMA_VERSION,
+    ExecutionAuthority,
+    ExecutionAuthorityError,
+    MAX_AUTHORITY_CAPABILITIES,
+    MAX_AUTHORITY_LIFETIME_SECONDS,
+    ResourceBudget,
+    ResourceUsage,
+    authority_policy_digest,
+    bind_authority_evidence,
+    validate_authority_attenuation,
+    verify_authority_receipt_chain,
+)
+
+__all__ += [
+    "AdmissionReceipt",
+    "AuthorityConsumptionReceipt",
+    "AuthorityEffect",
+    "AuthorityEvidenceBundle",
+    "AuthorityRevocationReceipt",
+    "AuthorityStateCheckpoint",
+    "EXECUTION_AUTHORITY_SCHEMA_VERSION",
+    "ExecutionAuthority",
+    "ExecutionAuthorityError",
+    "MAX_AUTHORITY_CAPABILITIES",
+    "MAX_AUTHORITY_LIFETIME_SECONDS",
+    "ResourceBudget",
+    "ResourceUsage",
+    "authority_policy_digest",
+    "bind_authority_evidence",
+    "validate_authority_attenuation",
+    "verify_authority_receipt_chain",
+]

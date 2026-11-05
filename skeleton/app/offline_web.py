@@ -63,6 +63,46 @@ HTML = r"""<!doctype html>
       <button id="reference-rollback" class="secondary">Roll back last write</button>
       <div id="knowledge-hits" class="knowledge-hits" aria-live="polite"></div>
     </section>
+    <section class="knowledge-section" aria-label="Local hardware resource monitor">
+      <div class="heading"><span>Hardware &amp; memory fabric</span>
+        <button id="resource-refresh" class="small" type="button" disabled>Refresh</button>
+      </div>
+      <p class="hint">Private device telemetry. GPU and shared memory remain
+      backend-owned; unknown hardware capacity is never assumed available.</p>
+      <pre id="resource-monitor" aria-live="polite">Connect to inspect your device.</pre>
+      <label for="resource-bytes" class="hint">Estimated source bytes</label>
+      <input id="resource-bytes" type="number" min="0" step="1" value="10000000">
+      <label for="resource-streams" class="hint">Requested concurrent read streams</label>
+      <input id="resource-streams" type="number" min="1" step="1" value="4">
+      <button id="resource-plan" class="secondary" disabled>Calculate adaptive plan</button>
+      <pre id="resource-plan-result">No workload planned.</pre>
+      <details><summary>Long-form virtual memory (Mac M-series / local)</summary>
+        <p class="hint">Spool selected, trusted local text files as compressed,
+        verified disk pages without loading the whole file into RAM.
+        This does not enlarge the model's trained context window.</p>
+        <label for="longform-root">Selected local directory (absolute path)</label>
+        <input id="longform-root" type="text" autocomplete="off" spellcheck="false">
+        <label for="longform-relative">Filename relative to selected directory</label>
+        <input id="longform-relative" type="text" autocomplete="off" spellcheck="false">
+        <label for="longform-grant"><input id="longform-grant" type="checkbox">
+          I approve this exact private disk-backed import</label>
+        <button id="longform-ingest" class="secondary" disabled>Stage long-form source</button>
+        <label for="longform-import-id">Import receipt ID (copy to recover after disconnect)</label>
+        <input id="longform-import-id" type="text" autocomplete="off" spellcheck="false">
+        <button id="longform-import-restore" class="secondary" disabled>Recover committed import</button>
+        <label for="longform-search">Search staged long-form pages</label>
+        <input id="longform-search" type="search" autocomplete="off">
+        <button id="longform-query" class="secondary" disabled>Retrieve verified passages</button>
+        <pre id="longform-status" aria-live="polite">No staged source.</pre>
+        <div class="heading"><span>Resumable long-form work</span></div>
+        <label for="longform-work-id">Work ID (copy to resume after restart)</label>
+        <input id="longform-work-id" type="text" autocomplete="off" spellcheck="false">
+        <button id="longform-work-start" class="secondary" disabled>Begin durable work</button>
+        <button id="longform-work-resume" class="secondary" disabled>Restore cursor</button>
+        <button id="longform-work-next" class="secondary" disabled>Read and commit next page</button>
+        <pre id="longform-work-status" aria-live="polite">No active work cursor.</pre>
+      </details>
+    </section>
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
       <button id="export" class="secondary">Export backup</button>
@@ -145,8 +185,40 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
-    network: new AbortController(),
+    network: new AbortController(), resourceTimer: null, longformSourceId: null,
+    longformWork: null, longformPendingRequest: null,
+    longformImportPending: null,
   };
+  async function refreshResources() {
+    if (!state.connected || !state.token) return;
+    try {
+      const view = await api('GET', '/v1/resources');
+      const h = view.hardware || {};
+      const gib = value => typeof value === 'number' ? (value / 1073741824).toFixed(2) + ' GiB' : 'unknown';
+      const vram = view.gpus && view.gpus.length ? view.gpus.map(d =>
+        d.device + ': ' + (d.vendor === 'apple'
+          ? 'Metal unified · recommended set ' + gib(d.recommended_working_set_bytes)
+            + ' · currently allocated ' + gib(d.current_allocated_bytes)
+          : gib(d.dedicated_free_bytes) + ' VRAM free' +
+            (d.shared_free_bytes === null ? ' · shared unknown' :
+              ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)'))
+      ).join('\n') : 'GPU telemetry unavailable — no VRAM allocation assumed';
+      const c = view.controller || {};
+      const throughput = typeof c.smoothed_read_bytes_per_second === 'number' ?
+        (c.smoothed_read_bytes_per_second / 1048576).toFixed(2) + ' MiB/s' : 'not calibrated';
+      get('resource-monitor').textContent =
+        'RAM ' + gib(h.available_ram_bytes) + ' / ' + gib(h.total_ram_bytes) +
+        '\nSwap/pagefile ' + gib(h.free_swap_bytes) + ' / ' + gib(h.total_swap_bytes) +
+        '\nLocal disk ' + gib(h.free_disk_bytes) + ' / ' + gib(h.total_disk_bytes) +
+        '\nCPU load ' + (h.cpu_load_ratio ?? 'unknown') +
+        ' · worker budget ' + (c.adaptive_stream_budget ?? '?') +
+        '\nMemory pressure ' + ((c.predictive_pressure ?? 0) * 100).toFixed(1) + '%' +
+        '\n' + vram + '\nRead throughput: ' + throughput +
+        '\nStaging: read-only host mmap / SQLite spill';
+    } catch (error) {
+      if (state.connected) get('resource-monitor').textContent = 'Resource telemetry unavailable.';
+    }
+  }
   const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
@@ -177,6 +249,14 @@ JAVASCRIPT = r"""'use strict';
     get('send').disabled = locked || working || !state.session;
     get('connect').disabled = state.busy || state.connected;
     get('disconnect').disabled = !state.connected && !state.token;
+    get('resource-refresh').disabled = locked;
+    get('resource-plan').disabled = locked;
+    get('longform-ingest').disabled = locked || state.busy;
+    get('longform-import-restore').disabled = locked || state.busy;
+    get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
+    get('longform-work-start').disabled = locked || state.busy || !state.longformSourceId;
+    get('longform-work-resume').disabled = locked || state.busy;
+    get('longform-work-next').disabled = locked || state.busy || !state.longformWork;
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -203,6 +283,18 @@ JAVASCRIPT = r"""'use strict';
     state.timer = null;
   }
   function lock() {
+    if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
+    state.resourceTimer = null;
+    get('resource-monitor').textContent = 'Connect to inspect your device.';
+    get('resource-plan-result').textContent = 'No workload planned.';
+    get('longform-status').textContent = 'No staged source.';
+    get('longform-work-status').textContent = 'No active work cursor.';
+    get('longform-work-id').value = '';
+    state.longformSourceId = null;
+    state.longformWork = null;
+    state.longformPendingRequest = null;
+    state.longformImportPending = null;
+    get('longform-import-id').value = '';
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -238,7 +330,10 @@ JAVASCRIPT = r"""'use strict';
     const timeout = new AbortController();
     const cancel = () => timeout.abort();
     network.signal.addEventListener('abort', cancel, {once: true});
-    const timer = setTimeout(cancel, 15000);
+    // Long file ingestion may stream for hours. Abort only on an explicit
+    // workspace lock; the durable import ID allows post-disconnect recovery.
+    const timer = path === '/v1/resources/longform/ingest' ? null :
+      setTimeout(cancel, 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -257,7 +352,7 @@ JAVASCRIPT = r"""'use strict';
       if (error.name === 'AbortError') throw new Error('The connection timed out. The server may still be working.');
       throw error;
     } finally {
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       network.signal.removeEventListener('abort', cancel);
     }
   }
@@ -535,6 +630,9 @@ JAVASCRIPT = r"""'use strict';
     get('budget').value = String(state.health.default_output_tokens);
     get('budget').max = String(state.health.max_output_tokens);
     await loadSessions(); await loadDocuments();
+    await refreshResources();
+    if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
+    state.resourceTimer = setInterval(refreshResources, 10000);
     if (state.health.active_turn) {
       const activeTurn = state.health.active_turn;
       await selectSession(activeTurn.session_id);
@@ -543,6 +641,121 @@ JAVASCRIPT = r"""'use strict';
     } else status('Connected locally. Choose a conversation or create a new one.');
   }));
   get('disconnect').addEventListener('click', lock);
+  get('resource-refresh').addEventListener('click', refreshResources);
+  get('resource-plan').addEventListener('click', () => run(async () => {
+    const source_bytes = Number(get('resource-bytes').value);
+    const desired_streams = Number(get('resource-streams').value);
+    if (!Number.isSafeInteger(source_bytes) || source_bytes < 0 ||
+        !Number.isSafeInteger(desired_streams) || desired_streams < 1) {
+      throw new Error('Select nonnegative source bytes and positive read streams.');
+    }
+    const plan = await api('POST', '/v1/resources/plan',
+                           {source_bytes, desired_streams});
+    get('resource-plan-result').textContent =
+      'Placement ' + plan.residency + '\nStreams ' + plan.stream_count +
+      '\nChunk bytes ' + plan.transfer_chunk_bytes +
+      '\nRead-only staging ' + (plan.readonly_staging ? 'recommended' : 'optional') +
+      '\nGPU transfer: backend qualification required';
+  }));
+  get('longform-ingest').addEventListener('click', () => run(async () => {
+    if (!get('longform-grant').checked) throw new Error('Approve this source first.');
+    const root = get('longform-root').value.trim();
+    const relative_path = get('longform-relative').value.trim();
+    if (!root || !relative_path) throw new Error('Choose the selected root and filename.');
+    let pending = state.longformImportPending;
+    if (pending && (pending.root !== root || pending.relative_path !== relative_path)) {
+      throw new Error('Recover the previous import ID before selecting a different source.');
+    }
+    if (!pending) {
+      const request_id = Array.from(crypto.getRandomValues(new Uint8Array(24)),
+        n => n.toString(16).padStart(2, '0')).join('');
+      pending = {root, relative_path, request_id};
+      state.longformImportPending = pending;
+    }
+    get('longform-import-id').value = pending.request_id;
+    get('longform-status').textContent = 'Private import running or awaiting recovery…';
+    const receipt = await api('POST', '/v1/resources/longform/ingest',
+      {...pending, approved: true});
+    state.longformImportPending = null;
+    state.longformSourceId = receipt.source_id;
+    get('longform-grant').checked = false;
+    get('longform-status').textContent =
+      'Private archive verified: ' + receipt.source_sha256.slice(0, 20) +
+      '…\nBytes: ' + receipt.source_bytes +
+      '\nPages: ' + receipt.page_count +
+      '\nDisk payload: ' + receipt.stored_payload_bytes;
+    updateControls();
+  }));
+  get('longform-import-restore').addEventListener('click', () => run(async () => {
+    const source_id = get('longform-import-id').value.trim();
+    if (!/^[0-9a-f]{48}$/.test(source_id)) throw new Error('Enter an exact import ID.');
+    const receipt = await api('POST', '/v1/resources/longform/source-status', {source_id});
+    state.longformSourceId = receipt.source_id;
+    state.longformImportPending = null;
+    get('longform-status').textContent =
+      'Committed source recovered: ' + receipt.source_sha256.slice(0, 20) +
+      '…\nBytes: ' + receipt.source_bytes + '\nPages: ' + receipt.page_count;
+    updateControls();
+  }));
+  get('longform-query').addEventListener('click', () => run(async () => {
+    if (!state.longformSourceId) throw new Error('Stage a source before searching.');
+    const query = get('longform-search').value.trim();
+    if (!query) throw new Error('Enter a query.');
+    const evidence = await api('POST', '/v1/resources/longform/search',
+      {source_id: state.longformSourceId, query, limit: 3});
+    get('longform-status').textContent =
+      'Verified ' + evidence.source_sha256.slice(0, 20) +
+      '…\n' + evidence.hits.map(h =>
+        'Page ' + h.page + ': ' + h.text.slice(0, 400)
+      ).join('\n\n');
+  }));
+  function displayLongformWork(work) {
+    const progress = work.next_page + ' / ' + work.total_pages + ' pages';
+    get('longform-work-id').value = work.work_id;
+    get('longform-work-status').textContent =
+      'Saved progress: ' + progress + '\nRevision: ' + work.revision +
+      (work.complete ? '\nComplete.' : '\nReady for next page.');
+    state.longformWork = work;
+    updateControls();
+  }
+  get('longform-work-start').addEventListener('click', () => run(async () => {
+    if (!state.longformSourceId) throw new Error('Stage a source first.');
+    const work = await api('POST', '/v1/resources/longform/work-start',
+      {source_id: state.longformSourceId, approved: true});
+    state.longformPendingRequest = null;
+    displayLongformWork(work);
+  }));
+  get('longform-work-resume').addEventListener('click', () => run(async () => {
+    const work_id = get('longform-work-id').value.trim();
+    if (!/^[0-9a-f]{48}$/.test(work_id)) throw new Error('Enter the exact work ID.');
+    const work = await api('POST', '/v1/resources/longform/work-status', {work_id});
+    state.longformPendingRequest = null;
+    state.longformSourceId = work.source_id;
+    displayLongformWork(work);
+  }));
+  get('longform-work-next').addEventListener('click', () => run(async () => {
+    const work = state.longformWork;
+    if (!work) throw new Error('Restore or begin a work cursor.');
+    // Preserve request identity on uncertain delivery. Reusing the same
+    // work/revision/pages replays the already committed delivery exactly.
+    const request = state.longformPendingRequest || {
+      work_id: work.work_id, expected_revision: work.revision,
+      request_id: Array.from(crypto.getRandomValues(new Uint8Array(24)),
+        n => n.toString(16).padStart(2, '0')).join(''), pages: 1,
+    };
+    state.longformPendingRequest = request;
+    const result = await api('POST', '/v1/resources/longform/work-next', request);
+    state.longformPendingRequest = null;
+    displayLongformWork({
+      ...work, next_page: result.next_page, revision: result.revision,
+      complete: result.next_page >= work.total_pages,
+      receipt_chain: result.receipt_chain,
+    });
+    get('longform-work-status').textContent +=
+      '\nReceipt: ' + result.receipt_digest.slice(0, 20) + '…' +
+      (result.replayed ? '\nOriginal delivery recovered.' : '\nPage committed.') +
+      '\nPage: ' + result.text.slice(0, 2000);
+  }));
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
     if (bytes(system) > 4096) throw new Error('Instructions exceed 4096 UTF-8 bytes.');

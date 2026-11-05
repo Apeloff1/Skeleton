@@ -21,7 +21,7 @@ export type AppHealthSnapshot = {
 };
 
 const FALLBACK_HEALTH_PATHS = Object.freeze({
-  backend: '/api/health',
+  backend: '/api/health/ready',
   skeleton: '/api/v1/health/live',
 });
 
@@ -62,13 +62,14 @@ async function probe(
       try { payload = JSON.parse(bounded.text); } catch { return failure('invalid health response', response.status); }
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return failure('invalid health response', response.status);
       const identity = name === 'skeleton' ? payload.application : payload.canonical_application;
-      if (name === 'skeleton' || identity !== undefined) {
+      if (name === 'skeleton' || path === '/api/health/ready' || identity !== undefined) {
         const expected = application || { name: 'Skeleton', version: '16.0.0' };
         if (!identity || typeof identity !== 'object' || identity.name !== expected.name || identity.version !== expected.version
           || identity.component !== (name === 'skeleton' ? 'engine' : 'backend')
           || identity.ingress_prefix !== (name === 'skeleton' ? '/api/v1' : '/api')) return failure('service identity mismatch', response.status);
         if (name === 'skeleton' && payload.alive !== true) return failure('engine liveness not confirmed', response.status);
-      } else if (name === 'backend' && payload.status !== 'healthy') return failure('health status not confirmed', response.status);
+      }
+      if (name === 'backend' && payload.status !== (path === '/api/health/ready' ? 'ready' : 'healthy')) return failure('health status not confirmed', response.status);
       return { name, ok: true, status: response.status, latencyMs: Date.now() - started, detail: 'healthy' };
     };
     const result = await Promise.race([read(), deadline, cancelled]);

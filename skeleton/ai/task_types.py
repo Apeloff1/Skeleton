@@ -27,7 +27,7 @@ _PROFILES={
 def classify_task(label:str)->TaskClassification:
  if not isinstance(label,str) or not label.strip():raise ValueError("task label required")
  text=label.lower()
- rules=((TaskType.SECURITY,("security","vulnerability","secret")),(TaskType.RELEASE,("release","deploy","publish")),(TaskType.DATA_CHANGE,("migration","schema","database")),(TaskType.CODE_CHANGE,("code","implement","refactor","fix")),(TaskType.RESEARCH,("research","investigate","analyze")))
+ rules=((TaskType.SECURITY,("security","vulnerability","secret")),(TaskType.RELEASE,("release","deploy","publish")),(TaskType.DATA_CHANGE,("migration","schema","database")),(TaskType.CODE_CHANGE,("code","implement","refactor")),(TaskType.RESEARCH,("research","investigate","analyze")))
  matches=[(t,k) for t,keys in rules for k in keys if k in text]
  if not matches:return TaskClassification(TaskType.GENERIC,0.0,("unknown-conservative-generic",),_PROFILES[TaskType.GENERIC])
  types={t for t,_ in matches}
