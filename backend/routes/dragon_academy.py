@@ -2680,11 +2680,26 @@ class CrawlerAtlasObjective(BaseModel):
     blocked_terms: list[str] = Field(default_factory=list, max_length=16)
 
 
+class CrawlerAtlasEffort(BaseModel):
+    """Explicit human-effort estimate; never fabricated measured history."""
+
+    model_config = ConfigDict(extra="forbid")
+    task_type: str = Field(pattern=(
+        r"^(source_policy|passage_integrity|source_provenance|"
+        r"claim_contradiction|claim_corroboration|objective_gap|human_fact_review)$"
+    ))
+    estimated_minutes: StrictInt = Field(ge=1, le=180)
+    estimate_basis: str = Field(default="operator_estimate",
+                                pattern=r"^operator_estimate$")
+
+
 class CrawlerAtlasRequest(BaseModel):
     """Read-only research inspection; explicit user goals are mandatory."""
 
     model_config = ConfigDict(extra="forbid")
     objectives: list[CrawlerAtlasObjective] = Field(min_length=1, max_length=8)
+    review_effort: list[CrawlerAtlasEffort] = Field(default_factory=list, max_length=7)
+    review_budget_minutes: StrictInt = Field(default=240, ge=1, le=1440)
 
 
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
@@ -2849,6 +2864,9 @@ async def crawler_research_atlas(
         crawler_application.campaign_atlas(
             scope, session_id,
             tuple(goal.model_dump() for goal in body.objectives),
+            review_effort=tuple(estimate.model_dump()
+                                for estimate in body.review_effort),
+            review_budget_minutes=body.review_budget_minutes,
         )
     )
 
