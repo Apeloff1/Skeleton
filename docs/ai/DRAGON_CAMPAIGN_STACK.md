@@ -467,3 +467,28 @@ Adversarial regressions cover swapped source identities, forged spans,
 duplicated selected passages, contradictory objective memberships,
 nonfinite rank scores, stale source-policy receipts, cross-mandate inputs,
 host-loss accounting, immutable digests and stage-chain replay.
+
+
+## Hard-filter correctness and exact-copy provenance
+
+Required and excluded operator terms are now carried as immutable constraints
+on every derived QueryVariant, not just appended to one lexical query.
+The reciprocal-rank-fusion and BM25 paths inspect each prospective passage
+against these constraints before allowing that objective to claim evidence.
+Hyphens and underscores are preserved for literal whole-token comparisons:
+a required term is not satisfied by a substring or by a semantically
+related word.
+
+The source index applies the same constraints **before** top-k selection and
+per-source result caps, preventing broad-query noise from filling a result
+window and displacing policy-matching passages. The exact filter terms are
+included in the index search result receipt digest. Withdrawn source
+identities cannot be readmitted by altering query filters.
+
+The robustness audit additionally counts unique captured-text hash families,
+not merely URLs or hosts. It detects selected source records containing
+exactly identical captured text across different hosts and projects their
+host-loss resilience without misrepresenting those copies as independent
+corroboration. This check cannot prove copying intent, common ownership or
+factual truth. The backend returns hashed/counted metadata only; no captured
+page body or active content is exposed in the Atlas panel.
