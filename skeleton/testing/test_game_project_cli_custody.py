@@ -105,3 +105,54 @@ def test_output_leaf_symlink_not_overwritten(tmp_path):
     with pytest.raises(GameCapsuleError, match="new file"):
         _write_new(alias, {"forged": True})
     assert _read_json(target) == {"owned": True}
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX anchored directory handles")
+def test_parent_swap_after_leaf_open_cannot_authorize_read(tmp_path, monkeypatch):
+    parent = tmp_path / "original"
+    moved = tmp_path / "moved"
+    parent.mkdir()
+    source = parent / "source.json"
+    source.write_text('{"original":true}', encoding="utf-8")
+    real_fdopen = os.fdopen
+    swapped = False
+
+    def replace_parent(fd, mode, *args, **kwargs):
+        nonlocal swapped
+        if mode == "rb" and not swapped:
+            swapped = True
+            parent.rename(moved)
+            parent.mkdir()
+            (parent / "source.json").write_text('{"new":true}', encoding="utf-8")
+        return real_fdopen(fd, mode, *args, **kwargs)
+
+    monkeypatch.setattr(os, "fdopen", replace_parent)
+    with pytest.raises(GameCapsuleError, match="parent identity changed"):
+        _read_json(source)
+    assert swapped
+    assert json.loads((moved / "source.json").read_text()) == {"original": True}
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX anchored directory handles")
+def test_parent_swap_during_exclusive_write_does_not_claim_publication(tmp_path, monkeypatch):
+    parent = tmp_path / "original"
+    moved = tmp_path / "moved"
+    parent.mkdir()
+    output = parent / "result.json"
+    real_fdopen = os.fdopen
+    swapped = False
+
+    def replace_parent(fd, mode, *args, **kwargs):
+        nonlocal swapped
+        if mode == "wb" and not swapped:
+            swapped = True
+            parent.rename(moved)
+            parent.mkdir()
+        return real_fdopen(fd, mode, *args, **kwargs)
+
+    monkeypatch.setattr(os, "fdopen", replace_parent)
+    with pytest.raises(GameCapsuleError, match="parent identity changed"):
+        _write_new(output, {"earned": False})
+    assert swapped
+    assert not output.exists()
+    assert (moved / "result.json").exists()
