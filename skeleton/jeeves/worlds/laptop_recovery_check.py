@@ -100,6 +100,17 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
             {"ok": False, "error": "source_digest_mismatch"}
         )
     ready = ready and lease_ok
+    # Owner-supplied guidance is untrusted diagnostic data. A missing,
+    # non-string, or oversized action must not be emitted as operator advice.
+    owner_action = report.get("next_action")
+    action_valid = (isinstance(owner_action, str)
+                    and 0 < len(owner_action) <= 160
+                    and all(32 <= ord(char) <= 126 for char in owner_action))
+    if not action_valid:
+        checks["operator_guidance"] = {
+            "ok": False, "error": "laptop_recovery_next_action_invalid"
+        }
+        ready = False
     return {
         "schema": "jeeves.world.laptop_recovery_check.v1",
         "world_id": world_id,
@@ -113,7 +124,7 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
             or (expected_source_digest is not None
                 and report.get("source_digest") != expected_source_digest)
             else "inspect_canonical_custody_without_overwriting_artifacts"
-            if malformed_stage else report.get("next_action")
+            if malformed_stage or not action_valid else owner_action
         ),
         "checks": checks,
         "qualification": "read_only_source_diagnostic_not_model_engine_or_device_certified",
