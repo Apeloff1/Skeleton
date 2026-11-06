@@ -281,7 +281,10 @@ def test_late_cross_game_nested_asset_inode_swap_rejected(
         return result
 
     monkeypatch.setattr(module, "inspect_consumer_first_run", swap_after_later_game)
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+    # The same-byte nested swap can be denied sooner by the independent
+    # parent-inode fence. Either specific custody rejection is fail-closed.
+    with pytest.raises(ConsumerFirstRunCohortError,
+                       match="nested|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
