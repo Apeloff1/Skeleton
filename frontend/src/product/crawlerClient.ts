@@ -325,20 +325,29 @@ export type CrawlAtlasReport = {
   retrieval_robustness: {
     audit_digest: string; retrieval_digest: string;
     selected_passages: number; selected_sources: number; selected_hosts: number;
+    distinct_content_families: number; cross_host_exact_copy_groups: number;
+    exact_copy_families: {
+      content_sha256: string; source_count: number; host_count: number;
+      hosts: string[]; selected_passages: number;
+      independence_verified: false;
+    }[];
     flagged_objectives: string[];
     objectives: {
       objective_id: string; selected_passages: number;
       distinct_selected_sources: number; distinct_selected_hosts: number;
+      distinct_content_families: number; cross_host_exact_content_reuse: boolean;
       dominant_host: string | null; dominant_host_fraction: number;
       remaining_passages_after_host_loss: number;
       remaining_sources_after_host_loss: number;
       risk: 'no_selected_evidence' | 'single_host' |
-        'host_concentrated' | 'multiple_observed_hosts';
+        'host_concentrated' | 'multiple_observed_hosts' |
+        'same_content_on_multiple_hosts';
       independence_confirmed: false;
     }[];
     host_ablation: {
       removed_host: string; removed_selected_passages: number;
       surviving_selected_passages: number; surviving_unique_sources: number;
+      surviving_distinct_content_families: number;
       objectives_without_evidence: string[];
       objectives_left_with_one_host: string[];
       reranking_executed: false;
@@ -346,6 +355,7 @@ export type CrawlAtlasReport = {
     objective_reuse: {
       left_objective_id: string; right_objective_id: string;
       shared_source_count: number; shared_host_count: number;
+      shared_content_family_count: number;
       source_jaccard: number; independence_proven: false;
     }[];
     limitations: string[]; source_bodies_excluded: true;
@@ -485,6 +495,18 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !integer(value.retrieval_robustness.selected_passages, 32)
       || !integer(value.retrieval_robustness.selected_sources, 64)
       || !integer(value.retrieval_robustness.selected_hosts, 32)
+      || !integer(value.retrieval_robustness.distinct_content_families, 32)
+      || value.retrieval_robustness.distinct_content_families
+         > value.retrieval_robustness.selected_sources
+      || !integer(value.retrieval_robustness.cross_host_exact_copy_groups, 32)
+      || !Array.isArray(value.retrieval_robustness.exact_copy_families)
+      || value.retrieval_robustness.exact_copy_families.length > 32
+      || value.retrieval_robustness.exact_copy_families.some(family =>
+        !family || !HASH.test(family.content_sha256)
+        || family.independence_verified !== false
+        || !integer(family.source_count, 32) || family.source_count < 2
+        || !integer(family.host_count, 32)
+        || !Array.isArray(family.hosts) || family.hosts.length !== family.host_count)
       || value.retrieval_robustness.source_bodies_excluded !== true
       || value.retrieval_robustness.verified_independence !== false
       || value.retrieval_robustness.network_or_reranking_executed !== false
