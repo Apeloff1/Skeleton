@@ -496,6 +496,11 @@ def runtime_manifest(
                 raise ValueError(f"{service.name} has an invalid public URL port")
             if existing_port is not None and not 1 <= existing_port <= 65535:
                 raise ValueError(f"{service.name} has an invalid public URL port")
+            # A packaged URL with a different port than its declared service
+            # is a broken install contract even if the operator supplies an
+            # override. Never conceal such drift by rewriting the URL.
+            if key and existing_port != int(port_keys[key]):
+                raise ValueError(f"{service.name} packaged public URL port differs from service contract")
             host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"

@@ -66,3 +66,34 @@ def test_port_override_rejects_credentialed_or_decorated_manifest_urls(
         runtime_manifest(hostile, root=tmp_path, environ={"BACKEND_PORT": "18001"})
     with pytest.raises(ValueError, match="non-local public URL"):
         public_service_urls(tmp_path, manifest=hostile, environ={"BACKEND_PORT": "18001"})
+
+
+@pytest.mark.parametrize(
+    "service_name,port",
+    [("frontend", 8001), ("backend", 3000), ("skeleton", 8000), ("chroma", 8010)],
+)
+def test_packaged_public_url_port_drift_rejected_even_with_override(
+    tmp_path: Path, service_name: str, port: int
+) -> None:
+    from dataclasses import replace
+
+    manifest = load_manifest()
+    service = manifest.service(service_name)
+    assert service.public_url
+    from urllib.parse import urlsplit, urlunsplit
+
+    parsed = urlsplit(service.public_url)
+    bad_url = urlunsplit((parsed.scheme, f"localhost:{port}", parsed.path, "", ""))
+    altered = replace(manifest, services=tuple(
+        replace(item, public_url=bad_url) if item.name == service_name else item
+        for item in manifest.services
+    ))
+    env_key = {
+        "frontend": "FRONTEND_PORT", "backend": "BACKEND_PORT",
+        "skeleton": "SKELETON_PORT", "chroma": "CHROMA_PORT",
+    }[service_name]
+    for overrides in ({}, {env_key: "19000"}):
+        with pytest.raises(ValueError, match="packaged public URL port differs"):
+            runtime_manifest(altered, root=tmp_path, environ=overrides)
+        with pytest.raises(ValueError, match="packaged public URL port differs"):
+            public_service_urls(tmp_path, manifest=altered, environ=overrides)
