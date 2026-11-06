@@ -252,7 +252,7 @@ def assemble_evidence_graph(
         source = canonical["sources"][hit.source_id]
         if source["canonical_url"] != hit.canonical_url:
             raise PermissionError("evidence graph source URL rebound")
-        node = _vertex("passage", _passage_key(*key))
+        node = _vertex("passage", _passage_key(hit.source_id, hit.start, hit.end, hit.passage_hash))
         add_node(EvidenceVertex(
             node, "passage", hit.passage_hash, "external_unreviewed",
             source_id=hit.source_id, origin=hit.canonical_url,

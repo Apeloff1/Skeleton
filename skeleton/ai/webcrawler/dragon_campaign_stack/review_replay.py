@@ -207,6 +207,20 @@ def replay_human_reviews(
     )
 
 
+@dataclass(frozen=True)
+class HumanReviewProposal:
+    """Untrusted operator-action request for the canonical reviewed-knowledge owner."""
+
+    task_id: str
+    action: str
+    agenda_digest: str
+    policy_digest: str
+    expected_task_revision: int
+    requested_at: float
+    persistence_performed: bool = False
+    authenticated: bool = False
+
+
 def next_review_action(
     agenda: ReviewAgenda,
     policy: SourcePolicyProjection,
@@ -214,15 +228,8 @@ def next_review_action(
     *,
     task_id: str,
     action: str,
-    reviewer_id: str,
-    external_receipt: str,
     now: float,
-) -> HumanReviewAction:
-    """Create an unsent event proposal, NOT proof that its signature was checked.
-
-    The actual persistence and authenticated reviewer custody must be
-    performed by the already existing reviewed-knowledge owner.
-    """
+) -> HumanReviewProposal:
     if agenda.agenda_digest != replay.agenda_digest or (
         policy.policy_digest != replay.policy_digest
     ):
@@ -234,9 +241,13 @@ def next_review_action(
         raise ValueError("unknown review task")
     if action == "reviewed" and not task.actionable:
         raise PermissionError("review prerequisites or policy not satisfied")
-    # This preview intentionally cannot pass replay_human_reviews until a
-    # separate trusted authority authenticates the action and creates the
-    # corresponding signed/current persisted receipt.
-    raise PermissionError(
-        "review action proposals must be created by the authenticated review owner"
+    if task.state in _TERMINAL:
+        raise PermissionError("review task already terminal")
+    finite(now, "review proposal clock")
+    return HumanReviewProposal(
+        task_id=task_id, action=action,
+        agenda_digest=agenda.agenda_digest,
+        policy_digest=policy.policy_digest,
+        expected_task_revision=task.revision,
+        requested_at=now,
     )

@@ -131,9 +131,9 @@ def compile_review_agenda(
                objective: str | None = None, source: str | None = None,
                passage: str | None = None, priority: float | None = None,
                after=()) -> str:
-        if len(by_task) >= max_tasks:
-            raise ValueError("review agenda task budget exceeded")
         identity = _task_id(kind, subject, reason, revision)
+        if identity not in by_task and len(by_task) >= max_tasks:
+            raise ValueError("review agenda task budget exceeded")
         urgency = _PRIORITIES[kind] if priority is None else priority
         row = ReviewTask(
             task_id=identity, task_type=kind, subject_id=subject,

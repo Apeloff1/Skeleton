@@ -59,6 +59,9 @@ class ResearchHandoff:
     serialized_json: str
     serialized_bytes: int
     handoff_digest: str
+    max_citations: int
+    max_tasks: int
+    max_json_bytes: int
     source_text_included: bool = False
     local_model_invoked: bool = False
     remote_model_invoked: bool = False
@@ -137,7 +140,7 @@ def compile_research_handoff(
         ))
     objective_ids = tuple(x.objective_id for x in graph.objectives)
     payload = {
-        "schema": "skeleton.dragon.jeeeves_research_handoff.v1",
+        "schema": "skeleton.dragon.jeeves_research_handoff.v1",
         "source_snapshot_digest": graph.source_snapshot_digest,
         "mandate_digest": mandate.fingerprint,
         "source_policy_digest": policy.policy_digest,
@@ -175,6 +178,8 @@ def compile_research_handoff(
             "payload": payload,
             "limits": (max_citations, max_tasks, max_json_bytes),
         }),
+        max_citations=max_citations, max_tasks=max_tasks,
+        max_json_bytes=max_json_bytes,
     )
 
 
@@ -197,12 +202,12 @@ def verify_research_handoff(
     expected = compile_research_handoff(
         mandate, policy, graph, retrieval, agenda,
         now=now, authorized=authorized, replay=replay,
-        max_citations=max(1, len(handoff.citations)),
-        max_tasks=max(1, len(handoff.tasks)),
-        max_json_bytes=max(1024, handoff.serialized_bytes),
+        max_citations=handoff.max_citations,
+        max_tasks=handoff.max_tasks,
+        max_json_bytes=handoff.max_json_bytes,
     )
     if expected.serialized_json != handoff.serialized_json:
-        raise ValueError("Je eves handoff JSON revision mismatch")
+        raise ValueError("Jeeves handoff JSON revision mismatch")
     body = json.loads(handoff.serialized_json)
     if any(body.get(x) is not False for x in (
         "execution_authorized", "publication_authorized", "training_authorized"
@@ -228,7 +233,5 @@ def verify_research_handoff(
         (expected.serialized_bytes, handoff.serialized_bytes),
     )):
         raise PermissionError("handoff manifest revision mismatch")
-    # The payload hash depends on explicit caller-defined capacity settings,
-    # therefore it is an inspection checksum, not independent proof of source.
-    if not isinstance(handoff.handoff_digest, str) or len(handoff.handoff_digest) != 64:
-        raise ValueError("missing handoff checksum")
+    if expected.handoff_digest != handoff.handoff_digest:
+        raise ValueError("research handoff checksum mismatch")
