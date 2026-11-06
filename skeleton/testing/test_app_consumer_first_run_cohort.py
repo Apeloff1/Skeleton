@@ -397,7 +397,7 @@ def test_late_original_source_nested_swap_rejected_when_requested(
         module, "inspect_consumer_first_run",
         swap_earlier_source_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="original source"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="original source|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],

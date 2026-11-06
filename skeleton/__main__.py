@@ -53,6 +53,7 @@ Commands:
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat-checkpoints  Replay and verify portable expedition checkpoints
+    combat-expedition  Play source-bound tactical expedition with earned rewards
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
@@ -783,6 +784,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-checkpoints":
         from skeleton.game.gameplay.arena_checkpoint_timeline import cli as checkpoint_cli
         return checkpoint_cli(rest)
+    if cmd == "combat-expedition":
+        from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
+        return expedition_cli(rest)
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)
