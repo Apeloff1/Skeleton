@@ -427,6 +427,7 @@ def verify_dragon_atlas_trace(
     verify_citation_manifest(
         mandate, canonical, atlas.policies, atlas.retrieval,
         atlas.citations, now=now, authorized=authorized,
-        max_citations=max(1, len(atlas.retrieval.results)),
+        max_citations=atlas.citations.max_citations,
+        max_serialized_bytes=atlas.citations.max_serialized_bytes,
     )
 

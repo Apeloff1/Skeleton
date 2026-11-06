@@ -49,6 +49,8 @@ class CitationManifest:
     encoded_bytes: int
     serialized_json: str
     manifest_digest: str
+    max_citations: int
+    max_serialized_bytes: int
     source_text_retained_in_manifest: bool = False
     remotely_fresh: bool = False
     publishable: bool = False
@@ -156,6 +158,8 @@ def build_citation_manifest(
         manifest_digest=digest({
             "payload": payload, "limits": (max_citations, max_serialized_bytes),
         }),
+        max_citations=max_citations,
+        max_serialized_bytes=max_serialized_bytes,
     )
 
 
