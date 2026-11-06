@@ -620,6 +620,59 @@ class RetrievalRobustnessRegression(unittest.TestCase):
         )
         self.assertFalse(blocked.hits)
 
+    def test_index_search_denies_forged_passage_hash_span_or_terms(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        index = build_ephemeral_index(
+            self.mandate, self.source, now=self.now, authorized=True,
+        )
+        self.assertTrue(index.passages)
+        p = index.passages[0]
+        bad_rows = (
+            replace(p, passage_hash="f" * 64),
+            replace(p, full_content_hash="f" * 64),
+            replace(p, preserved_text_hash="f" * 64),
+            replace(p, canonical_url="https://example.org/swap"),
+            replace(p, start=-1),
+            replace(p, start=True),
+            replace(p, end=p.end + 10000),
+            replace(p, terms=("fakeoperator",)),
+            replace(p, text="forged source text"),
+        )
+        for item in bad_rows:
+            with self.subTest(field=item):
+                tampered = replace(index, passages=(item,))
+                with self.assertRaises(PermissionError):
+                    search_ephemeral_index(
+                        self.mandate, self.source, tampered,
+                        "archive capture", now=self.now, authorized=True,
+                        mode="any",
+                    )
+
+    def test_canonical_passages_remain_searchable_after_strict_hash_validation(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        index = build_ephemeral_index(
+            self.mandate, self.source, now=self.now,
+            authorized=True,
+        )
+        result = search_ephemeral_index(
+            self.mandate, self.source, index,
+            "archive capture", now=self.now, authorized=True,
+            mode="any", limit=8,
+        )
+        self.assertTrue(result.hits)
+        source = next(iter(self.source["sources"].values()))
+        from hashlib import sha256
+        for hit in result.hits:
+            self.assertEqual(
+                sha256(source["text"][hit.start:hit.end].encode("utf-8")).hexdigest(),
+                hit.passage_hash,
+            )
+            self.assertEqual(hit.canonical_url, source["canonical_url"])
+
     def test_all_analysis_outputs_retain_explicit_no_authority_flags(self):
         a = self.atlas(self.double)
         r = a.robustness
