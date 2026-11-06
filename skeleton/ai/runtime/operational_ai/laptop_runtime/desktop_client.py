@@ -9,6 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
+import math
 import os
 from pathlib import Path
 import secrets
@@ -18,6 +19,7 @@ import threading
 from typing import Any
 
 from .contracts import identifier, identity_hash
+from .desktop_environment import native_child_environment
 from .desktop_protocol import (
     SCHEMA_RESPONSE, DesktopProtocolHold, MAX_OUTBOUND,
     command, read_frame, write_frame,
@@ -146,6 +148,31 @@ class DesktopConfig:
         if resume_session is not None:
             argv += ["--resume-session", resume_session]
         return argv
+
+
+def _request_deadline_seconds(op: str, fields: dict[str, object], inference_ms: int) -> float:
+    """Bound native watchdog timing before starting timers or publishing IPC.
+
+    The native worker may commit a durable SQLite result before a timeout.
+    Malformed wall clocks therefore cannot be normalized into a retry or
+    silently poison a healthy process. No clamp is an extra work grant.
+    """
+    if op == "turn":
+        if type(inference_ms) is not int or not 100 <= inference_ms <= 600000:
+            raise DesktopBridgeHold("invalid finite native inference deadline")
+        return min(660.0, inference_ms / 1000.0 + 45.0)
+    if op == "agent" or (
+        op == "durable" and fields.get("action") in ("start", "resume")
+    ):
+        value = fields.get("maximum_wall_seconds", 180)
+        if (
+            type(value) not in (int, float)
+            or not 1 <= value <= 3600
+            or (type(value) is float and not math.isfinite(value))
+        ):
+            raise DesktopBridgeHold("invalid native agent wall deadline")
+        return min(660.0, float(value) + 45.0)
+    return 30.0
 
 
 class DesktopBridge:
@@ -481,6 +508,7 @@ class DesktopBridge:
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL, close_fds=True,
                 bufsize=0, creationflags=creationflags,
+                env=native_child_environment(),
             )
             process = self._process
             assert process.stdout is not None
@@ -571,17 +599,8 @@ class DesktopBridge:
                 # Native inference has its own bounded deadline, but a hung
                 # pipe/child teardown must not hold the GUI forever. The timer
                 # revokes the child; a committed uncertain result is not retried.
-                deadline = (
-                    min(660.0, self.config.inference_ms / 1000.0 + 45.0)
-                    if op == "turn" else (
-                        min(660.0, float(fields.get("maximum_wall_seconds", 180)) + 45.0)
-                        if (
-                            op == "agent" or (
-                                op == "durable" and fields.get("action")
-                                in ("start", "resume")
-                            )
-                        ) else 30.0
-                    )
+                deadline = _request_deadline_seconds(
+                    op, fields, self.config.inference_ms,
                 )
                 watchdog = threading.Timer(deadline, self.abort)
                 watchdog.daemon = True
