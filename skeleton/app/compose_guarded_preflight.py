@@ -266,7 +266,9 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     # generation changes. Snapshot the generation as inert exact types.
     topology = hello.get("topologyVersion")
     if topology is not None:
-        if type(topology) is not dict or set(topology) != {"processId", "counter"}:
+        if (type(topology) is not dict or len(topology) != 2
+                or any(type(key) is not str for key in topology)
+                or "processId" not in topology or "counter" not in topology):
             return None
         try:
             from bson.objectid import ObjectId

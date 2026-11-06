@@ -150,6 +150,20 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(FakeEpoch.instances[0].calls, 2)
         self.assertEqual(self.db.calls, 6)
 
+    async def test_topology_version_rejects_noncanonical_key_types(self):
+        class StrSubclass(str):
+            pass
+
+        # Exact-string keys are required before comparing or hashing a
+        # topology witness. A string subclass cannot qualify as authority.
+        self.db.hello["topologyVersion"] = {
+            StrSubclass("processId"): "not-an-object-id", "counter": 1,
+        }
+        result = await self.inspect()
+        self.assertEqual(result["code"], "mongo_replica_set_primary_required")
+        self.assertEqual(FakeEpoch.instances, [])
+        self.assertFalse(result["guarded_local_ai_ready"])
+
     async def test_unbounded_replica_set_generation_denied_before_epoch(self):
         # BSON int64 is the maximum representable generation. An arbitrary
         # Python integer must not be treated as a Mongo election witness.
