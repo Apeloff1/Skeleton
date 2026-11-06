@@ -89,3 +89,34 @@ def test_contradictory_success_with_error_fails_closed(tmp_path, monkeypatch):
         "ok": False, "error": "laptop_recovery_stage_contradictory"
     }
     assert result["next_action"] == "inspect_canonical_custody_without_overwriting_artifacts"
+
+
+def test_command_success_emits_one_canonical_newline_terminated_record(tmp_path, capsys):
+    """Exercise the actual CLI success path, including byte framing."""
+    _, _, reviewed, _ = ready(tmp_path)
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()}
+    status = main([
+        "--store", str(tmp_path), "--world-id", "lighthouse",
+        "--expect-source-digest", reviewed["source_digest"],
+    ])
+    captured = capsys.readouterr()
+    assert status == 0
+    assert captured.err == ""
+    assert captured.out.endswith("\n")
+    assert captured.out.count("\n") == 1
+    result = json.loads(captured.out)
+    assert result["source_handoff_verified"] is True
+    assert result["source_digest"] == reviewed["source_digest"]
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()} == before
+
+
+def test_command_invalid_digest_emits_one_failure_record(tmp_path, capsys):
+    status = main([
+        "--store", str(tmp_path), "--world-id", "lighthouse",
+        "--expect-source-digest", "not-a-sha256",
+    ])
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.out.endswith("\n")
+    assert captured.out.count("\n") == 1
+    assert json.loads(captured.out)["error"] == "expected_source_digest_invalid"
