@@ -15,6 +15,9 @@ on:
       - 'frontend/Dockerfile'
       - 'frontend/.dockerignore'
       - 'skeleton/app/**'
+      - 'skeleton/ai/runtime/game_project_cli.py'
+      - 'scripts/game/game_project.py'
+      - 'skeleton/testing/test_packaging_contract.py'
       - 'skeleton/testing/test_app_assembly.py'
       - 'skeleton/testing/test_app_installer.py'
       - 'skeleton/testing/test_app_installer_epoch.py'
@@ -75,6 +78,7 @@ jobs:
       - name: Verify Python syntax at the exact head
         run: |
           python -m compileall -q skeleton/app
+          python -m compileall -q skeleton/ai/runtime/game_project_cli.py scripts/game/game_project.py skeleton/testing/test_packaging_contract.py
           python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
           python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
           python -m compileall -q skeleton/testing/test_studio_package_verifier_contract.py skeleton/testing/test_app_offline_signed_game_library_audit.py
@@ -98,7 +102,8 @@ jobs:
             skeleton/testing/test_app_offline_install_preflight.py \
             skeleton/testing/test_app_offline_install_reconciliation.py \
             skeleton/testing/test_first_install_required_routes.py \
-            skeleton/testing/test_windows_installer.py
+            skeleton/testing/test_windows_installer.py \
+            skeleton/testing/test_packaging_contract.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
