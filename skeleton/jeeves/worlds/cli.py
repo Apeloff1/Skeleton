@@ -4,7 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import errno
+import hashlib
+import hmac
 import os
+import re
 import stat
 import sys
 
@@ -78,6 +81,8 @@ def run(argv: list[str]) -> int:
     patch.add_argument("--id", required=True)
     patch.add_argument("--expected-digest", required=True)
     patch.add_argument("--operation-file", required=True)
+    patch.add_argument("--operation-sha256", required=True,
+                       help="SHA-256 of the exact operator-reviewed operation JSON bytes")
     compile_cmd = sub.add_parser("compile")
     compile_cmd.add_argument("--id", required=True)
     compile_cmd.add_argument("--expected-digest", required=True)
@@ -86,8 +91,19 @@ def run(argv: list[str]) -> int:
     try:
         # Validate operator input before constructing or touching the canonical
         # custody store. A rejected operation must have no filesystem effects.
-        operation = (strict_json(_read_operation_file(args.operation_file))
-                     if args.action == "edit" else None)
+        if args.action == "edit":
+            # Require a human-reviewed, byte-exact input commitment. The hash
+            # is checked before parsing and before opening the custody store.
+            # The source digest separately fences concurrent canonical edits.
+            if re.fullmatch(r"[0-9a-f]{64}", args.operation_sha256) is None:
+                raise CanonError("operation_invalid_sha256")
+            operation_bytes = _read_operation_file(args.operation_file)
+            actual_sha256 = hashlib.sha256(operation_bytes).hexdigest()
+            if not hmac.compare_digest(actual_sha256, args.operation_sha256):
+                raise CanonError("operation_review_digest_mismatch")
+            operation = strict_json(operation_bytes)
+        else:
+            operation = None
         input_loaded = True
         store = WorldStore(args.store)
         if args.action == "propose":
@@ -139,6 +155,8 @@ def run(argv: list[str]) -> int:
         # bypassing filesystem custody or removing another writer's lease.
         recovery = {
             "operation_invalid_path": "supply_a_normalized_existing_json_path",
+            "operation_invalid_sha256": "provide_lowercase_sha256_of_reviewed_operation_bytes",
+            "operation_review_digest_mismatch": "review_operation_again_and_recalculate_sha256",
             "operation_path_budget_exceeded": "shorten_operation_path_and_directory_depth",
             "operation_secure_open_unavailable": "use_descriptor_safe_input_platform",
             "operation_not_regular": "supply_a_regular_json_file",
