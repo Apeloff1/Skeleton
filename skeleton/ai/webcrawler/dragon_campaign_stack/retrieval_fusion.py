@@ -102,6 +102,8 @@ def fuse_retrieval(
             mandate, canonical, index, query.query,
             now=now, authorized=authorized, revoked_source_ids=revoked,
             mode="any", limit=32, max_per_source=8,
+            required_terms=query.required_terms,
+            blocked_terms=query.blocked_terms,
         )
         queries_run += 1
         for rank, hit in enumerate(current.hits, start=1):

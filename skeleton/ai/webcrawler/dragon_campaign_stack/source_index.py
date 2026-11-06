@@ -16,6 +16,7 @@ from ..dragon_mission_quality import segment_passages
 from ..operations import CrawlRun
 from .contracts import CampaignMandate, digest, ensure_snapshot_scope
 from .evidence import inspect_campaign_evidence
+from .query_lattice import passage_matches_operator_terms
 
 
 _WORDS = re.compile(r"[^\W_]{2,}", re.UNICODE)
@@ -166,6 +167,8 @@ def search_ephemeral_index(
     mode: str = "all",
     limit: int = 8,
     max_per_source: int = 3,
+    required_terms: tuple[str, ...] = (),
+    blocked_terms: tuple[str, ...] = (),
 ) -> IndexedSearch:
     mandate.admit(now=now, authorized=authorized)
     ensure_snapshot_scope(snapshot, mandate)
@@ -188,6 +191,13 @@ def search_ephemeral_index(
     tokens = tuple(sorted(set(_terms(query))))
     if not 1 <= len(tokens) <= 16:
         raise ValueError("query token capacity exceeded")
+    # Prove the exact literal filter contract before scanning any indexed
+    # source. Constraints must not be applied only after the top-k window:
+    # otherwise a broad query could fill the candidate limit with blocked
+    # passages and bury genuinely eligible passages.
+    passage_matches_operator_terms("", required_terms, blocked_terms)
+    if set(required_terms) & set(blocked_terms):
+        raise ValueError("contradictory per-passage filter")
     revoked = set(revoked_source_ids)
     if any(x not in current["sources"] for x in revoked):
         raise PermissionError("unknown revoked source")
@@ -206,6 +216,10 @@ def search_ephemeral_index(
             or source["text"][passage.start:passage.end] != passage.text
         ):
             raise PermissionError("indexed passage no longer matches source")
+        if (required_terms or blocked_terms) and not passage_matches_operator_terms(
+            passage.text, required_terms, blocked_terms,
+        ):
+            continue
         seen = frozenset(passage.terms) & set(tokens)
         if not seen or (mode == "all" and len(seen) != len(tokens)):
             continue
@@ -236,6 +250,7 @@ def search_ephemeral_index(
         "mandate": mandate.fingerprint,
         "snapshot": current["snapshot_digest"],
         "index": index.index_digest, "query": query, "mode": mode,
+        "required_terms": required_terms, "blocked_terms": blocked_terms,
         "hits": [
             (hit.source_id, hit.start, hit.end, hit.passage_hash, hit.score)
             for hit in hits
