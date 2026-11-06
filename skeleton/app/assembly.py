@@ -392,6 +392,7 @@ def runtime_manifest(
                 or url.password is not None
                 or url.query
                 or url.fragment
+                or url.path not in {"", "/"}
             ):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
             # Reject malformed authorities before rebuilding the URL. In particular,
