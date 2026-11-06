@@ -393,3 +393,44 @@ All three stage digests are chained into the Atlas final review receipt.
 The owner-scoped authenticated Atlas API surfaces read-only host, simulation,
 and recovery metadata without returning captured source bodies or granting
 real execution.
+
+## Jeeves operator UI: eight-goal source-bound research campaigns
+
+The existing Jeeves CrawlerWorkspace mounts an authenticated Dragon research
+Atlas panel in the capture view. Its only transport is the canonical
+/api/dragon-academy/crawler/sessions/{session_id}/research/atlas route.
+
+The panel supports up to eight distinct operator-authored goals in one
+request. Each goal retains its exact question, dimension, research stage,
+priority, minimum reviewable passage count, minimum independently attested
+group target, maximum capture age, required normalized terms and excluded
+terms. A nonempty unfinished draft is included automatically when analysis
+runs, not silently discarded. Goals are immutable finite objects with unique
+IDs; removal is explicit and never mutates source authority.
+
+The pure atlasCampaignPlan.ts compiler normalizes the operator's form and
+rejects duplicate Unicode-equivalent questions, unsafe/missing terms,
+contradictory required/excluded term lists, nonfinite priorities, out-of-range
+source-age windows and excessive objective count. Its validation provides
+operator feedback only. The backend retains final authoritative Pydantic
+and current Mongo source-policy checks.
+
+The UI presents evidence graph statistics, BM25/rank fusion selection,
+quantitative-review candidates, source-date mentions, human review tasks,
+canonically recorded frontier topology and read-only uncertainty custody.
+It cannot fetch new websites, invoke a model, certify factual truth,
+create review approvals, start workers, reserve network bytes, or publish.
+The review portfolio requires explicit human-estimated minutes and does
+not persist assignments.
+
+Source session-version changes, owner/account changes and edits cancel
+in-flight requests and invalidate their associated source-bound results.
+The adapter itself checks the current source policy again after a second
+authenticated Mongo read before returning inspection metadata.
+
+Draft qualification includes three independent lanes: canonical Python
+source-custody tests; full frontend TypeScript and focused lint with
+hermetic transport and campaign-planning tests; and actual application
+method tests with deterministic owned-row storage, withdrawal and
+second-read snapshot/policy race fencing. These do not replace live Mongo,
+network, real device or native-install release qualification.
