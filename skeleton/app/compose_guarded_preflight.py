@@ -95,9 +95,13 @@ def _authenticated_principals(response: object) -> tuple[tuple[str, str], ...] |
     # Bind the observation to authenticated role assignments when supplied.
     # Missing role metadata is not authorization evidence; this is strictly
     # an additional fail-closed rotation detector, never a readiness grant.
-    roles = response["authInfo"].get("authenticatedUserRoles")
-    if roles is None:
+    auth_info = response["authInfo"]
+    # Explicit null is malformed metadata, not an absent optional field.
+    # Otherwise a role-custody rotation could disappear into a null response
+    # and be treated as an unchanged authenticated identity.
+    if "authenticatedUserRoles" not in auth_info:
         return tuple(sorted(principals))
+    roles = auth_info["authenticatedUserRoles"]
     if type(roles) is not list or len(roles) > 64:
         return None
     trusted_roles: list[tuple[str, str]] = []
