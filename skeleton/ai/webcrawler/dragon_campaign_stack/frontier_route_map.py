@@ -93,18 +93,22 @@ def _nonrecursive_components(
     for root in nodes:
         if root in visited:
             continue
+        # Discover neighbors one at a time in a true depth-first
+        # traversal. Marking *all* children visited before descending can
+        # give an incorrect postorder for converging DAG edges and causes
+        # distinct noncyclic nodes to be reported in the same component.
         visited.add(root)
-        stack = [(root, False)]
+        stack = [(root, iter(sorted(forward[root])))]
         while stack:
-            key, finishing = stack.pop()
-            if finishing:
+            key, neighbors = stack[-1]
+            child = next(neighbors, None)
+            if child is None:
                 order.append(key)
+                stack.pop()
                 continue
-            stack.append((key, True))
-            for target in sorted(forward[key], reverse=True):
-                if target not in visited:
-                    visited.add(target)
-                    stack.append((target, False))
+            if child not in visited:
+                visited.add(child)
+                stack.append((child, iter(sorted(forward[child]))))
     visited.clear()
     components = []
     for root in reversed(order):

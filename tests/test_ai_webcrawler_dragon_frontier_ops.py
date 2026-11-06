@@ -14,6 +14,9 @@ import unittest
 
 import test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.operations import CrawlRun, _digest
+from skeleton.ai.webcrawler.dragon_campaign_stack.frontier_route_map import (
+    _nonrecursive_components, CanonicalRouteArc,
+)
 from skeleton.ai.webcrawler.dragon_campaign_stack import (
     ResourceObservation, recommend_crawl_pressure,
     project_canonical_routes, simulate_canonical_slice,
@@ -202,6 +205,48 @@ class FrontierOperationTests(unittest.TestCase):
         )
         self.assertIn(tuple(sorted(seeds)), report.strongly_connected_components)
         self.assertEqual(len(report.edges), 2)
+
+    def test_scc_converging_dag_cannot_fabricate_cycle(self):
+        # A->B, A->C and B->C is a DAG with three singleton SCCs.
+        # Earlier eager visited-child marking falsely grouped B and C.
+        nodes = ("https://example.com/a", "https://example.com/b",
+                 "https://example.com/c")
+        arcs = (
+            CanonicalRouteArc(nodes[0], nodes[1], False),
+            CanonicalRouteArc(nodes[0], nodes[2], False),
+            CanonicalRouteArc(nodes[1], nodes[2], False),
+        )
+        result = _nonrecursive_components(nodes, arcs)
+        self.assertEqual(result, tuple((x,) for x in nodes))
+
+    def test_scc_only_groups_actual_reciprocal_cycle(self):
+        nodes = ("https://example.com/a", "https://example.com/b",
+                 "https://example.com/c", "https://example.com/d")
+        arcs = (
+            CanonicalRouteArc(nodes[0], nodes[1], False),
+            CanonicalRouteArc(nodes[0], nodes[2], False),
+            CanonicalRouteArc(nodes[1], nodes[2], False),
+            CanonicalRouteArc(nodes[2], nodes[1], False),
+            CanonicalRouteArc(nodes[2], nodes[3], False),
+        )
+        result = _nonrecursive_components(nodes, arcs)
+        self.assertEqual(result, ((nodes[0],), (nodes[1], nodes[2]), (nodes[3],)))
+
+    def test_scc_iterative_long_dag_has_no_recursion_or_false_cycles(self):
+        nodes = tuple(f"https://example.com/v{i:04d}" for i in range(800))
+        arcs = tuple(CanonicalRouteArc(nodes[i], nodes[i + 1], False)
+                     for i in range(len(nodes) - 1))
+        result = _nonrecursive_components(nodes, arcs)
+        self.assertEqual(len(result), len(nodes))
+        self.assertEqual(result[0], (nodes[0],))
+        self.assertEqual(result[-1], (nodes[-1],))
+
+    def test_scc_rejects_dangling_or_attacker_supplied_endpoint(self):
+        nodes = ("https://example.com/a",)
+        with self.assertRaises(PermissionError):
+            _nonrecursive_components(
+                nodes, (CanonicalRouteArc(nodes[0], "https://unsafe.invalid/evil", True),),
+            )
 
     def test_route_graph_does_not_allow_self_parent(self):
         url = self.snapshot["frontier"][0]["url"]
