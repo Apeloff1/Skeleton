@@ -40,6 +40,14 @@ from .retrieval_fusion import RetrievalFusion, fuse_retrieval
 from .source_drift import SnapshotDrift, analyze_snapshot_drift
 from .source_index import EphemeralIndex, build_ephemeral_index
 from .workbench import DragonWorkbench, compose_dragon_workbench
+from .evidence_graph import EvidenceGraph, assemble_evidence_graph
+from .review_agenda import ReviewAgenda, compile_review_agenda
+from .review_replay import ReviewReplay, replay_human_reviews
+from .research_handoff import ResearchHandoff, compile_research_handoff, verify_research_handoff
+from .review_portfolio import ReviewEffort, ReviewPortfolio, allocate_human_review
+from .citation_manifest import (
+    CitationManifest, build_citation_manifest, verify_citation_manifest,
+)
 
 
 STAGES = (
@@ -53,6 +61,12 @@ STAGES = (
     "resource_bounded_frontier",
     "human_review_scorecard",
     "optional_checkpoint_drift",
+    "policy_bound_evidence_graph",
+    "dependency_review_agenda",
+    "append_only_review_projection",
+    "least_authority_jeeves_handoff",
+    "optional_human_review_portfolio",
+    "exact_span_citation_manifest",
 )
 
 
@@ -85,6 +99,12 @@ class DragonAtlas:
     allocation: AllocationAdvice
     scorecard: ResearchScorecard
     drift: SnapshotDrift | None
+    graph: EvidenceGraph
+    agenda: ReviewAgenda
+    review_replay: ReviewReplay
+    handoff: ResearchHandoff
+    portfolio: ReviewPortfolio | None
+    citations: CitationManifest
     stages: tuple[AtlasStage, ...]
     atlas_digest: str
     operational_state: str = "human_review_required"
@@ -141,6 +161,13 @@ def _receipts(atlas: DragonAtlas) -> tuple[tuple[str, str | None], ...]:
         ("resource_bounded_frontier", atlas.allocation.advice_digest),
         ("human_review_scorecard", atlas.scorecard.scorecard_digest),
         ("optional_checkpoint_drift", atlas.drift.drift_digest if atlas.drift else None),
+        ("policy_bound_evidence_graph", atlas.graph.graph_digest),
+        ("dependency_review_agenda", atlas.agenda.agenda_digest),
+        ("append_only_review_projection", atlas.review_replay.replay_digest),
+        ("least_authority_jeeves_handoff", atlas.handoff.handoff_digest),
+        ("optional_human_review_portfolio",
+         atlas.portfolio.portfolio_digest if atlas.portfolio else None),
+        ("exact_span_citation_manifest", atlas.citations.manifest_digest),
     )
 
 
@@ -162,6 +189,9 @@ def compose_dragon_atlas(
     max_index_passages: int = 2048,
     max_retrieved_passages: int = 16,
     max_context_chars: int = 8000,
+    review_effort: Iterable[ReviewEffort] = (),
+    review_budget_minutes: int = 240,
+    max_review_assignments: int = 32,
 ) -> DragonAtlas:
     """Compose one immutable, review-only source-bound research snapshot.
 
@@ -186,6 +216,7 @@ def compose_dragon_atlas(
     groups = tuple(independence_attestations)
     links = tuple(source_links)
     observations = tuple(telemetry)
+    effort_estimates = tuple(review_effort)
     # STOP before reading external page bodies unless ALL retained sources
     # have current, revision-accurate source-use decisions from the backend.
     policy = project_source_policy(
@@ -248,6 +279,41 @@ def compose_dragon_atlas(
             authorized=authorized, revoked_source_ids=withdrawn,
         ) if previous_snapshot is not None else None
     )
+    graph = assemble_evidence_graph(
+        mandate, canonical, policy, workbench.objectives,
+        index, fused, now=now, authorized=authorized,
+        claims=workbench.claim_matrix, independence=independent,
+        links=links,
+    )
+    agenda = compile_review_agenda(
+        mandate, graph, policy, fused, workbench.coverage,
+        now=now, authorized=authorized,
+        claims=workbench.claim_matrix, independence=independent,
+    )
+    # No action can be asserted as authenticated by a caller-provided page,
+    # model message or browser request. The canonical reviewed-knowledge
+    # owner must perform every subsequent human-authenticated transition.
+    review_replay = replay_human_reviews(
+        mandate, agenda, policy, (), now=now, authorized=authorized,
+    )
+    handoff = compile_research_handoff(
+        mandate, policy, graph, fused, agenda,
+        replay=review_replay, now=now, authorized=authorized,
+        max_citations=max_retrieved_passages,
+    )
+    portfolio = (
+        allocate_human_review(
+            mandate, agenda, effort_estimates, replay=review_replay,
+            now=now, authorized=authorized,
+            budget_minutes=review_budget_minutes,
+            max_assignments=max_review_assignments,
+        ) if effort_estimates else None
+    )
+    citations = build_citation_manifest(
+        mandate, canonical, policy, fused,
+        now=now, authorized=authorized,
+        max_citations=max_retrieved_passages,
+    )
     root = DragonAtlas(
         run_id=canonical["run_id"],
         mandate_digest=mandate.fingerprint,
@@ -257,6 +323,8 @@ def compose_dragon_atlas(
         lattice=lattice, index=index, retrieval=fused, context=context,
         independence=independent, pressure=pressure,
         allocation=allocation, scorecard=scorecard, drift=drift,
+        graph=graph, agenda=agenda, review_replay=review_replay,
+        handoff=handoff, portfolio=portfolio, citations=citations,
         stages=(), atlas_digest="",
     )
     stages = _stage_chain(
@@ -332,3 +400,33 @@ def verify_dragon_atlas_trace(
         raise PermissionError("Atlas context attached to foreign retrieval")
     if atlas.scorecard.source_snapshot_digest != atlas.source_snapshot_digest:
         raise PermissionError("Atlas scorecard attached to foreign source")
+    if atlas.graph.source_snapshot_digest != atlas.source_snapshot_digest or (
+        atlas.graph.source_policy_digest != atlas.policies.policy_digest
+        or atlas.graph.retrieval_digest != atlas.retrieval.fusion_digest
+    ):
+        raise PermissionError("Atlas graph policy or retrieval revision mismatch")
+    if atlas.agenda.graph_digest != atlas.graph.graph_digest or (
+        atlas.agenda.policy_digest != atlas.policies.policy_digest
+        or atlas.agenda.retrieval_digest != atlas.retrieval.fusion_digest
+    ):
+        raise PermissionError("Atlas review agenda provenance mismatch")
+    if atlas.review_replay.agenda_digest != atlas.agenda.agenda_digest or (
+        atlas.review_replay.policy_digest != atlas.policies.policy_digest
+    ):
+        raise PermissionError("Atlas review replay has stale policy")
+    if atlas.portfolio and (
+        atlas.portfolio.agenda_digest != atlas.agenda.agenda_digest
+        or atlas.portfolio.replay_digest != atlas.review_replay.replay_digest
+    ):
+        raise PermissionError("Atlas human effort portfolio is stale")
+    verify_research_handoff(
+        mandate, atlas.policies, atlas.graph, atlas.retrieval,
+        atlas.agenda, atlas.handoff, now=now,
+        authorized=authorized, replay=atlas.review_replay,
+    )
+    verify_citation_manifest(
+        mandate, canonical, atlas.policies, atlas.retrieval,
+        atlas.citations, now=now, authorized=authorized,
+        max_citations=max(1, len(atlas.retrieval.results)),
+    )
+

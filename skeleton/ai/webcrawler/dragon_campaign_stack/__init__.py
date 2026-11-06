@@ -96,4 +96,27 @@ from .retrieval_benchmark import (
     compare_retrieval_benchmarks,
 )
 
+
+# Operational evidence, review, citation and model-handoff projections.
+from .evidence_graph import (
+    EvidenceVertex, EvidenceArc, ObjectiveNeighborhood, GraphIntegrity,
+    EvidenceGraph, assemble_evidence_graph,
+)
+from .review_agenda import ReviewTask, ReviewAgenda, compile_review_agenda
+from .review_replay import (
+    HumanReviewAction, HumanReviewProposal, ReviewTaskState, ReviewReplay,
+    replay_human_reviews, next_review_action,
+)
+from .research_handoff import (
+    HandoffCitation, HandoffTask, ResearchHandoff,
+    compile_research_handoff, verify_research_handoff,
+)
+from .review_portfolio import (
+    ReviewEffort, PortfolioAssignment, ReviewPortfolio, allocate_human_review,
+)
+from .citation_manifest import (
+    BoundedCitation, CitationManifest, build_citation_manifest,
+    verify_citation_manifest,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]
