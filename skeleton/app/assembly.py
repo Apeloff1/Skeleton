@@ -208,8 +208,18 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     if "development" not in modes or "production" not in modes:
         raise ValueError("app modes must define development and production")
 
-    default_services = tuple(str(item) for item in app.get("default_services", ()))
-    full_services = tuple(str(item) for item in app.get("full_services", ()))
+    def _service_selection(field_name: str) -> tuple[str, ...]:
+        raw = app.get(field_name)
+        if not isinstance(raw, list):
+            raise ValueError(f"{field_name} must be a list of service names")
+        if any(not isinstance(item, str) or not item.strip() or item != item.strip() for item in raw):
+            raise ValueError(f"{field_name} must contain non-empty service names")
+        if len(set(raw)) != len(raw):
+            raise ValueError(f"{field_name} contains duplicate services")
+        return tuple(raw)
+
+    default_services = _service_selection("default_services")
+    full_services = _service_selection("full_services")
     unknown = (set(default_services) | set(full_services)) - set(names)
     if unknown:
         raise ValueError(f"manifest references unknown services: {sorted(unknown)}")
@@ -245,6 +255,25 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
                 raise ValueError(
                     f"service {service.name!r} health_path must live under ingress_prefix {prefix!r}"
                 )
+
+    # Startup order must be a DAG; cycles strand clean-host installation.
+    dependency_graph = {service.name: service.depends_on for service in services}
+    visited: set[str] = set()
+    visiting: set[str] = set()
+
+    def _visit(name: str) -> None:
+        if name in visiting:
+            raise ValueError(f"service dependency cycle detected at {name!r}")
+        if name in visited:
+            return
+        visiting.add(name)
+        for dependency in dependency_graph[name]:
+            _visit(dependency)
+        visiting.remove(name)
+        visited.add(name)
+
+    for service_name in dependency_graph:
+        _visit(service_name)
 
     backend = next((service for service in services if service.name == "backend"), None)
     if backend is None:
