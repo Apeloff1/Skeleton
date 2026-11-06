@@ -434,3 +434,36 @@ hermetic transport and campaign-planning tests; and actual application
 method tests with deterministic owned-row storage, withdrawal and
 second-read snapshot/policy race fencing. These do not replace live Mongo,
 network, real device or native-install release qualification.
+
+
+## Selected-evidence robustness: Atlas stage 24
+
+The Dragon Atlas now audits the *observed selected evidence* for
+single-origin dependence and cross-objective source reuse. Stage 24 consumes
+only currently policy-admitted passages, checks every selected source hash,
+canonical host, exact Unicode source span, passage digest and objective ID,
+then creates a deterministic digest-chained review projection.
+
+For each research objective it calculates the count of selected passages,
+distinct selected source IDs, observed hosts and the dominant host's share.
+It then models deletion of each selected host and reports the remaining
+selected passages, remaining distinct sources, affected objectives and
+review urgency. A host-deletion scenario **never reranks** the corpus,
+fetches new content, or claims to know unselected candidate relevance.
+
+The audit also calculates pairwise overlap between objectives so that
+reusing one physical source in multiple questions is not counted as
+independent corroboration. Multiple hosts can still share ownership,
+copy a claim, or originate from the same upstream publication; no number
+of hosts proves independence without separate attested review.
+
+The authenticated Atlas API returns only objective-level aggregates and
+bounded host-removal metadata, never stored source bodies or model
+instructions. The Jeeves UI displays host concentration, worst observed
+single-host loss and shared-source warnings as research workflow
+diagnostics rather than credibility scores.
+
+Adversarial regressions cover swapped source identities, forged spans,
+duplicated selected passages, contradictory objective memberships,
+nonfinite rank scores, stale source-policy receipts, cross-mandate inputs,
+host-loss accounting, immutable digests and stage-chain replay.
