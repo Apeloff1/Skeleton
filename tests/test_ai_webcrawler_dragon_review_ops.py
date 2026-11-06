@@ -7,6 +7,7 @@ finite work budgets and tamper-evident trace boundaries.
 from __future__ import annotations
 
 from dataclasses import replace
+from hashlib import sha256
 import json
 import unittest
 
@@ -406,10 +407,12 @@ class DragonReviewOperationsTest(unittest.TestCase):
         self.assertNotIn("Archive capture methodology", manifest.serialized_json)
         self.assertTrue(all(x.source_policy_current_at_issuance for x in manifest.citations))
         for ref in manifest.citations:
+            captured = self.source["sources"][ref.source_id]
             self.assertEqual(
-                self.source["sources"][ref.source_id]["text"][ref.start:ref.end].encode("utf-8").hex()[:8],
-                self.source["sources"][ref.source_id]["text"][ref.start:ref.end].encode("utf-8").hex()[:8],
+                sha256(captured["text"][ref.start:ref.end].encode("utf-8")).hexdigest(),
+                ref.passage_hash,
             )
+            self.assertEqual(captured["content_hash"], ref.full_content_hash)
         verify_citation_manifest(
             self.f.mandate, self.source,
             self.atlas.policies, self.atlas.retrieval, manifest,

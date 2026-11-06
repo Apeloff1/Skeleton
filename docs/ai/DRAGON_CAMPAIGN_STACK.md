@@ -259,3 +259,57 @@ relevance-label universe and k; otherwise it fails closed. These
 metrics are diagnostic offline source ranking, not a claim of global
 SOTA, production native evaluation, scientific ground truth, or
 release certification.
+
+
+## Operational review and Jeeves handoff: 16-stage Atlas
+
+The existing Atlas now composes six additional operational stages, all
+read-only and bounded by the same canonical Mongo crawl snapshot:
+
+11. A policy-bound typed evidence graph of source identities, exact passage
+    spans, authored objectives and review-held claims, including provenance
+    validation and transitive source-withdrawal closure.
+12. A deterministic human review task agenda with dependency DAG checks,
+    explicit priorities, finite ready windows, source-policy fences and
+    untrusted-content safety holds.
+13. A replayable append-only human-review projection with monotonically
+    increasing event sequence, expected per-task revision CAS, previous receipt
+    digest, exact source-policy and agenda identity. The authoritative
+    reviewed-knowledge owner is solely responsible for signing and storing any
+    real review; this pure projection never fabricates such authentication.
+14. A least-authority Jeeves handoff of exact source-reference metadata and
+    bounded review tasks. No source bodies, provider activation, model
+    instructions or external work execution are included.
+15. Optional human review planning with explicitly supplied effort estimates,
+    strict total minutes, dependency-closed selection, per-objective fairness,
+    and no claim that estimated minutes were actually measured.
+16. A citation manifest with exact Unicode codepoint spans, capture and
+    retained-text SHA-256 checks, current source-policy digest and strict
+    serialized JSON bounds. It cannot license, publish or verify external
+    knowledge by itself.
+
+The authenticated Atlas API returns the graph summary, prioritized review
+queue, metadata-only handoff and citation counts. Optional operator-supplied
+review_effort estimates let the user select a finite review portfolio. Example
+additional request properties:
+
+    "review_effort": [
+      {"task_type": "passage_integrity", "estimated_minutes": 10,
+       "estimate_basis": "operator_estimate"},
+      {"task_type": "objective_gap", "estimated_minutes": 15,
+       "estimate_basis": "operator_estimate"}
+    ],
+    "review_budget_minutes": 120
+
+Every task type in the resulting agenda must have an explicit estimate
+before a portfolio can be generated. If estimates are omitted, the portfolio
+is null rather than an invented timing claim. No new database, runtime
+service, provider credential, crawler transport or scheduling owner is
+introduced. The existing authenticated Mongo session and source-use policy
+remain the only valid source acquisition and reference authority; a second
+live database read fences policy and snapshot changes before responding.
+
+The source-only regression workflow runs the Dragon Atlas, campaign,
+invalidation, and review-ops suites after compiling all Python code. These
+checks alone do not certify an installed consumer app, live network
+acquisition, backend Mongo concurrency, real device execution or release.

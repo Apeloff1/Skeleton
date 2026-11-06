@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass
 from typing import Iterable
+from urllib.parse import urlsplit
 
 from ..operations import CrawlRun
 from .claims import ClaimReviewMatrix
@@ -321,7 +322,8 @@ def assemble_evidence_graph(
         "claim_count": len(claims.claims) if claims else 0,
         "vertex_count": len(vertices), "edge_count": len(arcs),
         "orphan_count": orphan_count,
-        "unique_hosts": len({x.origin for x in vertices if x.kind == "source"}),
+        "unique_hosts": len({urlsplit(x.origin).hostname for x in vertices
+                             if x.kind == "source"}),
     }
     integrity = GraphIntegrity(**integrity_body, graph_digest=digest(integrity_body))
     payload = {
