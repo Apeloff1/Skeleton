@@ -341,6 +341,30 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
         {report.scorecard.alerts.slice(0, 8).map((item, i) =>
           <Text key={i} style={s.error}>{readable(item)}</Text>)}
       </Section>
+      <Section title="Evidence-family collapse and apparent support">
+        <Text style={s.small}>
+          {report.evidence_family_stress.selected_source_records} selected source records · {report.evidence_family_stress.exact_content_families} unique captured-text families · {report.evidence_family_stress.possible_near_duplicate_clusters} possible lexical family clusters
+        </Text>
+        <Text style={s.small}>
+          These are sensitivity scenarios, not independently attested witnesses. Distinct content may still share origin, and similarity alone does not establish copied authorship.
+        </Text>
+        {report.evidence_family_stress.objectives.slice(0, 8).map(item =>
+          <View key={item.objective_id} style={s.check}>
+            <Text style={s.message}>{item.objective_id} · {readable(item.concern)}</Text>
+            <Text style={s.small}>
+              Records {item.selected_source_records} → exact text families {item.exact_content_families} → possible near-copy clusters {item.possible_near_duplicate_clusters}
+            </Text>
+            <Text style={s.small}>
+              Operator source-group target: {item.target_attested_groups} · hypothetical cluster shortfall: {item.hypothetical_target_shortfall} · verified independent groups: none
+            </Text>
+            <Text style={s.small}>
+              Under worst observed host removal: {item.worst_host_loss_clusters} clusters · {item.unscored_sources} sources still need a similarity review
+            </Text>
+          </View>)}
+        <Text style={s.small}>
+          {report.evidence_family_stress.flagged_objectives.length} objectives with potential dependence or missing selected evidence · all require human review before using claims.
+        </Text>
+      </Section>
       <Section title="Near-duplicate source provenance and copy review">
         <Text style={s.small}>
           {report.source_similarity.compared_sources} of {report.source_similarity.selected_sources} policy-eligible source(s) compared · {report.source_similarity.held_sources} held because too short or too large

@@ -322,6 +322,26 @@ export type CrawlAtlasReport = {
     manifest_digest: string; exact_anchored_references: number;
     body_redacted: true; publication_permission: false;
   };
+  evidence_family_stress: {
+    stress_digest: string; policy_digest: string; retrieval_digest: string;
+    robustness_digest: string; similarity_digest: string;
+    selected_source_records: number; exact_content_families: number;
+    possible_near_duplicate_clusters: number;
+    flagged_objectives: string[]; objectives_with_similarity_holds: string[];
+    objectives: {
+      objective_id: string; target_attested_groups: number;
+      selected_passages: number; selected_source_records: number;
+      exact_content_families: number; possible_near_duplicate_clusters: number;
+      possible_mirror_collapse: number; unscored_sources: number;
+      worst_host_loss_clusters: number;
+      hypothetical_target_shortfall: number; observed_hosts: number;
+      concern: string; independent_evidence_attested: false;
+    }[];
+    limitations: string[];
+    claim_correctness_verified: false;
+    source_text_exported: false; model_or_network_invoked: false;
+    human_review_required: true;
+  };
   source_similarity: {
     audit_digest: string; retrieval_digest: string; policy_digest: string;
     selected_sources: number; compared_sources: number; held_sources: number;
@@ -511,6 +531,45 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !value.jeeves_handoff?.body_excluded
       || value.jeeves_handoff.network_called !== false
       || value.jeeves_handoff.dispatch_granted !== false
+      || !value.evidence_family_stress
+      || !HASH.test(value.evidence_family_stress.stress_digest)
+      || value.evidence_family_stress.policy_digest !== value.source_policy.digest
+      || value.evidence_family_stress.retrieval_digest !== value.retrieval.digest
+      || value.evidence_family_stress.robustness_digest
+         !== value.retrieval_robustness?.audit_digest
+      || value.evidence_family_stress.similarity_digest
+         !== value.source_similarity?.audit_digest
+      || !integer(value.evidence_family_stress.selected_source_records, 32)
+      || !integer(value.evidence_family_stress.exact_content_families, 32)
+      || !integer(value.evidence_family_stress.possible_near_duplicate_clusters, 32)
+      || value.evidence_family_stress.exact_content_families
+         > value.evidence_family_stress.selected_source_records
+      || value.evidence_family_stress.possible_near_duplicate_clusters
+         > value.evidence_family_stress.exact_content_families
+      || !Array.isArray(value.evidence_family_stress.objectives)
+      || value.evidence_family_stress.objectives.length !== value.objectives?.length
+      || value.evidence_family_stress.objectives.some(item =>
+        !item || typeof item.objective_id !== 'string'
+        || item.independent_evidence_attested !== false
+        || !integer(item.selected_source_records, 32)
+        || !integer(item.exact_content_families, 32)
+        || !integer(item.possible_near_duplicate_clusters, 32)
+        || !integer(item.unscored_sources, 32)
+        || !integer(item.hypothetical_target_shortfall, 16)
+        || !integer(item.target_attested_groups, 16)
+        || item.target_attested_groups < 1
+        || item.possible_near_duplicate_clusters > item.exact_content_families
+        || item.exact_content_families > item.selected_source_records)
+      || !Array.isArray(value.evidence_family_stress.flagged_objectives)
+      || value.evidence_family_stress.flagged_objectives.length > 8
+      || !Array.isArray(value.evidence_family_stress.objectives_with_similarity_holds)
+      || value.evidence_family_stress.objectives_with_similarity_holds.length > 8
+      || !Array.isArray(value.evidence_family_stress.limitations)
+      || value.evidence_family_stress.limitations.length < 5
+      || value.evidence_family_stress.claim_correctness_verified !== false
+      || value.evidence_family_stress.source_text_exported !== false
+      || value.evidence_family_stress.model_or_network_invoked !== false
+      || value.evidence_family_stress.human_review_required !== true
       || !value.source_similarity || !HASH.test(value.source_similarity.audit_digest)
       || value.source_similarity.retrieval_digest !== value.retrieval.digest
       || value.source_similarity.policy_digest !== value.source_policy.digest

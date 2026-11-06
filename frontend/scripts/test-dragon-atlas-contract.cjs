@@ -100,6 +100,21 @@ function fixture() {
       requires_fresh_source_policy: true },
     citation_manifest: { manifest_digest: H, exact_anchored_references: 1,
       body_redacted: true, publication_permission: false },
+    evidence_family_stress: {
+      stress_digest: H, policy_digest: H, retrieval_digest: H,
+      robustness_digest: H, similarity_digest: H,
+      selected_source_records: 1, exact_content_families: 1,
+      possible_near_duplicate_clusters: 1,
+      flagged_objectives: [], objectives_with_similarity_holds: [],
+      objectives: [], limitations: [
+        'selected_evidence_only', 'lexical_near_duplicate_is_not_proven_shared_origin',
+        'near_duplicate_components_are_heuristic_collapse_scenarios',
+        'unscored_sources_are_explicit_uncertainty_not_independence',
+        'human_source_lineage_and_fact_review_are_mandatory',
+      ],
+      claim_correctness_verified: false, source_text_exported: false,
+      model_or_network_invoked: false, human_review_required: true,
+    },
     source_similarity: {
       audit_digest: H, retrieval_digest: H, policy_digest: H,
       selected_sources: 1, compared_sources: 1, held_sources: 0,
@@ -459,6 +474,38 @@ test('near-duplicate forged origins and unbounded pair scores fail closed', asyn
     }]; },
   ]) {
     const a = fixture(); change(a); setup(a);
+    await assert.rejects(client.getCrawlAtlas('session-1', request()),
+      /incomplete or violates/);
+  }
+});
+
+test('family collapse stress keeps all apparent support unverified', async () => {
+  setup();
+  const r = await client.getCrawlAtlas('session-1', request());
+  assert.equal(r.evidence_family_stress.robustness_digest, r.retrieval_robustness.audit_digest);
+  assert.equal(r.evidence_family_stress.similarity_digest, r.source_similarity.audit_digest);
+  assert.equal(r.evidence_family_stress.claim_correctness_verified, false);
+  assert.equal(r.evidence_family_stress.human_review_required, true);
+});
+
+test('forged factual independence and impossible source-family counts fail closed', async () => {
+  for (const change of [
+    x => { x.evidence_family_stress.claim_correctness_verified = true; },
+    x => { x.evidence_family_stress.human_review_required = false; },
+    x => { x.evidence_family_stress.model_or_network_invoked = true; },
+    x => { x.evidence_family_stress.source_text_exported = true; },
+    x => { x.evidence_family_stress.exact_content_families = 5; },
+    x => { x.evidence_family_stress.possible_near_duplicate_clusters = 2; },
+    x => { x.evidence_family_stress.similarity_digest = 'f'.repeat(64); },
+    x => { x.evidence_family_stress.objectives = [{
+      objective_id: 'operator-goal',
+      target_attested_groups: 2, selected_source_records: 1,
+      exact_content_families: 1, possible_near_duplicate_clusters: 1,
+      unscored_sources: 0, hypothetical_target_shortfall: 1,
+      independent_evidence_attested: true,
+    }]; },
+  ]) {
+    const x = fixture(); change(x); setup(x);
     await assert.rejects(client.getCrawlAtlas('session-1', request()),
       /incomplete or violates/);
   }
