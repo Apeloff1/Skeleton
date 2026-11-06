@@ -55,6 +55,7 @@
     "secret-scanning.yml",
     "security-alert-inventory.yml",
     "three-hour-actions-queue-expiry.yml",
+    "windows-installer.yml",
     "workflow-input-security.yml"
   ],
   "automatic_event_triggers": {
@@ -158,6 +159,10 @@
       "schedule",
       "workflow_dispatch",
       "push"
+    ],
+    "windows-installer.yml": [
+      "workflow_dispatch",
+      "pull_request"
     ],
     "workflow-input-security.yml": [
       "pull_request",

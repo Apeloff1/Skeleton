@@ -17,7 +17,7 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 # Explicit event-subscriber inventory: no extra independent Actions admission.
-MAX_INDEPENDENT_WORKFLOWS = 25
+MAX_INDEPENDENT_WORKFLOWS = 26
 
 
 def events(source: str) -> set[str]:

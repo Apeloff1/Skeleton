@@ -55,6 +55,21 @@ class WorkflowTierTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 events(invalid)
 
+    def test_windows_installer_pr_admission_keeps_manual_and_exact_head_custody(self):
+        workflow = (ROOT / ".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+        self.assertEqual(events(workflow), {"workflow_dispatch", "pull_request"})
+        policy = json.loads((ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8"))
+        self.assertIn("windows-installer.yml", policy["automatic_event_workflows"])
+        self.assertEqual(set(policy["automatic_event_triggers"]["windows-installer.yml"]),
+                         {"workflow_dispatch", "pull_request"})
+        self.assertIn("      - 'scripts/windows/**'", workflow)
+        self.assertIn("      - 'skeleton/app/installer.py'", workflow)
+        self.assertIn("      - 'backend/Dockerfile'", workflow)
+        self.assertIn("EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("name: Skeleton-Windows-Installer-${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("Smoke install generated Setup.exe", workflow)
+        self.assertIn("uninstaller missing", workflow)
+
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
