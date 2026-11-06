@@ -669,6 +669,7 @@ class DragonCrawlerApplication:
         objectives: tuple[dict[str, Any], ...],
         review_effort: tuple[dict[str, Any], ...] = (),
         review_budget_minutes: int = 240,
+        retrieval_mode: str = "fusion",
     ) -> dict[str, Any]:
         """Run the policy-first read-only research Atlas for an owned crawl.
 
@@ -730,6 +731,7 @@ class DragonCrawlerApplication:
             max_retrieved_passages=16, max_context_chars=8000,
             review_effort=review_costs,
             review_budget_minutes=review_budget_minutes,
+            retrieval_mode=retrieval_mode,
         )
         verify_dragon_atlas_trace(
             mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
@@ -803,6 +805,7 @@ class DragonCrawlerApplication:
             },
             "retrieval": {
                 "digest": atlas.retrieval.fusion_digest,
+                "mode": atlas.retrieval_mode,
                 "candidate_passages": atlas.retrieval.matched_passages,
                 "retained_hits": len(atlas.retrieval.results),
                 "distinct_hosts": atlas.retrieval.host_count,
@@ -834,6 +837,64 @@ class DragonCrawlerApplication:
                     "tainted_sources": atlas.independence.tainted_source_count,
                     "operator_fact_review_required": True,
                 } if atlas.independence else None
+            ),
+            "lexical_ranking": (
+                {
+                    "ranking_digest": atlas.lexical_ranking.ranking_digest,
+                    "indexed_passages": atlas.lexical_ranking.document_count,
+                    "scored_passages": atlas.lexical_ranking.scored_passages,
+                    "scored_query_receipts": len(atlas.lexical_ranking.scored_receipts),
+                    "indexed_terms": atlas.lexical_ranking.indexed_term_count,
+                    "ai_embedding_used": False,
+                    "model_confidence_certified": False,
+                } if atlas.lexical_ranking else None
+            ),
+            "numeric_signals": {
+                "report_digest": atlas.numeric_signals.report_digest,
+                "observed_quantities": len(atlas.numeric_signals.mentions),
+                "cross_source_review_candidates": len(atlas.numeric_signals.candidates),
+                "unit_families": atlas.numeric_signals.detected_unit_families,
+                "candidates": [
+                    {
+                        "objective_id": item.objective_id,
+                        "left_source_id": item.left_source_id,
+                        "right_source_id": item.right_source_id,
+                        "left_span_start": item.left_mention_start,
+                        "right_span_start": item.right_mention_start,
+                        "unit_family": item.normalized_unit,
+                        "normalized_left": item.left_value,
+                        "normalized_right": item.right_value,
+                        "relative_gap": item.relative_gap,
+                        "human_review_required": True,
+                        "factual_contradiction_established": False,
+                    }
+                    for item in atlas.numeric_signals.candidates[:16]
+                ],
+                "facts_verified": False,
+            },
+            "temporal_signals": {
+                "report_digest": atlas.temporal_signals.signal_digest,
+                "date_mentions": len(atlas.temporal_signals.mentions),
+                "date_groups": len(atlas.temporal_signals.date_groups),
+                "groups": [
+                    {
+                        "objective_id": item.objective_id,
+                        "date": item.iso_date,
+                        "source_count": len(item.source_ids),
+                        "date_not_verified_as_remote_update": True,
+                    }
+                    for item in atlas.temporal_signals.date_groups[:16]
+                ],
+                "remote_freshness_verified": False,
+            },
+            "reviewed_query_feedback": (
+                {
+                    "digest": atlas.feedback.feedback_digest,
+                    "operator_labeled_passages": atlas.feedback.label_count,
+                    "candidate_term_count": sum(len(x.candidates)
+                                                for x in atlas.feedback.objectives),
+                    "query_mutation_approved": False,
+                } if atlas.feedback else None
             ),
             "evidence_graph": {
                 "graph_digest": atlas.graph.graph_digest,
