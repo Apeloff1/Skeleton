@@ -375,7 +375,7 @@ def runtime_manifest(
     }
     for key, fallback in port_keys.items():
         raw = values.get(key, "") or fallback
-        if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+        if not raw.isascii() or not raw.isdigit() or len(raw) > 5 or not 1 <= int(raw) <= 65535:
             raise ValueError(f"{key} must be an integer from 1 to 65535")
     public_ports = [
         int(values.get(key, "") or port_keys[key])
@@ -395,7 +395,7 @@ def runtime_manifest(
         if raw and service.public_url:
             if _unsafe_endpoint_character(service.public_url):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
-            if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+            if not raw.isascii() or not raw.isdigit() or len(raw) > 5 or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
             url = urlsplit(service.public_url)
             if (
