@@ -523,6 +523,98 @@ class RetrievalRobustnessRegression(unittest.TestCase):
             self.assertFalse(hasattr(group, "raw_html"))
             self.assertFalse(hasattr(group, "model_verdict"))
 
+    def test_index_hard_filter_runs_before_top_one_window(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        text = ("archive capture methodology " * 95) + (
+            " archive capture requiredneedle"
+        )
+        captured = self.f.with_sources(
+            ("https://example.com/archive", text),
+        )
+        index = build_ephemeral_index(
+            self.mandate, captured, now=self.now,
+            authorized=True,
+        )
+        broad = search_ephemeral_index(
+            self.mandate, captured, index,
+            "archive capture",
+            now=self.now, authorized=True, mode="any", limit=1,
+        )
+        required = search_ephemeral_index(
+            self.mandate, captured, index,
+            "archive capture",
+            now=self.now, authorized=True, mode="any", limit=1,
+            required_terms=("requiredneedle",),
+        )
+        self.assertTrue(broad.hits)
+        self.assertTrue(required.hits)
+        self.assertIn("requiredneedle", required.hits[0].text.casefold())
+        self.assertNotEqual(broad.hits[0].passage_hash,
+                            required.hits[0].passage_hash)
+
+    def test_index_rejects_contradictory_or_unnormalized_hard_filters(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        index = build_ephemeral_index(
+            self.mandate, self.source, now=self.now,
+            authorized=True,
+        )
+        for arguments in (
+            {"required_terms": ("same",), "blocked_terms": ("same",)},
+            {"required_terms": ("MixedCase",)},
+            {"blocked_terms": ("a",)},
+            {"required_terms": ["mutable"]},
+        ):
+            with self.subTest(arguments=arguments):
+                with self.assertRaises((ValueError, TypeError)):
+                    search_ephemeral_index(
+                        self.mandate, self.source, index,
+                        "archive capture",
+                        now=self.now, authorized=True, **arguments,
+                    )
+
+    def test_preselected_filtered_query_has_distinct_replay_digest(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        index = build_ephemeral_index(
+            self.mandate, self.source, now=self.now,
+            authorized=True,
+        )
+        plain = search_ephemeral_index(
+            self.mandate, self.source, index, "archive capture",
+            now=self.now, authorized=True,
+        )
+        restricted = search_ephemeral_index(
+            self.mandate, self.source, index, "archive capture",
+            now=self.now, authorized=True,
+            required_terms=("archive",),
+        )
+        self.assertNotEqual(plain.result_digest, restricted.result_digest)
+        self.assertTrue(all("archive" in x.text.casefold()
+                            for x in restricted.hits))
+
+    def test_preselection_filter_cannot_admit_a_revoked_source(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        source_id = next(iter(self.source["sources"]))
+        index = build_ephemeral_index(
+            self.mandate, self.source, now=self.now,
+            authorized=True, revoked_source_ids=(source_id,),
+        )
+        self.assertFalse(index.passages)
+        blocked = search_ephemeral_index(
+            self.mandate, self.source, index, "archive capture",
+            now=self.now, authorized=True,
+            revoked_source_ids=(source_id,),
+            required_terms=("archive",),
+        )
+        self.assertFalse(blocked.hits)
+
     def test_all_analysis_outputs_retain_explicit_no_authority_flags(self):
         a = self.atlas(self.double)
         r = a.robustness
