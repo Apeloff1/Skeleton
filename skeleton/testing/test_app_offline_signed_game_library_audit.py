@@ -19,11 +19,6 @@ from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delive
 from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
 from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
 from skeleton.testing.test_app_offline_signed_progress_migration import migration
-# Pytest registers imported fixtures only in this collecting module. Carry the
-# complete signed-source dependency chain into the isolated audit suite.
-from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
-from skeleton.testing.test_app_offline_archive_signature import signed
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX custody")
 
@@ -140,7 +135,8 @@ def test_malformed_and_oversized_signed_entries_rejected(chain_delivery):
 
 def test_repeated_policy_path_and_malformed_epoch_chain_denied(chain_delivery):
     payload = asdict(_entry(chain_delivery))
-    payload["policies"][1] = payload["policies"][0]
+    # asdict preserves the dataclass tuple; build a mutable malformed JSON array.
+    payload["policies"] = [payload["policies"][0], payload["policies"][0]]
     with pytest.raises(SignedGameLibraryAuditError, match="duplicate"):
         audit_signed_game_library(
             [parse_signed_game_entry(json.dumps(payload))], authorized=True,
