@@ -145,6 +145,7 @@ def project_canonical_routes(
     sources = defaultdict(set)
     for source in canonical["sources"].values():
         sources[source["canonical_url"]].add(source["source_id"])
+    captured_source_urls = frozenset(sources)
     seeds = set(mandate.request.seed_urls)
     seen = set(canonical["seen"])
     universe = seeds | seen | set(pending) | set(sources)
@@ -194,7 +195,7 @@ def project_canonical_routes(
             url=url, host=hostname,
             depth=row["depth"] if row else None,
             seed=url in seeds, visited=url in seen, pending=row is not None,
-            source_count=len(sources[url]),
+            source_count=len(sources.get(url, ())),
             attempts=row["attempts"] if row else 0,
             ready_at=(
                 max(row["ready_at"], canonical["host_ready"].get(hostname, 0))
@@ -231,7 +232,9 @@ def project_canonical_routes(
     components = _nonrecursive_components(
         tuple(sorted(universe)), arcs,
     )
-    unknown_parents = tuple(sorted(parents - seen - set(pending) - seeds - set(sources)))
+    unknown_parents = tuple(sorted(
+        parents - seen - set(pending) - seeds - captured_source_urls
+    ))
     isolated_pending = tuple(sorted(x.url for x in nodes
                                     if x.pending and not x.seed
                                     and x.indegree == 0))
