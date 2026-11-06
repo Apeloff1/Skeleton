@@ -98,7 +98,7 @@ def test_forged_player_and_changed_world_fail_closed(tmp_path):
     with pytest.raises(CanonError, match="session_replay_mismatch"):
         ending_view({**source, "approved": True, "review_note": "reviewed"}, world, forged)
     changed = copy.deepcopy(world)
-    changed["premise"] = "New canon"
+    changed["prompt"] = "New canon"
     with pytest.raises(CanonError, match="epilogues_world_lease_mismatch"):
         validate_epilogues(source, changed)
 
