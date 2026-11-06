@@ -134,6 +134,13 @@ Commands:
     scene-market-fork-play      Source-bound original-game operator command
     scene-market-party-handoff  Source-bound original-game operator command
     scene-market-party-league-authorSource-bound original-game operator command
+    scene-market-contract-acceptSource-bound offline-market operator command
+    scene-market-party-board    Source-bound offline-market operator command
+    scene-market-party-league   Source-bound offline-market operator command
+    scene-market-contract-authorSource-bound offline-market operator command
+    scene-market-party-accept   Source-bound offline-market operator command
+    scene-market-party-compare  Source-bound offline-market operator command
+    scene-market-party-timeline Source-bound offline-market operator command
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -1109,6 +1116,27 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-league-author":
         from skeleton.game.gameplay.scene_market_party_league_author import cli as market_party_league_author_cli
         return market_party_league_author_cli(rest)
+    if cmd == "scene-market-contract-accept":
+        from skeleton.game.gameplay.scene_market_contract_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-board":
+        from skeleton.game.gameplay.scene_market_party_board import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-league":
+        from skeleton.game.gameplay.scene_market_party_league import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-contract-author":
+        from skeleton.game.gameplay.scene_market_contract_author import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-accept":
+        from skeleton.game.gameplay.scene_market_party_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-compare":
+        from skeleton.game.gameplay.scene_market_party_compare import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-timeline":
+        from skeleton.game.gameplay.scene_market_party_timeline import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
