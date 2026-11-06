@@ -30,6 +30,12 @@ def _file(path: str):
         parts = parts[1:]
     if not parts or any(part in ("", ".", "..") for part in parts):
         raise CanonError("input_invalid_path")
+    # Reject path-budget violations before opening any descriptor. These bounds
+    # prevent untrusted CLI arguments from causing unbounded directory walks.
+    if len(parts) > 64 or len(os.fsencode(path)) > 4096:
+        raise CanonError("input_path_budget_exceeded")
+    if any(len(os.fsencode(part)) > 255 for part in parts):
+        raise CanonError("input_path_budget_exceeded")
     directory_flags = (os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW |
                        getattr(os, "O_CLOEXEC", 0) | os.O_NONBLOCK)
     file_flags = (os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK |
@@ -207,6 +213,7 @@ def run(argv: list[str]) -> int:
             "laptop_engine_stale_source": "reinspect_engine_source_digests_before_compile",
             "laptop_engine_verify_mismatch": "reject_engine_handoff_and_reverify_exact_sources",
             "input_invalid_path": "provide_a_normalized_existing_json_file_path",
+            "input_path_budget_exceeded": "shorten_input_path_and_directory_depth",
             "input_symlink_disallowed": "use_a_regular_file_without_symlink_components",
             "input_missing": "verify_input_path_exists_before_retry",
             "input_invalid_directory": "replace_non_directory_parent_with_a_real_directory",
