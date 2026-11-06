@@ -363,3 +363,25 @@ def test_deep_dependency_cycle_fails_closed():
         })
     with pytest.raises(ValueError, match="dependency cycle"):
         parse_manifest(payload)
+
+
+@pytest.mark.parametrize("port", [
+    True, False, 0, -1, 65536, 3.5, "8000", "9" * 5000, [],
+])
+def test_manifest_rejects_noninteger_or_out_of_range_container_port(port):
+    from skeleton.app.assembly import ServiceSpec
+    with pytest.raises(ValueError, match="container_port must be an integer from 1 to 65535"):
+        ServiceSpec.from_mapping({
+            "name": "hostile", "role": "test", "path": ".", "kind": "service",
+            "depends_on": [], "container_port": port,
+        })
+
+
+def test_manifest_accepts_bounded_integer_container_port():
+    from skeleton.app.assembly import ServiceSpec
+    for port in (1, 8000, 65535):
+        service = ServiceSpec.from_mapping({
+            "name": "valid", "role": "test", "path": ".", "kind": "service",
+            "depends_on": [], "container_port": port,
+        })
+        assert service.container_port == port

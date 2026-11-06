@@ -47,6 +47,12 @@ class ServiceSpec:
         if not isinstance(raw_deps, list):
             raise ValueError(f"service {name!r} depends_on must be a list")
         port = value.get("container_port")
+        # Manifest data is untrusted: int() accepts booleans, floats and
+        # arbitrarily long decimal strings, potentially coercing malformed
+        # service ports or raising an interpreter-limit exception.
+        if port is not None:
+            if type(port) is not int or not 1 <= port <= 65535:
+                raise ValueError(f"service {name!r} container_port must be an integer from 1 to 65535")
         return cls(
             name=name,
             role=role,
@@ -57,7 +63,7 @@ class ServiceSpec:
             health_path=str(value.get("health_path", "") or ""),
             ingress_prefix=str(value.get("ingress_prefix", "") or ""),
             entrypoint=str(value.get("entrypoint", "") or ""),
-            container_port=int(port) if port is not None else None,
+            container_port=port,
             canonical=bool(value.get("canonical", True)),
             profile=str(value.get("profile", "") or ""),
         )
