@@ -206,3 +206,279 @@ export async function searchCrawlSources(id: string, query: string, signal?: Abo
   }
   return value;
 }
+
+
+// Dragon Atlas is a read-only, owner-scoped research inspection. Its
+// hashes are integrity identifiers, never reviewed-knowledge authorization.
+export type CrawlAtlasObjective = {
+  objective_id: string;
+  question: string;
+  dimension: 'fact' | 'method' | 'timeline' | 'source' | 'counterexample' | 'implementation';
+  stage: 'discovery' | 'collection' | 'verification' | 'review';
+  priority: number;
+  minimum_reviewable_passages: number;
+  minimum_attested_groups: number;
+  max_source_age_seconds: number;
+  required_terms: string[];
+  blocked_terms: string[];
+};
+export type CrawlAtlasEffort = {
+  task_type: 'source_policy' | 'passage_integrity' | 'source_provenance' |
+    'claim_contradiction' | 'claim_corroboration' | 'objective_gap' | 'human_fact_review';
+  estimated_minutes: number;
+  estimate_basis: 'operator_estimate';
+};
+export type CrawlAtlasRequest = {
+  objectives: CrawlAtlasObjective[];
+  retrieval_mode: 'fusion' | 'lexical_bm25';
+  review_effort?: CrawlAtlasEffort[];
+  review_budget_minutes?: number;
+};
+export type CrawlAtlasStage = {
+  ordinal: number; name: string; receipt_digest: string; chain_digest: string;
+};
+export type CrawlAtlasReviewTask = {
+  task_id: string; type: string; objective_id: string | null;
+  source_id: string | null; priority: number; predecessors: string[];
+  current_status: 'pending_human_review'; automatically_approvable: false;
+};
+export type CrawlAtlasReport = {
+  schema_version: 'skeleton.dragon.campaign_atlas_dashboard.v1';
+  session_id: string; run_id: string; run_sequence: number;
+  snapshot_digest: string; mandate_digest: string; atlas_digest: string;
+  issued_at: number; dashboard_digest: string; stages: CrawlAtlasStage[];
+  source_policy: {
+    digest: string; sources_seen: number; included_source_count: number;
+    excluded_source_count: number; complete_current_policy_required: true;
+  };
+  objectives: {
+    objective_id: string; dimension: string; stage: string; priority: number;
+  }[];
+  query_lattice: { digest: string; queries: number; source_authority: string };
+  retrieval: {
+    digest: string; mode: 'fusion' | 'lexical_bm25';
+    candidate_passages: number; retained_hits: number; distinct_hosts: number;
+    evidence: {
+      source_id: string; canonical_url: string; passage_hash: string;
+      start: number; end: number; score: number;
+      objective_ids: string[]; review_required: true;
+    }[];
+  };
+  lexical_ranking: null | {
+    ranking_digest: string; indexed_passages: number; scored_passages: number;
+    scored_query_receipts: number; indexed_terms: number;
+    ai_embedding_used: false; model_confidence_certified: false;
+  };
+  context: {
+    digest: string; source_references: number; serialized_bytes: number;
+    raw_source_text_redacted: true; fresh_policy_recheck_required: true;
+  };
+  numeric_signals: {
+    report_digest: string; observed_quantities: number;
+    cross_source_review_candidates: number; unit_families: string[];
+    candidates: {
+      objective_id: string; left_source_id: string; right_source_id: string;
+      left_span_start: number; right_span_start: number;
+      unit_family: string; normalized_left: string; normalized_right: string;
+      relative_gap: number; human_review_required: true;
+      factual_contradiction_established: false;
+    }[];
+    facts_verified: false;
+  };
+  temporal_signals: {
+    report_digest: string; date_mentions: number; date_groups: number;
+    groups: {
+      objective_id: string; date: string; source_count: number;
+      date_not_verified_as_remote_update: true;
+    }[];
+    remote_freshness_verified: false;
+  };
+  evidence_graph: {
+    graph_digest: string; vertices: number; arcs: number; retained_passages: number;
+    sources: number; held_sources: number; graph_is_factual_proof: false;
+    objective_neighborhoods: {
+      objective_id: string; source_count: number; passage_count: number;
+      host_count: number; claim_count: number; independence_attested: false;
+    }[];
+  };
+  review_operations: {
+    agenda_digest: string; replay_digest: string; tasks_total: number;
+    pending_tasks: number; blocked_tasks: number; ready_task_ids: string[];
+    task_types: Record<string, number>;
+    recommended_queue: CrawlAtlasReviewTask[];
+    human_review_recorded: false; durable_review_mutations: false;
+  };
+  review_portfolio: null | {
+    portfolio_digest: string; estimated_minutes: number; budget_minutes: number;
+    selected_count: number; task_ids: string[]; persistence_performed: false;
+    effort_is_observed: false;
+  };
+  jeeves_handoff: {
+    manifest_digest: string; citation_count: number; task_count: number;
+    body_excluded: true; network_called: false; dispatch_granted: false;
+    requires_fresh_source_policy: true;
+  };
+  citation_manifest: {
+    manifest_digest: string; exact_anchored_references: number;
+    body_redacted: true; publication_permission: false;
+  };
+  canonical_routes: {
+    route_digest: string; node_count: number; committed_parent_arcs: number;
+    components: number; unreachable_pending: number; unknown_parent_urls: number;
+    host_load: {
+      host: string; discovered_nodes: number; pending_urls: number;
+      ready_urls: number; robots_status: string; observed_fairness_share: number;
+    }[];
+    network_authority: false;
+  };
+  slice_simulation: {
+    simulation_digest: string; projected_request_slots: number;
+    projected_byte_reserve: number; remaining_requests: number;
+    remaining_bytes: number; steps: {
+      url: string; action: 'robots_preflight_only' | 'page_fetch_candidate';
+      host: string; ready_at: number; conservative_byte_cap: number;
+      robots_preflight_required: boolean;
+    }[];
+    held_urls: [string, string][]; blockers: string[];
+    physical_worker_authorized: false; network_committed: false;
+    real_robots_admission_executed: false;
+  };
+  dispatch_recovery: {
+    ledger_digest: string; retained_event_count: number;
+    event_history_incomplete: boolean; pending_dispatch: boolean;
+    uncertain_bytes: number; hosts: {
+      host: string; fault_grade: string; dispatch_intents: number;
+      retries: number; transport_failures: number; interrupted: number;
+    }[];
+    recovery_queue: {
+      code: string; severity: string; supporting_sequences: number[];
+      requires_operator_resolution: boolean; auto_execute: false;
+    }[];
+    physical_worker_join_confirmed: false; mongo_commit_confirmed: false;
+    uncertain_bytes_refunded: false;
+  };
+  scorecard: {
+    digest: string; dimensions: {
+      name: string; numerator: number; denominator: number;
+      ratio: number; grade: string; limitations: string[];
+    }[];
+    alerts: string[]; advisory_priority: number; decision: 'human_review_hold';
+  };
+  read_only: true; network_executed: false;
+  publication_granted: false; training_permission: false; review_required: true;
+};
+const ATLAS_OBJECTIVE_ID = /^[a-z][a-z0-9_-]{2,63}$/;
+const ATLAS_TERM = /^[a-z0-9_-]{2,48}$/;
+const ATLAS_DIMENSIONS = new Set(['fact', 'method', 'timeline', 'source', 'counterexample', 'implementation']);
+const ATLAS_STAGES = new Set(['discovery', 'collection', 'verification', 'review']);
+const ATLAS_EFFORT_TYPES = new Set([
+  'source_policy', 'passage_integrity', 'source_provenance',
+  'claim_contradiction', 'claim_corroboration', 'objective_gap', 'human_fact_review',
+]);
+function safeAtlasRequest(request: CrawlAtlasRequest): void {
+  if (!request || !Array.isArray(request.objectives) || request.objectives.length < 1
+      || request.objectives.length > 8 || !['fusion', 'lexical_bm25'].includes(request.retrieval_mode)) {
+    throw new ChatClientError('Choose a bounded objective and retrieval algorithm.', { kind: 'validation', retryable: false });
+  }
+  const seen = new Set<string>();
+  for (const item of request.objectives) {
+    if (!item || !ATLAS_OBJECTIVE_ID.test(item.objective_id) || seen.has(item.objective_id)
+        || typeof item.question !== 'string' || item.question !== item.question.trim()
+        || item.question.length < 3 || item.question.length > 512
+        || !ATLAS_DIMENSIONS.has(item.dimension) || !ATLAS_STAGES.has(item.stage)
+        || typeof item.priority !== 'number' || !Number.isFinite(item.priority)
+        || item.priority < 0 || item.priority > 1
+        || !Number.isSafeInteger(item.minimum_reviewable_passages) || item.minimum_reviewable_passages < 1
+        || item.minimum_reviewable_passages > 32
+        || !Number.isSafeInteger(item.minimum_attested_groups) || item.minimum_attested_groups < 1
+        || item.minimum_attested_groups > 16
+        || !Number.isSafeInteger(item.max_source_age_seconds) || item.max_source_age_seconds < 60
+        || item.max_source_age_seconds > 86400
+        || !Array.isArray(item.required_terms) || item.required_terms.length > 16
+        || !Array.isArray(item.blocked_terms) || item.blocked_terms.length > 16
+        || [...item.required_terms, ...item.blocked_terms].some(term => !ATLAS_TERM.test(term))
+        || item.required_terms.some(term => item.blocked_terms.includes(term))
+        || new Set(item.required_terms).size !== item.required_terms.length
+        || new Set(item.blocked_terms).size !== item.blocked_terms.length) {
+      throw new ChatClientError('Research goals need valid bounded questions, terms and targets.', { kind: 'validation', retryable: false });
+    }
+    seen.add(item.objective_id);
+  }
+  if (request.review_effort) {
+    if (!Array.isArray(request.review_effort) || request.review_effort.length > 7
+        || new Set(request.review_effort.map(row => row.task_type)).size !== request.review_effort.length
+        || request.review_effort.some(row => !ATLAS_EFFORT_TYPES.has(row.task_type)
+          || row.estimate_basis !== 'operator_estimate'
+          || !Number.isSafeInteger(row.estimated_minutes) || row.estimated_minutes < 1
+          || row.estimated_minutes > 180)) {
+      throw new ChatClientError('Use explicit finite review-effort estimates.', { kind: 'validation', retryable: false });
+    }
+  }
+  if (request.review_budget_minutes !== undefined && (!integer(request.review_budget_minutes, 1440)
+      || request.review_budget_minutes < 1)) {
+    throw new ChatClientError('Choose a finite human-review time budget.', { kind: 'validation', retryable: false });
+  }
+}
+function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requestedMode: CrawlAtlasRequest['retrieval_mode']): CrawlAtlasReport {
+  if (!value || value.schema_version !== 'skeleton.dragon.campaign_atlas_dashboard.v1'
+      || value.session_id !== sessionId || typeof value.run_id !== 'string'
+      || !HASH.test(value.snapshot_digest) || !HASH.test(value.mandate_digest)
+      || !HASH.test(value.atlas_digest) || !HASH.test(value.dashboard_digest)
+      || !integer(value.run_sequence) || typeof value.issued_at !== 'number'
+      || !Number.isFinite(value.issued_at) || value.retrieval?.mode !== requestedMode
+      || !Array.isArray(value.stages) || value.stages.length !== 23
+      || !value.stages.every((row, index) => row.ordinal === index
+        && typeof row.name === 'string' && row.name.length < 100
+        && HASH.test(row.receipt_digest) && HASH.test(row.chain_digest))
+      || !value.source_policy || !HASH.test(value.source_policy.digest)
+      || !integer(value.source_policy.sources_seen, 64)
+      || !integer(value.source_policy.included_source_count, 64)
+      || !integer(value.source_policy.excluded_source_count, 64)
+      || value.source_policy.included_source_count + value.source_policy.excluded_source_count
+         !== value.source_policy.sources_seen
+      || !value.context?.raw_source_text_redacted
+      || !value.context?.fresh_policy_recheck_required
+      || !value.review_operations || value.review_operations.human_review_recorded !== false
+      || value.review_operations.durable_review_mutations !== false
+      || !Array.isArray(value.review_operations.recommended_queue)
+      || value.review_operations.recommended_queue.length > 32
+      || value.review_operations.recommended_queue.some(task =>
+        !task || typeof task.task_id !== 'string' || task.automatically_approvable !== false
+        || task.current_status !== 'pending_human_review')
+      || !value.citation_manifest?.body_redacted
+      || value.citation_manifest.publication_permission !== false
+      || !value.jeeves_handoff?.body_excluded
+      || value.jeeves_handoff.network_called !== false
+      || value.jeeves_handoff.dispatch_granted !== false
+      || value.canonical_routes?.network_authority !== false
+      || value.slice_simulation?.network_committed !== false
+      || value.slice_simulation.physical_worker_authorized !== false
+      || value.dispatch_recovery?.mongo_commit_confirmed !== false
+      || value.dispatch_recovery.physical_worker_join_confirmed !== false
+      || value.dispatch_recovery.uncertain_bytes_refunded !== false
+      || value.scorecard?.decision !== 'human_review_hold'
+      || !Array.isArray(value.scorecard.alerts) || value.scorecard.alerts.length > 256
+      || value.read_only !== true || value.network_executed !== false
+      || value.publication_granted !== false || value.training_permission !== false
+      || value.review_required !== true || JSON.stringify(value).length > 512 * 1024) {
+    invalid('The current Dragon research inspection is incomplete or violates source authority.');
+  }
+  return value;
+}
+export async function getCrawlAtlas(
+  id: string, request: CrawlAtlasRequest, signal?: AbortSignal,
+): Promise<CrawlAtlasReport> {
+  safeAtlasRequest(request);
+  const previousToken = getAuthToken();
+  const payload = await read(
+    api.post<{ report: CrawlAtlasReport }>(
+      ROOT + '/sessions/' + identifier(id) + '/research/atlas',
+      request, options(signal),
+    ),
+    previousToken, 'The Dragon research inspection could not be verified.',
+  );
+  if (signal?.aborted || previousToken !== getAuthToken()) {
+    throw new ChatClientError('The research inspection was detached or your account changed.', { kind: 'authorization', retryable: false });
+  }
+  return checkedAtlasReport(payload.report, id, request.retrieval_mode);
+}
