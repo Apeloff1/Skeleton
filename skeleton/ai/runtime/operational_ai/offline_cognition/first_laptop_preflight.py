@@ -28,7 +28,10 @@ MAX_REQUIRED_FREE=2**40
 
 
 def _absolute_root(raw, *, label):
-    if type(raw) not in (str,Path):
+    # Path() returns the platform-specific PosixPath/WindowsPath subclass;
+    # rejecting those would reject every ordinary pathlib caller. Continue
+    # to enforce absolute, no-traversal and descriptor-anchored custody below.
+    if type(raw) is not str and not isinstance(raw, Path):
         refuse("trusted absolute "+label+" path required")
     path=Path(raw)
     if not path.is_absolute() or ".." in path.parts:
