@@ -108,7 +108,15 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
     except StoreError as exc:
         if str(exc) != "save slot does not exist":
             raise
-        current = store.new(slot)
+        try:
+            current = store.new(slot)
+        except StoreError as create_error:
+            # Two consumer processes may both observe an absent slot. If the
+            # other process won creation, attach to its authoritative save;
+            # never replace or reset its first committed turn.
+            if str(create_error) != "save slot already exists":
+                raise
+            current = store.load(slot)
     if ascii_mode is None:
         ascii_mode = os.name == "nt"
     while True:
