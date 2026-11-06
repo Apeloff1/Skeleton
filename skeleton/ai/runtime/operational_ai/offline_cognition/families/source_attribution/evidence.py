@@ -20,7 +20,10 @@ def query(catalog,text,*,limit=10,query_vector=None,embedding_model_sha256=None)
                             query_vector=query_vector,
                             embedding_model_sha256=embedding_model_sha256)
 
-def passages(document,*,window_bytes=2048,overlap_bytes=128):
+def passages(document,*,window_bytes=2048,overlap_bytes=None):
+    # A caller selecting a smaller window without an overlap has not requested
+    # the 128-byte default. The bounded core chooses a safe window-relative
+    # overlap; explicitly supplied invalid overlaps still fail closed.
     return partition(document,window_bytes=window_bytes,overlap_bytes=overlap_bytes)
 
 def citation(catalog,span,*,quoted_text=None):
