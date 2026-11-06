@@ -40,6 +40,23 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
         and checks.get("acceptance", {}).get("ok") is True
         and (slot is None or checks.get("session", {}).get("ok") is True)
     )
+    # Diagnose reads separately locked stages; detect source revision drift.
+    # This does not replace atomic playable custody verification.
+    observed_digest = report.get("source_digest")
+    try:
+        final_digest = LaptopFlow(store).inspect(world_id)["source_digest"]
+    except (CanonError, OSError) as exc:
+        checks["source_stability"] = {
+            "ok": False,
+            "error": exc.code if isinstance(exc, CanonError) else "source_recheck_unavailable",
+        }
+        ready = False
+    else:
+        stable = isinstance(observed_digest, str) and observed_digest == final_digest
+        checks["source_stability"] = (
+            {"ok": True} if stable else {"ok": False, "error": "source_changed_during_diagnostic"}
+        )
+        ready = ready and stable
     lease_ok = (expected_source_digest is None or
                 report.get("source_digest") == expected_source_digest)
     if expected_source_digest is not None:
@@ -55,10 +72,13 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
         "source_handoff_verified": ready,
         "source_digest": report.get("source_digest"),
         "expected_source_digest": expected_source_digest,
-        "next_action": ("restart_diagnostic_after_source_change" if
-                        expected_source_digest is not None and
-                        report.get("source_digest") != expected_source_digest
-                        else report.get("next_action")),
+        "next_action": (
+            "restart_diagnostic_after_source_change"
+            if checks.get("source_stability", {}).get("ok") is False
+            or (expected_source_digest is not None
+                and report.get("source_digest") != expected_source_digest)
+            else report.get("next_action")
+        ),
         "checks": checks,
         "qualification": "read_only_source_diagnostic_not_model_engine_or_device_certified",
     }
