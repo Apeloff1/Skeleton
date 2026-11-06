@@ -124,8 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = canonical(result)
         if len(payload) > MAX_REPORT_BYTES:
             raise CanonError("laptop_recovery_report_too_large")
-        sys.stdout.buffer.write(payload + b"
-")
+        sys.stdout.buffer.write(payload + b"\n")
         return 0 if result["source_handoff_verified"] else 2
     except (CanonError, OSError, ValueError) as exc:
         code = exc.code if isinstance(exc, CanonError) else "laptop_recovery_unavailable"
@@ -134,8 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             "source_handoff_verified": False,
             "error": code,
             "next_action": "inspect_canonical_custody_without_overwriting_artifacts",
-        }, sort_keys=True) + "
-")
+        }, sort_keys=True) + "\n")
         return 2
 
 
