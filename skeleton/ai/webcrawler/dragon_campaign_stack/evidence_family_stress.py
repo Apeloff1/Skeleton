@@ -21,8 +21,8 @@ from .contracts import CampaignMandate, digest, ensure_snapshot_scope, integer
 from .objectives import ObjectivePlan
 from .policy_matrix import SourcePolicyProjection
 from .retrieval_fusion import RetrievalFusion
-from .retrieval_robustness import RetrievalRobustnessAudit
-from .near_duplicate_audit import SourceSimilarityAudit
+from .retrieval_robustness import RetrievalRobustnessAudit, analyze_retrieval_robustness
+from .near_duplicate_audit import SourceSimilarityAudit, inspect_selected_source_similarity
 
 
 @dataclass(frozen=True)
@@ -187,6 +187,23 @@ def stress_test_evidence_families(
             selected_by_goal[goal].add(passage.source_id)
     if len(all_selected) > max_sources or len(similarity.similar_pairs) > max_candidate_pairs:
         raise ValueError("selected source or pair count exceeds family bounds")
+    # A valid-looking digest string is not evidence of an authentic
+    # provenance audit. Re-run each pure bounded source projection from the
+    # canonical snapshot before allowing their relationship graph to affect
+    # the objective family's count. This also rejects a forged report with
+    # a recomputed self-consistent digest.
+    canonical_robustness = analyze_retrieval_robustness(
+        mandate, canonical, objective_plan, policy, retrieval,
+        now=now, authorized=authorized,
+    )
+    if canonical_robustness != robustness:
+        raise PermissionError("family stress received altered robustness provenance")
+    canonical_similarity = inspect_selected_source_similarity(
+        mandate, canonical, policy, retrieval,
+        now=now, authorized=authorized,
+    )
+    if canonical_similarity != similarity:
+        raise PermissionError("family stress received altered similarity provenance")
     if set(similarity.considered_source_ids) != all_selected:
         raise PermissionError("similarity did not inspect selected source identities")
     if set(similarity.compared_source_ids) | set(similarity.held_source_ids) != all_selected or (
