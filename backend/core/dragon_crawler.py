@@ -968,6 +968,61 @@ class DragonCrawlerApplication:
                 "body_redacted": True,
                 "publication_permission": False,
             },
+            "retrieval_robustness": {
+                "audit_digest": atlas.robustness.audit_digest,
+                "retrieval_digest": atlas.robustness.retrieval_digest,
+                "selected_passages": atlas.robustness.selected_passages,
+                "selected_sources": atlas.robustness.selected_sources,
+                "selected_hosts": atlas.robustness.selected_hosts,
+                "flagged_objectives": atlas.robustness.flagged_objectives,
+                "objectives": [
+                    {
+                        "objective_id": item.objective_id,
+                        "selected_passages": item.selected_passages,
+                        "distinct_selected_sources": item.distinct_selected_sources,
+                        "distinct_selected_hosts": item.distinct_selected_hosts,
+                        "dominant_host": item.dominant_host,
+                        "dominant_host_fraction": item.dominant_host_fraction,
+                        "remaining_passages_after_host_loss": (
+                            item.smallest_remaining_passages_after_host_removal
+                        ),
+                        "remaining_sources_after_host_loss": (
+                            item.smallest_remaining_sources_after_host_removal
+                        ),
+                        "risk": item.host_ablation_risk,
+                        "independence_confirmed": False,
+                    } for item in atlas.robustness.analyses
+                ],
+                "host_ablation": [
+                    {
+                        "removed_host": item.removed_host,
+                        "removed_selected_passages": item.removed_selected_passages,
+                        "surviving_selected_passages": item.surviving_selected_passages,
+                        "surviving_unique_sources": item.surviving_unique_sources,
+                        "objectives_without_evidence": (
+                            item.objectives_without_any_selected_passages
+                        ),
+                        "objectives_left_with_one_host": (
+                            item.objectives_left_with_one_host
+                        ),
+                        "reranking_executed": False,
+                    } for item in atlas.robustness.leave_one_host_out
+                ],
+                "objective_reuse": [
+                    {
+                        "left_objective_id": item.left_objective_id,
+                        "right_objective_id": item.right_objective_id,
+                        "shared_source_count": len(item.overlapping_source_ids),
+                        "shared_host_count": len(item.overlapping_hosts),
+                        "source_jaccard": item.source_jaccard,
+                        "independence_proven": False,
+                    } for item in atlas.robustness.objective_reuse
+                ],
+                "limitations": atlas.robustness.limitations,
+                "source_bodies_excluded": True,
+                "verified_independence": False,
+                "network_or_reranking_executed": False,
+            },
             "canonical_routes": {
                 "route_digest": atlas.routes.route_digest,
                 "node_count": len(atlas.routes.nodes),
