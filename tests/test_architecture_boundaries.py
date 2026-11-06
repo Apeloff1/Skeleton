@@ -162,7 +162,7 @@ def test_private_production_fabric_api_sibling_is_not_public_adapter(tmp_path: P
     _write(
         root,
         "skeleton/ai/runtime/production_fabric/product/cli.py",
-        "from .api import LocalAPI\\nfrom . import api as sibling\\n",
+        "from .api import LocalAPI\nfrom . import api as sibling\n",
     )
     assert collect_violations(root) == []
 
@@ -172,15 +172,15 @@ def test_nested_relative_api_import_resolves_to_actual_package(tmp_path: Path) -
     _write(
         root,
         "skeleton/ai/runtime/production_fabric/product/cli.py",
-        "from ..api import helper\\n",
+        "from ..api import helper\n",
     )
     assert collect_violations(root) == []
 
 
 def test_relative_api_import_cannot_ascend_into_public_adapter(tmp_path: Path) -> None:
     root = _repo(tmp_path)
-    _write(root, "skeleton/agents/worker.py", "from ..api import routes\\n")
-    _write(root, "skeleton/agents/nested/worker.py", "from ...api import routes\\n")
+    _write(root, "skeleton/agents/worker.py", "from ..api import routes\n")
+    _write(root, "skeleton/agents/nested/worker.py", "from ...api import routes\n")
     violations = collect_violations(root)
     assert len(violations) == 2
     assert all("must not depend upward on skeleton.api" in x.message for x in violations)
@@ -188,7 +188,7 @@ def test_relative_api_import_cannot_ascend_into_public_adapter(tmp_path: Path) -
 
 def test_from_import_alias_cannot_hide_absolute_api_dependency(tmp_path: Path) -> None:
     root = _repo(tmp_path)
-    _write(root, "skeleton/agents/worker.py", "from skeleton import api as adapter\\n")
+    _write(root, "skeleton/agents/worker.py", "from skeleton import api as adapter\n")
     violations = collect_violations(root)
     assert len(violations) == 1
     assert "must not depend upward on skeleton.api" in violations[0].message
@@ -196,8 +196,8 @@ def test_from_import_alias_cannot_hide_absolute_api_dependency(tmp_path: Path) -
 
 def test_from_import_alias_cannot_hide_relative_api_dependency(tmp_path: Path) -> None:
     root = _repo(tmp_path)
-    _write(root, "skeleton/agents/worker.py", "from .. import api as adapter\\n")
-    _write(root, "skeleton/domain.py", "from . import api\\n")
+    _write(root, "skeleton/agents/worker.py", "from .. import api as adapter\n")
+    _write(root, "skeleton/domain.py", "from . import api\n")
     violations = collect_violations(root)
     assert len(violations) == 2
     assert all("must not depend upward on skeleton.api" in x.message for x in violations)
@@ -205,10 +205,10 @@ def test_from_import_alias_cannot_hide_relative_api_dependency(tmp_path: Path) -
 
 def test_api_lookalike_and_nested_internal_aliases_are_accepted(tmp_path: Path) -> None:
     root = _repo(tmp_path)
-    _write(root, "skeleton/agents/worker.py", "from skeleton import apish\\n")
+    _write(root, "skeleton/agents/worker.py", "from skeleton import apish\n")
     _write(
         root, "skeleton/ai/runtime/production_fabric/product/cli.py",
-        "from . import api\\nfrom skeleton.ai.runtime import api as internal_api\\n",
+        "from . import api\nfrom skeleton.ai.runtime import api as internal_api\n",
     )
     assert collect_violations(root) == []
 
