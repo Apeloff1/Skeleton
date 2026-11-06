@@ -275,7 +275,7 @@ class DragonRetrievalIntelligenceTest(unittest.TestCase):
              "Archive capture methodology cost $100 in the recorded experiment. " +
              samples.research_text("first")),
             ("https://example.org/research",
-             "Archive capture methodology cost €90 in the recorded experiment. " +
+             "Archive capture methodology cost 90 EUR in the recorded experiment. " +
              samples.research_text("second")),
         )
         _, atlas = self.comparison(rows)
