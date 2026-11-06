@@ -181,7 +181,7 @@ def test_deep_package_sibling_api_is_not_root_api(tmp_path: Path) -> None:
     _write(
         root,
         "skeleton/ai/runtime/production_fabric/product/cli.py",
-        "from .api import LocalAPI\\nfrom . import api\n",
+        "from .api import LocalAPI\nfrom . import api\n",
     )
     assert collect_violations(root) == []
 
@@ -191,7 +191,7 @@ def test_deep_package_relative_import_cannot_bypass_root_api(tmp_path: Path) -> 
     _write(
         root,
         "skeleton/ai/runtime/production_fabric/product/cli.py",
-        "from .....api import LocalAPI\\n",
+        "from .....api import LocalAPI\n",
     )
     violations = collect_violations(root)
     assert len(violations) == 1
