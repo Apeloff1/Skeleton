@@ -68,7 +68,7 @@ Commands:
     combat-contract-solve  Solve replay-verified combat contracts
     combat-contract-package  Package authored combat contracts
     combat-campaign-player  Play and checkpoint combat campaigns
-    combat-campaign-timeline  Audit earned campaign checkpoints
+    combat-campaign-timeline  Audit player turns and earned campaign checkpoints
     combat-drill  Run original combat drills
     combat-drill-solve  Solve replay-verified combat drills
     combat-league  Play original combat leagues
@@ -142,6 +142,16 @@ Commands:
     scene-market-party-compare  Source-bound offline-market operator command
     scene-market-party-timeline Source-bound offline-market operator command
     scene-market-route-accept    Replay-verified market route acceptance and portability
+    quest                              Source-verified offline gameplay command
+    scene-market-party-vault-history   Source-verified offline gameplay command
+    scene-weather-play                 Source-verified offline gameplay command
+    scene-market-contract-route        Source-verified offline gameplay command
+    scene-market-party-author          Source-verified offline gameplay command
+    scene-market-party-balance         Source-verified offline gameplay command
+    scene-market-party-portfolio       Source-verified offline gameplay command
+    scene-market-route                 Source-verified offline gameplay command
+    scene-market-board                 Source-verified offline gameplay command
+    scene-push                         Source-verified offline gameplay command
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -1141,6 +1151,36 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-route-accept":
         from skeleton.game.gameplay.scene_market_route_acceptance import cli as route_accept_cli
         return route_accept_cli(rest)
+    if cmd == "quest":
+        from skeleton.game.gameplay.quest_cli import main as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-vault-history":
+        from skeleton.game.gameplay.scene_market_party_vault_history import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-weather-play":
+        from skeleton.game.gameplay.scene_weather_interactive import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-contract-route":
+        from skeleton.game.gameplay.scene_market_contract_route import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-author":
+        from skeleton.game.gameplay.scene_market_party_author import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-balance":
+        from skeleton.game.gameplay.scene_market_party_balance import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-portfolio":
+        from skeleton.game.gameplay.scene_market_party_portfolio import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-route":
+        from skeleton.game.gameplay.scene_market_route import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-board":
+        from skeleton.game.gameplay.scene_market_board import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-push":
+        from skeleton.game.gameplay.scene_tile_push import cli as source_bound_cli
+        return source_bound_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
