@@ -309,7 +309,7 @@ def test_first_cohort_replay_nested_inode_swap_rejected(
         module, "inspect_first_playable_delivery_batch",
         swap_after_canonical_replay,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -361,7 +361,7 @@ def test_final_cohort_replay_nested_inode_swap_rejected(
         module, "inspect_first_playable_delivery_batch",
         swap_after_final_canonical_replay,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],

@@ -52,6 +52,7 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    combat-checkpoints  Replay and verify portable expedition checkpoints
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
@@ -779,6 +780,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "combat-checkpoints":
+        from skeleton.game.gameplay.arena_checkpoint_timeline import cli as checkpoint_cli
+        return checkpoint_cli(rest)
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)

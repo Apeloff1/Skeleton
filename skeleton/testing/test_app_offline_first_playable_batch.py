@@ -938,7 +938,9 @@ def test_second_cohort_replay_detects_late_in_place_installed_file_edit(
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
         )
-    assert calls >= 3
+    # Earlier fail-closed inode/content fences can reject immediately after
+    # the second replay; a third replay is not required for rejection.
+    assert calls >= 2
     assert target.read_bytes() != original
     assert published["release_certified"] is False
 

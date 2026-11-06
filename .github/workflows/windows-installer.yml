@@ -16,6 +16,7 @@ on:
       - 'skeleton/app/first_install.py'
       - 'skeleton/app/install_source_contracts.py'
       - 'skeleton/testing/test_windows_installer.py'
+      - 'skeleton/__main__.py'
       - 'backend/Dockerfile'
       - 'Dockerfile.dockerignore'
       - '.env.example'

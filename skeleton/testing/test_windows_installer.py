@@ -322,6 +322,7 @@ def test_windows_installer_workflow_has_scoped_pr_and_manual_read_only_admission
         "skeleton/app/installer.py",
         "skeleton/testing/test_windows_installer.py",
         "backend/Dockerfile",
+        "skeleton/__main__.py",
     ):
         assert f"      - '{path}'" in triggers
     assert "push:" not in triggers
