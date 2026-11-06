@@ -7,7 +7,7 @@ lease fencing, tenant authorization, consent, and durable Mongo commits.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Iterable
 from urllib.parse import urlsplit
 import json

@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from .contracts import CampaignMandate, finite, integer
+from .contracts import CampaignMandate, integer
 
 
 @dataclass(frozen=True)

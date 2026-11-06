@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from typing import Iterable
-from urllib.parse import urlsplit
 
 from ..dragon_mission_scheduler import (
     AcquisitionCandidate, allocate_host_dispatches, rank_acquisition_candidates,

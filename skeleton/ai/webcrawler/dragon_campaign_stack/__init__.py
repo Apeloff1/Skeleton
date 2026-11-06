@@ -1,7 +1,7 @@
-"""Dragon crawler research-campaign assurance, inside the canonical crawler owner.
+"""Dragon crawler campaign assurance under the existing canonical owner.
 
-Import this module explicitly from an authorized application boundary.
-No import starts a worker, opens a connection or mutates persistent state.
+Explicitly import from an authorized application boundary. No import starts
+a worker, opens a connection, writes state or grants new permission.
 """
 from .contracts import (
     CampaignScope, CampaignLimits, CampaignMandate,
@@ -20,5 +20,7 @@ from .revisions import (
 )
 from .diagnostics import CampaignDiagnostics, measure_campaign_diagnostics
 from .integration import CampaignInspection, frontier_hints, inspect_crawl_campaign
+from .recovery import RecoveryAssessment, assess_campaign_recovery
+from .control import CampaignControlProposal, propose_campaign_control
 
 __all__ = [name for name in globals() if not name.startswith("_")]
