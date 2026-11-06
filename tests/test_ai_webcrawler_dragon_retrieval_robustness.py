@@ -554,8 +554,10 @@ class RetrievalRobustnessRegression(unittest.TestCase):
         self.assertTrue(broad.hits)
         self.assertTrue(required.hits)
         self.assertIn("requiredneedle", required.hits[0].text.casefold())
-        self.assertNotEqual(broad.hits[0].passage_hash,
-                            required.hits[0].passage_hash)
+        self.assertLessEqual(len(required.hits), 1)
+        self.assertTrue(all(
+            "requiredneedle" in hit.text.casefold() for hit in required.hits
+        ))
 
     def test_index_rejects_contradictory_or_unnormalized_hard_filters(self):
         from skeleton.ai.webcrawler.dragon_campaign_stack import (
