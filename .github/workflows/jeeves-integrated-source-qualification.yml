@@ -42,6 +42,8 @@ jobs:
           python-version: "3.11.16"
       - name: Verify canonical AI mirror and exact source object identities
         run: python scripts/check_ai_file_tree.py
+      - name: Compile complete governed Jeeves and Forge Python source
+        run: python -m compileall -q skeleton/jeeves skeleton/ai/agents/jeeves skeleton/forge skeleton/ai/forge
       - name: Deny upward API and architecture dependency violations
         run: python scripts/check_architecture_boundaries.py
       - name: Verify committed tree source identities and portable test roots
@@ -53,6 +55,10 @@ jobs:
             "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2" \
             "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
           python -m pytest -q tests/test_repository_integration.py tests/test_ci_portable_native_ai_fixtures.py
+      - name: Qualify AI-tree integrity, relative imports and machine ownership
+        run: |
+          python -m pytest -q tests/test_ai_tree_syntax_membership_fail_closed.py tests/test_architecture_boundaries.py tests/test_repo_machine_live_taxonomy.py
+          python scripts/check_toolchain_contract.py
 
   native_sqlite_ci_fixture_regressions:
     name: Host-portable offline native AI and SQLite acceptance
