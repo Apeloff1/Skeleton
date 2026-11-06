@@ -69,3 +69,23 @@ def test_malformed_diagnostic_stage_is_fail_closed(tmp_path, monkeypatch):
     result = inspect_recovery(tmp_path, "lighthouse")
     assert result["source_handoff_verified"] is False
     assert result["checks"]["source"]["error"] == "laptop_recovery_stage_invalid"
+
+
+def test_contradictory_success_with_error_fails_closed(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+
+    def contradictory(self, world_id, slot=None):
+        report = original(self, world_id, slot)
+        report["checks"]["builder"] = {"ok": True, "error": "builder_custody_mismatch"}
+        return report
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", contradictory)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["builder"] == {
+        "ok": False, "error": "laptop_recovery_stage_contradictory"
+    }
+    assert result["next_action"] == "inspect_canonical_custody_without_overwriting_artifacts"
