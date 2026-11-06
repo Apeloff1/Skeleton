@@ -79,6 +79,15 @@ def audit(root: Path = ROOT) -> list[str]:
             or len(approved) != len(set(approved))
             or len(approved) > MAX_INDEPENDENT_WORKFLOWS):
         return ["invalid explicit automatic workflow inventory"]
+    profiles = policy.get("automatic_event_triggers")
+    if (not isinstance(profiles, dict) or set(profiles) != set(approved)
+            or any(not isinstance(event_names, list) or not event_names
+                   or len(set(event_names)) != len(event_names)
+                   or any(type(event) is not str
+                          or not re.fullmatch(r"[a-z_]+", event) for event in event_names)
+                   or not independently_triggered(set(event_names))
+                   for event_names in profiles.values())):
+        return ["invalid explicit automatic event trigger profiles"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
         failures.append("release rules must preserve explicit qualification")
@@ -101,6 +110,11 @@ def audit(root: Path = ROOT) -> list[str]:
         if independently_triggered(found):
             automatic += 1
             automatic_files.add(path.name)
+            if path.name in profiles and found != set(profiles[path.name]):
+                failures.append(
+                    f"{path.name}: event admission trigger drift "
+                    f"(expected={sorted(profiles[path.name])}, got={sorted(found)})"
+                )
     if automatic > MAX_INDEPENDENT_WORKFLOWS:
         failures.append(f"unexpected active workflow count: {automatic}")
     # Numeric caps alone admit unauthorized replacement beneath the ceiling.
