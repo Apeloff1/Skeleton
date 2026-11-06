@@ -358,3 +358,38 @@ No new storage owner, provider, network fetcher, executor, migration or
 autonomous background service was added. The user-facing review holds,
 draft/merge holds, exact-head security gates, real-device qualification and
 live backend E2E are unaffected by these inspection features.
+
+
+## Canonical frontier and recovery operations: stages 21–23
+
+The Atlas now includes three operational layers over the existing CrawlRun
+source of truth, **not** an alternative fetcher, task executor, scheduler,
+Mongo authority, or model provider.
+
+Stage 21 projects an exact bounded URL graph from canonical seeds, seen URLs,
+retained sources and persisted frontier parent links. The route analysis
+reports host backlog, due timestamps, connected components, source counts and
+known/unreachable parent references. It cannot reconstruct undisclosed links
+from discarded HTML or infer that a missing edge means no discovery.
+
+Stage 22 models **at most four** future steps as a zero-effect simulated
+slice. Only admitted canonical URLs are considered, with current committed
+request/doc/byte limits, host due times and quotas, consent expiry and real
+resource observations. Unknown/stale robots policy produces a hypothetical
+robots-preflight-only action rather than a page fetch; only one such action
+per origin can appear in a simulated slice. Even a page-fetch *candidate*
+must undergo a fresh canonical transport/DNS/socket/robots/grant and
+durable pre-network reservation before any real network call. Simulation
+never returns a dispatch authority token or worker lease.
+
+Stage 23 inspects bounded retained CrawlRun journal events into per-host
+fault pressure and a finite manual recovery queue. It distinguishes
+pre-network dispatch intent, robots observations, retry pressure, transport
+failure, redirect outcomes and interrupted/unknown remote effects. It
+never treats a source-only digest as a Mongo commit or physical worker join,
+never refunds uncertain bytes, and never silently retries unknown outcomes.
+
+All three stage digests are chained into the Atlas final review receipt.
+The owner-scoped authenticated Atlas API surfaces read-only host, simulation,
+and recovery metadata without returning captured source bodies or granting
+real execution.

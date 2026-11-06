@@ -968,6 +968,76 @@ class DragonCrawlerApplication:
                 "body_redacted": True,
                 "publication_permission": False,
             },
+            "canonical_routes": {
+                "route_digest": atlas.routes.route_digest,
+                "node_count": len(atlas.routes.nodes),
+                "committed_parent_arcs": len(atlas.routes.edges),
+                "components": len(atlas.routes.strongly_connected_components),
+                "unreachable_pending": len(atlas.routes.unreachable_pending_urls),
+                "unknown_parent_urls": len(atlas.routes.unknown_parent_urls),
+                "host_load": [
+                    {
+                        "host": host.host,
+                        "discovered_nodes": host.discovered_nodes,
+                        "pending_urls": host.pending_urls,
+                        "ready_urls": host.ready_urls,
+                        "robots_status": host.robots_status,
+                        "observed_fairness_share": host.pending_fairness_share,
+                    } for host in atlas.routes.host_load
+                ],
+                "network_authority": False,
+            },
+            "slice_simulation": {
+                "simulation_digest": atlas.simulation.simulation_digest,
+                "projected_request_slots": atlas.simulation.projected_request_slots,
+                "projected_byte_reserve": atlas.simulation.projected_byte_reserve,
+                "remaining_requests": atlas.simulation.request_budget_remaining_after,
+                "remaining_bytes": atlas.simulation.byte_budget_remaining_after,
+                "steps": [
+                    {
+                        "url": step.url,
+                        "action": step.action,
+                        "host": step.host,
+                        "ready_at": step.projected_ready_at,
+                        "conservative_byte_cap": step.conservative_reserve_bytes,
+                        "robots_preflight_required": step.requires_live_robots_authority,
+                    } for step in atlas.simulation.steps
+                ],
+                "held_urls": atlas.simulation.held_urls[:16],
+                "blockers": atlas.simulation.terminal_blockers,
+                "physical_worker_authorized": False,
+                "network_committed": False,
+                "real_robots_admission_executed": False,
+            },
+            "dispatch_recovery": {
+                "ledger_digest": atlas.faults.ledger_digest,
+                "retained_event_count": atlas.faults.events_retained,
+                "event_history_incomplete": atlas.faults.history_incomplete,
+                "pending_dispatch": atlas.faults.current_pending_dispatch,
+                "uncertain_bytes": atlas.faults.retained_uncertain_bytes,
+                "hosts": [
+                    {
+                        "host": entry.host,
+                        "fault_grade": entry.fault_grade,
+                        "dispatch_intents": entry.dispatch_intents,
+                        "retries": entry.retries,
+                        "transport_failures": entry.transport_failures,
+                        "interrupted": entry.interrupted,
+                    } for entry in atlas.faults.hosts
+                ],
+                "recovery_queue": [
+                    {
+                        "code": item.code,
+                        "severity": item.severity,
+                        "supporting_sequences": item.supporting_event_sequences,
+                        "requires_operator_resolution": item.blocked_until_operator_resolution,
+                        "auto_execute": False,
+                    } for item in atlas.faults.recovery_queue
+                ],
+                "physical_worker_join_confirmed": False,
+                "mongo_commit_confirmed": False,
+                "uncertain_bytes_refunded": False,
+            },
             "frontier": {
                 "advisory_digest": atlas.allocation.advice_digest,
                 "proposed_slots": atlas.allocation.request_slots,
