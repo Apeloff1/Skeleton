@@ -423,3 +423,77 @@ def test_runtime_fingerprint_rejects_inplace_rewrite_during_bounded_read(
     monkeypatch.setattr(setup_runtime, "_read_existing_env", changing_reader)
     with pytest.raises(ValueError, match="runtime configuration source"):
         runtime_source_fingerprint(tmp_path)
+
+
+def test_installer_binds_frontend_probe_to_admitted_environment(
+    tmp_path, monkeypatch,
+):
+    _prepare(monkeypatch, tmp_path)
+    monkeypatch.setenv("FRONTEND_PORT", "3100")
+    from skeleton.app.health import ProbeResult
+
+    observed = []
+    commands = []
+
+    def runner(command, **kwargs):
+        commands.append((command[-1], kwargs.get("env", {}).get("FRONTEND_PORT")))
+        if command[-1] == "config":
+            monkeypatch.setenv("FRONTEND_PORT", "3300")
+        return _completed(command)
+
+    def wait_for_health(**kwargs):
+        observed.append(dict(kwargs["public_url_overrides"]))
+        return (ProbeResult(
+            "backend", "http://localhost:8001", True, 200, "healthy",
+        ),)
+
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", wait_for_health)
+    monkeypatch.setattr(
+        "skeleton.app.first_install.critical_backend_route_report",
+        lambda *args, **kwargs: {"ready": True},
+    )
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False, runner=runner,
+    )
+    assert receipt.ok, receipt.to_dict()
+    assert commands == [("config", "3100"), ("up", "3100")]
+    assert observed == [{
+        "frontend": "http://localhost:3100",
+        "backend": "http://localhost:8001",
+    }]
+    assert os.environ["FRONTEND_PORT"] == "3300"
+
+
+def test_install_manifest_resolution_cannot_change_later_probe_epoch(
+    tmp_path, monkeypatch,
+):
+    _prepare(monkeypatch, tmp_path)
+    monkeypatch.setenv("FRONTEND_PORT", "3100")
+    resolved = installer.runtime_manifest
+    observed = []
+
+    def changing_manifest(*args, **kwargs):
+        manifest = resolved(*args, **kwargs)
+        monkeypatch.setenv("FRONTEND_PORT", "3300")
+        return manifest
+
+    monkeypatch.setattr(installer, "runtime_manifest", changing_manifest)
+    from skeleton.app.health import ProbeResult
+
+    def wait_for_health(**kwargs):
+        observed.append(kwargs["public_url_overrides"].get("frontend"))
+        return (ProbeResult(
+            "backend", "http://localhost:8001", True, 200, "healthy",
+        ),)
+
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", wait_for_health)
+    monkeypatch.setattr(
+        "skeleton.app.first_install.critical_backend_route_report",
+        lambda *args, **kwargs: {"ready": True},
+    )
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False,
+        runner=lambda command, **kwargs: _completed(command),
+    )
+    assert receipt.ok, receipt.to_dict()
+    assert observed == ["http://localhost:3100"]

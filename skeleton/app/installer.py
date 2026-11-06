@@ -255,8 +255,14 @@ def install_application(
         except (OSError, ValueError, UnicodeError):
             phases.append(_runtime_source_rejection())
             return InstallReceipt(root=root, phases=tuple(phases))
+    # One admitted process environment for manifest, Compose and live probes.
+    # A concurrent operator change to os.environ after this point cannot make
+    # startup validate one port while a later probe uses another port.
+    admitted_process_env = dict(os.environ)
     try:
-        manifest = runtime_manifest(manifest, root=root)
+        manifest = runtime_manifest(
+            manifest, root=root, environ=admitted_process_env,
+        )
     except (OSError, ValueError, UnicodeError):
         phases.append(
             InstallPhase(
@@ -272,7 +278,7 @@ def install_application(
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
-    compose_env = {**os.environ, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
+    compose_env = {**admitted_process_env, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
     compose_validate = _run(
         compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
@@ -289,7 +295,9 @@ def install_application(
         return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
-        host_urls = public_service_urls(root, manifest=manifest)
+        host_urls = public_service_urls(
+            root, manifest=manifest, environ=admitted_process_env,
+        )
     except (OSError, ValueError, UnicodeError):
         phases.append(
             InstallPhase("public-endpoints", False, "public endpoint configuration unsafe or invalid")
