@@ -563,6 +563,3 @@ def verify_dragon_atlas_trace(
         or atlas.faults.budget_refunded
     ):
         raise PermissionError("Atlas simulated operations claim real network or Mongo authority")
-
-
-
