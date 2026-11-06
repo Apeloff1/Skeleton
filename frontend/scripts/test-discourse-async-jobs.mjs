@@ -316,6 +316,7 @@ test('UI recovers private receipts from server and clears state on auth changes'
   assert.match(ui, /sessionEpoch\.current \+= 1/);
   assert.match(ui, /epoch !== sessionEpoch\.current/);
   assert.match(ui, /setRecentJobs\(\[\]\)/);
+  assert.match(ui, /setPrompt\(''\)/);
   assert.match(ui, /observer\.current = null/);
   assert.match(ui, /occupied\.current = false/);
   assert.match(ui, /setBusy\(false\)/);
