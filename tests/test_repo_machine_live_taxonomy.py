@@ -112,3 +112,16 @@ def test_governed_storage_and_release_cockpit_retain_existing_owners() -> None:
     cockpit = placement_for_path(config, "skeleton/ops/cockpit/smoke_verdict.py")
     assert (storage.zone, storage.owner) == ("platform", "platform-runtime")
     assert (cockpit.zone, cockpit.owner) == ("build-delivery", "delivery-plane")
+
+def test_godot_export_and_mass_build_are_owned_by_delivery_plane() -> None:
+    config = load_machine_config(ROOT)
+    for path in (
+        "skeleton/godot_export/export.py",
+        "skeleton/mass_build/manifest.py",
+    ):
+        placement = placement_for_path(config, path)
+        assert (placement.zone, placement.owner, placement.lifecycle) == (
+            "build-delivery",
+            "delivery-plane",
+            "canonical",
+        )
