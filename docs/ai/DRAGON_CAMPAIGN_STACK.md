@@ -67,3 +67,10 @@ model provider dependency or additional network endpoint was introduced.
 Reference revalidation and adaptive recrawl planning are also offline, advisory
 operations. A due date outside the current consent window requires a newly
 approved capture; a citation hash match is only eligibility for human review.
+
+IMPORTANT: Before returning evidence, the caller must obtain the currently
+withdrawn/stale source identifiers from the authoritative Mongo source-use
+policy, pass them as `revoked_source_ids`, and recheck policy at the real
+publication boundary. Withdrawn source text is excluded from campaign evidence
+rather than returned with a warning. The stand-alone inspection API cannot
+infer later per-source policy changes from an old crawl snapshot.

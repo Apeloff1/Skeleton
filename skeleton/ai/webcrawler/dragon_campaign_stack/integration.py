@@ -134,15 +134,21 @@ def inspect_crawl_campaign(
         host_ready_at=validated["host_ready"],
         authorized=authorized,
     )
+    revoked = tuple(revoked_source_ids)
+    if len(revoked) != len(set(revoked)):
+        raise ValueError("duplicate source withdrawal identity")
+    source_universe = tuple(validated["sources"])
+    if any(source_id not in validated["sources"] for source_id in revoked):
+        raise ValueError("withdrawal not bound to retained source")
     evidence = inspect_campaign_evidence(
         mandate, run.sources(), now=now, authorized=authorized,
+        revoked_source_ids=revoked,
     )
     duplicate_families = exact_duplicate_families(
         ((x.source_id, x.full_content_hash) for x in evidence.sources),
     )
-    source_ids = tuple(x.source_id for x in evidence.sources)
     lineage = invalidation_closure(
-        source_ids, links, revoked=revoked_source_ids, limits=mandate.limits,
+        source_universe, links, revoked=revoked, limits=mandate.limits,
     )
     extra_holds = (
         ("revoked_sources_require_revalidation",)

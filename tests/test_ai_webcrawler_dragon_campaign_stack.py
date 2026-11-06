@@ -374,5 +374,24 @@ class CampaignCase(unittest.TestCase):
             )
 
 
+    def test_withdrawn_source_never_enters_evidence_projection(self):
+        source = self.sample_source(
+            "archive capture " + " ".join(f"term{i}" for i in range(160))
+        )
+        report = inspect_campaign_evidence(
+            self.mandate, (source,), now=self.now + 1,
+            authorized=True, revoked_source_ids=(source["source_id"],),
+        )
+        self.assertEqual(report.sources, ())
+        self.assertEqual(report.passages, ())
+        self.assertEqual(
+            report.rejected_sources, ((source["source_id"], "source_policy_withdrawn"),)
+        )
+        with self.assertRaises(ValueError):
+            inspect_crawl_campaign(
+                self.snapshot, self.mandate, now=self.now + 1,
+                authorized=True, revoked_source_ids=("f" * 64,),
+            )
+
 if __name__ == "__main__":
     unittest.main()

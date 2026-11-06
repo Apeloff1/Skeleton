@@ -134,8 +134,12 @@ def inspect_campaign_evidence(
     sources: Iterable[dict[str, object]], *,
     now: float,
     authorized: bool,
+    revoked_source_ids: Iterable[str] = (),
 ) -> EvidenceInspection:
     mandate.admit(now=now, authorized=authorized)
+    revoked = set(revoked_source_ids)
+    for source_id in revoked:
+        exact_digest(source_id, "revoked source")
     data = tuple(sources)
     if len(data) > mandate.request.max_documents:
         raise ValueError("source review capacity exceeded")
@@ -144,6 +148,11 @@ def inspect_campaign_evidence(
     rejected: list[tuple[str, str]] = []
     seen_ids: set[str] = set()
     for raw in data:
+        # Source-specific withdrawal is applied BEFORE text/ranking inspection.
+        # The application must derive this set from current Mongo source policy.
+        if isinstance(raw, dict) and raw.get("source_id") in revoked:
+            rejected.append((raw["source_id"], "source_policy_withdrawn"))
+            continue
         try:
             result, text = _source(raw, mandate, now=now)
             if result.source_id in seen_ids:
