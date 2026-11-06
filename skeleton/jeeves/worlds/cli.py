@@ -129,7 +129,30 @@ def run(argv: list[str]) -> int:
                 errno.EDQUOT: "custody_storage_exhausted",
                 errno.EROFS: "custody_read_only",
             }.get(exc.errno, "custody_io_unavailable")
-        result = {"ok": False, "error": error}
+        # Stable, actionable errors for unattended operators. Never advise
+        # bypassing filesystem custody or removing another writer's lease.
+        recovery = {
+            "operation_invalid_path": "supply_a_normalized_existing_json_path",
+            "operation_secure_open_unavailable": "use_descriptor_safe_input_platform",
+            "operation_not_regular": "supply_a_regular_json_file",
+            "operation_too_large": "reduce_operation_json_below_524288_bytes",
+            "operation_empty": "supply_a_nonempty_json_operation",
+            "operation_changed_during_read": "retry_with_an_unchanging_input_file",
+            "operation_symlink_disallowed": "replace_symlink_with_regular_input",
+            "operation_missing": "check_input_file_exists",
+            "operation_invalid_directory": "check_input_directory_components",
+            "operation_permission_denied": "request_authorized_input_read_access",
+            "operation_io_unavailable": "inspect_input_filesystem_without_bypass",
+            "custody_permission_denied": "inspect_custody_permissions",
+            "custody_storage_exhausted": "free_authorized_space_and_retry",
+            "custody_read_only": "select_authorized_writable_custody",
+            "custody_io_unavailable": "inspect_custody_health_preserving_saves",
+            "stale_source": "inspect_current_canon_and_retry_with_latest_digest",
+        }
+        result = {
+            "ok": False, "error": error, "phase": args.action,
+            "next_action": recovery.get(error, "inspect_canonical_source_and_input"),
+        }
         print(json.dumps(result, sort_keys=True))
         return 2
     print(json.dumps(result, sort_keys=True, ensure_ascii=False))
