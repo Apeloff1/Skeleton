@@ -382,6 +382,8 @@ def runtime_manifest(
         }.get(service.name)
         raw = values.get(key, "") if key else ""
         if raw and service.public_url:
+            if any(ord(char) <= 32 or ord(char) == 127 for char in service.public_url):
+                raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
             if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
             url = urlsplit(service.public_url)
