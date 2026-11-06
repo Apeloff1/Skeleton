@@ -121,7 +121,9 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             write("Choose an action number, h for a hint, j for journal, a to audit, ? for help, e to export, b for full backup, s to sync the latest save, q to save and quit.")
         try:
             raw = read("> ")
-        except (EOFError, KeyboardInterrupt):
+        except (EOFError, KeyboardInterrupt, StopIteration):
+            # Scripted menu input exhaustion is an orderly quit, not a crash.
+            # The final committed save remains authoritative.
             raw = "q"
         if not isinstance(raw, str) or len(raw) > MAX_TERMINAL_INPUT:
             write("Unavailable command; no turn was consumed.")

@@ -53,3 +53,18 @@ def test_eof_quit_keeps_last_committed_save(tmp_path):
                  write=lambda _: None, ascii_mode=True)
     assert state["head"] == original["head"]
     assert SlotStore(root).load("adventure")["revision"] == 0
+
+
+def test_exhausted_scripted_menu_input_quits_without_losing_save(tmp_path):
+    root = tmp_path / "saves"
+    store = SlotStore(root)
+    original = store.new("adventure")
+    # The first prompt is a read-only help command; the next read exhausts.
+    commands = iter(("?",))
+    messages = []
+    result = play(store, "adventure", read=lambda _: next(commands),
+                  write=messages.append, ascii_mode=True)
+    assert result["head"] == original["head"]
+    assert result["revision"] == 0
+    assert SlotStore(root).audit("adventure")["audit_entries"] == 0
+    assert any("no turn" in message for message in messages)
