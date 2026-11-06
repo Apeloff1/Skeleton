@@ -32,6 +32,8 @@ class ObjectiveExposure:
     selected_passages: int
     distinct_selected_sources: int
     distinct_selected_hosts: int
+    distinct_content_families: int
+    cross_host_exact_content_reuse: bool
     dominant_host: str | None
     dominant_host_selected_passages: int
     dominant_host_fraction: float
@@ -49,6 +51,7 @@ class HostRemovalScenario:
     removed_unique_sources: int
     surviving_selected_passages: int
     surviving_unique_sources: int
+    surviving_distinct_content_families: int
     objectives_without_any_selected_passages: tuple[str, ...]
     objectives_left_with_one_host: tuple[str, ...]
     hypothetical_selection_only: bool = True
@@ -61,9 +64,26 @@ class ObjectiveSourceReuse:
     right_objective_id: str
     overlapping_source_ids: tuple[str, ...]
     overlapping_hosts: tuple[str, ...]
+    overlapping_content_hashes: tuple[str, ...]
     union_source_count: int
     source_jaccard: float
     evidentiary_independence_proven: bool = False
+
+
+@dataclass(frozen=True)
+class SelectedExactContentFamily:
+    """Several selected canonical sources share exactly the same text hash.
+
+    This is a zero-effect equality observation, not a finding that one site
+    plagiarized, maliciously mirrored, independently verified, or republished
+    the other. Content hashes expose no stored text.
+    """
+    content_sha256: str
+    selected_source_ids: tuple[str, ...]
+    observed_hosts: tuple[str, ...]
+    selected_passages: int
+    is_cross_host: bool
+    independent_origin_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,6 +96,9 @@ class RetrievalRobustnessAudit:
     selected_passages: int
     selected_sources: int
     selected_hosts: int
+    distinct_content_families: int
+    cross_host_exact_clone_groups: int
+    exact_content_reuse: tuple[SelectedExactContentFamily, ...]
     analyses: tuple[ObjectiveExposure, ...]
     leave_one_host_out: tuple[HostRemovalScenario, ...]
     objective_reuse: tuple[ObjectiveSourceReuse, ...]
@@ -94,6 +117,7 @@ _LIMITATIONS = (
     "unselected_candidates_and_missing_sources_not_recovered",
     "host_removal_does_not_rerank_or_fetch",
     "different_hosts_do_not_prove_independent_ownership",
+    "equal_text_hashes_are_copy_indicators_not_plagiarism_proof",
     "lexical_rank_not_a_fact_or_confidence_probability",
     "human_source_and_claim_review_required",
 )
@@ -158,6 +182,7 @@ def analyze_retrieval_robustness(
     seen_passages = set()
     host_to_source: dict[str, set[str]] = defaultdict(set)
     all_sources: set[str] = set()
+    selected_by_hash: dict[str, list] = defaultdict(list)
     for row in retrieval.results:
         if row.source_id not in allowed:
             raise PermissionError("withheld or missing source in retrieval")
@@ -191,15 +216,32 @@ def analyze_retrieval_robustness(
             raise ValueError("repeated objective identity within one passage")
         all_sources.add(row.source_id)
         host_to_source[row.host].add(row.source_id)
+        selected_by_hash[row.source_hash].append(row)
         for goal in row.matched_objective_ids:
             by_goal[goal].append(row)
     if len(host_to_source) > max_hosts:
         raise ValueError("selected host universe exceeds audit capacity")
+    clones = []
+    for text_hash, passages in sorted(selected_by_hash.items()):
+        identities = tuple(sorted({p.source_id for p in passages}))
+        if len(identities) < 2:
+            continue
+        hosts = tuple(sorted({p.host for p in passages}))
+        clones.append(SelectedExactContentFamily(
+            content_sha256=text_hash,
+            selected_source_ids=identities,
+            observed_hosts=hosts,
+            selected_passages=len(passages),
+            is_cross_host=len(hosts) > 1,
+        ))
     analyses = []
     flagged = []
     for goal in goals:
         passages = by_goal[goal]
         selected_sources = {x.source_id for x in passages}
+        content_families = {x.source_hash for x in passages}
+        cross_host_copy = bool(passages and len(content_families) == 1
+                               and len({x.host for x in passages}) > 1)
         host_counts: dict[str, int] = defaultdict(int)
         for item in passages:
             host_counts[item.host] += 1
@@ -217,6 +259,7 @@ def analyze_retrieval_robustness(
             )
             concentration = round(dominated / len(passages), 8)
             grade = ("single_host" if len(hosts) == 1 else
+                     "same_content_on_multiple_hosts" if cross_host_copy else
                      "host_concentrated" if concentration >= .75 else
                      "multiple_observed_hosts")
         else:
@@ -233,6 +276,8 @@ def analyze_retrieval_robustness(
             selected_passages=len(passages),
             distinct_selected_sources=len(selected_sources),
             distinct_selected_hosts=len(hosts),
+            distinct_content_families=len(content_families),
+            cross_host_exact_content_reuse=cross_host_copy,
             dominant_host=dominant,
             dominant_host_selected_passages=dominated,
             dominant_host_fraction=concentration,
@@ -261,6 +306,9 @@ def analyze_retrieval_robustness(
             removed_unique_sources=len({x.source_id for x in lost}),
             surviving_selected_passages=len(remaining),
             surviving_unique_sources=len({x.source_id for x in remaining}),
+            surviving_distinct_content_families=len({
+                x.source_hash for x in remaining
+            }),
             objectives_without_any_selected_passages=tuple(sorted(missing)),
             objectives_left_with_one_host=tuple(sorted(one_host_left)),
         ))
@@ -274,12 +322,17 @@ def analyze_retrieval_robustness(
         hosts_right = {x.host for x in right}
         shared_sources = tuple(sorted(sources_left & sources_right))
         shared_hosts = tuple(sorted(hosts_left & hosts_right))
+        shared_content_hashes = tuple(sorted(
+            {x.source_hash for x in left} &
+            {x.source_hash for x in right}
+        ))
         union = sources_left | sources_right
         overlaps.append(ObjectiveSourceReuse(
             left_objective_id=a,
             right_objective_id=b,
             overlapping_source_ids=shared_sources,
             overlapping_hosts=shared_hosts,
+            overlapping_content_hashes=shared_content_hashes,
             union_source_count=len(union),
             source_jaccard=round(len(shared_sources) / len(union), 8)
                            if union else 0.0,
@@ -291,6 +344,7 @@ def analyze_retrieval_robustness(
         "retrieval": retrieval.fusion_digest,
         "objective_plan": objectives.plan_digest,
         "objectives": [asdict(x) for x in analyses],
+        "content_reuse": [asdict(x) for x in clones],
         "host_removals": [asdict(x) for x in scenarios],
         "reuse": [asdict(x) for x in overlaps],
         "flagged": tuple(sorted(flagged)),
@@ -305,6 +359,9 @@ def analyze_retrieval_robustness(
         selected_passages=len(retrieval.results),
         selected_sources=len(all_sources),
         selected_hosts=len(host_to_source),
+        distinct_content_families=len(selected_by_hash),
+        cross_host_exact_clone_groups=sum(x.is_cross_host for x in clones),
+        exact_content_reuse=tuple(clones),
         analyses=tuple(analyses),
         leave_one_host_out=tuple(scenarios),
         objective_reuse=tuple(overlaps),
