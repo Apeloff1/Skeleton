@@ -213,3 +213,128 @@ test('account switch while awaiting transport rejects stale source data', async 
   await assert.rejects(pending, /Your account changed/);
   token = 'operator-one';
 });
+
+const planPath = path.join(root, 'src/features/Jeeves/atlasCampaignPlan.ts');
+function loadCampaignPlan() {
+  const module = { exports: {} };
+  new Function('require', 'module', 'exports', transpile(planPath))(
+    name => { throw new Error('Campaign plan must not import runtime authority: ' + name); },
+    module, module.exports,
+  );
+  return module.exports;
+}
+const campaign = loadCampaignPlan();
+const draft = (question = 'Which archive methodology is supported?') => ({
+  ...campaign.NEW_ATLAS_DRAFT, question,
+});
+
+test('bounded multi-objective campaign preserves every explicit operator question', () => {
+  let goals = [];
+  goals = campaign.enqueueAtlasObjective(goals, draft('Which archive methodology is supported?'));
+  goals = campaign.enqueueAtlasObjective(goals, {
+    ...draft('Which alternative observations challenge the method?'),
+    stage: 'review', dimension: 'counterexample', priority: '0.75',
+    requiredTerms: 'method, comparison', blockedTerms: 'advertisement spam',
+    passageTarget: '3', independenceTarget: '2', maxAgeMinutes: '120',
+  });
+  assert.equal(goals.length, 2);
+  assert.equal(goals[0].objective_id, 'operator-goal-01');
+  assert.equal(goals[1].objective_id, 'operator-goal-02');
+  assert.equal(goals[1].priority, 0.75);
+  assert.equal(goals[1].minimum_reviewable_passages, 3);
+  assert.equal(goals[1].minimum_attested_groups, 2);
+  assert.equal(goals[1].max_source_age_seconds, 7200);
+  assert.deepEqual(goals[1].required_terms, ['method', 'comparison']);
+  assert.deepEqual(goals[1].blocked_terms, ['advertisement', 'spam']);
+  assert.deepEqual(campaign.compileAtlasCampaign(goals, {
+    ...campaign.NEW_ATLAS_DRAFT, question: '',
+  }), goals);
+});
+
+test('eight-objective cap never discards older research goals', () => {
+  let goals = [];
+  for (let i = 1; i <= campaign.MAX_ATLAS_OBJECTIVES; i++) {
+    goals = campaign.enqueueAtlasObjective(goals, draft('Which method is recorded for case ' + i + '?'));
+  }
+  assert.equal(goals.length, 8);
+  const prior = JSON.stringify(goals);
+  assert.throws(() => campaign.enqueueAtlasObjective(
+    goals, draft('Which future model changed?'),
+  ), /more than eight/);
+  assert.throws(() => campaign.compileAtlasCampaign(
+    goals, draft('Which pending query changed?'),
+  ), /more than eight/);
+  assert.equal(JSON.stringify(goals), prior);
+});
+
+test('removal returns immutable copy and next goal receives bounded identity', () => {
+  const first = campaign.enqueueAtlasObjective([], draft('Which archive is captured?'));
+  const second = campaign.enqueueAtlasObjective(first, draft('Which source was revised?'));
+  const removed = campaign.removeAtlasObjective(second, first[0].objective_id);
+  assert.equal(removed.length, 1);
+  assert.equal(second.length, 2);
+  const replacement = campaign.enqueueAtlasObjective(removed, draft('Which source policy applies?'));
+  assert.equal(replacement.length, 2);
+  assert.equal(replacement[1].objective_id, first[0].objective_id);
+  assert.throws(() => campaign.removeAtlasObjective(replacement, 'not-a-goal'), /No matching/);
+});
+
+test('duplicate and Unicode-equivalent operator objectives are rejected', () => {
+  const first = campaign.enqueueAtlasObjective([], draft('What source is current?'));
+  assert.throws(() => campaign.enqueueAtlasObjective(first,
+    draft('What source is current?')), /already queued/);
+  assert.throws(() => campaign.enqueueAtlasObjective(first,
+    draft('what SOURCE is current?')), /already queued/);
+  const unicode = campaign.enqueueAtlasObjective([], draft('What is the fullwidth Ａ source?'));
+  assert.throws(() => campaign.enqueueAtlasObjective(unicode,
+    draft('What is the fullwidth A source?')), /already queued/);
+});
+
+test('term tokens are bounded, disjoint and source-neutral', () => {
+  for (const patch of [
+    { requiredTerms: 'Acapital' },
+    { blockedTerms: 'a' },
+    { requiredTerms: 'same same' },
+    { requiredTerms: 'keep', blockedTerms: 'keep' },
+    { requiredTerms: 'x'.repeat(49) },
+    { requiredTerms: 'a '.repeat(17).trim() },
+  ]) {
+    assert.throws(() => campaign.compileAtlasObjective(
+      { ...draft(), ...patch }, []), /terms|overlap/i);
+  }
+});
+
+test('priority, age and research targets are strictly finite', () => {
+  for (const patch of [
+    { priority: '-0.2' }, { priority: '1.1' }, { priority: 'NaN' },
+    { priority: '' }, { priority: '0.1234' },
+    { passageTarget: '0' }, { passageTarget: '33' },
+    { independenceTarget: '0' }, { independenceTarget: '17' },
+    { maxAgeMinutes: '0' }, { maxAgeMinutes: '1441' },
+    { maxAgeMinutes: '1.5' },
+  ]) {
+    assert.throws(() => campaign.compileAtlasObjective(
+      { ...draft(), ...patch }, []), /bound|Priority|number|age/i);
+  }
+});
+
+test('a pending unqueued question is included, not discarded', () => {
+  const queued = campaign.enqueueAtlasObjective([], draft('Which source claims were captured?'));
+  const compiled = campaign.compileAtlasCampaign(queued,
+    draft('Which source revisions are inconsistent?'));
+  assert.equal(compiled.length, 2);
+  assert.equal(compiled[0].question, queued[0].question);
+  assert.equal(compiled[1].question, 'Which source revisions are inconsistent?');
+  assert.equal(queued.length, 1);
+});
+
+test('no implicit empty question, duplicate or outside-mandate campaign', () => {
+  assert.throws(() => campaign.compileAtlasCampaign([], draft('')), /Enter a research question/);
+  assert.throws(() => campaign.compileAtlasObjective(draft(''), []), /3–512/);
+  assert.throws(() => campaign.compileAtlasObjective({
+    ...draft(), stage: 'model_execution',
+  }, []), /Unsupported objective/);
+  assert.throws(() => campaign.compileAtlasObjective({
+    ...draft(), dimension: 'publisher',
+  }, []), /Unsupported objective/);
+});
