@@ -138,4 +138,19 @@ from .temporal_signals import (
     detect_temporal_mentions,
 )
 
+
+# Canonical crawler frontier and dispatch-recovery read-only operational analysis.
+from .frontier_route_map import (
+    CanonicalRouteNode, CanonicalRouteArc, HostRouteLoad,
+    CrawlRouteTopology, project_canonical_routes,
+)
+from .slice_simulation import (
+    HypotheticalSliceStep, HypotheticalSlicePlan,
+    simulate_canonical_slice,
+)
+from .dispatch_faults import (
+    DispatchEventReceipt, HostFaultPressure, RecoveryStep,
+    DispatchFaultLedger, analyze_dispatch_faults,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]

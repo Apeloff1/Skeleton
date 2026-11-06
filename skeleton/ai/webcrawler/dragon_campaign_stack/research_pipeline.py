@@ -48,6 +48,9 @@ from .retrieval_benchmark import PassageJudgment
 from .lexical_feedback import FeedbackReport, propose_reviewed_query_terms
 from .numeric_signals import NumericSignalReport, inspect_numeric_discrepancies
 from .temporal_signals import TemporalSignalReport, detect_temporal_mentions
+from .frontier_route_map import CrawlRouteTopology, project_canonical_routes
+from .slice_simulation import HypotheticalSlicePlan, simulate_canonical_slice
+from .dispatch_faults import DispatchFaultLedger, analyze_dispatch_faults
 from .evidence_graph import EvidenceGraph, assemble_evidence_graph
 from .review_agenda import ReviewAgenda, compile_review_agenda
 from .review_replay import ReviewReplay, replay_human_reviews
@@ -79,6 +82,9 @@ STAGES = (
     "bounded_numeric_difference_screening",
     "source_date_signal_inspection",
     "optional_operator_feedback_terms",
+    "canonical_route_graph_diagnostics",
+    "resource_bounded_slice_simulation",
+    "dispatch_fault_and_recovery_impacts",
 )
 
 
@@ -121,6 +127,9 @@ class DragonAtlas:
     numeric_signals: NumericSignalReport
     temporal_signals: TemporalSignalReport
     feedback: FeedbackReport | None
+    routes: CrawlRouteTopology
+    simulation: HypotheticalSlicePlan
+    faults: DispatchFaultLedger
     retrieval_mode: str
     stages: tuple[AtlasStage, ...]
     atlas_digest: str
@@ -191,6 +200,9 @@ def _receipts(atlas: DragonAtlas) -> tuple[tuple[str, str | None], ...]:
         ("source_date_signal_inspection", atlas.temporal_signals.signal_digest),
         ("optional_operator_feedback_terms",
          atlas.feedback.feedback_digest if atlas.feedback else None),
+        ("canonical_route_graph_diagnostics", atlas.routes.route_digest),
+        ("resource_bounded_slice_simulation", atlas.simulation.simulation_digest),
+        ("dispatch_fault_and_recovery_impacts", atlas.faults.ledger_digest),
     )
 
 
@@ -371,6 +383,17 @@ def compose_dragon_atlas(
         now=now, authorized=authorized,
         max_citations=max_retrieved_passages,
     )
+    routes = project_canonical_routes(
+        mandate, canonical, now=now, authorized=authorized,
+    )
+    simulation = simulate_canonical_slice(
+        mandate, canonical, routes, workbench.inspection.budget,
+        now=now, authorized=authorized, pressure=pressure,
+    )
+    faults = analyze_dispatch_faults(
+        mandate, canonical, workbench.inspection.budget,
+        now=now, authorized=authorized,
+    )
     root = DragonAtlas(
         run_id=canonical["run_id"],
         mandate_digest=mandate.fingerprint,
@@ -384,6 +407,7 @@ def compose_dragon_atlas(
         handoff=handoff, portfolio=portfolio, citations=citations,
         lexical_ranking=lexical, numeric_signals=numeric,
         temporal_signals=temporal, feedback=feedback,
+        routes=routes, simulation=simulation, faults=faults,
         retrieval_mode=retrieval_mode,
         stages=(), atlas_digest="",
     )
@@ -517,5 +541,28 @@ def verify_dragon_atlas_trace(
         or atlas.feedback.query_lattice_digest != atlas.lattice.lattice_digest
     ):
         raise PermissionError("Atlas human-feedback projection references stale sources")
+    if (
+        atlas.routes.mandate_digest != mandate.fingerprint
+        or atlas.routes.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.routes.run_id != atlas.run_id
+        or atlas.simulation.mandate_digest != mandate.fingerprint
+        or atlas.simulation.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.simulation.routes_digest != atlas.routes.route_digest
+        or atlas.faults.mandate_digest != mandate.fingerprint
+        or atlas.faults.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.faults.run_id != atlas.run_id
+        or atlas.faults.source_sequence != atlas.source_sequence
+    ):
+        raise PermissionError("Atlas operations receipt mismatch")
+    if (
+        atlas.simulation.actual_network_executed
+        or atlas.simulation.reservation_committed
+        or atlas.simulation.worker_lease_authenticated
+        or atlas.faults.worker_join_confirmed
+        or atlas.faults.mongo_commit_confirmed
+        or atlas.faults.budget_refunded
+    ):
+        raise PermissionError("Atlas simulated operations claim real network or Mongo authority")
+
 
 

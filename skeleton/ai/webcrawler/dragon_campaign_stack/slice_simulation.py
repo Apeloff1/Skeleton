@@ -115,6 +115,7 @@ def simulate_canonical_slice(
     host_ready = dict(current["host_ready"])
     host_usage = Counter()
     scheduled = set()
+    preflight_origins = set()
     output = []
     held = {}
     charged = 0
@@ -142,6 +143,9 @@ def simulate_canonical_slice(
                 robots is None or robots["text"] is None
                 or due - robots["fetched_at"] >= 86400
             )
+            if unknown and origin_url in preflight_origins:
+                held[url] = "same_origin_robots_preflight_already_projected"
+                continue
             if unknown:
                 action = "robots_preflight_only"
                 byte_count = min(65536, mandate.request.max_response_bytes)
@@ -174,6 +178,8 @@ def simulate_canonical_slice(
         )
         output.append(step)
         scheduled.add(url)
+        if unknown:
+            preflight_origins.add(origin)
         charged += bytes_reserved
         host_usage[host] += 1
         host_ready[host] = due + mandate.request.min_host_delay_seconds
