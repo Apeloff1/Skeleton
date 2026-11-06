@@ -974,6 +974,22 @@ class DragonCrawlerApplication:
                 "selected_passages": atlas.robustness.selected_passages,
                 "selected_sources": atlas.robustness.selected_sources,
                 "selected_hosts": atlas.robustness.selected_hosts,
+                "distinct_content_families": (
+                    atlas.robustness.distinct_content_families
+                ),
+                "cross_host_exact_copy_groups": (
+                    atlas.robustness.cross_host_exact_clone_groups
+                ),
+                "exact_copy_families": [
+                    {
+                        "content_sha256": family.content_sha256,
+                        "source_count": len(family.selected_source_ids),
+                        "host_count": len(family.observed_hosts),
+                        "hosts": family.observed_hosts,
+                        "selected_passages": family.selected_passages,
+                        "independence_verified": False,
+                    } for family in atlas.robustness.exact_content_reuse
+                ],
                 "flagged_objectives": atlas.robustness.flagged_objectives,
                 "objectives": [
                     {
@@ -981,6 +997,8 @@ class DragonCrawlerApplication:
                         "selected_passages": item.selected_passages,
                         "distinct_selected_sources": item.distinct_selected_sources,
                         "distinct_selected_hosts": item.distinct_selected_hosts,
+                        "distinct_content_families": item.distinct_content_families,
+                        "cross_host_exact_content_reuse": item.cross_host_exact_content_reuse,
                         "dominant_host": item.dominant_host,
                         "dominant_host_fraction": item.dominant_host_fraction,
                         "remaining_passages_after_host_loss": (
@@ -999,6 +1017,9 @@ class DragonCrawlerApplication:
                         "removed_selected_passages": item.removed_selected_passages,
                         "surviving_selected_passages": item.surviving_selected_passages,
                         "surviving_unique_sources": item.surviving_unique_sources,
+                        "surviving_distinct_content_families": (
+                            item.surviving_distinct_content_families
+                        ),
                         "objectives_without_evidence": (
                             item.objectives_without_any_selected_passages
                         ),
@@ -1014,6 +1035,9 @@ class DragonCrawlerApplication:
                         "right_objective_id": item.right_objective_id,
                         "shared_source_count": len(item.overlapping_source_ids),
                         "shared_host_count": len(item.overlapping_hosts),
+                        "shared_content_family_count": len(
+                            item.overlapping_content_hashes
+                        ),
                         "source_jaccard": item.source_jaccard,
                         "independence_proven": False,
                     } for item in atlas.robustness.objective_reuse
