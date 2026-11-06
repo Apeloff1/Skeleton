@@ -44,6 +44,16 @@ class WorkflowTierTests(unittest.TestCase):
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
+        for invalid in (
+            "on: [push]\njobs:\n",
+            "on:\n  push:\n  push:\njobs:\n",
+            "on:\n  pull_request: {branches: [main]}\njobs:\n",
+            "on:\n  workflow_dispatch:\njobs:\non:\n  push:\n",
+            "on:\n  - push\njobs:\n",
+            "on:\njobs:\n",
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events(invalid)
 
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
