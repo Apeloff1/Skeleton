@@ -141,6 +141,7 @@ Commands:
     scene-market-party-accept   Source-bound offline-market operator command
     scene-market-party-compare  Source-bound offline-market operator command
     scene-market-party-timeline Source-bound offline-market operator command
+    scene-market-route-accept    Replay-verified market route acceptance and portability
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -1137,6 +1138,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-timeline":
         from skeleton.game.gameplay.scene_market_party_timeline import cli as handler_cli
         return handler_cli(rest)
+    if cmd == "scene-market-route-accept":
+        from skeleton.game.gameplay.scene_market_route_acceptance import cli as route_accept_cli
+        return route_accept_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
