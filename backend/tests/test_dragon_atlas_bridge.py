@@ -126,6 +126,8 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(report["retrieval_robustness"]["source_bodies_excluded"])
         self.assertFalse(report["retrieval_robustness"]["verified_independence"])
         self.assertFalse(report["retrieval_robustness"]["network_or_reranking_executed"])
+        self.assertEqual(report["retrieval_robustness"]["distinct_content_families"], 1)
+        self.assertEqual(report["retrieval_robustness"]["cross_host_exact_copy_groups"], 0)
         self.assertEqual(report["session_id"], self.session)
         self.assertEqual(report["retrieval"]["mode"], "fusion")
         self.assertEqual(report["source_policy"]["included_source_count"], 1)

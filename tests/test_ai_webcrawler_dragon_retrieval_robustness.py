@@ -429,6 +429,100 @@ class RetrievalRobustnessRegression(unittest.TestCase):
                 self.assertEqual(mapped["required-absent"].selected_passages, 0)
                 self.assertGreater(mapped["archive-method"].selected_passages, 0)
 
+    def test_exact_same_content_on_two_hosts_is_not_two_independent_families(self):
+        identical = fixtures.research_text("identical")
+        captured = self.f.with_sources(
+            ("https://example.com/archive", identical),
+            ("https://example.org/research", identical),
+        )
+        a = self.atlas(captured)
+        self.assertGreaterEqual(a.robustness.selected_sources, 1)
+        observed_hashes = {x.source_hash for x in a.retrieval.results}
+        self.assertEqual(len(observed_hashes), 1)
+        self.assertEqual(a.robustness.distinct_content_families, 1)
+        if a.robustness.selected_sources > 1:
+            self.assertEqual(a.robustness.cross_host_exact_clone_groups, 1)
+            self.assertEqual(len(a.robustness.exact_content_reuse), 1)
+            clone = a.robustness.exact_content_reuse[0]
+            self.assertTrue(clone.is_cross_host)
+            self.assertEqual(len(clone.selected_source_ids), 2)
+            self.assertEqual(clone.observed_hosts,
+                             ("example.com", "example.org"))
+            self.assertFalse(clone.independent_origin_verified)
+            self.assertEqual(a.robustness.analyses[0].host_ablation_risk,
+                             "same_content_on_multiple_hosts")
+        self.assertFalse(a.robustness.verified_independence)
+
+    def test_different_content_hashes_never_collide_as_exact_clones(self):
+        a = self.atlas(self.double)
+        expected = {hit.source_hash for hit in a.retrieval.results}
+        self.assertEqual(a.robustness.distinct_content_families,
+                         len(expected))
+        self.assertFalse(any(
+            group.content_sha256 not in expected
+            for group in a.robustness.exact_content_reuse
+        ))
+
+    def test_host_ablation_reports_remaining_exact_content_families(self):
+        a = self.atlas(self.double)
+        for event in a.robustness.leave_one_host_out:
+            remaining = {
+                hit.source_hash for hit in a.retrieval.results
+                if hit.host != event.removed_host
+            }
+            self.assertEqual(
+                event.surviving_distinct_content_families, len(remaining),
+            )
+
+    def test_pairwise_objective_reuse_observes_content_hashes(self):
+        a = self.multi(self.double)
+        for reuse in a.robustness.objective_reuse:
+            left = {hit.source_hash for hit in a.retrieval.results
+                    if reuse.left_objective_id in hit.matched_objective_ids}
+            right = {hit.source_hash for hit in a.retrieval.results
+                     if reuse.right_objective_id in hit.matched_objective_ids}
+            self.assertEqual(
+                reuse.overlapping_content_hashes,
+                tuple(sorted(left & right)),
+            )
+            self.assertFalse(reuse.evidentiary_independence_proven)
+
+    def test_withdrawn_sources_cannot_survive_in_content_clone_projection(self):
+        captured = self.f.with_sources(
+            ("https://example.com/archive", fixtures.research_text("copy")),
+            ("https://example.org/research", fixtures.research_text("copy")),
+        )
+        a = compose_dragon_atlas(
+            self.mandate, captured,
+            objectives=(self.f.objective(),),
+            source_policies=self.f.policies(captured, status="withdrawn"),
+            policy_snapshot_authenticated=True,
+            now=self.now, authorized=True,
+        )
+        self.assertEqual(a.robustness.selected_sources, 0)
+        self.assertEqual(a.robustness.exact_content_reuse, ())
+        self.assertEqual(a.robustness.distinct_content_families, 0)
+
+    def test_content_copy_groups_cannot_be_fabricated_after_receipt(self):
+        a = self.atlas(self.double)
+        forged = replace(
+            a.robustness, cross_host_exact_clone_groups=1000,
+        )
+        with self.assertRaises(PermissionError):
+            verify_dragon_atlas_trace(
+                self.mandate, self.double,
+                replace(a, robustness=forged), now=self.now, authorized=True,
+            )
+
+    def test_content_clone_metadata_never_contains_captured_bodies(self):
+        a = self.atlas(self.double)
+        for group in a.robustness.exact_content_reuse:
+            self.assertEqual(len(group.content_sha256), 64)
+            self.assertFalse(group.independent_origin_verified)
+            self.assertFalse(hasattr(group, "text"))
+            self.assertFalse(hasattr(group, "raw_html"))
+            self.assertFalse(hasattr(group, "model_verdict"))
+
     def test_all_analysis_outputs_retain_explicit_no_authority_flags(self):
         a = self.atlas(self.double)
         r = a.robustness

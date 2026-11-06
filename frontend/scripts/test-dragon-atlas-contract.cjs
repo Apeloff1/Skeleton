@@ -393,3 +393,26 @@ test('forged host-ablation trust or malformed concentration fails closed', async
     );
   }
 });
+
+
+test('copy-family receipts require exact content hashes and no independence grants', async () => {
+  for (const change of [
+    x => { x.retrieval_robustness.distinct_content_families = 100; },
+    x => { x.retrieval_robustness.exact_copy_families = [{
+      content_sha256: H, source_count: 2, host_count: 2,
+      hosts: ['example.com', 'example.org'],
+      selected_passages: 2, independence_verified: true,
+    }]; },
+    x => { x.retrieval_robustness.exact_copy_families = [{
+      content_sha256: 'not-a-hash', source_count: 2, host_count: 2,
+      hosts: ['example.com', 'example.org'],
+      selected_passages: 2, independence_verified: false,
+    }]; },
+  ]) {
+    const a = fixture(); change(a); setup(a);
+    await assert.rejects(
+      client.getCrawlAtlas('session-1', request()),
+      /incomplete or violates/,
+    );
+  }
+});
