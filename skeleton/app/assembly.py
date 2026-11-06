@@ -445,6 +445,11 @@ def public_service_urls(
         public_url = resolved.service(name).public_url
         if not public_url:
             continue
+        # urlsplit silently strips leading C0 controls and whitespace. Reject
+        # the original bytes before parsing so a poisoned manifest cannot
+        # become a seemingly trustworthy local endpoint in setup receipts.
+        if any(ord(char) <= 32 or ord(char) == 127 for char in public_url):
+            raise ValueError(f"{name} has an invalid local public URL")
         # A manifest URL is untrusted even without a host-port override.
         # Never return credential-bearing, remote, or ambiguous authorities to
         # the setup UI or readiness probes.
