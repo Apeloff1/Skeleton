@@ -30,7 +30,7 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(missing, [], "masterplan references missing workflows")
 
     def test_auxiliary_admissions_are_manual_only(self):
-        """Keep the 20-trigger cap without dropping required security gates."""
+        """Keep the reviewed automatic-inventory quota and required security gates."""
         for name in ("historical-zero-job-canary.yml", "local-ai-boilerplate.yml"):
             source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
             self.assertEqual(events(source), {"workflow_dispatch"}, name)
@@ -88,6 +88,38 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
+            # An unregistered PR subscriber must fail even if the numeric
+            # quota would otherwise have spare capacity.
+            evidence.write_text(
+                "name: Rogue workflow\n"
+                "on:\n"
+                "  pull_request:\n"
+                "jobs:\n"
+                "  hold:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: echo hold\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "unregistered automatic workflows" in item
+                for item in audit(root)
+            ))
+            evidence.unlink()
+            # Silently deactivating a required source gate must also fail.
+            expected_gate = root / ".github/workflows/first-install-source-qualification.yml"
+            original_gate = expected_gate.read_text(encoding="utf-8")
+            self.assertIn("  pull_request:", original_gate)
+            expected_gate.write_text(
+                original_gate.replace("  pull_request:", "  workflow_dispatch:", 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "expected automatic workflows not triggered" in item
+                for item in audit(root)
+            ))
+            expected_gate.write_text(original_gate, encoding="utf-8")
+            self.assertEqual(audit(root), [])
             for index in range(10):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
