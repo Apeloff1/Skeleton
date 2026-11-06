@@ -305,7 +305,9 @@ def test_host_port_input_is_bounded_before_integer_conversion(tmp_path: Path, po
     """Malformed operator input fails with the documented error, not an int overflow."""
     with pytest.raises(ValueError, match="FRONTEND_PORT must be an integer from 1 to 65535"):
         runtime_manifest(load_manifest(), root=tmp_path, environ={"FRONTEND_PORT": port})
-\n\ndef test_manifest_rejects_direct_dependency_cycle():
+
+
+def test_manifest_rejects_direct_dependency_cycle():
     from skeleton.app.assembly import parse_manifest
     import json
     from skeleton.app.assembly import _manifest_bytes
@@ -332,5 +334,32 @@ def test_manifest_rejects_optional_service_dependency_cycle():
         "name": "optional_cycle_b", "role": "test", "path": ".", "kind": "service",
         "depends_on": ["optional_cycle_a"],
     })
+    with pytest.raises(ValueError, match="dependency cycle"):
+        parse_manifest(payload)
+
+
+def test_deep_dependency_chain_is_iterative():
+    from skeleton.app.assembly import parse_manifest, _manifest_bytes
+    import json
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    for index in range(1200):
+        payload["services"].append({
+            "name": f"deep_service_{index}", "role": "test",
+            "path": ".", "kind": "service",
+            "depends_on": [f"deep_service_{index - 1}"] if index else [],
+        })
+    assert "deep_service_1199" in parse_manifest(payload).service_names
+
+
+def test_deep_dependency_cycle_fails_closed():
+    from skeleton.app.assembly import parse_manifest, _manifest_bytes
+    import json
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    for index in range(1200):
+        payload["services"].append({
+            "name": f"cycle_service_{index}", "role": "test",
+            "path": ".", "kind": "service",
+            "depends_on": [f"cycle_service_{index + 1}"] if index < 1199 else ["cycle_service_0"],
+        })
     with pytest.raises(ValueError, match="dependency cycle"):
         parse_manifest(payload)

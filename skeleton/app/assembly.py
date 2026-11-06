@@ -250,22 +250,28 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     # Validate the entire declared graph, including optional services, so a
     # disabled profile cannot hide a cycle until a consumer enables it.
     dependencies = {service.name: service.depends_on for service in services}
-    visited: set[str] = set()
-    visiting: set[str] = set()
-
-    def visit(name: str) -> None:
-        if name in visiting:
-            raise ValueError(f"service dependency cycle involving {name!r}")
-        if name in visited:
-            return
-        visiting.add(name)
-        for dependency in dependencies[name]:
-            visit(dependency)
-        visiting.remove(name)
-        visited.add(name)
-
+    # Iterative DFS prevents a recursion-depth failure on deep dependency graphs.
+    completed: set[str] = set()
+    active: set[str] = set()
     for service in services:
-        visit(service.name)
+        root = service.name
+        if root in completed:
+            continue
+        active.add(root)
+        stack = [(root, iter(dependencies[root]))]
+        while stack:
+            name, children = stack[-1]
+            dependency = next(children, None)
+            if dependency is None:
+                stack.pop()
+                active.remove(name)
+                completed.add(name)
+                continue
+            if dependency in active:
+                raise ValueError(f"service dependency cycle involving {dependency!r}")
+            if dependency not in completed:
+                active.add(dependency)
+                stack.append((dependency, iter(dependencies[dependency])))
 
     backend = next((service for service in services if service.name == "backend"), None)
     if backend is None:
