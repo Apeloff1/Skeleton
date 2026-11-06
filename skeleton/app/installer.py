@@ -291,14 +291,25 @@ def install_application(
                 default_services=("frontend",),
                 full_services=("frontend",),
             )
-            recovery = _run(
-                compose_command("up", manifest=diagnostic_manifest, hot=hot),
-                root=root,
-                runner=runner,
-                label="setup-ui-recovery",
-                timeout=900.0,
-                env=compose_env,
-            )
+            try:
+                recovery_command = compose_command("up", manifest=diagnostic_manifest, hot=hot)
+            except ValueError:
+                # Invalid diagnostic topology must not mask the original
+                # protected-stack failure or escape without a receipt.
+                recovery = InstallPhase(
+                    "setup-ui-recovery",
+                    False,
+                    "independent setup UI recovery configuration is invalid",
+                )
+            else:
+                recovery = _run(
+                    recovery_command,
+                    root=root,
+                    runner=runner,
+                    label="setup-ui-recovery",
+                    timeout=900.0,
+                    env=compose_env,
+                )
             phases.append(
                 InstallPhase(
                     "setup-ui-recovery", recovery.ok,
