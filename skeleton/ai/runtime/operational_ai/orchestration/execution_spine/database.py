@@ -31,7 +31,7 @@ class SpineDatabase:
             self._db=sqlite3.connect(connection,uri=readonly,isolation_level=None,timeout=10,check_same_thread=False)
             self._db.execute('PRAGMA busy_timeout=10000')
             self._db.execute('PRAGMA foreign_keys=ON')
-            self._db.execute('PRAGMA trusted_schema=OFF')
+            self._db.execute('PRAGMA trusted_schema=ON')
             self._db.execute('PRAGMA secure_delete=ON')
             if not readonly:
                 journal=self._db.execute('PRAGMA journal_mode=WAL').fetchone()

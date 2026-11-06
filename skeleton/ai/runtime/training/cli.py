@@ -12,7 +12,7 @@ import sqlite3
 import stat
 from collections.abc import Sequence
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import datetime, timezone; UTC = timezone.utc
 from pathlib import Path
 
 from skeleton.ai.runtime.inference.artifact import (

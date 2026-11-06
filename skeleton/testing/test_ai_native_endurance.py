@@ -35,7 +35,7 @@ class FixtureOnlyBackend:
         output=sha256(text.encode()).hexdigest()
         model=MODEL if self.mode!='model-swap' else 'c'*64
         if self.mode=='wrong-output-digest':output='0'*64
-        if self.mode=='empty':text=''
+        if self.mode=='empty':raise QualificationHeld('empty output refused')
         generated=6 if self.mode!='overlimit' else 500
         if self.mode=='bad-finish':finish='tool_calls'
         else:finish='stop'

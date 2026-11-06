@@ -13,7 +13,7 @@ import inspect
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone; UTC = timezone.utc
 from enum import Enum
 from uuid import NAMESPACE_URL, uuid5
 

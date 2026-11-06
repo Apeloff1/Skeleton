@@ -1,5 +1,6 @@
 """Invalid-model receipts open the local circuit; live probe never fakes readiness."""
-from __future__ import annotations
+from hashlib import sha256
+from hashlib import sha256
 
 from dataclasses import replace
 from types import SimpleNamespace
@@ -35,7 +36,7 @@ class InvalidBackend:
             return {'text':'not a native receipt'}
         prompt=10000 if self.kind=='context' else 3
         generated=900 if self.kind=='output' else 3
-        return Generated('hello',prompt,generated,B,
+        return Generated('hello',prompt,generated,sha256('hello'.encode()).hexdigest(),
                          B if self.kind=='identity' else A,A,'stop')
 
 

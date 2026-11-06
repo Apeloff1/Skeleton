@@ -9,7 +9,7 @@ import sqlite3
 import stat
 import tempfile
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone; UTC = timezone.utc
 from pathlib import Path
 
 from skeleton.storage.cas import GovernedContentStore

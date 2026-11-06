@@ -15,7 +15,7 @@ import wave
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import datetime, timezone; UTC = timezone.utc
 from itertools import pairwise
 from types import MappingProxyType
 from typing import TYPE_CHECKING

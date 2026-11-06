@@ -10,7 +10,7 @@ import json
 import sqlite3
 import time
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime, timezone; UTC = timezone.utc
 from hashlib import sha256
 from typing import Any
 
