@@ -65,3 +65,58 @@ def test_malformed_source_digest_fails_closed(tmp_path, monkeypatch):
     result = inspect_recovery(tmp_path, "lighthouse")
     assert result["source_handoff_verified"] is False
     assert result["checks"]["source_digest_integrity"]["error"] == "source_digest_invalid"
+
+
+def test_invalid_final_snapshot_fails_closed(tmp_path, monkeypatch):
+    ready(tmp_path)
+    original = LaptopFlow.inspect
+    calls = 0
+
+    def malformed(self, world_id):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            return {"source_digest": None}
+        return original(self, world_id)
+
+    monkeypatch.setattr(LaptopFlow, "inspect", malformed)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["source_stability"]["error"] == "source_changed_during_diagnostic"
+
+
+def test_non_mapping_final_snapshot_fails_closed(tmp_path, monkeypatch):
+    ready(tmp_path)
+    original = LaptopFlow.inspect
+    calls = 0
+
+    def malformed(self, world_id):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            return None
+        return original(self, world_id)
+
+    monkeypatch.setattr(LaptopFlow, "inspect", malformed)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["source_stability"]["error"] == "source_recheck_invalid"
+
+
+def test_diagnostic_checks_are_not_mutated(tmp_path, monkeypatch):
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+    observed = {}
+
+    def malformed(self, world_id, slot=None):
+        report = original(self, world_id, slot)
+        observed["checks"] = report["checks"]
+        report["checks"]["builder"] = "broken"
+        return report
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", malformed)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["builder"]["error"] == "laptop_recovery_stage_invalid"
+    assert observed["checks"]["builder"] == "broken"
+    assert result["next_action"] == "inspect_canonical_custody_without_overwriting_artifacts"
