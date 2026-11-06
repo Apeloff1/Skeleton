@@ -63,17 +63,20 @@ RUN --mount=type=secret,id=proxy_ca \
 # development stage below can restore pip from Python's bundled ensurepip when
 # developer-only tools are explicitly requested.
 RUN python - <<'PY'
+from glob import glob
 import pathlib
 import shutil
 import sysconfig
 
 site = pathlib.Path(sysconfig.get_path("purelib"))
-if not site.is_dir() or not site.is_relative_to(pathlib.Path("/usr/local/lib")):
+expected_site = pathlib.Path("/usr/local/lib/python3.14/site-packages")
+if not site.is_dir() or site != expected_site:
     raise SystemExit("unexpected Python site-packages path; refusing runtime pip cleanup")
-shutil.rmtree(site / "pip", ignore_errors=True)
-for dist in site.glob("pip-*.dist-info"):
+shutil.rmtree(pathlib.Path("/usr/local/lib/python3.14/site-packages/pip"), ignore_errors=True)
+for dist in glob("/usr/local/lib/python3.14/site-packages/pip-*.dist-info"):
     shutil.rmtree(dist)
-for pip_bin in pathlib.Path("/usr/local/bin").glob("pip*"):
+for pip_bin_name in glob("/usr/local/bin/pip*"):
+    pip_bin = pathlib.Path(pip_bin_name)
     if pip_bin.is_file() or pip_bin.is_symlink():
         pip_bin.unlink()
 PY
