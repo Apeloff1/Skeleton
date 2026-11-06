@@ -89,12 +89,20 @@ def _imports_forbidden_kernel_dependency(module: str) -> bool:
     return root in _KERNEL_FORBIDDEN_ROOTS or module == "skeleton.api" or module.startswith("skeleton.api.")
 
 
-def _imports_api(module: str, level: int = 0) -> bool:
-    if module == "skeleton.api" or module.startswith("skeleton.api."):
-        return True
-    # Relative imports such as ``from ..api import routes`` should not bypass
-    # the same boundary merely because they omit the absolute package prefix.
-    return level > 0 and (module == "api" or module.startswith("api."))
+def _imports_api(module: str, level: int, importing_module: str) -> bool:
+    """Resolve relative imports before checking the canonical API boundary.
+
+    A deep sibling module named "api" is not the root skeleton.api package.
+    Imports that resolve to skeleton.api remain prohibited.
+    """
+    if level == 0:
+        return module == "skeleton.api" or module.startswith("skeleton.api.")
+    package = importing_module.split(".")[:-1]
+    if not package or level > len(package):
+        return False
+    owner = package[: len(package) - level + 1]
+    resolved = ".".join([*owner, module] if module else owner)
+    return resolved == "skeleton.api" or resolved.startswith("skeleton.api.")
 
 
 def _matches_module(module: str, forbidden: str) -> bool:
@@ -197,7 +205,10 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                 if isinstance(node, ast.Import):
                     imports.extend((alias.name, 0) for alias in node.names)
                 elif isinstance(node, ast.ImportFrom):
-                    imports.append((node.module or "", node.level))
+                    if node.module:
+                        imports.append((node.module, node.level))
+                    elif node.level:
+                        imports.extend((alias.name, node.level) for alias in node.names)
                 else:
                     continue
 
@@ -217,7 +228,11 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                         and not production_exempt
                         and not api_composition_root
                         and not _is_staged_api_mirror(rel, repo_root)
-                        and _imports_api(module, level)
+                        and _imports_api(
+                            module,
+                            level,
+                            ".".join(path.relative_to(repo_root).with_suffix("").parts),
+                        )
                     ):
                         violations.append(
                             Violation(
