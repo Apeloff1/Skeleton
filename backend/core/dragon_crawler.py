@@ -968,6 +968,58 @@ class DragonCrawlerApplication:
                 "body_redacted": True,
                 "publication_permission": False,
             },
+            "evidence_family_stress": {
+                "stress_digest": atlas.family_stress.stress_digest,
+                "policy_digest": atlas.family_stress.policy_digest,
+                "retrieval_digest": atlas.family_stress.retrieval_digest,
+                "robustness_digest": atlas.family_stress.robustness_digest,
+                "similarity_digest": atlas.family_stress.similarity_digest,
+                "selected_source_records": (
+                    atlas.family_stress.source_records_observed
+                ),
+                "exact_content_families": (
+                    atlas.family_stress.exact_content_families_observed
+                ),
+                "possible_near_duplicate_clusters": (
+                    atlas.family_stress.possible_near_duplicate_clusters
+                ),
+                "flagged_objectives": (
+                    atlas.family_stress.objectives_with_potential_dependence
+                ),
+                "objectives_with_similarity_holds": (
+                    atlas.family_stress.objectives_with_similarity_holds
+                ),
+                "objectives": [
+                    {
+                        "objective_id": item.objective_id,
+                        "target_attested_groups": item.desired_attested_source_groups,
+                        "selected_passages": item.observed_selected_passages,
+                        "selected_source_records": item.source_record_count,
+                        "exact_content_families": item.exact_content_family_count,
+                        "possible_near_duplicate_clusters": (
+                            item.possible_near_duplicate_cluster_count
+                        ),
+                        "possible_mirror_collapse": (
+                            item.possible_collapse_from_exact_families
+                        ),
+                        "unscored_sources": item.unscored_similarity_source_count,
+                        "worst_host_loss_clusters": (
+                            item.worst_observed_host_removal_cluster_count
+                        ),
+                        "hypothetical_target_shortfall": (
+                            item.hypothetical_target_shortfall
+                        ),
+                        "observed_hosts": item.observed_host_count,
+                        "concern": item.concern,
+                        "independent_evidence_attested": False,
+                    } for item in atlas.family_stress.objectives
+                ],
+                "limitations": atlas.family_stress.limitations,
+                "claim_correctness_verified": False,
+                "source_text_exported": False,
+                "model_or_network_invoked": False,
+                "human_review_required": True,
+            },
             "source_similarity": {
                 "audit_digest": atlas.similarity.audit_digest,
                 "retrieval_digest": atlas.similarity.retrieval_digest,
