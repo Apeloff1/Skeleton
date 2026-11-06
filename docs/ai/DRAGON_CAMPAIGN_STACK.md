@@ -313,3 +313,48 @@ The source-only regression workflow runs the Dragon Atlas, campaign,
 invalidation, and review-ops suites after compiling all Python code. These
 checks alone do not certify an installed consumer app, live network
 acquisition, backend Mongo concurrency, real device execution or release.
+
+
+## Lexical BM25 and cross-source research intelligence (20-stage Atlas)
+
+The authenticated owner-scoped Atlas route supports an optional retrieval
+mode, either fusion (the existing reciprocal-rank pipeline) or lexical_bm25.
+The lexical mode is a source-only, deterministic ranker using passage-level
+IDF, bounded BM25 term frequency, query coverage, minimum-term phrase
+proximity, query-weight saturation, and host/source-fair selection.
+
+The BM25 ranker first **rebuilds the complete ephemeral passage index**
+from the original validated source snapshot and current policy exclusions,
+then checks the entire indexed receipt before scoring. Consequently a
+caller cannot smuggle forged text, source identities, offsets or search
+tokens through a constructed index object. Its score is a lexical ranking
+heuristic, not calibrated factual probability, source independence, or
+external content trust.
+
+The 20-stage source-custody chain adds four final stages:
+17. Optional lexical ranking receipt, with real per-query rank positions,
+    bounded term/score budgets and a downstream exact-source fusion adapter.
+18. Quantitative observation extraction and cross-source difference
+    candidates, based on explicit decimal units: kilograms/grams,
+    meters/kilometers/miles, times, percentages and unchanged currencies.
+    Only comparable unit families are compared. Context overlap is mandatory
+    and every discrepancy stays unverified pending human review.
+19. ISO date mention detection with exact Unicode offsets, valid calendar
+    dates, semantic context hints and source capture-time receipt. A page
+    mentioning a date does not prove remote freshness or a real-world event.
+20. Optional term-feedback proposals from source-anchored, operator-reviewed
+    graded relevance labels. External source text can only suggest terms;
+    it can never change the operator's objectives, grant an acquisition
+    right, or execute a query by itself.
+
+Set "retrieval_mode": "lexical_bm25" alongside the normal read-only Atlas
+POST request to use the new ranking engine. The response now exposes
+ranking counts, source-anchored numeric discrepancy coordinates and
+date-group metadata, not full page bodies or any verified-knowledge claim.
+
+The capability remains in the same backend/core/dragon_crawler.py owner,
+under the existing authenticated route and source-use permission checks.
+No new storage owner, provider, network fetcher, executor, migration or
+autonomous background service was added. The user-facing review holds,
+draft/merge holds, exact-head security gates, real-device qualification and
+live backend E2E are unaffected by these inspection features.

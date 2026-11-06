@@ -102,11 +102,10 @@ def propose_reviewed_query_terms(
         raise PermissionError("feedback query lattice not bound to operator objectives")
     if set(index.admitted_source_ids) - set(policy.allowed_source_ids):
         raise PermissionError("query feedback contains source no longer eligible")
-    if index.rejected_source_ids and not set(index.rejected_source_ids).issubset(
-        set(index.admitted_source_ids) | set(index.rejected_source_ids)
-        | set(policy.excluded_source_ids)
+    if not set(index.rejected_source_ids).issubset(
+        set(policy.allowed_source_ids) | set(policy.excluded_source_ids)
     ):
-        raise PermissionError("malformed rejected source feedback scope")
+        raise PermissionError("feedback source rejection outside current policy universe")
     rows = tuple(judgments)
     if len(rows) > max_labels:
         raise ValueError("feedback relevance-label capacity exceeded")

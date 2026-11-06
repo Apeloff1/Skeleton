@@ -1,7 +1,7 @@
 """Bounded BM25/phrase-proximity ranker over current Dragon source snapshots.
 
 This is a genuinely different lexical retrieval algorithm from reciprocal-rank
-fusion: source-level document frequencies, explicit TF saturation, bounded
+fusion: passage-level document frequencies, explicit TF saturation, bounded
 query-term proximity, and host/source-fair result selection. It only consumes
 passages from the existing current-source ephemeral index. No model provider,
 embedding service, internet request, training, public knowledge promotion,
