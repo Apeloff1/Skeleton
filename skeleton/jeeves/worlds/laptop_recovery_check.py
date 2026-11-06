@@ -35,13 +35,14 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
     checks = report.get("checks", {})
     if not isinstance(checks, dict):
         raise CanonError("laptop_recovery_checks_invalid")
-    ready = (
-        checks.get("source", {}).get("ok") is True
-        and checks.get("review", {}).get("ok") is True
-        and checks.get("builder", {}).get("ok") is True
-        and checks.get("acceptance", {}).get("ok") is True
-        and (slot is None or checks.get("session", {}).get("ok") is True)
-    )
+    # Corrupt diagnostic stages must fail closed rather than raise AttributeError.
+    required = ("source", "review", "builder", "acceptance")
+    if slot is not None:
+        required += ("session",)
+    for stage in required:
+        if not isinstance(checks.get(stage), dict):
+            checks[stage] = {"ok": False, "error": "laptop_recovery_stage_invalid"}
+    ready = all(checks[stage].get("ok") is True for stage in required)
     # Diagnose reads separately locked stages; detect source revision drift.
     # This does not replace atomic playable custody verification.
     observed_digest = report.get("source_digest")

@@ -49,3 +49,23 @@ def test_command_reports_typed_failure_without_traceback(tmp_path, capsys):
     output = json.loads(capsys.readouterr().out)
     assert output["source_handoff_verified"] is False
     assert output["next_action"]
+
+
+def test_malformed_diagnostic_stage_is_fail_closed(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+    from skeleton.jeeves.worlds.laptop_recovery_check import inspect_recovery
+
+    def corrupted(self, world_id, slot=None):
+        return {
+            "source_digest": "a" * 64,
+            "checks": {"source": None, "review": {"ok": True},
+                       "builder": {"ok": True}, "acceptance": {"ok": True}},
+            "next_action": "inspect_source",
+        }
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", corrupted)
+    monkeypatch.setattr(LaptopFlow, "inspect",
+                        lambda self, world_id: {"source_digest": "a" * 64})
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["source"]["error"] == "laptop_recovery_stage_invalid"
