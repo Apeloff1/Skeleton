@@ -358,6 +358,14 @@ async def inspect_compose_mongo_epoch(
         if _authenticated_principals(post_auth) != initial_users:
             return _result("mongo_principal_changed_during_final_epoch_read",
                            replica_set=True, authenticated=False)
+        # The final authentication probe is another network await. An
+        # election during that probe must not be reported as a stable
+        # topology observation. This is still NOT a writer lease.
+        async with asyncio.timeout(3.0):
+            terminal_hello = await database.command("hello")
+        if _trusted_topology(terminal_hello) != initial_topology:
+            return _result("mongo_primary_changed_after_final_authentication",
+                           replica_set=True, authenticated=False)
     except Exception:
         return _result("canonical_actor_epoch_unavailable", replica_set=True, authenticated=True)
     return _result("mongo_epoch_observed_only", replica_set=True, epoch=True, authenticated=True)
