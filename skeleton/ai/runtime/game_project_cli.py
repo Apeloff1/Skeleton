@@ -127,7 +127,9 @@ def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any
     if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_RESULT_BYTES:
         raise GameCapsuleError("invalid game project input budget")
     with _anchored_parent(path) as (parent_fd, leaf, target):
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        # A hostile FIFO must not block before the regular-file fstat gate.
+        flags = (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0))
         try:
             if parent_fd is None:
                 if target.is_symlink() or not target.is_file():
