@@ -137,7 +137,7 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
         # invisible controls rather than silently normalizing them into a valid
         # action, especially where two players share one authoritative slot.
         if (not isinstance(raw, str) or len(raw) > MAX_TERMINAL_INPUT or
-                any(ord(ch) < 32 and ch not in "\t\r\n" for ch in raw) or
+                any((ord(ch) < 32 and ch not in "\t\r\n") or ord(ch) == 127 for ch in raw) or
                 any(0xD800 <= ord(ch) <= 0xDFFF for ch in raw)):
             write("Unavailable command; no turn was consumed.")
             continue
