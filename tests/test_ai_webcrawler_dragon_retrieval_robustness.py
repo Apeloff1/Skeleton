@@ -297,6 +297,138 @@ class RetrievalRobustnessRegression(unittest.TestCase):
                 a.policies, a.retrieval, now=self.now, authorized=True,
             )
 
+    def test_exact_required_term_gate_applies_to_all_fusion_query_variants(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack import ResearchObjective
+        forced = ResearchObjective(
+            "required-absent",
+            "Which archive capture methods are described?",
+            "method", "verification", .8, 1, 1, 3600,
+            required_terms=("nonexistentmarker",),
+        )
+        a = compose_dragon_atlas(
+            self.mandate, self.source,
+            objectives=(forced,),
+            source_policies=self.f.policies(self.source),
+            policy_snapshot_authenticated=True,
+            now=self.now, authorized=True,
+        )
+        self.assertEqual(a.retrieval.results, ())
+        self.assertEqual(a.robustness.analyses[0].selected_passages, 0)
+        self.assertEqual(a.robustness.analyses[0].host_ablation_risk,
+                         "no_selected_evidence")
+        self.assertTrue(all(
+            "nonexistentmarker" in row.required_terms
+            for row in a.lattice.queries
+        ))
+
+    def test_exact_required_term_gate_applies_to_all_bm25_query_variants(self):
+        forced = ResearchObjective(
+            "required-absent",
+            "Which archive capture methods are described?",
+            "method", "verification", .8, 1, 1, 3600,
+            required_terms=("nonexistentmarker",),
+        )
+        a = compose_dragon_atlas(
+            self.mandate, self.source,
+            objectives=(forced,),
+            source_policies=self.f.policies(self.source),
+            policy_snapshot_authenticated=True,
+            now=self.now, authorized=True,
+            retrieval_mode="lexical_bm25",
+        )
+        self.assertEqual(a.retrieval.results, ())
+        self.assertEqual(a.robustness.selected_passages, 0)
+        self.assertIsNotNone(a.lexical_ranking)
+        self.assertEqual(a.lexical_ranking.scored_passages, 0)
+
+    def test_blocked_terms_prevent_passage_selection_even_if_query_matched(self):
+        blocked = ResearchObjective(
+            "blocked-archive",
+            "Which archive capture methods are described?",
+            "method", "verification", .8, 1, 1, 3600,
+            blocked_terms=("archive",),
+        )
+        for mode in ("fusion", "lexical_bm25"):
+            with self.subTest(mode=mode):
+                a = compose_dragon_atlas(
+                    self.mandate, self.source,
+                    objectives=(blocked,),
+                    source_policies=self.f.policies(self.source),
+                    policy_snapshot_authenticated=True,
+                    now=self.now, authorized=True,
+                    retrieval_mode=mode,
+                )
+                self.assertEqual(a.retrieval.results, ())
+                self.assertEqual(a.robustness.selected_passages, 0)
+
+    def test_operator_terms_match_whole_tokens_not_substrings(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack.query_lattice import (
+            passage_matches_operator_terms,
+        )
+        self.assertTrue(passage_matches_operator_terms(
+            "Methods use source-id and audit_log.", ("source-id",), (),
+        ))
+        self.assertTrue(passage_matches_operator_terms(
+            "Methods use source-id and audit_log.", ("audit_log",), (),
+        ))
+        self.assertFalse(passage_matches_operator_terms(
+            "Auditing protocols.", ("audit",), (),
+        ))
+        self.assertTrue(passage_matches_operator_terms(
+            "Auditing protocols.", (), ("audit",),
+        ))
+        self.assertFalse(passage_matches_operator_terms(
+            "Checking full audit_log.", (), ("audit_log",),
+        ))
+        self.assertTrue(passage_matches_operator_terms(
+            "A source-id is not a source.", ("source-id",), (),
+        ))
+
+    def test_query_receipt_hard_filters_are_immutable_and_disjoint(self):
+        from skeleton.ai.webcrawler.dragon_campaign_stack.query_lattice import (
+            QueryVariant,
+        )
+        baseline = dict(
+            objective_id="test-constraint", family="core", terms=("method",),
+            query="method", priority=.8, weight=.7, ordinal=0,
+        )
+        with self.assertRaises(ValueError):
+            QueryVariant(**baseline, required_terms=("same",),
+                         blocked_terms=("same",))
+        with self.assertRaises(ValueError):
+            QueryVariant(**baseline, required_terms=("same", "same"))
+        with self.assertRaises(ValueError):
+            QueryVariant(**baseline, blocked_terms=("MixedCase",))
+        with self.assertRaises(TypeError):
+            QueryVariant(**baseline, required_terms=["not-a-tuple"])
+
+    def test_one_objective_filter_does_not_suppress_other_valid_objective(self):
+        valid = self.f.objective()
+        blocked = ResearchObjective(
+            "required-absent",
+            "Which archive capture methods are described?",
+            "method", "verification", .8, 1, 1, 3600,
+            required_terms=("nonexistentmarker",),
+        )
+        for mode in ("fusion", "lexical_bm25"):
+            with self.subTest(mode=mode):
+                a = compose_dragon_atlas(
+                    self.mandate, self.source,
+                    objectives=(valid, blocked),
+                    source_policies=self.f.policies(self.source),
+                    policy_snapshot_authenticated=True,
+                    now=self.now, authorized=True,
+                    retrieval_mode=mode,
+                )
+                self.assertGreater(len(a.retrieval.results), 0)
+                self.assertTrue(all(
+                    "required-absent" not in hit.matched_objective_ids
+                    for hit in a.retrieval.results
+                ))
+                mapped = {x.objective_id: x for x in a.robustness.analyses}
+                self.assertEqual(mapped["required-absent"].selected_passages, 0)
+                self.assertGreater(mapped["archive-method"].selected_passages, 0)
+
     def test_all_analysis_outputs_retain_explicit_no_authority_flags(self):
         a = self.atlas(self.double)
         r = a.robustness
