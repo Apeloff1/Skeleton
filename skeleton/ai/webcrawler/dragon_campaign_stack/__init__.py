@@ -22,5 +22,8 @@ from .diagnostics import CampaignDiagnostics, measure_campaign_diagnostics
 from .integration import CampaignInspection, frontier_hints, inspect_crawl_campaign
 from .recovery import RecoveryAssessment, assess_campaign_recovery
 from .control import CampaignControlProposal, propose_campaign_control
+from .references import CitationCheck, CitationReport, verify_current_citations
+from .recrawl_advisory import RefreshObservation, RefreshProposal, RefreshPortfolio, propose_adaptive_refresh
+from .stopping import ResearchStopGate, decide_campaign_stop
 
 __all__ = [name for name in globals() if not name.startswith("_")]
