@@ -129,6 +129,16 @@ class WorkflowTierTests(unittest.TestCase):
                 for item in audit(root)
             ))
             expected_gate.write_text(original_gate, encoding="utf-8")
+            # Changing a trusted PR gate into a push-only subscriber preserves
+            # the total automatic count but violates its approved event scope.
+            expected_gate.write_text(
+                original_gate.replace("  pull_request:", "  push:", 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "event admission trigger drift" in item for item in audit(root)
+            ))
+            expected_gate.write_text(original_gate, encoding="utf-8")
             self.assertEqual(audit(root), [])
             for index in range(10):
                 (
