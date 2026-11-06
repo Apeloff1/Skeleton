@@ -56,6 +56,9 @@ Commands:
     combat-expedition  Play source-bound tactical expedition with earned rewards
     quest-expedition  Play source-bound quest expeditions and replay
     quest-author  Author and validate original expedition quests
+    quest-campaign  Replay source-authored quest chapters and endings
+    quest-factions  Replay source-bound faction choices and diplomacy
+    game-vertical-accept  Verify integrated original-game vertical acceptance
     combat-expedition-audit  Audit replay-bound expedition economy
     combat-expedition-solve  Solve original expedition routes
     combat-expedition-playbook  Rehearse tactical expedition playbooks
@@ -815,6 +818,54 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as quest_author_cli
         return quest_author_cli(rest)
+    if cmd == "game-vertical-accept":
+        from skeleton.game.gameplay.game_vertical_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-checkpoints":
+        from skeleton.game.gameplay.expedition_quest_checkpoints import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-decisions":
+        from skeleton.game.gameplay.expedition_quest_decisions import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-expedition-play":
+        from skeleton.game.gameplay.expedition_quest_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-expedition-route":
+        from skeleton.game.gameplay.expedition_quest_route import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-inventory":
+        from skeleton.game.gameplay.expedition_quest_inventory import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign":
+        from skeleton.game.gameplay.quest_chapter_campaign import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-accept":
+        from skeleton.game.gameplay.quest_chapter_campaign_accept import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-author":
+        from skeleton.game.gameplay.quest_chapter_campaign_author import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-play":
+        from skeleton.game.gameplay.quest_chapter_campaign_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-route":
+        from skeleton.game.gameplay.quest_chapter_campaign_route import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions":
+        from skeleton.game.gameplay.quest_factions import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-accept":
+        from skeleton.game.gameplay.quest_factions_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-author":
+        from skeleton.game.gameplay.quest_factions_author import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-play":
+        from skeleton.game.gameplay.quest_factions_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-route":
+        from skeleton.game.gameplay.quest_factions_route import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "combat-expedition-audit":
         from skeleton.game.gameplay.arena_expedition_economy import cli as route_cli
         return route_cli(rest)
