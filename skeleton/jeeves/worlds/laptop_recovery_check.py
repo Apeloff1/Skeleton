@@ -33,6 +33,8 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
             raise CanonError("expected_source_digest_invalid")
     report = LaptopFlow(store).diagnose(world_id, slot)
     checks = report.get("checks", {})
+    if not isinstance(checks, dict):
+        raise CanonError("laptop_recovery_checks_invalid")
     ready = (
         checks.get("source", {}).get("ok") is True
         and checks.get("review", {}).get("ok") is True
@@ -43,6 +45,12 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
     # Diagnose reads separately locked stages; detect source revision drift.
     # This does not replace atomic playable custody verification.
     observed_digest = report.get("source_digest")
+    digest_valid = (isinstance(observed_digest, str)
+                    and len(observed_digest) == 64
+                    and all(ch in "0123456789abcdef" for ch in observed_digest))
+    if not digest_valid:
+        checks["source_digest_integrity"] = {"ok": False, "error": "source_digest_invalid"}
+        ready = False
     try:
         final_digest = LaptopFlow(store).inspect(world_id)["source_digest"]
     except (CanonError, OSError) as exc:
@@ -52,7 +60,7 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
         }
         ready = False
     else:
-        stable = isinstance(observed_digest, str) and observed_digest == final_digest
+        stable = digest_valid and observed_digest == final_digest
         checks["source_stability"] = (
             {"ok": True} if stable else {"ok": False, "error": "source_changed_during_diagnostic"}
         )

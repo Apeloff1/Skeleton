@@ -50,3 +50,18 @@ def test_source_recheck_lock_failure_fails_closed(tmp_path, monkeypatch):
     result = inspect_recovery(tmp_path, "lighthouse")
     assert result["source_handoff_verified"] is False
     assert result["checks"]["source_stability"]["error"] == "lease_busy"
+
+
+def test_malformed_source_digest_fails_closed(tmp_path, monkeypatch):
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+
+    def corrupted(self, world_id, slot=None):
+        report = original(self, world_id, slot)
+        report["source_digest"] = "not-a-sha256"
+        return report
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", corrupted)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["source_digest_integrity"]["error"] == "source_digest_invalid"
