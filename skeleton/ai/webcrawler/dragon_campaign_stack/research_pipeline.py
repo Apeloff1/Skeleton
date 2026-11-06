@@ -51,6 +51,7 @@ from .temporal_signals import TemporalSignalReport, detect_temporal_mentions
 from .frontier_route_map import CrawlRouteTopology, project_canonical_routes
 from .slice_simulation import HypotheticalSlicePlan, simulate_canonical_slice
 from .dispatch_faults import DispatchFaultLedger, analyze_dispatch_faults
+from .retrieval_robustness import RetrievalRobustnessAudit, analyze_retrieval_robustness
 from .evidence_graph import EvidenceGraph, assemble_evidence_graph
 from .review_agenda import ReviewAgenda, compile_review_agenda
 from .review_replay import ReviewReplay, replay_human_reviews
@@ -85,6 +86,7 @@ STAGES = (
     "canonical_route_graph_diagnostics",
     "resource_bounded_slice_simulation",
     "dispatch_fault_and_recovery_impacts",
+    "selected_evidence_host_ablation_and_reuse",
 )
 
 
@@ -130,6 +132,7 @@ class DragonAtlas:
     routes: CrawlRouteTopology
     simulation: HypotheticalSlicePlan
     faults: DispatchFaultLedger
+    robustness: RetrievalRobustnessAudit
     retrieval_mode: str
     stages: tuple[AtlasStage, ...]
     atlas_digest: str
@@ -203,6 +206,7 @@ def _receipts(atlas: DragonAtlas) -> tuple[tuple[str, str | None], ...]:
         ("canonical_route_graph_diagnostics", atlas.routes.route_digest),
         ("resource_bounded_slice_simulation", atlas.simulation.simulation_digest),
         ("dispatch_fault_and_recovery_impacts", atlas.faults.ledger_digest),
+        ("selected_evidence_host_ablation_and_reuse", atlas.robustness.audit_digest),
     )
 
 
@@ -394,6 +398,10 @@ def compose_dragon_atlas(
         mandate, canonical, workbench.inspection.budget,
         now=now, authorized=authorized,
     )
+    robustness = analyze_retrieval_robustness(
+        mandate, canonical, workbench.objectives, policy, fused,
+        now=now, authorized=authorized,
+    )
     root = DragonAtlas(
         run_id=canonical["run_id"],
         mandate_digest=mandate.fingerprint,
@@ -408,6 +416,7 @@ def compose_dragon_atlas(
         lexical_ranking=lexical, numeric_signals=numeric,
         temporal_signals=temporal, feedback=feedback,
         routes=routes, simulation=simulation, faults=faults,
+        robustness=robustness,
         retrieval_mode=retrieval_mode,
         stages=(), atlas_digest="",
     )
@@ -563,3 +572,26 @@ def verify_dragon_atlas_trace(
         or atlas.faults.budget_refunded
     ):
         raise PermissionError("Atlas simulated operations claim real network or Mongo authority")
+    if (
+        atlas.robustness.mandate_digest != mandate.fingerprint
+        or atlas.robustness.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.robustness.policy_digest != atlas.policies.policy_digest
+        or atlas.robustness.retrieval_digest != atlas.retrieval.fusion_digest
+        or atlas.robustness.objective_plan_digest != atlas.workbench.objectives.plan_digest
+        or not atlas.robustness.source_bodies_excluded
+        or atlas.robustness.counterfactual_ranking_executed
+        or atlas.robustness.verified_independence
+        or atlas.robustness.training_authorized
+        or atlas.robustness.publication_authorized
+    ):
+        raise PermissionError("Atlas retrieval robustness receipt claims foreign evidence or authority")
+    # The robustness digest alone is not enough: reconstruct the exact
+    # selected-passage provenance and ensure a forged internal scenario
+    # cannot survive by retaining an earlier audit digest.
+    expected_robustness = analyze_retrieval_robustness(
+        mandate, canonical, atlas.workbench.objectives,
+        atlas.policies, atlas.retrieval,
+        now=now, authorized=authorized,
+    )
+    if expected_robustness != atlas.robustness:
+        raise PermissionError("Atlas selected-evidence sensitivity was altered")

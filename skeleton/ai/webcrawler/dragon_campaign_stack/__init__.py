@@ -153,4 +153,9 @@ from .dispatch_faults import (
     DispatchFaultLedger, analyze_dispatch_faults,
 )
 
+from .retrieval_robustness import (
+    ObjectiveExposure, HostRemovalScenario, ObjectiveSourceReuse,
+    RetrievalRobustnessAudit, analyze_retrieval_robustness,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]
