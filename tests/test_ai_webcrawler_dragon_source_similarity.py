@@ -109,9 +109,9 @@ class DragonSourceSimilarityTests(unittest.TestCase):
 
     def test_verified_atlas_trace_includes_25th_policy_bounded_stage(self):
         a = self.atlas()
-        self.assertEqual(len(a.stages), 25)
+        self.assertEqual(len(a.stages), 26)
         self.assertEqual(a.stages[-1].name,
-                         "near_duplicate_source_provenance_screening")
+                         "objective_evidence_family_collapse_stress")
         verify_dragon_atlas_trace(
             self.mandate, self.duo, a, now=self.now, authorized=True,
         )

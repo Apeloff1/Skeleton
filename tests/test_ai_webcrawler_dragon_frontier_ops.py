@@ -509,10 +509,10 @@ class FrontierOperationTests(unittest.TestCase):
 
     def test_atlas_integrates_three_new_operational_stages(self):
         atlas = self.f.atlas()
-        self.assertEqual(len(atlas.stages), 25)
-        self.assertEqual(atlas.stages[-5].name, "canonical_route_graph_diagnostics")
-        self.assertEqual(atlas.stages[-4].name, "resource_bounded_slice_simulation")
-        self.assertEqual(atlas.stages[-3].name, "dispatch_fault_and_recovery_impacts")
+        self.assertEqual(len(atlas.stages), 26)
+        self.assertEqual(atlas.stages[-6].name, "canonical_route_graph_diagnostics")
+        self.assertEqual(atlas.stages[-5].name, "resource_bounded_slice_simulation")
+        self.assertEqual(atlas.stages[-4].name, "dispatch_fault_and_recovery_impacts")
         self.assertEqual(atlas.routes.run_id, atlas.run_id)
         self.assertEqual(atlas.simulation.routes_digest, atlas.routes.route_digest)
         self.assertEqual(atlas.faults.source_sequence, atlas.source_sequence)

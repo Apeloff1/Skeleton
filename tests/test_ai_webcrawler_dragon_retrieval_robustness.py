@@ -171,9 +171,9 @@ class RetrievalRobustnessRegression(unittest.TestCase):
 
     def test_replay_verification_covers_new_24th_stage(self):
         a = self.atlas(self.double)
-        self.assertEqual(len(a.stages), 25)
+        self.assertEqual(len(a.stages), 26)
         self.assertEqual(a.stages[-1].name,
-                         "near_duplicate_source_provenance_screening")
+                         "objective_evidence_family_collapse_stress")
         verify_dragon_atlas_trace(
             self.mandate, self.double, a, now=self.now, authorized=True,
         )
