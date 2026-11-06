@@ -23,17 +23,24 @@ MAX_INDEPENDENT_WORKFLOWS = 24
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    starts = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(starts) != 1:
+        raise ValueError("workflow requires exactly one literal multiline 'on:' trigger")
     found: set[str] = set()
-    for line in lines[start + 1:]:
+    for line in lines[starts[0] + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
-            found.add(match.group(1))
+            event = match.group(1)
+            if event in found:
+                raise ValueError("duplicate workflow trigger event")
+            found.add(event)
+        elif re.match(r"^  \S", line) and not line.lstrip().startswith("#"):
+            # Do not silently miss inline, aliased, or quoted triggers.
+            raise ValueError("unsupported workflow trigger event declaration")
+    if not found:
+        raise ValueError("workflow has no explicit trigger events")
     return found
 
 
