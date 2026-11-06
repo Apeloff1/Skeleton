@@ -2700,6 +2700,7 @@ class CrawlerAtlasRequest(BaseModel):
     objectives: list[CrawlerAtlasObjective] = Field(min_length=1, max_length=8)
     review_effort: list[CrawlerAtlasEffort] = Field(default_factory=list, max_length=7)
     review_budget_minutes: StrictInt = Field(default=240, ge=1, le=1440)
+    retrieval_mode: str = Field(default="fusion", pattern=r"^(fusion|lexical_bm25)$")
 
 
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
@@ -2867,6 +2868,7 @@ async def crawler_research_atlas(
             review_effort=tuple(estimate.model_dump()
                                 for estimate in body.review_effort),
             review_budget_minutes=body.review_budget_minutes,
+            retrieval_mode=body.retrieval_mode,
         )
     )
 
