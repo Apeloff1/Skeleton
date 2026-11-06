@@ -225,9 +225,12 @@ def rank_ephemeral_research(
         raise PermissionError("BM25 cannot trust a forged or stale index receipt")
     if len(lattice.queries) > 128 or not lattice.queries:
         raise ValueError("finite operator query lattice required")
-    if any(row.objective_id not in {x.objective_id for x in lattice.queries}
-           for row in lattice.queries):
-        raise ValueError("invalid query lattice objective binding")
+    if any(
+        row.query != " ".join(row.terms)
+        or not row.objective_id or not row.retrieval_only
+        for row in lattice.queries
+    ):
+        raise ValueError("unbound or unauthorized lexical query variant")
     documents = []
     all_words = []
     df = defaultdict(int)
@@ -267,6 +270,20 @@ def rank_ephemeral_research(
                 raise ValueError("lexical scoring trace capacity exceeded")
             key = passage.source_id, passage.passage_hash, passage.start, passage.end
             ranked[key].append(receipt)
+    # Record actual within-query ranks. A rank of one is never asserted for
+    # every passage: each query's candidate set has a deterministic order.
+    rank_lookup = {}
+    rows_by_query = defaultdict(list)
+    for key, receipts in ranked.items():
+        for receipt in receipts:
+            rows_by_query[receipt.query_index].append((key, receipt))
+    for query_index, rows in rows_by_query.items():
+        rows.sort(key=lambda item: (
+            -item[1].combined, item[1].source_id, item[1].start,
+            item[1].end,
+        ))
+        for rank, (key, _) in enumerate(rows, 1):
+            rank_lookup[(query_index, key)] = rank
     # A query may target the same passage repeatedly; identity still maps to
     # one external source and is never counted as independent corroboration.
     by_key = {
@@ -290,7 +307,7 @@ def rank_ephemeral_research(
         # authored variant ordinal and local score; no model claim is used.
         matching = tuple(sorted({x.objective_id for x in receipts}))
         queries = tuple(sorted({lattice.queries[x.query_index].query for x in receipts}))
-        traces = tuple(sorted((x.query_index, 1) for x in receipts))
+        traces = tuple(sorted((x.query_index, rank_lookup[(x.query_index, key)]) for x in receipts))
         candidate.append(FusedEvidence(
             source_id=passage.source_id,
             canonical_url=passage.canonical_url,
