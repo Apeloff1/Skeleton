@@ -43,6 +43,14 @@ class InstallerCallerPathTests(unittest.TestCase):
             ["--admin-password-file"],
         )
 
+    def test_option_after_missing_operand_remains_an_option(self) -> None:
+        self.assertEqual(
+            install_app._caller_bound_arguments(
+                ["--admin-password-file", "--no-python"], Path("/operator")
+            ),
+            ["--admin-password-file", "--no-python"],
+        )
+
     def test_empty_equals_operand_is_left_to_parser(self) -> None:
         self.assertEqual(
             install_app._caller_bound_arguments(

@@ -29,6 +29,10 @@ def _caller_bound_arguments(arguments: Sequence[str], caller: Path) -> list[str]
     pending_file = False
     for argument in arguments:
         if pending_file:
+            if argument.startswith("--"):
+                result.append(argument)
+                pending_file = False
+                continue
             path = Path(argument)
             result.append(str(caller / path) if not path.is_absolute() else argument)
             pending_file = False
