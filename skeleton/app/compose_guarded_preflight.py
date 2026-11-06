@@ -155,6 +155,12 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     # replica-set primary. A ghost replica-set member is likewise not a
     # canonical writer. Explicit contradictory server roles fail closed.
     # These are topology observations only, never an activation certificate.
+    # Explicit null authority flags are malformed rather than absent. A
+    # proxy/ghost-role transition must not collapse to an omitted field.
+    if any(field in hello and hello[field] is None for field in (
+        "msg", "loadBalanced", "isreplicaset",
+    )):
+        return None
     msg = hello.get("msg")
     if msg is not None and (type(msg) is not str or msg == "isdbgrid"):
         return None
