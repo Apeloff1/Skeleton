@@ -17,10 +17,14 @@ def test_stable_source_reports_second_snapshot(tmp_path):
 def test_changed_source_during_diagnostic_fails_closed(tmp_path, monkeypatch):
     ready(tmp_path)
     original = LaptopFlow.inspect
+    calls = 0
 
     def changed(self, world_id):
+        nonlocal calls
+        calls += 1
         value = original(self, world_id)
-        value["source_digest"] = "0" * 64
+        if calls > 1:
+            value["source_digest"] = "0" * 64
         return value
 
     monkeypatch.setattr(LaptopFlow, "inspect", changed)
