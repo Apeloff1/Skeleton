@@ -135,10 +135,10 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             # the authoritative save when interactive input disappears.
             raw = "q"
         # Terminal input may contain pasted Unicode or control characters. Reject
-        # invisible controls rather than silently normalizing them into a valid
+        # all controls (including pasted newlines/tabs) rather than normalizing them into a valid
         # action, especially where two players share one authoritative slot.
         if (not isinstance(raw, str) or len(raw) > MAX_TERMINAL_INPUT or
-                any((ord(ch) < 32 and ch not in "\t\r\n") or ord(ch) == 127 for ch in raw) or
+                any(ord(ch) < 32 or ord(ch) == 127 for ch in raw) or
                 any(0xD800 <= ord(ch) <= 0xDFFF for ch in raw)):
             write("Unavailable command; no turn was consumed.")
             continue
