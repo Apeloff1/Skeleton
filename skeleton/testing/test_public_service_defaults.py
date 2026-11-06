@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from skeleton.app.assembly import load_manifest, public_service_urls
+from skeleton.app.assembly import load_manifest, public_service_urls, runtime_manifest
 
 
 def test_default_public_endpoints_are_returned_without_port_overrides(tmp_path: Path):
@@ -198,3 +198,31 @@ def test_override_rejects_url_controls_before_rewriting(tmp_path: Path, public_u
             tmp_path, manifest=replace(manifest, services=services),
             environ={"FRONTEND_PORT": "31999"},
         )
+
+
+@pytest.mark.parametrize("public_url", [
+    "http://remote.example:3000/",
+    "http://operator@localhost:3000/",
+    "http://localhost:3000/?token=secret",
+    "http://localhost:3000/redirect",
+    "http://localhost:99999/",
+    "http://localhost:3000/\\n",
+])
+def test_direct_runtime_manifest_rejects_untrusted_public_urls(
+    tmp_path: Path, public_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        runtime_manifest(
+            replace(manifest, services=services), root=tmp_path, environ={}
+        )
+
+
+def test_direct_runtime_manifest_preserves_valid_loopback_url(tmp_path: Path):
+    manifest = load_manifest()
+    resolved = runtime_manifest(manifest, root=tmp_path, environ={})
+    assert resolved.service("frontend").public_url == manifest.service("frontend").public_url
