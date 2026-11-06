@@ -349,7 +349,11 @@ def _unsafe_endpoint_character(value: str) -> bool:
     """Reject controls, Unicode whitespace and invisible format characters before URL parsing."""
     from unicodedata import category
 
-    return any(char.isspace() or category(char) in {"Cc", "Cf"} for char in value)
+    # Empty query/fragment delimiters are ambiguous to URL consumers:
+    # urlsplit drops their presence when the payload is empty.
+    return ("?" in value or "#" in value or any(
+        char.isspace() or category(char) in {"Cc", "Cf"} for char in value
+    ))
 
 
 def runtime_manifest(

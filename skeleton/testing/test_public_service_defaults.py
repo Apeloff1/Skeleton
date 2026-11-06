@@ -269,3 +269,26 @@ def test_invisible_unicode_url_characters_rejected_before_port_override(
             root=tmp_path,
             environ={"FRONTEND_PORT": "31999"},
         )
+
+
+@pytest.mark.parametrize("public_url", [
+    "http://localhost:3000/?",
+    "http://localhost:3000/#",
+    "http://localhost:3000/?#",
+    "http://localhost:3000/#?",
+])
+def test_empty_query_and_fragment_delimiters_are_not_silently_normalized(
+    tmp_path: Path, public_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    poisoned = replace(manifest, services=services)
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        runtime_manifest(poisoned, root=tmp_path, environ={})
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        public_service_urls(tmp_path, manifest=poisoned, environ={})
+    with pytest.raises(ValueError, match="non-local public URL"):
+        runtime_manifest(poisoned, root=tmp_path, environ={"FRONTEND_PORT": "31999"})
