@@ -179,3 +179,22 @@ def test_default_public_endpoint_rejects_url_controls(tmp_path: Path, public_url
     )
     with pytest.raises(ValueError, match="invalid local public URL"):
         public_service_urls(tmp_path, manifest=replace(manifest, services=services), environ={})
+
+
+@pytest.mark.parametrize("public_url", [
+    " http://localhost:3000/",
+    "\thttp://localhost:3000/",
+    "http://localhost:3000/\n",
+    "http://localhost:3000/\x7f",
+])
+def test_override_rejects_url_controls_before_rewriting(tmp_path: Path, public_url: str):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="non-local public URL"):
+        public_service_urls(
+            tmp_path, manifest=replace(manifest, services=services),
+            environ={"FRONTEND_PORT": "31999"},
+        )
