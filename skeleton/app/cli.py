@@ -421,7 +421,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     # parser, exclusive save publication, replay and terminal controls.
     # Do not parse arbitrary game-project options as app assembly commands.
     if arguments and arguments[0] == "game-project":
-        from scripts.game.game_project import main as game_project_main
+        from skeleton.ai.runtime.game_project_cli import main as game_project_main
         return game_project_main(arguments[1:])
     # The same pinned Jeeves candidate optimizer owns multidomain specialization.
     if arguments and arguments[0] == "training-modules":
