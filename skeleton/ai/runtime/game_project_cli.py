@@ -109,7 +109,7 @@ def _anchored_parent(path: Path):
 
 
 def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any]:
-    if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_INPUT_BYTES:
+    if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_RESULT_BYTES:
         raise GameCapsuleError("invalid game project input budget")
     with _anchored_parent(path) as (parent_fd, leaf, target):
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
