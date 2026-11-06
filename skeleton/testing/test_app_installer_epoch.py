@@ -497,3 +497,45 @@ def test_install_manifest_resolution_cannot_change_later_probe_epoch(
     )
     assert receipt.ok, receipt.to_dict()
     assert observed == ["http://localhost:3100"]
+
+
+def test_preflight_and_startup_share_exact_process_environment(
+    tmp_path, monkeypatch,
+):
+    _prepare(monkeypatch, tmp_path)
+    monkeypatch.setenv("FRONTEND_PORT", "3100")
+    seen = []
+    from skeleton.app.health import ProbeResult
+
+    def mutating_preflight(*args, **kwargs):
+        seen.append(("preflight", kwargs["environ"]["FRONTEND_PORT"]))
+        monkeypatch.setenv("FRONTEND_PORT", "3300")
+        return ()
+
+    monkeypatch.setattr(installer, "preflight", mutating_preflight)
+
+    def runner(command, **kwargs):
+        seen.append((command[-1], kwargs["env"]["FRONTEND_PORT"]))
+        return _completed(command)
+
+    def probe(**kwargs):
+        seen.append(("probe", kwargs["public_url_overrides"]["frontend"]))
+        return (ProbeResult(
+            "backend", "http://localhost:8001", True, 200, "healthy",
+        ),)
+
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", probe)
+    monkeypatch.setattr(
+        "skeleton.app.first_install.critical_backend_route_report",
+        lambda *args, **kwargs: {"ready": True},
+    )
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False, runner=runner,
+    )
+    assert receipt.ok, receipt.to_dict()
+    assert seen == [
+        ("preflight", "3100"),
+        ("config", "3100"),
+        ("up", "3100"),
+        ("probe", "http://localhost:3100"),
+    ]

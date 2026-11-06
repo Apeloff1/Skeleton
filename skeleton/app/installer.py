@@ -229,8 +229,13 @@ def install_application(
             )
         )
 
+    # Admit one process environment before runtime preflight; all later
+    # manifest, Compose and readiness decisions consume the same snapshot.
+    admitted_process_env = dict(os.environ)
     manifest = load_manifest()
-    runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    runtime_checks = preflight(
+        root, runtime=True, manifest=manifest, environ=admitted_process_env,
+    )
     runtime_ok = checks_ok(runtime_checks)
     failed_codes = [check.code for check in runtime_checks if check.required and not check.ok]
     phases.append(
@@ -255,10 +260,8 @@ def install_application(
         except (OSError, ValueError, UnicodeError):
             phases.append(_runtime_source_rejection())
             return InstallReceipt(root=root, phases=tuple(phases))
-    # One admitted process environment for manifest, Compose and live probes.
-    # A concurrent operator change to os.environ after this point cannot make
+    # A concurrent operator change to os.environ after preflight cannot make
     # startup validate one port while a later probe uses another port.
-    admitted_process_env = dict(os.environ)
     try:
         manifest = runtime_manifest(
             manifest, root=root, environ=admitted_process_env,
