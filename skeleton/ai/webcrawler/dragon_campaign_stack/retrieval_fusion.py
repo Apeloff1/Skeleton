@@ -107,7 +107,14 @@ def fuse_retrieval(
         for rank, hit in enumerate(current.hits, start=1):
             key = (hit.source_id, hit.passage_hash, hit.start, hit.end)
             old = hits_by_key.setdefault(key, hit)
-            if old != hit:
+            # SearchHit matched_terms and lexical score vary by query;
+            # those are *ranking* fields, not anchored passage identity.
+            # All source-bound immutable fields must still agree exactly.
+            immutable = lambda x: (
+                x.source_id, x.canonical_url, x.source_hash,
+                x.passage_hash, x.start, x.end, x.text,
+            )
+            if immutable(old) != immutable(hit):
                 raise PermissionError("ambiguous same-key retrieval evidence")
             scores[key] += query.weight / (reciprocal_rank_k + rank)
             rank_by_key[key].append((query_index, rank))
