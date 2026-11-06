@@ -292,3 +292,16 @@ def test_empty_query_and_fragment_delimiters_are_not_silently_normalized(
         public_service_urls(tmp_path, manifest=poisoned, environ={})
     with pytest.raises(ValueError, match="non-local public URL"):
         runtime_manifest(poisoned, root=tmp_path, environ={"FRONTEND_PORT": "31999"})
+
+
+@pytest.mark.parametrize("port", [
+    "9" * 5000,
+    "000001",
+    "65536",
+    "0",
+    "１２３４",
+])
+def test_host_port_input_is_bounded_before_integer_conversion(tmp_path: Path, port: str):
+    """Malformed operator input fails with the documented error, not an int overflow."""
+    with pytest.raises(ValueError, match="FRONTEND_PORT must be an integer from 1 to 65535"):
+        runtime_manifest(load_manifest(), root=tmp_path, environ={"FRONTEND_PORT": port})
