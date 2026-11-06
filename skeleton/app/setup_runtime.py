@@ -230,19 +230,46 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
 def runtime_source_fingerprint(root: Path) -> str:
     """Return a redacted identity for the exact bounded runtime source bytes.
 
-    The installer checks the same private environment file before and after
-    manifest resolution and Compose validation. This fence detects operator
-    edits and configuration swaps rather than starting with an unvalidated
-    port/credential set. It never chmods the file or includes secrets in
-    errors, logs or receipts.
+    Bind the private bytes to their file and installation-root identities.
+    Content-only hashes would admit replacement by a new same-byte inode.
+    This is an observation fence rather than a lock on an external writer;
+    neither raw secrets nor source names are exposed in the result.
     """
     try:
+        root = Path(root)
+        source = root / ".env"
+        root_before = os.lstat(root)
+        file_before = os.lstat(source)
+        if (not stat.S_ISDIR(root_before.st_mode)
+                or not stat.S_ISREG(file_before.st_mode)):
+            raise ValueError("invalid runtime source identity")
         raw, _ = _read_existing_env(
-            root / ".env", label="runtime .env", private=False
+            source, label="runtime .env", private=False
         )
-    except (OSError, UnicodeError, ValueError):
+        root_after = os.lstat(root)
+        file_after = os.lstat(source)
+        if (not stat.S_ISDIR(root_after.st_mode)
+                or not stat.S_ISREG(file_after.st_mode)
+                or (root_before.st_dev, root_before.st_ino) !=
+                   (root_after.st_dev, root_after.st_ino)
+                or (file_before.st_dev, file_before.st_ino) !=
+                   (file_after.st_dev, file_after.st_ino)
+                or (file_before.st_size, file_before.st_mtime_ns,
+                    file_before.st_ctime_ns) !=
+                   (file_after.st_size, file_after.st_mtime_ns,
+                    file_after.st_ctime_ns)):
+            raise ValueError("runtime source identity changed during admission")
+        identity = {
+            "root": (root_after.st_dev, root_after.st_ino),
+            "file": (file_after.st_dev, file_after.st_ino,
+                     file_after.st_size, file_after.st_mtime_ns,
+                     file_after.st_ctime_ns),
+            "content_sha256": sha256(raw.encode("utf-8")).hexdigest(),
+        }
+        return sha256(json.dumps(identity, sort_keys=True,
+                                 separators=(",", ":")).encode("ascii")).hexdigest()
+    except (OSError, ValueError, TypeError, UnicodeError):
         raise ValueError("runtime configuration source cannot be safely admitted") from None
-    return sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _atomic_write(path: Path, text: str) -> None:

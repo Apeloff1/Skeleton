@@ -9,10 +9,21 @@ from __future__ import annotations
 import json
 from queue import Empty, Queue
 import secrets
+import sys
 import threading
-import tkinter as tk
-from tkinter import ttk, filedialog
-from tkinter.scrolledtext import ScrolledText
+
+# GUI dependencies are optional on headless Linux/WSL2 and minimal Python
+# installations. Missing Tk must produce an explicit offline launch hold,
+# not an import-time traceback or a network-provider fallback.
+try:
+    import tkinter as tk
+    from tkinter import ttk, filedialog
+    from tkinter.scrolledtext import ScrolledText
+except ImportError:
+    tk = None
+    ttk = None
+    filedialog = None
+    ScrolledText = None
 
 from .desktop_client import DesktopBridge, DesktopBridgeHold, DesktopConfig
 from .desktop_protocol import DesktopProtocolHold, MAX_PROMPT
@@ -25,7 +36,7 @@ from .desktop_attachments import (
 MAX_VIEWPORT_CHARS = 1000000
 
 
-class JeevesWindow(tk.Tk):
+class JeevesWindow(tk.Tk if tk is not None else object):
     def __init__(self):
         super().__init__()
         self.title("Jeeves — Private Offline AI")
@@ -936,9 +947,27 @@ class JeevesWindow(tk.Tk):
 
 
 def main(argv=None) -> int:
-    if argv:
+    # The -m entry point calls main() with no explicit argv; inspect the real
+    # process command line instead of silently ignoring supplied arguments.
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments:
         raise SystemExit("Jeeves desktop accepts no prompt or secret arguments")
-    app = JeevesWindow()
+    if tk is None:
+        print(
+            "Jeeves desktop requires Python tkinter (Tk). "
+            "No model, state, or hosted provider was started.",
+            file=sys.stderr,
+        )
+        return 78
+    try:
+        app = JeevesWindow()
+    except tk.TclError:
+        print(
+            "Jeeves desktop requires a working graphical display. "
+            "Enable a local desktop/Tk session before launching.",
+            file=sys.stderr,
+        )
+        return 78
     app.mainloop()
     return 0
 
