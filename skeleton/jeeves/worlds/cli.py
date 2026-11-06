@@ -23,6 +23,12 @@ def _read_operation_file(path: str) -> bytes:
         parts = parts[1:]
     if not parts or any(part in ("", ".", "..") for part in parts):
         raise CanonError("operation_invalid_path")
+    # Bound traversal cost before touching any filesystem descriptor. A hostile
+    # input path must not force unbounded syscalls or exceed OS name limits.
+    if len(parts) > 64 or len(os.fsencode(path)) > 4096:
+        raise CanonError("operation_path_budget_exceeded")
+    if any(len(os.fsencode(part)) > 255 for part in parts):
+        raise CanonError("operation_path_budget_exceeded")
     directory_flags = (os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW |
                        os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0))
     directory = os.open(os.sep if absolute else ".", directory_flags)
@@ -133,6 +139,7 @@ def run(argv: list[str]) -> int:
         # bypassing filesystem custody or removing another writer's lease.
         recovery = {
             "operation_invalid_path": "supply_a_normalized_existing_json_path",
+            "operation_path_budget_exceeded": "shorten_operation_path_and_directory_depth",
             "operation_secure_open_unavailable": "use_descriptor_safe_input_platform",
             "operation_not_regular": "supply_a_regular_json_file",
             "operation_too_large": "reduce_operation_json_below_524288_bytes",
