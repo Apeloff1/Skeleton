@@ -527,9 +527,12 @@ class RetrievalRobustnessRegression(unittest.TestCase):
         from skeleton.ai.webcrawler.dragon_campaign_stack import (
             build_ephemeral_index, search_ephemeral_index,
         )
-        text = ("archive capture methodology " * 95) + (
-            " archive capture requiredneedle"
-        )
+        text = " ".join(
+            "Archive capture methodology and historical evidence. "
+            + " ".join(f"independent{i}reference{j}" for j in range(32))
+            + " Archive capture reference provenance."
+            for i in range(5)
+        ) + " Archive capture requiredneedle."
         captured = self.f.with_sources(
             ("https://example.com/archive", text),
         )
