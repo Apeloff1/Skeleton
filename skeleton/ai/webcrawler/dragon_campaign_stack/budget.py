@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Mapping
+import json
 
 from .contracts import CampaignMandate, integer
 
@@ -127,3 +128,32 @@ def reserve_advisory(
         remaining_bytes_after=projection.bytes_remaining - charged,
         remaining_requests_after=projection.requests_remaining - len(allocations),
     )
+
+
+def verify_projected_budget(
+    snapshot: Mapping[str, object],
+    mandate: CampaignMandate,
+    projection: BudgetProjection,
+) -> None:
+    """Reproduce the canonical inspection's exact UTF-8 byte-size budget.
+
+    Equality checks *all* fields, not only used request/byte counters.
+    Otherwise an advisory could accept a forged larger remaining budget,
+    altered document count, missing in-flight flag, or omitted blocker.
+    The verified receipt still does not authorize transport or Mongo writes.
+    """
+    if not isinstance(projection, BudgetProjection):
+        raise TypeError("typed canonical budget projection required")
+    if not isinstance(snapshot, Mapping):
+        raise ValueError("canonical snapshot mapping required")
+    encoded = json.dumps(
+        snapshot, ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    actual = project_budget(
+        snapshot, mandate, snapshot_bytes=len(encoded),
+    )
+    if actual != projection:
+        raise PermissionError(
+            "budget projection not bound to current canonical snapshot"
+        )

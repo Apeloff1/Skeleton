@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass
 from urllib.parse import urlsplit
 
 from ..operations import CrawlRun
-from .budget import BudgetProjection
+from .budget import BudgetProjection, verify_projected_budget
 from .contracts import CampaignMandate, digest, ensure_snapshot_scope, integer
 
 
@@ -119,6 +119,7 @@ def analyze_dispatch_faults(
     if not isinstance(budget, BudgetProjection):
         raise TypeError("canonical budget projection required")
     canonical = CrawlRun.from_snapshot(snapshot).snapshot()
+    verify_projected_budget(canonical, mandate, budget)
     events = tuple(canonical["events"])
     if len(events) > max_events:
         raise ValueError("bounded event history exceeds inspection capacity")

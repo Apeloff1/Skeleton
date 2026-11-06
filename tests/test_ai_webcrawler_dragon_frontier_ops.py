@@ -433,6 +433,39 @@ class FrontierOperationTests(unittest.TestCase):
                 now=self.now, authorized=True,
             )
 
+    def test_simulation_denies_forged_positive_remaining_requests(self):
+        tampered = replace(
+            self.budget,
+            requests_remaining=self.budget.requests_remaining + 100,
+        )
+        with self.assertRaises(PermissionError):
+            self.simulated(pressure=self.fresh_pressure(), budget=tampered)
+
+    def test_simulation_denies_forged_document_and_byte_budgets(self):
+        for change in (
+            {"documents_remaining": self.budget.documents_remaining + 1},
+            {"bytes_remaining": self.budget.bytes_remaining + 1024},
+            {"snapshot_bytes": 1},
+            {"blockers": () if self.budget.blockers else ("fake",)},
+        ):
+            with self.subTest(change=change):
+                with self.assertRaises(PermissionError):
+                    self.simulated(
+                        pressure=self.fresh_pressure(),
+                        budget=replace(self.budget, **change),
+                    )
+
+    def test_faults_deny_substituted_budget_even_with_matching_used_counters(self):
+        forged = replace(
+            self.budget,
+            documents_remaining=self.budget.documents_remaining + 1,
+        )
+        with self.assertRaises(PermissionError):
+            analyze_dispatch_faults(
+                self.mandate, self.snapshot, forged,
+                now=self.now, authorized=True,
+            )
+
     def test_fault_ledger_denies_oversized_retained_event_window(self):
         snap = self.event_snapshot(("retry", "error"))
         with self.assertRaises(ValueError):

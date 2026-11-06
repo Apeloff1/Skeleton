@@ -20,7 +20,7 @@ from typing import Iterable
 from urllib.parse import urlsplit
 
 from ..operations import CrawlRun
-from .budget import BudgetProjection
+from .budget import BudgetProjection, verify_projected_budget
 from .contracts import CampaignMandate, digest, ensure_snapshot_scope, finite, integer
 from .frontier_route_map import CrawlRouteTopology
 from .pressure import PressureDecision
@@ -88,6 +88,7 @@ def simulate_canonical_slice(
         raise TypeError("measured resource-pressure receipt required")
     run = CrawlRun.from_snapshot(snapshot)
     current = run.snapshot()
+    verify_projected_budget(current, mandate, budget)
     if routes.source_snapshot_digest != current["snapshot_digest"]:
         raise PermissionError("route graph snapshot revision changed")
     blocking = list(budget.blockers)
