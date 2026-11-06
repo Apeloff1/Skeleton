@@ -121,6 +121,11 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["schema_version"],
                          "skeleton.dragon.campaign_atlas_dashboard.v1")
         self.assertEqual(len(report["stages"]), 24)
+        self.assertEqual(report["stages"][-1]["name"], "selected_evidence_host_ablation_and_reuse")
+        self.assertEqual(report["retrieval_robustness"]["retrieval_digest"], report["retrieval"]["digest"])
+        self.assertTrue(report["retrieval_robustness"]["source_bodies_excluded"])
+        self.assertFalse(report["retrieval_robustness"]["verified_independence"])
+        self.assertFalse(report["retrieval_robustness"]["network_or_reranking_executed"])
         self.assertEqual(report["session_id"], self.session)
         self.assertEqual(report["retrieval"]["mode"], "fusion")
         self.assertEqual(report["source_policy"]["included_source_count"], 1)

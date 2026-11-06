@@ -12,6 +12,7 @@ on:
       - "tests/test_ai_webcrawler_dragon_review_ops.py"
       - "tests/test_ai_webcrawler_dragon_retrieval_intel.py"
       - "tests/test_ai_webcrawler_dragon_frontier_ops.py"
+      - "tests/test_ai_webcrawler_dragon_retrieval_robustness.py"
       - "backend/core/dragon_crawler.py"
       - "backend/routes/dragon_academy.py"
       - ".github/workflows/dragon-campaign-source-tests.yml"
@@ -47,6 +48,7 @@ jobs:
           python -m py_compile tests/test_ai_webcrawler_dragon_review_ops.py
           python -m py_compile tests/test_ai_webcrawler_dragon_retrieval_intel.py
           python -m py_compile tests/test_ai_webcrawler_dragon_frontier_ops.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_retrieval_robustness.py
           python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
       - name: Execute source-only campaign regressions
         env:
@@ -60,3 +62,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_review_ops.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_retrieval_intel.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_frontier_ops.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_retrieval_robustness.py' -v

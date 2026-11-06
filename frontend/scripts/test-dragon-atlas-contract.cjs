@@ -100,6 +100,26 @@ function fixture() {
       requires_fresh_source_policy: true },
     citation_manifest: { manifest_digest: H, exact_anchored_references: 1,
       body_redacted: true, publication_permission: false },
+    retrieval_robustness: {
+      audit_digest: H, retrieval_digest: H, selected_passages: 1,
+      selected_sources: 1, selected_hosts: 1,
+      flagged_objectives: [],
+      objectives: [], host_ablation: [{
+        removed_host: 'example.com', removed_selected_passages: 1,
+        surviving_selected_passages: 0, surviving_unique_sources: 0,
+        objectives_without_evidence: [], objectives_left_with_one_host: [],
+        reranking_executed: false,
+      }],
+      objective_reuse: [],
+      limitations: ['observed_selected_passages_only',
+        'unselected_candidates_and_missing_sources_not_recovered',
+        'host_removal_does_not_rerank_or_fetch',
+        'different_hosts_do_not_prove_independent_ownership',
+        'human_source_and_claim_review_required'],
+      source_bodies_excluded: true,
+      verified_independence: false,
+      network_or_reranking_executed: false,
+    },
     canonical_routes: { route_digest: H, node_count: 1,
       committed_parent_arcs: 0, components: 1, unreachable_pending: 0,
       unknown_parent_urls: 0, host_load: [], network_authority: false },
@@ -337,4 +357,37 @@ test('no implicit empty question, duplicate or outside-mandate campaign', () => 
   assert.throws(() => campaign.compileAtlasObjective({
     ...draft(), dimension: 'publisher',
   }, []), /Unsupported objective/);
+});
+
+
+test('retrieval sensitivity metadata must bind exact selected passages', async () => {
+  setup();
+  const r = await client.getCrawlAtlas('session-1', request());
+  assert.equal(r.retrieval_robustness.retrieval_digest, r.retrieval.digest);
+  assert.equal(r.retrieval_robustness.verified_independence, false);
+  assert.equal(r.retrieval_robustness.network_or_reranking_executed, false);
+});
+
+test('forged host-ablation trust or malformed concentration fails closed', async () => {
+  for (const change of [
+    x => { x.retrieval_robustness.retrieval_digest = 'f'.repeat(64); },
+    x => { x.retrieval_robustness.verified_independence = true; },
+    x => { x.retrieval_robustness.network_or_reranking_executed = true; },
+    x => { x.retrieval_robustness.source_bodies_excluded = false; },
+    x => { x.retrieval_robustness.host_ablation[0].reranking_executed = true; },
+    x => { x.retrieval_robustness.objectives = [{
+      objective_id: 'operator-goal', dominant_host_fraction: 7,
+      independence_confirmed: false,
+    }]; },
+    x => { x.retrieval_robustness.objective_reuse = [{
+      left_objective_id: 'a', right_objective_id: 'b',
+      source_jaccard: 0.5, independence_proven: true,
+    }]; },
+  ]) {
+    const r = fixture(); change(r); setup(r);
+    await assert.rejects(
+      client.getCrawlAtlas('session-1', request()),
+      /incomplete or violates/,
+    );
+  }
 });
