@@ -322,6 +322,35 @@ export type CrawlAtlasReport = {
     manifest_digest: string; exact_anchored_references: number;
     body_redacted: true; publication_permission: false;
   };
+  retrieval_robustness: {
+    audit_digest: string; retrieval_digest: string;
+    selected_passages: number; selected_sources: number; selected_hosts: number;
+    flagged_objectives: string[];
+    objectives: {
+      objective_id: string; selected_passages: number;
+      distinct_selected_sources: number; distinct_selected_hosts: number;
+      dominant_host: string | null; dominant_host_fraction: number;
+      remaining_passages_after_host_loss: number;
+      remaining_sources_after_host_loss: number;
+      risk: 'no_selected_evidence' | 'single_host' |
+        'host_concentrated' | 'multiple_observed_hosts';
+      independence_confirmed: false;
+    }[];
+    host_ablation: {
+      removed_host: string; removed_selected_passages: number;
+      surviving_selected_passages: number; surviving_unique_sources: number;
+      objectives_without_evidence: string[];
+      objectives_left_with_one_host: string[];
+      reranking_executed: false;
+    }[];
+    objective_reuse: {
+      left_objective_id: string; right_objective_id: string;
+      shared_source_count: number; shared_host_count: number;
+      source_jaccard: number; independence_proven: false;
+    }[];
+    limitations: string[]; source_bodies_excluded: true;
+    verified_independence: false; network_or_reranking_executed: false;
+  };
   canonical_routes: {
     route_digest: string; node_count: number; committed_parent_arcs: number;
     components: number; unreachable_pending: number; unknown_parent_urls: number;
@@ -450,6 +479,36 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !value.jeeves_handoff?.body_excluded
       || value.jeeves_handoff.network_called !== false
       || value.jeeves_handoff.dispatch_granted !== false
+      || !value.retrieval_robustness
+      || !HASH.test(value.retrieval_robustness.audit_digest)
+      || value.retrieval_robustness.retrieval_digest !== value.retrieval.digest
+      || !integer(value.retrieval_robustness.selected_passages, 32)
+      || !integer(value.retrieval_robustness.selected_sources, 64)
+      || !integer(value.retrieval_robustness.selected_hosts, 32)
+      || value.retrieval_robustness.source_bodies_excluded !== true
+      || value.retrieval_robustness.verified_independence !== false
+      || value.retrieval_robustness.network_or_reranking_executed !== false
+      || !Array.isArray(value.retrieval_robustness.objectives)
+      || value.retrieval_robustness.objectives.length !== value.objectives?.length
+      || value.retrieval_robustness.objectives.some(row =>
+        !row || row.independence_confirmed !== false
+        || !Number.isFinite(row.dominant_host_fraction)
+        || row.dominant_host_fraction < 0 || row.dominant_host_fraction > 1)
+      || !Array.isArray(value.retrieval_robustness.host_ablation)
+      || value.retrieval_robustness.host_ablation.length > 32
+      || value.retrieval_robustness.host_ablation.some(row =>
+        !row || row.reranking_executed !== false)
+      || !Array.isArray(value.retrieval_robustness.objective_reuse)
+      || value.retrieval_robustness.objective_reuse.length > 28
+      || value.retrieval_robustness.objective_reuse.some(row =>
+        !row || row.independence_proven !== false
+        || !Number.isFinite(row.source_jaccard)
+        || row.source_jaccard < 0 || row.source_jaccard > 1)
+      || !Array.isArray(value.retrieval_robustness.flagged_objectives)
+      || value.retrieval_robustness.flagged_objectives.length > 8
+      || !Array.isArray(value.retrieval_robustness.limitations)
+      || value.retrieval_robustness.limitations.length < 5
+      || value.retrieval_robustness.limitations.length > 12
       || value.canonical_routes?.network_authority !== false
       || value.slice_simulation?.network_committed !== false
       || value.slice_simulation.physical_worker_authorized !== false
