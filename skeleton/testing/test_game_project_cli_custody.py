@@ -156,3 +156,11 @@ def test_parent_swap_during_exclusive_write_does_not_claim_publication(tmp_path,
     assert swapped
     assert not output.exists()
     assert (moved / "result.json").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX named pipes")
+def test_fifo_input_refuses_without_waiting_for_writer(tmp_path):
+    fifo = tmp_path / "blocked-input"
+    os.mkfifo(fifo, 0o600)
+    with pytest.raises(GameCapsuleError, match="budget"):
+        _read_json(fifo)
