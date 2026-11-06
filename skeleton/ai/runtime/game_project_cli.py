@@ -17,6 +17,7 @@ model inference or training data are used.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -72,15 +73,68 @@ def _nonfinite(_: str) -> None:
     raise GameCapsuleError("nonfinite game project numbers are inadmissible")
 
 
+@contextmanager
+def _anchored_parent(path: Path):
+    """Open a POSIX directory component by component without following links.
+
+    Windows lacks the dir_fd path APIs; its caller retains exclusive leaf
+    publication and no-follow checks, without claiming POSIX custody parity.
+    """
+    if not isinstance(path, Path):
+        raise GameCapsuleError("game project file path must be pathlib.Path")
+    target = path.expanduser().absolute()
+    if ".." in target.parts or not target.name or target.name in (".", ".."):
+        raise GameCapsuleError("game project path traversal refused")
+    if os.name != "posix":
+        yield None, target, target
+        return
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise GameCapsuleError("descriptor-anchored file custody unavailable")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    try:
+        parent_fd = os.open(target.anchor, flags)
+    except OSError as exc:
+        raise GameCapsuleError("game project root directory unavailable") from exc
+    try:
+        for segment in target.parts[1:-1]:
+            try:
+                child_fd = os.open(segment, flags, dir_fd=parent_fd)
+            except OSError as exc:
+                raise GameCapsuleError("game project path contains an unsafe directory") from exc
+            os.close(parent_fd)
+            parent_fd = child_fd
+        yield parent_fd, target.name, target
+    finally:
+        os.close(parent_fd)
+
+
 def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file():
-        raise GameCapsuleError("game input must be an existing regular local file")
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    with os.fdopen(fd, "rb") as stream:
-        info = os.fstat(stream.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
-            raise GameCapsuleError("game project input exceeded local file budget")
-        data = stream.read(max_bytes + 1)
+    if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_INPUT_BYTES:
+        raise GameCapsuleError("invalid game project input budget")
+    with _anchored_parent(path) as (parent_fd, leaf, target):
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        try:
+            if parent_fd is None:
+                if target.is_symlink() or not target.is_file():
+                    raise GameCapsuleError("game input must be an existing regular local file")
+                fd = os.open(target, flags)
+            else:
+                fd = os.open(leaf, flags, dir_fd=parent_fd)
+        except OSError as exc:
+            raise GameCapsuleError("game input must be an existing regular local file") from exc
+        with os.fdopen(fd, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
+                raise GameCapsuleError("game project input exceeded local file budget")
+            data = stream.read(max_bytes + 1)
+        if parent_fd is not None:
+            try:
+                named = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise GameCapsuleError("game project input identity changed") from exc
+            if (not stat.S_ISREG(named.st_mode)
+                    or (named.st_dev, named.st_ino) != (info.st_dev, info.st_ino)):
+                raise GameCapsuleError("game project input identity changed")
     if len(data) > max_bytes:
         raise GameCapsuleError("game project input exceeded local file budget")
     try:
@@ -104,17 +158,34 @@ def _write_new(path: Path, result: dict[str, Any]) -> str:
     ).encode("ascii")
     if len(raw) > MAX_RESULT_BYTES:
         raise GameCapsuleError("game project output exceeds 160-KiB cap")
-    target = path.expanduser().absolute()
-    if target.exists() or target.is_symlink() or not target.parent.is_dir():
-        raise GameCapsuleError("project output must be a new file in an existing directory")
-    fd = os.open(
-        target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
-        0o600,
-    )
-    with os.fdopen(fd, "wb") as stream:
-        stream.write(raw)
-        stream.flush()
-        os.fsync(stream.fileno())
+    with _anchored_parent(path) as (parent_fd, leaf, target):
+        flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                 | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+        if parent_fd is None and (target.exists() or target.is_symlink()
+                                   or not target.parent.is_dir()):
+            raise GameCapsuleError("project output must be a new file in an existing directory")
+        try:
+            if parent_fd is None:
+                fd = os.open(target, flags, 0o600)
+            else:
+                fd = os.open(leaf, flags, 0o600, dir_fd=parent_fd)
+        except OSError as exc:
+            raise GameCapsuleError("project output must be a new file in an existing directory") from exc
+        with os.fdopen(fd, "wb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode):
+                raise GameCapsuleError("project output must be a regular file")
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if parent_fd is not None:
+            try:
+                named = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise GameCapsuleError("game project output identity changed") from exc
+            if (not stat.S_ISREG(named.st_mode)
+                    or (named.st_dev, named.st_ino) != (info.st_dev, info.st_ino)):
+                raise GameCapsuleError("game project output identity changed")
     return str(target)
 
 
