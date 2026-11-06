@@ -75,6 +75,8 @@ export default function DiscourseScreen() {
     observer.current = null;
     occupied.current = false;
     setBusy(false);
+    // A typed brief is private to the previous authenticated account too.
+    setPrompt('');
     setRes(null);
     setJobId(null);
     setCanResume(false);
