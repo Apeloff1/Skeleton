@@ -426,7 +426,7 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !HASH.test(value.atlas_digest) || !HASH.test(value.dashboard_digest)
       || !integer(value.run_sequence) || typeof value.issued_at !== 'number'
       || !Number.isFinite(value.issued_at) || value.retrieval?.mode !== requestedMode
-      || !Array.isArray(value.stages) || value.stages.length !== 23
+      || !Array.isArray(value.stages) || value.stages.length !== 24
       || !value.stages.every((row, index) => row.ordinal === index
         && typeof row.name === 'string' && row.name.length < 100
         && HASH.test(row.receipt_digest) && HASH.test(row.chain_digest))

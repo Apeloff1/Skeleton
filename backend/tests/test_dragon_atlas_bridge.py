@@ -120,7 +120,7 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.owned_reads, 2)
         self.assertEqual(report["schema_version"],
                          "skeleton.dragon.campaign_atlas_dashboard.v1")
-        self.assertEqual(len(report["stages"]), 23)
+        self.assertEqual(len(report["stages"]), 24)
         self.assertEqual(report["session_id"], self.session)
         self.assertEqual(report["retrieval"]["mode"], "fusion")
         self.assertEqual(report["source_policy"]["included_source_count"], 1)

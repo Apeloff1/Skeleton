@@ -66,7 +66,7 @@ function fixture() {
     session_id: 'session-1', run_id: 'run-1', run_sequence: 1,
     snapshot_digest: H, mandate_digest: H, atlas_digest: H,
     dashboard_digest: H, issued_at: 100,
-    stages: Array.from({length: 23}, (_, ordinal) => ({
+    stages: Array.from({length: 24}, (_, ordinal) => ({
       ordinal, name: 'stage-' + ordinal, receipt_digest: H, chain_digest: H,
     })),
     source_policy: { digest: H, sources_seen: 1, included_source_count: 1,
