@@ -341,6 +341,36 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
         {report.scorecard.alerts.slice(0, 8).map((item, i) =>
           <Text key={i} style={s.error}>{readable(item)}</Text>)}
       </Section>
+      <Section title="Source concentration and evidence fragility">
+        <Text style={s.small}>
+          {report.retrieval_robustness.selected_sources} selected sources on {report.retrieval_robustness.selected_hosts} host(s) · {report.retrieval_robustness.flagged_objectives.length} objectives require exposure review
+        </Text>
+        <Text style={s.small}>Host removal models only the currently selected evidence. It does not refetch, rerank or prove source independence.</Text>
+        {report.retrieval_robustness.objectives.slice(0, 8).map(item =>
+          <View key={item.objective_id} style={s.check}>
+            <Text style={s.message}>{item.objective_id} · {readable(item.risk)}</Text>
+            <Text style={s.small}>
+              {item.selected_passages} passages · {item.distinct_selected_sources} sources · {item.distinct_selected_hosts} hosts
+            </Text>
+            <Text style={s.small}>
+              Most represented host: {item.dominant_host ?? 'none'} ({(item.dominant_host_fraction * 100).toFixed(1)}% of passages)
+            </Text>
+            <Text style={s.small}>
+              Under worst observed single-host loss: {item.remaining_passages_after_host_loss} retained passages from {item.remaining_sources_after_host_loss} sources
+            </Text>
+          </View>)}
+        {report.retrieval_robustness.host_ablation.slice(0, 12).map(item =>
+          <Text key={item.removed_host} style={s.small}>
+            Exclude {item.removed_host}: {item.surviving_selected_passages} selected passages remain · {item.objectives_without_evidence.length} objectives have no surviving selected evidence
+          </Text>)}
+        {report.retrieval_robustness.objective_reuse.filter(
+          item => item.shared_source_count > 0,
+        ).slice(0, 8).map(item =>
+          <Text key={item.left_objective_id + ':' + item.right_objective_id} style={s.small}>
+            {item.left_objective_id} and {item.right_objective_id} share {item.shared_source_count} selected source(s); reuse is not independent corroboration
+          </Text>)}
+        <Text style={s.small}>These are review-priority diagnostics. External claims remain unverified even when multiple hosts agree.</Text>
+      </Section>
       <Section title="Quantitative and chronological leads">
         <Text style={s.small}>{report.numeric_signals.observed_quantities} numeric mention(s) · {report.numeric_signals.cross_source_review_candidates} differences · {report.temporal_signals.date_mentions} date mentions</Text>
         {report.numeric_signals.candidates.slice(0, 8).map((item, i) =>
