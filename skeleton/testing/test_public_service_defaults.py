@@ -78,6 +78,8 @@ def test_independent_chroma_port_override_is_visible(tmp_path: Path):
         "http://localhost:3000/?token=secret",
         "http://localhost:3000/#private",
         "https://user:pass@127.0.0.1:3000",
+        "http://localhost:3000/redirect",
+        "http://localhost:3000/%2e%2e/",
     ],
 )
 def test_port_override_rejects_credential_or_fragment_url(tmp_path: Path, public_url: str):
