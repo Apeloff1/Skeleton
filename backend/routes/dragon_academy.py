@@ -2800,6 +2800,34 @@ async def crawler_automation(
     }
 
 
+
+@router.get("/crawler/sessions/{session_id}/research/inspection")
+async def crawler_research_inspection(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only evidence and frontier diagnostics under existing owner auth."""
+    return await _crawler_result(
+        crawler_application.campaign_inspection(scope, session_id)
+    )
+
+
+@router.get("/crawler/sessions/{session_id}/research/search")
+async def crawler_research_search(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    query: str = Query(min_length=1, max_length=512),
+    mode: str = Query(default="all", pattern="^(all|any)$"),
+    limit: int = Query(default=8, ge=1, le=8),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Search current retained evidence; withdrawals and consent checked now."""
+    return await _crawler_result(
+        crawler_application.campaign_index_search(
+            scope, session_id, query, mode=mode, limit=limit,
+        )
+    )
+
+
 @router.get("/crawler/sessions/{session_id}/search")
 async def crawler_search(
     session_id: str,

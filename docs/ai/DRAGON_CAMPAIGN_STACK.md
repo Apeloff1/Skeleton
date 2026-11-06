@@ -74,3 +74,55 @@ policy, pass them as `revoked_source_ids`, and recheck policy at the real
 publication boundary. Withdrawn source text is excluded from campaign evidence
 rather than returned with a warning. The stand-alone inspection API cannot
 infer later per-source policy changes from an old crawl snapshot.
+
+## Deep research and temporal wave
+
+The extended, explicitly typed workbench also implements:
+
+- **Operator-defined objectives**: purpose, domain, evidence thresholds, required
+  and blocked lexical terms, stable objectives and bounded planning budget.
+- **Claim-evidence matrix**: attributed statements, opposing evidence stances,
+  source-revalidation receipts and independently reviewed source groups.
+  Review and factual truth remain separate; no triage score is a probability
+  of truth or a legal rights determination.
+- **Coverage and discovery**: anchored evidence deficits mapped to the current
+  frontier, host fairness, duplicate/near-duplicate source families and
+  conservative value-of-information heuristics. The plan cannot invent URLs.
+- **Temporal custody**: bounded Unicode-preserving exact revision spans,
+  source-version identity validation, partial-retention holds and deterministic
+  recrawl review proposals.
+- **Ephemeral lexical research**: an owner-bound, in-memory, limited passage
+  index rebuilt from currently authorized canonical Mongo captures.
+  It is not a new persistence authority or a verified knowledge database.
+- **Operational assurance**: robots state and cooldown diagnostics, snapshot
+  event-risk inventory, resource-pressure advice and explicit incident holds.
+- **Contradictions and export**: source-dependency clusters, opposing attributed
+  readings, review packets, replay chains and cross-receipt source identity.
+  Hashes are integrity checks, never cryptographic authorizations.
+- **Composition**: \`compose_dragon_workbench\` builds one immutable, source-fenced
+  inspection linking all these receipts to the same run/source snapshot.
+
+### Authenticated read-only product surface
+
+Two additive routes are exposed under the existing Dragon Academy router:
+
+- \`GET /api/dragon-academy/crawler/sessions/{session_id}/research/inspection\`
+  gives budget and host breakdown, retained source metadata, risk diagnostics,
+  and stop/review posture without raw source text.
+- \`GET /api/dragon-academy/crawler/sessions/{session_id}/research/search\`
+  rebuilds and searches the current retained passage index, with bounded
+  \`query\`, \`mode\` and \`limit\`.
+
+Both reuse the existing authenticated \`_crawler_scope\`, canonical
+\`DragonCrawlerApplication._owned\`, source-policy freshness, withdrawals,
+and complete CrawlRun snapshot revalidation. No new creation, mutation,
+provider, worker, storage, or public access endpoint is added. Both surfaces
+must be checked with backend auth and Mongo integration tests before launch.
+
+### Exact-head source suite
+
+\`python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_campaign_depth.py' -v\`
+must pass alongside the original focused suite. Backend source files are
+compiled in the same workflow. This does not replace live Mongo/API auth,
+real transport, performance, install or release qualification.
+

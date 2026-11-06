@@ -513,6 +513,156 @@ class DragonCrawlerApplication:
     async def get(self, scope: dict[str, str], identifier: str) -> dict:
         return self._projection(await self._reconcile(scope, await self._owned(scope, identifier)))
 
+
+    @staticmethod
+    def _campaign_mandate(scope: dict[str, str], row: dict):
+        """Advisory research boundary tied to an existing authenticated capture."""
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            CampaignMandate, CampaignScope,
+        )
+        request_type, _ = _core()
+        request = request_type.from_dict(_plain(row["request"]))
+        consent = _plain(row["consent"])
+        return CampaignMandate(
+            scope=CampaignScope(
+                tenant_id=scope["tenant_id"],
+                owner_id=scope["owner_id"],
+                consent_id=consent["consent_id"],
+                expires_at=consent["expires_at"],
+                allowed_hosts=tuple(request.allowed_hosts),
+                purpose="authenticated_existing_capture_research",
+            ),
+            request=request,
+            query=request.query,
+            created_at=_utc(row["created_at"]).timestamp(),
+        )
+
+    def _campaign_authority(self, row: dict) -> tuple[dict, tuple[str, ...]]:
+        """Return only the bound snapshot and source-policy-disallowed IDs."""
+        self._source_use(row)
+        snapshot = _plain(row["snapshot"])
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(snapshot)
+        revoked = tuple(sorted(
+            source["source_id"]
+            for source in runtime.sources()
+            if self._capture_freshness(row, source)["state"] != "current"
+        ))
+        return snapshot, revoked
+
+    async def campaign_inspection(
+        self, scope: dict[str, str], identifier: str,
+    ) -> dict[str, Any]:
+        """Read-only, owner-fenced research diagnostics from current Mongo data.
+
+        No raw page text, pending worker control, autonomous scheduling,
+        pre-IO budget reservation or knowledge promotion is returned.
+        """
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            analyze_frontier_topology, compile_crawl_risks,
+            inspect_crawl_campaign, decide_campaign_stop,
+        )
+        row = await self._owned(scope, identifier)
+        snapshot, revoked = self._campaign_authority(row)
+        mandate = self._campaign_mandate(scope, row)
+        at = _now().timestamp()
+        report = inspect_crawl_campaign(
+            snapshot, mandate, now=at, authorized=True,
+            revoked_source_ids=revoked,
+        )
+        topology = analyze_frontier_topology(
+            snapshot, mandate, now=at, authorized=True,
+        )
+        risk = compile_crawl_risks(
+            snapshot, mandate, now=at, authorized=True,
+        )
+        stop = decide_campaign_stop(
+            mandate, report.budget, report.evidence,
+            novelty_scores=(), now=at, authorized=True,
+        )
+        source_summary = [
+            {
+                "source_id": src.source_id,
+                "canonical_url": src.canonical_url,
+                "captured_at": src.fetched_at,
+                "truncated": src.text_truncated,
+                "instruction_risk_count": src.risk_count,
+                "review_required": True,
+                "source_hash": src.full_content_hash,
+            }
+            for src in report.evidence.sources
+        ]
+        response = {
+            "schema_version": "skeleton.dragon.campaign_dashboard.v1",
+            "session_id": identifier,
+            "run_id": report.run_id,
+            "run_sequence": report.run_sequence,
+            "snapshot_digest": report.snapshot_digest,
+            "mandate_digest": mandate.fingerprint,
+            "inspection_digest": report.inspection_digest,
+            "budget": asdict(report.budget),
+            "dispatch_proposal_count": len(report.plan.dispatches),
+            "dispatch_hints_authoritative": False,
+            "frontier": {
+                "count": topology.frontier_count,
+                "by_depth": topology.pending_by_depth,
+                "hosts": [asdict(host) for host in topology.hosts],
+                "digest": topology.topology_digest,
+            },
+            "sources": source_summary,
+            "source_policy_held_count": len(revoked),
+            "rejected_source_count": len(report.evidence.rejected_sources),
+            "risk": {
+                "events_retained": risk.events_retained,
+                "event_history_truncated": risk.events_truncated,
+                "findings": [asdict(item) for item in risk.risks],
+                "digest": risk.risk_digest,
+            },
+            "stop": asdict(stop),
+            "knowledge_verified": False,
+            "training_permission": False,
+            "read_only": True,
+        }
+        response["dashboard_digest"] = _digest(response)
+        return {"ok": True, "report": response}
+
+    async def campaign_index_search(
+        self, scope: dict[str, str], identifier: str,
+        query: str, *, mode: str = "all", limit: int = 8,
+    ) -> dict[str, Any]:
+        """Freshly rebuilt lexical research search under current source policy."""
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        row = await self._owned(scope, identifier)
+        snapshot, revoked = self._campaign_authority(row)
+        mandate = self._campaign_mandate(scope, row)
+        at = _now().timestamp()
+        index = build_ephemeral_index(
+            mandate, snapshot, now=at, authorized=True,
+            revoked_source_ids=revoked,
+        )
+        result = search_ephemeral_index(
+            mandate, snapshot, index, query,
+            now=at, authorized=True, revoked_source_ids=revoked,
+            mode=mode, limit=limit,
+        )
+        payload = {
+            "schema_version": "skeleton.dragon.campaign_index_search.v1",
+            "session_id": identifier,
+            "source_snapshot_digest": result.source_snapshot_digest,
+            "index_digest": index.index_digest,
+            "query": query,
+            "mode": mode,
+            "hits": [asdict(hit) for hit in result.hits],
+            "result_digest": result.result_digest,
+            "source_policy_held_count": len(revoked),
+            "review_state": "unreviewed_external_evidence_only",
+            "training_permission": False,
+            "publication_granted": False,
+        }
+        return {"ok": True, "result": payload}
+
     async def list(self, scope: dict[str, str], *, cursor: str | None = None, limit: int = 16) -> dict:
         query = {**scope, "status": {"$ne": "deleted"}}
         if cursor:

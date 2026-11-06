@@ -26,4 +26,37 @@ from .references import CitationCheck, CitationReport, verify_current_citations
 from .recrawl_advisory import RefreshObservation, RefreshProposal, RefreshPortfolio, propose_adaptive_refresh
 from .stopping import ResearchStopGate, decide_campaign_stop
 
+from .objectives import ResearchObjective, ObjectivePlan, compile_objectives, objective_matches
+from .claims import (
+    ResearchClaim, ClaimCitation, IndependenceAttestation, ClaimAssessment,
+    ClaimReviewMatrix, assess_claim_matrix,
+)
+from .coverage import ObjectiveCoverage, CoverageReport, measure_objective_coverage
+from .temporal_diff import (
+    RetainedVersion, ChangeSpan, TemporalChangeReport, TemporalSequence,
+    compare_retained_versions, build_temporal_sequence,
+)
+from .novelty import (
+    NoveltyDocument, NoveltyPair, NoveltyFamily, NoveltyReport,
+    group_near_duplicates,
+)
+from .frontier_graph import HostFrontier, FrontierArc, FrontierTopology, analyze_frontier_topology
+from .source_index import (
+    IndexedPassage, EphemeralIndex, IndexedHit, IndexedSearch,
+    build_ephemeral_index, search_ephemeral_index,
+)
+from .risk_register import CrawlRisk, CrawlRiskRegister, compile_crawl_risks
+from .pressure import ResourceObservation, PressureDecision, recommend_crawl_pressure
+from .mission_strategy import MissionCandidate, MissionStrategy, prioritize_unmet_research
+from .review_packet import (
+    PacketReference, ReviewPacket, create_review_packet, verify_review_packet,
+)
+from .replay_assurance import ReplayLink, ReplayAudit, audit_campaign_replay
+
+from .contradictions import (
+    Disagreement, CitationDependency, DisagreementGraph, build_disagreement_graph,
+)
+from .robots_audit import OriginRobots, RobotsAudit, audit_robots_state
+from .workbench import DragonWorkbench, compose_dragon_workbench
+
 __all__ = [name for name in globals() if not name.startswith("_")]

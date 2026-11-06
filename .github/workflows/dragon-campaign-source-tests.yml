@@ -6,6 +6,9 @@ on:
     paths:
       - "skeleton/ai/webcrawler/dragon_campaign_stack/**"
       - "tests/test_ai_webcrawler_dragon_campaign_stack.py"
+      - "tests/test_ai_webcrawler_dragon_campaign_depth.py"
+      - "backend/core/dragon_crawler.py"
+      - "backend/routes/dragon_academy.py"
       - ".github/workflows/dragon-campaign-source-tests.yml"
 
 permissions:
@@ -33,8 +36,12 @@ jobs:
         run: |
           python -m compileall -q skeleton/ai/webcrawler/dragon_campaign_stack
           python -m py_compile tests/test_ai_webcrawler_dragon_campaign_stack.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_campaign_depth.py
+          python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
       - name: Execute source-only campaign regressions
         env:
           PYTHONPATH: "."
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_campaign_stack.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_campaign_stack.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_campaign_depth.py' -v
