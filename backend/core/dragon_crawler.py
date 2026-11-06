@@ -667,6 +667,8 @@ class DragonCrawlerApplication:
     async def campaign_atlas(
         self, scope: dict[str, str], identifier: str,
         objectives: tuple[dict[str, Any], ...],
+        review_effort: tuple[dict[str, Any], ...] = (),
+        review_budget_minutes: int = 240,
     ) -> dict[str, Any]:
         """Run the policy-first read-only research Atlas for an owned crawl.
 
@@ -676,7 +678,7 @@ class DragonCrawlerApplication:
         network rights, credentials, or a dispatch grant.
         """
         from skeleton.ai.webcrawler.dragon_campaign_stack import (
-            ResearchObjective, SourcePolicyDecision,
+            ResearchObjective, SourcePolicyDecision, ReviewEffort,
             compose_dragon_atlas, verify_dragon_atlas_trace,
         )
 
@@ -693,6 +695,9 @@ class DragonCrawlerApplication:
                 "blocked_terms": tuple(value.get("blocked_terms", ())),
             },
         ) for value in objectives)
+        if not isinstance(review_effort, tuple) or len(review_effort) > 7:
+            raise ValueError("bounded explicit review effort estimates required")
+        review_costs = tuple(ReviewEffort(**value) for value in review_effort)
         _, run_type = _core()
         runtime = run_type.from_snapshot(snapshot)
         authoritative = []
@@ -723,6 +728,8 @@ class DragonCrawlerApplication:
             policy_snapshot_authenticated=True,
             now=now, authorized=True,
             max_retrieved_passages=16, max_context_chars=8000,
+            review_effort=review_costs,
+            review_budget_minutes=review_budget_minutes,
         )
         verify_dragon_atlas_trace(
             mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
@@ -828,6 +835,78 @@ class DragonCrawlerApplication:
                     "operator_fact_review_required": True,
                 } if atlas.independence else None
             ),
+            "evidence_graph": {
+                "graph_digest": atlas.graph.graph_digest,
+                "vertices": atlas.graph.integrity.vertex_count,
+                "arcs": atlas.graph.integrity.edge_count,
+                "retained_passages": atlas.graph.integrity.passage_count,
+                "sources": atlas.graph.integrity.source_count,
+                "held_sources": atlas.graph.integrity.held_source_count,
+                "objective_neighborhoods": [
+                    {
+                        "objective_id": item.objective_id,
+                        "source_count": len(item.distinct_source_ids),
+                        "passage_count": item.exact_passage_count,
+                        "host_count": len(item.distinct_hosts),
+                        "claim_count": len(item.associated_claim_ids),
+                        "independence_attested": False,
+                    }
+                    for item in atlas.graph.objectives
+                ],
+                "graph_is_factual_proof": False,
+            },
+            "review_operations": {
+                "agenda_digest": atlas.agenda.agenda_digest,
+                "replay_digest": atlas.review_replay.replay_digest,
+                "tasks_total": len(atlas.agenda.tasks),
+                "pending_tasks": len(atlas.review_replay.pending_task_ids),
+                "blocked_tasks": len(atlas.review_replay.blocked_task_ids),
+                "ready_task_ids": atlas.agenda.ready_task_ids[:32],
+                "task_types": dict(atlas.agenda.counts_by_type),
+                "recommended_queue": [
+                    {
+                        "task_id": task.task_id,
+                        "type": task.task_type,
+                        "objective_id": task.objective_id,
+                        "source_id": task.source_id,
+                        "priority": task.priority,
+                        "predecessors": task.predecessors,
+                        "current_status": "pending_human_review",
+                        "automatically_approvable": False,
+                    }
+                    for task in atlas.agenda.tasks[:32]
+                ],
+                "human_review_recorded": False,
+                "durable_review_mutations": False,
+            },
+            "review_portfolio": (
+                {
+                    "portfolio_digest": atlas.portfolio.portfolio_digest,
+                    "estimated_minutes": atlas.portfolio.consumed_minutes_estimated,
+                    "budget_minutes": atlas.portfolio.time_budget_minutes,
+                    "selected_count": len(atlas.portfolio.tasks_selected),
+                    "task_ids": [
+                        item.task_id for item in atlas.portfolio.tasks_selected
+                    ],
+                    "persistence_performed": False,
+                    "effort_is_observed": False,
+                } if atlas.portfolio is not None else None
+            ),
+            "jeeves_handoff": {
+                "manifest_digest": atlas.handoff.handoff_digest,
+                "citation_count": len(atlas.handoff.citations),
+                "task_count": len(atlas.handoff.tasks),
+                "body_excluded": True,
+                "network_called": False,
+                "dispatch_granted": False,
+                "requires_fresh_source_policy": True,
+            },
+            "citation_manifest": {
+                "manifest_digest": atlas.citations.manifest_digest,
+                "exact_anchored_references": len(atlas.citations.citations),
+                "body_redacted": True,
+                "publication_permission": False,
+            },
             "frontier": {
                 "advisory_digest": atlas.allocation.advice_digest,
                 "proposed_slots": atlas.allocation.request_slots,
