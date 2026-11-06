@@ -198,3 +198,31 @@ source qualification boundary. Root AGENTS.md rules, wider backend and
 security checks, live-device E2E, authorization route tests, packaging and
 release approval are separate mandatory gates. This branch remains a
 draft until those gates are independently satisfied.
+
+
+### Authenticated Dragon Atlas application endpoint (read-only)
+
+POST /api/dragon-academy/crawler/sessions/{session_id}/research/atlas
+
+Body: {"objectives": [{"objective_id": "archive-method",
+"question": "How was archive capture methodology documented?",
+"dimension": "method", "stage": "verification", "priority": 0.9,
+"minimum_reviewable_passages": 1, "minimum_attested_groups": 1,
+"max_source_age_seconds": 3600,
+"required_terms": ["archive", "capture"], "blocked_terms": []}]}
+
+The existing authentication dependency derives tenant/owner; no request field
+can claim an owner, consent revision or policy authorization. The backend
+reads and replays the Mongo-held run, projects every retained source against
+its existing source-use, capture-age and consent authority, constructs the
+strict policy decision universe and composes the Atlas. It performs another
+authenticated session/source-policy read before responding and aborts on any
+revision change. The returned dashboard contains stage hashes, query counts,
+source IDs and exact passage anchors, bounded diagnostic scores, review holds
+and zero dispatch authority. **No retained page body or research envelope
+JSON is returned.** A later consuming operation must re-check policy and
+source revision again; the dashboard is not a durable approval receipt.
+
+This POST is a read-only analytical query (operator-provided objectives),
+not a capture command. Its Pydantic input denies extraneous fields,
+bounds all strings and list sizes and cannot grant external networking.

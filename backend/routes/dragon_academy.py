@@ -2662,6 +2662,31 @@ class CrawlerSourceUseRequest(CrawlerWriteRequest):
     max_age_seconds: int = Field(ge=60, le=86400, strict=True)
 
 
+
+class CrawlerAtlasObjective(BaseModel):
+    """Operator-authored bounded research intent, not crawler admission."""
+
+    model_config = ConfigDict(extra="forbid")
+    objective_id: str = Field(min_length=3, max_length=64,
+                              pattern=r"^[a-z][a-z0-9_-]{2,63}$")
+    question: str = Field(min_length=3, max_length=512)
+    dimension: str = Field(pattern=r"^(fact|method|timeline|source|counterexample|implementation)$")
+    stage: str = Field(pattern=r"^(discovery|collection|verification|review)$")
+    priority: float = Field(ge=0.0, le=1.0)
+    minimum_reviewable_passages: int = Field(default=1, ge=1, le=32, strict=True)
+    minimum_attested_groups: int = Field(default=1, ge=1, le=16, strict=True)
+    max_source_age_seconds: int = Field(default=3600, ge=60, le=86400, strict=True)
+    required_terms: list[str] = Field(default_factory=list, max_length=16)
+    blocked_terms: list[str] = Field(default_factory=list, max_length=16)
+
+
+class CrawlerAtlasRequest(BaseModel):
+    """Read-only research inspection; explicit user goals are mandatory."""
+
+    model_config = ConfigDict(extra="forbid")
+    objectives: list[CrawlerAtlasObjective] = Field(min_length=1, max_length=8)
+
+
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
     owner = _principal(user)
     return {"tenant_id": (user.get("tenant_id") or user["email"]).strip(), "owner_id": owner}
@@ -2809,6 +2834,22 @@ async def crawler_research_inspection(
     """Read-only evidence and frontier diagnostics under existing owner auth."""
     return await _crawler_result(
         crawler_application.campaign_inspection(scope, session_id)
+    )
+
+
+
+@router.post("/crawler/sessions/{session_id}/research/atlas")
+async def crawler_research_atlas(
+    body: CrawlerAtlasRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only source-policy-first research audit, no external text returned."""
+    return await _crawler_result(
+        crawler_application.campaign_atlas(
+            scope, session_id,
+            tuple(goal.model_dump() for goal in body.objectives),
+        )
     )
 
 

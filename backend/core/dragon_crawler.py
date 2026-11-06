@@ -663,6 +663,194 @@ class DragonCrawlerApplication:
         }
         return {"ok": True, "result": payload}
 
+
+    async def campaign_atlas(
+        self, scope: dict[str, str], identifier: str,
+        objectives: tuple[dict[str, Any], ...],
+    ) -> dict[str, Any]:
+        """Run the policy-first read-only research Atlas for an owned crawl.
+
+        The authenticated Mongo session and its current source-use policy are
+        the only authority. The caller provides research questions, never
+        source-policy decisions, retained text, an authorization boolean,
+        network rights, credentials, or a dispatch grant.
+        """
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            ResearchObjective, SourcePolicyDecision,
+            compose_dragon_atlas, verify_dragon_atlas_trace,
+        )
+
+        row = await self._owned(scope, identifier)
+        snapshot, _ = self._campaign_authority(row)
+        mandate = self._campaign_mandate(scope, row)
+        now = _now().timestamp()
+        if not isinstance(objectives, tuple) or not 1 <= len(objectives) <= 8:
+            raise ValueError("bounded operator research objectives required")
+        goals = tuple(ResearchObjective(
+            **{
+                **value,
+                "required_terms": tuple(value.get("required_terms", ())),
+                "blocked_terms": tuple(value.get("blocked_terms", ())),
+            },
+        ) for value in objectives)
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(snapshot)
+        authoritative = []
+        for source in runtime.sources():
+            capture = self._capture_freshness(row, source)
+            source_policy = self._capture_policy(row, source)
+            retained_until = _utc(datetime.fromisoformat(
+                capture["valid_until"]
+            )).timestamp()
+            authoritative.append(SourcePolicyDecision(
+                source_id=source["source_id"],
+                source_hash=source["content_hash"],
+                consent_id=mandate.scope.consent_id,
+                policy_revision=source_policy["version"],
+                effective_at=source["fetched_at"],
+                expires_at=retained_until,
+                status=(
+                    "review_scoped" if capture["state"] == "current" else
+                    "withdrawn" if capture["state"] == "withdrawn" else
+                    "embargoed"
+                ),
+                authority_reference="authenticated_owned_mongo_source_use",
+                purpose=mandate.scope.purpose,
+            ))
+        atlas = compose_dragon_atlas(
+            mandate, snapshot, objectives=goals,
+            source_policies=tuple(authoritative),
+            policy_snapshot_authenticated=True,
+            now=now, authorized=True,
+            max_retrieved_passages=16, max_context_chars=8000,
+        )
+        verify_dragon_atlas_trace(
+            mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
+        )
+        # A second authenticated Mongo read fences revision/policy races.
+        # Consumers still MUST recheck both sources and consent before use.
+        latest = await self._owned(scope, identifier)
+        latest_snapshot, _ = self._campaign_authority(latest)
+        if (
+            latest_snapshot.get("snapshot_digest") != snapshot.get("snapshot_digest")
+            or latest.get("version") != row.get("version")
+            or _plain(latest.get("source_use_policies", {}))
+               != _plain(row.get("source_use_policies", {}))
+        ):
+            raise CrawlerError(
+                "crawler_research_revision_changed",
+                "The capture or source-use policy changed during Atlas inspection.",
+                409,
+            )
+        now_again = _now().timestamp()
+        mandate.admit(now=now_again, authorized=True)
+        for source in runtime.sources():
+            if source["source_id"] in atlas.policies.allowed_source_ids and (
+                self._capture_freshness(latest, source)["state"] != "current"
+            ):
+                raise CrawlerError(
+                    "crawler_research_source_changed",
+                    "Source access changed during Atlas inspection.",
+                    409,
+                )
+        # Expose audit metadata, NEVER the JSON envelope or raw external
+        # passages: source text remains on the separate checked source API.
+        metadata = {
+            "schema_version": "skeleton.dragon.campaign_atlas_dashboard.v1",
+            "session_id": identifier,
+            "run_id": atlas.run_id,
+            "run_sequence": atlas.source_sequence,
+            "snapshot_digest": atlas.source_snapshot_digest,
+            "mandate_digest": atlas.mandate_digest,
+            "atlas_digest": atlas.atlas_digest,
+            "issued_at": atlas.issued_at,
+            "stages": [
+                {
+                    "ordinal": stage.ordinal,
+                    "name": stage.name,
+                    "receipt_digest": stage.receipt_digest,
+                    "chain_digest": stage.chain_digest,
+                }
+                for stage in atlas.stages
+            ],
+            "source_policy": {
+                "digest": atlas.policies.policy_digest,
+                "sources_seen": atlas.policies.source_count,
+                "included_source_count": len(atlas.policies.allowed_source_ids),
+                "excluded_source_count": len(atlas.policies.excluded_source_ids),
+                "complete_current_policy_required": True,
+            },
+            "objectives": [
+                {
+                    "objective_id": goal.objective_id,
+                    "dimension": goal.dimension,
+                    "stage": goal.stage,
+                    "priority": goal.priority,
+                }
+                for goal in atlas.workbench.objectives.objectives
+            ],
+            "query_lattice": {
+                "digest": atlas.lattice.lattice_digest,
+                "queries": len(atlas.lattice.queries),
+                "source_authority": "operator_objectives_only",
+            },
+            "retrieval": {
+                "digest": atlas.retrieval.fusion_digest,
+                "candidate_passages": atlas.retrieval.matched_passages,
+                "retained_hits": len(atlas.retrieval.results),
+                "distinct_hosts": atlas.retrieval.host_count,
+                "evidence": [
+                    {
+                        "source_id": hit.source_id,
+                        "canonical_url": hit.canonical_url,
+                        "passage_hash": hit.passage_hash,
+                        "start": hit.start,
+                        "end": hit.end,
+                        "score": hit.score,
+                        "objective_ids": hit.matched_objective_ids,
+                        "review_required": True,
+                    }
+                    for hit in atlas.retrieval.results
+                ],
+            },
+            "context": {
+                "digest": atlas.context.envelope_digest,
+                "source_references": atlas.context.reference_count,
+                "serialized_bytes": atlas.context.serialized_bytes,
+                "raw_source_text_redacted": True,
+                "fresh_policy_recheck_required": True,
+            },
+            "independence": (
+                {
+                    "digest": atlas.independence.audit_digest,
+                    "ambiguous_groups": atlas.independence.ambiguous_group_count,
+                    "tainted_sources": atlas.independence.tainted_source_count,
+                    "operator_fact_review_required": True,
+                } if atlas.independence else None
+            ),
+            "frontier": {
+                "advisory_digest": atlas.allocation.advice_digest,
+                "proposed_slots": atlas.allocation.request_slots,
+                "actual_dispatches": 0,
+                "resource_sample_required": atlas.pressure is None,
+                "externally_authorized": False,
+            },
+            "scorecard": {
+                "digest": atlas.scorecard.scorecard_digest,
+                "dimensions": [asdict(x) for x in atlas.scorecard.dimensions],
+                "alerts": atlas.scorecard.alerts,
+                "advisory_priority": atlas.scorecard.advisory_priority_score,
+                "decision": atlas.scorecard.decision,
+            },
+            "read_only": True,
+            "network_executed": False,
+            "publication_granted": False,
+            "training_permission": False,
+            "review_required": True,
+        }
+        metadata["dashboard_digest"] = _digest(metadata)
+        return {"ok": True, "report": metadata}
+
     async def list(self, scope: dict[str, str], *, cursor: str | None = None, limit: int = 16) -> dict:
         query = {**scope, "status": {"$ne": "deleted"}}
         if cursor:
