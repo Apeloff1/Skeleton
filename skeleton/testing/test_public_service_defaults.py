@@ -226,3 +226,46 @@ def test_direct_runtime_manifest_preserves_valid_loopback_url(tmp_path: Path):
     manifest = load_manifest()
     resolved = runtime_manifest(manifest, root=tmp_path, environ={})
     assert resolved.service("frontend").public_url == manifest.service("frontend").public_url
+
+
+@pytest.mark.parametrize("public_url", [
+    "http://localhost:3000/\u200b",
+    "http://localhost:3000/\u202e",
+    "http://localhost:3000/\u00a0",
+    "http://localhost:3000/\u0085",
+    "http://localhost:3000/\u2060",
+])
+def test_invisible_unicode_url_characters_fail_closed_in_all_consumers(
+    tmp_path: Path, public_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    poisoned = replace(manifest, services=services)
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        runtime_manifest(poisoned, root=tmp_path, environ={})
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        public_service_urls(tmp_path, manifest=poisoned, environ={})
+
+
+@pytest.mark.parametrize("public_url", [
+    "http://localhost:3000/\u200b",
+    "http://localhost:3000/\u202e",
+    "http://localhost:3000/\u00a0",
+])
+def test_invisible_unicode_url_characters_rejected_before_port_override(
+    tmp_path: Path, public_url: str
+):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="non-local public URL"):
+        runtime_manifest(
+            replace(manifest, services=services),
+            root=tmp_path,
+            environ={"FRONTEND_PORT": "31999"},
+        )
