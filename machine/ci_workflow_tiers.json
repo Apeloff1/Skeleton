@@ -29,5 +29,31 @@
   },
   "required_reusable_workflows": [
     "ci.yml"
+  ],
+  "automatic_event_workflows": [
+    "actions-housekeeping-cli.yml",
+    "app-foundation-e2e.yml",
+    "artifact-policy.yml",
+    "automation-traffic-manager.yml",
+    "automerge-control-plane.yml",
+    "backend-quality.yml",
+    "dependency-review.yml",
+    "first-install-source-qualification.yml",
+    "game-frontier-validation.yml",
+    "jeeves-integrated-source-qualification.yml",
+    "jeeves-laptop-dispatcher-source-tests.yml",
+    "jeeves-native-sqlite-source-qualification.yml",
+    "malware-gate.yml",
+    "merge-readiness.yml",
+    "owner-historical-actions-cleanup.yml",
+    "queue-drain.yml",
+    "release-images.yml",
+    "repository-hygiene-gate.yml",
+    "reproducible-release.yml",
+    "sealed-context-guard.yml",
+    "secret-scanning.yml",
+    "security-alert-inventory.yml",
+    "three-hour-actions-queue-expiry.yml",
+    "workflow-input-security.yml"
   ]
 }
