@@ -42,6 +42,8 @@ def test_release_workflow_verifies_native_assembly_wheel_payload() -> None:
         "skeleton_asm.h", "aarch64.S", "x86_64.S", "README.md",
     ):
         assert f"skeleton/native/asm/{source}" in workflow
+    assert "skeleton/app/cli.py" in workflow
+    assert "skeleton/ai/runtime/game_project_cli.py" in workflow
 
 
 def test_runtime_image_excludes_development_payload() -> None:
