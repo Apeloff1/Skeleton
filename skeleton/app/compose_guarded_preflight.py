@@ -170,6 +170,14 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     ghost = hello.get("isreplicaset")
     if ghost is not None and (type(ghost) is not bool or ghost is True):
         return None
+    # A present-but-null authority field is not an omitted optional field.
+    # In particular, null membership or election identity must not silently
+    # collapse into the same snapshot as an older server omitting that field.
+    if any(field in hello and hello[field] is None for field in (
+        "me", "primary", "hosts", "passives", "arbiters",
+        "electionId", "setVersion", "topologyVersion",
+    )):
+        return None
     name = hello.get("setName")
     if (type(name) is not str or not 1 <= len(name) <= 128
             or not name.isascii()
