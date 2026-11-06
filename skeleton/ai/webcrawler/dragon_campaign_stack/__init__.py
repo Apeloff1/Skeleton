@@ -85,4 +85,15 @@ from .research_pipeline import (
     AtlasStage, DragonAtlas, compose_dragon_atlas, verify_dragon_atlas_trace,
 )
 
+
+from .policy_invalidation import (
+    PolicyTransition, EvidenceInvalidation, PolicyInvalidation,
+    assess_policy_invalidation,
+)
+from .retrieval_benchmark import (
+    PassageJudgment, ObjectiveRetrievalMetrics, RetrievalBenchmark,
+    RetrievalComparison, evaluate_fused_retrieval,
+    compare_retrieval_benchmarks,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]

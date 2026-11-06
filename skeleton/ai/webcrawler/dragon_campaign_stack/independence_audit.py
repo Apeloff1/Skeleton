@@ -74,6 +74,24 @@ def audit_independence(
     if len(set(revoked)) != len(revoked) or not set(revoked).issubset(sources):
         raise PermissionError("invalid current source withdrawals")
     lineage = validate_lineage(sources, links, limits=mandate.limits)
+    # Derivation/revision ancestry is transitive. Two attested origins may
+    # share an un-attested intermediary even when there is no direct edge
+    # between their own captured source identities.
+    parents = {source_id: set() for source_id in sources}
+    for edge in lineage:
+        if edge.relation in ("derived_from", "revision_of"):
+            parents[edge.child_source_id].add(edge.parent_source_id)
+    ancestry = {}
+    for source_id in sorted(sources):
+        visited = set()
+        pending = list(parents[source_id])
+        while pending:
+            previous = pending.pop()
+            if previous in visited:
+                continue
+            visited.add(previous)
+            pending.extend(parents[previous] - visited)
+        ancestry[source_id] = visited | {source_id}
     by_group = {}
     membership = {}
     for group in groups:
@@ -102,6 +120,8 @@ def audit_independence(
                 for b in right.source_ids:
                     if sources[a]["content_hash"] == sources[b]["content_hash"]:
                         reasons.setdefault("identical_captured_content", []).append((a, b))
+                    if ancestry[a] & ancestry[b]:
+                        reasons.setdefault("shared_derivation_ancestry", []).append((a, b))
             for link in lineage:
                 a, b = link.child_source_id, link.parent_source_id
                 if ((a in left.source_ids and b in right.source_ids)

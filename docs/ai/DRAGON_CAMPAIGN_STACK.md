@@ -226,3 +226,36 @@ source revision again; the dashboard is not a durable approval receipt.
 This POST is a read-only analytical query (operator-provided objectives),
 not a capture command. Its Pydantic input denies extraneous fields,
 bounds all strings and list sizes and cannot grant external networking.
+
+
+### Current source-policy impact and transitive independence
+
+policy_invalidation.assess_policy_invalidation() compares two bounded
+policy projections for the same crawl snapshot. Any source-use state
+or policy-revision transition invalidates its dependent source lineage,
+claim evidence, fused retrieval references and serialized context. A policy
+revision is never silently reused. The report produces exact source/claim/
+objective invalidation identities, but only the canonical application
+mutates actual policy and a later consumer must re-fetch current access.
+Cross-checkpoint source differences belong to source_drift.py.
+
+independence_audit.audit_independence() additionally closes the complete
+acyclic derived_from / revision_of graph. Two provenance groups
+sharing an upstream source are both held until a person reviews their
+true independence, including when their connection passes through an
+intermediary not represented in either asserted group.
+
+### Operator-labeled retrieval comparator
+
+retrieval_benchmark.evaluate_fused_retrieval() computes bounded recall@k,
+MRR@k, and normalized DCG@k from explicit operator-reviewed graded
+passage labels. A judgment must reference an exact current indexed
+source/span/hash and operator objective. Missing labels produce null,
+not invented performance zeros. No result is a factual confidence score.
+
+retrieval_benchmark.compare_retrieval_benchmarks() allows only comparisons
+sharing mandate, crawl snapshot, source index, objective definitions,
+relevance-label universe and k; otherwise it fails closed. These
+metrics are diagnostic offline source ranking, not a claim of global
+SOTA, production native evaluation, scientific ground truth, or
+release certification.
