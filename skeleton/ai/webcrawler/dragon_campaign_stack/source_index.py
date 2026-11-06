@@ -210,12 +210,23 @@ def search_ephemeral_index(
         source = current["sources"].get(passage.source_id)
         if source is None:
             raise PermissionError("missing indexed source")
+        # Reject caller-constructed index tuples with negative/Boolean spans,
+        # swapped source URLs, an invented passage digest or altered term
+        # vectors. Downstream citations cannot trust ambiguous offsets just
+        # because Python's negative indexing happens to return some text.
         if (
-            source["content_hash"] != passage.full_content_hash
+            type(passage.start) is not int or type(passage.end) is not int
+            or passage.start < 0 or passage.end <= passage.start
+            or passage.end > len(source["text"])
+            or passage.end - passage.start > 600
+            or source["content_hash"] != passage.full_content_hash
             or source["preserved_text_hash"] != passage.preserved_text_hash
+            or source["canonical_url"] != passage.canonical_url
             or source["text"][passage.start:passage.end] != passage.text
+            or sha256(passage.text.encode("utf-8")).hexdigest() != passage.passage_hash
+            or tuple(sorted(set(_terms(passage.text)))) != passage.terms
         ):
-            raise PermissionError("indexed passage no longer matches source")
+            raise PermissionError("indexed passage span/hash/terms no longer match source")
         if (required_terms or blocked_terms) and not passage_matches_operator_terms(
             passage.text, required_terms, blocked_terms,
         ):
