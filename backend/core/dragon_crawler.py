@@ -968,6 +968,47 @@ class DragonCrawlerApplication:
                 "body_redacted": True,
                 "publication_permission": False,
             },
+            "source_similarity": {
+                "audit_digest": atlas.similarity.audit_digest,
+                "retrieval_digest": atlas.similarity.retrieval_digest,
+                "policy_digest": atlas.similarity.source_policy_digest,
+                "selected_sources": len(atlas.similarity.considered_source_ids),
+                "compared_sources": len(atlas.similarity.compared_source_ids),
+                "held_sources": len(atlas.similarity.held_source_ids),
+                "eligible_pairs": atlas.similarity.eligible_pair_count,
+                "candidate_pairs": atlas.similarity.scored_pair_count,
+                "cross_host_candidates": atlas.similarity.cross_host_candidate_count,
+                "skipped_oversize": atlas.similarity.skipped_oversize_sources,
+                "skipped_short": atlas.similarity.skipped_short_sources,
+                "jaccard_threshold": atlas.similarity.threshold_jaccard,
+                "containment_threshold": atlas.similarity.threshold_containment,
+                "candidate_leads": [
+                    {
+                        "left_host": item.left_host,
+                        "right_host": item.right_host,
+                        "jaccard": item.jaccard,
+                        "smaller_set_containment": item.smaller_set_containment,
+                        "length_ratio": item.length_ratio,
+                        "relation": item.relation,
+                        "cross_host": item.cross_host,
+                        "human_lineage_review_required": True,
+                        "shared_origin_established": False,
+                    } for item in atlas.similarity.similar_pairs[:16]
+                ],
+                "clusters": [
+                    {
+                        "observed_hosts": item.observed_hosts,
+                        "source_count": len(item.source_ids),
+                        "direct_candidate_edges": item.direct_candidate_edges,
+                        "all_pairs_verified": False,
+                        "independent_origin_verified": False,
+                    } for item in atlas.similarity.components[:16]
+                ],
+                "source_bodies_redacted": True,
+                "network_used": False,
+                "training_or_publication_granted": False,
+                "lineage_verified": False,
+            },
             "retrieval_robustness": {
                 "audit_digest": atlas.robustness.audit_digest,
                 "retrieval_digest": atlas.robustness.retrieval_digest,
