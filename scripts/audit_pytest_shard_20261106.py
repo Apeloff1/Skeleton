@@ -20,14 +20,18 @@ def main() -> int:
     total = int(total_str)
     if total < 1 or not 0 <= shard < total:
         raise ValueError("invalid shard index")
-    if area not in ("skeleton/testing", "tests", "backend/tests"):
+    if area not in ("skeleton/testing", "tests", "backend/tests", "uncovered"):
         raise ValueError("unknown test scope")
 
     files = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
-    tests = sorted(os.fsdecode(item) for item in files if item and
-                   os.fsdecode(item).startswith(area + "/") and
-                   os.path.basename(os.fsdecode(item)).startswith("test_") and
-                   os.fsdecode(item).endswith(".py"))
+    all_tests = sorted(os.fsdecode(item) for item in files if item and
+                       os.path.basename(os.fsdecode(item)).startswith("test_") and
+                       os.fsdecode(item).endswith(".py"))
+    if area == "uncovered":
+        covered = ("skeleton/testing", "tests", "backend/tests")
+        tests = [p for p in all_tests if not any(p.startswith(base + "/") for base in covered)]
+    else:
+        tests = [p for p in all_tests if p.startswith(area + "/")]
     selected = [p for p in tests if int.from_bytes(
         hashlib.sha256(p.encode("utf-8")).digest()[:8], "big"
     ) % total == shard]
