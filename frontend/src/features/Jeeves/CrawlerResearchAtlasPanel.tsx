@@ -10,6 +10,11 @@ import {
   type CrawlAtlasEffort, type CrawlAtlasReport, type CrawlSession,
 } from '../../product/crawlerClient';
 import s, { colors as C } from './CrawlerWorkspace.styles';
+import {
+  NEW_ATLAS_DRAFT, MAX_ATLAS_OBJECTIVES,
+  compileAtlasCampaign, enqueueAtlasObjective, removeAtlasObjective,
+  type AtlasObjectiveDraft,
+} from './atlasCampaignPlan';
 
 type Dimension = CrawlAtlasObjective['dimension'];
 type Stage = CrawlAtlasObjective['stage'];
@@ -57,8 +62,15 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
   const [dimension, setDimension] = useState<Dimension>('method');
   const [stage, setStage] = useState<Stage>('verification');
   const [mode, setMode] = useState<Mode>('fusion');
+  const [priority, setPriority] = useState(NEW_ATLAS_DRAFT.priority);
+  const [passageTarget, setPassageTarget] = useState(NEW_ATLAS_DRAFT.passageTarget);
+  const [independenceTarget, setIndependenceTarget] = useState(NEW_ATLAS_DRAFT.independenceTarget);
+  const [maxAgeMinutes, setMaxAgeMinutes] = useState(NEW_ATLAS_DRAFT.maxAgeMinutes);
+  const [requiredTerms, setRequiredTerms] = useState(NEW_ATLAS_DRAFT.requiredTerms);
+  const [blockedTerms, setBlockedTerms] = useState(NEW_ATLAS_DRAFT.blockedTerms);
+  const [queuedGoals, setQueuedGoals] = useState<CrawlAtlasObjective[]>([]);
   const [report, setReport] = useState<CrawlAtlasReport | null>(null);
-  const [objective, setObjective] = useState<CrawlAtlasObjective | null>(null);
+  const [currentGoals, setCurrentGoals] = useState<CrawlAtlasObjective[] | null>(null);
   const [minutesPerTask, setMinutesPerTask] = useState('12');
   const [budget, setBudget] = useState('120');
   const [working, setWorking] = useState(false);
@@ -77,12 +89,18 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     request.current?.abort();
     request.current = null;
     busy.current = false;
-    setWorking(false); setReport(null); setObjective(null); setError(''); setNotice('');
+    setWorking(false); setReport(null); setCurrentGoals(null); setError(''); setNotice('');
   }, []);
   useEffect(() => {
     clear();
     return () => { epoch.current++; request.current?.abort(); request.current = null; };
   }, [revision, clear]);
+  useEffect(() => {
+    // Research goals are per-capture. A different authenticated session must
+    // not inherit questions or query filters from the previous source scope.
+    setQueuedGoals([]);
+    setQuestion('');
+  }, [session.session_id]);
 
   // Clear any source identities from a previous signed-in account. Async
   // responses are independently fenced against a concurrent account change.
@@ -91,19 +109,31 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     if (authChanged) {
       authRef.current = getAuthToken();
       clear();
+      setQueuedGoals([]);
+      setQuestion('');
     }
   }, [authChanged, clear]);
 
   const analyze = useCallback(async (allocate: boolean) => {
     if (busy.current) return;
-    const goal: CrawlAtlasObjective | null = allocate ? objective : {
-      objective_id: 'operator-research-goal', question: question.trim(),
-      dimension, stage, priority: 0.9,
-      minimum_reviewable_passages: 1, minimum_attested_groups: 1,
-      max_source_age_seconds: 3600, required_terms: [], blocked_terms: [],
-    };
-    if (!session.consent_current || !goal || goal.question.length < 3) {
-      setError('Supply a research question and a current capture consent grant.');
+    let goals: CrawlAtlasObjective[];
+    try {
+      const draft: AtlasObjectiveDraft = {
+        question, dimension, stage, priority, requiredTerms, blockedTerms,
+        passageTarget, independenceTarget, maxAgeMinutes,
+      };
+      if (allocate) {
+        if (!currentGoals) throw new RangeError('Analyze an exact objective set before planning review.');
+        goals = [...currentGoals];
+      } else {
+        goals = compileAtlasCampaign(queuedGoals, draft);
+      }
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : 'Research objective input was invalid.');
+      return;
+    }
+    if (!session.consent_current) {
+      setError('A current capture consent grant is required.');
       return;
     }
     if (allocate && (!report || !report.review_operations.tasks_total)) {
@@ -127,7 +157,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
       return;
     }
     const payload: CrawlAtlasRequest = {
-      objectives: [goal], retrieval_mode: mode,
+      objectives: goals, retrieval_mode: mode,
       ...(allocate ? {
         review_effort: estimates, review_budget_minutes: Number(budget),
       } : {}),
@@ -144,14 +174,14 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
       setReport(data);
-      setObjective(goal);
+      setCurrentGoals(goals);
       setNotice(allocate
         ? 'A bounded review plan was calculated, but no human was assigned and nothing was approved.'
         : 'Source-bound research completed. All external statements require human review.');
     } catch (exc) {
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
-      setReport(null); setObjective(null);
+      setReport(null); setCurrentGoals(null);
       setError(exc instanceof Error ? exc.message : 'The Atlas inspection could not be verified.');
     } finally {
       if (submittedAt === epoch.current) {
@@ -159,13 +189,39 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
       }
     }
   }, [session.session_id, session.consent_current, question, dimension,
-    stage, mode, objective, report, minutesPerTask, budget]);
+    stage, mode, priority, requiredTerms, blockedTerms, passageTarget,
+    independenceTarget, maxAgeMinutes, queuedGoals,
+    currentGoals, report, minutesPerTask, budget]);
 
   const changeQuestion = (x: string) => { clear(); setQuestion(x); };
   const changeDimension = (x: Dimension) => { clear(); setDimension(x); };
   const changeStage = (x: Stage) => { clear(); setStage(x); };
   const changeMode = (x: Mode) => { clear(); setMode(x); };
-  const ready = !working && !authChanged && session.consent_current && question.trim().length >= 3;
+  const draft: AtlasObjectiveDraft = {
+    question, dimension, stage, priority, requiredTerms, blockedTerms,
+    passageTarget, independenceTarget, maxAgeMinutes,
+  };
+  const enqueue = () => {
+    try {
+      const next = enqueueAtlasObjective(queuedGoals, draft);
+      clear();
+      setQueuedGoals(next);
+      setQuestion('');
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : 'Research objective is invalid.');
+    }
+  };
+  const removeGoal = (id: string) => {
+    try {
+      const next = removeAtlasObjective(queuedGoals, id);
+      clear();
+      setQueuedGoals(next);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : 'The objective is no longer in this campaign.');
+    }
+  };
+  const ready = !working && !authChanged && session.consent_current &&
+    (queuedGoals.length > 0 || question.trim().length >= 3);
 
   return <View style={s.card}>
     <Text style={s.heading}>Dragon research Atlas</Text>
@@ -184,6 +240,64 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     <View style={s.row}>{STAGES.map(x => <Choice key={x} text={x}
       selected={stage === x} disabled={working}
       onPress={() => changeStage(x)} />)}</View>
+    <Section title={'Research campaign objectives · ' + queuedGoals.length + '/' + MAX_ATLAS_OBJECTIVES}>
+      <Text style={s.small}>Queue up to eight distinct operator-authored questions. An unqueued question is included when you analyze; it is never silently discarded.</Text>
+      {queuedGoals.map(item =>
+        <View key={item.objective_id} style={s.check}>
+          <Text style={s.message}>{item.question}</Text>
+          <Text style={s.small}>{readable(item.dimension)} · {readable(item.stage)} · priority {item.priority.toFixed(3)} · {item.minimum_reviewable_passages} passages · {item.minimum_attested_groups} source group(s)</Text>
+          <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel={'Remove research objective ' + item.objective_id}
+            style={s.button} disabled={working}
+            onPress={() => removeGoal(item.objective_id)}>
+            <Text style={s.buttonText}>Remove objective</Text>
+          </TouchableOpacity>
+        </View>)}
+      <Text style={s.label}>Objective priority (0–1)</Text>
+      <TextInput accessibilityLabel="Objective priority" style={styles.textField}
+        keyboardType="decimal-pad" maxLength={5} editable={!working}
+        value={priority} onChangeText={value => { clear(); setPriority(value); }} />
+      <View style={s.row}>
+        <View style={styles.estimate}>
+          <Text style={s.small}>Minimum reviewable passages (1–32)</Text>
+          <TextInput accessibilityLabel="Minimum reviewable passages" style={styles.textField}
+            keyboardType="number-pad" value={passageTarget} maxLength={2}
+            editable={!working} onChangeText={value => { clear(); setPassageTarget(value); }} />
+        </View>
+        <View style={styles.estimate}>
+          <Text style={s.small}>Independent source groups (1–16)</Text>
+          <TextInput accessibilityLabel="Minimum attested source groups" style={styles.textField}
+            keyboardType="number-pad" value={independenceTarget} maxLength={2}
+            editable={!working} onChangeText={value => { clear(); setIndependenceTarget(value); }} />
+        </View>
+        <View style={styles.estimate}>
+          <Text style={s.small}>Source capture age limit (1–1440 minutes)</Text>
+          <TextInput accessibilityLabel="Maximum source capture age minutes"
+            style={styles.textField} keyboardType="number-pad"
+            value={maxAgeMinutes} maxLength={4} editable={!working}
+            onChangeText={value => { clear(); setMaxAgeMinutes(value); }} />
+        </View>
+      </View>
+      <Text style={s.label}>Required query terms (optional, lowercase)</Text>
+      <TextInput accessibilityLabel="Required normalized query terms"
+        style={styles.textField} value={requiredTerms} maxLength={1024}
+        placeholder="archive, methodology" placeholderTextColor={C.muted}
+        autoCapitalize="none" editable={!working}
+        onChangeText={value => { clear(); setRequiredTerms(value); }} />
+      <Text style={s.label}>Excluded query terms (optional, lowercase)</Text>
+      <TextInput accessibilityLabel="Excluded normalized query terms"
+        style={styles.textField} value={blockedTerms} maxLength={1024}
+        placeholder="advertisement, spam" placeholderTextColor={C.muted}
+        autoCapitalize="none" editable={!working}
+        onChangeText={value => { clear(); setBlockedTerms(value); }} />
+      <TouchableOpacity accessibilityRole="button"
+        accessibilityState={{ disabled: working || queuedGoals.length >= MAX_ATLAS_OBJECTIVES || question.trim().length < 3 }}
+        disabled={working || queuedGoals.length >= MAX_ATLAS_OBJECTIVES || question.trim().length < 3}
+        style={[s.button, (working || queuedGoals.length >= MAX_ATLAS_OBJECTIVES || question.trim().length < 3) && s.disabled]}
+        onPress={enqueue}>
+        <Text style={s.buttonText}>Add question to research campaign</Text>
+      </TouchableOpacity>
+    </Section>
     <Text style={s.label}>Retrieval algorithm</Text>
     <View style={s.row}>{MODES.map(x => <Choice key={x}
       text={x === 'fusion' ? 'Reciprocal rank fusion' : 'BM25 proximity'}
@@ -207,7 +321,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     {!!notice && <Text style={s.small} accessibilityLiveRegion="polite">{notice}</Text>}
     {!authChanged && report && <>
       <Text style={s.heading}>Evidence inspection</Text>
-      <Text style={s.small}>Snapshot {report.snapshot_digest.slice(0, 16)} · {report.stages.length} audit stages · sequence {report.run_sequence}</Text>
+      <Text style={s.small}>Snapshot {report.snapshot_digest.slice(0, 16)} · {report.stages.length} audit stages · sequence {report.run_sequence} · {report.objectives.length} operator objectives</Text>
       <View style={styles.section}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>
           <Metric title="Allowed sources" value={report.source_policy.included_source_count}
