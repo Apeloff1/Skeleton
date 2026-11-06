@@ -158,4 +158,9 @@ from .retrieval_robustness import (
     RetrievalRobustnessAudit, analyze_retrieval_robustness,
 )
 
+from .near_duplicate_audit import (
+    LexicalSimilarityCandidate, SimilarityComponent, SourceSimilarityAudit,
+    inspect_selected_source_similarity,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]

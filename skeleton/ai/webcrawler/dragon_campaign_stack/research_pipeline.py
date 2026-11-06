@@ -52,6 +52,7 @@ from .frontier_route_map import CrawlRouteTopology, project_canonical_routes
 from .slice_simulation import HypotheticalSlicePlan, simulate_canonical_slice
 from .dispatch_faults import DispatchFaultLedger, analyze_dispatch_faults
 from .retrieval_robustness import RetrievalRobustnessAudit, analyze_retrieval_robustness
+from .near_duplicate_audit import SourceSimilarityAudit, inspect_selected_source_similarity
 from .evidence_graph import EvidenceGraph, assemble_evidence_graph
 from .review_agenda import ReviewAgenda, compile_review_agenda
 from .review_replay import ReviewReplay, replay_human_reviews
@@ -87,6 +88,7 @@ STAGES = (
     "resource_bounded_slice_simulation",
     "dispatch_fault_and_recovery_impacts",
     "selected_evidence_host_ablation_and_reuse",
+    "near_duplicate_source_provenance_screening",
 )
 
 
@@ -133,6 +135,7 @@ class DragonAtlas:
     simulation: HypotheticalSlicePlan
     faults: DispatchFaultLedger
     robustness: RetrievalRobustnessAudit
+    similarity: SourceSimilarityAudit
     retrieval_mode: str
     stages: tuple[AtlasStage, ...]
     atlas_digest: str
@@ -207,6 +210,7 @@ def _receipts(atlas: DragonAtlas) -> tuple[tuple[str, str | None], ...]:
         ("resource_bounded_slice_simulation", atlas.simulation.simulation_digest),
         ("dispatch_fault_and_recovery_impacts", atlas.faults.ledger_digest),
         ("selected_evidence_host_ablation_and_reuse", atlas.robustness.audit_digest),
+        ("near_duplicate_source_provenance_screening", atlas.similarity.audit_digest),
     )
 
 
@@ -402,6 +406,10 @@ def compose_dragon_atlas(
         mandate, canonical, workbench.objectives, policy, fused,
         now=now, authorized=authorized,
     )
+    similarity = inspect_selected_source_similarity(
+        mandate, canonical, policy, fused,
+        now=now, authorized=authorized,
+    )
     root = DragonAtlas(
         run_id=canonical["run_id"],
         mandate_digest=mandate.fingerprint,
@@ -416,7 +424,7 @@ def compose_dragon_atlas(
         lexical_ranking=lexical, numeric_signals=numeric,
         temporal_signals=temporal, feedback=feedback,
         routes=routes, simulation=simulation, faults=faults,
-        robustness=robustness,
+        robustness=robustness, similarity=similarity,
         retrieval_mode=retrieval_mode,
         stages=(), atlas_digest="",
     )
@@ -595,3 +603,23 @@ def verify_dragon_atlas_trace(
     )
     if expected_robustness != atlas.robustness:
         raise PermissionError("Atlas selected-evidence sensitivity was altered")
+    if (
+        atlas.similarity.mandate_digest != mandate.fingerprint
+        or atlas.similarity.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.similarity.source_policy_digest != atlas.policies.policy_digest
+        or atlas.similarity.retrieval_digest != atlas.retrieval.fusion_digest
+        or atlas.similarity.source_body_exposed
+        or atlas.similarity.external_lookup_performed
+        or atlas.similarity.lineage_verified
+        or atlas.similarity.factual_independence_certified
+        or atlas.similarity.training_or_publication_granted
+    ):
+        raise PermissionError("Atlas near-duplicate report asserts unavailable source authority")
+    # Recalculate all similarity edges against the original captured text;
+    # a mutable digest string cannot authenticate the original pair set.
+    expected_similarity = inspect_selected_source_similarity(
+        mandate, canonical, atlas.policies, atlas.retrieval,
+        now=now, authorized=authorized,
+    )
+    if expected_similarity != atlas.similarity:
+        raise PermissionError("Atlas selected-source similarity was altered")
