@@ -30,7 +30,7 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(missing, [], "masterplan references missing workflows")
 
     def test_auxiliary_admissions_are_manual_only(self):
-        """Keep the 20-trigger cap without dropping required security gates."""
+        """Keep the reviewed automatic-inventory quota and required security gates."""
         for name in ("historical-zero-job-canary.yml", "local-ai-boilerplate.yml"):
             source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
             self.assertEqual(events(source), {"workflow_dispatch"}, name)
@@ -44,6 +44,16 @@ class WorkflowTierTests(unittest.TestCase):
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
+        for invalid in (
+            "on: [push]\njobs:\n",
+            "on:\n  push:\n  push:\njobs:\n",
+            "on:\n  pull_request: {branches: [main]}\njobs:\n",
+            "on:\n  workflow_dispatch:\njobs:\non:\n  push:\n",
+            "on:\n  - push\njobs:\n",
+            "on:\njobs:\n",
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events(invalid)
 
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
@@ -88,6 +98,48 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
+            # An unregistered PR subscriber must fail even if the numeric
+            # quota would otherwise have spare capacity.
+            evidence.write_text(
+                "name: Rogue workflow\n"
+                "on:\n"
+                "  pull_request:\n"
+                "jobs:\n"
+                "  hold:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: echo hold\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "unregistered automatic workflows" in item
+                for item in audit(root)
+            ))
+            evidence.unlink()
+            # Silently deactivating a required source gate must also fail.
+            expected_gate = root / ".github/workflows/first-install-source-qualification.yml"
+            original_gate = expected_gate.read_text(encoding="utf-8")
+            self.assertIn("  pull_request:", original_gate)
+            expected_gate.write_text(
+                original_gate.replace("  pull_request:", "  workflow_dispatch:", 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "expected automatic workflows not triggered" in item
+                for item in audit(root)
+            ))
+            expected_gate.write_text(original_gate, encoding="utf-8")
+            # Changing a trusted PR gate into a push-only subscriber preserves
+            # the total automatic count but violates its approved event scope.
+            expected_gate.write_text(
+                original_gate.replace("  pull_request:", "  push:", 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "event admission trigger drift" in item for item in audit(root)
+            ))
+            expected_gate.write_text(original_gate, encoding="utf-8")
+            self.assertEqual(audit(root), [])
             for index in range(10):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
