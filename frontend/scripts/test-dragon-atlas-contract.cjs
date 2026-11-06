@@ -100,6 +100,16 @@ function fixture() {
       requires_fresh_source_policy: true },
     citation_manifest: { manifest_digest: H, exact_anchored_references: 1,
       body_redacted: true, publication_permission: false },
+    source_similarity: {
+      audit_digest: H, retrieval_digest: H, policy_digest: H,
+      selected_sources: 1, compared_sources: 1, held_sources: 0,
+      eligible_pairs: 0, candidate_pairs: 0, cross_host_candidates: 0,
+      skipped_oversize: 0, skipped_short: 0,
+      jaccard_threshold: .78, containment_threshold: .92,
+      candidate_leads: [], clusters: [],
+      source_bodies_redacted: true, network_used: false,
+      training_or_publication_granted: false, lineage_verified: false,
+    },
     retrieval_robustness: {
       audit_digest: H, retrieval_digest: H, selected_passages: 1,
       selected_sources: 1, selected_hosts: 1,
@@ -414,5 +424,42 @@ test('copy-family receipts require exact content hashes and no independence gran
       client.getCrawlAtlas('session-1', request()),
       /incomplete or violates/,
     );
+  }
+});
+
+test('source similarity is policy bound and excludes external side effects', async () => {
+  setup();
+  const result = await client.getCrawlAtlas('session-1', request());
+  assert.equal(result.source_similarity.policy_digest, result.source_policy.digest);
+  assert.equal(result.source_similarity.retrieval_digest, result.retrieval.digest);
+  assert.equal(result.source_similarity.network_used, false);
+  assert.equal(result.source_similarity.lineage_verified, false);
+});
+
+test('near-duplicate forged origins and unbounded pair scores fail closed', async () => {
+  for (const change of [
+    a => { a.source_similarity.network_used = true; },
+    a => { a.source_similarity.lineage_verified = true; },
+    a => { a.source_similarity.held_sources = 2; },
+    a => { a.source_similarity.policy_digest = 'f'.repeat(64); },
+    a => { a.source_similarity.candidate_pairs = 497; },
+    a => { a.source_similarity.candidate_pairs = 1;
+           a.source_similarity.eligible_pairs = 1;
+           a.source_similarity.candidate_leads = [{
+             left_host: 'example.com', right_host: 'example.org',
+             jaccard: 1.25, smaller_set_containment: .92,
+             length_ratio: .99, relation: 'near_duplicate_review',
+             cross_host: true, human_lineage_review_required: true,
+             shared_origin_established: false,
+           }]; },
+    a => { a.source_similarity.clusters = [{
+      observed_hosts: ['example.com'], source_count: 2,
+      direct_candidate_edges: 1, all_pairs_verified: true,
+      independent_origin_verified: false,
+    }]; },
+  ]) {
+    const a = fixture(); change(a); setup(a);
+    await assert.rejects(client.getCrawlAtlas('session-1', request()),
+      /incomplete or violates/);
   }
 });

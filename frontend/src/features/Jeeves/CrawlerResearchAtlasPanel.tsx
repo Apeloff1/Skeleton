@@ -341,6 +341,28 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
         {report.scorecard.alerts.slice(0, 8).map((item, i) =>
           <Text key={i} style={s.error}>{readable(item)}</Text>)}
       </Section>
+      <Section title="Near-duplicate source provenance and copy review">
+        <Text style={s.small}>
+          {report.source_similarity.compared_sources} of {report.source_similarity.selected_sources} policy-eligible source(s) compared · {report.source_similarity.held_sources} held because too short or too large
+        </Text>
+        <Text style={s.small}>
+          {report.source_similarity.candidate_pairs} similarity-review lead(s) across {report.source_similarity.eligible_pairs} examined pair(s) · {report.source_similarity.cross_host_candidates} crossed host boundaries
+        </Text>
+        <Text style={s.small}>These matches use bounded Unicode-normalized text shingles, not factual verification. A cluster may connect sources indirectly without every pair being similar.</Text>
+        {report.source_similarity.candidate_leads.map((item, index) =>
+          <View key={item.left_host + ':' + item.right_host + ':' + index} style={s.check}>
+            <Text style={s.message}>
+              {item.left_host} ↔ {item.right_host} · {readable(item.relation)}
+            </Text>
+            <Text style={s.small}>
+              {(item.jaccard * 100).toFixed(1)}% four-gram Jaccard · {(item.smaller_set_containment * 100).toFixed(1)}% smaller-source containment · requires human lineage review
+            </Text>
+          </View>)}
+        {report.source_similarity.clusters.map((item, index) =>
+          <Text key={index} style={s.small}>
+            Review cluster: {item.source_count} sources / {item.observed_hosts.length} hosts / {item.direct_candidate_edges} direct pair matches · not independently verified
+          </Text>)}
+      </Section>
       <Section title="Source concentration and evidence fragility">
         <Text style={s.small}>
           {report.retrieval_robustness.selected_sources} selected sources on {report.retrieval_robustness.selected_hosts} host(s) · {report.retrieval_robustness.distinct_content_families} distinct exact-content families · {report.retrieval_robustness.flagged_objectives.length} exposure-review objectives

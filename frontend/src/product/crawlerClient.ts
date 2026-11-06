@@ -322,6 +322,28 @@ export type CrawlAtlasReport = {
     manifest_digest: string; exact_anchored_references: number;
     body_redacted: true; publication_permission: false;
   };
+  source_similarity: {
+    audit_digest: string; retrieval_digest: string; policy_digest: string;
+    selected_sources: number; compared_sources: number; held_sources: number;
+    eligible_pairs: number; candidate_pairs: number;
+    cross_host_candidates: number; skipped_oversize: number;
+    skipped_short: number; jaccard_threshold: number;
+    containment_threshold: number;
+    candidate_leads: {
+      left_host: string; right_host: string;
+      jaccard: number; smaller_set_containment: number;
+      length_ratio: number; relation: 'exact_content' | 'near_duplicate_review';
+      cross_host: boolean;
+      human_lineage_review_required: true; shared_origin_established: false;
+    }[];
+    clusters: {
+      observed_hosts: string[]; source_count: number;
+      direct_candidate_edges: number; all_pairs_verified: false;
+      independent_origin_verified: false;
+    }[];
+    source_bodies_redacted: true; network_used: false;
+    training_or_publication_granted: false; lineage_verified: false;
+  };
   retrieval_robustness: {
     audit_digest: string; retrieval_digest: string;
     selected_passages: number; selected_sources: number; selected_hosts: number;
@@ -489,6 +511,51 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !value.jeeves_handoff?.body_excluded
       || value.jeeves_handoff.network_called !== false
       || value.jeeves_handoff.dispatch_granted !== false
+      || !value.source_similarity || !HASH.test(value.source_similarity.audit_digest)
+      || value.source_similarity.retrieval_digest !== value.retrieval.digest
+      || value.source_similarity.policy_digest !== value.source_policy.digest
+      || !integer(value.source_similarity.selected_sources, 32)
+      || !integer(value.source_similarity.compared_sources, 32)
+      || !integer(value.source_similarity.held_sources, 32)
+      || value.source_similarity.compared_sources + value.source_similarity.held_sources
+         !== value.source_similarity.selected_sources
+      || !integer(value.source_similarity.eligible_pairs, 496)
+      || !integer(value.source_similarity.candidate_pairs, 496)
+      || value.source_similarity.candidate_pairs > value.source_similarity.eligible_pairs
+      || !integer(value.source_similarity.cross_host_candidates, 496)
+      || value.source_similarity.cross_host_candidates > value.source_similarity.candidate_pairs
+      || !integer(value.source_similarity.skipped_oversize, 32)
+      || !integer(value.source_similarity.skipped_short, 32)
+      || !Number.isFinite(value.source_similarity.jaccard_threshold)
+      || value.source_similarity.jaccard_threshold < 0.5
+      || value.source_similarity.jaccard_threshold > 1
+      || !Number.isFinite(value.source_similarity.containment_threshold)
+      || value.source_similarity.containment_threshold < 0.5
+      || value.source_similarity.containment_threshold > 1
+      || value.source_similarity.source_bodies_redacted !== true
+      || value.source_similarity.network_used !== false
+      || value.source_similarity.training_or_publication_granted !== false
+      || value.source_similarity.lineage_verified !== false
+      || !Array.isArray(value.source_similarity.candidate_leads)
+      || value.source_similarity.candidate_leads.length > 16
+      || value.source_similarity.candidate_leads.length > value.source_similarity.candidate_pairs
+      || value.source_similarity.candidate_leads.some(item =>
+        !item || !['exact_content', 'near_duplicate_review'].includes(item.relation)
+        || item.human_lineage_review_required !== true
+        || item.shared_origin_established !== false
+        || !Number.isFinite(item.jaccard) || item.jaccard < 0 || item.jaccard > 1
+        || !Number.isFinite(item.smaller_set_containment)
+        || item.smaller_set_containment < 0 || item.smaller_set_containment > 1
+        || !Number.isFinite(item.length_ratio)
+        || item.length_ratio < 0 || item.length_ratio > 1)
+      || !Array.isArray(value.source_similarity.clusters)
+      || value.source_similarity.clusters.length > 16
+      || value.source_similarity.clusters.some(item =>
+        !item || item.all_pairs_verified !== false
+        || item.independent_origin_verified !== false
+        || !integer(item.source_count, 32) || item.source_count < 2
+        || !integer(item.direct_candidate_edges, 496)
+        || !Array.isArray(item.observed_hosts) || item.observed_hosts.length > 32)
       || !value.retrieval_robustness
       || !HASH.test(value.retrieval_robustness.audit_digest)
       || value.retrieval_robustness.retrieval_digest !== value.retrieval.digest
