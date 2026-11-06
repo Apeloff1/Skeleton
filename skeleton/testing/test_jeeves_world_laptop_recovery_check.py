@@ -120,3 +120,38 @@ def test_command_invalid_digest_emits_one_failure_record(tmp_path, capsys):
     assert captured.out.endswith("\n")
     assert captured.out.count("\n") == 1
     assert json.loads(captured.out)["error"] == "expected_source_digest_invalid"
+
+
+def test_non_boolean_stage_success_fails_closed(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+
+    def invalid(self, world_id, slot=None):
+        report = original(self, world_id, slot)
+        report["checks"]["builder"] = {"ok": 1}
+        return report
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", invalid)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["builder"]["error"] == "laptop_recovery_stage_invalid"
+    assert result["next_action"] == "inspect_canonical_custody_without_overwriting_artifacts"
+
+
+def test_non_string_stage_error_fails_closed(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+
+    def invalid(self, world_id, slot=None):
+        report = original(self, world_id, slot)
+        report["checks"]["review"] = {"ok": True, "error": {"unsafe": True}}
+        return report
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", invalid)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["review"]["error"] == "laptop_recovery_stage_invalid"
