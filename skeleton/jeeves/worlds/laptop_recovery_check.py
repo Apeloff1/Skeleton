@@ -32,9 +32,13 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
                 any(c not in "0123456789abcdef" for c in expected_source_digest)):
             raise CanonError("expected_source_digest_invalid")
     report = LaptopFlow(store).diagnose(world_id, slot)
+    if not isinstance(report, dict):
+        raise CanonError("laptop_recovery_report_invalid")
     checks = report.get("checks", {})
     if not isinstance(checks, dict):
         raise CanonError("laptop_recovery_checks_invalid")
+    # Copy stages before annotating: diagnostics must never mutate owner custody.
+    checks = dict(checks)
     # Corrupt diagnostic stages must fail closed rather than raise AttributeError.
     required = ("source", "review", "builder", "acceptance")
     if slot is not None:
@@ -43,6 +47,8 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
         if not isinstance(checks.get(stage), dict):
             checks[stage] = {"ok": False, "error": "laptop_recovery_stage_invalid"}
     ready = all(checks[stage].get("ok") is True for stage in required)
+    malformed_stage = any(checks[stage].get("error") == "laptop_recovery_stage_invalid"
+                          for stage in required)
     # Diagnose reads separately locked stages; detect source revision drift.
     # This does not replace atomic playable custody verification.
     observed_digest = report.get("source_digest")
@@ -53,7 +59,10 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
         checks["source_digest_integrity"] = {"ok": False, "error": "source_digest_invalid"}
         ready = False
     try:
-        final_digest = LaptopFlow(store).inspect(world_id)["source_digest"]
+        final_snapshot = LaptopFlow(store).inspect(world_id)
+        if not isinstance(final_snapshot, dict):
+            raise CanonError("source_recheck_invalid")
+        final_digest = final_snapshot.get("source_digest")
     except (CanonError, OSError) as exc:
         checks["source_stability"] = {
             "ok": False,
@@ -61,7 +70,9 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
         }
         ready = False
     else:
-        stable = digest_valid and observed_digest == final_digest
+        final_valid = (isinstance(final_digest, str) and len(final_digest) == 64
+                       and all(ch in "0123456789abcdef" for ch in final_digest))
+        stable = digest_valid and final_valid and observed_digest == final_digest
         checks["source_stability"] = (
             {"ok": True} if stable else {"ok": False, "error": "source_changed_during_diagnostic"}
         )
@@ -86,7 +97,8 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
             if checks.get("source_stability", {}).get("ok") is False
             or (expected_source_digest is not None
                 and report.get("source_digest") != expected_source_digest)
-            else report.get("next_action")
+            else "inspect_canonical_custody_without_overwriting_artifacts"
+            if malformed_stage else report.get("next_action")
         ),
         "checks": checks,
         "qualification": "read_only_source_diagnostic_not_model_engine_or_device_certified",
