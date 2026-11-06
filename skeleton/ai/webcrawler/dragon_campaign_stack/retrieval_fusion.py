@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 from ..operations import CrawlRun
 from .contracts import CampaignMandate, digest, ensure_snapshot_scope, integer
-from .query_lattice import QueryLattice
+from .query_lattice import QueryLattice, passage_matches_operator_terms
 from .source_index import EphemeralIndex, search_ephemeral_index
 
 
@@ -105,6 +105,12 @@ def fuse_retrieval(
         )
         queries_run += 1
         for rank, hit in enumerate(current.hits, start=1):
+            # Required and blocked operator terms are hard passage-level
+            # constraints, not mere suggestions for query construction.
+            if not passage_matches_operator_terms(
+                hit.text, query.required_terms, query.blocked_terms,
+            ):
+                continue
             key = (hit.source_id, hit.passage_hash, hit.start, hit.end)
             old = hits_by_key.setdefault(key, hit)
             # SearchHit matched_terms and lexical score vary by query;

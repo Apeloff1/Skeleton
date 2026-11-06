@@ -23,7 +23,9 @@ from urllib.parse import urlsplit
 from ..operations import CrawlRun
 from .contracts import CampaignMandate, digest, ensure_snapshot_scope, finite, integer
 from .policy_matrix import SourcePolicyProjection
-from .query_lattice import QueryLattice, QueryVariant
+from .query_lattice import (
+    QueryLattice, QueryVariant, passage_matches_operator_terms,
+)
 from .retrieval_fusion import FusedEvidence, RetrievalFusion
 from .source_index import EphemeralIndex, IndexedPassage, build_ephemeral_index, _terms
 
@@ -259,6 +261,10 @@ def rank_ephemeral_research(
         if len(query.terms) > 16:
             raise ValueError("too many query expansion terms")
         for passage, words in zip(documents, all_words):
+            if not passage_matches_operator_terms(
+                passage.text, query.required_terms, query.blocked_terms,
+            ):
+                continue
             receipt = _score_query(
                 passage, words, query, df, max(1, count),
                 average_length, weights, query_index,

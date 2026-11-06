@@ -15,6 +15,41 @@ from .contracts import CampaignMandate, digest, integer
 from .objectives import ObjectivePlan, ResearchObjective
 
 _TOKEN = re.compile(r"[^\W_]{2,}", re.UNICODE)
+# Exact operator constraints use a boundary-aware tokenizer that preserves
+# hyphens and underscores in normalized operator terms. Broad query ranking
+# uses _TOKEN; these are deliberately separate concerns.
+_CONSTRAINT_TOKEN = re.compile(r"(?<![\w-])[\w-]{2,48}(?![\w-])", re.UNICODE)
+
+
+def passage_matches_operator_terms(
+    text: str, required: tuple[str, ...], blocked: tuple[str, ...],
+) -> bool:
+    """A soft query may suggest candidates, but a hard filter is mandatory.
+
+    No case-insensitive substring matching: "audit" must not match
+    "auditing"; "source-id" is one token, not two independent tokens.
+    This function only checks literal terms in current retained passage
+    text, never semantic equivalence or page-level rights.
+    """
+    if not isinstance(text, str):
+        raise TypeError("source text must be a literal string")
+    if len(text.encode("utf-8")) > 24_000:
+        raise ValueError("objective passage text exceeds local bound")
+    if not isinstance(required, tuple) or not isinstance(blocked, tuple):
+        raise TypeError("objective term filters must be immutable")
+    if len(required) > 16 or len(blocked) > 16:
+        raise ValueError("operator term filter capacity exceeded")
+    for token in required + blocked:
+        if (
+            not isinstance(token, str)
+            or re.fullmatch(r"[\w-]{2,48}", token) is None
+            or token != token.casefold()
+        ):
+            raise ValueError("invalid normalized operator term")
+    tokens = set(_CONSTRAINT_TOKEN.findall(text.casefold()))
+    return all(term in tokens for term in required) and not any(
+        term in tokens for term in blocked
+    )
 _NOISE = frozenset({
     "the", "with", "from", "that", "this", "and", "for", "when",
     "were", "have", "what", "which", "where", "about", "does",
@@ -32,6 +67,8 @@ class QueryVariant:
     weight: float
     ordinal: int
     retrieval_only: bool = True
+    required_terms: tuple[str, ...] = ()
+    blocked_terms: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.terms or len(self.terms) > 16:
@@ -42,6 +79,15 @@ class QueryVariant:
             raise ValueError("invalid query family")
         if type(self.ordinal) is not int or self.ordinal < 0:
             raise ValueError("invalid query order")
+        # Validate even directly constructed query receipts: compiler-created
+        # variants carry these immutable hard constraints into both rankers.
+        passage_matches_operator_terms("", self.required_terms, self.blocked_terms)
+        if set(self.required_terms) & set(self.blocked_terms):
+            raise ValueError("contradictory objective term constraints")
+        if len(set(self.required_terms)) != len(self.required_terms) or (
+            len(set(self.blocked_terms)) != len(self.blocked_terms)
+        ):
+            raise ValueError("duplicate operator term constraint")
 
 
 @dataclass(frozen=True)
@@ -134,6 +180,8 @@ def compile_query_lattice(
                     0.95 if family == "intersection" else
                     0.8 if family == "core" else 0.65), 8),
                 ordinal=ordinal,
+                required_terms=tuple(objective.required_terms),
+                blocked_terms=tuple(objective.blocked_terms),
             ))
             if count >= max_variants_per_objective:
                 break
