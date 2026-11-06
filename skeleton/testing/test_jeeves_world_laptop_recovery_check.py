@@ -155,3 +155,40 @@ def test_non_string_stage_error_fails_closed(tmp_path, monkeypatch):
     result = inspect_recovery(tmp_path, "lighthouse")
     assert result["source_handoff_verified"] is False
     assert result["checks"]["review"]["error"] == "laptop_recovery_stage_invalid"
+
+
+def test_missing_operator_guidance_fails_closed(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+
+    def missing(self, world_id, slot=None):
+        report = original(self, world_id, slot)
+        report.pop("next_action", None)
+        return report
+
+    monkeypatch.setattr(LaptopFlow, "diagnose", missing)
+    result = inspect_recovery(tmp_path, "lighthouse")
+    assert result["source_handoff_verified"] is False
+    assert result["checks"]["operator_guidance"]["error"] == "laptop_recovery_next_action_invalid"
+    assert result["next_action"] == "inspect_canonical_custody_without_overwriting_artifacts"
+
+
+def test_untrusted_operator_guidance_is_not_emitted(tmp_path, monkeypatch):
+    from skeleton.jeeves.worlds.laptop_flow import LaptopFlow
+
+    ready(tmp_path)
+    original = LaptopFlow.diagnose
+
+    for unsafe in ({"command": "overwrite"}, "", "a" * 161, "ok\\nunsafe"):
+        def invalid(self, world_id, slot=None):
+            report = original(self, world_id, slot)
+            report["next_action"] = unsafe
+            return report
+
+        monkeypatch.setattr(LaptopFlow, "diagnose", invalid)
+        result = inspect_recovery(tmp_path, "lighthouse")
+        assert result["source_handoff_verified"] is False
+        assert result["checks"]["operator_guidance"]["ok"] is False
+        assert result["next_action"] == "inspect_canonical_custody_without_overwriting_artifacts"
