@@ -6,6 +6,7 @@ on:
     paths:
       - "frontend/src/product/crawlerClient.ts"
       - "frontend/src/features/Jeeves/CrawlerResearchAtlasPanel.tsx"
+      - "frontend/src/features/Jeeves/atlasCampaignPlan.ts"
       - "frontend/src/features/Jeeves/CrawlerWorkspace.tsx"
       - "frontend/scripts/test-dragon-atlas-contract.cjs"
       - ".github/workflows/dragon-campaign-frontend-checks.yml"
@@ -45,4 +46,4 @@ jobs:
       - name: Compile full frontend TypeScript
         run: yarn typecheck
       - name: Lint Atlas client and mounted Jeeves UI
-        run: yarn eslint src/product/crawlerClient.ts src/features/Jeeves/CrawlerResearchAtlasPanel.tsx src/features/Jeeves/CrawlerWorkspace.tsx --max-warnings=0
+        run: yarn eslint src/product/crawlerClient.ts src/features/Jeeves/atlasCampaignPlan.ts src/features/Jeeves/CrawlerResearchAtlasPanel.tsx src/features/Jeeves/CrawlerWorkspace.tsx --max-warnings=0
