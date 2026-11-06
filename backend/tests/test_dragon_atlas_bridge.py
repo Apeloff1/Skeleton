@@ -125,7 +125,7 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["source_similarity"]["policy_digest"], report["source_policy"]["digest"])
         self.assertFalse(report["source_similarity"]["network_used"])
         self.assertFalse(report["source_similarity"]["lineage_verified"])
-        self.assertEqual(report["stages"][-1]["name"], "selected_evidence_host_ablation_and_reuse")
+        self.assertEqual(report["stages"][-1]["name"], "near_duplicate_source_provenance_screening")
         self.assertEqual(report["retrieval_robustness"]["retrieval_digest"], report["retrieval"]["digest"])
         self.assertTrue(report["retrieval_robustness"]["source_bodies_excluded"])
         self.assertFalse(report["retrieval_robustness"]["verified_independence"])
