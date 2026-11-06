@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import errno
 import os
 import stat
 import sys
@@ -12,9 +13,9 @@ from .world_canon import CanonError, WorldStore, digest, edit, propose, prove, s
 
 def _read_operation_file(path: str) -> bytes:
     """Bounded descriptor-relative review read; reject symlinks in every component."""
-    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+    if not all(hasattr(os, flag) for flag in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")):
         raise CanonError("operation_secure_open_unavailable")
-    if not path or "\\x00" in path:
+    if not isinstance(path, str) or not path or "\x00" in path:
         raise CanonError("operation_invalid_path")
     absolute = os.path.isabs(path)
     parts = path.split(os.sep)
@@ -22,13 +23,16 @@ def _read_operation_file(path: str) -> bytes:
         parts = parts[1:]
     if not parts or any(part in ("", ".", "..") for part in parts):
         raise CanonError("operation_invalid_path")
-    directory = os.open(os.sep if absolute else ".", os.O_RDONLY | os.O_DIRECTORY)
+    directory_flags = (os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW |
+                       os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0))
+    directory = os.open(os.sep if absolute else ".", directory_flags)
     try:
         for part in parts[:-1]:
-            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            child = os.open(part, directory_flags, dir_fd=directory)
             os.close(directory)
             directory = child
-        flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+        flags = (os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK |
+                 getattr(os, "O_CLOEXEC", 0))
         fd = os.open(parts[-1], flags, dir_fd=directory)
         try:
             info = os.fstat(fd)
@@ -40,6 +44,15 @@ def _read_operation_file(path: str) -> bytes:
                 raw = stream.read(524289)
             if len(raw) > 524288:
                 raise CanonError("operation_too_large")
+            after = os.fstat(fd)
+            if (after.st_dev != info.st_dev or after.st_ino != info.st_ino
+                    or after.st_size != info.st_size
+                    or after.st_mtime_ns != info.st_mtime_ns
+                    or after.st_ctime_ns != info.st_ctime_ns
+                    or len(raw) != info.st_size):
+                raise CanonError("operation_changed_during_read")
+            if not raw:
+                raise CanonError("operation_empty")
             return raw
         finally:
             os.close(fd)
@@ -93,8 +106,14 @@ def run(argv: list[str]) -> int:
         else:
             result = {"ok": True, **store.compile(args.id, args.expected_digest)}
     except (CanonError, OSError) as exc:
-        result = {"ok": False, "error": exc.code if isinstance(exc, CanonError)
-                  else "io_error"}
+        error = exc.code if isinstance(exc, CanonError) else {
+            errno.ELOOP: "operation_symlink_disallowed",
+            errno.ENOENT: "operation_missing",
+            errno.EACCES: "operation_permission_denied",
+            errno.EPERM: "operation_permission_denied",
+            errno.ENOTDIR: "operation_invalid_directory",
+        }.get(exc.errno, "io_error")
+        result = {"ok": False, "error": error}
         print(json.dumps(result, sort_keys=True))
         return 2
     print(json.dumps(result, sort_keys=True, ensure_ascii=False))
