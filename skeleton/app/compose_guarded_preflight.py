@@ -137,6 +137,11 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     # Legacy hello fields can coexist with modern primary flags. A server
     # claiming writable-primary while explicitly denying legacy primary
     # status is contradictory; do not use it as an epoch authority.
+    # Present-but-null role claims are malformed, not absent. Reject them
+    # before canonical epoch custody to prevent ambiguous role transitions.
+    if any(field in hello and hello[field] is None
+           for field in ("ismaster", "secondary", "arbiterOnly")):
+        return None
     legacy_primary = hello.get("ismaster")
     if legacy_primary is not None and legacy_primary is not True:
         return None
