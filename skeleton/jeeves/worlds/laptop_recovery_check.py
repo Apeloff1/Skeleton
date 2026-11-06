@@ -46,8 +46,8 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
     for stage in required:
         if not isinstance(checks.get(stage), dict):
             checks[stage] = {"ok": False, "error": "laptop_recovery_stage_invalid"}
-    ready = all(checks[stage].get("ok") is True for stage in required)
-    malformed_stage = any(checks[stage].get("error") == "laptop_recovery_stage_invalid"
+    ready = all(checks[stage].get("ok") is True and not checks[stage].get("error")\n                for stage in required)
+    # A stage cannot be successful while simultaneously reporting an error.\n    # Treat contradictory owner diagnostics as invalid rather than green.\n    for stage in required:\n        if checks[stage].get("ok") is True and checks[stage].get("error"):\n            checks[stage] = {"ok": False, "error": "laptop_recovery_stage_contradictory"}\n    malformed_stage = any(checks[stage].get("error") in ("laptop_recovery_stage_invalid",\n                                                         "laptop_recovery_stage_contradictory")
                           for stage in required)
     # Diagnose reads separately locked stages; detect source revision drift.
     # This does not replace atomic playable custody verification.
