@@ -104,12 +104,23 @@ class CrawlerPolicyAndBenchmarkTest(unittest.TestCase):
         self.assertEqual(result.evidence, ())
 
     def test_policy_reenable_does_not_auto_restore_old_context(self):
-        previous, new = self.pair()
+        earlier = self.policy((replace(
+            self.f.policies(self.snapshot)[0],
+            status="withdrawn", policy_revision=2,
+        ),))
+        restored = self.policy((replace(
+            self.f.policies(self.snapshot)[0],
+            status="review_scoped", policy_revision=3,
+        ),))
         impact = assess_policy_invalidation(
-            self.f.mandate, new, previous, now=self.now, authorized=True,
+            self.f.mandate, earlier, restored,
+            now=self.now, authorized=True,
         )
-        # A backward policy revision is not a valid current decision.
-        self.fail("rollback was accepted") if impact else None
+        self.assertTrue(impact.requires_context_rebuild)
+        self.assertTrue(impact.requires_claim_review)
+        self.assertEqual(impact.transitions[0].disposition,
+                         "source_use_reenabled_requires_fresh_review")
+        self.assertFalse(impact.automatic_publication_authority)
 
     def test_policy_rollback_is_rejected(self):
         first, next_policy = self.pair(status="withdrawn", revision=2)
