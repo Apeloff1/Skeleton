@@ -305,3 +305,32 @@ def test_host_port_input_is_bounded_before_integer_conversion(tmp_path: Path, po
     """Malformed operator input fails with the documented error, not an int overflow."""
     with pytest.raises(ValueError, match="FRONTEND_PORT must be an integer from 1 to 65535"):
         runtime_manifest(load_manifest(), root=tmp_path, environ={"FRONTEND_PORT": port})
+\n\ndef test_manifest_rejects_direct_dependency_cycle():
+    from skeleton.app.assembly import parse_manifest
+    import json
+    from skeleton.app.assembly import _manifest_bytes
+
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    services = {service["name"]: service for service in payload["services"]}
+    services["backend"]["depends_on"] = ["skeleton"]
+    services["skeleton"]["depends_on"] = ["backend"]
+    with pytest.raises(ValueError, match="dependency cycle"):
+        parse_manifest(payload)
+
+
+def test_manifest_rejects_optional_service_dependency_cycle():
+    from skeleton.app.assembly import parse_manifest, _manifest_bytes
+    import json
+
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    services = payload["services"]
+    services.append({
+        "name": "optional_cycle_a", "role": "test", "path": ".", "kind": "service",
+        "depends_on": ["optional_cycle_b"],
+    })
+    services.append({
+        "name": "optional_cycle_b", "role": "test", "path": ".", "kind": "service",
+        "depends_on": ["optional_cycle_a"],
+    })
+    with pytest.raises(ValueError, match="dependency cycle"):
+        parse_manifest(payload)

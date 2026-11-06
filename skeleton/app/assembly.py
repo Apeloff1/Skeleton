@@ -246,6 +246,27 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
                     f"service {service.name!r} health_path must live under ingress_prefix {prefix!r}"
                 )
 
+    # A cyclic startup graph can deadlock Compose before the setup UI appears.
+    # Validate the entire declared graph, including optional services, so a
+    # disabled profile cannot hide a cycle until a consumer enables it.
+    dependencies = {service.name: service.depends_on for service in services}
+    visited: set[str] = set()
+    visiting: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in visiting:
+            raise ValueError(f"service dependency cycle involving {name!r}")
+        if name in visited:
+            return
+        visiting.add(name)
+        for dependency in dependencies[name]:
+            visit(dependency)
+        visiting.remove(name)
+        visited.add(name)
+
+    for service in services:
+        visit(service.name)
+
     backend = next((service for service in services if service.name == "backend"), None)
     if backend is None:
         raise ValueError("manifest requires canonical backend service")
