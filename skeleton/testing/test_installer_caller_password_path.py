@@ -67,8 +67,19 @@ class InstallerCallerPathTests(unittest.TestCase):
             patch.object(install_app, "run_app_cli", return_value=0) as cli,
         ):
             self.assertEqual(install_app.main(), 0)
-        chdir.assert_called_once_with(install_app.ROOT)
+        self.assertEqual(chdir.call_args_list, [unittest.mock.call(install_app.ROOT), unittest.mock.call(Path("/operator"))])
         cli.assert_called_once_with(["install", "--admin-password-file", "/operator/secret.txt"])
+
+    def test_main_restores_caller_directory_on_cli_failure(self) -> None:
+        with (
+            patch.object(install_app.Path, "cwd", return_value=Path("/operator")),
+            patch.object(install_app.os, "chdir") as chdir,
+            patch.object(install_app.sys, "argv", ["install_app.py", "--no-python"]),
+            patch.object(install_app, "run_app_cli", side_effect=RuntimeError("installer failure")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "installer failure"):
+                install_app.main()
+        self.assertEqual(chdir.call_args_list, [unittest.mock.call(install_app.ROOT), unittest.mock.call(Path("/operator"))])
 
 
 if __name__ == "__main__":

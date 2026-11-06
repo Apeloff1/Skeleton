@@ -55,7 +55,12 @@ def main() -> int:
     caller = Path.cwd()
     arguments = _caller_bound_arguments(sys.argv[1:], caller)
     os.chdir(ROOT)
-    return run_app_cli(["install", *arguments])
+    try:
+        return run_app_cli(["install", *arguments])
+    finally:
+        # The entrypoint is also imported by tests and embedded operators.
+        # Never leak a checkout-root cwd into the caller after an error.
+        os.chdir(caller)
 
 
 if __name__ == "__main__":
