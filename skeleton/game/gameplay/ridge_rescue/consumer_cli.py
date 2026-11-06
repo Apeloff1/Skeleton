@@ -129,9 +129,10 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             write("Choose an action number, h for a hint, j for journal, a to audit, ? for help, e to export, b for full backup, s to sync the latest save, q to save and quit.")
         try:
             raw = read("> ")
-        except (EOFError, KeyboardInterrupt, StopIteration):
-            # Scripted menu input exhaustion is an orderly quit, not a crash.
-            # The final committed save remains authoritative.
+        except (EOFError, KeyboardInterrupt, StopIteration, OSError, UnicodeError):
+            # Closed terminal streams, disconnected consoles and decoding
+            # failures are orderly exits. Never consume an action or reset
+            # the authoritative save when interactive input disappears.
             raw = "q"
         # Terminal input may contain pasted Unicode or control characters. Reject
         # invisible controls rather than silently normalizing them into a valid
