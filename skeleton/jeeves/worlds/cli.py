@@ -76,11 +76,13 @@ def run(argv: list[str]) -> int:
     compile_cmd.add_argument("--id", required=True)
     compile_cmd.add_argument("--expected-digest", required=True)
     args = parser.parse_args(argv)
+    input_loaded = args.action != "edit"
     try:
         # Validate operator input before constructing or touching the canonical
         # custody store. A rejected operation must have no filesystem effects.
         operation = (strict_json(_read_operation_file(args.operation_file))
                      if args.action == "edit" else None)
+        input_loaded = True
         store = WorldStore(args.store)
         if args.action == "propose":
             source = propose(world_id=args.id, premise=args.premise,
@@ -109,13 +111,24 @@ def run(argv: list[str]) -> int:
         else:
             result = {"ok": True, **store.compile(args.id, args.expected_digest)}
     except (CanonError, OSError) as exc:
-        error = exc.code if isinstance(exc, CanonError) else {
-            errno.ELOOP: "operation_symlink_disallowed",
-            errno.ENOENT: "operation_missing",
-            errno.EACCES: "operation_permission_denied",
-            errno.EPERM: "operation_permission_denied",
-            errno.ENOTDIR: "operation_invalid_directory",
-        }.get(exc.errno, "io_error")
+        if isinstance(exc, CanonError):
+            error = exc.code
+        elif not input_loaded:
+            error = {
+                errno.ELOOP: "operation_symlink_disallowed",
+                errno.ENOENT: "operation_missing",
+                errno.EACCES: "operation_permission_denied",
+                errno.EPERM: "operation_permission_denied",
+                errno.ENOTDIR: "operation_invalid_directory",
+            }.get(exc.errno, "operation_io_unavailable")
+        else:
+            error = {
+                errno.EACCES: "custody_permission_denied",
+                errno.EPERM: "custody_permission_denied",
+                errno.ENOSPC: "custody_storage_exhausted",
+                errno.EDQUOT: "custody_storage_exhausted",
+                errno.EROFS: "custody_read_only",
+            }.get(exc.errno, "custody_io_unavailable")
         result = {"ok": False, "error": error}
         print(json.dumps(result, sort_keys=True))
         return 2
