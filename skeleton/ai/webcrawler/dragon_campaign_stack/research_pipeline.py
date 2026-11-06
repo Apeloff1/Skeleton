@@ -40,6 +40,14 @@ from .retrieval_fusion import RetrievalFusion, fuse_retrieval
 from .source_drift import SnapshotDrift, analyze_snapshot_drift
 from .source_index import EphemeralIndex, build_ephemeral_index
 from .workbench import DragonWorkbench, compose_dragon_workbench
+from .lexical_ranking import (
+    LexicalRankingWeights, LexicalRankingReport,
+    rank_ephemeral_research, lexical_report_to_fusion,
+)
+from .retrieval_benchmark import PassageJudgment
+from .lexical_feedback import FeedbackReport, propose_reviewed_query_terms
+from .numeric_signals import NumericSignalReport, inspect_numeric_discrepancies
+from .temporal_signals import TemporalSignalReport, detect_temporal_mentions
 from .evidence_graph import EvidenceGraph, assemble_evidence_graph
 from .review_agenda import ReviewAgenda, compile_review_agenda
 from .review_replay import ReviewReplay, replay_human_reviews
@@ -67,6 +75,10 @@ STAGES = (
     "least_authority_jeeves_handoff",
     "optional_human_review_portfolio",
     "exact_span_citation_manifest",
+    "optional_bm25_proximity_ranking",
+    "bounded_numeric_difference_screening",
+    "source_date_signal_inspection",
+    "optional_operator_feedback_terms",
 )
 
 
@@ -105,6 +117,11 @@ class DragonAtlas:
     handoff: ResearchHandoff
     portfolio: ReviewPortfolio | None
     citations: CitationManifest
+    lexical_ranking: LexicalRankingReport | None
+    numeric_signals: NumericSignalReport
+    temporal_signals: TemporalSignalReport
+    feedback: FeedbackReport | None
+    retrieval_mode: str
     stages: tuple[AtlasStage, ...]
     atlas_digest: str
     operational_state: str = "human_review_required"
@@ -168,6 +185,12 @@ def _receipts(atlas: DragonAtlas) -> tuple[tuple[str, str | None], ...]:
         ("optional_human_review_portfolio",
          atlas.portfolio.portfolio_digest if atlas.portfolio else None),
         ("exact_span_citation_manifest", atlas.citations.manifest_digest),
+        ("optional_bm25_proximity_ranking",
+         atlas.lexical_ranking.ranking_digest if atlas.lexical_ranking else None),
+        ("bounded_numeric_difference_screening", atlas.numeric_signals.report_digest),
+        ("source_date_signal_inspection", atlas.temporal_signals.signal_digest),
+        ("optional_operator_feedback_terms",
+         atlas.feedback.feedback_digest if atlas.feedback else None),
     )
 
 
@@ -192,6 +215,9 @@ def compose_dragon_atlas(
     review_effort: Iterable[ReviewEffort] = (),
     review_budget_minutes: int = 240,
     max_review_assignments: int = 32,
+    retrieval_mode: str = "fusion",
+    ranking_weights: LexicalRankingWeights | None = None,
+    reviewed_relevance_labels: Iterable[PassageJudgment] = (),
 ) -> DragonAtlas:
     """Compose one immutable, review-only source-bound research snapshot.
 
@@ -217,6 +243,11 @@ def compose_dragon_atlas(
     links = tuple(source_links)
     observations = tuple(telemetry)
     effort_estimates = tuple(review_effort)
+    relevance_labels = tuple(reviewed_relevance_labels)
+    if retrieval_mode not in ("fusion", "lexical_bm25"):
+        raise ValueError("unsupported source-only retrieval algorithm")
+    if ranking_weights is not None and not isinstance(ranking_weights, LexicalRankingWeights):
+        raise TypeError("typed lexical ranking parameters required")
     # STOP before reading external page bodies unless ALL retained sources
     # have current, revision-accurate source-use decisions from the backend.
     policy = project_source_policy(
@@ -239,11 +270,37 @@ def compose_dragon_atlas(
         mandate, canonical, now=now, authorized=authorized,
         revoked_source_ids=withdrawn, max_passages=max_index_passages,
     )
-    fused = fuse_retrieval(
-        mandate, canonical, index, lattice, now=now,
-        authorized=authorized, revoked_source_ids=withdrawn,
-        max_results=max_retrieved_passages,
-        max_context_chars=max_context_chars,
+    if retrieval_mode == "lexical_bm25":
+        lexical = rank_ephemeral_research(
+            mandate, canonical, policy, index, lattice,
+            now=now, authorized=authorized,
+            weights=ranking_weights or LexicalRankingWeights(),
+            max_results=max_retrieved_passages,
+            max_context_chars=max_context_chars,
+            max_receipts=8192,
+        )
+        fused = lexical_report_to_fusion(lexical)
+    else:
+        if ranking_weights is not None:
+            raise ValueError("lexical scoring parameters require lexical_bm25 mode")
+        lexical = None
+        fused = fuse_retrieval(
+            mandate, canonical, index, lattice, now=now,
+            authorized=authorized, revoked_source_ids=withdrawn,
+            max_results=max_retrieved_passages,
+            max_context_chars=max_context_chars,
+        )
+    numeric = inspect_numeric_discrepancies(
+        mandate, canonical, policy, fused, now=now, authorized=authorized,
+    )
+    temporal = detect_temporal_mentions(
+        mandate, canonical, policy, fused, now=now, authorized=authorized,
+    )
+    feedback = (
+        propose_reviewed_query_terms(
+            mandate, policy, workbench.objectives, lattice, index,
+            relevance_labels, now=now, authorized=authorized,
+        ) if relevance_labels else None
     )
     context = build_research_context(
         mandate, canonical, fused, now=now, authorized=authorized,
@@ -325,6 +382,9 @@ def compose_dragon_atlas(
         allocation=allocation, scorecard=scorecard, drift=drift,
         graph=graph, agenda=agenda, review_replay=review_replay,
         handoff=handoff, portfolio=portfolio, citations=citations,
+        lexical_ranking=lexical, numeric_signals=numeric,
+        temporal_signals=temporal, feedback=feedback,
+        retrieval_mode=retrieval_mode,
         stages=(), atlas_digest="",
     )
     stages = _stage_chain(
@@ -430,4 +490,32 @@ def verify_dragon_atlas_trace(
         max_citations=atlas.citations.max_citations,
         max_serialized_bytes=atlas.citations.max_serialized_bytes,
     )
+    if atlas.retrieval_mode not in ("fusion", "lexical_bm25"):
+        raise PermissionError("Atlas advertises an unknown retrieval algorithm")
+    if atlas.retrieval_mode == "fusion" and atlas.lexical_ranking is not None:
+        raise PermissionError("reciprocal fusion cannot claim BM25 scoring")
+    if atlas.retrieval_mode == "lexical_bm25":
+        if not atlas.lexical_ranking or (
+            lexical_report_to_fusion(atlas.lexical_ranking) != atlas.retrieval
+        ):
+            raise PermissionError("Atlas BM25 ranking receipt not bound to retrieved passages")
+    for report, field in (
+        (atlas.numeric_signals, "report_digest"),
+        (atlas.temporal_signals, "signal_digest"),
+    ):
+        if (
+            report.mandate_digest != mandate.fingerprint
+            or report.source_snapshot_digest != atlas.source_snapshot_digest
+            or report.source_policy_digest != atlas.policies.policy_digest
+            or report.retrieval_digest != atlas.retrieval.fusion_digest
+        ):
+            raise PermissionError("source-analysis report not bound to Atlas evidence")
+    if atlas.feedback is not None and (
+        atlas.feedback.mandate_digest != mandate.fingerprint
+        or atlas.feedback.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.feedback.policy_digest != atlas.policies.policy_digest
+        or atlas.feedback.query_lattice_digest != atlas.lattice.lattice_digest
+    ):
+        raise PermissionError("Atlas human-feedback projection references stale sources")
+
 

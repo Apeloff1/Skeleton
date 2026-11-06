@@ -119,4 +119,23 @@ from .citation_manifest import (
     verify_citation_manifest,
 )
 
+
+# Lexical research intelligence: optional source-only BM25 and human review.
+from .lexical_ranking import (
+    LexicalRankingWeights, PassageScore, LexicalRankingReport,
+    rank_ephemeral_research, lexical_report_to_fusion,
+)
+from .lexical_feedback import (
+    FeedbackTermCandidate, ObjectiveFeedback, FeedbackReport,
+    propose_reviewed_query_terms,
+)
+from .numeric_signals import (
+    NumericMention, NumericDiscrepancy, NumericSignalReport,
+    inspect_numeric_discrepancies,
+)
+from .temporal_signals import (
+    TemporalMention, TemporalNeighborhood, TemporalSignalReport,
+    detect_temporal_mentions,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]
