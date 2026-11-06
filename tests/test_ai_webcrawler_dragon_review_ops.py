@@ -69,7 +69,7 @@ class DragonReviewOperationsTest(unittest.TestCase):
 
     def test_integrated_six_operational_stage_chain(self):
         atlas = self.atlas
-        self.assertEqual(len(atlas.stages), 24)
+        self.assertEqual(len(atlas.stages), 25)
         self.assertEqual(atlas.stages[10].name, "policy_bound_evidence_graph")
         self.assertEqual(atlas.stages[11].name, "dependency_review_agenda")
         self.assertEqual(atlas.stages[12].name, "append_only_review_projection")

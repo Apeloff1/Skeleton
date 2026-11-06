@@ -139,9 +139,13 @@ class DragonSourceSimilarityTests(unittest.TestCase):
             ("https://example.com/a", self.base),
             ("https://example.org/b", self.base),
         )
-        a = self.f.atlas(
-            protected,
+        from skeleton.ai.webcrawler.dragon_campaign_stack import compose_dragon_atlas
+        a = compose_dragon_atlas(
+            self.mandate, protected,
+            objectives=(self.f.objective(),),
             source_policies=self.f.policies(protected, status="withdrawn"),
+            policy_snapshot_authenticated=True,
+            now=self.now, authorized=True,
         )
         self.assertEqual(a.similarity.considered_source_ids, ())
         self.assertEqual(a.similarity.compared_source_ids, ())

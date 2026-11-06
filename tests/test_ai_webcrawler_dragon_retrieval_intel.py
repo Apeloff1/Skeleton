@@ -370,7 +370,7 @@ class DragonRetrievalIntelligenceTest(unittest.TestCase):
         self.assertEqual(a.atlas_digest, b.atlas_digest)
         self.assertEqual(a.numeric_signals.report_digest, b.numeric_signals.report_digest)
         self.assertEqual(a.temporal_signals.signal_digest, b.temporal_signals.signal_digest)
-        self.assertEqual(len(a.stages), 24)
+        self.assertEqual(len(a.stages), 25)
         self.assertTrue(all(not x.content_may_be_trusted for x in a.stages))
 
 
