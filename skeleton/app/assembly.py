@@ -345,6 +345,13 @@ def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str
     return values
 
 
+def _unsafe_endpoint_character(value: str) -> bool:
+    """Reject controls, Unicode whitespace and invisible format characters before URL parsing."""
+    from unicodedata import category
+
+    return any(char.isspace() or category(char) in {"Cc", "Cf"} for char in value)
+
+
 def runtime_manifest(
     manifest: AssemblyManifest | None = None,
     *,
@@ -382,7 +389,7 @@ def runtime_manifest(
         }.get(service.name)
         raw = values.get(key, "") if key else ""
         if raw and service.public_url:
-            if any(ord(char) <= 32 or ord(char) == 127 for char in service.public_url):
+            if _unsafe_endpoint_character(service.public_url):
                 raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
             if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
@@ -421,7 +428,7 @@ def runtime_manifest(
         # for private services, but a declared URL must be local and unambiguous.
         if service.public_url:
             candidate = service.public_url
-            if any(ord(char) <= 32 or ord(char) == 127 for char in candidate):
+            if _unsafe_endpoint_character(candidate):
                 raise ValueError(f"{service.name} has an invalid local public URL")
             try:
                 parsed = urlsplit(candidate)
@@ -475,7 +482,7 @@ def public_service_urls(
         # urlsplit silently strips leading C0 controls and whitespace. Reject
         # the original bytes before parsing so a poisoned manifest cannot
         # become a seemingly trustworthy local endpoint in setup receipts.
-        if any(ord(char) <= 32 or ord(char) == 127 for char in public_url):
+        if _unsafe_endpoint_character(public_url):
             raise ValueError(f"{name} has an invalid local public URL")
         # A manifest URL is untrusted even without a host-port override.
         # Never return credential-bearing, remote, or ambiguous authorities to
