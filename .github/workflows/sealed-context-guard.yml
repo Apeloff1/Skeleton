@@ -8,6 +8,14 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'skeleton/ai/runtime/inference/local.py'
+      # Runtime model/qualification changes also alter guarded local-first execution.
+      - 'skeleton/ai/model_runtime/**'
+      - 'skeleton/ai/runtime/operational_ai/model/**'
+      - 'skeleton/ai/runtime/operational_ai/deployment/qualification/**'
+      - 'skeleton/app/local_ai.py'
+      - 'skeleton/testing/test_ai_real_model_qualification.py'
+      - 'skeleton/testing/test_ai_next_model.py'
+      - 'skeleton/testing/test_ai_native_endurance.py'
       - 'skeleton/ai/runtime/inference/guarded_service.py'
       - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
       - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'

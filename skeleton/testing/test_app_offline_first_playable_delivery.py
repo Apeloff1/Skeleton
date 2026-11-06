@@ -301,7 +301,8 @@ def test_dotdot_archive_alias_into_original_source_fails_before_publication(
 ):
     """Existing sibling/.. must not bypass source/output separation."""
     source, pin = original_source
-    sibling = tmp_path / "existing-sibling"
+    # The module-scoped source lives under tmp_path_factory, not this case's tmp_path.
+    sibling = source.parent / "existing-archive-sibling"
     sibling.mkdir()
     archive, install, save, receipt = _destinations(tmp_path)
     disguised = sibling / ".." / source.name / "poison.zip"
@@ -318,7 +319,7 @@ def test_dotdot_install_alias_into_original_source_fails_before_publication(
     original_source, tmp_path,
 ):
     source, pin = original_source
-    sibling = tmp_path / "existing-sibling"
+    sibling = source.parent / "existing-install-sibling"
     sibling.mkdir()
     archive, install, save, receipt = _destinations(tmp_path)
     disguised = sibling / ".." / source.name / "new-install"

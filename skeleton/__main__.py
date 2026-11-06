@@ -54,6 +54,26 @@ Commands:
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat-checkpoints  Replay and verify portable expedition checkpoints
     combat-expedition  Play source-bound tactical expedition with earned rewards
+    combat-expedition-audit  Audit replay-bound expedition economy
+    combat-expedition-solve  Solve original expedition routes
+    combat-expedition-playbook  Rehearse tactical expedition playbooks
+    arena-terrain  Run original tactical terrain
+    combat-contract  Play source-bound combat contracts
+    combat-contract-author  Author bounded combat contracts
+    combat-contract-solve  Solve replay-verified combat contracts
+    combat-contract-package  Package authored combat contracts
+    combat-campaign-player  Play and checkpoint combat campaigns
+    combat-campaign-timeline  Audit earned campaign checkpoints
+    combat-drill  Run original combat drills
+    combat-drill-solve  Solve replay-verified combat drills
+    combat-league  Play original combat leagues
+    combat-league-author  Author original combat leagues
+    combat-career  Play original league careers
+    combat-career-advice  Inspect replay-bound career advice
+    combat-career-author  Author original league careers
+    combat-career-roadmap  Plan bounded career routes
+    combat-stamina  Run source-bound stamina combat
+    combat-inspect  Inspect combat session evidence
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
@@ -787,6 +807,66 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-expedition":
         from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
         return expedition_cli(rest)
+    if cmd == "combat-expedition-audit":
+        from skeleton.game.gameplay.arena_expedition_economy import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-expedition-solve":
+        from skeleton.game.gameplay.arena_expedition_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-expedition-playbook":
+        from skeleton.game.gameplay.arena_expedition_playbook import cli as route_cli
+        return route_cli(rest)
+    if cmd == "arena-terrain":
+        from skeleton.game.gameplay.arena_terrain import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract":
+        from skeleton.game.gameplay.combat_contract import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract-author":
+        from skeleton.game.gameplay.combat_contract_author import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract-solve":
+        from skeleton.game.gameplay.combat_contract_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract-package":
+        from skeleton.game.gameplay.combat_contract_package import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-campaign-player":
+        from skeleton.game.gameplay.combat_campaign_player import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-campaign-timeline":
+        from skeleton.game.gameplay.combat_campaign_timeline import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-drill":
+        from skeleton.game.gameplay.combat_drill import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-drill-solve":
+        from skeleton.game.gameplay.combat_drill_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-league":
+        from skeleton.game.gameplay.combat_league import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-league-author":
+        from skeleton.game.gameplay.combat_league_author import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career":
+        from skeleton.game.gameplay.combat_league_career import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career-advice":
+        from skeleton.game.gameplay.combat_league_career_advice import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career-author":
+        from skeleton.game.gameplay.combat_league_career_author import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career-roadmap":
+        from skeleton.game.gameplay.combat_league_career_roadmap import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-stamina":
+        from skeleton.game.gameplay.combat_stamina import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-inspect":
+        from skeleton.game.gameplay.combat_inspector import cli as route_cli
+        return route_cli(rest)
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)

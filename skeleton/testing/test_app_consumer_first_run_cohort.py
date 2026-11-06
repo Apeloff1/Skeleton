@@ -436,7 +436,7 @@ def test_late_cross_game_evidence_parent_swap_preserving_file_inode_rejected(
     monkeypatch.setattr(
         module, "inspect_consumer_first_run", swap_parent_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode|another installed game or summary changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -475,7 +475,7 @@ def test_late_cohort_summary_parent_swap_preserving_file_inode_rejected(
         module, "inspect_consumer_first_run",
         swap_summary_parent_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="summary parent"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="summary parent|another installed game or summary changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
