@@ -492,3 +492,48 @@ host-loss resilience without misrepresenting those copies as independent
 corroboration. This check cannot prove copying intent, common ownership or
 factual truth. The backend returns hashed/counted metadata only; no captured
 page body or active content is exposed in the Atlas panel.
+
+
+## Source copy-inflation and objective stress: Atlas stages 25–26
+
+The source-bound Dragon Atlas now has two additional, independent read-only
+inspection stages. Neither is a source-authentication certificate, new
+persistent search store, task dispatcher, provider interface or network actor.
+
+**Stage 25 — near-duplicate provenance.** Selected captured source texts
+are checked against current owner-scoped use policy, current source hashes
+and exact retained passage spans. Bounded Unicode NFKC/casefold 4-token
+shingle comparisons produce candidate pairs with Jaccard, smaller-set
+containment and size-ratio diagnostics. Exact copies are distinguished from
+edited near copies. The work is limited to at most 32 selected source
+records, 496 pairs, 24,000 characters and 6,000 words per source. Short,
+overlarge or unscorable sources are visible policy-bound holds, never
+silently asserted dissimilar.
+
+The near-duplicate scanner exposes metadata only. It does not fetch pages,
+prove plagiarism, determine common ownership, establish chronology or
+infer factual correctness. Transitive clusters carry explicit warnings
+that two indirectly connected endpoints may not be directly similar.
+
+**Stage 26 — objective source-family collapse stress.** Each
+operator-authored research objective is evaluated under three selected
+evidence interpretations: number of source records, number of distinct
+exact-text hash families and number of possible near-copy clusters.
+The result includes heuristic target shortfall, sensitivity to losing an
+observed host, sources excluded from similarity scoring and reasons a
+human reviewer should investigate apparent source dependence.
+
+A possible near-copy cluster count is an *analysis scenario*, not a
+credible lower bound on real independent witnesses. Dissimilar sources can
+copy the same claim. No source record, exact-text family or potential
+cluster can satisfy a human attestation automatically.
+
+Both stages are hashed into the existing Atlas deterministic stage chain.
+Trace verification recomputes their reports against the current captured
+snapshot; changing a reported count without changing the original source
+data fails verification. The authenticated backend returns only bounded
+aggregates and review leads. The Jeeves UI displays source-families,
+hypothetical dependence and unscored holdings, never raw page bodies.
+Regression coverage includes revocation, mutation, host removal, unseen
+source IDs, Unicode normalization, exact mirrors, edited copies, hard
+budget ceilings, no-evidence goals and forged authority flags.
