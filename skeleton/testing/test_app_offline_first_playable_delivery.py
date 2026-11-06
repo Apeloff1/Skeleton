@@ -431,7 +431,10 @@ def test_consumer_first_run_evidence_replays_real_installed_game(
     result = json.loads(capsys.readouterr().out)
     assert result["source_level_replay_passes"] == 2
     assert result["installed_game_and_private_save_reexecuted"] is True
-    assert result["all_input_inodes_stable_during_inspection"] is True
+    # Point-in-time custody snapshots are not a persistent filesystem lock.
+    assert result["all_input_inodes_stable_during_inspection"] is False
+    assert result["root_and_evidence_inodes_stable_during_inspection"] is True
+    assert result["nested_asset_inode_snapshots_equal"] is True
     assert result["files_published"] == 0
     assert result["read_only"] is True
     assert result["native_device_qualified"] is False

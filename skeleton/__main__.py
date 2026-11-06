@@ -54,6 +54,8 @@ Commands:
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat-checkpoints  Replay and verify portable expedition checkpoints
     combat-expedition  Play source-bound tactical expedition with earned rewards
+    quest-expedition  Play source-bound quest expeditions and replay
+    quest-author  Author and validate original expedition quests
     combat-expedition-audit  Audit replay-bound expedition economy
     combat-expedition-solve  Solve original expedition routes
     combat-expedition-playbook  Rehearse tactical expedition playbooks
@@ -807,6 +809,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-expedition":
         from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
         return expedition_cli(rest)
+    if cmd == "quest-expedition":
+        from skeleton.game.gameplay.expedition_quest import cli as quest_cli
+        return quest_cli(rest)
+    if cmd == "quest-author":
+        from skeleton.game.gameplay.expedition_quest_author import cli as quest_author_cli
+        return quest_author_cli(rest)
     if cmd == "combat-expedition-audit":
         from skeleton.game.gameplay.arena_expedition_economy import cli as route_cli
         return route_cli(rest)
