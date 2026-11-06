@@ -163,4 +163,9 @@ from .near_duplicate_audit import (
     inspect_selected_source_similarity,
 )
 
+from .evidence_family_stress import (
+    ObjectiveFamilyStress, EvidenceFamilyStress,
+    stress_test_evidence_families,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]

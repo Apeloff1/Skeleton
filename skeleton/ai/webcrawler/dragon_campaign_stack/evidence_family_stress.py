@@ -149,8 +149,8 @@ def stress_test_evidence_families(
         robustness.source_snapshot_digest, similarity.source_snapshot_digest,
     )):
         raise PermissionError("stale source-family snapshot")
-    if policy.policy_digest not in (
-        robustness.policy_digest, similarity.source_policy_digest
+    if robustness.policy_digest != policy.policy_digest or (
+        similarity.source_policy_digest != policy.policy_digest
     ) or robustness.retrieval_digest != retrieval.fusion_digest or (
         similarity.retrieval_digest != retrieval.fusion_digest
     ) or robustness.objective_plan_digest != objective_plan.plan_digest:

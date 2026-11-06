@@ -53,6 +53,7 @@ from .slice_simulation import HypotheticalSlicePlan, simulate_canonical_slice
 from .dispatch_faults import DispatchFaultLedger, analyze_dispatch_faults
 from .retrieval_robustness import RetrievalRobustnessAudit, analyze_retrieval_robustness
 from .near_duplicate_audit import SourceSimilarityAudit, inspect_selected_source_similarity
+from .evidence_family_stress import EvidenceFamilyStress, stress_test_evidence_families
 from .evidence_graph import EvidenceGraph, assemble_evidence_graph
 from .review_agenda import ReviewAgenda, compile_review_agenda
 from .review_replay import ReviewReplay, replay_human_reviews
@@ -89,6 +90,7 @@ STAGES = (
     "dispatch_fault_and_recovery_impacts",
     "selected_evidence_host_ablation_and_reuse",
     "near_duplicate_source_provenance_screening",
+    "objective_evidence_family_collapse_stress",
 )
 
 
@@ -136,6 +138,7 @@ class DragonAtlas:
     faults: DispatchFaultLedger
     robustness: RetrievalRobustnessAudit
     similarity: SourceSimilarityAudit
+    family_stress: EvidenceFamilyStress
     retrieval_mode: str
     stages: tuple[AtlasStage, ...]
     atlas_digest: str
@@ -211,6 +214,7 @@ def _receipts(atlas: DragonAtlas) -> tuple[tuple[str, str | None], ...]:
         ("dispatch_fault_and_recovery_impacts", atlas.faults.ledger_digest),
         ("selected_evidence_host_ablation_and_reuse", atlas.robustness.audit_digest),
         ("near_duplicate_source_provenance_screening", atlas.similarity.audit_digest),
+        ("objective_evidence_family_collapse_stress", atlas.family_stress.stress_digest),
     )
 
 
@@ -410,6 +414,10 @@ def compose_dragon_atlas(
         mandate, canonical, policy, fused,
         now=now, authorized=authorized,
     )
+    family_stress = stress_test_evidence_families(
+        mandate, canonical, workbench.objectives, policy, fused,
+        robustness, similarity, now=now, authorized=authorized,
+    )
     root = DragonAtlas(
         run_id=canonical["run_id"],
         mandate_digest=mandate.fingerprint,
@@ -424,7 +432,7 @@ def compose_dragon_atlas(
         lexical_ranking=lexical, numeric_signals=numeric,
         temporal_signals=temporal, feedback=feedback,
         routes=routes, simulation=simulation, faults=faults,
-        robustness=robustness, similarity=similarity,
+        robustness=robustness, similarity=similarity, family_stress=family_stress,
         retrieval_mode=retrieval_mode,
         stages=(), atlas_digest="",
     )
@@ -623,3 +631,25 @@ def verify_dragon_atlas_trace(
     )
     if expected_similarity != atlas.similarity:
         raise PermissionError("Atlas selected-source similarity was altered")
+    if (
+        atlas.family_stress.mandate_digest != mandate.fingerprint
+        or atlas.family_stress.source_snapshot_digest != atlas.source_snapshot_digest
+        or atlas.family_stress.policy_digest != atlas.policies.policy_digest
+        or atlas.family_stress.retrieval_digest != atlas.retrieval.fusion_digest
+        or atlas.family_stress.objective_plan_digest != atlas.workbench.objectives.plan_digest
+        or atlas.family_stress.robustness_digest != atlas.robustness.audit_digest
+        or atlas.family_stress.similarity_digest != atlas.similarity.audit_digest
+        or atlas.family_stress.independent_sources_certified
+        or atlas.family_stress.claim_correctness_verified
+        or atlas.family_stress.source_text_exported
+        or atlas.family_stress.model_or_network_invoked
+        or not atlas.family_stress.human_review_required
+    ):
+        raise PermissionError("Atlas evidence-family stress exceeded source authority")
+    expected_family_stress = stress_test_evidence_families(
+        mandate, canonical, atlas.workbench.objectives,
+        atlas.policies, atlas.retrieval, atlas.robustness,
+        atlas.similarity, now=now, authorized=authorized,
+    )
+    if expected_family_stress != atlas.family_stress:
+        raise PermissionError("Atlas evidence-family collapse scenario was altered")
