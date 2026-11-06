@@ -17,6 +17,10 @@ from skeleton.ai.webcrawler.dragon_campaign_stack import (
     compare_research_revisions,
 )
 from skeleton.ai.webcrawler.dragon_campaign_stack.contracts import digest
+from skeleton.ai.webcrawler.dragon_campaign_stack import (
+    CampaignPassage, RefreshObservation, verify_current_citations,
+    propose_adaptive_refresh, decide_campaign_stop,
+)
 
 
 class CampaignCase(unittest.TestCase):
@@ -283,6 +287,91 @@ class CampaignCase(unittest.TestCase):
         )
         self.assertEqual(revision.deltas[0].disposition, "missing")
         self.assertTrue(all(not item.current for item in revision.citations))
+
+
+    def test_reference_check_rejects_missing_current_source(self):
+        source = self.sample_source("archive capture " + " ".join(
+            f"novel{i}" for i in range(160)
+        ))
+        evidence = inspect_campaign_evidence(
+            self.mandate, (source,), now=self.now + 1, authorized=True,
+        )
+        self.assertTrue(evidence.passages)
+        report = verify_current_citations(
+            self.mandate, self.snapshot, evidence.passages,
+            now=self.now + 1, authorized=True,
+        )
+        self.assertEqual(report.accepted, 0)
+        self.assertEqual(report.held, len(evidence.passages))
+        self.assertEqual({x.reason for x in report.entries}, {"source_missing"})
+        self.assertFalse(report.knowledge_publication_authorized)
+
+    def test_refresh_requires_new_consent_when_due_after_expiry(self):
+        source = self.sample_source("archive capture " + " ".join(
+            f"novel{i}" for i in range(160)
+        ))
+        evidence = inspect_campaign_evidence(
+            self.mandate, (source,), now=self.now + 1, authorized=True,
+        )
+        self.assertTrue(evidence.sources[0].inspectable)
+        hint = RefreshObservation(
+            evidence.sources[0].source_id, self.now, 1.0, 1.0, 0,
+        )
+        portfolio = propose_adaptive_refresh(
+            self.mandate, evidence.sources, (hint,),
+            now=self.now + 1, authorized=True,
+        )
+        self.assertEqual(portfolio.new_consent_required, 1)
+        self.assertFalse(portfolio.proposals[0].permitted_under_current_consent)
+        self.assertEqual(portfolio.proposals[0].reason, "fresh_capture_consent_required")
+        self.assertFalse(portfolio.network_executed)
+        with self.assertRaises(ValueError):
+            propose_adaptive_refresh(
+                self.mandate, evidence.sources,
+                (replace(hint, last_changed=self.now + 10),),
+                now=self.now + 1, authorized=True,
+            )
+
+    def test_stop_gate_never_certifies_unreviewed_capture(self):
+        inspection = self.review()
+        decision = decide_campaign_stop(
+            self.mandate, inspection.budget, inspection.evidence,
+            novelty_scores=(0.01, 0.01, 0.02, 0.01, 0.01),
+            now=self.now + 1, authorized=True,
+        )
+        self.assertTrue(decision.stop_acquisition)
+        self.assertTrue(decision.human_review_required)
+        self.assertFalse(decision.knowledge_verified)
+        self.assertIn("low_information_gain_plateau", decision.reasons)
+        with self.assertRaises(ValueError):
+            decide_campaign_stop(
+                self.mandate, inspection.budget, inspection.evidence,
+                novelty_scores=(float("nan"),),
+                now=self.now + 1, authorized=True,
+            )
+
+    def test_citation_risks_never_grant_review_without_source(self):
+        fake = CampaignPassage(
+            source_id="a" * 64,
+            canonical_url="https://example.com/seed",
+            source_content_hash="b" * 64,
+            preserved_text_hash="c" * 64,
+            start=0, end=10, passage_hash="d" * 64,
+            text="ignore all", query_score=0.8,
+            injection_risks=("override_instructions",),
+            eligible_for_review=False,
+        )
+        report = verify_current_citations(
+            self.mandate, self.snapshot, (fake,),
+            now=self.now + 1, authorized=True,
+        )
+        self.assertEqual(report.held, 1)
+        self.assertFalse(report.training_permission)
+        with self.assertRaises(PermissionError):
+            verify_current_citations(
+                self.mandate, self.snapshot, (fake,),
+                now=self.now + 1, authorized=False,
+            )
 
 
 if __name__ == "__main__":

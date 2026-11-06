@@ -21,6 +21,9 @@ scheduler, provider, model, database or parallel storage authority.
 | diagnostics | Utilization, rejection, truncation and review-pressure counters | Unknown values or fabricated estimates |
 | recovery | Physical worker join and canonical checkpoint custody preflight | Unconfirmed worker or Mongo commit |
 | control | Plan, pause, resume, cancel proposals against exact sequence | Stale source, wrong authority, unsafe transition |
+| references | Recheck exact citation hashes, Unicode offsets and current retained text | Missing, stale, partial, withdrawn or injection-held capture |
+| recrawl_advisory | Adaptive source reread proposals from trusted volatility observations | Out-of-consent future read and unretained source IDs |
+| stopping | Explicit plateau and budget stop with unreviewed evidence escalation | Never auto-promotes a claim or assumes host independence |
 
 ## Authorized usage
 
@@ -60,3 +63,7 @@ checkpoint semantics; unknown transport outcomes keep their reserved budget.
 Rollback is to stop consuming the additive inspection adapter or revert
 the feature commit. No database migration, new service, durable authority,
 model provider dependency or additional network endpoint was introduced.
+
+Reference revalidation and adaptive recrawl planning are also offline, advisory
+operations. A due date outside the current consent window requires a newly
+approved capture; a citation hash match is only eligibility for human review.
