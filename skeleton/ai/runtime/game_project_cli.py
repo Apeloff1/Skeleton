@@ -108,6 +108,21 @@ def _anchored_parent(path: Path):
         os.close(parent_fd)
 
 
+def _revalidate_parent(target: Path, parent_fd: int) -> None:
+    """Catch parent-directory substitution during a file custody window."""
+    try:
+        original = os.fstat(parent_fd)
+        with _anchored_parent(target) as (fresh_fd, _, _):
+            if fresh_fd is None:
+                raise GameCapsuleError("game project parent identity changed")
+            refreshed = os.fstat(fresh_fd)
+    except (OSError, GameCapsuleError) as exc:
+        raise GameCapsuleError("game project parent identity changed") from exc
+    if ((original.st_dev, original.st_ino)
+            != (refreshed.st_dev, refreshed.st_ino)):
+        raise GameCapsuleError("game project parent identity changed")
+
+
 def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any]:
     if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_RESULT_BYTES:
         raise GameCapsuleError("invalid game project input budget")
@@ -135,6 +150,7 @@ def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any
             if (not stat.S_ISREG(named.st_mode)
                     or (named.st_dev, named.st_ino) != (info.st_dev, info.st_ino)):
                 raise GameCapsuleError("game project input identity changed")
+            _revalidate_parent(target, parent_fd)
     if len(data) > max_bytes:
         raise GameCapsuleError("game project input exceeded local file budget")
     try:
@@ -164,6 +180,8 @@ def _write_new(path: Path, result: dict[str, Any]) -> str:
         if parent_fd is None and (target.exists() or target.is_symlink()
                                    or not target.parent.is_dir()):
             raise GameCapsuleError("project output must be a new file in an existing directory")
+        if parent_fd is not None:
+            _revalidate_parent(target, parent_fd)
         try:
             if parent_fd is None:
                 fd = os.open(target, flags, 0o600)
@@ -186,6 +204,7 @@ def _write_new(path: Path, result: dict[str, Any]) -> str:
             if (not stat.S_ISREG(named.st_mode)
                     or (named.st_dev, named.st_ino) != (info.st_dev, info.st_ino)):
                 raise GameCapsuleError("game project output identity changed")
+            _revalidate_parent(target, parent_fd)
     return str(target)
 
 
