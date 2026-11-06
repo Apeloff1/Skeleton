@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
+# Explicit event-subscriber inventory: no extra independent Actions admission.
+MAX_INDEPENDENT_WORKFLOWS = 24
 
 
 def events(source: str) -> set[str]:
@@ -63,6 +65,13 @@ def audit(root: Path = ROOT) -> list[str]:
     names = specialised + core + reusable
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
+    approved = policy.get("automatic_event_workflows")
+    if (not isinstance(approved, list) or not approved
+            or any(type(name) is not str or not name.endswith((".yml", ".yaml"))
+                   or "/" in name or name.startswith(".") for name in approved)
+            or len(approved) != len(set(approved))
+            or len(approved) > MAX_INDEPENDENT_WORKFLOWS):
+        return ["invalid explicit automatic workflow inventory"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
         failures.append("release rules must preserve explicit qualification")
@@ -73,6 +82,7 @@ def audit(root: Path = ROOT) -> list[str]:
     # Signed evidence workflows may sit beside the compact PR set when they
     # cannot run automatically. Only non-manual triggers consume the cap.
     automatic = 0
+    automatic_files: set[str] = set()
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -83,8 +93,17 @@ def audit(root: Path = ROOT) -> list[str]:
             continue
         if independently_triggered(found):
             automatic += 1
-    if automatic > 20:
+            automatic_files.add(path.name)
+    if automatic > MAX_INDEPENDENT_WORKFLOWS:
         failures.append(f"unexpected active workflow count: {automatic}")
+    # Numeric caps alone admit unauthorized replacement beneath the ceiling.
+    # Both new automatic subscribers and missing expected gates fail closed.
+    unregistered = sorted(automatic_files - set(approved))
+    missing = sorted(set(approved) - automatic_files)
+    if unregistered:
+        failures.append(f"unregistered automatic workflows: {unregistered}")
+    if missing:
+        failures.append(f"expected automatic workflows not triggered: {missing}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():
