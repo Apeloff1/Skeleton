@@ -232,6 +232,18 @@ def install_application(
     # Admit one process environment before runtime preflight; all later
     # manifest, Compose and readiness decisions consume the same snapshot.
     admitted_process_env = dict(os.environ)
+    # Observe the .env source before preflight itself can read its contents.
+    # Recheck afterward so configuration changes during validation cannot
+    # certify startup using a different source or inode.
+    admitted_digest: str | None = None
+    if start:
+        try:
+            # A fresh installed runtime must have a bounded private source.
+            # No bypass for a missing or replaced .env, including bundled EXEs.
+            admitted_digest = runtime_source_fingerprint(root)
+        except (OSError, ValueError, UnicodeError):
+            phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
     manifest = load_manifest()
     runtime_checks = preflight(
         root, runtime=True, manifest=manifest, environ=admitted_process_env,
@@ -251,15 +263,9 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
-    admitted_digest: str | None = None
-    if start:
-        try:
-            # A fresh installed runtime must have a bounded private source.
-            # No bypass for a missing or replaced .env, including bundled EXEs.
-            admitted_digest = runtime_source_fingerprint(root)
-        except (OSError, ValueError, UnicodeError):
-            phases.append(_runtime_source_rejection())
-            return InstallReceipt(root=root, phases=tuple(phases))
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
     # A concurrent operator change to os.environ after preflight cannot make
     # startup validate one port while a later probe uses another port.
     try:

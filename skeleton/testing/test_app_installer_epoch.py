@@ -539,3 +539,32 @@ def test_preflight_and_startup_share_exact_process_environment(
         ("up", "3100"),
         ("probe", "http://localhost:3100"),
     ]
+
+
+@pytest.mark.parametrize("same_bytes", [True, False])
+def test_runtime_preflight_cannot_swap_private_config_before_epoch_admission(
+    tmp_path, monkeypatch, same_bytes,
+):
+    env = _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+
+    def changing_preflight(*args, **kwargs):
+        original = env.read_bytes()
+        replacement = tmp_path / "operator-preflight-change"
+        replacement.write_bytes(
+            original if same_bytes else original + b"PORT_OVERRIDE=untrusted\n"
+        )
+        os.replace(replacement, env)
+        return ()
+
+    monkeypatch.setattr(installer, "preflight", changing_preflight)
+    receipt = installer.install_application(
+        tmp_path, start=True, install_python=False,
+        runner=lambda *args, **kwargs: pytest.fail(
+            "preflight source drift must reject before Compose runs"
+        ),
+    )
+    assert receipt.ok is False
+    assert receipt.phases[-1].name == "runtime-source-epoch"
+    assert not any(x.name in {"compose-config", "start", "readiness"}
+                   for x in receipt.phases)
