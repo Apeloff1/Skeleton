@@ -49,7 +49,15 @@ def inspect_recovery(store: str | Path, world_id: str, slot: str | None = None,
     # A stage cannot be successful while simultaneously reporting an error.
     # Treat contradictory owner diagnostics as invalid rather than green.
     for stage in required:
-        if checks[stage].get("ok") is True and checks[stage].get("error"):
+        state = checks[stage]
+        # Reject non-boolean success flags and non-string error fields.
+        # Malformed diagnostics are never canonical evidence.
+        if type(state.get("ok")) is not bool or (
+            "error" in state and
+            (not isinstance(state["error"], str) or not state["error"])
+        ):
+            checks[stage] = {"ok": False, "error": "laptop_recovery_stage_invalid"}
+        elif state["ok"] and "error" in state:
             checks[stage] = {"ok": False, "error": "laptop_recovery_stage_contradictory"}
     ready = all(checks[stage].get("ok") is True and not checks[stage].get("error")
                 for stage in required)
