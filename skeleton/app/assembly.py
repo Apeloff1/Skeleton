@@ -416,6 +416,31 @@ def runtime_manifest(
             service = replace(
                 service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
             )
+        # Direct runtime_manifest consumers must not bypass the same URL trust
+        # boundary enforced by public_service_urls. A missing URL is allowed
+        # for private services, but a declared URL must be local and unambiguous.
+        if service.public_url:
+            candidate = service.public_url
+            if any(ord(char) <= 32 or ord(char) == 127 for char in candidate):
+                raise ValueError(f"{service.name} has an invalid local public URL")
+            try:
+                parsed = urlsplit(candidate)
+                port = parsed.port
+                trusted = (
+                    parsed.scheme in {"http", "https"}
+                    and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+                    and parsed.username is None
+                    and parsed.password is None
+                    and not parsed.query
+                    and not parsed.fragment
+                    and parsed.path in {"", "/"}
+                    and port is not None
+                    and 1 <= port <= 65535
+                )
+            except ValueError:
+                trusted = False
+            if not trusted:
+                raise ValueError(f"{service.name} has an invalid local public URL")
         services.append(service)
     return replace(manifest, services=tuple(services))
 
