@@ -32,7 +32,11 @@ class FrontierOperationTests(unittest.TestCase):
         self.now = f.now + 3
         self.mandate = f.mandate
         self.snapshot = f.empty
-        self.report = f.inspect()
+        from skeleton.ai.webcrawler.dragon_campaign_stack import inspect_crawl_campaign
+        self.report = inspect_crawl_campaign(
+            self.snapshot, self.mandate,
+            now=self.now, authorized=True,
+        )
         self.routes = project_canonical_routes(
             self.mandate, self.snapshot, now=self.now, authorized=True,
         )
