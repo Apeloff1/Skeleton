@@ -19,6 +19,7 @@ from .contradictions import CitationDependency, DisagreementGraph, build_disagre
 from .coverage import CoverageReport, measure_objective_coverage
 from .frontier_graph import FrontierTopology, analyze_frontier_topology
 from .integration import CampaignInspection, inspect_crawl_campaign
+from .lineage import SourceLink
 from .mission_strategy import MissionStrategy, prioritize_unmet_research
 from .objectives import ObjectivePlan, ResearchObjective, compile_objectives
 from .references import CitationReport, verify_current_citations
@@ -63,6 +64,7 @@ def compose_dragon_workbench(
     claim_citations: Iterable[ClaimCitation] = (),
     independence_attestations: Iterable[IndependenceAttestation] = (),
     citation_dependencies: Iterable[CitationDependency] = (),
+    source_links: Iterable[SourceLink] = (),
     novelty_scores: Iterable[float] = (),
 ) -> DragonWorkbench:
     mandate.admit(now=now, authorized=authorized)
@@ -76,10 +78,11 @@ def compose_dragon_workbench(
     citations_rows = tuple(claim_citations)
     groups = tuple(independence_attestations)
     dependencies = tuple(citation_dependencies)
+    links = tuple(source_links)
     history = tuple(novelty_scores)
     inspection = inspect_crawl_campaign(
         canonical, mandate, now=now, authorized=authorized,
-        revoked_source_ids=revoked,
+        revoked_source_ids=revoked, links=links,
     )
     plan = compile_objectives(
         mandate, objective_rows, now=now, authorized=authorized,

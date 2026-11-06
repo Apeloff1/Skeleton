@@ -126,3 +126,75 @@ must pass alongside the original focused suite. Backend source files are
 compiled in the same workflow. This does not replace live Mongo/API auth,
 real transport, performance, install or release qualification.
 
+
+
+## Dragon Atlas: source-policy-first operational research (additional workload)
+
+The Atlas is a bounded, synchronous extension of the existing canonical
+CrawlRun snapshot owner, not an alternative fetcher or database. Core entry
+point: skeleton.ai.webcrawler.dragon_campaign_stack.compose_dragon_atlas.
+It requires a caller-authenticated current policy decision for *every*
+captured source before any retained page text is ranked or serialized.
+
+### Ten strictly ordered stages
+
+1. Authenticated, exact-source policy projection: explicit consent, purpose,
+   policy revision, source content hash, effective/expiry window, complete
+   retained-source universe. Missing and expired policy decisions fail closed
+   or exclude sources. Rights, publishing and training remain separately held.
+2. Canonical workbench: budget, risk, robots, goals, claim matrix, lineage,
+   source revalidation, review packet and mission stop controls.
+3. Operator-objective query lattice: finite, deterministic, bounded lexical
+   variants, each traceable to an operator objective. Never expand the URL
+   allowlist or accept model/page-generated research instructions as authority.
+4. Ephemeral source index: exact Unicode span/text/hash revalidation from a
+   fully validated canonical CrawlRun snapshot.
+5. Multiple-query, rank-fused retrieval: bounded reciprocal-rank aggregation,
+   objective IDs, per-source and per-host caps, current withdrawal enforcement
+   on every constituent search, no external embeddings or provider calls.
+6. Research context envelope: strict source-content hash/span/withdrawal checks,
+   JSON data encapsulation, byte/character/reference caps and explicit
+   untrusted-data status. The consumer must separately maintain a safe prompt
+   boundary, request fresh policy and never obey page instructions.
+7. Independence counter-audit: operator-supplied provenance groups are
+   collapsed when exact copies, revisions or derived lineage could inflate
+   corroboration. No conclusion is auto-verified.
+8. Canonical-frontier allocator: advisory host-fair dispatch slots based only
+   on the immutable current frontier, conservative capacity and independently
+   observed resource pressure. Without measured telemetry the planner returns
+   zero slots; backend CAS, robots, DNS, consent and physical-worker fences
+   remain mandatory.
+9. Review scorecard: source eligibility, objective coverage, unreviewed claims,
+   evidence references, independent group deficits and immutable hard holds.
+   Scores are diagnostic triage quantities, not probabilities or certification.
+10. Optional cross-checkpoint drift: same-run sequence checks, revision and
+    withdrawal invalidation without falsely inferring remote content freshness.
+
+Every stage is linked to a previous-stage SHA-256 receipt. This is
+tamper-evident deterministic bookkeeping, **not authentication**. Atlas
+trace verification checks exact-run/snapshot/stage identities and rejects
+authority escalation, but it cannot authenticate operator-supplied source
+policy or replace backend admission and human review.
+
+### Backend integration contract
+
+Retrieve the tenant/owner-bound CrawlRun and its complete current source
+policy under the existing authenticated backend route. Mark
+policy_snapshot_authenticated true only *after* that authority has been
+verified by the application; model-generated or caller-provided booleans
+without an authenticated boundary are not a valid integration. Run Atlas
+synchronously on this read-only snapshot, do not store or publish the
+context envelope as knowledge, and recheck policy before any downstream
+consumer reads it. No new network service, new policy grant, database
+migration, autonomous worker or source use permission is introduced.
+
+### Regression qualification
+
+python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_atlas.py' -v
+
+The exact-head Dragon source workflow additionally compiles all Atlas
+modules, then runs existing campaign tests and Atlas tests. It is only one
+source qualification boundary. Root AGENTS.md rules, wider backend and
+security checks, live-device E2E, authorization route tests, packaging and
+release approval are separate mandatory gates. This branch remains a
+draft until those gates are independently satisfied.

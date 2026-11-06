@@ -59,4 +59,30 @@ from .contradictions import (
 from .robots_audit import OriginRobots, RobotsAudit, audit_robots_state
 from .workbench import DragonWorkbench, compose_dragon_workbench
 
+
+# Atlas source-policy-first research pipeline. Explicit imports are inert:
+# no network, persistence, worker spawning or source authority on import.
+from .query_lattice import QueryVariant, QueryLattice, compile_query_lattice
+from .retrieval_fusion import FusedEvidence, RetrievalFusion, fuse_retrieval
+from .context_envelope import (
+    EnvelopeReference, ResearchContextEnvelope, build_research_context,
+)
+from .source_drift import DriftEntry, SnapshotDrift, analyze_snapshot_drift
+from .policy_matrix import (
+    SourcePolicyDecision, SourcePolicyFinding, SourcePolicyProjection,
+    project_source_policy,
+)
+from .independence_audit import (
+    CorrelatedGroups, ClaimIndependence, IndependenceAudit, audit_independence,
+)
+from .frontier_allocator import (
+    DispatchSlot, AllocationAdvice, allocate_frontier_advisory,
+)
+from .quality_scorecard import (
+    QualityDimension, ResearchScorecard, measure_research_scorecard,
+)
+from .research_pipeline import (
+    AtlasStage, DragonAtlas, compose_dragon_atlas, verify_dragon_atlas_trace,
+)
+
 __all__ = [name for name in globals() if not name.startswith("_")]
