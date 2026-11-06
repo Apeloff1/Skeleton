@@ -385,3 +385,21 @@ def test_manifest_accepts_bounded_integer_container_port():
             "depends_on": [], "container_port": port,
         })
         assert service.container_port == port
+
+
+@pytest.mark.parametrize(("key", "invalid"), [
+    ("default_services", "frontend"),
+    ("full_services", "frontend"),
+    ("default_services", ["frontend", 17]),
+    ("full_services", ["frontend", None]),
+    ("default_services", ["frontend", " frontend"]),
+    ("full_services", ["frontend", "frontend"]),
+])
+def test_manifest_rejects_malformed_service_selection(key, invalid):
+    import json
+    from skeleton.app.assembly import _manifest_bytes, parse_manifest
+
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    payload["app"][key] = invalid
+    with pytest.raises(ValueError, match=key):
+        parse_manifest(payload)

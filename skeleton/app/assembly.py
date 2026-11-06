@@ -214,8 +214,21 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     if "development" not in modes or "production" not in modes:
         raise ValueError("app modes must define development and production")
 
-    default_services = tuple(str(item) for item in app.get("default_services", ()))
-    full_services = tuple(str(item) for item in app.get("full_services", ()))
+    # Do not coerce malformed JSON into service identifiers. In particular,
+    # a string is iterable and would otherwise be split into characters.
+    def _service_selection(key: str) -> tuple[str, ...]:
+        raw = app.get(key)
+        if not isinstance(raw, list) or any(
+            not isinstance(item, str) or not item.strip() or item != item.strip()
+            for item in raw
+        ):
+            raise ValueError(f"{key} must be a list of non-empty service names")
+        if len(raw) != len(set(raw)):
+            raise ValueError(f"{key} contains duplicate services")
+        return tuple(raw)
+
+    default_services = _service_selection("default_services")
+    full_services = _service_selection("full_services")
     unknown = (set(default_services) | set(full_services)) - set(names)
     if unknown:
         raise ValueError(f"manifest references unknown services: {sorted(unknown)}")
