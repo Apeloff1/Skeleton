@@ -162,3 +162,20 @@ def test_safe_ipv6_loopback_default_is_retained(tmp_path: Path):
         tmp_path, manifest=replace(manifest, services=services), environ={}
     )
     assert urls["frontend"] == "http://[::1]:3000/"
+
+
+@pytest.mark.parametrize("public_url", [
+    " http://localhost:3000/",
+    "\thttp://localhost:3000/",
+    "http://localhost:3000/\n",
+    "http://localhost:3000/\r",
+    "http://localhost:3000/\x7f",
+])
+def test_default_public_endpoint_rejects_url_controls(tmp_path: Path, public_url: str):
+    manifest = load_manifest()
+    services = tuple(
+        replace(service, public_url=public_url) if service.name == "frontend" else service
+        for service in manifest.services
+    )
+    with pytest.raises(ValueError, match="invalid local public URL"):
+        public_service_urls(tmp_path, manifest=replace(manifest, services=services), environ={})
