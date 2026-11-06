@@ -122,6 +122,18 @@ Commands:
     scene-escort-author  Transactionally edit and preview escort missions
     scene-escort-solve  Find replay-proven safe convoy routes with bounded search
     scene-escort-play  Interactively play and checkpoint offline convoy deliveries
+    world-route                 Source-bound reviewed Jeeves world command
+    world-cast                  Source-bound reviewed Jeeves world command
+    world-quest                 Source-bound reviewed Jeeves world command
+    world-counterfactual        Source-bound reviewed Jeeves world command
+    world-lore                  Source-bound reviewed Jeeves world command
+    world-events                Source-bound reviewed Jeeves world command
+    combat-balance              Source-bound original-game operator command
+    scene-market-fork-author    Source-bound original-game operator command
+    scene-market-fork-accept    Source-bound original-game operator command
+    scene-market-fork-play      Source-bound original-game operator command
+    scene-market-party-handoff  Source-bound original-game operator command
+    scene-market-party-league-authorSource-bound original-game operator command
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -1061,6 +1073,42 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-npc-play":
         from skeleton.game.gameplay.scene_npc_interactive import cli as npc_play_cli
         return npc_play_cli(rest)
+    if cmd == "world-route":
+        from skeleton.jeeves.worlds.route_cli import run as world_route_cli
+        return world_route_cli(rest)
+    if cmd == "world-cast":
+        from skeleton.jeeves.worlds.cast_cli import run as world_cast_cli
+        return world_cast_cli(rest)
+    if cmd == "world-quest":
+        from skeleton.jeeves.worlds.quest_cli import run as world_quest_cli
+        return world_quest_cli(rest)
+    if cmd == "world-counterfactual":
+        from skeleton.jeeves.worlds.counterfactual_cli import run as world_counterfactual_cli
+        return world_counterfactual_cli(rest)
+    if cmd == "world-lore":
+        from skeleton.jeeves.worlds.lore_cli import run as world_lore_cli
+        return world_lore_cli(rest)
+    if cmd == "world-events":
+        from skeleton.jeeves.worlds.events_cli import run as world_events_cli
+        return world_events_cli(rest)
+    if cmd == "combat-balance":
+        from skeleton.game.gameplay.combat_balance import cli as combat_balance_cli
+        return combat_balance_cli(rest)
+    if cmd == "scene-market-fork-author":
+        from skeleton.game.gameplay.scene_market_fork_author import cli as market_fork_author_cli
+        return market_fork_author_cli(rest)
+    if cmd == "scene-market-fork-accept":
+        from skeleton.game.gameplay.scene_market_fork_acceptance import cli as market_fork_accept_cli
+        return market_fork_accept_cli(rest)
+    if cmd == "scene-market-fork-play":
+        from skeleton.game.gameplay.scene_market_fork_interactive import cli as market_fork_play_cli
+        return market_fork_play_cli(rest)
+    if cmd == "scene-market-party-handoff":
+        from skeleton.game.gameplay.scene_market_party_handoff import cli as market_party_handoff_cli
+        return market_party_handoff_cli(rest)
+    if cmd == "scene-market-party-league-author":
+        from skeleton.game.gameplay.scene_market_party_league_author import cli as market_party_league_author_cli
+        return market_party_league_author_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
