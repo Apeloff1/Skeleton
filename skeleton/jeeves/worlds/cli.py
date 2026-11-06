@@ -77,6 +77,10 @@ def run(argv: list[str]) -> int:
     compile_cmd.add_argument("--expected-digest", required=True)
     args = parser.parse_args(argv)
     try:
+        # Validate operator input before constructing or touching the canonical
+        # custody store. A rejected operation must have no filesystem effects.
+        operation = (strict_json(_read_operation_file(args.operation_file))
+                     if args.action == "edit" else None)
         store = WorldStore(args.store)
         if args.action == "propose":
             source = propose(world_id=args.id, premise=args.premise,
@@ -94,7 +98,6 @@ def run(argv: list[str]) -> int:
         elif args.action == "edit":
             # A user-authored JSON operation is a reviewable typed edit, never
             # arbitrary executable code or an implicit language-model action.
-            operation = strict_json(_read_operation_file(args.operation_file))
             source = store.read(args.id)
             if digest(source) != args.expected_digest:
                 raise CanonError("stale_source")
