@@ -149,6 +149,15 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     msg = hello.get("msg")
     if msg is not None and (type(msg) is not str or msg == "isdbgrid"):
         return None
+    # A load-balanced proxy is not an independently observed replica-set
+    # writer, even if a synthetic hello response includes primary fields.
+    # A serviceId denotes a load-balanced service endpoint rather than a
+    # stable Mongo election identity. Neither may authorize epoch custody.
+    load_balanced = hello.get("loadBalanced")
+    if load_balanced is not None and (type(load_balanced) is not bool or load_balanced):
+        return None
+    if "serviceId" in hello:
+        return None
     ghost = hello.get("isreplicaset")
     if ghost is not None and (type(ghost) is not bool or ghost is True):
         return None
