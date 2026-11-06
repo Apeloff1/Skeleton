@@ -8,7 +8,7 @@ import stat
 import pytest
 
 from skeleton.ai.runtime.game_project_cli import (
-    GameCapsuleError, MAX_INPUT_BYTES, MAX_RESULT_BYTES, _read_json, _write_new,
+    GameCapsuleError, MAX_RESULT_BYTES, _read_json, _write_new,
 )
 
 
@@ -40,7 +40,7 @@ def test_read_and_write_budgets_hold_before_publication(tmp_path):
     with pytest.raises(GameCapsuleError, match="budget"):
         _read_json(path, max_bytes=10)
     with pytest.raises(GameCapsuleError, match="budget"):
-        _read_json(path, max_bytes=MAX_INPUT_BYTES + 1)
+        _read_json(path, max_bytes=MAX_RESULT_BYTES + 1)
     destination = tmp_path / "large.json"
     with pytest.raises(GameCapsuleError, match="160-KiB"):
         _write_new(destination, {"blob": "x" * MAX_RESULT_BYTES})
