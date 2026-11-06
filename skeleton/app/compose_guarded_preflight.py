@@ -142,6 +142,16 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
             return None
         if role_value is True:
             return None
+    # A mongos router can report writable-primary semantics without being a
+    # replica-set primary. A ghost replica-set member is likewise not a
+    # canonical writer. Explicit contradictory server roles fail closed.
+    # These are topology observations only, never an activation certificate.
+    msg = hello.get("msg")
+    if msg is not None and (type(msg) is not str or msg == "isdbgrid"):
+        return None
+    ghost = hello.get("isreplicaset")
+    if ghost is not None and (type(ghost) is not bool or ghost is True):
+        return None
     name = hello.get("setName")
     if (type(name) is not str or not 1 <= len(name) <= 128
             or not name.isascii()
