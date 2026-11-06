@@ -162,7 +162,9 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
     )):
         return None
     msg = hello.get("msg")
-    if msg is not None and (type(msg) is not str or msg == "isdbgrid"):
+    if msg is not None and (type(msg) is not str or msg == "isdbgrid"
+                            or not 1 <= len(msg) <= 128 or not msg.isascii()
+                            or any(ord(ch) < 33 or ord(ch) > 126 for ch in msg)):
         return None
     # A load-balanced proxy is not an independently observed replica-set
     # writer, even if a synthetic hello response includes primary fields.
