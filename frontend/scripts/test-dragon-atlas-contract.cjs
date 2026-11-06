@@ -103,6 +103,8 @@ function fixture() {
     retrieval_robustness: {
       audit_digest: H, retrieval_digest: H, selected_passages: 1,
       selected_sources: 1, selected_hosts: 1,
+      distinct_content_families: 1, cross_host_exact_copy_groups: 0,
+      exact_copy_families: [],
       flagged_objectives: [],
       objectives: [], host_ablation: [{
         removed_host: 'example.com', removed_selected_passages: 1,

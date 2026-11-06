@@ -343,14 +343,21 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
       </Section>
       <Section title="Source concentration and evidence fragility">
         <Text style={s.small}>
-          {report.retrieval_robustness.selected_sources} selected sources on {report.retrieval_robustness.selected_hosts} host(s) · {report.retrieval_robustness.flagged_objectives.length} objectives require exposure review
+          {report.retrieval_robustness.selected_sources} selected sources on {report.retrieval_robustness.selected_hosts} host(s) · {report.retrieval_robustness.distinct_content_families} distinct exact-content families · {report.retrieval_robustness.flagged_objectives.length} exposure-review objectives
         </Text>
         <Text style={s.small}>Host removal models only the currently selected evidence. It does not refetch, rerank or prove source independence.</Text>
+        <Text style={s.small}>
+          {report.retrieval_robustness.cross_host_exact_copy_groups} exact-content copy group(s) appearing across separate hosts. Exact copies count as one textual evidence family, not independent confirmation.
+        </Text>
+        {report.retrieval_robustness.exact_copy_families.slice(0, 12).map(group =>
+          <Text key={group.content_sha256} style={s.small}>
+            Exact-copy family {group.content_sha256.slice(0, 12)}: {group.source_count} source records, {group.host_count} hosts, {group.selected_passages} passages · unreviewed relationship
+          </Text>)}
         {report.retrieval_robustness.objectives.slice(0, 8).map(item =>
           <View key={item.objective_id} style={s.check}>
             <Text style={s.message}>{item.objective_id} · {readable(item.risk)}</Text>
             <Text style={s.small}>
-              {item.selected_passages} passages · {item.distinct_selected_sources} sources · {item.distinct_selected_hosts} hosts
+              {item.selected_passages} passages · {item.distinct_selected_sources} sources · {item.distinct_selected_hosts} hosts · {item.distinct_content_families} unique text families
             </Text>
             <Text style={s.small}>
               Most represented host: {item.dominant_host ?? 'none'} ({(item.dominant_host_fraction * 100).toFixed(1)}% of passages)
@@ -361,13 +368,13 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
           </View>)}
         {report.retrieval_robustness.host_ablation.slice(0, 12).map(item =>
           <Text key={item.removed_host} style={s.small}>
-            Exclude {item.removed_host}: {item.surviving_selected_passages} selected passages remain · {item.objectives_without_evidence.length} objectives have no surviving selected evidence
+            Exclude {item.removed_host}: {item.surviving_selected_passages} selected passages remain across {item.surviving_distinct_content_families} exact-content families · {item.objectives_without_evidence.length} objectives have no surviving selected evidence
           </Text>)}
         {report.retrieval_robustness.objective_reuse.filter(
           item => item.shared_source_count > 0,
         ).slice(0, 8).map(item =>
           <Text key={item.left_objective_id + ':' + item.right_objective_id} style={s.small}>
-            {item.left_objective_id} and {item.right_objective_id} share {item.shared_source_count} selected source(s); reuse is not independent corroboration
+            {item.left_objective_id} and {item.right_objective_id} share {item.shared_source_count} selected source(s), {item.shared_content_family_count} exact-content families; reuse is not independent corroboration
           </Text>)}
         <Text style={s.small}>These are review-priority diagnostics. External claims remain unverified even when multiple hosts agree.</Text>
       </Section>
