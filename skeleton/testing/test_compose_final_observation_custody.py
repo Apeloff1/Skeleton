@@ -85,6 +85,40 @@ class FinalObservationCustodyTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["guarded_local_ai_ready"])
         self.assertFalse(result["canonical_actor_epoch_stable_observed"])
 
+    async def test_terminal_election_rotation_denies_observation(self):
+        class ElectionRotated(_Database):
+            async def command(self, command):
+                result = await super().command(command)
+                if command == "hello":
+                    return {**result, "electionId": (
+                        "new-election" if self.hello_count == 4 else "old-election"
+                    )}
+                return result
+
+        database = ElectionRotated()
+        result = await self._inspect(database)
+        self.assertEqual(result["code"], "mongo_primary_changed_after_final_authentication")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(database.epochs, [])
+
+    async def test_terminal_set_version_rotation_denies_observation(self):
+        class GenerationRotated(_Database):
+            async def command(self, command):
+                result = await super().command(command)
+                if command == "hello":
+                    return {**result, "setVersion": (
+                        12 if self.hello_count == 4 else 11
+                    )}
+                return result
+
+        database = GenerationRotated()
+        result = await self._inspect(database)
+        self.assertEqual(result["code"], "mongo_primary_changed_after_final_authentication")
+        self.assertFalse(result["canonical_actor_epoch_stable_observed"])
+        self.assertFalse(result["guarded_local_ai_ready"])
+        self.assertEqual(database.epochs, [])
+
     async def test_odd_epoch_denies_observation(self):
         database = _Database(epochs=(3, 3))
         result = await self._inspect(database)
