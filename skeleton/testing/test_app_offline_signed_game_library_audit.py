@@ -12,8 +12,13 @@ from skeleton.app.offline_signed_game_library_audit import (
     SignedGameLibraryAuditError, SignedGameLibraryEntry,
     audit_signed_game_library, parse_signed_game_entry,
 )
+# Pytest does not register fixture dependencies imported only by another
+# test module. Keep the entire isolated library-audit fixture closure explicit.
+from skeleton.testing.test_app_offline_archive_signature import signed
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
 from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
+from skeleton.testing.test_app_offline_signed_progress_migration import migration
 # Pytest registers imported fixtures only in this collecting module. Carry the
 # complete signed-source dependency chain into the isolated audit suite.
 from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
