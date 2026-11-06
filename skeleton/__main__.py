@@ -129,6 +129,7 @@ Commands:
     world-lore                  Source-bound reviewed Jeeves world command
     world-events                Source-bound reviewed Jeeves world command
     combat-balance              Source-bound original-game operator command
+    scene-market-fork           Replay-verified market branch proposals and choices
     scene-market-fork-author    Source-bound original-game operator command
     scene-market-fork-accept    Source-bound original-game operator command
     scene-market-fork-play      Source-bound original-game operator command
@@ -1112,6 +1113,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-balance":
         from skeleton.game.gameplay.combat_balance import cli as combat_balance_cli
         return combat_balance_cli(rest)
+    if cmd == "scene-market-fork":
+        from skeleton.game.gameplay.scene_market_fork import cli as market_fork_cli
+        return market_fork_cli(rest)
     if cmd == "scene-market-fork-author":
         from skeleton.game.gameplay.scene_market_fork_author import cli as market_fork_author_cli
         return market_fork_author_cli(rest)
@@ -1151,6 +1155,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-route-accept":
         from skeleton.game.gameplay.scene_market_route_acceptance import cli as route_accept_cli
         return route_accept_cli(rest)
+    if cmd == "campaign":
+        from scripts.game.offline_grid_campaign import main as campaign_cli
+        return campaign_cli(rest)
     if cmd == "quest":
         from skeleton.game.gameplay.quest_cli import main as source_bound_cli
         return source_bound_cli(rest)

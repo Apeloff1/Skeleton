@@ -160,6 +160,9 @@ def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any
             data.decode("utf-8", "strict"),
             object_pairs_hook=_pairs, parse_constant=_nonfinite,
         )
+    except GameCapsuleError:
+        # Preserve policy-specific refusals from object_pairs_hook and parse_constant.
+        raise
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise GameCapsuleError("game project JSON is malformed") from exc
     if not isinstance(value, dict):
