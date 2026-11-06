@@ -308,13 +308,31 @@ def test_windows_payload_includes_chroma_recovery_and_local_ai_guides():
     assert '"docs/ai/LOCAL_CODING_PROFILE.md"' in paths
 
 
-def test_windows_installer_workflow_is_manual_and_read_only():
+def test_windows_installer_workflow_has_scoped_pr_and_manual_read_only_admission():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
     triggers = source.split("\npermissions:", 1)[0]
-    assert "workflow_dispatch:" in triggers
-    assert "pull_request:" not in triggers and "push:" not in triggers
+    assert "workflow_dispatch:" in triggers  # explicit operator qualification retained
+    assert "pull_request:" in triggers
+    assert "branches: [main]" in triggers
+    assert "types: [opened, synchronize, reopened, ready_for_review]" in triggers
+    for path in (
+        ".github/workflows/windows-installer.yml",
+        "scripts/windows/**",
+        "packaging/**",
+        "skeleton/app/installer.py",
+        "skeleton/testing/test_windows_installer.py",
+        "backend/Dockerfile",
+    ):
+        assert f"      - '{path}'" in triggers
+    assert "push:" not in triggers
+    assert "pull_request_target:" not in triggers
     assert "pull_request_target:" not in source
     assert "permissions:\n  contents: read\n" in source
+    assert "persist-credentials: false" in source
+    assert "EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}" in source
+    assert 'test "$(git rev-parse HEAD)"' not in source  # Windows uses exact-head PowerShell identity
+    assert 'if ($observed -ne $env:EXPECTED_HEAD)' in source
+    assert "name: Skeleton-Windows-Installer-${{ github.event.pull_request.head.sha || github.sha }}" in source
     artifact = source.split("      - name: Upload Windows installer\n", 1)[1]
     assert "if: always()" not in artifact
 
