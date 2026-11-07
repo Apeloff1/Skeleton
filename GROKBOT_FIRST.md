@@ -93,6 +93,10 @@
 - 78. Embodied NPC perception, beliefs and causal social intelligence
 - 79. Quest solvability, softlock classification and physical witnesses
 - 80. Secure mod ecosystem and semantic extension compatibility
+- 81. Authoritative multiplayer and transport synchronization
+- 82. World-save transactions and crash-safe game continuation
+- 83. Semantic compiler diagnostics and creator-guided repair
+- 84. Journey maturity, quality-debt ratchet and finite 12-bot production
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -7504,3 +7508,123 @@ The creator should inspect mod source, author/provenance, license, compatibility
 ## 80.5 Acceptance
 
 Install one original declarative quest extension and one original media extension into a single player-tested game. Prove source revision, dependency ordering, canonical inventory/quest effects, real target import, save/reload and package rights. Reject a cyclic dependency, stale manifest, changed installed bytes, unsafe archive, hostile hook source, illegal native executable, wrong tenant, missing grant and incompatibility after an engine upgrade. A safe content hook does not certify unrestricted native plugin execution.
+
+# 81. Real multiplayer transition: authoritative world continuity beyond local protocol simulation
+
+**Work order:** FRONTIER-81 | **Primary:** BOT-06 with BOT-02 security/architecture | **Partners:** BOT-05 NPC/world state, BOT-07 region streaming, BOT-09 target build, BOT-11 creator UI, BOT-12 network/game QA.
+
+**Source truth:** skeleton/ai/game_builder/advanced_networking_runtime.py is an integer-world deterministic **local multiplayer protocol simulator**, explicitly not a socket server; its state carries real_network=False. It exercises sequencing, bounded delay, prediction, acknowledgement and rollback without deploying internet infrastructure. The source base is suitable for validating some state machine semantics, but must not be presented as working Internet/LAN matchmaking, authenticated peer transport or production netcode.
+
+## 81.1 Declare the network contract by product mode
+
+Support modes in increasing proof order: offline single-player, same-device co-op, owner-approved LAN host, asynchronous turn-based shared state and optional separately deployed remote authoritative server. Each mode has an explicit game/target capability profile: actor identity, authoritative state writer, session authentication, game package source/version, simulation tick/turn rules, input and observation contracts, maximum peers, message resource ceilings, persistence, anti-replay and reconnection behavior. A mode absent from the approved architecture remains unavailable; a game build cannot create a public server simply by enabling a checkbox.
+
+Client actions are *intents*: movement direction, attack request, dialogue selection, inventory-use proposal. The host validates existence, distance, cooldown, relevant equipment, ownership and game-rule preconditions before applying them. A client-supplied victory, resource count, damage total, secret quest state or time offset is never a canonical mutation. For same-device co-op, two input devices must be independently mapped and the one shared world state must remain deterministic.
+
+## 81.2 Input sequence, snapshot and rollback protocol
+
+A real multiplayer input envelope conceptually includes project/game digest, actor/session identity, source epoch, input sequence number, logical target tick, action and bounded payload. The server responds with authoritative event cursor/ack and current state digest or a constrained projection. Input replay is rejected if already applied; stale epoch is fenced; future-tick spam and unbounded queues are denied. Reliable transport, unreliable movement and event ordering need explicit negotiated tradeoffs; do not assume TCP/UDP protocol choice is automatically solved by a game schema.
+
+Prediction is a client presentation optimization and may be rolled back. A rollback window is finite and source-versioned; replay should not double-trigger inventory grants, death rewards, audio cues or NPC perception. Smooth movement correction may interpolate render coordinates, but authoritative collision and quest state remain exact. When runtime physics is not deterministic across architectures, use server outcomes and tolerance-aware client reconciliation instead of unqualified deterministic lockstep.
+
+## 81.3 Cross-region and NPC ownership
+
+A streamed NPC may be visible in region A and becoming active in B, but only one authoritative simulation owner may commit its resource and movement events at each moment. Transfer needs actor ID, event cursor, source region, target region, fencing version, last committed state, pending operation claims and safe rollback. Avoid two workers both harvesting or granting a unique item for the same NPC; avoid an entity vanishing because a transfer acknowledged before the destination could restore it.
+
+A remote aggregated NPC needs a bounded simulation and conservation witness before entering a fully embodied target region. Trust and memory must survive. World clock continues or pauses according to declared multiplayer mode; one local client's pause cannot silently halt all others. If target region loads slowly, display truthful pending state, not locally invent a settled quest outcome.
+
+## 81.4 Attack surfaces and physical qualification
+
+Real network deployment needs an approved service owner, protected secrets/credentials, session key rotation, rate limiting, bounded decoding, fraud/cheat resistance, network segregation and crash-safe recovery. No generated game script inherits app backend credentials. Chat/user generated content has separate moderation/privacy scopes; peer world membership is not permission to read another user's private project. Protect target source/plugin interfaces against untrusted network data, long payloads and replayed command injection.
+
+Start acceptance with two real controllers in one original game scene. For LAN or remote claims, run two independent processes on real approved network topology, verify packet loss/reordering, authority correction, disconnect/rejoin, synchronized unique item pickup and host crash. Inject forged actor, double reward, stale epoch, position teleport and forced world transfer conflict. Report logical simulator pass and actual transport proof separately. Do not claim remote production multiplayer from a local protocol simulation.
+
+# 82. World-save transaction boundaries and causal game-state recovery
+
+**Work order:** FRONTIER-82 | **Primary:** BOT-02 canonical state and BOT-06 game-save owner | **Partners:** BOT-01 installation/backup, BOT-05 quest/world, BOT-09 package migration, BOT-11 UI, BOT-12 independent recovery.
+
+**Source anchors:** advanced_save_system_runtime.py explicitly simulates finite in-memory save slots with integrity-checked replay and no disk I/O, with simulated_disk_durability=False. quest_progress_save.py stores a **view**, pinned to Director world and final-state digests, under GameSavePlane; quest_campaign_save.py is separately responsible for campaign replay. quest_rewards_bridge.py mirrors a QuestBoard Protocol and notes the B028 economy implementation belonged to draft PR #4598 at the recorded source; do not treat that stale in-source comment as current integration truth without checking the active PR and main tree. The correct implementation path is source reconciliation and one durable owner, not a second save store.
+
+## 82.1 Cross-domain commit semantics
+
+A player action can simultaneously change physical position, inventory, a quest stage, NPC belief, an asset-triggered visual effect and an in-game economy transaction. Those are not seven separate authoritative saves. Define a typed world event and canonical transaction boundary; commit the required domain mutations atomically within available store guarantees, or use a durable outbox with strictly defined idempotent projections where distributed transactions are unavailable. Camera/audio are presentation effects and should be recoverable from committed state rather than a rival ledger.
+
+A save snapshot captures the world event cursor and invariant-checked sections: player/actor, quest and failure state, resources, region, clock/RNG, entitled mods, active target schema and only necessary presentation state. It references content-addressed source/project and licensed assets rather than serializing model prompts or physical OS pointers. A target-specific save adapter may use a different binary layout, but must preserve the same meaningful game state and migration rules.
+
+## 82.2 Exactly-once effects versus at-least-once delivery
+
+A unique reward is paid *once*, even when the game crashes after economy commit but before frontend acknowledgement. Model this as an idempotent committed event keyed by owner, quest identity and versioned reward occurrence; repeat requests retrieve the same authoritative outcome or a clear already-applied state. A client cache or saved gameplay HUD cannot be the arbiter of monetary rewards. The quest reward bridge's intended all-or-nothing behavior must be integrated against its actual available source owner before declaring money/item continuity.
+
+For external side effects (store payment, public publish, hosted multiplayer invite), no general exactly-once primitive can be assumed. Use consistent idempotency keys, durable operation state and authoritative reconciliation rather than blindly retry with a new key. Report unknown outcomes honestly. On restart, compare committed event cursor, snapshot and downstream projections; repair derived views without creating new rewards.
+
+## 82.3 Save-schema migration and imported project safety
+
+Every format has schema ID, version, game target and executable identity, state digest, allowed future fields and migration chain. Migration is staged against a copy, validates old snapshot and new invariant, and commits a new revision only after successful restore in a compatible target. Unknown newer mandatory fields are not silently discarded. A user may retain old game binaries and saves; the editor should show which package can open which save and which changes require irreversible migration.
+
+Importing a save from a modded game must verify mod dependency/version, source rights and expected state schema before applying it. Removing a mod that owned a quest cannot erase another mod's player history or corrupt the base world. When a cross-platform port cannot represent a given game mechanic, reject the migration or obtain an explicit reviewed approximation. The user should be able to export quarantined unsupported data for recovery without running untrusted executable payloads.
+
+## 82.4 True durability and disaster tests
+
+Reference save tests can prove logical invariants but cannot certify disk durability. Use the actual existing disk save owner with real process interruption and target filesystem semantics. Inject crash before commit, after event journal, during snapshot publication, while two devices write a project, during source rights withdrawal, after pay-once reward but before acknowledgement, after mod removal, and while changing engine version. After restart verify the exact committed inventory/quest/actor state and last known good package. A successful JSON serialization test is only a lower rung.
+
+Track restore time, saved-state size growth, migration recoverability and wrong-version rejection under target hardware. Keep secrets out of downloadable game archives. Any debug tool must not reveal private user/project data to unrelated tenants. The test proves actual user game continuation through several scenes and an ending after a crash, not merely that the save checksum matches.
+
+# 83. Creator-grade semantic compiler diagnostics and change-impact intelligence
+
+**Work order:** FRONTIER-83 | **Primary:** BOT-11 user interaction with BOT-05 compiler and BOT-04 Jeeves | **Verifier:** BOT-12 | **Inputs:** world/quest IR, engine bindings, source-edit gateway, real build/QA receipts and current source topology.
+
+The difference between a source generator and a professional production workbench is **explainability at the action and artifact level**. A creator must know what their edit changed, why a build is blocked, which source object failed, which tests are stale and whether the issue is design intent, source syntax, target limitation, physical gameplay or release policy. A model-generated optimistic paragraph cannot substitute for a structured compiler diagnostic.
+
+## 83.1 Typed diagnostic contract
+
+A diagnostic binds code/category, owning plane, source game/project revision, semantic entity/rule ID, optional file/line, target and toolchain, severity, proof level, expected invariant, actual observation or missing evidence, candidate repair, dependencies and dismissal policy. A warning about optional material shader quality differs from a hard block that the required door cannot be opened. Diagnostics can be proposed by AI, but accepted gate status is issued only by the real deterministic verifier.
+
+Examples: a quest requires an item with no reachable source; a generated hitbox differs from sprite frame; a trigger references a deleted scene; a video clip requires unavailable codec; a save migration loses unique inventory; a sprite uses colors outside the console palette; a font lacks Arabic shaping; a native compiler is missing; an AI tool lacks a grant; a project head is stale; a source-rights dependency was withdrawn. All require different repair owners and evidence.
+
+## 83.2 Impact preview for manual and AI edits
+
+Before committing an edit, compute the dependency closure over canonical semantic IDs, build artifacts, test requirements, rights, target compilers, saves and public release. A change to player movement invalidates collider/navigation/quest feasibility and actual controller tests, but should not unnecessarily rebuild voice files. A change to a cinematic line invalidates subtitles/audio timing and localized presentation, not distant geometry unless the line changes a quest predicate. Cache identity and provenance determine safe reuse.
+
+Present the human with a concise grouped impact: changed behavior; affected game objects; expected build/resource cost; required exact current tests; safety/rights consequences; rollback path. For large bulk AI work, enable selective approval of independent operations while preserving transactional integrity for coupled systems. User locks on art and story remain authoritative. Do not show estimated counts as measured facts when graph dependency closure has not been computed.
+
+## 83.3 Guided repair with negative evidence
+
+A repair assistant sees the actual failure and a source-pinned minimal reproducer. It proposes the smallest safe change, with independent test capable of failing the original defect. If the first attempt fails, preserve logs and exact reason rather than cycling random rewrites. A code editor can apply authorized source patches only through the existing source gateway with grants and postwrite hashes. Game world edits use semantic CAS. A repair cannot remove a user-required mechanic, falsify a test oracle or bypass release policy.
+
+The assistant distinguishes *build stage failure* (syntax, import, dependency, signature), *play stage failure* (physics, unsatisfiable quest, input), *presentation failure* (missing pixels/audio/captions), *data failure* (save, source rights) and *evaluation unknown* (hardware/runner unavailable). This triage prevents false confidence and shortens the critical path to a playable original game.
+
+## 83.4 Human interface and evidence replay
+
+The creator selects a failed scene/quest and sees a visual overlay on the affected object, a source/rule inspector, the exact last tested game package, a replay timeline and a proposed remedy. They can compare project revisions and real target captures; design preview frames must be labelled separately from actual engine output. A user may fix geometry manually and immediately see whether the logically required route became physically traversable. Source-only predictive diagnostics are useful but do not replace actual recompilation and gameplay proof.
+
+Build one acceptance journey: an assistant authors a locked door, the user changes a key requirement, a native input trace fails, the UI identifies the causal rule, Jeeves proposes a bounded patch, the user accepts, the engine reruns, and the same saved game reaches its goal. Test stale source, wrong account, offline editor draft, concurrently modified quest and missing target compiler; UI must neither claim success nor overwrite user work.
+
+# 84. Production readiness from measurable game journeys and conservative autonomous scheduling
+
+**Work order:** FRONTIER-84 | **Primary:** BOT-04 automation and BOT-12 qualification | **Partners:** BOT-01 install, BOT-02 architecture, BOT-03 local AI, BOT-05/06/07/08 game content, BOT-09 export, BOT-11 UI.
+
+The masterplan's goal is functional completion, not maximizing the number of draft PRs, design pages or tests that cannot fail. Architect a target-specific **journey maturity evaluator** over existing evidence and operations. The central user journey runs from clean install and project creation through original gameplay, AI-assisted editing if enabled, independent target play, save/restart and export. Every contributing capability is graded at source-present, integrated, observed in actual runtime, physical target observed and release-authorized levels, with noncompensable security/rights/custody holds.
+
+## 84.1 Finite critical path and resource reservations
+
+The coordinating bot compiles a user-approved work objective into a finite graph of source inspection, authorized game edit, engine build, independent test, repair and target package. It binds exact source head, project revision, permitted tool, expected artifact, resource reservation, retry budget and verification rule. Background mass asset generation cannot preempt foreground playable testing or consume GPU resources required by a human. Virtual workers represent logical scheduling; physical model processes, browser runs and native compilers remain limited by measured capacity.
+
+A successful tool invocation is an effect receipt, not a new stage of a model's internal plan. If a task is cancelled or the model/host crashes, reconcile whether the actual side effect occurred before retry. Preserve last-good source and previous playable package. An unavailable model may leave deterministic game editing usable; a missing native compiler leaves source export available where supported. Never silently use network fallback when the user chose offline mode.
+
+## 84.2 Quality-debt and regression ratchet
+
+Use the existing quality_debt.py ledger rather than invent a new policy engine. Protected architectural/security/privacy/rightful-use axes cannot be traded against faster build or cosmetic creativity. Every candidate change has a baseline and test plan, including negative cases that detect removal of required mechanics, hidden save failure, source-rights regression, false native evidence and accessibility break. Do not tune evaluation thresholds after seeing candidate results. Stronger playability and richer aesthetics matter only when hard invariants remain valid.
+
+Metrics should be tied to accepted gameplay: actual quest completion, controller response, NPC resource accounting, visible art/audio, native import, platform save recovery, build correctness, player editing/undo and upgrade resilience. Count source files as repository metadata, not a claim of game usability. Include uncertainty where no physical device or user playtest is available.
+
+## 84.3 Twelve-bot integration ownership
+
+BOT-01 supplies install/hardware readiness, BOT-02 secures authority and canonical state, BOT-03 produces real admitted local inference where needed, BOT-04 schedules finite work and handles source-fenced tool calls, BOT-05 supplies actual world/quest semantics, BOT-06 verifies real input/physics, BOT-07 handles procedural worlds and incremental rebuild, BOT-08 supplies actual pixels/audio/rigs, BOT-09 builds lawful target artifacts, BOT-10 supplies rights-checked research, BOT-11 provides human editing/approval and BOT-12 independently falsifies success claims.
+
+The first campaign must build **one consistent game**. Its scene, NPCs, inventory, media, save, source revision and compiled target cannot be unrelated example fixtures that happen to pass separate unit suites. The same player completes a meaningful sequence on actual supported target. A human changes a quest rule mid-production and all affected work is correctly invalidated and recomputed.
+
+## 84.4 Completion state and release safeguards
+
+A ticket can be implemented and qualified, implemented but lacking target proof, blocked with reproducer, or duplicate/already implemented with correct source map. Unknown checks stay unknown. A failing Sealed Context Guard, repository hygiene, malware scan, incomplete device test or missing human release permission is not compensated by dozens of passing source tests. Exact-head CI and independent target evidence determine merger/release eligibility. No draft, checklist or model assertion waives security and legal holds.
+
+Prepare a source-bound readiness dossier for each user journey: source SHA and project revision, executable/toolchain digests, actual controller/input tape, observed world/event/frame/audio state, feature claim, proof layer, current issues, rollback and operator decision. A reader can distinguish what truly works from what the frontier design intends to build. This is the operational contract that every future blueprint volume should strengthen.
