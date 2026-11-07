@@ -70,6 +70,40 @@ class AtomicReviewTests(unittest.TestCase):
             self.flow.compile(BRIEF["id"], inspected["source_digest"])
         self.assertEqual(raised.exception.code, "review_required")
 
+    def test_interrupted_reversion_cannot_replay_prior_approval(self):
+        first = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        prior_digest = first["source_digest"]
+        revert = {
+            "action": "replace_scene",
+            "value": {
+                "id": "opening", "title": "Mira in North Marsh",
+                "narrative": BRIEF["premise"],
+            },
+        }
+        second = self.flow.review(BRIEF["id"], prior_digest, revert, NOTE)
+        self.assertEqual(second["source_digest"], self.initial)
+        # The earlier reviewed revision still exists in the source history.
+        # Simulate interruption while attempting to restore that digest.
+        real_write = self.flow.worlds._write
+        calls = 0
+
+        def interrupted(fd, name, data):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("interrupted approval publication")
+            return real_write(fd, name, data)
+
+        with patch.object(self.flow.worlds, "_write", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        inspected = self.flow.inspect(BRIEF["id"])
+        self.assertEqual(inspected["source_digest"], prior_digest)
+        self.assertFalse(inspected["reviewed"])
+        with self.assertRaises(CanonError) as raised:
+            self.flow.compile(BRIEF["id"], prior_digest)
+        self.assertEqual(raised.exception.code, "review_required")
+
     def test_writer_lock_rejects_concurrent_review_without_mutation(self):
         fd = self.flow.worlds._directory()
         try:
