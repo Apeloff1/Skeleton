@@ -741,12 +741,16 @@ class DragonCrawlerApplication:
         )
         # Forensic analysis consumes only the authenticated exact-source Atlas
         # and emits metadata-only, review-held receipts. Never include Frame text.
+        # Use one immutable inspection clock for deterministic replay.
+        # Current wall-time and Mongo authorization are checked separately
+        # again before the response crosses the authenticated boundary.
+        forensic_issued_at = _now().timestamp()
         forensic = compose_atlas_forensics(
-            mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
+            mandate, snapshot, atlas, now=forensic_issued_at, authorized=True,
         )
         verify_atlas_forensics(
             mandate, snapshot, atlas, forensic,
-            now=_now().timestamp(), authorized=True,
+            now=forensic_issued_at, authorized=True,
         )
         # A second authenticated Mongo read fences revision/policy races.
         # Consumers still MUST recheck both sources and consent before use.
