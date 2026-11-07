@@ -178,6 +178,26 @@ class FirstRunHandoffTests(unittest.TestCase):
         evidence["release_holds"].append("ADDITIONAL_SECURITY_REVIEW")
         validate_source_only_handoff(evidence)
 
+    def test_release_hold_tokens_reject_ambiguous_unicode_and_controls(self):
+        for token in ("optional security review", "optional-security-review",
+                      "REVIEW\\nPASSED", "RÉVIEW", "REVIEW\\x00", "review"):
+            with self.subTest(token=token):
+                evidence = valid_evidence()
+                evidence["release_holds"].append(token)
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
+    def test_runtime_observation_rejects_unexpected_claims(self):
+        for key, value in (("device_qualified", True),
+                           ("release_certified", True),
+                           ("operator_secret", "private"),
+                           (42, "invalid key")):
+            with self.subTest(key=key):
+                evidence = valid_evidence()
+                evidence["runtime_observation"][key] = value
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
     def test_read_only_input(self):
         evidence = valid_evidence()
         original = copy.deepcopy(evidence)
