@@ -553,6 +553,11 @@ class RobotsCache:
         parser = self._parsers.get(f"{p.scheme}://{p.netloc}")
         return parser.crawl_delay(self.user_agent) if parser else None
 
+    def request_rate(self, url: str):
+        p = urlsplit(url)
+        parser = self._parsers.get(f"{p.scheme}://{p.netloc}")
+        return parser.request_rate(self.user_agent) if parser else None
+
 
 class CrawlEngine:
     """Bounded deterministic scheduler with retries, dedupe and resumable state."""

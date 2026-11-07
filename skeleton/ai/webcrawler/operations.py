@@ -35,6 +35,7 @@ from .structured_discovery import (
 )
 from .frontier_scheduler import choose_frontier
 from .host_backpressure import origin_throttle
+from .robots_rate import combine_robots_pacing
 from .capture_rights import source_capture_rights
 from .media_probe import inspect_download_media
 from .link_header_discovery import parse_link_headers
@@ -97,6 +98,7 @@ def implementation_digest():
                 "pdf_documents.py",
                 "pdf_worker.py",
                 "office_suites.py",
+                "robots_rate.py",
             )
         }
     )
@@ -809,7 +811,19 @@ class CrawlRun:
         delay = self.request.min_host_delay_seconds
         cache = self._robots_cache(origin)
         if cache is not None:
-            delay = max(delay, cache.crawl_delay(url) or 0)
+            robot_rate = cache.request_rate(url)
+            pacing = combine_robots_pacing(
+                operator_delay=delay, crawl_delay=cache.crawl_delay(url),
+                requests=robot_rate.requests if robot_rate else None,
+                seconds=robot_rate.seconds if robot_rate else None,
+            )
+            if pacing.denied:
+                self._finish_item(item)
+                return self._event(
+                    "rejected", now=now, url=url,
+                    reason="robots_rate_outside_consent_horizon",
+                )
+            delay = pacing.minimum_seconds
         state["host_ready"][host] = now + delay
         remaining = self.request.max_total_bytes - state["usage"]["bytes"] - state["usage"]["reserved_bytes"]
         limit = min(

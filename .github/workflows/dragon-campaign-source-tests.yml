@@ -22,6 +22,8 @@ on:
       - "skeleton/ai/webcrawler/pdf_documents.py"
       - "skeleton/ai/webcrawler/pdf_worker.py"
       - "skeleton/ai/webcrawler/office_suites.py"
+      - "skeleton/ai/webcrawler/robots_rate.py"
+      - "tests/test_ai_webcrawler_dragon_robots_rate.py"
       - "tests/test_ai_webcrawler_dragon_office_suites.py"
       - "tests/test_ai_webcrawler_dragon_pdf_documents.py"
       - "tests/test_ai_webcrawler_dragon_media_probe.py"
@@ -95,6 +97,8 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/pdf_documents.py
           python -m py_compile skeleton/ai/webcrawler/pdf_worker.py
           python -m py_compile skeleton/ai/webcrawler/office_suites.py
+          python -m py_compile skeleton/ai/webcrawler/robots_rate.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_robots_rate.py
           python -m py_compile tests/test_ai_webcrawler_dragon_office_suites.py
           python -m py_compile tests/test_ai_webcrawler_dragon_pdf_documents.py
           python -m py_compile tests/test_ai_webcrawler_dragon_media_probe.py
@@ -157,3 +161,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_media_probe.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_pdf_documents.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_office_suites.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_robots_rate.py' -v
