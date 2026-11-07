@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 from .core import CrawlPolicy, canonicalize_url
+from .discovery_relations import sitemap_language_alternate
 
 
 XML_MEDIA = frozenset({
@@ -130,7 +131,15 @@ def _entries(root: ET.Element, kind: str):
                 child_ns, child_local = _local(child.tag)
                 if child_local == "loc" and child_ns in ("", SITEMAP_NS):
                     yield (child.text or "").strip()
-                    break
+                elif kind == "sitemap_urlset":
+                    alt = sitemap_language_alternate(
+                        namespace=child_ns, local_tag=child_local,
+                        rel=child.attrib.get("rel"),
+                        hreflang=child.attrib.get("hreflang"),
+                        href=child.attrib.get("href"),
+                    )
+                    if alt is not None:
+                        yield alt
     elif kind == "rss_feed":
         for channel in root:
             if _local(channel.tag) != ("", "channel"):
@@ -188,7 +197,7 @@ def _feed_page_links(root: ET.Element, kind: str):
         for child in container:
             if _local(child.tag) not in allowed_tags:
                 continue
-            if child.attrib.get("rel", "").strip().lower() != "next":
+            if child.attrib.get("rel", "").strip().lower() not in ("next", "prev"):
                 continue
             media = child.attrib.get("type", "").strip().lower()
             if media and media not in (

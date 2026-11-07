@@ -12,6 +12,7 @@ import re
 from typing import Mapping
 
 from .core import CrawlPolicy, canonicalize_url
+from .discovery_relations import navigational_relation
 
 
 _FEEDS = frozenset({
@@ -117,7 +118,9 @@ def parse_link_headers(
         relation = params.get("rel", "")
         rels = {token.lower() for token in relation.split() if _REL.fullmatch(token)}
         mime = params.get("type", "").split(";", 1)[0].lower().strip()
-        if not ("next" in rels or ("alternate" in rels and mime in _FEEDS)):
+        if not navigational_relation(
+            rels, media_type=mime, hreflang=params.get("hreflang", ""),
+        ):
             rejected += 1
             continue
         try:

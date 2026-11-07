@@ -31,6 +31,7 @@ from .archive_documents import ARCHIVE_TYPES, extract_archive_document
 from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
 from .html_semantics import HTMLSemanticError, extract_html_semantics
 from .pdf_documents import PDF_MEDIA_TYPE, extract_pdf_document
+from .discovery_relations import navigational_relation
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -280,16 +281,12 @@ class _Extractor(HTMLParser):
         if tag in ("a", "link") and not self.skip:
             attributes = dict(attrs)
             href = attributes.get("href")
-            eligible = tag == "a"
+            rel = set((attributes.get("rel") or "").lower().split())
+            eligible = tag == "a" and "nofollow" not in rel
             if tag == "link":
-                rel = set((attributes.get("rel") or "").lower().split())
-                mime = (attributes.get("type") or "").lower().split(";", 1)[0].strip()
-                eligible = (
-                    "next" in rel
-                    or ("alternate" in rel and mime in (
-                        "application/rss+xml", "application/atom+xml",
-                        "application/feed+json", "application/xml", "text/xml",
-                    ))
+                eligible = navigational_relation(
+                    rel, media_type=attributes.get("type") or "",
+                    hreflang=attributes.get("hreflang") or "",
                 )
             if (eligible and href and len(self.links) < self.max_links
                     and len(href) <= 4096):

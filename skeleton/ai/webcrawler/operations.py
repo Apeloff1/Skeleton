@@ -106,6 +106,7 @@ def implementation_digest():
                 "bibliography_documents.py",
                 "notebook_documents.py",
                 "rdf_documents.py",
+                "discovery_relations.py",
             )
         }
     )
