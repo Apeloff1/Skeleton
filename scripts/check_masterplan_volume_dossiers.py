@@ -10,11 +10,13 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 
-from scripts.check_ai_100_large_milestones import run as verify_milestone_sources
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.check_ai_100_large_milestones import run as verify_milestone_sources
 DOCS = Path("docs/plan/volume_completion")
 SCHEMA = "SOURCE-BOUND-VOLUME-DOSSIER v1"
 LAYER_COUNT = 14
