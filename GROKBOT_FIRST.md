@@ -60,6 +60,11 @@
 - 45. Creator cockpit and coherent AI editing workspace
 - 46. Forge-to-engine action semantics and real gameplay parity
 - 47. Multi-scale living-world simulation and large RPG state
+- 48. Verification laboratory and anti-gaming evidence
+- 49. AI game toolchain security and original-work rights
+- 50. Physical QoS, mixed-load scheduling and device economics
+- 51. Product maturity graph and dependency-first completion
+- 52. Next 24 executable engineering tickets
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -6285,3 +6290,143 @@ Use stable seeds for authored environmental variation with explicit RNG stream v
 
 Acceptance campaigns: 10,000 or more simulated offscreen steps within a declared bounded test envelope; deterministic replay under fixed seed/implementation; no duplicate unique IDs across streamed regions; no negative conserved resources; two causally distinct endings; player transfer across regions while save/reload occurs; NPC knowledge restricted to observations; economy updates during world-clock jumps; late quest edit invalidates dependent missions but not all unrelated art. These are proposed tests, not results. Report memory, CPU, storage and actual user-visible quality, not just the number of procedural configurations.
 
+# 48. Verification laboratory and anti-gaming evidence
+
+**Work packet:** DEEP-48 | **Lead:** BOT-12 | **Partners:** BOT-02, BOT-05, BOT-06, BOT-07, BOT-08, BOT-09. **Source directly inspected:** skeleton/forge/playtest.py runs a bounded Godot headless import and main-scene startup, scanning parse and runtime logs; its own source documents binary provenance and the distinction between a verified artifact-plane executable and a caller/PATH-provided unverified binary. This is genuine dynamic smoke evidence, not a complete input-driven game proof.
+
+## 48.1 Claim-calibrated verification levels
+
+For each proposed product capability, define the minimum experiment whose failure would contradict the claim. A game source file can be proven with hashes, but game playability requires an actual engine launch and controller actions that produce observed objective changes. A game that boots for 300 frames without parse errors is not necessarily traversable or winnable; a fixture reporting "win" is not equivalent to the exported game running on a clean target. An exported source project is not the same as a signed native executable. A working test on Windows CI is not by itself a supported consumer-device install certification. Keep these differences visible in the user cockpit and machine evidence.
+
+Proof layers: **structural source**, **type/static**, **pure deterministic unit**, **multi-owner integration**, **real service**, **real engine and interactive input**, **exported clean-host**, **physical device**, **independently authorized release**. Map each positive claim to one or more layers, and retain explicit failure/pending/skipped/unobserved states for mandatory checks. All proof references bind source SHA, game project revision, canonical policy, toolchain executable digest, input workload, test runner, scorer and actual output artifact. Evidence from an ancestor commit expires when a relevant dependency changes. A verifier cannot upgrade source-only success merely by reading the builder's prose.
+
+## 48.2 Model-based testing of project and game state
+
+Generate command sequences against the **real** bounded application: create project; edit tile, actor, world rule and quest; inspect preview; commit revision; request AI work; start play; move/jump/interact; collect reward; save; restart; replay; delete or restore an asset; export. Include rejected commands: unknown project, wrong actor, stale revision, changed idempotency input, impossible terrain, forbidden source, oversized payload and unaudited script. After each accepted action assert invariants: revision monotonicity, typed source/rights references, valid world graph, finite resource usage, no duplicate rewards, no cross-tenant leakage, no unpublished artifact in public view and no active unauthorized worker.
+
+Property-based tests should generate both small syntactically valid gameplay worlds and adversarial invalid ones. Constrain valid generations so failures are informative rather than universally rejected. Shrink complex counterexample sequences down to reproducible minimal steps with exact source/seed/environment. Preserve a regression test for every genuine defect found. A test that is guaranteed to pass because it only checks the generator's own claimed success string is invalid.
+
+## 48.3 Differential proof between reference and Godot
+
+For each supported action family, create a *logical projection* of the pure reference state and the native engine state. Replay the same initial game specification, fixed random seeds and action trace. Compare inventory ownership, quest flags, door/portal access, enemy damage, player checkpoint, dialogue choice, world-time changes and save data at defined synchronization points. Floating-point physics may need justified tolerances and platform-specific frames, but integer currency and idempotent quest grants should not. Record timing semantics so a harmless frame drift does not become a false source defect.
+
+Metamorphic assertions expose hidden coupling: replacing a decorative particle asset must not change loot; changing a UI font must not change NPC factions; an identical idempotency request must not mint a second item; changing a collision shape must invalidate movement and navigation playtests; removing a source license must invalidate dependent exports even if rendered bytes are unchanged. Deliberately break one native signal, one gameplay reward and one save migration to prove the integration oracle detects actual engine divergence.
+
+## 48.4 Forced crashes and unknown outcomes
+
+Interrupt operations at every irreversible boundary: after resource reservation; after the project write but before its receipt; after outbound tool action but before durable reconciliation; halfway through asset import; before stream terminal; during Chroma volume migration; during save publication; during export signing; after provider payment callback but before entitlement; and after physical cancellation request but before worker exit. Restart the real owning service. Verify exactly one committed result or a truthful quarantined unknown outcome; no lost canonical user data, duplicate economy effect, stale source overwrite, leaked worker capacity or false "success" stream event.
+
+The test harness must exercise process kill/restart or equivalent real failure, not only throw an exception inside a mocked function. Rebuild derived caches from authoritative state where policy permits. Inspect physical worker state before returning GPU/CPU memory reservations. Where an external side effect is uncertain, query or reconcile rather than blindly retry with a new identity.
+
+## 48.5 Independent game quality and fairness
+
+Create distinct tester profiles—novice, expert, explorer, accessibility, speedrun and adversarial—and let them interact through the actual game input path. An AI builder cannot author its own final scorer after seeing outputs. Hold out seeds and source briefs from optimization. Metrics include completion, softlocks, discoverability, fairness, input latency, player choice, visual style consistency, audible cues, accessibility, asset rights and user satisfaction. Subjective fun and art merit need blinded human review with disagreement and sample-size reporting; do not invent exact quality scores or promise universal delight.
+
+A performance win that makes the game unwinnable, breaks captions or degrades privacy fails the noncompensable gates. The release evidence owner collects all required checks on the exact head; Secret Scanning success cannot neutralize Malware Gate failure, and source compile cannot neutralize actual target failure.
+
+# 49. Safety architecture for an AI game-production toolchain
+
+**Work packet:** DEEP-49 | **Lead:** BOT-02 | **Partner owners:** BOT-03 model, BOT-04 tools, BOT-08 media, BOT-09 packages, BOT-10 Dragon, BOT-12 independent security. Reuse the current declared identity, governance, tool, artifact and release planes. Do not create shadow permission or provider authority.
+
+## 49.1 Security boundaries by input type
+
+Inputs to the game studio may be hostile even when they look like creative assets: prompts, web pages, imported project files, binary meshes, compressed textures, shader code, animation metadata, game saves, generated scripts, tool manifests, model weights, package install metadata and repository PR content. Every payload is tagged by trust origin, tenant, admitted purpose, type, size and allowed operations. Data in a user's scene is not automatically privileged executable code. A crawler's instructions never become an agent's system prompt. A game export cannot inherit server secrets merely because both run on the same laptop.
+
+Every protected mutation requires authenticated principal, scoped tenant/project, explicit delegated capability, approved tool manifest and bounded execution. The deterministic owner—not an LLM-generated answer—validates grants, arguments digest, expiry, source version, resource budget and postconditions. A replayed approval is not valid for a changed request body. Unknown tool definitions and unoffered functions are rejected before side effects.
+
+## 49.2 Safe file trees and hostile media
+
+Native extraction/build operations need descriptor-anchored file handling and defenses against symlinks, parent-directory replacement, Windows reparse points, archive traversal, Unicode/case collisions, special files, decompression bombs and excessive tree depth. A Path.resolve() followed by an unguarded read may be vulnerable to races; test actual implementation against concurrent swaps rather than treating a string-prefix comparison as sufficient. Limit files, expanded bytes, parser memory, recursion, CPU time, disk IO, process count and open file descriptors. Reject platforms on which required confinement guarantees cannot be met.
+
+Execute compiler/import/asset processors under restricted identities with bounded source and output roots and no production credentials. Disallow arbitrary network access by default. Never let a model-proposed shell string directly become a privileged system command. Separate user-approved advanced plugin execution from normal game content parsing. A source package that contains executable payloads needs explicit policy and malware analysis before publishing it. Store scan status as completed-clean, finding, pending or unavailable, never as a binary unqualified green.
+
+## 49.3 Immutable provenance and original-work rights
+
+Every generated or imported asset needs canonical ArtifactRecord lineage: source bytes and digest, creator/license, transformation chain, model identity where relevant, permitted use, attribution, expiry/revocation, tenant, data class and dependent outputs. A publicly accessible image is not inherently reusable commercially. An AI-generated likeness or voice requires appropriate original source rights and consent. Rights to prototype are not automatically rights to monetize or redistribute. A revoked source propagates to derived media and public export eligibility, including cached packages, without erasing unrelated original artwork.
+
+Game models, toolchains and dependencies need immutable byte identity and origin. A filename or version string is insufficient. Build evidence includes relevant dependency inventories, executable/scanner identity, scan findings, target architecture and rollback references. Treat model files as untrusted complex data parsed by native libraries even when inference itself is offline. Do not embed private chats, restricted research or secrets in fine-tuning datasets without explicit allowed processing and withdrawal support.
+
+## 49.4 Cross-domain injection campaign
+
+Attack via a page telling Dragon to access a private network; a repository README instructing Jeeves to expose credentials; a generated shader requiring shell execution; a ZIP with traversal; a fake source license; a project note spoofing a system role; an LLM tool proposal widening the grant; a modified artifact digest; and a tenant switch racing an in-flight editor request. Each negative test asserts no unauthorized filesystem/network/DB mutation and a durable denial or quarantine receipt. Quality is irrelevant if an accepted path bypasses authority. Unknown scanner results keep publication held.
+
+# 50. Real-time QoS, device economics and adaptive physical scheduling
+
+**Work packet:** DEEP-50 | **Lead:** BOT-03 and BOT-06 | **Partners:** BOT-07, BOT-08, BOT-09, BOT-11, BOT-12. Two workloads share a laptop: foreground playable real-time game state and background AI generation/build. They need separate latency objectives, but a single canonical capacity/admission authority. Never use logical virtual-worker counts as physical device evidence.
+
+## 50.1 Latency and capacity budget vectors
+
+Profile CPU execution, GPU memory and queue, physical RAM, page/swap pressure, disk throughput/latency, model KV, active model weights, decoder/renderer memory, build process slots and thermal/power state where observable. Reservation and actual utilization are distinct. A resource vector belongs to tenant, operation, workload class, exact model/game target, deadline and finite release receipt. When a cancellation is requested, keep the capacity reserved until the physical worker actually stops or is fenced by verified isolation. Unknown worker state blocks unsafe overcommit.
+
+Measure end-to-end latency: input acquisition, server transport if used, game tick, world-rule evaluation, render submission, GPU output and user-visible display; separately track model queue wait, time to first usable design, time to actual game preview and time to complete accepted export. Report p50, p95 and p99 with workload/sample size and source/toolchain identity. A mean FPS or peak tokens/s without tail behavior is not sufficient.
+
+## 50.2 Scheduler priorities and safety hysteresis
+
+Protected interactive game frames and current user input must not be starved by unattended 3D asset synthesis. Interactive editing/chat jobs should be bounded and fairly admitted. Batch media, indexing, learning and compilation may be throttled, queued or safely checkpointed under pressure. Avoid abrupt oscillating admission by using measured multi-signal pressure states and hysteresis. Evict rebuildable caches before durable state; never free GPU reservations optimistically while the native process remains alive. Preserve last-good project commits when a low-memory situation forces cancellation.
+
+The combined stress test runs real gameplay while Jeeves generates an asset and Dragon performs a genuinely approved bounded capture. Inject GPU pressure, large scene streaming, disk full, system suspend, backend restart and model timeout. Success requires the game remains within its declared target limits and background jobs either finish under bounded resources or pause safely with truthful status. Unmeasured host pressure remains unknown; do not fabricate sensor values.
+
+## 50.3 Large-world and media streaming
+
+Stream by spatial interest, gameplay relevance, rights validity and current performance budget. Use content-addressed region cells, stable world identities, actor-event continuity, prioritized asset IO and bounded GPU upload. Apply level-of-detail to geometry, textures, animation and distant NPC simulation while preserving collision, quest information and visual cues. Shader precompilation, import cache and image atlas optimization are candidates; measure frame-time outliers and memory against a retained reference version.
+
+A streaming region cannot reappear with a different merchant inventory because the renderer unloaded it. Cosmetic RNG must be decoupled from quest and loot RNG. Dynamic prefetch must not follow untrusted network instructions. When assets are absent, show correct loading/fallback states without pretending a mandatory quest trigger exists. A game that briefly boots but stutters catastrophically during play is not a high-quality released target.
+
+## 50.4 Power and thermal behavior
+
+Handle AC/battery mode where observable, host sleep/resume, thermal throttling, WSL/container capacity differences and background workload suspension. Do not alter host safety controls or privileged system settings automatically. Profile sustained mixed-load performance rather than cold-start peaks only. If hardware telemetry is missing, prefer conservative limits and label measurement incomplete. Hardware support claims need representative physical device acceptance, not just resource calculations in source.
+
+# 51. Exact product maturity and completion graph
+
+**Work packet:** DEEP-51 | **Coordinator:** Grokbot | **Independent verdict:** BOT-12. The 421 existing AI masterplan volumes, 301 prior work orders, 42 already-done P0 tasks and hundreds of source modules are real scope and historical work. None alone prove the final product. Measure completion by demonstrated user journeys J-01..J-18 and supported target profiles.
+
+## 51.1 Fixed evidence matrix
+
+Each journey receives separate fields: source implemented, cross-plane integrated, actual live behavior observed, independently executed on target, release authorized. Keep qualitative holds for security, rights, state durability, install and exact-head CI. A weighted summary may be shown only if denominator, weights, workload and date/head are fixed and public to operators. A source volume cannot score full completion because it contains hundreds of thousands of lines. A model cannot self-award 95% completion. The weakest noncompensable required gate remains visible regardless of aggregate score.
+
+## 51.2 Dependency-first implementation order
+
+**Wave A:** canonical owner/current-head reconciliation, shared AI tree, backend route health, state writer topology. **Wave B:** reversible setup/install with stable secrets, safe Mongo/Chroma and offline source custody. **Wave C:** actual guarded GGUF through canonical provider with tokenizer/epoch/reviewer and authenticated tool work. **Wave D:** one original playable game from user brief, semantic world graph, real engine input, media, save/undo and editor. **Wave E:** clean native export, actual end conditions and source rights. **Wave F:** crash/retry, adversarial injection, device benchmarking, release gate and human approval. **Wave G:** broader genres, longform worlds, high-fidelity rendering and advanced model optimization, gated by verified core pipeline.
+
+Parallelize disjoint media variants, independent test corpus generation and target adapters once underlying contracts are stable. Serialize conflicting schema/root/source writer changes. A draft PR containing enormous mirrored AI-tree changes should not be blindly overlaid onto another feature branch. Each work batch returns exact source paths, new user-visible capability, negative proof, focused tests, changed/unchanged holds, rollback and independent review. Producing twenty PRs without one integrated playable game is not more complete than producing one verified end-to-end slice.
+
+## 51.3 Explicit blockers and promotion math
+
+Four truthful work outcomes: implemented and qualified; implemented but missing target proof; blocked by a concrete reproducible failure; already implemented/duplicate and mapped to the right canonical owner. A valid no-op after discovering an existing verified owner is better than inventing a duplicate feature. Blocks must cite a specific failed invariant and minimum safe repair. Promote only source and toolchain identities with exact-head evidence; pass from another head is context, not a final verdict. Track source/code, model, runtime, rights and policy drift independently so reruns are precise rather than pretending all previously completed tests remain valid forever.
+
+# 52. Next deep engineering tickets with executable proofs
+
+These 24 tickets extend existing FRT-001..024. They are planning records until an authorized builder creates and validates the corresponding code in the existing owner. Do not regenerate already complete code merely because a ticket is newly indexed.
+
+| Ticket | Bot | Minimal genuine implementation and negative acceptance |
+|---|---|---|
+| FRT-025 | 01 | Install journal over existing installer; process kill at every stage preserves prior data |
+| FRT-026 | 01 | Live protected route/epoch/model status; absent reviewer never reports AI ready |
+| FRT-027 | 11 | Unified project/auth-epoch projection; stale request cannot overwrite switched account |
+| FRT-028 | 11 | Human/AI CAS edit, preview and undo; conflicting revision requires explicit replan |
+| FRT-029 | 06 | One authored event lowers into Godot, real input changes scene; broken signal fails |
+| FRT-030 | 06 | Reference/native action-trace differential harness; corrupted reward fails |
+| FRT-031 | 05 | Multi-region actor continuity; duplicate trader spawn/replay denied |
+| FRT-032 | 05 | Quest/economy conserved resource state; negative currency and impossible key rejected |
+| FRT-033 | 12 | Stateful property-based project workflow; one failing action trace shrinks |
+| FRT-034 | 12 | Source/headless/interactive proof classifier; boot marker cannot certify game |
+| FRT-035 | 02 | Safe imported tree/build confinement; symlink, archive and active payload denied |
+| FRT-036 | 02 | Asset rights dependency invalidation; revoked source blocks export |
+| FRT-037 | 03 | AI+game worker admission; background load cannot violate declared frame envelope |
+| FRT-038 | 06 | Real game frame/audio/input latency evidence with concurrent model execution |
+| FRT-039 | 09 | Clean-host package upgrade and rollback retaining old saves |
+| FRT-040 | 12 | Cross-plane kill/recovery campaign; uncertain outcome never marked successful |
+| FRT-041 | 04 | Finite directed campaign; human edit invalidates stale builder tool proposal |
+| FRT-042 | 10 | Admitted source research to editable original game; injection cannot grant extra network |
+| FRT-043 | 07 | Incremental world regeneration with exact invalidation/full-build parity |
+| FRT-044 | 08 | Actual skinned motion and audible cue in exported game; missing clip fails |
+| FRT-045 | 11 | Keyboard/gamepad/screen-reader creator journey from setup through export |
+| FRT-046 | 12 | Maturity denominator fixed by target and journey; source-only receipts never certify |
+| FRT-047 | 02 | Overlapping PR and mirrored AI tree parity; conflicting owner roots block integration |
+| FRT-048 | 09 | Actual offline clean-runner web/desktop launch and independent game completion |
+
+## 52.1 Build order and gates for the next twelve-bot execution
+
+**S0 preflight:** read all AGENTS.md mandatory contracts; fetch active exact PR heads and file paths; map tickets to existing canonical owners; retain old data; classify observed versus proposed behavior. **S1 implement:** first repair an actual critical-path failure and make one vertical-slice operation traverse real source paths. **S2 integrate:** compare source semantics to actual game engine and studio UI; capture typed receipts. **S3 test when complete:** run architecture validators, focused negatives, actual engine play, clean target export and crash/restart acceptance. **S4 reconcile:** update source/contract only through authorized process; preserve unrelated good work; rebase without mixing conflicting AI trees. **S5 certify or hold:** independent exact-head verdict, clear unresolved gaps, no inferred install/model/native readiness.
+
+**Completion rule:** this document extends an indexed engineering constitution. Its sections and work orders are not executable features, not a native qualification report and not release authority. Prioritize real accepted game-building behavior over word count, while continuing meaningful source-grounded blueprint expansion toward the user's separate one-million-word document goal.
