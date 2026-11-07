@@ -70,6 +70,44 @@ class AtomicReviewTests(unittest.TestCase):
             self.flow.compile(BRIEF["id"], inspected["source_digest"])
         self.assertEqual(raised.exception.code, "review_required")
 
+    def test_prior_approval_cannot_authorize_interrupted_new_revision(self):
+        first = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
+        second = {
+            "action": "replace_scene",
+            "value": {
+                "id": "opening", "title": "Mira finds a second crossing",
+                "narrative": "The safe path changes after the storm.",
+            },
+        }
+        real_write = self.flow.worlds._write
+        calls = 0
+
+        def interrupted(fd, name, data):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("simulated review publication failure")
+            return real_write(fd, name, data)
+
+        with patch.object(self.flow.worlds, "_write", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.flow.review(BRIEF["id"], first["source_digest"], second, NOTE)
+        current = self.flow.inspect(BRIEF["id"])
+        self.assertFalse(current["reviewed"])
+        self.assertNotEqual(current["source_digest"], first["source_digest"])
+        with self.assertRaises(CanonError) as raised:
+            self.flow.compile(BRIEF["id"], current["source_digest"])
+        self.assertEqual(raised.exception.code, "review_required")
+        self.assertEqual(self.flow.diagnose(BRIEF["id"])["next_action"],
+                         "review_and_approve_canonical_source")
+        approved = self.flow.approve_current(
+            BRIEF["id"], current["source_digest"], NOTE)
+        self.assertTrue(approved["reviewed"])
+        receipt = self.flow.compile(BRIEF["id"], current["source_digest"])
+        self.assertEqual(receipt["source_digest"], current["source_digest"])
+        self.assertEqual(self.flow.verify(BRIEF["id"]), receipt)
+
     def test_writer_lock_rejects_concurrent_review_without_mutation(self):
         fd = self.flow.worlds._directory()
         try:
