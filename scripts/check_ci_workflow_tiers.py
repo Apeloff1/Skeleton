@@ -20,6 +20,16 @@ INDEX = Path("machine/ci_workflow_tiers.json")
 MAX_INDEPENDENT_WORKFLOWS = 24
 
 
+def _unique_policy_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate registry keys rather than silently trusting the last value."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate CI registry key: {key}")
+        result[key] = value
+    return result
+
+
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
@@ -56,7 +66,7 @@ def independently_triggered(found: set[str]) -> bool:
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
-        policy = json.loads((root / INDEX).read_text(encoding="utf-8"))
+        policy = json.loads((root / INDEX).read_text(encoding="utf-8"), object_pairs_hook=_unique_policy_pairs)
     except (OSError, ValueError, UnicodeError) as exc:
         return [f"cannot read CI tier registry: {exc}"]
     if not isinstance(policy, dict) or policy.get("schema") != SCHEMA:
@@ -82,9 +92,9 @@ def audit(root: Path = ROOT) -> list[str]:
     profiles = policy.get("automatic_event_triggers")
     if (not isinstance(profiles, dict) or set(profiles) != set(approved)
             or any(not isinstance(event_names, list) or not event_names
-                   or len(set(event_names)) != len(event_names)
                    or any(type(event) is not str
                           or not re.fullmatch(r"[a-z_]+", event) for event in event_names)
+                   or len(set(event_names)) != len(event_names)
                    or not independently_triggered(set(event_names))
                    for event_names in profiles.values())):
         return ["invalid explicit automatic event trigger profiles"]
