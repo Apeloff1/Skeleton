@@ -44,6 +44,8 @@
 - 29. Workable integration contract catalog
 - 30. Twelve-bot executable vertical slices
 - 31. Exact-head CI incident triage and repair order
+- 32. Existing 421-volume masterplan review crosswalk
+- 33. Existing 42-task P0 construction queue reconciliation
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -5208,3 +5210,511 @@ The suggested repair owners are BOT-09 for public CLI, BOT-05 for story CAS, BOT
 A current-head successful Dragon Atlas backend source test is meaningful and should not be discarded merely because a prior fixture was broken. A current-head failed composite domain test is equally meaningful and should not be hidden by successful installer or secret-scan siblings. No bot may relabel a completed check under an ancestor SHA as current-head success, infer an unexecuted physical target test, waive source rights, modify required CI to skip failing functionality, or merge a deliberately held draft because a plan includes it.
 
 The primary implementation objective remains one safely installable and controllable AI game studio that can create, edit, genuinely play, diagnose, repair and export original games. Operational source-level green checks are necessary but not equivalent to that user-level achievement.
+
+# 32. Source-derived VOL-000 through VOL-420 mapping to 12 bot review lanes
+
+**This is a full indexed cross-reference of existing masterplan volume records, not 421 new gaps.** It is derived from machine/ai_master_plan.json as observed at main e00bfb0809b34573c2df313ea16e17fd10bead38. Titles, machine-declared implementation status and candidate source paths are retained as source metadata. Candidate bot numbers are heuristic *review-routing hints* from each volume's title, not authoritative source owners or proof that the volume is incomplete. When a title is ambiguous, BOT-02 is assigned triage-only; all source mutations still require machine/architecture and named canonical owner confirmation. Do not spawn a new PR just because a volume appears below.
+
+At this snapshot the machine plan declares 421 volumes: **404 implementation_status verified, 7 hardened and 10 implemented**; all 421 enterprise_grade_state fields are **designed**. These are historical plan states, not a live product quality score. In particular “designed for enterprise qualification” is not equivalent to enterprise-qualified, comparator-superior, Windows-installed, gameplay-proven or release-certified. A volume can have an implementation_checkbox and past evidence and still require a fresh final-head game/device or security acceptance. The plan's scope freeze at VOL-420 still applies; new requirements should be nested into existing volumes or undergo an authorized ADR exception.
+
+The following indexed table deliberately avoids making up per-volume acceptance results, because the test logs and code execution for all 421 were not performed in this review. Each row is a **lookup key** for the bot to read the full machine dossier, confirm real paths, reconcile prior evidence and decide whether any new implementation task is justified.
+
+| Volume | Canonical title | Source implementation status | Suggested review lane | Existing code anchor |
+|---|---|---|---|---|
+| VOL-000 | Plan Constitution | verified | BOT-02 (triage) | skeleton/contracts/maturity_reconciliation.py |
+| VOL-001 | Scientific & Historical Foundation | verified | BOT-02 (triage) | skeleton/research/source_lineage.py |
+| VOL-002 | System Architecture | verified | BOT-02 | machine/architecture.json |
+| VOL-003 | Canonical Contract System | verified | BOT-02 | skeleton/contracts/canonical.py |
+| VOL-004 | Kernel & Execution Foundation | verified | BOT-02 (triage) | skeleton/persistence/operation_runtime.py |
+| VOL-005 | Data & Persistence | verified | BOT-02 (triage) | machine/state_topology.json |
+| VOL-006 | Model Development Program | verified | BOT-03 | skeleton/modeling/registry.py |
+| VOL-007 | Inference Engine | verified | BOT-03 | skeleton/provider_runtime.py |
+| VOL-008 | Model Routing | verified | BOT-03 | skeleton/intelligence/admission.py |
+| VOL-009 | Context Engineering | verified | BOT-03 | skeleton/context/compiler.py |
+| VOL-010 | Memory System | verified | BOT-02 (triage) | skeleton/memory/reconciliation.py |
+| VOL-011 | Retrieval System | verified | BOT-02 (triage) | skeleton/retrieval/reranker_contract.py |
+| VOL-012 | Knowledge System | verified | BOT-02 (triage) | skeleton/intelligence/memory_retrieval_quality.py |
+| VOL-013 | Cognitive Core | hardened | BOT-03 | skeleton/intelligence/strategy_registry.py |
+| VOL-014 | Planning Engine | hardened | BOT-04 | skeleton/intelligence/plan_verifier.py |
+| VOL-015 | Tool & Action System | hardened | BOT-02 (triage) | skeleton/skills/privileged_transaction.py |
+| VOL-016 | Agent Runtime | hardened | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-017 | Multi-Agent Orchestration | hardened | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-018 | Long-Horizon Autonomy | verified | BOT-04 | skeleton/agents/autonomy_control.py |
+| VOL-019 | World Models & Simulation | verified | BOT-05 | skeleton/simulation/environment.py |
+| VOL-020 | Multimodal Intelligence | verified | BOT-02 (triage) | skeleton/multimodal/contracts.py |
+| VOL-021 | Code Intelligence | verified | BOT-02 (triage) | skeleton/repo_intelligence/repository_graph.py |
+| VOL-022 | Autonomous Repository Engineering | verified | BOT-04 | skeleton/automation/transactional_workspace.py |
+| VOL-023 | Forge | verified | BOT-04 | skeleton/eval/champion_registry.py |
+| VOL-024 | Learning & Evolution | verified | BOT-02 (triage) | skeleton/eval/failure_knowledge.py |
+| VOL-025 | Safety Architecture | verified | BOT-02 | skeleton/intelligence/verification_runtime.py |
+| VOL-026 | Cybersecurity | verified | BOT-12 | skeleton/security/capability_contracts.py |
+| VOL-027 | Privacy & Data Protection | verified | BOT-02 (triage) | skeleton/vault/deletion_proof.py |
+| VOL-028 | Governance & Authority | verified | BOT-02 | skeleton/vault/governance_audit.py |
+| VOL-029 | Reliability | verified | BOT-12 | skeleton/mesh/capacity_qualification.py |
+| VOL-030 | Distributed Systems | verified | BOT-02 (triage) | skeleton/network/remote_execution.py |
+| VOL-031 | Compute & Hardware | verified | BOT-01 | skeleton/network/model_placement.py |
+| VOL-032 | High-Performance Native Core | verified | BOT-02 (triage) | skeleton/native/isolation.py |
+| VOL-033 | Java / JVM Plane | verified | BOT-02 (triage) | skeleton/native/jvm_protocol.py |
+| VOL-034 | Observability | verified | BOT-12 | skeleton/contracts/canonical.py |
+| VOL-035 | Evaluation Program | verified | BOT-12 | skeleton/contracts/reproducibility.py |
+| VOL-036 | Adversarial Evaluation | verified | BOT-12 | skeleton/contracts/risk_evidence.py |
+| VOL-037 | Verification Plane | verified | BOT-12 | skeleton/intelligence/verification_runtime.py |
+| VOL-038 | Provenance | verified | BOT-02 | skeleton/contracts/canonical.py |
+| VOL-039 | Event Architecture | verified | BOT-02 | skeleton/frontier/operation_stream.py |
+| VOL-040 | Streaming | verified | BOT-02 (triage) | skeleton/frontier/operation_stream.py |
+| VOL-041 | API Architecture | verified | BOT-02 | machine/ai_runtime_schemas.json |
+| VOL-042 | Product Shell | verified | BOT-11 | skeleton/frontier/operation_stream.py |
+| VOL-043 | Desktop Application | verified | BOT-11 | backend |
+| VOL-044 | Web Application | verified | BOT-11 | skeleton/frontier/operation_stream.py |
+| VOL-045 | UX for Long-Running AI | verified | BOT-11 | skeleton/frontier/operation_stream.py |
+| VOL-046 | Multi-Tenancy | verified | BOT-02 (triage) | skeleton/security |
+| VOL-047 | Installer | verified | BOT-01 | skeleton/release/lifecycle.py |
+| VOL-048 | Updater | verified | BOT-01 | skeleton/release/lifecycle.py |
+| VOL-049 | Repair System | verified | BOT-02 (triage) | skeleton/release/lifecycle.py |
+| VOL-050 | Uninstaller | verified | BOT-01 | skeleton/release/lifecycle.py |
+| VOL-051 | Repository Architecture | verified | BOT-02 | skeleton/volumes/wave4/engine.py |
+| VOL-052 | Internal Python Architecture | verified | BOT-02 | skeleton |
+| VOL-053 | Import Architecture | verified | BOT-02 | skeleton/volumes/wave4/engine.py |
+| VOL-054 | Machine Architecture Manifests | verified | BOT-02 | machine/manifest_reference_policy.json |
+| VOL-055 | Architecture Linter | verified | BOT-02 | scripts |
+| VOL-056 | Gap Ledger | verified | BOT-02 (triage) | skeleton/contracts/maturity_reconciliation.py |
+| VOL-057 | Risk Register | verified | BOT-02 (triage) | skeleton/contracts/risk_evidence.py |
+| VOL-058 | ADR Program | verified | BOT-02 (triage) | docs/adr |
+| VOL-059 | CI | verified | BOT-02 (triage) | skeleton/contracts/promotion_gates.py |
+| VOL-060 | Release Engineering | verified | BOT-12 | skeleton/release/qualification.py |
+| VOL-061 | Deployment | verified | BOT-01 | skeleton/release/migration.py |
+| VOL-062 | Environment Management | verified | BOT-02 (triage) | skeleton/release/migration.py |
+| VOL-063 | Configuration | verified | BOT-02 (triage) | skeleton/release/migration.py |
+| VOL-064 | Backup | verified | BOT-02 (triage) | skeleton/release/restore.py |
+| VOL-065 | Disaster Recovery | verified | BOT-01 | skeleton/release/restore.py |
+| VOL-066 | Incident Response | verified | BOT-12 | skeleton/release/disaster_recovery.py |
+| VOL-067 | Performance Program | verified | BOT-02 (triage) | skeleton/mesh/capacity_qualification.py |
+| VOL-068 | Capacity Planning | verified | BOT-02 (triage) | skeleton/mesh/capacity_qualification.py |
+| VOL-069 | Cost Engineering | verified | BOT-02 (triage) | skeleton/observability/budget_accounting.py |
+| VOL-070 | Quality Vector | verified | BOT-12 | skeleton/eval/quality_vector.py |
+| VOL-071 | Specialized Intelligence | verified | BOT-02 (triage) | skeleton/ai/specialization/domain_registry.py |
+| VOL-072 | Jeeves Domain System | verified | BOT-02 (triage) | skeleton/jeeves/evidence_response.py |
+| VOL-073 | Game & Simulation Intelligence | verified | BOT-02 (triage) | skeleton/simulation/environment.py |
+| VOL-074 | Education & Teaching | verified | BOT-02 (triage) | skeleton/learning/instruction_runtime.py |
+| VOL-075 | Artifact System | verified | BOT-08 | skeleton/release/qualification.py |
+| VOL-076 | Content-Addressed Storage | verified | BOT-03 | skeleton/release/qualification.py |
+| VOL-077 | Experiment Platform | verified | BOT-02 (triage) | skeleton/eval/experiment_registry.py |
+| VOL-078 | Reproducibility | verified | BOT-02 (triage) | skeleton/contracts/canonical.py |
+| VOL-079 | Software Quality | verified | BOT-12 | skeleton/contracts/reproducibility.py |
+| VOL-080 | Test Architecture | verified | BOT-02 | skeleton/contracts/maturity_reconciliation.py |
+| VOL-081 | Formal Methods | verified | BOT-02 (triage) | skeleton/contracts/formal_methods.py |
+| VOL-082 | Benchmark Lab | verified | BOT-12 | skeleton/eval/benchmark_registry.py |
+| VOL-083 | Red Team | verified | BOT-12 | skeleton/eval/regression_corpus.py |
+| VOL-084 | Human Control | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-085 | Explainability | verified | BOT-02 (triage) | skeleton/observability/explainability.py |
+| VOL-086 | Accessibility | verified | BOT-11 | frontend/src/accessibility/runtime.ts |
+| VOL-087 | Internationalization | verified | BOT-02 (triage) | skeleton/contracts/localization.py |
+| VOL-088 | Compliance & Legal Engineering | verified | BOT-02 (triage) | skeleton/contracts/compliance.py |
+| VOL-089 | Documentation Engine | verified | BOT-02 (triage) | skeleton/documentation/runtime.py |
+| VOL-090 | Generated Documentation | verified | BOT-02 (triage) | skeleton/documentation/runtime.py |
+| VOL-091 | Operations Manual | verified | BOT-02 (triage) | skeleton/observability/runbooks.py |
+| VOL-092 | Repository Maintenance | verified | BOT-02 (triage) | skeleton/repo_machine/maintenance.py |
+| VOL-093 | Backlog Control | verified | BOT-02 (triage) | skeleton/automation/backlog_control.py |
+| VOL-094 | Priority Engine | verified | BOT-02 (triage) | skeleton/automation/priority_engine.py |
+| VOL-095 | Build Work Packages | verified | BOT-02 (triage) | skeleton/automation/work_packages.py |
+| VOL-096 | VS-000 Foundation Recovery Slice | verified | BOT-02 (triage) | skeleton/persistence/foundation_recovery.py |
+| VOL-097 | VS-001 Functional AI | verified | BOT-02 (triage) | skeleton/ai/functional_transaction.py |
+| VOL-098 | VS-002 Engineering Agent | verified | BOT-04 | skeleton/ai/build/engineering_agent.py |
+| VOL-099 | VS-003 Scientific Researcher | verified | BOT-10 | skeleton/ai/research.py |
+| VOL-100 | VS-004 Multi-Agent Engineering | verified | BOT-04 | skeleton/ai/agents/multi_agent_engineering.py |
+| VOL-101 | VS-005 Self-Improvement | verified | BOT-02 (triage) | skeleton/learning/promotion_control.py |
+| VOL-102 | VS-006 Distributed Execution | verified | BOT-02 (triage) | skeleton/reliability/distributed_execution.py |
+| VOL-103 | VS-007 Desktop Product | verified | BOT-02 (triage) | skeleton/app/installer.py |
+| VOL-104 | Acceptance: Functional AI | verified | BOT-02 (triage) | skeleton/eval/functional_acceptance.py |
+| VOL-105 | Acceptance: Autonomous AI Worker | verified | BOT-04 | skeleton/eval/autonomy_acceptance.py |
+| VOL-106 | Acceptance: Research System | verified | BOT-10 | skeleton/eval/research_acceptance.py |
+| VOL-107 | Acceptance: SOTA Candidate | verified | BOT-02 (triage) | skeleton/eval/sota_qualification.py |
+| VOL-108 | Anti-Patterns | verified | BOT-02 (triage) | skeleton/eval/antipatterns.py |
+| VOL-109 | Build Order | verified | BOT-02 (triage) | skeleton/automation/build_order.py |
+| VOL-110 | Definition of Done | verified | BOT-02 (triage) | skeleton/contracts/definition_of_done.py |
+| VOL-111 | Full Construction Manual Format | verified | BOT-02 (triage) | skeleton/automation/construction_packet.py |
+| VOL-112 | Master Traceability Matrix | verified | BOT-02 (triage) | skeleton/contracts/traceability.py |
+| VOL-113 | Capability Map | verified | BOT-02 (triage) | skeleton/ai/capability_map.py |
+| VOL-114 | Technology Radar | verified | BOT-02 (triage) | skeleton/contracts/technology_radar.py |
+| VOL-115 | Technical Debt Ledger | verified | BOT-02 (triage) | skeleton/contracts/technical_debt.py |
+| VOL-116 | Architecture Fitness Functions | verified | BOT-02 | skeleton/contracts/architecture_fitness.py |
+| VOL-117 | Project Metrics | verified | BOT-02 (triage) | skeleton/contracts/project_metrics.py |
+| VOL-118 | Roadmap Control | verified | BOT-02 (triage) | skeleton/contracts/roadmap_control.py |
+| VOL-119 | Completion Model | verified | BOT-03 | skeleton/automation/completion_model.py |
+| VOL-120 | Final Assembly Test | verified | BOT-02 (triage) | skeleton/app/final_assembly.py |
+| VOL-121 | Master Appendices | verified | BOT-02 (triage) | skeleton/automation/master_appendices.py |
+| VOL-122 | Requirements Engineering | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-123 | Non-Functional Requirements | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-124 | Capability Taxonomy | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-125 | Capability Maturity Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-126 | Behavior Specifications | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-127 | State Machine Catalogue | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-128 | Interface Design Standard | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-129 | Schema Registry | verified | BOT-02 | machine |
+| VOL-130 | Compatibility Model | verified | BOT-03 | machine |
+| VOL-131 | Internal Protocols | verified | BOT-02 (triage) | skeleton/ai |
+| VOL-132 | Consistency Model | verified | BOT-02 | machine/state_topology.json |
+| VOL-133 | Distributed Transaction Strategy | verified | BOT-02 | skeleton/storage/cas/__init__.py |
+| VOL-134 | Outbox / Inbox Patterns | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-135 | Cache Architecture | verified | BOT-02 | skeleton/storage/cas/__init__.py |
+| VOL-136 | Content Addressing | verified | BOT-02 (triage) | skeleton/storage/cas/__init__.py |
+| VOL-137 | Data Ingestion Engine | verified | BOT-02 (triage) | skeleton/data/ingestion.py |
+| VOL-138 | Document Intelligence | verified | BOT-02 (triage) | skeleton/data/document_intelligence.py |
+| VOL-139 | Data Lineage | verified | BOT-02 | skeleton/data/lineage_governance.py |
+| VOL-140 | Data Quality Engine | verified | BOT-12 | skeleton/data/quality.py |
+| VOL-141 | Dataset Registry | verified | BOT-02 (triage) | skeleton/data/dataset_registry.py |
+| VOL-142 | Synthetic Data Factory | verified | BOT-02 (triage) | skeleton/data/synthetic.py |
+| VOL-143 | Training Control Plane | verified | BOT-03 | skeleton/training/control_plane.py |
+| VOL-144 | Distributed Training | verified | BOT-03 | skeleton/training/distributed.py |
+| VOL-145 | Training Checkpointing | verified | BOT-03 | skeleton/training/checkpointing.py |
+| VOL-146 | Elastic Training Recovery | verified | BOT-03 | skeleton/training/elastic_recovery.py |
+| VOL-147 | Training Observability | verified | BOT-03 | skeleton/training/observability.py |
+| VOL-148 | Training Evaluation Gates | verified | BOT-03 | skeleton/training/eval_gates.py |
+| VOL-149 | Post-Training Lab | verified | BOT-03 | skeleton/training/post_training.py |
+| VOL-150 | Reinforcement Learning Environments | verified | BOT-02 (triage) | skeleton/training/rl_environment.py |
+| VOL-151 | Curriculum Engine | verified | BOT-02 (triage) | skeleton/training/curriculum.py |
+| VOL-152 | Verifier Model Program | verified | BOT-03 | skeleton/training/verifier_models.py |
+| VOL-153 | Multimodal Ingestion Core | verified | BOT-02 (triage) | skeleton/artifacts/__init__.py |
+| VOL-154 | Vision Pipeline | verified | BOT-02 (triage) | skeleton/vision/pipeline.py |
+| VOL-155 | Document Vision | verified | BOT-02 (triage) | skeleton/document_vision/fusion.py |
+| VOL-156 | Audio Pipeline | verified | BOT-08 | skeleton/audio/pipeline.py |
+| VOL-157 | Live Speech Runtime | verified | BOT-02 (triage) | skeleton/speech/runtime.py |
+| VOL-158 | Video Pipeline | verified | BOT-08 | skeleton/video/pipeline.py |
+| VOL-159 | Multimodal Retrieval | verified | BOT-02 (triage) | skeleton/ai/runtime/extensions/multimodal.py |
+| VOL-160 | Tool SDK | verified | BOT-02 (triage) | skeleton/ai/runtime/extensions/ecosystem.py |
+| VOL-161 | Connector Framework | verified | BOT-02 (triage) | skeleton/connectors/framework.py |
+| VOL-162 | Plugin Ecosystem | verified | BOT-05 | skeleton/plugins/lifecycle.py |
+| VOL-163 | Tool Marketplace Security | verified | BOT-11 | skeleton/ai/runtime/extensions/ecosystem.py |
+| VOL-164 | Sandbox Runtime | verified | BOT-02 (triage) | skeleton/skills/privileged_transaction.py |
+| VOL-165 | Policy Language | verified | BOT-02 (triage) | skeleton/skills/privileged_transaction.py |
+| VOL-166 | Policy Simulation | implemented | BOT-02 (triage) | skeleton/security/policy_simulation.py |
+| VOL-167 | Threat Model | implemented | BOT-03 | skeleton/security/threat_model.py |
+| VOL-168 | AI-Specific Threats | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-169 | Security Boundaries | implemented | BOT-12 | skeleton/security/boundaries.py |
+| VOL-170 | Zero-Trust Internal Model | verified | BOT-03 | skeleton/agents/blast_radius.py |
+| VOL-171 | Network Architecture | verified | BOT-02 | skeleton/network/architecture.py |
+| VOL-172 | Egress Control | implemented | BOT-02 (triage) | skeleton/security/egress_control.py |
+| VOL-173 | Secret Security | implemented | BOT-12 | skeleton/security/secret_handles.py |
+| VOL-174 | Key Management | implemented | BOT-02 (triage) | skeleton/security/key_management.py |
+| VOL-175 | Tenant Isolation | implemented | BOT-02 | skeleton/security/tenant_isolation.py |
+| VOL-176 | Privacy Engine | implemented | BOT-02 (triage) | skeleton/security/privacy_engine.py |
+| VOL-177 | Data Deletion | implemented | BOT-02 (triage) | skeleton/security/data_deletion.py |
+| VOL-178 | Software Bill of Materials | implemented | BOT-08 | skeleton/supply_chain/sbom.py |
+| VOL-179 | Model Bill of Materials | verified | BOT-03 | skeleton/supply_chain/model_bom.py |
+| VOL-180 | Service Level Objectives | verified | BOT-02 (triage) | skeleton/observability/slo.py |
+| VOL-181 | Error Budgets | verified | BOT-02 (triage) | skeleton/observability/error_budget_policy.py |
+| VOL-182 | Observability Cardinality Control | verified | BOT-12 | skeleton/observability/cardinality_control.py |
+| VOL-183 | Trace Model | verified | BOT-03 | skeleton/observability/trace_model.py |
+| VOL-184 | Performance Profiling | verified | BOT-02 (triage) | skeleton/observability/profile_records.py |
+| VOL-185 | Latency Budgeting | verified | BOT-02 (triage) | skeleton/observability/latency_budget.py |
+| VOL-186 | Cost Governor | verified | BOT-02 (triage) | skeleton/observability/cost_governor.py |
+| VOL-187 | Energy / Compute Efficiency | verified | BOT-02 (triage) | skeleton/observability/efficiency_metrics.py |
+| VOL-188 | Chaos Engineering | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-189 | Recovery Drills | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-190 | Release Qualification Matrix | verified | BOT-12 | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-191 | Canary Deployment | verified | BOT-01 | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-192 | Feature Flags | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-193 | Rollback Architecture | verified | BOT-02 | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-194 | Developer Experience | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/developer_experience.py |
+| VOL-195 | Local Development | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/local_development.py |
+| VOL-196 | Test Fixture Platform | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/fixture_platform.py |
+| VOL-197 | Simulation Mode | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/simulation_mode.py |
+| VOL-198 | Contract Fuzzing | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/contract_fuzzing.py |
+| VOL-199 | Property-Based Invariant Testing | verified | BOT-12 | skeleton/testing/property_invariants.py |
+| VOL-200 | Formal Verification Candidates | verified | BOT-12 | skeleton/contracts/formal_candidates.py |
+| VOL-201 | Agent Communication Protocol | verified | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-202 | Agent Handoff | verified | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-203 | Agent Performance Evidence | verified | BOT-04 | skeleton/ai/agents/performance_evidence.py |
+| VOL-204 | Agent Economics | verified | BOT-04 | skeleton/ai/agents/economics.py |
+| VOL-205 | Delegation Budgets | verified | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-206 | Consensus & Disagreement | verified | BOT-02 (triage) | skeleton/ai/agents/consensus.py |
+| VOL-207 | Adversarial Reviewer | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-208 | Independent Verifier | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-209 | Artifact Review Workflow | verified | BOT-08 | skeleton/ai/artifact_review.py |
+| VOL-210 | Research Agent Team | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-211 | Literature Watch System | verified | BOT-10 | skeleton/volumes/wave4/engine.py |
+| VOL-212 | Citation Graph Analytics | verified | BOT-10 | skeleton/volumes/wave4/engine.py |
+| VOL-213 | Reproduction Packages | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-214 | Experiment Comparison | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-215 | Statistical Analysis | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-216 | Model Evaluation Harness | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-217 | Agent Evaluation Harness | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-218 | Long-Horizon Benchmarks | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-219 | Contamination Auditor | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-220 | Human Evaluation | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-221 | Model Card System | verified | BOT-03 | skeleton/ai/governance/cards.py |
+| VOL-222 | Dataset Card System | verified | BOT-02 (triage) | skeleton/ai/governance/cards.py |
+| VOL-223 | Tool Card System | verified | BOT-02 (triage) | skeleton/ai/governance/cards.py |
+| VOL-224 | Agent Card System | verified | BOT-04 | skeleton/ai/governance/cards.py |
+| VOL-225 | Component Health Scorecard | verified | BOT-02 (triage) | skeleton/ai/governance/health.py |
+| VOL-226 | Dependency Health | verified | BOT-02 (triage) | skeleton/ai/governance/health.py |
+| VOL-227 | Vendor / Provider Risk | verified | BOT-02 (triage) | skeleton/ai/providers/provider_risk.py |
+| VOL-228 | Provider Failover | verified | BOT-02 (triage) | skeleton/ai/providers/failover.py |
+| VOL-229 | Offline Mode | verified | BOT-02 (triage) | skeleton/ai/providers/offline_mode.py |
+| VOL-230 | Air-Gapped Profile | verified | BOT-02 (triage) | skeleton/security/air_gap.py |
+| VOL-231 | Edge Deployment | verified | BOT-01 | skeleton/ai/runtime/deployment_profiles.py |
+| VOL-232 | Enterprise Deployment | verified | BOT-01 | skeleton/ai/runtime/deployment_profiles.py |
+| VOL-233 | Identity Federation | verified | BOT-02 | skeleton/security/identity_federation.py |
+| VOL-234 | Administration Plane | verified | BOT-02 (triage) | skeleton/ai/governance/administration.py |
+| VOL-235 | Audit UI | verified | BOT-12 | frontend |
+| VOL-236 | Operations Dashboard | verified | BOT-11 | frontend |
+| VOL-237 | Agent Operations Dashboard | verified | BOT-04 | skeleton/ai/agents |
+| VOL-238 | Research Dashboard | verified | BOT-10 | frontend |
+| VOL-239 | Model Operations | verified | BOT-03 | skeleton/ai/providers |
+| VOL-240 | Model Rollback | verified | BOT-03 | skeleton/ai/providers |
+| VOL-241 | Prompt / Instruction Registry | verified | BOT-03 | machine |
+| VOL-242 | Prompt Regression Testing | verified | BOT-03 | skeleton/eval |
+| VOL-243 | Routing Policy Registry | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-244 | Memory Policy Registry | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-245 | Retrieval Policy Registry | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-246 | Knowledge Refresh | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-247 | Temporal Knowledge | verified | BOT-05 | skeleton/ai |
+| VOL-248 | Uncertainty Representation | hardened | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-249 | Hypothesis Engine | verified | BOT-02 (triage) | skeleton/ai |
+| VOL-250 | Causal Knowledge | verified | BOT-02 (triage) | skeleton/ai |
+| VOL-251 | Search Strategy Engine | verified | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-252 | Value of Information | verified | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-253 | Stopping Policies | hardened | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-254 | Answer Quality Pipeline | verified | BOT-12 | skeleton/intelligence/output_quality.py |
+| VOL-255 | Artifact Quality Pipeline | verified | BOT-08 | skeleton/intelligence/output_quality.py |
+| VOL-256 | Human-in-the-Loop Gates | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-257 | Reversibility Classification | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-258 | Blast-Radius Model | verified | BOT-03 | skeleton/agents/blast_radius.py |
+| VOL-259 | Changeset Budgeting | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-260 | Migration Engine | verified | BOT-02 (triage) | skeleton/persistence |
+| VOL-261 | Legacy Compatibility | verified | BOT-02 (triage) | skeleton/ai/compat |
+| VOL-262 | Deprecation Process | verified | BOT-02 (triage) | machine |
+| VOL-263 | Architecture Archaeology | verified | BOT-02 | skeleton/ai/build |
+| VOL-264 | Repository Consolidation Engine | verified | BOT-02 (triage) | skeleton/ai/build |
+| VOL-265 | Code Provenance | verified | BOT-02 | skeleton/ai/build |
+| VOL-266 | Duplication Detector | verified | BOT-02 (triage) | skeleton/ai/build |
+| VOL-267 | Module Ownership | verified | BOT-02 (triage) | machine/architecture.json |
+| VOL-268 | CODEOWNERS Generation | verified | BOT-07 | scripts |
+| VOL-269 | Documentation as Code | verified | BOT-02 (triage) | docs |
+| VOL-270 | Diagram as Code | verified | BOT-02 (triage) | docs |
+| VOL-271 | Architecture Snapshots | verified | BOT-02 | machine |
+| VOL-272 | Release Reproducibility | verified | BOT-12 | release |
+| VOL-273 | Build Hermeticity | verified | BOT-02 (triage) | scripts |
+| VOL-274 | Build Cache | verified | BOT-02 (triage) | .github/workflows |
+| VOL-275 | Binary Provenance | verified | BOT-02 | release |
+| VOL-276 | Installer Security | verified | BOT-01 | installer |
+| VOL-277 | Update Security | verified | BOT-12 | updater |
+| VOL-278 | Bootstrap Recovery | verified | BOT-02 (triage) | repair |
+| VOL-279 | Crash Diagnostics | verified | BOT-02 (triage) | skeleton/observability |
+| VOL-280 | Support Bundle | verified | BOT-02 (triage) | repair |
+| VOL-281 | Doctor Command | verified | BOT-02 (triage) | scripts |
+| VOL-282 | Self-Diagnosis | verified | BOT-02 (triage) | skeleton/observability |
+| VOL-283 | Safe Repair | verified | BOT-02 (triage) | repair |
+| VOL-284 | System Digital Twin | verified | BOT-02 (triage) | skeleton/simulation |
+| VOL-285 | Deployment Planner | verified | BOT-01 | deploy |
+| VOL-286 | Resource Scheduler | verified | BOT-02 (triage) | skeleton/runtime |
+| VOL-287 | Fairness / Starvation Control | verified | BOT-02 (triage) | skeleton/runtime |
+| VOL-288 | Backpressure | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-289 | Load Shedding | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-290 | Queue Congestion Control | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-291 | Retry Budgets | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-292 | Circuit Breaker Standard | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-293 | Bulkhead Architecture | verified | BOT-02 | skeleton/reliability |
+| VOL-294 | Dead-Letter Workflow | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-295 | Operation Replay | verified | BOT-02 (triage) | skeleton/frontier |
+| VOL-296 | Determinism Envelope | verified | BOT-02 (triage) | machine |
+| VOL-297 | Time Architecture | verified | BOT-02 | skeleton/foundation |
+| VOL-298 | Identifier Standard | verified | BOT-02 (triage) | skeleton/foundation |
+| VOL-299 | Logical Clocks / Event Ordering | verified | BOT-02 (triage) | skeleton/foundation |
+| VOL-300 | Final Master Control Plane | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-301 | System Objective Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-302 | Objective Normalization | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-303 | Constraint Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-304 | Decision Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-305 | Decision Record Graph | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-306 | Workflow Intermediate Representation | verified | BOT-08 | skeleton/volumes/wave4/engine.py |
+| VOL-307 | Workflow DSL | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-308 | Workflow Compiler | verified | BOT-09 | skeleton/volumes/wave4/engine.py |
+| VOL-309 | Workflow Versioning | verified | BOT-02 | skeleton/volumes/wave4/engine.py |
+| VOL-310 | Workflow Migration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-311 | Semantic Task Types | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-312 | Task Complexity Estimator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-313 | Task Decomposition Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-314 | Critical Path Analysis | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-315 | Scheduling Algorithms | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-316 | Scheduling Simulator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-317 | Control Theory for Autonomy | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-318 | Autonomy Levels | verified | BOT-04 | skeleton/agents/autonomy_control.py |
+| VOL-319 | Autonomy Escalation | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-320 | Autonomy De-Escalation | verified | BOT-04 | skeleton/agents/autonomy_control.py |
+| VOL-321 | Human Override Plane | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-322 | Interrupt Handling | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-323 | Goal Drift Detector | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-324 | Specification Gaming Tests | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-325 | Alignment Between Plan and Execution | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-326 | Human Factors | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-327 | Approval Fatigue Control | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-328 | Trust Calibration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-329 | User Intent Continuity | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-330 | Project Memory | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-331 | Workspace Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-332 | Resource Namespace | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-333 | Resource Resolution Service | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-334 | Artifact Dependency Graph | verified | BOT-08 | skeleton/volumes/wave4/engine.py |
+| VOL-335 | Artifact Rebuild Engine | verified | BOT-08 | skeleton/volumes/wave4/engine.py |
+| VOL-336 | Impact Analysis Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-337 | Change Risk Estimator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-338 | Safe Change Planner | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-339 | System Compiler Concept | verified | BOT-09 | skeleton/volumes/wave4/engine.py |
+| VOL-340 | Code Generation from Contracts | verified | BOT-07 | skeleton/volumes/wave4/engine.py |
+| VOL-341 | API Client SDK Generator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-342 | Internal SDK | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-343 | Provider SDK | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-344 | Storage SDK | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-345 | Event SDK | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-346 | Evaluation SDK | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-347 | Benchmark Plugin System | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-348 | Data Contracts | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-349 | Data Service SLOs | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-350 | Embedding Lifecycle | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-351 | Vector Index Migration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-352 | Search Index Lifecycle | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-353 | Retrieval Freshness Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-354 | Source Trust Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-355 | Source Diversity Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-356 | Claim Deduplication | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-357 | Claim Scope | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-358 | Claim Expiration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-359 | Knowledge Reconciliation | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-360 | Knowledge Snapshots | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-361 | Memory Garbage Collection | verified | BOT-02 (triage) | skeleton/memory/reconciliation.py |
+| VOL-362 | Memory Quality Evaluation | verified | BOT-12 | skeleton/memory/reconciliation.py |
+| VOL-363 | Memory Interference Testing | verified | BOT-12 | skeleton/intelligence/memory_retrieval_quality.py |
+| VOL-364 | Memory Versioning | verified | BOT-02 | skeleton/contracts/memory_record.py |
+| VOL-365 | Memory Reconciliation | verified | BOT-02 (triage) | skeleton/memory/reconciliation.py |
+| VOL-366 | Cognitive Strategy Registry | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-367 | Strategy Selection | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-368 | Reasoning Cost Accounting | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-369 | Reasoning Regression Tests | verified | BOT-03 | skeleton/intelligence/output_quality.py |
+| VOL-370 | Plan Verifier | verified | BOT-02 (triage) | skeleton/intelligence/plan_verifier.py |
+| VOL-371 | Plan Static Analyzer | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-372 | Plan Simulation | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-373 | Tool Composition Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-374 | Tool Dependency Graph | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-375 | Tool Health | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-376 | Tool Capability Discovery | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-377 | Tool Result Trust | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-378 | Side-Effect Ledger | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-379 | Compensation Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-380 | Saga Workflows | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-381 | Distributed Inference Control Plane | verified | BOT-03 | skeleton/network/model_placement.py |
+| VOL-382 | Model Placement | verified | BOT-03 | skeleton/network/model_placement.py |
+| VOL-383 | GPU Memory Manager | verified | BOT-01 | skeleton/volumes/wave4/engine.py |
+| VOL-384 | Model Eviction | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-385 | Model Warming | verified | BOT-03 | skeleton/network/model_placement.py |
+| VOL-386 | Continuous Batching Scheduler | verified | BOT-02 (triage) | skeleton/mesh/batching_autoscaling.py |
+| VOL-387 | KV Cache Service | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-388 | Prefix Cache | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-389 | Speculative Inference | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-390 | Inference Autoscaling | verified | BOT-03 | skeleton/mesh/batching_autoscaling.py |
+| VOL-391 | Inference Load Testing | verified | BOT-03 | skeleton/mesh/capacity_qualification.py |
+| VOL-392 | Hardware Topology Model | verified | BOT-01 | skeleton/network/model_placement.py |
+| VOL-393 | NUMA Awareness | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-394 | GPU Interconnect Awareness | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-395 | Storage Tiering | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-396 | Data Locality | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-397 | Network Topology Awareness | verified | BOT-02 (triage) | skeleton/network/model_placement.py |
+| VOL-398 | Remote Execution Protocol | verified | BOT-02 (triage) | skeleton/network/remote_execution.py |
+| VOL-399 | Worker Attestation | verified | BOT-02 (triage) | skeleton/network/remote_execution.py |
+| VOL-400 | Build Farm | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-401 | Evaluation Farm | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-402 | Research Compute Queue | verified | BOT-10 | skeleton/volumes/wave4/engine.py |
+| VOL-403 | Compute Quotas | verified | BOT-02 (triage) | skeleton/observability/budget_accounting.py |
+| VOL-404 | Budget Accounting Ledger | verified | BOT-11 | skeleton/observability/budget_accounting.py |
+| VOL-405 | Forecasting Engine | verified | BOT-02 (triage) | skeleton/observability/forecasting.py |
+| VOL-406 | Cost Anomaly Detection | verified | BOT-02 (triage) | skeleton/observability/forecasting.py |
+| VOL-407 | License Intelligence | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-408 | Data Usage Rights | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-409 | Attribution Engine | verified | BOT-02 (triage) | skeleton/release/attribution.py |
+| VOL-410 | Research Ethics Review | verified | BOT-10 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-411 | Model Lifecycle Governance | verified | BOT-02 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-412 | Model Deprecation | verified | BOT-03 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-413 | Provider Migration | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-414 | Shadow Traffic | verified | BOT-02 (triage) | skeleton/eval/shadow_traffic.py |
+| VOL-415 | Champion / Challenger Registry | verified | BOT-02 (triage) | skeleton/eval/champion_registry.py |
+| VOL-416 | Experimental Feature Sandbox | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-417 | Research Branching Model | verified | BOT-03 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-418 | Technique Retirement | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-419 | Knowledge of Failure | verified | BOT-02 (triage) | skeleton/eval/failure_knowledge.py |
+| VOL-420 | Architecture Scope Freeze | verified | BOT-02 | machine/ai_master_plan.json |
+
+## 32.1 Candidate review load and owner verification
+
+Suggested review row counts: BOT-01: 13; BOT-02: 278; BOT-03: 46; BOT-04: 23; BOT-05: 3; BOT-07: 2; BOT-08: 9; BOT-09: 2; BOT-10: 7; BOT-11: 8; BOT-12: 30. Ambiguous title rows requiring actual owner review: 245. These load counts are **not** engineering completion counts, estimated labor or authority transfers. Because the entire corpus is title-indexed, review lanes will be unbalanced and must be redistributed by true dependency graph and physical capacity. Where a volume lists source files under another bot's code family, the declared machine owner wins over the suggestion. Bot 12 owns independent acceptance for all lanes even when assigned a volume's initial review. A task whose original evidence and implementation remain valid may be closed as “no new work”; a task requiring device, rights, game or operational proof must be linked to its actual acceptance dossier instead of reopened for cosmetic code churn.
+
+### Required per-volume reconciliation checklist
+
+For each VOL-xxx, load exact original title and scope, target/actual maturity, key requirements, declared implementation_paths, current source object hashes, tests, implementation signoff, independent verification and enterprise-grade target. Classify any already verified behavior as retained; cross-reference BOT work orders and actual user journeys; identify only material unimplemented/untested end-user functionality. Preserve canonical architecture and the breadth freeze, avoid reimplementing already valid modules, and make real tests executable when claiming acceptance. Record reason and minimum proof for every requalification or reopening. Prior named evidence that is attached to an ancestor SHA cannot be silently reused as final-head evidence for changed behavior.
+
+
+# 33. Existing 42-task P0 source queue reconciliation
+
+The canonical P0 source queue already has **42 explicit task records** with IDs, gaps, stages, parallel lanes, objectives and status. At the reviewed main source snapshot, all 42 list status **done**. These “done” statuses are material historical construction metadata; the Grokbot-first specification must not restart them as though nothing had been built. Their source closure does not establish full present-day consumer installation or a complete playable studio, especially after later candidate branches touch relevant implementation. The proper next step is **regression/requalification** at the active integration head when relevant, plus implementation of genuinely new game-production functionality under existing canonical owners.
+
+| Existing task ID | Stage | Source gap | Source status | Short original construction objective |
+|---|---|---|---|---|
+| AIQ-S0-STATE-01 | 0 | gap-state-authority-convergence | done | Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories. |
+| AIQ-S0-STATE-02 | 0 | gap-state-authority-convergence | done | Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. |
+| AIQ-S0-STATE-03 | 0 | gap-state-authority-convergence | done | Prove authoritative restore first and derived index/cache rebuild second. |
+| AIQ-S0-GOV-01 | 0 | gap-governance-registry | done | Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. |
+| AIQ-S0-GOV-02 | 0 | gap-governance-registry | done | Wire delete/export/retention decisions through real durable-store and projection adapters. |
+| AIQ-S0-GOV-03 | 0 | gap-governance-registry | done | Bind governance receipts and lifecycle actions into canonical observability/audit timelines. |
+| AIQ-S0-COST-01 | 0 | gap-cost-admission | done | Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. |
+| AIQ-S0-COST-02 | 0 | gap-cost-admission | done | Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget. |
+| AIQ-S0-COST-03 | 0 | gap-cost-admission | done | Add shared cross-process pressure/concurrency coordination and overload shedding. |
+| AIQ-S0-PROV-01 | 0 | gap-provider-surface-convergence | done | Run provider-surface discovery and classify every credential/network model edge. |
+| AIQ-S0-PROV-02 | 0 | gap-provider-surface-convergence | done | Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs. |
+| AIQ-S0-PROV-03 | 0 | gap-provider-surface-convergence | done | Produce current-head CI evidence that only declared source-level provider surfaces remain. |
+| AIQ-S1-CONV-01 | 1 | gap-conversation-state-authority | done | Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append. |
+| AIQ-S1-CONV-02 | 1 | gap-conversation-state-authority | done | Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage. |
+| AIQ-S1-CONV-03 | 1 | gap-conversation-state-authority | done | Make frontend transcript state rebuildable from server authority and wire delete/export/retention. |
+| AIQ-S1-MEM-01 | 1 | gap-memory-durable-authority | done | Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary. |
+| AIQ-S1-MEM-02 | 1 | gap-memory-durable-authority | done | Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy. |
+| AIQ-S1-MEM-03 | 1 | gap-memory-durable-authority | done | Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior. |
+| AIQ-S1-TOOL-01 | 1 | gap-tool-runtime-convergence | done | Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime. |
+| AIQ-S1-TOOL-02 | 1 | gap-tool-runtime-convergence | done | Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters. |
+| AIQ-S1-TOOL-03 | 1 | gap-tool-runtime-convergence | done | Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only. |
+| AIQ-S2-CTX-01 | 2 | gap-context-compiler-convergence | done | Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection. |
+| AIQ-S2-CTX-02 | 2 | gap-context-compiler-convergence | done | Converge legacy route/service system prompts onto versioned instruction-policy identities. |
+| AIQ-S2-CTX-03 | 2 | gap-context-compiler-convergence | done | Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly. |
+| AIQ-S2-PROTO-01 | 2 | gap-provider-interaction-protocol | done | Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts. |
+| AIQ-S2-PROTO-02 | 2 | gap-provider-interaction-protocol | done | Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation. |
+| AIQ-S2-PROTO-03 | 2 | gap-provider-interaction-protocol | done | Add optional normalized provider streaming deltas without making provider stream the durable operation stream. |
+| AIQ-S3-VER-01 | 3 | gap-verification-evidence-contract | done | Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy. |
+| AIQ-S3-VER-02 | 3 | gap-verification-evidence-contract | done | Implement deterministic claim grounding, citation integrity and tool postcondition adapters. |
+| AIQ-S3-VER-03 | 3 | gap-verification-evidence-contract | done | Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics. |
+| AIQ-S4-EXEC-01 | 4 | gap-cognitive-execution-loop | done | Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces. |
+| AIQ-S4-EXEC-02 | 4 | gap-cognitive-execution-loop | done | Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics. |
+| AIQ-S4-EXEC-03 | 4 | gap-cognitive-execution-loop | done | Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state. |
+| AIQ-S5-ENG-01 | 5 | gap-engine-application-execution-boundary | done | Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation. |
+| AIQ-S5-ENG-02 | 5 | gap-engine-application-execution-boundary | done | Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it. |
+| AIQ-S5-ENG-03 | 5 | gap-engine-application-execution-boundary | done | Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity. |
+| AIQ-S6-STREAM-01 | 6 | gap-streaming-protocol | done | Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation. |
+| AIQ-S6-STREAM-02 | 6 | gap-streaming-protocol | done | Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics. |
+| AIQ-S6-STREAM-03 | 6 | gap-streaming-protocol | done | Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end. |
+| AIQ-S7-E2E-01 | 7 | gap-e2e-golden-journeys | done | Build deterministic full-stack provider/tool/retrieval harness without live provider secrets. |
+| AIQ-S7-E2E-02 | 7 | gap-e2e-golden-journeys | done | Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys. |
+| AIQ-S7-E2E-03 | 7 | gap-e2e-golden-journeys | done | Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle. |
+
+
+## 33.1 No-duplicate mapping of completed P0 work to new product proof
+
+- **Stage 0** already records source authority, governance, quota/cost admission and provider surface convergence. New first-install work must be a real integration/cutover/physical-device qualification, not a second database authority, third provider runtime or duplicate quota ledger.
+- **Stage 1** records canonical conversation and memory state plus tool runtime. New creative assistant behavior should consume those operations and granted tool manifests, not a disconnected LLM agent that silently writes files.
+- **Stage 2** records context compilation and provider interaction. Improve source-grounded game-edit quality and actual model output only through the protected context, tokenizer and receipt interfaces; keep untrusted crawler text inert.
+- **Stage 3** records the verification/evidence contract. Game playtest proof can extend the verified type and postcondition coverage but must not invent an independent release certifier with overlapping authority.
+- **Stage 4** records cognitive execution and durable recovery. Long-running creative campaigns should attach to existing execution checkpoints and idempotency rather than starting unaudited background loops.
+- **Stage 5** records engine-to-app boundary and provider credential custody. Local GGUF and game editor integrations must use that bridge and the current trusted guard, with explicit operation identity.
+- **Stage 6** records stream sequencing and reconnection. User-facing progress for game builds and AI work should use real stream/recovery state, not optimistic UI state.
+- **Stage 7** records source-level golden journeys. Expand into real gameplay, physical device installation, export and operator acceptance without counting already completed source fixture tests twice.
+
+## 33.2 Distinguishing verified construction from a complete game studio
+
+A credible completionist plan asks three separate questions of each volume/task: **(1) Has its canonical source behavior been correctly implemented? (2) Is it integrated into a real user journey at the current exact source head? (3) Is that journey independently certified on an actual supported target?** Source registry status can support question 1; it cannot answer 2 or 3 alone. The actual critical path still includes guarded local inference, reliable first install, native Godot controller-driven gameplay, real media, editing, save/restore and source/provenance-safe release.
+
+This crosswalk is a routing layer and a denominator for review coverage, not an instruction to spawn 421 bots, create 421 new service owners, spend on 421 model training campaigns or duplicate 421 implementation dossiers. The 12-bot federation should work by owner, dependency and user effect, with every canonical plan item either linked to an observed current runtime proof or an explicitly scoped discrepancy and no hidden assumed success.
