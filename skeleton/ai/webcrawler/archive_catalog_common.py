@@ -81,6 +81,9 @@ def load_json_catalog(raw: bytes) -> dict:
 
 
 def catalog_source(url: str, policy: CrawlPolicy) -> str:
+    # Defer the runtime class import until core has finished initializing.
+    from .core import CrawlPolicy
+
     if not isinstance(policy, CrawlPolicy) or not isinstance(url, str):
         raise CatalogDiscoveryError("missing immutable catalog policy")
     from .core import canonicalize_url
