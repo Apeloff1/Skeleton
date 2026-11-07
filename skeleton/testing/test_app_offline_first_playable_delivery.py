@@ -486,6 +486,12 @@ def test_consumer_first_run_rejects_forged_upstream_evidence(
         "persistent_rollback_protection": False,
     }
     monkeypatch.setattr(module, "_custody", lambda *args: ((1, 2),) * 4)
+    # This adversarial fixture verifies claim validation, not installed tree
+    # replay. Its upstream inspection and inode snapshot are deliberately
+    # synthetic; explicitly replace the tree scan too so no fake /game path
+    # reaches the real descriptor-anchored filesystem reader.
+    monkeypatch.setattr(module, "snapshot_installed_tree",
+                        lambda *_args: {"fixture": "fixed-source-tree"})
     def inspect(**overrides):
         monkeypatch.setattr(
             module, "inspect_first_playable_delivery",
