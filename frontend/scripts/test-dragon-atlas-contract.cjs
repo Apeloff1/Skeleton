@@ -100,6 +100,26 @@ function fixture() {
       requires_fresh_source_policy: true },
     citation_manifest: { manifest_digest: H, exact_anchored_references: 1,
       body_redacted: true, publication_permission: false },
+    forensics: {
+      report_digest: H, frame_set_digest: H, atlas_digest: H,
+      source_policy_digest: H, retrieval_digest: H,
+      stages: Array.from({length: 13}, (_, ordinal) => ({
+        ordinal, name: ordinal === 0 ? 'exact_selected_source_custody'
+          : ordinal === 12 ? 'review_only_forensic_queue' : 'forensic-' + ordinal,
+        receipt_digest: H, chain_digest: H,
+      })),
+      selected_passages: 1, selected_sources: 1,
+      security_held_passages: 0, security_held_sources: 0,
+      active_content_held_sources: 0, privacy_held_sources: 0,
+      cross_host_sentence_echoes: 0, source_reuse_components: 0,
+      possible_polarity_collisions: 0, low_information_passages: 0,
+      capture_age_held_sources: 0, overlap_excess_characters: 0,
+      concentrated_objectives: [], review_tasks: 0,
+      critical_review_tasks: 0, review_queue: [],
+      source_bodies_redacted: true, human_review_required: true,
+      publication_granted: false, training_permission: false,
+      network_or_model_invoked: false,
+    },
     evidence_family_stress: {
       stress_digest: H, policy_digest: H, retrieval_digest: H,
       robustness_digest: H, similarity_digest: H,
@@ -201,6 +221,12 @@ test('foreign session, staged digest mismatch and alleged external effects are r
     a => { a.context.raw_source_text_redacted = false; },
     a => { a.dispatch_recovery.mongo_commit_confirmed = true; },
     a => { a.review_operations.human_review_recorded = true; },
+    a => { a.forensics.source_bodies_redacted = false; },
+    a => { a.forensics.stages.pop(); },
+    a => { a.forensics.atlas_digest = 'b'.repeat(64); },
+    a => { a.forensics.publication_granted = true; },
+    a => { a.forensics.critical_review_tasks = 257; },
+    a => { a.forensics.review_queue = [{ task_id: 'bad', risk: 'critical', reason: 'injection', source_ids: [], objective_ids: [], model_may_decide: false }]; },
   ]) {
     const body = fixture(); change(body); setup(body);
     await assert.rejects(client.getCrawlAtlas('session-1', request()),

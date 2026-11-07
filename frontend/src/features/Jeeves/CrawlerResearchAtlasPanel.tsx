@@ -341,6 +341,38 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
         {report.scorecard.alerts.slice(0, 8).map((item, i) =>
           <Text key={i} style={s.error}>{readable(item)}</Text>)}
       </Section>
+      <Section title="Forensic source-integrity and privacy review">
+        <Text style={s.small}>
+          {report.forensics.stages.length} forensic stages · {report.forensics.selected_passages} anchored passages · {report.forensics.selected_sources} distinct sources · {report.forensics.review_tasks} pending review signals
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>
+          <Metric title="Injection / text holds" value={report.forensics.security_held_passages}
+            caption={report.forensics.security_held_sources + ' source(s)'} />
+          <Metric title="Active content" value={report.forensics.active_content_held_sources}
+            caption="Unsafe rendering signals" />
+          <Metric title="Privacy review" value={report.forensics.privacy_held_sources}
+            caption="Sensitive values redacted" />
+          <Metric title="Critical review tasks" value={report.forensics.critical_review_tasks}
+            caption={report.forensics.review_tasks + ' total signals'} />
+        </View>
+        <Text style={s.small}>
+          {report.forensics.cross_host_sentence_echoes} cross-host sentence echoes · {report.forensics.source_reuse_components} possible source-reuse clusters · {report.forensics.possible_polarity_collisions} possible polarity collisions
+        </Text>
+        <Text style={s.small}>
+          {report.forensics.low_information_passages} low-information passages · {report.forensics.capture_age_held_sources} capture-age holds · {report.forensics.concentrated_objectives.length} objectives with concentrated hosts
+        </Text>
+        <Text style={s.small}>All indicators are unverified review signals, not confirmed attacks, factual errors or rights decisions. The original source text remains restricted by current authenticated capture policy.</Text>
+        {report.forensics.review_queue.slice(0, 12).map(item =>
+          <View key={item.task_id} style={s.check}>
+            <Text style={item.risk === 'critical' ? s.error : s.message}>
+              {readable(item.reason)} · {readable(item.risk)} risk
+            </Text>
+            <Text style={s.small}>
+              {item.source_ids.length} source(s) · {item.objective_ids.length} objective(s) · task {item.task_id.slice(0, 12)} · human review only
+            </Text>
+          </View>)}
+        {!report.forensics.review_tasks && <Text style={s.small}>No additional forensic holds in the currently selected passages. Absence of findings does not establish safety or truth.</Text>}
+      </Section>
       <Section title="Evidence-family collapse and apparent support">
         <Text style={s.small}>
           {report.evidence_family_stress.selected_source_records} selected source records · {report.evidence_family_stress.exact_content_families} unique captured-text families · {report.evidence_family_stress.possible_near_duplicate_clusters} possible lexical family clusters

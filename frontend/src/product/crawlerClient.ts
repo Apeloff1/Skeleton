@@ -322,6 +322,27 @@ export type CrawlAtlasReport = {
     manifest_digest: string; exact_anchored_references: number;
     body_redacted: true; publication_permission: false;
   };
+  forensics: {
+    report_digest: string; frame_set_digest: string; atlas_digest: string;
+    source_policy_digest: string; retrieval_digest: string;
+    stages: CrawlAtlasStage[];
+    selected_passages: number; selected_sources: number;
+    security_held_passages: number; security_held_sources: number;
+    active_content_held_sources: number; privacy_held_sources: number;
+    cross_host_sentence_echoes: number; source_reuse_components: number;
+    possible_polarity_collisions: number; low_information_passages: number;
+    capture_age_held_sources: number; overlap_excess_characters: number;
+    concentrated_objectives: string[]; review_tasks: number;
+    critical_review_tasks: number;
+    review_queue: {
+      task_id: string; risk: 'critical' | 'high' | 'medium' | 'low';
+      reason: string; source_ids: string[]; objective_ids: string[];
+      model_may_decide: false;
+    }[];
+    source_bodies_redacted: true; human_review_required: true;
+    publication_granted: false; training_permission: false;
+    network_or_model_invoked: false;
+  };
   evidence_family_stress: {
     stress_digest: string; policy_digest: string; retrieval_digest: string;
     robustness_digest: string; similarity_digest: string;
@@ -531,6 +552,54 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !value.jeeves_handoff?.body_excluded
       || value.jeeves_handoff.network_called !== false
       || value.jeeves_handoff.dispatch_granted !== false
+      || !value.forensics
+      || !HASH.test(value.forensics.report_digest)
+      || !HASH.test(value.forensics.frame_set_digest)
+      || value.forensics.atlas_digest !== value.atlas_digest
+      || value.forensics.source_policy_digest !== value.source_policy.digest
+      || value.forensics.retrieval_digest !== value.retrieval.digest
+      || !Array.isArray(value.forensics.stages) || value.forensics.stages.length !== 13
+      || value.forensics.stages.some((entry, index) =>
+        !entry || entry.ordinal !== index
+        || typeof entry.name !== 'string' || entry.name.length > 100
+        || !HASH.test(entry.receipt_digest) || !HASH.test(entry.chain_digest))
+      || value.forensics.stages[0].name !== 'exact_selected_source_custody'
+      || value.forensics.stages[12].name !== 'review_only_forensic_queue'
+      || !integer(value.forensics.selected_passages, 32)
+      || !integer(value.forensics.selected_sources, 32)
+      || !integer(value.forensics.security_held_passages, 32)
+      || !integer(value.forensics.security_held_sources, 32)
+      || !integer(value.forensics.active_content_held_sources, 32)
+      || !integer(value.forensics.privacy_held_sources, 32)
+      || !integer(value.forensics.cross_host_sentence_echoes, 256)
+      || !integer(value.forensics.source_reuse_components, 32)
+      || !integer(value.forensics.possible_polarity_collisions, 256)
+      || !integer(value.forensics.low_information_passages, 32)
+      || !integer(value.forensics.capture_age_held_sources, 32)
+      || !integer(value.forensics.overlap_excess_characters, 48000)
+      || !integer(value.forensics.review_tasks, 256)
+      || !integer(value.forensics.critical_review_tasks, 256)
+      || value.forensics.critical_review_tasks > value.forensics.review_tasks
+      || !Array.isArray(value.forensics.concentrated_objectives)
+      || value.forensics.concentrated_objectives.length > 8
+      || value.forensics.concentrated_objectives.some(x => typeof x !== 'string' || x.length > 64)
+      || !Array.isArray(value.forensics.review_queue)
+      || value.forensics.review_queue.length > 24
+      || value.forensics.review_queue.length > value.forensics.review_tasks
+      || value.forensics.review_queue.some(item =>
+        !item || typeof item.task_id !== 'string' || item.task_id.length !== 24
+        || !['critical', 'high', 'medium', 'low'].includes(item.risk)
+        || typeof item.reason !== 'string' || item.reason.length > 128
+        || !Array.isArray(item.source_ids) || item.source_ids.length > 32
+        || item.source_ids.some(id => !HASH.test(id))
+        || !Array.isArray(item.objective_ids) || item.objective_ids.length > 8
+        || item.objective_ids.some(id => typeof id !== 'string' || id.length > 64)
+        || item.model_may_decide !== false)
+      || value.forensics.source_bodies_redacted !== true
+      || value.forensics.human_review_required !== true
+      || value.forensics.publication_granted !== false
+      || value.forensics.training_permission !== false
+      || value.forensics.network_or_model_invoked !== false
       || !value.evidence_family_stress
       || !HASH.test(value.evidence_family_stress.stress_digest)
       || value.evidence_family_stress.policy_digest !== value.source_policy.digest

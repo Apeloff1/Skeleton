@@ -149,6 +149,25 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(report["dashboard_digest"]), 64)
         self.assertNotIn("Archive capture methodology", repr(report))
 
+    async def test_authenticated_forensics_dashboard_requires_review_and_redacts_source_text(self):
+        response = await self.atlas()
+        report = response["report"]
+        forensic = report["forensics"]
+        self.assertEqual(self.owned_reads, 2)
+        self.assertEqual(len(forensic["stages"]), 13)
+        self.assertEqual(forensic["stages"][0]["name"], "exact_selected_source_custody")
+        self.assertEqual(forensic["stages"][-1]["name"], "review_only_forensic_queue")
+        self.assertEqual(forensic["source_policy_digest"], report["source_policy"]["digest"])
+        self.assertEqual(forensic["atlas_digest"], report["atlas_digest"])
+        self.assertEqual(forensic["retrieval_digest"], report["retrieval"]["digest"])
+        self.assertTrue(forensic["source_bodies_redacted"])
+        self.assertTrue(forensic["human_review_required"])
+        self.assertFalse(forensic["training_permission"])
+        self.assertFalse(forensic["publication_granted"])
+        self.assertFalse(forensic["network_or_model_invoked"])
+        self.assertNotIn("Archive capture methodology", repr(forensic))
+        self.assertLessEqual(len(forensic["review_queue"]), 24)
+
     async def test_actual_backend_bm25_routes_to_second_ranker(self):
         response = await self.atlas(retrieval_mode="lexical_bm25")
         report = response["report"]
