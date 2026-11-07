@@ -752,6 +752,16 @@ class DragonCrawlerApplication:
             mandate, snapshot, atlas, forensic,
             now=forensic_issued_at, authorized=True,
         )
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            compose_operational_assurance, verify_operational_assurance,
+        )
+        operations = compose_operational_assurance(
+            mandate, snapshot, now=forensic_issued_at, authorized=True,
+        )
+        verify_operational_assurance(
+            mandate, snapshot, operations,
+            now=forensic_issued_at, authorized=True,
+        )
         # A second authenticated Mongo read fences revision/policy races.
         # Consumers still MUST recheck both sources and consent before use.
         latest = await self._owned(scope, identifier)
@@ -1232,6 +1242,50 @@ class DragonCrawlerApplication:
                 "actual_dispatches": 0,
                 "resource_sample_required": atlas.pressure is None,
                 "externally_authorized": False,
+            },
+            "operations": {
+                "report_digest": operations.report_digest,
+                "source_snapshot_digest": operations.source_snapshot_digest,
+                "run_sequence": operations.run_sequence,
+                "stages": [
+                    {
+                        "ordinal": stage.ordinal,
+                        "name": stage.name,
+                        "receipt_digest": stage.source_receipt_digest,
+                        "chain_digest": stage.chain_digest,
+                    } for stage in operations.stages
+                ],
+                "retained_event_count": len(operations.timeline.events),
+                "historical_events_incomplete": operations.timeline.retained_history_incomplete,
+                "event_clock_integrity_review": (
+                    operations.timeline.interior_sequence_gap
+                    or operations.timeline.clock_regression_detected
+                    or bool(operations.timeline.future_clock_receipts)
+                ),
+                "pending_dispatch": operations.timeline.pending_dispatch_unresolved,
+                "uncertain_bytes": operations.timeline.uncertain_bytes,
+                "inspected_origins": len(operations.hosts.origins),
+                "unresolved_robots_origins": operations.hosts.cold_robots_origins,
+                "stale_robots_origins": operations.hosts.stale_robots_origins,
+                "observed_resource_samples": operations.capacity.samples_observed,
+                "hypothetical_work_candidates": operations.dispatch.feasible_hypothetical_requests,
+                "capacity_holds": operations.capacity.holds,
+                "critical_operator_steps": operations.runbook.critical_step_count,
+                "operator_runbook": [
+                    {
+                        "code": item.code,
+                        "priority": item.priority,
+                        "requires_backend_authority": True,
+                        "automatically_executed": False,
+                    } for item in operations.runbook.steps[:16]
+                ],
+                "physical_worker_fenced": False,
+                "mongo_checkpoint_confirmed": False,
+                "live_robots_permission_granted": False,
+                "network_executed": False,
+                "source_text_redacted": True,
+                "read_only": True,
+                "automatic_recovery_authorized": False,
             },
             "forensics": {
                 "report_digest": forensic.report_digest,
