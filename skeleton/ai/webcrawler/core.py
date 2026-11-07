@@ -45,6 +45,7 @@ from .research_projection import ResearchFormatError
 from .binary_media_metadata import BINARY_MEDIA_TYPES, extract_binary_media_metadata
 from .zip_inventory import ZIP_INVENTORY_TYPES, extract_zip_inventory
 from .extended_media import EXTENDED_MEDIA_TYPES, extract_extended_media
+from .ml_model_artifacts import ML_MODEL_TYPES, extract_ml_model
 from .source_structure import (
     SOURCE_STRUCTURE_TYPES, SourceSignatureError, analyze_source_structure,
 )
@@ -181,6 +182,12 @@ class CrawlPolicy:
         "text/patch",
         "application/vnd.citationstyles.csl+json",
         "application/x-csl+json",
+        "application/vnd.safetensors",
+        "application/x-safetensors",
+        "application/vnd.gguf",
+        "application/x-gguf",
+        "application/onnx",
+        "application/x-onnx",
         "application/graphml+xml",
         "application/x-graphml+xml",
         "application/gexf+xml",
@@ -463,6 +470,16 @@ def extract_document(
     max_text_chars: int = 1_000_000, link_base_url: str | None = None,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
+    if ctype in ML_MODEL_TYPES:
+        try:
+            row=extract_ml_model(
+                response.body,ctype,max_chars=max_text_chars,
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response,canonical_url,ctype,row.text,row.title,[],row.truncated,
+        )
     if ctype in EXTENDED_MEDIA_TYPES:
         try:
             row = extract_extended_media(

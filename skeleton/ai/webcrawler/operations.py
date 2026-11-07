@@ -177,6 +177,10 @@ def implementation_digest():
                 "gexf_documents.py",
                 "dot_documents.py",
                 "graph_artifacts.py",
+                "safetensors_metadata.py",
+                "gguf_metadata.py",
+                "onnx_metadata.py",
+                "ml_model_artifacts.py",
             )
         }
     )
