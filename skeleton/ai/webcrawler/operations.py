@@ -34,6 +34,7 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .frontier_circuit import evaluate_frontier_candidate
 from .host_backpressure import origin_throttle
 from .robots_rate import combine_robots_pacing
 from .capture_rights import source_capture_rights
@@ -157,6 +158,7 @@ def implementation_digest():
                 "package_lock_artifacts.py",
                 "sbom_topology.py",
                 "html_structured_entities.py",
+                "frontier_circuit.py",
             )
         }
     )
@@ -605,6 +607,15 @@ class CrawlRun:
             or url in state["seen"]
             or any(row["url"] == url for row in state["frontier"])
         ):
+            return False
+        try:
+            circuit = evaluate_frontier_candidate(
+                url,seen=state["seen"],
+                frontier=[entry["url"] for entry in state["frontier"]],
+            )
+        except (ValueError,UnicodeError):
+            return False
+        if not circuit.allowed:
             return False
         if sum(len(_json(row)) for row in state["frontier"]) + 3 * len(url.encode()) + 512 > 262144:
             return False
