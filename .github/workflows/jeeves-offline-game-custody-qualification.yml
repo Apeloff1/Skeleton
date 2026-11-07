@@ -45,6 +45,7 @@ jobs:
           PYTHONNOUSERSITE: "1"
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
+          export TMPDIR="$HOME"
           python -m pytest -q --maxfail=1 \
             skeleton/testing/test_app_offline_install_quarantine.py \
             skeleton/testing/test_app_offline_signed_game_library_audit.py \
