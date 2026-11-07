@@ -20,6 +20,8 @@ from collections.abc import Mapping
 
 SCHEMA = "skeleton.app.consumer_first_run_evidence.v1"
 SHA = re.compile(r"[0-9a-f]{64}\Z")
+HOLD_TOKEN = re.compile(r"[A-Z][A-Z0-9_]{0,127}\Z")
+OBSERVATION_KEYS = frozenset({"posix_nofollow_available", "operating_system", "machine", "python"})
 REQUIRED_FALSE = (
     "native_device_qualified", "native_godot_executed",
     "windows_laptop_qualified", "installer_qualified",
@@ -76,7 +78,7 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
         raise FirstRunHandoffContractError("invalid bounded replay action count")
     holds = evidence.get("release_holds")
     if (type(holds) is not list or not holds or len(holds) > 32
-            or any(type(h) is not str or not h or len(h) > 128 for h in holds)):
+            or any(type(h) is not str or HOLD_TOKEN.fullmatch(h) is None for h in holds)):
         raise FirstRunHandoffContractError("release holds must be explicit")
     if not MANDATORY_HOLDS.issubset(holds):
         raise FirstRunHandoffContractError("mandatory release hold missing")
@@ -84,6 +86,7 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
         raise FirstRunHandoffContractError("duplicate release hold")
     observation = evidence.get("runtime_observation")
     if (type(observation) is not dict
+            or set(observation) != OBSERVATION_KEYS
             or observation.get("posix_nofollow_available") is not True
             or type(observation.get("operating_system")) is not str
             or not observation["operating_system"]
