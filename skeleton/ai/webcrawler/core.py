@@ -26,6 +26,7 @@ from urllib.robotparser import RobotFileParser
 from .document_formats import ADDITIONAL_TYPES, extract_additional_format
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
 from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
+from .html_semantics import HTMLSemanticError, extract_html_semantics
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -375,6 +376,18 @@ def extract_document(
         text = " ".join(parser.text)
         title = " ".join(parser.title)
         links = parser.links
+        try:
+            semantics = extract_html_semantics(
+                raw, max_chars=min(max_text_chars, 24000),
+            )
+        except HTMLSemanticError:
+            # Semantic annotations are best-effort and have no authority.
+            # A malformed JSON-LD/table cannot authorize or block HTML links.
+            pass
+        else:
+            if semantics.text:
+                text += "\n" + semantics.text
+            parser_text_truncated = semantics.truncated
     elif ctype == "text/plain":
         text = raw
     elif ctype in GENERIC_XML_TYPES:

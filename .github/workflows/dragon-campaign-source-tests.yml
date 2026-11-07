@@ -17,6 +17,8 @@ on:
       - "skeleton/ai/webcrawler/host_backpressure.py"
       - "skeleton/ai/webcrawler/xml_documents.py"
       - "skeleton/ai/webcrawler/capture_rights.py"
+      - "skeleton/ai/webcrawler/html_semantics.py"
+      - "tests/test_ai_webcrawler_dragon_html_semantics.py"
       - "tests/test_ai_webcrawler_dragon_capture_rights.py"
       - "tests/test_ai_webcrawler_dragon_xml_documents.py"
       - "tests/test_ai_webcrawler_dragon_host_backpressure.py"
@@ -79,6 +81,8 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/host_backpressure.py
           python -m py_compile skeleton/ai/webcrawler/xml_documents.py
           python -m py_compile skeleton/ai/webcrawler/capture_rights.py
+          python -m py_compile skeleton/ai/webcrawler/html_semantics.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_html_semantics.py
           python -m py_compile tests/test_ai_webcrawler_dragon_capture_rights.py
           python -m py_compile tests/test_ai_webcrawler_dragon_xml_documents.py
           python -m py_compile tests/test_ai_webcrawler_dragon_host_backpressure.py
@@ -133,3 +137,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_xml_documents.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_capture_rights.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_html_semantics.py' -v

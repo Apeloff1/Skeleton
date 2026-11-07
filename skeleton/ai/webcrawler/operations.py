@@ -91,6 +91,7 @@ def implementation_digest():
                 "host_backpressure.py",
                 "xml_documents.py",
                 "capture_rights.py",
+                "html_semantics.py",
             )
         }
     )
