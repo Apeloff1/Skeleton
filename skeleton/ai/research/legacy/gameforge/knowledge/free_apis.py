@@ -103,6 +103,21 @@ def _validate_catalog_url(api: dict, url: str) -> None:
         raise ValueError("API URL credentials are not allowed")
 
 
+def _catalog_request_parts(api: dict, url: str) -> tuple[str, str]:
+    """Split a generated URL into a trusted catalog origin and relative target."""
+    _validate_catalog_url(api, url)
+    configured = urlsplit(api["url"])
+    actual = urlsplit(url)
+    host = configured.hostname
+    if not host:
+        raise ValueError("trusted API catalog entry has no host")
+    port = configured.port
+    origin = f"https://{host}" if port in (None, 443) else f"https://{host}:{port}"
+    path = "/" + (actual.path or "").lstrip("/")
+    target = path + (f"?{actual.query}" if actual.query else "")
+    return origin, target
+
+
 async def _read_bounded_body(response) -> bytes:
     """Read a streamed response without allowing unbounded buffering."""
     declared = response.headers.get("content-length")
@@ -128,10 +143,15 @@ async def fetch(api_key: str, params: dict) -> dict:
         return {"ok": False, "error": f"unknown api '{api_key}'", "available": sorted(FREE_APIS.keys())}
     url = _build_url(api, params or {})
     try:
-        _validate_catalog_url(api, url)
+        base_url, request_target = _catalog_request_parts(api, url)
         import httpx
-        async with httpx.AsyncClient(timeout=10, follow_redirects=False, headers=_HEADERS) as c:
-            async with c.stream("GET", url) as r:
+        async with httpx.AsyncClient(
+            base_url=base_url,
+            timeout=10,
+            follow_redirects=False,
+            headers=_HEADERS,
+        ) as c:
+            async with c.stream("GET", request_target) as r:
                 raw = await _read_bounded_body(r)
                 ct = r.headers.get("content-type", "")
                 status = r.status_code

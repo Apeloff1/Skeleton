@@ -351,10 +351,136 @@ def _admin_handler(state: Any):
     return handle
 
 
+RUN_MODES = ("auto", "questionnaire", "pipeline")
+_MAX_PIPELINE_FILE_NAMES = 512
+
+
+def _pipeline_runner(state: Any) -> Any:
+    """Return the ten-stage ``GameForgeRun`` shared with the HTTP surface.
+
+    Mirrors ``skeleton.api.routes._gameforge_runner``: an existing runner on
+    ``state.gameforge_run`` (or an ``execute``-capable ``state.gameforge``) is
+    reused so cockpit pins such as ``BIND ARCHETYPE`` apply; otherwise one is
+    built lazily and cached on the state.
+    """
+    existing = getattr(state, "gameforge", None)
+    if existing is not None and callable(getattr(existing, "execute", None)):
+        return existing
+    runner = getattr(state, "gameforge_run", None)
+    if runner is None:
+        from skeleton.context.cockpit import Cockpit
+        from skeleton.context.pipeline import GameForgeRun
+
+        cockpit = getattr(state, "cockpit", None)
+        runner = GameForgeRun(cockpit=cockpit if isinstance(cockpit, Cockpit) else None)
+        try:
+            state.gameforge_run = runner
+        except AttributeError:
+            pass
+    return runner
+
+
+def _summarise_pipeline(out: Mapping[str, Any]) -> Dict[str, Any]:
+    run = out.get("run") or {}
+    stages = [
+        {
+            "name": str(stage.get("name", "")),
+            "status": str(stage.get("status", "")),
+            "error": stage.get("error"),
+        }
+        for stage in (run.get("stages") or [])
+        if isinstance(stage, Mapping)
+    ]
+    files = out.get("files") or {}
+    forge = out.get("forge") or {}
+    verification = forge.get("verification") or {}
+    return {
+        "run_id": run.get("run_id"),
+        "succeeded": bool(out.get("succeeded")),
+        "stage_count": len(stages),
+        "stages": stages,
+        "era": out.get("era"),
+        "generation": out.get("generation"),
+        "mass": out.get("mass"),
+        "complete": bool(out.get("complete")),
+        "ledger": out.get("ledger"),
+        "blueprint_id": forge.get("blueprint_id"),
+        "file_count": len(files),
+        "file_names": sorted(files)[:_MAX_PIPELINE_FILE_NAMES],
+        "verification_accepted": verification.get("accepted") if isinstance(verification, Mapping) else None,
+        "playtest": out.get("playtest"),
+        "project": out.get("project"),
+    }
+
+
+def _execute_pipeline(state: Any, payload: Mapping[str, Any], answers: Mapping[str, Any], target: str) -> Dict[str, Any]:
+    from skeleton.forge.playtest import PLAYTEST_MODES
+    from skeleton.forge.repair import REPAIR_MODES
+
+    vision = require_text(payload, "vision", "")
+    if len(vision) > _MAX_VISION_CHARS:
+        raise CommandError("invalid_argument", f"vision must be at most {_MAX_VISION_CHARS} characters")
+    era = require_text(payload, "era", None, optional=True) or None
+    archetype = require_text(payload, "archetype", None, optional=True) or None
+    playtest = require_text(payload, "playtest", "off", allowed=PLAYTEST_MODES)
+    repair_mode = require_text(payload, "repair_mode", "apply", allowed=REPAIR_MODES)
+    include_files = require_bool(payload, "include_files", False)
+    if not vision and not answers:
+        raise CommandError("invalid_argument", "pipeline mode requires a vision or questionnaire answers")
+    runner = _pipeline_runner(state)
+    try:
+        out = runner.execute(
+            vision,
+            era=era,
+            archetype=archetype,
+            target=target,
+            answers=dict(answers) or None,
+            playtest=playtest,
+            repair_mode=repair_mode,
+        )
+    except (ValueError, KeyError) as exc:
+        raise CommandError("invalid_argument", str(exc)[:400]) from exc
+    except Exception as exc:
+        raise CommandError(
+            "unavailable",
+            "GameForge pipeline failed",
+            details={"exception": type(exc).__name__},
+        ) from exc
+    summary = _summarise_pipeline(out)
+    if not summary["succeeded"]:
+        failed = [stage for stage in summary["stages"] if stage["status"] not in ("SUCCEEDED", "SKIPPED")]
+        raise CommandError(
+            "conflict",
+            "GameForge pipeline did not complete all ten stages",
+            details={
+                "run_id": summary["run_id"],
+                "failed_stages": [stage["name"] for stage in failed][:10],
+                "first_error": str((failed[0].get("error") if failed else "") or "")[:200],
+            },
+        )
+    result: Dict[str, Any] = {
+        "status": "generated" if summary["succeeded"] else "failed",
+        "mode": "pipeline",
+        "pipeline": summary,
+    }
+    if include_files:
+        result["files"] = dict(out.get("files") or {})
+    return result
+
+
 def _run_handler(state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        mode = require_text(payload, "mode", "auto", allowed=RUN_MODES)
         gameforge = getattr(state, "gameforge", None)
-        if gameforge is None:
+        has_questionnaire = gameforge is not None and callable(getattr(gameforge, "run", None))
+        wants_pipeline = mode == "pipeline" or (
+            mode == "auto" and ("vision" in payload or (gameforge is None and "answers" in payload))
+        )
+        if wants_pipeline:
+            answers = require_mapping(payload, "answers", {}, optional=True) or {}
+            target = require_text(payload, "target", "godot", allowed=MATERIALISE_TARGETS)
+            return _execute_pipeline(state, payload, answers, target)
+        if gameforge is None or not has_questionnaire:
             raise CommandError("unavailable", "GameForge runtime is not initialized")
         answers = require_mapping(payload, "answers", {}, optional=False)
         spec = gameforge.run(

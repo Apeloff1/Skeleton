@@ -3,7 +3,10 @@
 # and the Godot emit → verify-until-green loop.
 set -euo pipefail
 
-python - <<'PY'
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+PYTHON="${PYTHON:-$(command -v python3 || command -v python)}"
+
+"$PYTHON" - <<'PY'
 from skeleton.forge.universal import Forge
 
 # 1. JSON target: build, validate, materialise

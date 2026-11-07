@@ -154,6 +154,7 @@ class GameForgeRun:
                 "verify_loop": run.context.get("verify_loop"),
                 "repair": run.context.get("repair"),
                 "composition": run.context.get("composition"),
+                "playable_archetype": run.context.get("playable_archetype"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -329,12 +330,19 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "composition_features": (composition or {}).get("features"),
         "composition_fallback": (composition or {}).get("fallback"),
     })
+    files = art.get("files") or {}
+    playable = None
+    if (ctx.get("target") or "godot") == "godot" and "project.godot" in files:
+        from skeleton.forge.archetype_content import attach_archetype_content, content_archetypes
+        playable = name if name in content_archetypes() else "extraction"
+        files = attach_archetype_content(files, playable)
     return {
         "blueprint_id": art.get("blueprint_id"),
         "primary_dps": art.get("primary_dps"),
         "artefact": art,
-        "files": art.get("files") or {},
-        "file_count": art.get("file_count") or len(art.get("files") or {}),
+        "files": files,
+        "file_count": len(files),
+        "playable_archetype": playable,
         "build_plan": build_plan.to_dict(),
         "verification": art.get("verification"),
         "verify_loop": art.get("verify_loop"),

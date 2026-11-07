@@ -102,6 +102,24 @@ def _default_generator(description: str, params: dict[str, Any]) -> dict[str, An
     }
 
 
+def _complete_persona(description: str, persona: dict[str, Any]) -> dict[str, Any]:
+    """Fill optional persona fields an injected generator may omit.
+
+    ``archetype`` and ``traits`` are mandatory (checked by the caller); the
+    dialogue builder also reads ``speech_register`` and ``motivation``, so a
+    minimal generator must not crash with ``KeyError``. Supplied values win;
+    gaps come from the deterministic default generator.
+    """
+    traits = persona.get("traits")
+    if not isinstance(traits, (list, tuple)) or not traits:
+        raise GenerationError("generator returned no traits", context={"keys": sorted(persona)})
+    defaults = _default_generator(description, {"archetype": persona["archetype"]})
+    merged = dict(defaults)
+    merged.update(persona)
+    merged["traits"] = list(traits)
+    return merged
+
+
 def _build_dialogue(persona: dict[str, Any], beats: int) -> list[DialogueNode]:
     nodes: list[DialogueNode] = [DialogueNode("root", f"A {persona['traits'][0]} greeting in a {persona['speech_register']} register.")]
     for i in range(1, beats + 1):
@@ -156,6 +174,7 @@ class NpcPipeline:
             if "archetype" not in persona or "traits" not in persona:
                 raise GenerationError("generator returned an incomplete persona",
                                       context={"keys": sorted(persona)})
+            persona = _complete_persona(description, persona)
             spec = NpcSpec(
                 run_id=run_id,
                 name=name or f"npc_{run_id[-6:]}",

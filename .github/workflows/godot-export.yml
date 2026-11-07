@@ -1,0 +1,79 @@
+# Godot 4.3 export: forge playable projects through the ten-stage GameForge
+# pipeline, export a real Linux build with the official 4.3-stable editor and
+# templates (SHA-512 pinned), boot it headless, and upload the artefacts.
+name: Godot Export
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skeleton/**'
+      - 'scripts/godot_export_build.py'
+      - '.github/workflows/godot-export.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'skeleton/**'
+      - 'scripts/godot_export_build.py'
+      - '.github/workflows/godot-export.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: godot-export-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11.16"
+  GODOT_VERSION: "4.3-stable"
+  GODOT_EDITOR_SHA512: "fd52bb4ba8acc30ca5accd1c566d470ad7282f891ccc0995dfafabcf92bcf76280ce182bf9d80ebd885f3ed2165d01e1fc3f2928436b15498dfbd98656c2a45a"
+  GODOT_TEMPLATES_SHA512: "476366caf0fd45a8f24136cf9cf1dc0bc2b96f7c82d53e5f82200b55aefd07b286d283fd6f1ce29e0de70648c5a51d3b12f96c6d4fafd4e8c4878ecda6406d6a"
+
+jobs:
+  export-linux:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    name: "Godot 4.3 Linux export"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - name: Install Skeleton runtime slice
+        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
+      - name: Install Godot 4.3 editor and Linux export templates (checksum pinned)
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}"
+          mkdir -p "$RUNNER_TEMP/godot"
+          cd "$RUNNER_TEMP/godot"
+          curl -fsSL --retry 3 -o editor.zip "$base/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_EDITOR_SHA512}  editor.zip" | sha512sum -c -
+          unzip -q editor.zip
+          curl -fsSL --retry 3 -o templates.tpz "$base/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          echo "${GODOT_TEMPLATES_SHA512}  templates.tpz" | sha512sum -c -
+          tpl="$HOME/.local/share/godot/export_templates/${GODOT_VERSION/-/.}"
+          mkdir -p "$tpl"
+          unzip -q -j templates.tpz templates/linux_release.x86_64 templates/linux_debug.x86_64 templates/version.txt -d "$tpl"
+          rm -f templates.tpz editor.zip
+          bin="$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}_linux.x86_64"
+          chmod +x "$bin"
+          "$bin" --headless --version
+          echo "SKELETON_GODOT_BIN=$bin" >> "$GITHUB_ENV"
+      - name: Forge, export and boot builds per archetype
+        env: {PYTHONPATH: "."}
+        run: python scripts/godot_export_build.py --out godot-export --godot "$SKELETON_GODOT_BIN"
+      - name: Headless playable E2E against real Godot
+        env: {PYTHONPATH: "."}
+        run: python -m pytest -q skeleton/testing/test_godot_export_build.py skeleton/testing/test_archetype_playable_e2e.py skeleton/testing/test_forge_playtest.py
+      - name: Upload exported builds
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: godot-export-linux-${{ github.sha }}
+          path: |
+            godot-export/export_manifest.json
+            godot-export/*/builds/linux/
+          if-no-files-found: error
+          retention-days: 14
