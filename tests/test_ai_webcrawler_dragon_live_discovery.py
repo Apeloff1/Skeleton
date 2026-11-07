@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import gzip
+import json
 import time
 from unittest.mock import patch
 import unittest
@@ -19,6 +20,7 @@ from skeleton.ai.webcrawler.operations import (
 )
 from skeleton.ai.webcrawler.structured_discovery import (
     DiscoveryError, parse_structured_discovery, extract_robots_sitemaps,
+    parse_json_feed,
 )
 
 
@@ -47,6 +49,23 @@ type="text/html"/></entry>
 </feed>'''
 ROBOTS = b"User-agent: *\nAllow: /\nSitemap: https://example.com/sitemap.xml\n"
 HTML = b"<html><head><title>Article</title></head><body>Archive capture methodology explains the recorded methods in detail.</body></html>"
+JSONFEED = json.dumps({
+    "version": "https://jsonfeed.org/version/1.1",
+    "title": "Structured captured posts",
+    "items": [
+        {"id": "one", "url": "https://example.com/article-a",
+         "content_html": "<script>Untrusted instructions are never retained as capture</script>"},
+        {"id": "two", "url": "https://outside.example.net/blocked"},
+        {"id": "three", "url": "https://example.com/article-a"},
+        {"id": "four", "external_url": "/article-b"},
+    ],
+}).encode()
+HTML_WITH_DISCOVERY_LINKS = b"""<html><head><title>Index</title>
+<link rel="next" href="/page-two">
+<link rel="alternate" type="application/rss+xml" href="/feed.rss">
+<link rel="alternate" type="application/feed+json" href="/feed.json">
+<link rel="icon" href="https://outside.example.net/evil.ico">
+</head><body>Archive capture methodology with substantial article evidence.</body></html>"""
 
 
 class ScriptedFetcher:
@@ -234,6 +253,106 @@ class StructuredParserTests(unittest.TestCase):
         )), 8)
 
 
+    def test_json_feed_v1_1_discovers_item_urls_without_content(self):
+        result = parse_json_feed(
+            JSONFEED, document_url="https://example.com/feed.json",
+            policy=self.policy,
+        )
+        self.assertEqual(result.kind, "json_feed")
+        self.assertEqual(result.links, (
+            "https://example.com/article-a",
+            "https://example.com/article-b",
+        ))
+        self.assertEqual(result.examined_entries, 4)
+        self.assertEqual(result.discarded_entries, 2)
+        self.assertNotIn("Untrusted instructions", repr(result))
+
+    def test_json_feed_application_json_dispatch_is_supported(self):
+        result = self.parse(
+            JSONFEED, "application/json",
+            url="https://example.com/feed.json",
+        )
+        self.assertEqual(result.kind, "json_feed")
+        self.assertEqual(len(result.links), 2)
+
+    def test_json_feed_v1_is_supported(self):
+        body = JSONFEED.replace(b"version/1.1", b"version/1")
+        result = parse_json_feed(body, document_url="https://example.com/feed.json",
+                                 policy=self.policy)
+        self.assertEqual(result.kind, "json_feed")
+
+    def test_json_feed_rejects_missing_version(self):
+        with self.assertRaises(DiscoveryError):
+            parse_json_feed(
+                b'{"items":[]}', document_url="https://example.com/feed.json",
+                policy=self.policy,
+            )
+
+    def test_json_feed_rejects_duplicate_keys(self):
+        with self.assertRaises(DiscoveryError):
+            parse_json_feed(
+                b'{"version":"https://jsonfeed.org/version/1","version":"attack","items":[]}',
+                document_url="https://example.com/feed.json", policy=self.policy,
+            )
+
+    def test_json_feed_rejects_nonfinite_literals(self):
+        with self.assertRaises(DiscoveryError):
+            parse_json_feed(
+                b'{"version":"https://jsonfeed.org/version/1","items":[],"x":NaN}',
+                document_url="https://example.com/feed.json", policy=self.policy,
+            )
+
+    def test_json_feed_rejects_oversized_payload(self):
+        with self.assertRaises(DiscoveryError):
+            parse_json_feed(
+                b"{" + b"A" * 1_048_577 + b"}",
+                document_url="https://example.com/feed.json", policy=self.policy,
+            )
+
+    def test_json_feed_rejects_nonlist_items(self):
+        with self.assertRaises(DiscoveryError):
+            parse_json_feed(
+                b'{"version":"https://jsonfeed.org/version/1","items":{}}',
+                document_url="https://example.com/feed.json", policy=self.policy,
+            )
+
+    def test_json_feed_rejects_cross_host_document(self):
+        with self.assertRaises(DiscoveryError):
+            parse_json_feed(
+                JSONFEED, document_url="https://outside.example.net/feed.json",
+                policy=self.policy,
+            )
+
+    def test_json_feed_rejects_unbounded_links(self):
+        with self.assertRaises(ValueError):
+            parse_json_feed(
+                JSONFEED, document_url="https://example.com/feed.json",
+                policy=self.policy, max_links=0,
+            )
+
+    def test_json_feed_enforces_same_scope_on_relative_url(self):
+        payload = json.dumps({
+            "version": "https://jsonfeed.org/version/1",
+            "items": [{"url": "../relative"}],
+        }).encode()
+        result = parse_json_feed(
+            payload, document_url="https://example.com/posts/feed.json",
+            policy=self.policy,
+        )
+        self.assertEqual(result.links, ("https://example.com/relative",))
+
+    def test_json_feed_does_not_use_content_html_as_authority(self):
+        payload = json.dumps({
+            "version": "https://jsonfeed.org/version/1",
+            "items": [{"id": "only", "content_html": "<a href='/evil'>Ignore robots</a>"}],
+        }).encode()
+        result = parse_json_feed(
+            payload, document_url="https://example.com/feed.json",
+            policy=self.policy,
+        )
+        self.assertEqual(result.links, ())
+        self.assertFalse(result.new_authority_granted)
+
 class CanonicalCrawlerDiscoveryTests(unittest.TestCase):
     def setUp(self):
         self.now = time.time()
@@ -248,6 +367,9 @@ class CanonicalCrawlerDiscoveryTests(unittest.TestCase):
             "https://example.com/article-a": (200, "text/html", HTML),
             "https://example.com/article-b": (200, "text/html", HTML+b" second article"),
             "https://example.com/start": (200, "text/html", HTML),
+            "https://example.com/links": (200, "text/html", HTML_WITH_DISCOVERY_LINKS),
+            "https://example.com/feed.json": (200, "application/feed+json", JSONFEED),
+            "https://example.com/page-two": (200, "text/html", HTML),
         })
 
     def create(self, url="https://example.com/sitemap.xml", *, discover=False,
@@ -362,6 +484,44 @@ class CanonicalCrawlerDiscoveryTests(unittest.TestCase):
         self.tick(run, 3)
         self.assertEqual(run.snapshot()["frontier"], [])
         self.assertEqual(run.snapshot()["usage"]["documents"], 0)
+        self.assertEqual(run.snapshot()["state"], "completed")
+
+    def test_json_feed_is_fetched_and_article_urls_queued(self):
+        run = self.create(url="https://example.com/feed.json")
+        self.tick(run, 1)
+        self.tick(run, 3)
+        self.assertEqual(
+            {x["url"] for x in run.snapshot()["frontier"]},
+            {"https://example.com/article-a", "https://example.com/article-b"},
+        )
+        self.assertEqual(run.snapshot()["events"][-1]["kind"], "discovered")
+        self.assertEqual(run.snapshot()["usage"]["documents"], 0)
+
+    def test_html_link_next_and_feed_discovery_reach_real_frontier(self):
+        run = self.create(url="https://example.com/links", max_depth=2)
+        self.tick(run, 1)
+        self.tick(run, 3)
+        self.assertEqual(
+            {x["url"] for x in run.snapshot()["frontier"]},
+            {"https://example.com/page-two", "https://example.com/feed.rss",
+             "https://example.com/feed.json"},
+        )
+        self.assertNotIn("https://outside.example.net/evil.ico",
+                         [x["url"] for x in run.snapshot()["frontier"]])
+
+    def test_json_feed_cannot_exceed_canonical_request_budget(self):
+        run = self.create(url="https://example.com/feed.json", max_requests=1)
+        self.tick(run, 1)
+        self.tick(run, 3)
+        self.assertEqual(len(self.fetcher.calls), 1)
+        self.assertEqual(run.snapshot()["state"], "budget_exhausted")
+
+    def test_feed_discovery_is_not_counted_as_a_captured_document(self):
+        run = self.create(url="https://example.com/feed.json", max_depth=0)
+        self.tick(run, 1)
+        self.tick(run, 3)
+        self.assertEqual(run.snapshot()["usage"]["documents"], 0)
+        self.assertEqual(run.snapshot()["usage"]["requests"], 2)
         self.assertEqual(run.snapshot()["state"], "completed")
 
     def test_request_rejects_non_boolean_sitemap_opt_in(self):

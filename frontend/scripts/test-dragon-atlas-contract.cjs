@@ -251,6 +251,14 @@ function fixture() {
 }
 function setup(report = fixture()) { token = 'operator-one'; response = { report }; posts = []; }
 
+test('operator sitemap discovery is explicit, bounded and carried into the create request', () => {
+  const source = fs.readFileSync(workspacePath, 'utf8');
+  assert.match(source, /discover_sitemaps:\s*discoverSitemaps/);
+  assert.match(source, /setDiscoverSitemaps\(false\)/);
+  assert.match(source, /value=\{discoverSitemaps\}/);
+  assert.match(source, /XML sitemaps, gzip sitemaps or RSS\/Atom feeds/);
+});
+
 test('panel and surrounding workspace compile as TSX', () => {
   assert.match(transpile(panelPath), /CrawlerResearchAtlasPanel/);
   assert.match(transpile(workspacePath), /CrawlerResearchAtlasPanel/);
