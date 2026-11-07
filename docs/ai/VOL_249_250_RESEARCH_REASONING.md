@@ -113,3 +113,11 @@ leaf is private. The two hosted portability fixtures use `Path.home()` as
 their parent; if that home is not private enough, tests correctly fail without
 loosening `open_trusted_root`. The branch still requires real hardware custody
 and native runtime acceptance before release.
+
+The native SQLite/flight acceptance workflow additionally exercises the
+research knowledge plane, flight admission, local inference daemon, daemon
+operator and durable Jeeves CLI. Their synthetic fixtures now also use
+mode-`0700` temporary subdirectories under the caller's home rather than
+requiring a fixed container identity. This leaves descriptor-based no-follow
+and writable-parent rejection active and does not waive Windows, GGUF or
+hardware-pressure qualification.
