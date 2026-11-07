@@ -29,12 +29,10 @@ def loopback_probe(service: str, url: str, *, timeout: float = 1.5) -> Callable[
         raise ValueError("loopback-required")
     if type(timeout) not in (int, float) or not 0 < timeout <= 5:
         raise ValueError("invalid-timeout")
-    opener = build_opener(NoRedirect())
-
     def probe() -> bool:
         try:
             request = Request(url, headers={"Accept": "application/json"}, method="GET")
-            with opener.open(request, timeout=timeout) as response:
+            with build_opener(NoRedirect()).open(request, timeout=timeout) as response:
                 if response.status != 200 or response.headers.get_content_type() != "application/json":
                     return False
                 body = response.read(MAX_BODY + 1)
