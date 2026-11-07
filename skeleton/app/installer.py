@@ -460,19 +460,14 @@ def install_application(
                 required=False,
             ))
         else:
-            probe = probe_local_setup(
-                replace(
-                    frontend,
-                    public_url=host_urls.get("frontend", frontend.public_url),
-                    health_path="/setup",
-                ),
-                timeout=2.0,
+            setup_available = _probe_setup_route(
+                frontend, host_urls.get("frontend", frontend.public_url),
             )
             phases.append(InstallPhase(
-                "setup-ui-availability", probe.ok,
+                "setup-ui-availability", setup_available,
                 (
                     "setup route available; protected runtime remains unhealthy"
-                    if probe.ok
+                    if setup_available
                     else "setup route unavailable; inspect frontend logs; protected runtime remains unhealthy"
                 ),
                 required=False,
