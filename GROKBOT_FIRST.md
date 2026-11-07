@@ -1,11 +1,11 @@
 
 # GROKBOT FIRST — Skeleton Completionist Engineering Constitution
-**Document ID:** SKL-GROK-FIRST-2026-11-07  
-**Repository:** https://github.com/Apeloff1/Skeleton  
-**Audit baseline:** main at e00bfb0809b34573c2df313ea16e17fd10bead38  
-**Audience:** one coordinating Grokbot and eleven equal-capability specialist bots, twelve active bots total  
-**Scope:** secure local-first AI game production, original-world generation, complete playable games, asset and media pipelines, knowledge, integration, deployment, commercialization and independent assurance  
-**Status:** living, source-anchored implementation constitution — NOT a claim of implementation, certification or one-million-word completion  
+**Document ID:** SKL-GROK-FIRST-2026-11-07
+**Repository:** https://github.com/Apeloff1/Skeleton
+**Audit baseline:** main at e00bfb0809b34573c2df313ea16e17fd10bead38
+**Audience:** one coordinating Grokbot and eleven equal-capability specialist bots, twelve active bots total
+**Scope:** secure local-first AI game production, original-world generation, complete playable games, asset and media pipelines, knowledge, integration, deployment, commercialization and independent assurance
+**Status:** living, source-anchored implementation constitution — NOT a claim of implementation, certification or one-million-word completion
 **Delivery rule:** code, interoperable interfaces, real runnable examples, actual target-machine evidence, and independent playtests outrank catalog size, files, LOC, commits, and prose length.
 
 > Treat the existing product as an ambitious but incompletely integrated first draft. Every feature is suspect until it works in a representative real user journey. Critical gaps block release regardless of how much neighboring software is present. Do not delete prior work or replace canonical owners. Diagnose, consolidate, implement, validate, then promote through existing protected release gates.
@@ -252,23 +252,23 @@ promotion:
 
 ## 08. Cross-cutting invariants
 
-**S-01** Model output is always untrusted until typed, admitted and committed by an owner.  
-**S-02** Every external source and binary preserves consent, rights, origin, hashes, expiry and withdrawal propagation.  
-**S-03** All remote interactions use explicit network/host/IP/redirect protection and finite byte/time/page budgets; no SSRF or implicit credential forwarding.  
-**S-04** All file operations on untrusted roots use descriptor-relative bounds or equivalent safe primitives, no parent symlink traversal, no TOCTOU assumption, no unbounded reads.  
-**S-05** Never log secrets, full prompts, raw untrusted HTML, private source bodies or sensitive credentials into public PR/CI receipts.  
-**S-06** Tenant, principal, source and project identities are bound at creation, reading, mutation, scheduling, background work, export and retention.  
-**S-07** Missing/uncertain source authority, primary fencing, signatures, entitlement and native worker join are denial conditions.  
-**S-08** Payments require atomic idempotent settlement, verified webhook identity, entitlements and refund/reversal consistency.  
-**S-09** Unsafe model/asset/media rights disallow generation, voice cloning, publication and training until explicitly approved.  
-**S-10** Offline mode does not hide a hosted fallback or silent telemetry.  
-**S-11** A tool's ability to produce a source file is not permission to run arbitrary executable instructions.  
-**S-12** Hardware overload, disk exhaustion and cancellation must degrade use safely, retaining evidence and recoverability.  
-**S-13** Replay, resume and retry cannot double count game events, AI inference, payments, crawls, training or artifact publication.  
-**S-14** A sandbox cannot be bypassed by compatibility code, plugin, import, archive extraction or indirect subprocess.  
-**S-15** Autosave, branch switching, merges and migrations are transactionally safe and independent of LLM promises.  
-**S-16** Unfinished PRs stay drafts or otherwise explicitly blocked; passed sibling jobs are not overall qualification.  
-**S-17** All critical claims reference actual current source, host, workload and observed behavior; no paper-only certification.  
+**S-01** Model output is always untrusted until typed, admitted and committed by an owner.
+**S-02** Every external source and binary preserves consent, rights, origin, hashes, expiry and withdrawal propagation.
+**S-03** All remote interactions use explicit network/host/IP/redirect protection and finite byte/time/page budgets; no SSRF or implicit credential forwarding.
+**S-04** All file operations on untrusted roots use descriptor-relative bounds or equivalent safe primitives, no parent symlink traversal, no TOCTOU assumption, no unbounded reads.
+**S-05** Never log secrets, full prompts, raw untrusted HTML, private source bodies or sensitive credentials into public PR/CI receipts.
+**S-06** Tenant, principal, source and project identities are bound at creation, reading, mutation, scheduling, background work, export and retention.
+**S-07** Missing/uncertain source authority, primary fencing, signatures, entitlement and native worker join are denial conditions.
+**S-08** Payments require atomic idempotent settlement, verified webhook identity, entitlements and refund/reversal consistency.
+**S-09** Unsafe model/asset/media rights disallow generation, voice cloning, publication and training until explicitly approved.
+**S-10** Offline mode does not hide a hosted fallback or silent telemetry.
+**S-11** A tool's ability to produce a source file is not permission to run arbitrary executable instructions.
+**S-12** Hardware overload, disk exhaustion and cancellation must degrade use safely, retaining evidence and recoverability.
+**S-13** Replay, resume and retry cannot double count game events, AI inference, payments, crawls, training or artifact publication.
+**S-14** A sandbox cannot be bypassed by compatibility code, plugin, import, archive extraction or indirect subprocess.
+**S-15** Autosave, branch switching, merges and migrations are transactionally safe and independent of LLM promises.
+**S-16** Unfinished PRs stay drafts or otherwise explicitly blocked; passed sibling jobs are not overall qualification.
+**S-17** All critical claims reference actual current source, host, workload and observed behavior; no paper-only certification.
 **S-18** Every subsystem supports accessible operation, diagnosable failure and reversible correction where possible.
 
 ## 09. Universal proof matrix
@@ -3658,7 +3658,7 @@ Grokbot reads 00–10 and 14–15 first, picks blocked critical-path work, then 
 - GameASG-Bench, strict game behavior evaluation: https://arxiv.org/abs/2609.21293
 - GUI Agents for Continual Game Generation, playable GUI judgment: https://aclanthology.org/2026.findings-emnlp.1100/
 
-**Editorial closure:** Every build work order must tie to a code change and actual user capability; every acceptance claim must tie to source and executable proof; every denied or incomplete condition stays visible. A fully functioning, trustworthy studio can grow into a much larger frontier platform only if its first real install, first real game and first real recovery remain consistently excellent.  
+**Editorial closure:** Every build work order must tie to a code change and actual user capability; every acceptance claim must tie to source and executable proof; every denied or incomplete condition stays visible. A fully functioning, trustworthy studio can grow into a much larger frontier platform only if its first real install, first real game and first real recovery remain consistently excellent.
 
 
 # 17. Second-pass source census and falsifiable implementation-gap index
