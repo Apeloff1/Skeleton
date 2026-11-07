@@ -1,0 +1,194 @@
+extends "res://scripts/loops/loop_base.gd"
+## Soulslike loop — stamina-gated melee, telegraphed enemy strikes, shrines
+## that heal/set respawn and restore the world, echoes dropped on death,
+## and a two-phase boss guarding the exit. Too many deaths hollows the run.
+
+var respawn_pos: Vector2 = Vector2.ZERO
+var echoes: int = 0
+var boss_down: bool = false
+var max_deaths: int = 10
+var _revive_t: float = -1.0
+var _rested: Dictionary = {}
+var _nag_t: float = 0.0
+
+
+func _on_setup() -> void:
+	respawn_pos = main.tile_center(main.spawn_tile)
+	max_deaths = int(Game.get_cfg("rules.max_deaths", 10))
+	Game.counters["echoes"] = 0
+	Game.counters["boss_down"] = false
+	Game.counters["rests"] = 0
+	Game.say("Kindle the shrine. Slay %s." % str(Game.get_cfg("rules.boss_name", "the Warden")))
+
+
+func _physics_process(delta: float) -> void:
+	if main == null or Game.outcome != "":
+		return
+	var p = main.player
+	if _revive_t >= 0.0:
+		_revive_t -= delta
+		if _revive_t < 0.0:
+			_respawn_world()
+			p.revive_at(respawn_pos)
+			Game.say("YOU RISE AGAIN")
+		return
+	for m in touching("echo"):
+		echoes += int(m.data.get("amount", 0))
+		Game.counters["echoes"] = echoes
+		m.collect()
+		Game.say("ECHOES RECOVERED")
+		Game.log_event("echo_recovered", str(echoes))
+	_nag_t -= delta
+	for x in touching("exit", 26.0):
+		if boss_down:
+			Game.say(str(Game.get_cfg("rules.win_text", "VICTORY")))
+			Game.finish("win")
+			return
+		elif _nag_t <= 0.0:
+			_nag_t = 2.5
+			Game.say("A seal bars the way. The guardian still lives.")
+
+
+func interact(p) -> void:
+	var shrine = nearest_marker("shrine", p.global_position, 40.0)
+	if shrine == null:
+		return
+	p.heal(p.max_hp)
+	p.stamina = p.max_stamina
+	respawn_pos = shrine.global_position + Vector2(0, 26)
+	_respawn_world()
+	_rested[str(shrine.get_instance_id())] = true
+	Game.counters["rests"] = int(Game.counters["rests"]) + 1
+	Game.say("SHRINE KINDLED — the world stirs anew")
+	Game.log_event("rest", str(main.to_tile(shrine.global_position)))
+
+
+func _respawn_world() -> void:
+	var alive_homes := {}
+	for e in main.enemies():
+		alive_homes[str(e._home)] = true
+		e.reset_to_home()
+	for s in main.enemy_spawns:
+		var tier := str(s["tier"])
+		if tier == "boss" and boss_down:
+			continue
+		if not alive_homes.has(str(s["pos"])):
+			main.spawn_enemy(tier, s["pos"])
+
+
+func on_enemy_killed(enemy) -> void:
+	echoes += int(enemy.reward)
+	Game.counters["echoes"] = echoes
+	if enemy.boss:
+		boss_down = true
+		Game.counters["boss_down"] = true
+		Game.say("%s FELLED — the seal breaks" % str(Game.get_cfg("rules.boss_name", "THE WARDEN")).to_upper())
+		Game.log_event("boss_down", "")
+
+
+func on_player_died(p) -> void:
+	var deaths := int(Game.stats["deaths"])
+	for old in main.markers("echo"):
+		old.collect()
+	if echoes > 0:
+		main.spawn_marker("echo", p.global_position, {"amount": echoes})
+	echoes = 0
+	Game.counters["echoes"] = 0
+	if deaths >= max_deaths:
+		Game.say("HOLLOWED — the run is lost")
+		Game.finish("lose")
+		return
+	Game.say("YOU DIED")
+	_revive_t = 1.5
+
+
+func objective_text() -> String:
+	if boss_down:
+		return "The seal is broken — reach the EXIT"
+	return "Defeat %s   (deaths %d/%d)" % [str(Game.get_cfg("rules.boss_name", "the Warden")), int(Game.stats["deaths"]), max_deaths]
+
+
+func hud_lines() -> String:
+	return "Echoes %d   Kills %d   Rests %d" % [echoes, int(Game.stats["kills"]), int(Game.counters.get("rests", 0))]
+
+
+func secondary_bar() -> Array:
+	var p = main.player
+	return ["STAMINA", p.stamina, p.max_stamina]
+
+
+func smoke_extra() -> Dictionary:
+	return {"boss_down": boss_down, "echoes": echoes, "rests": int(Game.counters.get("rests", 0))}
+
+
+func bot_think(bot) -> void:
+	var p = main.player
+	var shrine = nearest_by_path(main.markers("shrine"), p.global_position, 30)
+	if shrine != null and not _rested.has(str(shrine.get_instance_id())) and main.path_distance(p.global_position, shrine.global_position) <= 14:
+		_approach_and_use(bot, shrine)
+		return
+	var bosses: Array = main.get_tree().get_nodes_in_group("boss")
+	var boss = bosses[0] if not bosses.is_empty() else null
+	var boss_near: bool = boss != null and p.global_position.distance_to(boss.global_position) < TILE * 7.0
+	if p.hp < p.max_hp * 0.35 and not boss_near and shrine != null and main.path_distance(p.global_position, shrine.global_position) <= 25:
+		_rested.erase(str(shrine.get_instance_id()))
+		_approach_and_use(bot, shrine)
+		return
+	var foe = null
+	var foe_d := TILE * 5.0
+	for e in main.enemies():
+		var d: float = p.global_position.distance_to(e.global_position)
+		if d < foe_d and (e.state != "idle" or d < TILE * 3.0) and main.has_los(p.global_position, e.global_position):
+			foe_d = d
+			foe = e
+	if foe == null and boss != null:
+		foe = boss
+	if foe != null:
+		_fight(bot, foe)
+		return
+	var echo = nearest_by_path(main.markers("echo"), p.global_position, 40)
+	if echo != null:
+		bot_go(bot, echo.global_position)
+		return
+	var exit = nearest_marker("exit", p.global_position)
+	if exit != null:
+		bot_go(bot, exit.global_position)
+
+
+func _approach_and_use(bot, m) -> void:
+	var p = main.player
+	if p.global_position.distance_to(m.global_position) <= 30.0:
+		bot.want_interact = true
+		_rested[str(m.get_instance_id())] = true
+	else:
+		bot_go(bot, m.global_position)
+
+
+func _fight(bot, foe) -> void:
+	var p = main.player
+	var d: float = p.global_position.distance_to(foe.global_position)
+	var reach: float = float(Game.CONFIG["weapon"]["reach"])
+	var cost: float = float(Game.CONFIG["weapon"]["stamina_cost"])
+	bot.aim_point = foe.global_position
+	var to_foe: Vector2 = (foe.global_position - p.global_position).normalized()
+	if not main.has_los(p.global_position, foe.global_position):
+		bot_go(bot, foe.global_position)
+		return
+	if foe.state == "windup" and d <= foe.reach + 34.0:
+		if p.stamina >= p.dodge_cost:
+			bot.want_dodge = true
+		var back: Vector2 = -to_foe
+		if main.is_wall(p.global_position + back * 40.0):
+			back = to_foe.orthogonal()
+		bot.move_vector = back
+		return
+	if d <= reach + foe.radius - 4.0:
+		if p.stamina >= cost:
+			bot.want_attack = true
+			bot.move_vector = Vector2.ZERO
+		else:
+			bot.move_vector = -to_foe * 0.8
+	elif foe.state == "recover" or foe.state == "idle" or p.stamina >= cost * 2.0:
+		bot.move_vector = to_foe
+	else:
+		bot.move_vector = -to_foe * 0.5

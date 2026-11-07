@@ -1,0 +1,245 @@
+extends CharacterBody2D
+## Player controller — movement, dodge with i-frames, gun/melee/tool modes,
+## stamina, weapon heat, ammo and health. Reads Autopilot when --autoplay is set.
+
+var main = null
+var alive: bool = true
+var max_hp: float = 100.0
+var hp: float = 100.0
+var speed: float = 150.0
+var accel: float = 1400.0
+var weapon: Dictionary = {}
+var mode: String = "gun"
+var aim_dir: Vector2 = Vector2.RIGHT
+var facing: Vector2 = Vector2.RIGHT
+var max_stamina: float = 100.0
+var stamina: float = 100.0
+var stamina_regen: float = 30.0
+var heat_enabled: bool = false
+var heat: float = 0.0
+var max_heat: float = 100.0
+var heat_cool: float = 5.0
+var ammo: int = -1
+var dodge_cost: float = 25.0
+var iframe_seconds: float = 0.2
+var _cooldown: float = 0.0
+var _iframes: float = 0.0
+var _dodge_time: float = 0.0
+var _dodge_dir: Vector2 = Vector2.ZERO
+var _stamina_delay: float = 0.0
+var _jam: float = 0.0
+var _swing_flash: float = 0.0
+var _hurt_flash: float = 0.0
+var _mouse_aim: float = 0.0
+var _color: Color = Color.WHITE
+
+
+func _ready() -> void:
+	add_to_group("player")
+	var p: Dictionary = Game.CONFIG["player"]
+	max_hp = float(p["max_hp"])
+	hp = max_hp
+	speed = float(p["speed"])
+	max_stamina = float(p["max_stamina"])
+	stamina = max_stamina
+	stamina_regen = float(p["stamina_regen"])
+	dodge_cost = float(p["dodge_cost"])
+	iframe_seconds = float(p["iframe_seconds"])
+	_color = Color.html(str(p["color"]))
+	weapon = Game.CONFIG["weapon"]
+	mode = str(weapon["mode"])
+	ammo = int(weapon.get("ammo", -1))
+	heat_enabled = bool(Game.get_cfg("heat.enabled", false))
+	max_heat = float(Game.get_cfg("heat.max", 100.0))
+	heat_cool = float(Game.get_cfg("heat.cool", 5.0))
+	Game.hp_changed.emit(hp, max_hp)
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse_aim = 2.0
+
+
+func _physics_process(delta: float) -> void:
+	_cooldown = max(0.0, _cooldown - delta)
+	_iframes = max(0.0, _iframes - delta)
+	_swing_flash = max(0.0, _swing_flash - delta)
+	_hurt_flash = max(0.0, _hurt_flash - delta)
+	_mouse_aim = max(0.0, _mouse_aim - delta)
+	if not alive or Game.outcome != "":
+		velocity = velocity.move_toward(Vector2.ZERO, accel * delta)
+		move_and_slide()
+		return
+	var move := Vector2.ZERO
+	var want_attack := false
+	var want_dodge := false
+	var want_interact := false
+	if Game.autoplay:
+		move = Autopilot.move_vector
+		want_attack = Autopilot.want_attack
+		want_dodge = Autopilot.want_dodge
+		want_interact = Autopilot.want_interact
+		if Autopilot.aim_point != Vector2.ZERO and want_attack:
+			aim_dir = (Autopilot.aim_point - global_position).normalized()
+	else:
+		move = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+		want_attack = Input.is_action_pressed("attack")
+		want_dodge = Input.is_action_just_pressed("dodge")
+		want_interact = Input.is_action_just_pressed("interact")
+		if _mouse_aim > 0.0:
+			aim_dir = (get_global_mouse_position() - global_position).normalized()
+		elif move != Vector2.ZERO:
+			aim_dir = move.normalized()
+	if move.length() > 1.0:
+		move = move.normalized()
+	if move != Vector2.ZERO:
+		facing = move.normalized()
+	_tick_resources(delta)
+	if want_dodge and _dodge_time <= 0.0 and stamina >= dodge_cost:
+		_dodge_time = 0.2
+		_dodge_dir = move.normalized() if move != Vector2.ZERO else -aim_dir
+		_iframes = max(_iframes, iframe_seconds)
+		stamina -= dodge_cost
+		_stamina_delay = 0.5
+		if heat_enabled:
+			heat = min(max_heat * 1.2, heat + float(Game.get_cfg("heat.per_dodge", 8.0)))
+		Game.bump("dodges")
+	if _dodge_time > 0.0:
+		_dodge_time -= delta
+		velocity = _dodge_dir * speed * 2.8
+	else:
+		velocity = velocity.move_toward(move * speed, accel * delta)
+	move_and_slide()
+	if want_attack:
+		_attack()
+	if want_interact:
+		Game.bump("interactions")
+		main.loop.interact(self)
+	_check_hazard(delta)
+
+
+func _tick_resources(delta: float) -> void:
+	if _stamina_delay > 0.0:
+		_stamina_delay -= delta
+	else:
+		stamina = min(max_stamina, stamina + stamina_regen * delta)
+	if heat_enabled:
+		heat = max(0.0, heat - heat_cool * delta)
+		if _jam > 0.0:
+			_jam -= delta
+			if _jam <= 0.0:
+				Game.say("WEAPON COOLED")
+
+
+func _attack() -> void:
+	if _cooldown > 0.0 or mode == "none":
+		return
+	if mode == "gun":
+		if _jam > 0.0 or ammo == 0:
+			if ammo == 0:
+				Game.advise("no_ammo")
+			return
+		var spread: float = float(weapon.get("spread", 0.04))
+		var dir := aim_dir.rotated(Game.rng.randf_range(-spread, spread))
+		main.spawn_projectile(global_position + dir * 14.0, dir, float(weapon["projectile_speed"]), float(weapon["damage"]), true)
+		_cooldown = float(weapon["cooldown"])
+		Game.bump("shots")
+		if ammo > 0:
+			ammo -= 1
+		if heat_enabled:
+			heat += float(weapon.get("heat", 0.0))
+			if heat >= max_heat:
+				_jam = float(Game.get_cfg("heat.jam_seconds", 1.5))
+				Game.say("OVERHEATED — weapon jammed")
+				Game.advise("overheat")
+				Game.log_event("overheat", "")
+		main.loop.on_player_fired(self)
+	elif mode == "melee":
+		var cost: float = float(weapon.get("stamina_cost", 18.0))
+		if stamina < cost:
+			return
+		stamina -= cost
+		_stamina_delay = 0.55
+		_cooldown = float(weapon["cooldown"])
+		_swing_flash = 0.14
+		Game.bump("swings")
+		var reach: float = float(weapon["reach"])
+		var arc: float = deg_to_rad(float(weapon.get("arc_degrees", 110.0))) * 0.5
+		for e in main.enemies():
+			var to_e: Vector2 = e.global_position - global_position
+			if to_e.length() <= reach + e.radius and abs(aim_dir.angle_to(to_e)) <= arc:
+				e.take_damage(float(weapon["damage"]), global_position)
+		main.loop.on_player_fired(self)
+
+
+func _check_hazard(delta: float) -> void:
+	if main.tile_char(main.to_tile(global_position)) != "H":
+		return
+	if heat_enabled:
+		heat = min(max_heat * 1.2, heat + float(Game.get_cfg("heat.hazard_per_sec", 20.0)) * delta)
+	hp = max(1.0, hp - float(Game.get_cfg("rules.hazard_dps", 4.0)) * delta)
+	Game.hp_changed.emit(hp, max_hp)
+	Game.advise("hazard")
+
+
+func take_damage(amount: float, from_pos: Vector2 = Vector2.ZERO) -> void:
+	if not alive or _iframes > 0.0 or Game.outcome != "":
+		return
+	hp = max(0.0, hp - amount)
+	Game.bump("damage_taken", amount)
+	_iframes = 0.3
+	_hurt_flash = 0.2
+	main.fx.spark(global_position, Color(1, 0.3, 0.3), "-%d" % int(round(amount)))
+	if from_pos != Vector2.ZERO:
+		velocity += (global_position - from_pos).normalized() * 240.0
+	Game.hp_changed.emit(hp, max_hp)
+	if hp <= max_hp * 0.3:
+		Game.advise("low_hp")
+	if hp <= 0.0:
+		alive = false
+		Game.bump("deaths")
+		Game.log_event("death", str(main.to_tile(global_position)))
+		main.loop.on_player_died(self)
+
+
+func heal(amount: float) -> void:
+	hp = min(max_hp, hp + amount)
+	Game.hp_changed.emit(hp, max_hp)
+
+
+func revive_at(pos: Vector2) -> void:
+	alive = true
+	hp = max_hp
+	stamina = max_stamina
+	heat = 0.0
+	_jam = 0.0
+	velocity = Vector2.ZERO
+	global_position = pos
+	_iframes = 1.2
+	Game.hp_changed.emit(hp, max_hp)
+
+
+func is_jammed() -> bool:
+	return _jam > 0.0
+
+
+func _process(_delta: float) -> void:
+	queue_redraw()
+
+
+func _draw() -> void:
+	# PLACEHOLDER ART: player token (see data/asset_manifest.json -> player).
+	var c := _color
+	if _hurt_flash > 0.0:
+		c = Color(1, 0.35, 0.35)
+	elif _iframes > 0.0 and int(_iframes * 20.0) % 2 == 0:
+		c.a = 0.45
+	if not alive:
+		c = Color(0.3, 0.3, 0.3, 0.6)
+	draw_circle(Vector2.ZERO, 10.0, c)
+	draw_arc(Vector2.ZERO, 10.0, 0.0, TAU, 20, c.darkened(0.5), 2.0)
+	draw_line(Vector2.ZERO, aim_dir * 16.0, Color(1, 1, 1, 0.8), 2.0)
+	if _swing_flash > 0.0:
+		var reach: float = float(weapon.get("reach", 40.0))
+		var arc: float = deg_to_rad(float(weapon.get("arc_degrees", 110.0))) * 0.5
+		draw_arc(Vector2.ZERO, reach, aim_dir.angle() - arc, aim_dir.angle() + arc, 16, Color(1, 1, 0.7, 0.9), 4.0)

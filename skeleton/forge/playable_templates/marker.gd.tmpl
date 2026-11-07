@@ -1,0 +1,54 @@
+extends Node2D
+## Marker — pickups, objectives and interactables (PLACEHOLDER icon art).
+
+var kind: String = "core"
+var data: Dictionary = {}
+var active: bool = true
+var _t: float = 0.0
+
+
+func _ready() -> void:
+	add_to_group("marker")
+	z_index = -1
+
+
+func collect() -> void:
+	active = false
+	remove_from_group("marker")
+	queue_free()
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	queue_redraw()
+
+
+func _draw() -> void:
+	var spec: Dictionary = Game.get_cfg("markers." + kind, {})
+	var c := Color.html(str(spec.get("color", "#ffffff")))
+	var r: float = float(spec.get("radius", 9.0))
+	var shape := str(spec.get("shape", "circle"))
+	var bob := sin(_t * 3.0) * 2.0 if bool(spec.get("bob", false)) else 0.0
+	var o := Vector2(0, bob)
+	match shape:
+		"diamond":
+			draw_colored_polygon(PackedVector2Array([o + Vector2(0, -r), o + Vector2(r, 0), o + Vector2(0, r), o + Vector2(-r, 0)]), c)
+		"square":
+			draw_rect(Rect2(o - Vector2(r, r), Vector2(r, r) * 2.0), c)
+		"ring":
+			draw_arc(o, r, 0.0, TAU, 24, c, 4.0)
+			draw_arc(o, r * 0.55 + sin(_t * 4.0) * 2.0, 0.0, TAU, 16, c.lightened(0.3), 2.0)
+		"plot":
+			draw_rect(Rect2(Vector2(-14, -14), Vector2(28, 28)), Color.html("#5a3b22"))
+			var st := str(data.get("state", "empty"))
+			if st == "growing":
+				var k: float = clamp(float(data.get("t", 0.0)) / max(float(data.get("grow", 1.0)), 0.01), 0.0, 1.0)
+				draw_circle(Vector2.ZERO, 3.0 + 7.0 * k, Color.html("#7bc950"))
+			elif st == "ready":
+				draw_circle(Vector2.ZERO, 11.0, c)
+				draw_arc(Vector2.ZERO, 13.0 + sin(_t * 5.0), 0.0, TAU, 20, Color(1, 1, 0.6), 2.0)
+		_:
+			draw_circle(o, r, c)
+	var lbl := str(spec.get("label", ""))
+	if lbl != "":
+		draw_string(ThemeDB.fallback_font, o + Vector2(-r, -r - 4), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.85))

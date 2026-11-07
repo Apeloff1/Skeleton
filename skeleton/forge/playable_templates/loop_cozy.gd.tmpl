@@ -1,0 +1,159 @@
+extends "res://scripts/loops/loop_base.gd"
+## Cozy loop — plant, tend and harvest plots, sell at the market stall,
+## chat with neighbours, and reach the festival goal before the season ends.
+## No combat: the only pressure is the day clock.
+
+var coins: int = 0
+var seeds: int = 0
+var produce: int = 0
+var goal: int = 120
+var day: int = 1
+var days: int = 4
+var day_seconds: float = 90.0
+var clock: float = 0.0
+var _talk_i: int = 0
+
+
+func _on_setup() -> void:
+	goal = int(Game.get_cfg("rules.goal_coins", 120))
+	seeds = int(Game.get_cfg("rules.start_seeds", 4))
+	coins = int(Game.get_cfg("rules.start_coins", 0))
+	days = int(Game.get_cfg("rules.days", 4))
+	day_seconds = float(Game.get_cfg("rules.day_seconds", 90.0))
+	for plot in main.markers("plot"):
+		plot.data = {"state": "empty", "t": 0.0, "grow": float(Game.get_cfg("rules.grow_seconds", 10.0))}
+	_sync()
+	Game.say("A new season. Raise %d coins for the festival!" % goal)
+
+
+func _sync() -> void:
+	Game.counters["coins"] = coins
+	Game.counters["seeds"] = seeds
+	Game.counters["produce"] = produce
+	Game.counters["day"] = day
+
+
+func _physics_process(delta: float) -> void:
+	if main == null or Game.outcome != "":
+		return
+	clock += delta
+	if clock >= day_seconds:
+		clock = 0.0
+		day += 1
+		_sync()
+		if day > days:
+			Game.say("The season has ended.")
+			Game.finish("lose")
+			return
+		Game.say("DAY %d" % day)
+		Game.log_event("day", str(day))
+	for plot in main.markers("plot"):
+		if str(plot.data.get("state", "")) == "growing":
+			plot.data["t"] = float(plot.data["t"]) + delta
+			if float(plot.data["t"]) >= float(plot.data["grow"]):
+				plot.data["state"] = "ready"
+	var k: float = clock / day_seconds
+	var light: float = 1.0 - 0.45 * clamp((k - 0.7) / 0.3, 0.0, 1.0)
+	main.daylight.color = Color(light, light, min(1.0, light + 0.08), 1.0)
+
+
+func interact(p) -> void:
+	var best = null
+	var best_d := 40.0
+	for m in main.markers():
+		if m.kind in ["plot", "market", "npc"]:
+			var d: float = p.global_position.distance_to(m.global_position)
+			if d < best_d:
+				best_d = d
+				best = m
+	if best == null:
+		return
+	match str(best.kind):
+		"plot":
+			var st := str(best.data.get("state", "empty"))
+			if st == "empty" and seeds > 0:
+				seeds -= 1
+				best.data["state"] = "growing"
+				best.data["t"] = 0.0
+				main.fx.spark(best.global_position, Color.html("#7bc950"), "planted")
+				Game.log_event("plant", "")
+			elif st == "ready":
+				var yield_n := 2 if Game.rng.randf() < float(Game.get_cfg("rules.bumper_chance", 0.2)) else 1
+				produce += yield_n
+				best.data["state"] = "empty"
+				Game.bump("pickups", yield_n)
+				main.fx.spark(best.global_position, Color.html("#ffd166"), "+%d" % yield_n)
+				Game.log_event("harvest", str(yield_n))
+			elif st == "empty":
+				Game.say("No seeds — visit the market stall")
+		"market":
+			var earned := produce * int(Game.get_cfg("rules.crop_price", 12))
+			coins += earned
+			produce = 0
+			var price := int(Game.get_cfg("rules.seed_price", 3))
+			var want: int = max(0, main.markers("plot").size() - seeds)
+			var buy: int = min(want, int(coins / max(price, 1)))
+			if coins >= goal:
+				buy = 0
+			coins -= buy * price
+			seeds += buy
+			Game.say("Sold for %d coins, bought %d seeds" % [earned, buy])
+			Game.log_event("market", str(coins))
+			if coins >= goal:
+				_sync()
+				Game.say(str(Game.get_cfg("rules.win_text", "Festival time!")))
+				Game.finish("win")
+				return
+		"npc":
+			var lines: Array = Game.get_cfg("companion.chatter", ["Lovely day for it."])
+			Game.advisor.emit("%s: %s" % [str(Game.get_cfg("companion.name", "Neighbour")), str(lines[_talk_i % lines.size()])])
+			_talk_i += 1
+	_sync()
+
+
+func objective_text() -> String:
+	return "Coins %d/%d   Day %d/%d" % [coins, goal, min(day, days), days]
+
+
+func hud_lines() -> String:
+	return "Seeds %d   Produce %d   Harvested %d" % [seeds, produce, int(Game.stats["pickups"])]
+
+
+func secondary_bar() -> Array:
+	return ["DAYLIGHT", day_seconds - clock, day_seconds]
+
+
+func smoke_extra() -> Dictionary:
+	return {"coins": coins, "goal": goal, "day": day}
+
+
+func bot_think(bot) -> void:
+	var p = main.player
+	var ready: Array = []
+	var empty: Array = []
+	var growing: Array = []
+	for pl in main.markers("plot"):
+		var st := str(pl.data.get("state", "empty"))
+		if st == "ready":
+			ready.append(pl)
+		elif st == "empty":
+			empty.append(pl)
+		else:
+			growing.append(pl)
+	var target = null
+	if not ready.is_empty():
+		target = nearest_by_path(ready, p.global_position)
+	elif seeds > 0 and not empty.is_empty():
+		target = nearest_by_path(empty, p.global_position)
+	elif produce > 0 or (seeds == 0 and growing.is_empty()):
+		target = nearest_marker("market", p.global_position)
+	elif not growing.is_empty():
+		target = nearest_by_path(growing, p.global_position)
+		if p.global_position.distance_to(target.global_position) < 40.0:
+			return
+	if target == null:
+		return
+	if p.global_position.distance_to(target.global_position) <= 28.0:
+		bot.want_interact = true
+	else:
+		bot_go(bot, target.global_position)

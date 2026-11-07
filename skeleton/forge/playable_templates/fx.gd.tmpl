@@ -1,0 +1,33 @@
+extends Node2D
+## FX — lightweight PLACEHOLDER juice: hit sparks and floating text.
+
+var _items: Array = []
+
+
+func spark(pos: Vector2, color: Color, text: String = "") -> void:
+	_items.append({"pos": pos, "color": color, "text": text, "t": 0.0, "life": 0.5 if text == "" else 0.9})
+	if _items.size() > 128:
+		_items.pop_front()
+
+
+func _process(delta: float) -> void:
+	var keep: Array = []
+	for it in _items:
+		it["t"] = float(it["t"]) + delta
+		if float(it["t"]) < float(it["life"]):
+			keep.append(it)
+	_items = keep
+	queue_redraw()
+
+
+func _draw() -> void:
+	var font := ThemeDB.fallback_font
+	for it in _items:
+		var k: float = float(it["t"]) / float(it["life"])
+		var c: Color = it["color"]
+		c.a = 1.0 - k
+		var p: Vector2 = it["pos"]
+		if str(it["text"]) == "":
+			draw_arc(p, 4.0 + 14.0 * k, 0.0, TAU, 12, c, 2.0)
+		else:
+			draw_string(font, p + Vector2(-12, -18 - 22 * k), str(it["text"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, c)

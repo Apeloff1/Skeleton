@@ -1,0 +1,43 @@
+extends Node2D
+## Projectile — swept point bullet; stops on walls, hits by radius test.
+
+var main = null
+var velocity: Vector2 = Vector2.ZERO
+var damage: float = 10.0
+var from_player: bool = true
+var life: float = 1.4
+var radius: float = 4.0
+
+
+func _physics_process(delta: float) -> void:
+	if Game.outcome != "":
+		queue_free()
+		return
+	var prev := global_position
+	global_position += velocity * delta
+	life -= delta
+	if life <= 0.0 or main.is_wall(global_position):
+		main.fx.spark(global_position, Color(0.8, 0.8, 0.8, 0.8))
+		queue_free()
+		return
+	if from_player:
+		for e in main.enemies():
+			if is_instance_valid(e) and e.hp > 0.0 and e.global_position.distance_to(global_position) <= e.radius + radius:
+				e.take_damage(damage, prev)
+				queue_free()
+				return
+	else:
+		var p = main.player
+		if p != null and p.alive and p.global_position.distance_to(global_position) <= 10.0 + radius:
+			p.take_damage(damage, prev)
+			queue_free()
+
+
+func _process(_delta: float) -> void:
+	queue_redraw()
+
+
+func _draw() -> void:
+	var c := Color(1.0, 0.9, 0.4) if from_player else Color(1.0, 0.3, 0.7)
+	draw_line(Vector2.ZERO, -velocity.normalized() * 8.0, c, 3.0)
+	draw_circle(Vector2.ZERO, radius * 0.75, c)

@@ -1,0 +1,112 @@
+extends "res://scripts/loops/loop_base.gd"
+## Horror loop — a failing flashlight, scarce ammo, noise that wakes the
+## stalkers, and a locked exit. Find the key, then get out.
+
+var battery: float = 1.0
+var battery_seconds: float = 150.0
+var has_key: bool = false
+var _flicker: float = 0.0
+var _nag_t: float = 0.0
+
+
+func _on_setup() -> void:
+	battery_seconds = float(Game.get_cfg("rules.battery_seconds", 150.0))
+	Game.counters["has_key"] = false
+	Game.counters["battery"] = 1.0
+	Game.say("It's dark. Find the key. Get out.")
+
+
+func _physics_process(delta: float) -> void:
+	if main == null or Game.outcome != "":
+		return
+	var p = main.player
+	battery = max(0.0, battery - delta / battery_seconds)
+	Game.counters["battery"] = snappedf(battery, 0.01)
+	Game.counters["ammo"] = p.ammo
+	_flicker = Game.rng.randf() if battery < 0.25 else 0.0
+	if battery < 0.2:
+		Game.advise("battery")
+	for m in touching("battery"):
+		m.collect()
+		battery = min(1.0, battery + float(Game.get_cfg("rules.battery_pickup", 0.4)))
+		Game.bump("pickups")
+		Game.say("BATTERY")
+	for m in touching("ammo"):
+		m.collect()
+		p.ammo += int(Game.get_cfg("rules.ammo_pickup", 6))
+		Game.bump("pickups")
+		Game.say("AMMO +%d" % int(Game.get_cfg("rules.ammo_pickup", 6)))
+	for m in touching("medkit"):
+		m.collect()
+		p.heal(float(Game.get_cfg("rules.medkit_heal", 40.0)))
+		Game.bump("pickups")
+	for m in touching("key"):
+		m.collect()
+		has_key = true
+		Game.counters["has_key"] = true
+		Game.say("You found the KEY")
+		Game.advise("key")
+		Game.log_event("key", "")
+	_nag_t -= delta
+	for x in touching("exit", 26.0):
+		if has_key:
+			Game.say(str(Game.get_cfg("rules.win_text", "You escaped.")))
+			Game.finish("win")
+			return
+		elif _nag_t <= 0.0:
+			_nag_t = 2.5
+			Game.say("LOCKED. There must be a key somewhere.")
+
+
+func on_player_fired(p) -> void:
+	var noise_px: float = float(Game.get_cfg("rules.noise_tiles", 9)) * TILE
+	for e in main.enemies():
+		if e.global_position.distance_to(p.global_position) <= noise_px:
+			e.alerted = true
+
+
+func light_radius() -> float:
+	var lo: float = float(Game.get_cfg("rules.light_min", 70.0))
+	var hi: float = float(Game.get_cfg("rules.light_max", 230.0))
+	return lerp(lo, hi, battery)
+
+
+func light_flicker() -> float:
+	return _flicker
+
+
+func objective_text() -> String:
+	return "Escape through the EXIT" if has_key else "Find the KEY"
+
+
+func hud_lines() -> String:
+	var p = main.player
+	return "Ammo %d   Kills %d   Battery %d%%" % [p.ammo, int(Game.stats["kills"]), int(battery * 100.0)]
+
+
+func secondary_bar() -> Array:
+	return ["BATTERY", battery, 1.0]
+
+
+func smoke_extra() -> Dictionary:
+	return {"has_key": has_key, "battery": snappedf(battery, 0.01), "ammo": main.player.ammo}
+
+
+func bot_think(bot) -> void:
+	var p = main.player
+	if p.ammo > 0:
+		bot_engage(bot, 5.0)
+	var target = null
+	if p.hp < p.max_hp * 0.5:
+		target = nearest_by_path(main.markers("medkit"), p.global_position, 14)
+	if target == null and p.ammo < 4:
+		target = nearest_by_path(main.markers("ammo"), p.global_position, 14)
+	if target == null and battery < 0.35:
+		target = nearest_by_path(main.markers("battery"), p.global_position, 14)
+	if target == null and not has_key:
+		target = nearest_marker("key", p.global_position)
+	if target == null:
+		target = nearest_marker("exit", p.global_position)
+	if target != null:
+		bot_go(bot, target.global_position)
+	bot_dodge_threats(bot)

@@ -1,0 +1,116 @@
+extends Node
+## LoopBase — shared rule plumbing and autopilot helpers for core loops.
+
+const TILE := 32.0
+
+var main = null
+
+
+func setup(m) -> void:
+	main = m
+	_on_setup()
+
+
+func _on_setup() -> void:
+	pass
+
+
+func objective_text() -> String:
+	return ""
+
+
+func hud_lines() -> String:
+	return ""
+
+
+func secondary_bar() -> Array:
+	return []
+
+
+func smoke_extra() -> Dictionary:
+	return {}
+
+
+func interact(_player) -> void:
+	pass
+
+
+func on_player_died(_player) -> void:
+	Game.say(str(Game.get_cfg("rules.lose_text", "You died.")))
+	Game.finish("lose")
+
+
+func on_enemy_killed(_enemy) -> void:
+	pass
+
+
+func on_player_fired(_player) -> void:
+	pass
+
+
+func bot_think(_bot) -> void:
+	pass
+
+
+func touching(kind: String, radius: float = 22.0) -> Array:
+	var out: Array = []
+	var p = main.player
+	for m in main.markers(kind):
+		if p.global_position.distance_to(m.global_position) <= radius:
+			out.append(m)
+	return out
+
+
+func nearest_marker(kind: String, pos: Vector2, max_px: float = INF):
+	var best = null
+	var best_d := max_px
+	for m in main.markers(kind):
+		var d: float = pos.distance_to(m.global_position)
+		if d < best_d:
+			best_d = d
+			best = m
+	return best
+
+
+func nearest_by_path(nodes: Array, pos: Vector2, max_tiles: int = 99999):
+	var best = null
+	var best_d := max_tiles + 1
+	for n in nodes:
+		if not is_instance_valid(n):
+			continue
+		var d: int = main.path_distance(pos, n.global_position)
+		if d < best_d:
+			best_d = d
+			best = n
+	return best
+
+
+func bot_go(bot, target: Vector2) -> void:
+	bot.move_vector = main.step_toward(main.player.global_position, target)
+
+
+func bot_engage(bot, max_tiles: float, need_los: bool = true):
+	var p = main.player
+	var target = null
+	var best := max_tiles * TILE
+	for e in main.enemies():
+		var d: float = p.global_position.distance_to(e.global_position)
+		if d < best and (not need_los or main.has_los(p.global_position, e.global_position)):
+			best = d
+			target = e
+	if target == null:
+		return null
+	bot.aim_point = target.global_position + target.velocity * 0.12
+	bot.want_attack = true
+	return target
+
+
+func bot_dodge_threats(bot) -> void:
+	var p = main.player
+	for e in main.enemies():
+		if e.state == "windup" and not e.ranged and p.global_position.distance_to(e.global_position) <= e.reach + 22.0:
+			bot.want_dodge = true
+			var away: Vector2 = (p.global_position - e.global_position).normalized()
+			if not main.is_wall(p.global_position + away * 40.0):
+				bot.move_vector = away
+			return
