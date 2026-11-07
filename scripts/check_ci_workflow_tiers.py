@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
+import stat
 
 SCHEMA = "skeleton.ci.workflow_tiers.v1"
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,22 +33,40 @@ def _unique_policy_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _read_reviewed(root: Path, relative: Path) -> str:
-    """Reject linked evidence files and parent directories before reading."""
-    path = root
-    for component in relative.parts:
-        path = path / component
-        if path.is_symlink():
-            raise ValueError(f"linked CI evidence path: {relative}")
-    if not path.is_file():
-        raise ValueError(f"missing CI evidence file: {relative}")
-    # GitHub workflow/registry evidence is text, never a bulk data payload.
-    # Bound reads even when a hostile checkout changes size after stat().
+    """Read only regular files beneath descriptor-anchored, unlinked directories.
+
+    Checking Path.is_symlink() before Path.open() leaves a replacement window.
+    Each component is instead opened relative to its already-open parent with
+    O_NOFOLLOW, so a concurrent rename cannot redirect a reviewed evidence read.
+    """
+    if (relative.is_absolute() or not relative.parts
+            or any(part in ("", ".", "..") for part in relative.parts)):
+        raise ValueError(f"invalid CI evidence path: {relative}")
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise ValueError("descriptor-anchored CI evidence reads unsupported")
     limit = 1024 * 1024
-    with path.open("rb") as stream:
-        payload = stream.read(limit + 1)
-    if len(payload) > limit:
-        raise ValueError(f"oversized CI evidence file: {relative}")
-    return payload.decode("utf-8")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW
+    descriptors: list[int] = []
+    try:
+        descriptors.append(os.open(root, directory_flags))
+        for component in relative.parts[:-1]:
+            descriptors.append(os.open(component, directory_flags, dir_fd=descriptors[-1]))
+        fd = os.open(relative.parts[-1], file_flags, dir_fd=descriptors[-1])
+        descriptors.append(fd)
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError(f"CI evidence must be a regular file: {relative}")
+        if info.st_size > limit:
+            raise ValueError(f"oversized CI evidence file: {relative}")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            payload = stream.read(limit + 1)
+        if len(payload) > limit:
+            raise ValueError(f"oversized CI evidence file: {relative}")
+        return payload.decode("utf-8")
+    finally:
+        for fd in reversed(descriptors):
+            os.close(fd)
 
 
 def events(source: str) -> set[str]:
