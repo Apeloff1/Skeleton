@@ -20,7 +20,24 @@ from typing import Any
 MARKDOWN_TYPES = frozenset({"text/markdown", "text/x-markdown"})
 CSV_TYPES = frozenset({"text/csv", "application/csv"})
 JSON_TYPES = frozenset({"application/json", "application/ld+json"})
-ADDITIONAL_TYPES = MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES
+NDJSON_TYPES = frozenset({
+    "application/x-ndjson", "application/ndjson",
+    "application/jsonl", "text/x-jsonl",
+})
+SOURCE_CODE_TYPES = frozenset({
+    "text/x-python", "text/x-c", "text/x-csrc", "text/x-c++src",
+    "text/x-rust", "text/x-go", "text/x-java-source",
+    "text/javascript", "application/javascript",
+    "application/x-javascript", "text/x-typescript",
+    "application/typescript", "text/css",
+    "text/x-rst", "text/x-asciidoc",
+    "text/yaml", "text/x-yaml", "application/yaml",
+    "application/x-yaml", "application/toml", "text/x-toml",
+    "text/x-shellscript", "application/x-sh",
+})
+ADDITIONAL_TYPES = (
+    MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES | NDJSON_TYPES | SOURCE_CODE_TYPES
+)
 
 _MD_LINK = re.compile(
     r"(?<!!)\[[^\]\n]{1,256}\]\(\s*<?([^\s<>)]{1,4096})>?\s*(?:[\"'][^\"']{0,256}[\"'])?\s*\)"
@@ -249,6 +266,65 @@ def extract_json(
     )
 
 
+def extract_source_code(
+    raw: str, *, max_chars: int = 524_288, max_links: int = 128,
+) -> ExtractedFormat:
+    """Capture syntax-bearing source as inert, explicitly untrusted evidence.
+
+    Source code is never executed, imported, interpreted as a crawler policy,
+    or mined for requestable links. Binary markers, terminal escapes and
+    non-text control bytes are rejected before persistence.
+    """
+    _bounds(raw, max_chars, max_links)
+    if any(ord(ch) < 32 and ch not in "\n\t\r" for ch in raw):
+        raise DocumentFormatError("unsafe control bytes in source document")
+    if raw.count("\ufffd") > max(4, len(raw) // 100):
+        raise DocumentFormatError("source document has excessive decoder replacements")
+    text = raw.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        raise DocumentFormatError("source document contains no code or prose")
+    return ExtractedFormat(
+        text=text[:max_chars], title="", links=(),
+        truncated=len(text) > max_chars,
+    )
+
+
+def extract_ndjson(
+    raw: str, *, max_chars: int = 524_288, max_links: int = 128,
+    max_records: int = 512,
+) -> ExtractedFormat:
+    """Bounded newline-separated JSON dataset evidence, without URL fanout."""
+    _bounds(raw, max_chars, max_links)
+    if type(max_records) is not int or not 1 <= max_records <= 2048:
+        raise DocumentFormatError("invalid bounded NDJSON record count")
+    lines = []
+    records = 0
+    total = 0
+    for row in raw.splitlines():
+        if not row.strip():
+            continue
+        records += 1
+        if records > max_records or len(row) > 65536:
+            raise DocumentFormatError("NDJSON record limit exceeded")
+        parsed = extract_json(
+            row, max_chars=min(max_chars, 65536), max_links=0,
+        )
+        if parsed.truncated:
+            raise DocumentFormatError("NDJSON record cannot be silently truncated")
+        line = f"Record {records}: {parsed.text}"
+        total += len(line)
+        if total > max_chars * 2:
+            raise DocumentFormatError("NDJSON evidence exceeds parse budget")
+        lines.append(line)
+    if not records:
+        raise DocumentFormatError("NDJSON body has no records")
+    text = "\n".join(lines)
+    return ExtractedFormat(
+        text=text[:max_chars], title="JSON Lines dataset", links=(),
+        truncated=len(text) > max_chars,
+    )
+
+
 def extract_additional_format(
     raw: str, media_type: str, *, max_chars: int,
     max_links: int,
@@ -259,4 +335,8 @@ def extract_additional_format(
         return extract_csv(raw, max_chars=max_chars, max_links=max_links)
     if media_type in JSON_TYPES:
         return extract_json(raw, max_chars=max_chars, max_links=max_links)
+    if media_type in NDJSON_TYPES:
+        return extract_ndjson(raw, max_chars=max_chars, max_links=max_links)
+    if media_type in SOURCE_CODE_TYPES:
+        return extract_source_code(raw, max_chars=max_chars, max_links=max_links)
     raise DocumentFormatError("unsupported additional source type")
