@@ -99,7 +99,7 @@ class ParserTests(unittest.TestCase):
                                           'lock-version = "8.0"'))
         with self.assertRaises(ResearchFormatError):
             extract_pylock(PYLOCK.replace('name = "worldgraph"}',
-                                          'name = "worldgraph", bogus = 3}'))
+                                          'name = 123}'))
 
 class Transport:
     timeout_seconds=4
