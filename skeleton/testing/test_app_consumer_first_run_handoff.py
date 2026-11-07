@@ -7,6 +7,7 @@ import unittest
 from skeleton.app.consumer_first_run_handoff import (
     FirstRunHandoffContractError,
     REQUIRED_FALSE,
+    MANDATORY_HOLDS,
     REQUIRED_TRUE,
     SCHEMA,
     validate_source_only_handoff,
@@ -20,8 +21,12 @@ def valid_evidence():
         "status": "source_level_first_run_replayed_release_blocked",
         "files_published": 0,
         "source_level_replay_passes": 2,
-        "release_holds": ["NATIVE_DEVICE_QUALIFICATION_ABSENT"],
-        "runtime_observation": {"posix_nofollow_available": True},
+        "release_holds": sorted(MANDATORY_HOLDS),
+        "project_id": "offline-first-playable",
+        "action_count": 2,
+        "runtime_observation": {"posix_nofollow_available": True,
+                                "operating_system": "Linux", "machine": "x86_64",
+                                "python": "3.12.0"},
     }
     evidence.update({name: False for name in REQUIRED_FALSE})
     evidence.update({name: True for name in REQUIRED_TRUE})
@@ -91,6 +96,37 @@ class FirstRunHandoffTests(unittest.TestCase):
             evidence[field] = value
             with self.assertRaises(FirstRunHandoffContractError):
                 validate_source_only_handoff(evidence)
+
+    def test_project_identifier_and_action_bounds(self):
+        for value in (None, "", "../escape", "a" * 129, 1, "with space"):
+            with self.subTest(project_id=value):
+                evidence = valid_evidence()
+                evidence["project_id"] = value
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+        for value in (None, False, True, 0, 65, 1.5, "2"):
+            with self.subTest(action_count=value):
+                evidence = valid_evidence()
+                evidence["action_count"] = value
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
+    def test_every_mandatory_release_hold_is_required(self):
+        for hold in MANDATORY_HOLDS:
+            with self.subTest(hold=hold):
+                evidence = valid_evidence()
+                evidence["release_holds"].remove(hold)
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
+    def test_runtime_observation_types_are_enforced(self):
+        for name, value in (("operating_system", None), ("machine", ""),
+                            ("python", "unknown"), ("python", 3)):
+            with self.subTest(name=name, value=value):
+                evidence = valid_evidence()
+                evidence["runtime_observation"][name] = value
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
 
     def test_read_only_input(self):
         evidence = valid_evidence()
