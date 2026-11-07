@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "b80362482d10e791ed3db1de9bf0514d96324ae4",
+      "source_git_object_sha": "50eaebbeab932bd90d64d51de9a598d7a8ea428a",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
+      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "App-wide game-build evidence and security batch contracts",
+      "reason": "Mass-build batches are deterministic game-production and security evidence, not a credentialed AI provider or canonical model runtime; retain the existing owner until an approved capability-level import and authority cutover."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7327,6 +7332,11 @@
       "path": "skeleton/parse",
       "owner": "package/parsing compatibility boundary",
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/perf_profiler",
+      "owner": "Shared application performance instrumentation",
+      "reason": "The stdlib allocation, frame and load-time profiling CLI measures both game and AI surfaces but does not own inference, providers or canonical AI state; retain shared application tooling until an explicit owner migration is verified."
     },
     {
       "path": "skeleton/persist",
@@ -7543,8 +7553,8 @@
     "status": "reconciled_retained_standalone_and_shared_roots_pending_verified_cutover",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
     "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25",
-    "newly_classified": 30,
-    "verification_note": "30 previously unclassified tracked roots retain explicit non-canonical owners; parity validation and runtime promotion requirements remain enforced."
+    "newly_classified": 32,
+    "verification_note": "32 previously unclassified tracked roots retain explicit non-canonical owners, including app-wide mass-build evidence and shared performance profiling; parity validation and runtime promotion requirements remain enforced."
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",

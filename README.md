@@ -74,6 +74,20 @@ chat remains unavailable even after model provisioning. Full-profile Chroma
 startup is blocked pending safe persistence recovery. The current revision has
 not been qualified on the target Windows laptop.
 
+Before any package or container installation, the read-only preload now checks the
+source-bounded backend Python image, all three Docker COPY build contexts and
+private context-exclusion rules. The Windows payload must retain
+`Dockerfile.dockerignore` alongside `Dockerfile`. Missing or incompatible
+build inputs fail before credentials are generated; do not remove the
+preflight or bypass its failure.
+
+Runtime doctor and `app check --runtime` also read `.env` through a bounded,
+descriptor-checked path. A symlink, hardlink, named pipe, oversized file,
+invalid encoding or replaced source fails closed with redacted remediation.
+Do not delete a suspicious existing `.env` or reinitialize persistent Mongo
+credentials to make diagnostics pass. Preserve the file for operator-led
+recovery. Healthy service probes are not trained-model activation evidence.
+
 Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
 Start Docker before running the installer. Host Node/Yarn are optional; the
 container build supplies frontend dependencies. Initial dependency/image builds

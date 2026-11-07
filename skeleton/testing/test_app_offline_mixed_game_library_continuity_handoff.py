@@ -13,6 +13,11 @@ from skeleton.app.offline_mixed_game_library_continuity_handoff import (
     publish_mixed_library_continuity_handoff,
     inspect_mixed_library_continuity_handoff,
 )
+# Explicit transitive pytest fixtures for isolated canonical domain shards.
+from skeleton.testing.test_app_offline_archive_signature import signed
+from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
+from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
 from skeleton.testing.test_app_offline_mixed_game_library_continuity import (
     catalog, _advance,
 )

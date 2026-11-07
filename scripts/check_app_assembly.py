@@ -484,6 +484,17 @@ def audit_compose_modes() -> None:
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
     )
+    check(
+        "CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}" in base,
+        "backend browser CORS default must follow the published frontend port",
+    )
+    env_template = read(".env.example")
+    check(
+        "\nCORS_ORIGINS=\n" in env_template,
+        "first-install env template must defer browser origin to Compose port selection",
+    )
+
 
     skeleton_block = (
         base.split("  skeleton:", 1)[1].split("\n  backend:", 1)[0]
@@ -549,13 +560,17 @@ def audit_compose_modes() -> None:
         if "  frontend:" in base and "\n  mongo:" in base
         else ""
     )
+    # First-run diagnostics must be available even when Mongo, the engine
+    # or backend cannot start. Keep the UI independent and leave protected
+    # API admission to the backend/engine health and authorization fences.
     check(
-        "backend:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy backend",
+        not re.search(r"(?m)^    depends_on:\s*$", frontend_block),
+        "frontend setup/diagnostic UI must not depend on backend or engine startup",
     )
     check(
-        "skeleton:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy Skeleton engine",
+        "backend:\n        condition: service_healthy" in backend_block
+        or "skeleton:\n        condition: service_healthy" in backend_block,
+        "backend must preserve its protected startup dependencies",
     )
 
 
@@ -588,9 +603,23 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        upstream = f"proxy_pass http://{name}:{port};"
+        alias = {"backend": "application_backend", "skeleton": "application_engine"}[name]
+        upstream = f"upstream {alias} {{"
+        member = f"server {name}:{port} resolve;"
+        proxy = f"proxy_pass http://{alias};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
-        check(upstream in nginx, f"production ingress upstream drift: {upstream}")
+        check(
+            nginx.count(upstream) == 1 and member in nginx,
+            f"production ingress resolver upstream drift: {name}",
+        )
+        location_start = nginx.find(location)
+        location_end = nginx.find("\n    }", location_start) if location_start >= 0 else -1
+        location_body = (
+            nginx[location_start:location_end]
+            if location_start >= 0 and location_end > location_start
+            else ""
+        )
+        check(proxy in location_body, f"production ingress route target drift: {name}")
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -962,8 +991,8 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = APIRouter(prefix="/api/admin/ops"' in ops,
-        "backend ops prefix drift",
+        'router = project_router(prefix="/api/admin/ops"' in ops,
+        "backend ops prefix must use the canonical project router",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
 
@@ -1000,7 +1029,40 @@ def audit_product_route_registry() -> None:
         )
 
 
+def audit_preinstall_docker_sources() -> None:
+    """Keep the actual Dockerfile inputs inside the reviewed source contract."""
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    defects = build_source_errors(ROOT)
+    check(
+        not defects,
+        (
+            "pre-first-install Docker source admission failed: "
+            + "; ".join(defects[:4])
+            if defects
+            else "pre-first-install Docker source admission passed"
+        ),
+    )
+    raw = read("skeleton/app/manifest.json")
+    try:
+        manifest = json.loads(raw)
+        required = manifest["required_paths"]
+        if not isinstance(required, list):
+            raise ValueError("required_paths must be a list")
+    except (ValueError, KeyError, TypeError):
+        check(False, "first-install required-path manifest is unreadable or invalid")
+        return
+    for path in (
+        "Dockerfile.dockerignore",
+        "backend/Dockerfile.dockerignore",
+        "frontend/.dockerignore",
+        "skeleton/app/install_source_contracts.py",
+    ):
+        check(path in required, f"installed assembly omits required Docker input: {path}")
+
+
 def main() -> int:
+    audit_preinstall_docker_sources()
     audit_manifest()
     audit_topology_alignment()
     audit_backend_public_identity()

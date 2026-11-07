@@ -53,7 +53,11 @@ def test_exhaustive_proof_replay_and_determinism(tmp_path):
     assert all(row["status"] == "passed" for row in report["rules"])
     other = copy.deepcopy(source)
     other["choices"].reverse()
-    assert prove_invariants(spec, other) == report
+    # The invariant suite is pinned to an exact source identity, even when
+    # a reordered copy has equivalent gameplay transitions.
+    with pytest.raises(CanonError, match="invariant_world_lease_mismatch"):
+        prove_invariants(spec, other)
+    assert prove_invariants(spec, copy.deepcopy(source)) == report
 
 
 def test_violation_witness_replays_actual_flag_state(tmp_path):

@@ -8,7 +8,7 @@ import math
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
 
@@ -31,17 +31,31 @@ class ProbeResult:
         }
 
 
+def _open_direct_health(request: Request, *, timeout: float):
+    """Fetch one declared health endpoint without ambient proxies or redirects.
+
+    A remote redirect must not cause a second network request, even when a
+    subsequent URL comparison would have rejected its final 200 response.
+    """
+
+    class RejectRedirect(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            return None
+
+    return build_opener(ProxyHandler({}), RejectRedirect()).open(request, timeout=timeout)
+
+
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
-    """Probe one HTTP endpoint without external client dependencies."""
+    """Probe one health endpoint with no proxy or redirect side effects."""
 
     if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _open_direct_health(request, timeout=timeout) as response:
             status = int(getattr(response, "status", 200))
-            # urllib automatically follows redirects. A redirected login page
-            # returning 200 is NOT evidence the declared health endpoint works.
+            # Preserve the original URL check as a second fence even though
+            # _open_direct_health already blocks redirect traversal.
             geturl = getattr(response, "geturl", None)
             effective_url = geturl() if callable(geturl) else url
             response.read(256)
@@ -63,12 +77,13 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             detail=detail,
         )
     except HTTPError as exc:
+        code = int(exc.code)
         return ProbeResult(
             service=name,
             url=url,
             ok=False,
-            status=int(exc.code),
-            detail=f"HTTP error {exc.code}",
+            status=code,
+            detail="health endpoint redirected" if 300 <= code < 400 else f"HTTP error {code}",
         )
     except (URLError, TimeoutError, OSError) as exc:
         return ProbeResult(

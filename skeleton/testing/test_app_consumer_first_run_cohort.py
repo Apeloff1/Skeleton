@@ -281,7 +281,10 @@ def test_late_cross_game_nested_asset_inode_swap_rejected(
         return result
 
     monkeypatch.setattr(module, "inspect_consumer_first_run", swap_after_later_game)
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+    # The same-byte nested swap can be denied sooner by the independent
+    # parent-inode fence. Either specific custody rejection is fail-closed.
+    with pytest.raises(ConsumerFirstRunCohortError,
+                       match="nested|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -306,7 +309,7 @@ def test_first_cohort_replay_nested_inode_swap_rejected(
         module, "inspect_first_playable_delivery_batch",
         swap_after_canonical_replay,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -358,7 +361,7 @@ def test_final_cohort_replay_nested_inode_swap_rejected(
         module, "inspect_first_playable_delivery_batch",
         swap_after_final_canonical_replay,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -394,7 +397,7 @@ def test_late_original_source_nested_swap_rejected_when_requested(
         module, "inspect_consumer_first_run",
         swap_earlier_source_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="original source"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="original source|consumer evidence parent inode changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -433,7 +436,7 @@ def test_late_cross_game_evidence_parent_swap_preserving_file_inode_rejected(
     monkeypatch.setattr(
         module, "inspect_consumer_first_run", swap_parent_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode|another installed game or summary changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -472,7 +475,7 @@ def test_late_cohort_summary_parent_swap_preserving_file_inode_rejected(
         module, "inspect_consumer_first_run",
         swap_summary_parent_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="summary parent"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="summary parent|another installed game or summary changed"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],

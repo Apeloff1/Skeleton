@@ -43,14 +43,17 @@ class Passage:
 def passages(value,*,target_words=160,overlap=24,maximum_passages=1024):
     integer(target_words,minimum=16,maximum=4096)
     integer(overlap,maximum=1024)
-    integer(maximum_passages,minimum=1,maximum=10000)
+    # Profile context limits are token budgets, not an unlimited passage quota.
+    # Accept bounded profile values while retaining the hard 10k passage cap.
+    integer(maximum_passages,minimum=1,maximum=262144)
+    physical_ceiling=min(maximum_passages,10000)
     if overlap>=target_words:refuse("overlap must be strictly smaller than chunk")
     tokenized=tuple(words(value,maximum=262144))
     if not tokenized:refuse("source contains no lexical content")
     result=[]
     step=target_words-overlap
     for start in range(0,len(tokenized),step):
-        if len(result)>=maximum_passages:refuse("source would exceed passage bound")
+        if len(result)>=physical_ceiling:refuse("source would exceed passage bound")
         end=min(len(tokenized),start+target_words)
         piece=" ".join(tokenized[start:end])
         result.append(Passage(len(result),piece,start,end,

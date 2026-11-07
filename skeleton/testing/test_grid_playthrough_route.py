@@ -73,7 +73,7 @@ def test_unknown_ending_denied() -> None:
 
 @pytest.mark.parametrize("key,value", [
     ("checksum", "0" * 64),
-    ("status", "solved"),
+    ("status", "inconclusive"),
     ("goal_ending", "wanderer"),
     ("commands", []),
     ("state_digest", "0" * 64),
