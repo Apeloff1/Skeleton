@@ -57,8 +57,10 @@ def _role_custody(auth: object) -> tuple[tuple[str, str], ...]:
     if type(auth) is not dict or type(auth.get("authInfo")) is not dict:
         raise ActivationBlocked("Mongo role custody unavailable")
     info = auth["authInfo"]
+    # Missing role inventory is not authorization custody: a proxy must not
+    # erase role rotation evidence by omitting this field during attestation.
     if "authenticatedUserRoles" not in info:
-        return ()
+        raise ActivationBlocked("Mongo role custody unavailable")
     roles = info["authenticatedUserRoles"]
     if type(roles) is not list or len(roles) > 64:
         raise ActivationBlocked("Mongo role custody malformed")
