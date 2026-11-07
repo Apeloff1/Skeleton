@@ -56,5 +56,19 @@ class LoopbackReadinessTests(unittest.TestCase):
             factory.return_value.open.side_effect = OSError("offline")
             self.assertFalse(probe())
 
+class WizardObservationTests(unittest.TestCase):
+    def test_missing_endpoints_keep_setup_available(self):
+        from skeleton.install.wizard_10000x import FirstRunWizard10000x
+        report = FirstRunWizard10000x().observe_local_services({})
+        self.assertTrue(report["setup_accessible"])
+        self.assertFalse(report["all_services_observed_ready"])
+        self.assertFalse(report["release_ready"])
+        self.assertEqual(len(report["services"]), 5)
+
+    def test_external_endpoint_fails_closed(self):
+        from skeleton.install.wizard_10000x import FirstRunWizard10000x
+        report = FirstRunWizard10000x().observe_local_services({"backend": "http://example.org:80/health"})
+        self.assertFalse(report["services"]["backend"])
+
 if __name__ == "__main__":
     unittest.main()
