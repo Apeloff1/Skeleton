@@ -68,6 +68,27 @@ class WorkflowTierTests(unittest.TestCase):
                     registry_path.write_text(json.dumps(registry), encoding="utf-8")
                     self.assertIn("invalid explicit automatic event trigger profiles", audit(root))
 
+    def test_reviewed_evidence_read_is_bounded(self):
+        """Oversized registries and workflow files must fail before parsing."""
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "machine").mkdir()
+            (root / ".github/workflows").mkdir(parents=True)
+            registry = root / "machine/ci_workflow_tiers.json"
+            registry.write_bytes(b" " * (1024 * 1024 + 1))
+            self.assertTrue(any(
+                "oversized CI evidence file" in problem for problem in audit(root)
+            ))
+            registry.write_text(
+                (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            workflow = root / ".github/workflows/oversized.yml"
+            workflow.write_bytes(b"on:\\n  pull_request:\\n" + b"#" * (1024 * 1024))
+            self.assertTrue(any(
+                "oversized CI evidence file" in problem for problem in audit(root)
+            ))
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
