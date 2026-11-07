@@ -2800,3 +2800,862 @@ These work orders are **proposed completeness obligations**, not claims that a f
 
 
 **BOT-12 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+# 12. Frontier research, discontinuous capability gains and optional expansion
+
+The following are not assumed to exist. They are **R-series research initiatives** that must enter production only after an independent functional proof, targeted threat assessment and no degradation of P0/P1 use. All research targets are subordinated to true game-creation capability. The fact that a model can generate source or art is not evidence that it can author a working playable game. Each proposal needs a minimal experiment, rejected cases, reproducible baseline and an adoption threshold.
+
+### R-001 — Neuro-symbolic scene intelligence
+
+**Involved bots:** 02+03+05. **Research path:** Integrate typed semantic scene graphs with language/vision interpretation, keeping graph state authoritative and neural guesses provisional. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A model that labels a scene incorrectly cannot move an object or rewrite story state without editor grant. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind object-interaction reasoning plus scene replay. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-002 — Interactive world digital twin
+
+**Involved bots:** 02+05+06. **Research path:** Create a deterministic inspectable shadow model of world mechanics, economy, quest predicates and NPC schedules to predict consequences before committing changes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Predictions must expose error bands and not claim correspondence without observed game samples. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Predict quest breakage then verify real seeded run. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-003 — Continuous game quality laboratory
+
+**Involved bots:** 04+06+12. **Research path:** Build a closed benchmark loop that generates playable candidate, measures play, localizes defect, applies reviewed repair and reruns held-out scenarios. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Prevent benchmark contamination and closed-loop grader hacking by separating builder and judge. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent play agent flags a nontrivial bug and confirms repair. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-004 — Semantic editable game IR
+
+**Involved bots:** 02+07+09. **Research path:** Represent abilities, animation needs, events, objectives and save semantics as a stable engine-agnostic model. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Engine compilation not permitted to erase essential mechanics silently. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Same IR exports two targets with documented fidelity delta. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-005 — Neural asset inverse design
+
+**Involved bots:** 03+08. **Research path:** Infer original geometry/material/rig requirements from source-approved design art or sketches using typed structured scene constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Untrusted image content never authorizes scraping/training or copyrighted content duplication. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Reconstruct functional object and inspect actual rendered scene. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-006 — Player-driven narrative intelligence
+
+**Involved bots:** 04+05+06. **Research path:** Adapt narrative beats from causal world state, player decisions and explicit guardrails without inventing canonical memories. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never retroactively revise confirmed player choice history. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Different player actions cause consistent distinct in-game scenes. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-007 — Procedural storytelling solver
+
+**Involved bots:** 05+07. **Research path:** Use formal reachability/constraint satisfaction to keep large branching narratives consistent and finishable. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** When a branch becomes unreachable, deny generation and expose minimal counterexample. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Prove reachable endings through solver and actual player actions. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-008 — Semantic failure slicing
+
+**Involved bots:** 04+09+12. **Research path:** Generate minimal reproduction from failing frame/input/scene state and locate responsible code/asset/quest dependencies. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not assume traceback alone identifies first causal defect. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Bug minimized into small reproducible trace then fixed. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-009 — Differential engine compiler
+
+**Involved bots:** 02+09+12. **Research path:** Compile one typed game feature to two engines and use stable input/state witnesses to compare behavior. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Divergence must be reported rather than normalized into false parity. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Cross-engine camera/input/quest comparison suite. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-010 — Neural cinematography supervisor
+
+**Involved bots:** 05+08+11. **Research path:** Use temporal composition and scene context to propose camera/light/music cuts with director-controlled overrides. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No cutscene may trap user input or violate motion-reduction settings. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind viewer comprehension study and skip/resume checks. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-011 — Resource-driven runtime topology
+
+**Involved bots:** 01+03. **Research path:** Adapt CPU/GPU/VRAM/RAM/swap/disk inference and game previews using predictive capacity admission. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot claim free memory from OS page cache while native work unresolved. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Pressure matrix, restart, and measured user responsiveness. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-012 — Game studio project graph RAG
+
+**Involved bots:** 02+03+04. **Research path:** Retrieve exact project code, scene, quests, approved lore and test failures through versioned graph queries and citations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No source from stale branch, withdrawn grant or other project. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Agent explains correct code/quest connection under branch changes. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-013 — Agent self-play curriculum
+
+**Involved bots:** 03+06+12. **Research path:** Train evaluators on increasingly complex consented original games with held-out evaluation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Don't promote trained evaluator on its own training episodes. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Held-out game-agent performance plus human alignment review. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-014 — Procedural 3D topology control
+
+**Involved bots:** 07+08. **Research path:** Combine grammar and geometry constraints to create cities, roads, caves, ecosystems and interactive placement. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No physically unsupported path or inaccessible interactable structure. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** 3D navigation/physics full-world traversal. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-015 — Automated art continuity review
+
+**Involved bots:** 08+12. **Research path:** Compare character silhouette, palette, rig, facial geometry and material across generated sequences. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid claiming aesthetic identity from single-image cosine similarity. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent visual continuity judgment across scene revisions. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-016 — Live shader optimization
+
+**Involved bots:** 08+09. **Research path:** Compile and optimize target-aware shaders, with fallbacks for GPU feature sets and conservative performance profiling. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not silently erase essential visual cues. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Compare real device frame pacing and semantic feedback. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-017 — Game feel optimization
+
+**Involved bots:** 06+12. **Research path:** Optimize input latency, camera damping, jump buffering, impact feedback and audio response using recorded play. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A faster framerate cannot substitute for coherent controller feedback. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind preference trial with matched controls and replay. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-018 — Audio state composer
+
+**Involved bots:** 05+08. **Research path:** Generate original layered musical loops synchronized to world state, combat and narrative beats with rights-bound sources. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not use unauthorized copyrighted melody reproduction. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** In-game music transitions, loop quality and source attestation. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-019 — Interoperable multiplayer rollback
+
+**Involved bots:** 02+06+09. **Research path:** Use authoritative ticks, input prediction and rollback with digest-bound state and deterministic replay. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Client cannot self-award resources or alter server state. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two-client packet-loss and desync recovery game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-020 — Multiplayer shared world director
+
+**Involved bots:** 04+05+06. **Research path:** Coordinate goals, factions and encounters across cooperative players using fair group adaptation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** One player cannot invalidate another's confirmed main quest progress. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two-player divergent-action and reconciliation scenarios. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-021 — Narrative language localization engine
+
+**Involved bots:** 03+05+11. **Research path:** Maintain semantic state, canonical named entities, speaker style and accessibility during translation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Localization may not invent quest flags, rewards or spoilers. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Multi-lingual playtester verifies quest equivalence. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-022 — Offline-first creator collaboration
+
+**Involved bots:** 02+11. **Research path:** Version conflict-aware project assets and graph edits for disconnected artists/engineers with later reconciliation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid last-writer-wins on noncommutative scene and graph mutations. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two-device offline conflict merge with reviewed outcome. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-023 — Whole-game proof generator
+
+**Involved bots:** 06+09+12. **Research path:** Create executable acceptance journeys from design specs, including setup, gameplay, reward, fail and save. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No passing test based only on declared manifest file. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent executable acceptance fixture for new genre. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-024 — Rights-aware synthetic design knowledge
+
+**Involved bots:** 03+10. **Research path:** Produce original design hypotheses from licensed and reviewed observations without copying protected page content. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Source withdrawal invalidates every derived active prompt or asset. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Withdrawing source removes its claim from next design run. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-025 — Provenance-sensitive procedural training
+
+**Involved bots:** 03+07+10. **Research path:** Train procedural generators only on lawful original or licensed data with dataset lineage and contamination checks. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No uncontrolled crawler-to-training path. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Lineage audit, held-out quality and revocation simulation. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-026 — Adaptive creative budgeting
+
+**Involved bots:** 01+03+04. **Research path:** Choose model calls, GPU time, media fidelity and asset iterations under explicit user time/cost/quality budgets. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not overspend because model predicts higher quality. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Budget-constrained studio run meets requested game scope. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-027 — Causal debugging cockpit
+
+**Involved bots:** 02+04+11. **Research path:** Show exactly why a world event happened, which source state changed, and how to reproduce it. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Privacy limits must redact unavailable private source data. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Owner click-to-trace from failed in-game quest to event/command. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-028 — World rewind with immutable rights
+
+**Involved bots:** 02+05. **Research path:** Allow gameplay time-travel and alternative narrative exploration while preserving external audit/payment/source authority. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never roll back real-world payments or source revocations when rewinding fiction. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Game rewind replay without cross-store privilege confusion. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-029 — Simulation-driven economy balancing
+
+**Involved bots:** 05+06+07. **Research path:** Optimize sinks, drops, crafting and quest rewards with multiple play styles and long-horizon stochastic checks. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid a single optimizer exploiting scoring loopholes. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Economy remains viable under exploit-seeking synthetic agents. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-030 — Dynamic NPC social intelligence
+
+**Involved bots:** 03+05. **Research path:** Use context-bounded causal memory and utility planners for NPC collaboration and conflict in evolving towns. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** NPCs cannot omnisciently cite secrets or private player identity. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Town memory consistency through save/load and player misdirection. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-031 — Adaptive difficulty without dark patterns
+
+**Involved bots:** 04+06+11. **Research path:** Provide transparent adjustable challenge and player agency, not covert engagement-maximization. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Respect accessibility and do not manipulate users with opaque wagering mechanics. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Human review of fairness and player-controlled settings. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-032 — Developer co-pilot in visual scene
+
+**Involved bots:** 03+04+11. **Research path:** Ground agent edits to selected viewport object, inspector schema, script snippet and current source revision. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No model may edit unselected assets without explicit scoped grant. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Natural-language scene change followed by undo and engine preview. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-033 — Constraint solver for cinematic staging
+
+**Involved bots:** 05+08. **Research path:** Place characters/cameras/props while respecting dialogue beats, visible action and collision constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not block essential player route or cause clipping. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Cutscene staged and verified through engine frames. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-034 — Game asset graph optimization
+
+**Involved bots:** 02+08+09. **Research path:** Deduplicate, stream, compress and LOD shared media under immutable source/provenance refs. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No rights-mixing or identity collisions from dedup. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Cross-scene reuse preserves correct rights and visual assets. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-035 — Shadow build and replay validation
+
+**Involved bots:** 01+09+12. **Research path:** Compile proposed game changes into isolated sandbox, run blind tests before affecting published project. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No preview artifact should masquerade as approved release. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Failing change held while previous stable game remains playable. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-036 — Hotfix and migration assistant
+
+**Involved bots:** 02+04+09. **Research path:** Propose scoped repairs to game code, save formats and existing user-created content with migration plan. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid automatic destructive schema rewrites. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Hotfix after real save migration with rollback. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-037 — Project quality contract compiler
+
+**Involved bots:** 04+12. **Research path:** Turn genre brief and acceptance goals into versioned gameplay, audio, visual, UX and performance test obligations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not let generator and evaluator use same undisclosed mutable rubric. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Locked rubric seeded before model action and independently scored. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-038 — Human/AI comparative design loop
+
+**Involved bots:** 04+11+12. **Research path:** A/B user-observed game versions across mechanics/feedback/story rather than model self-scoring. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Respect informed user feedback/consent and avoid deceptive exposure. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind comparative playtest with confidence intervals. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-039 — Long-form quest continuity engine
+
+**Involved bots:** 02+05+07. **Research path:** Satisfy global predicates across 100 chapters, 1000 acts and 9999 scenes without empty filler. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Scale capacities should not imply generated depth. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Longform graph validated and sampled actual gameplay. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-040 — Self-healing build execution
+
+**Involved bots:** 01+04+09. **Research path:** Read true compiler errors, apply bounded owner-approved patch and re-run proof under one deadline. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No unbounded repair loop or failure concealment. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Real build failure recovered within finite rounds. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-041 — Frontier genre synthesizer
+
+**Involved bots:** 04+06+07. **Research path:** Combine distinct systems into newly coherent genres using explicit mechanical constraints and user goals. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Novelty label does not certify fun or original IP rights. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** User can complete unique prototype with tested rules. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-042 — Designer-facing economy workbench
+
+**Involved bots:** 05+06+11. **Research path:** Visualize sources, sinks, prices, progression and simulation outcomes with reversible tuning. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Values edited in UI must affect actual running economy. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Tune a craft exploit, rerun simulation, verify fix. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-043 — Cross-media provenance ledger
+
+**Involved bots:** 02+08+10. **Research path:** Trace generated or transformed audio, image, animation and text to source rights and model/tool receipts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot publish media with uncertain license or revoked input. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Audit generated scene media to exact permitted source. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-044 — Accessible game generation policies
+
+**Involved bots:** 04+06+08+11. **Research path:** Require captions, remappable controls, feedback redundancy and navigation in generated game plan. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A11y cannot be entirely deferred as polish. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Input/play, reduced-motion and subtitles through complete game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-045 — Live cost/pressure governor
+
+**Involved bots:** 01+03+12. **Research path:** Reserve and meter GPU tokens, memory, storage and external API costs as shared physical resources. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Unknown cost or timed-out physical child cannot be treated as free. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** 12-concurrent-bot capacity and cancellation fairness. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-046 — Review-safe external tool ecosystem
+
+**Involved bots:** 02+04+11+12. **Research path:** Offer plugins/add-ons under declared version, capabilities, network and filesystem restrictions. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Signed extension cannot bypass granted scope via subprocess. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Malicious plugin fixture rejected and incident trace. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-047 — Studio provenance export
+
+**Involved bots:** 02+09+12. **Research path:** Package editable game, source receipts, license manifest, QA replay and signed build context together. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No artifact claimed as verified merely because uploaded. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Fresh host independently rebuilds and plays distributed game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-048 — Originality and plagiarism review
+
+**Involved bots:** 05+08+10+12. **Research path:** Compare generated work with authorized source corpus and human review before publication. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not use unlicensed datasets as training or similarity index. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** High-similarity candidate quarantined and revised with new original asset. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-049 — Emulator-to-real-device parity
+
+**Involved bots:** 06+09+12. **Research path:** Compare declared homebrew mechanics, timing, controller and memory behavior across approved core and hardware. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Emulator compatibility not automatic physical console approval. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Exact target binaries tested with documented tolerances. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-050 — Interactive AI debugging observability
+
+**Involved bots:** 03+04+11. **Research path:** Show inference state, tool grant, source changes and exact failure receipt without exposing hidden prompts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot leak privileged secrets or raw source bodies via log UI. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Owner sees actionable error path and privacy redaction. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-051 — Chronological world replay
+
+**Involved bots:** 02+05+12. **Research path:** Allow deterministic replay of quest/faction/economy transitions with path-independent state hashes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Replay inconsistency must block publication and trigger investigation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Replay 10000 committed events after power loss. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-052 — Graph compression for giant campaigns
+
+**Involved bots:** 02+05+07. **Research path:** Store large world DAGs through deduplicated shards, efficient indexes and deterministic content-addressed chunking. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Compression cannot erase event dependencies or cause hidden drift. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Large campaign load and localized edit performance bound. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-053 — Visual world blueprint compiler
+
+**Involved bots:** 04+07+08+11. **Research path:** Turn hand sketches, maps and annotated mood boards into editable world/scene specs and actual scenes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Visual inference remains proposal requiring owner confirmation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Sketch-to-3D scene with manual edit and actual traversal. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-054 — Nondestructive generative editing
+
+**Involved bots:** 02+08+11. **Research path:** Use layers, variants, semantic asset edits and reversible bindings rather than repeatedly regenerating all files. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Approved art preserved through novel batch generation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Edit rig/material and compare alternate branches without loss. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-055 — Adaptive NPC accessibility
+
+**Involved bots:** 05+06+11. **Research path:** Provide readable cues, dialogue pacing, subtitles and player-controlled guidance for dynamic NPCs. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Dynamic speech cannot omit critical quest content without textual alternative. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Accessible NPC quest with variable rate/control settings. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-056 — World state selective synchronization
+
+**Involved bots:** 02+05+06. **Research path:** Synchronize only relevant multiplayer/streaming graph subsets while preserving canonical ordering. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Client subset cannot assert unknown global world state as authority. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Large co-op world sync with late-join and isolation tests. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-057 — Real-time voice direction
+
+**Involved bots:** 03+05+08. **Research path:** Generate lawful original voice performance from user-authorized actor/profile with lip sync and emotional constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No identity imitation without valid performer consent. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Scene with sourced voice, captions and editable emotional markers. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-058 — Physics-informed procedural animation
+
+**Involved bots:** 06+08. **Research path:** Blend IK and motion planning to handle uneven terrain, impacts and object contact. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Contact errors cannot bypass collision/animation synchronization. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Walk/climb/carry tests with animation and collision evidence. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-059 — Automated level fairness witness
+
+**Involved bots:** 06+07+12. **Research path:** Find a feasible no-hit or recoverable play route for claimed challenge modes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Mathematical solver alone insufficient if engine physics differs. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent controller trace demonstrates claimed reachable route. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-060 — Procedural adversary AI with policy bounds
+
+**Involved bots:** 03+06. **Research path:** Generate novel enemy policies using simulation/utility constraints while remaining interpretable and budgeted. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not accidentally turn NPC policy into network/host agent. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Novel foe plays fairly and respects real turn/tick semantics. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-061 — Narrative safety and content settings
+
+**Involved bots:** 05+11. **Research path:** Offer configurable content warnings, controls, privacy and age-appropriate variation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot silently censor/transform user-authored approved content without review. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** User changes content mode and gameplay remains consistent. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-062 — Game-driven research planner
+
+**Involved bots:** 04+10. **Research path:** Identify specific mechanics needing external research; request approved lawfully scoped capture and review. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No model-driven open internet without operator grant. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Research finding leads to an original reviewed mechanic. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-063 — Automated source credibility graph
+
+**Involved bots:** 02+10. **Research path:** Separate primary observation, quotation, interpretation and derived claim, with temporal confidence. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Repeated syndicated content does not count as independent corroboration. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Conflicting-source chain reveals true common origin. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-064 — 3D coauthoring and semantic merge
+
+**Involved bots:** 02+08+11. **Research path:** Merge mesh/material/rig changes at semantic object layer under project revision. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Concurrent edit cannot create silent corrupt geometry. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two artist edits resolve with explicit conflict report. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-065 — Adaptive on-device render/AI scheduling
+
+**Involved bots:** 01+03+09. **Research path:** Prioritize interactive frame and user input over background model generation, with GPU memory admission. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Creative worker cannot freeze gameplay or destabilize OS. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Run model and Godot preview concurrently on constrained laptop. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-066 — Project graph visual debugger
+
+**Involved bots:** 02+04+05+11. **Research path:** Display source-to-canon-to-game dependencies and highlight stale or invalid claims. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot mark missing evidence green through UI stale cache. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Visual inspection finds source revocation impacting quest. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-067 — Unattended safe overnight campaigns
+
+**Involved bots:** 01+02+04+12. **Research path:** Execute preauthorized bounded offline tasks with checkpoint, budget and review queue. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No auto-release, source scope expansion, checkout or unlimited cloud spend. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Crash-resilient long run generates reviewable draft outcomes. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-068 — Transactional asset replacement
+
+**Involved bots:** 02+08+09. **Research path:** Stage new media and validate all references before switching current world version. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Missing texture/audio/animation must leave previous game usable. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Kill process mid texture update, verify old game intact. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-069 — Composable genre SDK
+
+**Involved bots:** 06+07+09. **Research path:** Expose versioned mechanics and scene systems that can be mixed without hidden cross-genre coupling. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Composed systems must retain unique gameplay and valid resource budgets. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Combine racing and narrative quest into real playable microgame. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-070 — AI-initiated tests under permission
+
+**Involved bots:** 03+04+12. **Research path:** Allow model to request authorized tests and interpret results as evidence while verifier remains independent. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Tool output cannot self-promote a new grant or bypass review. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Agent selects right test for compiler error and surfaces exact result. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-071 — Reproducible player trajectory dataset
+
+**Involved bots:** 06+12. **Research path:** Capture consented anonymized controller input, world state, frame/audio and outcomes as benchmark cases. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No hidden identifiers or replay of unrelated personal data. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Replay held-out trajectory and reproduce objective event. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-072 — Automatic regression localization
+
+**Involved bots:** 02+09+12. **Research path:** Compare source commits, gameplay replays and artifacts to isolate first change introducing failure. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not assume arbitrary ancestor check success applies to current candidate. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Binary search commits with stable failing game test. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-073 — Cinematic-aware gameplay continuity
+
+**Involved bots:** 05+06+08. **Research path:** Maintain player state and quest effects across interactive/cinematic boundaries. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cutscene must not duplicate rewards or consume input twice. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Skip/cancel/resume cutscene without quest or inventory corruption. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-074 — Narrative item lore synthesis
+
+**Involved bots:** 05+07+08. **Research path:** Generate item descriptions, visual motifs and gameplay utility from causal world history. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Lore cannot claim gameplay mechanics not implemented. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Player acquires item with accurate written and observed effect. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-075 — AI studio explainability and policy UI
+
+**Involved bots:** 02+03+11. **Research path:** Expose why tool operation was admitted/denied and which contracts it invoked. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot reveal hidden backend secrets or internal reviewer material. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Human owner can approve or reject based on clear scope and cost. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-076 — Game completeness formal grammar
+
+**Involved bots:** 04+06+12. **Research path:** Specify minimum complete game evidence as typed, executable obligations by genre and target. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A model must not declare done before required interactive observations. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Conjunctive test of objective/input/save/restart/render/audio where required. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-077 — Human agency-preserving world events
+
+**Involved bots:** 05+06. **Research path:** Let NPC director create consequential events without overriding player choice history. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot hard-code player failure to force designed storyline. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Player can choose alternate outcomes and remain on valid branch. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-078 — Continuous render diff triage
+
+**Involved bots:** 08+09+12. **Research path:** Store exact frame captures at locked states and compare geometry, layout, visibility and accessibility. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Nondeterministic antialiasing should be tolerance-bound not blindly ignored. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Spot missing HUD/mesh/lighting regressions on identical input. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-079 — Playable package self-diagnostics
+
+**Involved bots:** 01+09+11. **Research path:** Export game with safe crash report and clear missing-runtime/dependency diagnosis. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No private development credentials shipped in user game. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Fresh nondeveloper machine identifies and fixes missing dependency. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-080 — Cross-platform memory/CPU governor
+
+**Involved bots:** 01+03+06. **Research path:** Share resource measurements for inference, media compilation, game preview and playtest with priority tiers. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Throttling must preserve real-time input responsiveness. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Mixed workload under memory, thermal and disk pressure. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-081 — Large-world spatial reasoning agent
+
+**Involved bots:** 03+05+07. **Research path:** Ground reasoning in authoritative nav/scene state and solved paths instead of text hallucinations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Agent must acknowledge inaccessible locations. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Goal planning tested on changing multilevel maze. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-082 — Interactive procedural tool tutorials
+
+**Involved bots:** 04+11. **Research path:** Teach new creator features inside actual editable game project with deterministic examples. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Documentation cannot claim a disabled feature works. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Beginner completes visual edit and engine playtest guided by UI. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-083 — Multi-project asset reuse graph
+
+**Involved bots:** 02+08+11. **Research path:** Permit explicit rights-scoped reuse of original assets across projects without shared mutable ownership. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Revocation or client change in one project cannot corrupt others. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Clone licensed asset, evolve one variant, compare isolation. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-084 — Game economy automated audit
+
+**Involved bots:** 05+06+12. **Research path:** Run exploit-seeking policies across prices, drops, crafting, faction trade and persistence. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never infer no exploit from one short simulation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Counterexample to free currency loop found and fixed. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-085 — Synthetic social-world actor laboratory
+
+**Involved bots:** 04+05+12. **Research path:** Run deterministic multi-agent social scenarios with clear human-authored goals and constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never turn fictional actor intelligence into unbounded real-world contact automation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Observe NPC interactions and resource cost over 1000 world turns. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-086 — Offline media synthesis safety
+
+**Involved bots:** 03+08. **Research path:** Deliver real on-device image/audio material generation when lawful compatible models are available. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No silent hosted generation or synthetic file placeholder passed as art. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Actual locally rendered sprite/audio artifact with source/model rights. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-087 — Project production cost forecasting
+
+**Involved bots:** 01+04+11. **Research path:** Estimate render, model, build, storage and QA budgets from real historical receipts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Forecasts must provide bounds and uncertainty, not guaranteed output. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Compare estimate to completed pilot project and update calibration. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-088 — Third-party plugin dependency vetting
+
+**Involved bots:** 02+09+12. **Research path:** Scan licenses, package capabilities, code execution surface, security reports and version compatibility. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Unsigned/unreviewed plugin quarantined prior to import. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Exercise malicious package fixtures and benign install. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-089 — Dynamic content moderation with operator controls
+
+**Involved bots:** 05+08+11. **Research path:** Offer configurable content, dialogue and presentation constraints appropriate to user and platform. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not erase creative source or conceal changes under safety rewrite. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Preview adjustments and audit trail in story and audio. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-090 — Whole-app resilient workspace mode
+
+**Involved bots:** 01+02+11. **Research path:** Keep user drafts safe through backend outage and provide read-only/offline edit queues with explicit sync. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never show successful server save when only local draft exists. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Disconnect network, edit, reconnect and resolve source revision conflict. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-091 — Autonomous bug reproduction planner
+
+**Involved bots:** 03+04+12. **Research path:** Use code+state+UI traces to propose a minimal reproducer using real tools under a budget. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot fabricate a passing reproduction or execute arbitrary shell as model suggestion. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** From user bug report to exact failing controller trace. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-092 — Sandboxed script VM for game mods
+
+**Involved bots:** 02+06+09. **Research path:** Provide finite host API for player-authored behaviors with capabilities and deterministic execution. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Mod cannot exfiltrate secrets, launch shell or mutate another save. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Malicious bytecode/script test denied with reproducible message. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-093 — Scene semantics to sensory cues
+
+**Involved bots:** 05+06+08. **Research path:** Make damage, rewards, quest discoveries and relationships visible/audible/tactile according to settings. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Required objective signal must have accessible fallback. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind user tester understands action outcome through available cues. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-094 — High-density bot planning ledger
+
+**Involved bots:** 02+04+12. **Research path:** Coordinate 12 agents by independent path leases, dependency constraints, physical capacity and immutable reports. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No shared path overwritten by concurrent agents. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Twelve-job conflict and race test with exact file/head receipts. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-095 — SOTA comparison harness
+
+**Involved bots:** 09+12. **Research path:** Benchmark installed Skeleton against supported published tests for Godot build, game fix and game optimization. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No cherry-picked suite presented as global market leadership. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Publish method, seeds, versioned targets and strict pass rate. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-096 — User-controlled full studio portability
+
+**Involved bots:** 01+02+09+11. **Research path:** Export complete editable studio project with assets, dependencies, rights, model/toolchain hints and migration receipts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Portable bundle cannot contain private token or unauthorized third-party asset. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Import to clean host and rebuild same golden game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-097 — Novel simulation education mode
+
+**Involved bots:** 04+05+06. **Research path:** Reuse original world/editor/gameplay components for interactive scientific, historical and engineering simulations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not market educational simulation as verified science without model validation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Interactive parameter changes produce source-grounded simulated behavior. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-098 — Interactive visualization authoring
+
+**Involved bots:** 03+04+07+11. **Research path:** Use game engine and director to create explorable data/world visualizations with provenance and accessible control. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not reinterpret numeric data without traceable conversion. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** User imports approved dataset and navigates a true 3D visualization. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-099 — Accessible training-world sandbox
+
+**Involved bots:** 04+05+06+11. **Research path:** Let users build ethical training scenarios, interactive tutorials and simulations using same original-game tools. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Domain-specific safety/legal approvals remain external. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Complete interactive tutorial with measurable learning objective. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-100 — Multimodal agent application builder extension
+
+**Involved bots:** 02+03+04. **Research path:** Reuse Jeeves tool/compiler/QA boundaries for non-game original applications only after game baseline stable. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** New domain cannot erode P0 install and user-game quality. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Produce a small safe application with same proof and rollback model. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+
+# 13. Whole-product integration campaigns and adversarial matrix
+
+Every IC campaign is a **conjunctive** product experiment with a signed immutable brief, fixed accepted toolchain, source SHA, actor role, state seed, expected behaviors and independently replayable evidence. A failure in one critical component invalidates the overall campaign. Each listed bot must contribute real code/evidence, but only one integration owner may coordinate the release head. BOT-12 is required to review results independently.
+
+## IC-01 — First clean install to local inference
+
+**Responsible participants:** BOT-01, BOT-02, BOT-03, BOT-11, BOT-12. **Scenario:** Cold Windows/WSL2 host, Docker running, no preexisting model. Setup must appear, owner setup must be explicit, model provisioning must verify source, trusted guard must activate and real GGUF must reply. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Intentional faults: missing daemon, stale Mongo primary, insufficient disk, malformed model, wrong tokenizer and restart during provisioning. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Full source-bound install receipt plus screen recording, active model hash, real reply and successful cold reopen. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-02 — Single-prompt playable top-down shooter
+
+**Responsible participants:** BOT-04, BOT-06, BOT-07, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Brief -> design spec -> generated assets/input/physics/combat -> Godot package -> user finishes wave and spends earned salvage -> replay. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: invisible sprite, missing attack signal, combat damage exploit, engine parse error and controller focus loss. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Frame+input+audio+state/save evidence across win/lose/retry. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-03 — Platformer with real physics
+
+**Responsible participants:** BOT-04, BOT-06, BOT-07, BOT-08, BOT-09, BOT-12. **Scenario:** Produce original geometry, moving hazards, collisions, jump/timing, game state and full successful traversal. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: impossible jump, dropped input, frame-rate-dependent collision and malformed moving platform. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Deterministic replay at multiple FPS and real engine playable package. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-04 — 3D micro-world game
+
+**Responsible participants:** BOT-04, BOT-05, BOT-06, BOT-07, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Generate character rig, material, camera, 3D scene, NPC, quests and sound; user interacts and completes objective. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: missing shader, malformed skeleton, unlit objective, collider trap and audio cues missing. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Actual real-time rendered GPU/CPU target run and independent player success. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-05 — Causal story branch
+
+**Responsible participants:** BOT-02, BOT-04, BOT-05, BOT-06, BOT-07, BOT-11, BOT-12. **Scenario:** Two different player choices alter NPC memory, factions, quest, dialogue and ending with valid source-traced state. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: rewound state, stale story cue, impossible quest and changed character fact. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Independent replay of both endings and graph solver witnesses. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-06 — Dynamic social/economic world
+
+**Responsible participants:** BOT-02, BOT-05, BOT-06, BOT-07, BOT-12. **Scenario:** Run repeatable economy, faction and NPC schedules that change with player actions across thousands of ticks. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: free-currency exploit, NPC omniscience, schedule conflict and stale ledger. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** State digest, long-run bounded resource use and actual displayed changes. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-07 — Visual editor human/AI joint work
+
+**Responsible participants:** BOT-02, BOT-03, BOT-04, BOT-05, BOT-08, BOT-11, BOT-12. **Scenario:** Human selects and edits actor, agent proposes scene/quest improvement, user approves, game rebuild reflects effect. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: overlapping edits, revoked grant, stale source and undo after crash. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Canonical command receipts and verified before/after game behavior. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-08 — Dragon lawful research to design
+
+**Responsible participants:** BOT-02, BOT-03, BOT-04, BOT-10, BOT-11, BOT-12. **Scenario:** Owner grants specific source host, captures bounded page, approves evidence, uses it as original mechanic inspiration. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: SSRF, malicious prompt injection, expired consent, withdrawal and source revision. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Live backend+browser trace plus withdrawal invalidating generated references. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-09 — Autonomous game bug repair
+
+**Responsible participants:** BOT-03, BOT-04, BOT-06, BOT-09, BOT-11, BOT-12. **Scenario:** Inject collision or quest bug, ask Jeeves to find minimal failing trace, propose bounded patch, human accepts, tests rerun. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: reviewer prompt contamination, fabricated success and patch causing unrelated regression. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Pre-patch failure, source diff, post-patch interactive success and negative tests. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-10 — Crash-resilient campaign
+
+**Responsible participants:** BOT-01, BOT-02, BOT-03, BOT-04, BOT-05, BOT-09, BOT-12. **Scenario:** Long-run campaign generates scenes/builds and snapshots, loses engine, recovers without duplicate code or content. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: process kill mid-write, stale lease, disk full and repeated client retry. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Exact count/event ledger, no duplication, consistent source/project head. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-11 — Audio/visual game polish
+
+**Responsible participants:** BOT-04, BOT-06, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Original audiovisual game pack with actual sprites/rigs, feedback, HUD, sound, cinematic and accessibility modes. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: silent audio clip, disjoint rig, zero contrast, animation trap and corrupt texture. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Independent playback and accessibility study with frame/audio artifact. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-12 — Cross-platform export
+
+**Responsible participants:** BOT-01, BOT-02, BOT-06, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Build game once for declared web+desktop targets and retain source and rights manifests. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: ABI mismatch, missing codec, save migration error and unsupported mobile features. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Real target launches, input traces, source exact-head and package provenance. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-13 — Marketplace original game release
+
+**Responsible participants:** BOT-02, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12. **Scenario:** Only after payment and rights guards: list, buy, entitle, download, refund and revoke content as applicable. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: forged webhook, concurrent duplicate settlement and stale entitlement. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Provider-bound atomic consistency and legal/source manifest proof. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-14 — Collaborative story editing
+
+**Responsible participants:** BOT-02, BOT-04, BOT-05, BOT-08, BOT-11, BOT-12. **Scenario:** Two project editors work on dialogue, rig and world scene offline; merge with clear review and game rebuild. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: conflict, lost permissions and deleted source. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Conflict-free final state or explicit unresolved merge; no silent loss. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-15 — World simulation on low-RAM laptop
+
+**Responsible participants:** BOT-01, BOT-03, BOT-05, BOT-06, BOT-07, BOT-09, BOT-12. **Scenario:** Run real local model and game preview concurrently while creator edits interactive world. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: pressure spikes, swap thrash, GPU unavailable and native cancellation tail. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** No host OOM, bounded memory and maintained user input responsiveness. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-16 — Original game patch & save migration
+
+**Responsible participants:** BOT-01, BOT-02, BOT-04, BOT-05, BOT-06, BOT-09, BOT-12. **Scenario:** Update game content schema preserving old player choices, inventory and quests with rollback. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: mid-upgrade outage and incompatible save. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Old save boots in new game or produces clearly protected incompatibility outcome. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-17 — Original media rights withdrawal
+
+**Responsible participants:** BOT-02, BOT-04, BOT-05, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12. **Scenario:** Remove permission for one source image/audio; invalidate every derived asset, preview and release candidate. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: cached library, version branch, offline package and mixed tenant reference. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Asset audit and denial of every now-ineligible derivation. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-18 — Full first-install release rehearsal
+
+**Responsible participants:** BOT-01, BOT-02, BOT-03, BOT-04, BOT-05, BOT-06, BOT-07, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12. **Scenario:** Run all mandatory first-install journeys from clean target machine using current exact release artifact and independently reviewed source. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: each failed hard gate, skipped job, stale artifact and source drift. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Signed release decision packet listing exact pass/fail, approvals and remaining scope holds. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+
+## 13.1 Multi-dimensional adversarial coverage
+
+No single continuous green CI bar is sufficient. At each IC test campaign, sample the following axes and record N/A with an explicit reason, not a silent skip:
+
+- **Identity:** owner, viewer, editor, collaborator, revoked grant, wrong tenant, missing consent, expired session, deactivated user.
+- **Data revision:** exact current head, stale branch, crossed project, mismatched artifact hash, obsolete save schema, withdrawn source, renamed actor ID, source edited after proof.
+- **Filesystem:** symlink leaf, swapped parent directory, hardlink, FIFO, sparse giant file, unreadable file, ownership/ACL mismatch, zip slip, zip bomb, race during publication.
+- **Service health:** UI alone, backend alone, engine alone, Mongo alone, Chroma alone, network isolation, driver loss, corrupt/cold cache, incomplete installation.
+- **Scheduling:** duplicate request, speculative double worker, stale lease, cancellation while worker alive, expired resource grant, callback timeout, admission pressure, priority starvation.
+- **Playability:** no input, stuck key, impossible jump, missing enemy, unearned reward, broken checkpoint, save corrupt, quest softlock, game exit unreachable, unseen critical text.
+- **World consistency:** NPC omniscience, timeline paradox, faction mutation without reason, offscreen resource inflation, duplicate event, orphan scene, invalid portal, unreachable ending.
+- **Art and media:** blank/magenta mesh, absent animation, missing collision, unlicensed music, clipped audio, stale camera target, unreadable subtitles, severe motion effects.
+- **Model trust:** system-role spoof, tool argument injection, hallucinated tool, stale source summary, incomplete output, tokenizer mismatch, reviewer not independent, budget exhaustion.
+- **Network/crawler:** forged host, DNS rebinding, redirect to private net, decompression bomb, malicious document instructions, consent expiry, source withdrawal, offline replay.
+- **Build/export:** wrong compiler target, incompatible ABI, missing asset, nondeterministic seed, invalid signing receipt, binary missing, game launch with no interactive success.
+- **Target environments:** Linux x86-64, Windows 11/WSL2, physical laptop CPU-only, compatible GPU, low disk, low RAM, battery saver, suspend/resume, real mobile where claimed.
+- **Economy/payment:** concurrent settlement, duplicate or forged webhook, currency mismatch, refund/reversal, stale entitlements, paid feature revoked incorrectly.
+- **Internationalization:** RTL, long translated labels, unsupported glyphs, audio/captions diverge, language-specific input or menu ordering, screen-reader pronunciation.
+- **Performance:** p50/p95/p99 latency, startup, TTFT, GPU occupancy, CPU load, game frame time, content compile time, save/restore, maximum object and scene counts.
+- **Privacy:** prompt history, raw source pages, credentials in stdout, telemetry without consent, cross-tenant inference cache, game exports containing owner/private path.
+
+### Concrete first-install acceptance protocol
+
+1. Select one released candidate exact SHA and record its source tree/commit/branch graph. Collect declared required workflows.
+2. Validate schema/architecture ownership and canonical AI mirror parity, then all independent security/quality gates.
+3. Verify artifact provenance, installer identity, license/SBOM and model/runtime source. No fresh hidden downloads in offline mode.
+4. Execute a true clean-machine setup under target Windows 11/WSL2, without privileged shortcuts, documenting ports and data locations.
+5. Prove setup UI remains available with backend intentionally unavailable; recover and observe truthful service readiness.
+6. Bootstrap owner account explicitly without committing any secret and demonstrate a viewer cannot escalate.
+7. Configure verified GGUF and trusted guard; activate real guarded chat through canonical engine and record receipt.
+8. Create a new original top-down game from a natural-language brief. Inspect the versioned design spec and generated files.
+9. Import original sprite/audio/collider assets, compile with real supported Godot, play by real input, reach win and failure conditions.
+10. Save game and project, reboot, reload and verify event, RNG, inventory and quest correctness; ensure no duplicate agent actions.
+11. Ask Jeeves to make an authorized visible design change, preview its diff, reject one bad candidate, approve a safe one and recompile.
+12. Inject a gameplay error and prove bot can reproduce, propose repair and pass independent replay under a bounded budget.
+13. Export a source package and a playable binary. Verify actual download byte identity and run target executable.
+14. Exercise Dragon only under explicit authorized source grant; withdraw source and check invalidation if Dragon is included in that release scope.
+15. Fault power, network, storage pressure and worker cancellation at least once and prove recoverability with protected data.
+16. Have BOT-12 verify exact installed artifact, evidence and source SHA independently; secure operator signs release decision.
+17. Recheck that frontend, CLI, docs, runtime receipts and release status match. Unknown or absent target behavior stays on hold.
+
+### Workstream overlap controls
+
+Bots 01/02/03 must converge on the same Mongo epoch and local guard without setting a shadow config. Bots 04/05/06/07 own design and simulation rules but cannot publish incompatible project state; every game mechanic must have a real renderer/engine target. Bots 08/09 coordinate asset budgets and legal provenance; an asset generated but not loaded is no more finished than a source file that never compiles. Bot 10's research grant never becomes model training consent. Bot 11 cannot create duplicate authority just to make a panel responsive. Bot 12 cannot “fix” hard failures by changing expected fixtures to weaker semantics. Conflicting PRs must be isolated/rebased/reconciled with actual diff and exact-head source checks.
+
+## 13.2 Red-team drills by release phase
+
+**Pre-install:** malicious archive, unsafe path extraction, old environment secrets, dependency tamper, release artifact mismatch, insufficient disk and unsupported OS/CPU. **First boot:** missing database primary, engine denied, frontend-only startup, model corrupt, guard absent and stale session credentials. **Creation:** prompt injection in design brief, hostile imported project, unsigned toolchain, unbounded world generator and malformed asset. **Play:** inconsistent physics seeds, nonfunctional button, crash during save, race between enemy action and cutscene and third-party mod. **Agent:** oversized context, invented tool, tool call after cancellation, stale source drift, misleading success test and malicious README instructions. **Research:** SSRF, unauthorized new host, consent expiry, source withdrawal and misattributed quotation. **Publication:** unverified artifact, stale checkout, malicious dependency, missing license, duplicate payment, bad entitlement and compromised signing key. **Maintenance:** hotfix with incompatible save, corrupted backup, partial migration, rollback with live clients and lost user-authored changes.
+
+For every drill, require an expected deny/recover/allow state; exactly one authoritative final outcome; bounded bytes/time/resource use; reproducible evidence; and a clear operator recovery action. A drill without a pass/fail oracle is a discussion topic, not a test.
+
+# 14. Release governance, evidence and acceptance
+
+## 14.1 Mandatory release holds
+- Default guarded local AI not proven active on target system: hold first install AI claim.
+- Shared Mongo epoch/writer authority not proven under real primary-bound reads: hold guarded AI.
+- Optional Chroma durable migration not proven: hold full-profile persistence; preserve legacy state.
+- Pending, skipped, failed, superseded or ancestor exact-head CI: hold merge/release scope.
+- Unqualified target Windows 11/WSL2/Docker/GGUF: hold physical laptop usability claim.
+- Game built but no independently verified input-driven finished loop: hold “complete game builder” claim.
+- External data used without current approved rights: hold knowledge/training/generated artifact distribution.
+- Checkout/entitlement concurrency and webhook authority unproven: hold marketplace/premium checkout.
+- Unreviewed security incidents or suspected exposed credentials: hold release affected by risk.
+- Unproven native/emulator hardware or licensed compiler profile: hold corresponding target claims.
+- Unreviewed overlap in stacked PRs or AI mirror source migration: hold unsafe merge.
+- Failed independent security, accessibility or recovery gate: hold corresponding release.
+
+A scoped experimental nightly may be authorized by appropriate maintainer policy only if it is clearly identified as unsupported and never contradicts a hard safety/rights constraint. No claim of full app launch is inferred from a source green check, model response, one golden game, or a large merged PR.
+
+## 14.2 Evidence packet schema
+
+An acceptance packet must include:
+- immutable source commit, PR and merge-base SHAs, canonical tree/object identity and modified path inventory;
+- executable/artifact hash, toolchain and model digests, dependency/SBOM data and source/asset licensing;
+- test suite name, command, host identity class (not private address), runtime version and exact input fixtures;
+- stdout/stderr/log hash or private sanitized artifact reference, timestamps, resource envelope and per-assertion outcome;
+- separate results for source test, real service, playable user input, target machine, source rights, accessibility and security;
+- original failure and fix causal chain, rerun scope and regressions, pending/unsupported/failed/blocked classifications;
+- independent validator's signature or attested identity where enabled by policy, plus exact scope and expiration;
+- deploy/rollback instructions and explicit operator release decision;
+- no secrets, raw prompts, scraped pages or unsafe media payloads in public logs.
+
+## 14.3 Metrics and realistic completion percent
+
+Compute maturity at **journey×target×quality dimension**, not line-count. For instance, playable 2D shooter on Chromium may be M4, while untested Android build is M1. Overall first-install acceptance is **false** until all required journey gates succeed conjunctively. Report a weighted scope percentage only with both numerator and denominator, and state unknown outcomes. Large catalogs and generated placeholder files count as zero implementation progress. Rejected candidates remain discoverable as evidence of learning and risk.
+
+# 15. Index expansion ledger toward one million meaningful words
+
+The owner requested a **one-million-word indexed source document**. The document presently represents the completed initial engineering constitution plus hundreds of detailed task specifications and research entries, not one million words. **Do not fake the count by repeating boilerplate or duplicating test matrices.** Continue expanding into the same single root file in reviewable commits only when additions are grounded in actual sources, new architectural decisions, code contracts, concrete defects and reproduced evidence. The file must remain navigable by stable IDs, topical headings, searchable cross-references and bot-specific reading slices.
+
+### Final desired word allocation for substantive expansion
+| Responsibility | Eventual unique word budget | Coverage required before declaring its tranche complete |
+|---|---:|---|
+| BOT-01 | 83,334 | complete host/platform inventory, real setup lifecycle, migration runbooks, hardware profiles and fault logs |
+| BOT-02 | 83,334 | entity schemas, source ownership, graph and data migrations, formal authority, all consistency rules |
+| BOT-03 | 83,334 | model/runtime procedures, token/tool proofs, memory and pressure, training lineage and agent evaluation |
+| BOT-04 | 83,334 | creative workflow design, role contracts, plan/repair and multistep full-game campaigns |
+| BOT-05 | 83,334 | world/quest/narrative semantics, consistency proofs, NPC/economy simulations and campaign examples |
+| BOT-06 | 83,333 | gameplay architecture and engine runnable behaviors, controller traces and exploit cases |
+| BOT-07 | 83,333 | procedural generation algorithms, seeds, solver witnesses and diverse example projects |
+| BOT-08 | 83,333 | real asset/audio/rig/scene pipeline, provenance, quality criteria and rendered media proofs |
+| BOT-09 | 83,333 | engine/compiler target compatibility, build artifacts, runtime and publishing matrices |
+| BOT-10 | 83,333 | Dragon crawler network/source policy, citation, campaign and live integration contracts |
+| BOT-11 | 83,333 | complete user journeys, UX/editor/collaboration/commerce/a11y flows and real user trials |
+| BOT-12 | 83,332 | full independent QA, threats, incident recovery, exact-head CI and release evidence |
+| **Total** | **1,000,000** | unique, traceable, materially useful wording — not a release or quality proxy |
+
+Expansion phases must not presume bots can run asynchronously without a configured and actually executing automation. Each added entry should include reason, observed source, target behavior, architecture, graph dependencies, implementation, failure cases, tests, reproducible proof and status. The word budget is a **writing allocation**, not a mandate to delay engineering, and not evidence that a feature exists. If the 1m target conflicts with first-install engineering, release quality and useful source truth, prioritize working software and continue the document as an honest evolving artifact.
+
+### Bot-specific document navigation
+Grokbot reads 00–10 and 14–15 first, picks blocked critical-path work, then routes to BOT-NN chapter and matching IC/R entries. BOT-12 requires the relevant cross-bot owners and frozen acceptance packet before starting independent tests. Full-source census must fill a cross-reference from every encountered code symbol/manifest/CI workflow to affected BOT work orders; every active PR overlap must be indexed by number and SHA. Keep an append-only change note with commit, authoring bot, added/changed IDs and evidence source. Prefer dense machine-readable data tables and developer-oriented examples inside this same file to generic essays.
+
+# 16. Source and benchmark references
+
+**Repo anchors (inspected through GitHub connector, baseline 2026-11-07):**
+- https://github.com/Apeloff1/Skeleton/blob/main/README.md
+- https://github.com/Apeloff1/Skeleton/blob/main/pyproject.toml
+- https://github.com/Apeloff1/Skeleton/blob/main/frontend/package.json
+- https://github.com/Apeloff1/Skeleton/blob/main/skeleton/app/manifest.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_master_plan.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_build_queue.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_file_tree.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_first_install.json
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/APP_ASSEMBLY.md
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/ai/CONSUMER_READINESS_2026-10-31.md
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md
+- https://github.com/Apeloff1/Skeleton/pull/4875
+- https://github.com/Apeloff1/Skeleton/pull/4876
+- https://github.com/Apeloff1/Skeleton/pull/4870
+- https://github.com/Apeloff1/Skeleton/pull/4872
+
+**External methodological references (research baseline, verify latest before implementation):**
+- Godot stable support policy: https://docs.godotengine.org/en/stable/about/release_policy.html
+- GameCraft-Bench, Godot interactive game completion: https://arxiv.org/abs/2606.17861
+- GameXpert-Bench, generation/repair/optimization lifecycle: https://arxiv.org/abs/2608.21833
+- GameASG-Bench, strict game behavior evaluation: https://arxiv.org/abs/2609.21293
+- GUI Agents for Continual Game Generation, playable GUI judgment: https://aclanthology.org/2026.findings-emnlp.1100/
+
+**Editorial closure:** Every build work order must tie to a code change and actual user capability; every acceptance claim must tie to source and executable proof; every denied or incomplete condition stays visible. A fully functioning, trustworthy studio can grow into a much larger frontier platform only if its first real install, first real game and first real recovery remain consistently excellent.  
