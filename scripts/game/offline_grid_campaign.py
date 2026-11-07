@@ -127,10 +127,10 @@ def main(argv: list[str] | None = None) -> int:
                     session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
-            print()
             if args.out_save is not None:
-            _write_save(args.out_save, session.snapshot())
-        print(json.dumps({"save": session.snapshot(), "map": session.render(),
+                _write_save(args.out_save, session.snapshot())
+            print()
+            print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
                              sort_keys=True))
             return 0
@@ -144,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")
             session = session.step(Command(**item))
+        if args.out_save is not None:
+            _write_save(args.out_save, session.snapshot())
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                           "viewport": viewport(session, args.view_width, args.view_height).record()},
                          sort_keys=True))
