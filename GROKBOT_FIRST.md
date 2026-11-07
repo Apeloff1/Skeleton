@@ -3659,3 +3659,408 @@ Grokbot reads 00–10 and 14–15 first, picks blocked critical-path work, then 
 - GUI Agents for Continual Game Generation, playable GUI judgment: https://aclanthology.org/2026.findings-emnlp.1100/
 
 **Editorial closure:** Every build work order must tie to a code change and actual user capability; every acceptance claim must tie to source and executable proof; every denied or incomplete condition stays visible. A fully functioning, trustworthy studio can grow into a much larger frontier platform only if its first real install, first real game and first real recovery remain consistently excellent.  
+
+
+# 17. Second-pass source census and falsifiable implementation-gap index
+
+**Census provenance:** the local container's HTTPS git transport could not resolve \`github.com\`, including a direct \`git ls-remote\` attempt. GitHub's authenticated repository and Git-tree GET interface was used instead, pinned to main commit \`e00bfb0809b34573c2df313ea16e17fd10bead38\`. This is a real Git-tree-level path inventory, substantially more direct than searching README descriptions, but it is not a local clone or execution environment. The root tree was fetched without truncation; the recursive \`skeleton/\` response was flagged \`truncated=true\`; the relevant large subtrees below were individually fetched with \`truncated=false\`. For a complete audit, obtain an actual clone or descend into *every* \`skeleton/\` direct child and verify that none truncates. The inability to clone is a deployment/tool-transport limitation of this review session, not necessarily a failure of the application's own installer.
+
+## 17.1 Actual tree topology sample
+
+| Pinned tree | Git-tree entries returned | Blob entries | Traversal status | Technical interpretation |
+|---|---:|---:|---|---|
+| \`.github/\` | 536 | 531 | Full recursive subtree | Very broad workflow/instruction surface; automated CI policy census is critical |
+| \`backend/\` | 2,753 | 2,658 | Full recursive subtree | Large application/router/identity surface that must connect to one engine |
+| \`frontend/\` | 1,136 | 1,011 | Full recursive subtree | Expo frontend substantial; UX assertions need browser/device proof |
+| \`docs/\` | 3,191 | 3,012 | Full recursive subtree | Documentation breadth cannot serve as release acceptance |
+| \`machine/\` | 704 | 674 | Full recursive subtree | Multiple construction and evidence authorities; dependency drift risk |
+| \`scripts/\` | 595 | 587 | Full recursive subtree | Qualification, generation and install commands should be classified by side effects |
+| \`tests/\` | 2,401 | 2,368 | Full recursive subtree | Test volume is large; distinguish pure fixture from executable integration |
+| \`satellites/\` | 12,604 | 11,733 | Full recursive subtree | Many satellite packages need actual runtime relevance and reuse policies |
+| \`skeleton/\` | 70,096 | 68,666 | **Truncated** | Never report these as an exact total |
+| \`skeleton/ai/\` | 21,860 | 21,054 | Full recursive subtree | Many AI agents/runtime/research/build tools; root has many ownership planes |
+| \`skeleton/jeeves/\` | 9,227 | 9,045 | Full recursive subtree | Large Jeeves ecosystem catalog and native fabric; qualify true execution paths |
+| \`skeleton/testing/\` | 5,542 | 5,521 | Full recursive subtree | Many source-level tests; independent live game QA still required |
+| \`skeleton/forge/\` | 1,681 | 1,647 | Full recursive subtree | Ten 150-file mechanic/domain families plus canonical game builder |
+| \`skeleton/game/\` | 926 | 853 | Full recursive subtree | Many gameplay and deterministic-contract implementations |
+| \`skeleton/automation/\` | 306 | 300 | Full recursive subtree | Worker/agent/supervisor subsystems, potential parallel owners |
+| \`skeleton/simulation/\` | 779 | 765 | Full recursive subtree | Physics and simulation reference families; verify actual game integration |
+| \`skeleton/app/\` | 165 | 164 | Full recursive subtree | Install, app status, CLI, runtime and setup surfaces |
+| \`skeleton/godot/\` | 4 | 4 | Full recursive subtree | Tiny alternate Godot exporter family, not canonical Godot product by itself |
+| \`skeleton/world/\` | 2 | 2 | Full recursive subtree | A minimal alternate world namespace; canonical world owner must be resolved |
+
+The ten \`skeleton/forge/*_v1/v2\` domains contain approximately 153 paths each, reflecting many independent deterministic mechanics and contracts. The existence of files named \`ammo.py\`, \`economy.py\`, \`boss.py\`, \`quest.py\` or \`rig.py\` is useful but insufficient: it does not prove a shared update loop or target-rendered play. One inspected \`skeleton/forge/game_mechanics_v2/ammo.py\` implements a bounded deterministic ammo state transition and replay receipt; its acceptance into a shooter requires mapping that operation to an actual input event, renderer, projectile budget, inventory, sound, collision and saved player state. Domain modules should be re-used rather than replaced, but their user-level wiring must be demonstrated.
+
+### Source anchor resolution protocol
+
+The root \`AGENTS.md\` is a mandatory construction bootstrap listing machine manifests, architecture, capability interfaces, state topology, runtime schemas, and the construction manual in a particular order. **Do not use this GROKBOT_FIRST document to supersede those authorities.** Grokbot can read this navigation overview first, but before modifying source must read and obey \`AGENTS.md\` and its ordered documents. \`BOT_BRIEF.md\` defines historical work-unit and ownership practice. Its staging/claim rules may be stricter than this proposal and must be reconciled with the current maintainer's explicitly approved execution process, not silently ignored. For every implementation task, write down which authoritative rule it satisfies and which potential rule conflict needs owner review.
+
+The published \`.github/GROK_AUTH_SETUP.md\` describes a classic GitHub PAT with \`repo\`, \`workflow\`, \`admin:repo_hook\` and \`admin:org_hook\` permissions for tasks including file updates and PR creation. Treat this as a **least-privilege review candidate**: routine draft-PR writing does not itself establish a need for broad organization webhook administration. Prefer appropriately scoped GitHub App permissions/fine-grained credentials, credential rotation and an explicit security-approved token policy. Do not collect, print, store or request a PAT in a repository document. Never assume a documented third-party app UI setting or login method is a current verified supported workflow.
+
+## 17.2 Directly inspected source seams and regression guards
+
+### GAP-SRC-001: Canonical game builder declares substantial unfinished output
+\`skeleton/forge/game_builder.py\` defines \`RUN_SCHEMA=skeleton.game_builder_run.v1\` and a finite 120-second default deadline. Its \`STUBBED\` contract explicitly identifies authored sprites, meshes and audio; input-driven play beyond headless core-loop proof; multiplayer, persistence beyond an economy ledger and store packaging; model proposals; and vehicle dynamics beyond a single kinematic proof. These are **declared gaps in the canonical path**, not guesses. An integration bot should first decide which existing alternate paths can safely supply a real capability. Add a portable game-proof adapter that uses the same source version and game world state, and keep the existing default output honest until independent user input is observed.
+
+**Architecture acceptance:** a real player and independent replay agent must move, aim, attack, collect, win, lose, save, resume and close a built Godot project. The operator must be able to open the project, inspect authored scene/scripts/assets, apply a local change and export the result. A proof-marker string can be retained as a smoke signal but not as the complete criterion. Include in each game bundle a machine-readable \`playable_proof.json\` with input trace and target-version evidence, retaining the original builder receipt.
+
+### GAP-SRC-002: Logical animation reference has no skeletal renderer
+\`skeleton/ai/game_builder/advanced_animation_runtime.py\` explicitly computes animation state, blend and optional root motion without rendering bone meshes or importing foreign rigs. It is a genuine reference simulation. Bridge it into a named engine target via a typed skeleton, clip, keyframe, attachment and material map. Preserve deterministic event IDs, timing and state; do not invent animation data when required source assets do not exist. Verify foot contact and input-to-frame behavior, not only state names.
+
+**Intermediate implementation gate:** adopt an original 2D character with real sprite frames or a simple 3D rig, state transitions for idle, walk, jump, attack and defeat, and a repeated event replay. The acceptance transcript should include transition state, actual animation player event, source clip digest, rendered frame identity and the input that caused it. A clip with missing mesh/atlas is invalid. This work belongs to BOT-08 with BOT-06 and BOT-09 integration reviewers.
+
+### GAP-SRC-003: Logical audio reference has no actual waveform production
+\`skeleton/ai/game_builder/advanced_audio_runtime.py\` explicitly provides a deterministic authored cue scheduler, priority stealing, ducking and spatial gain logic without wave synthesis or sound-card access. Extend *through* the canonical media owner into actual original/approved audio assets, encoded loop files, engine audio bus, positional emitter and audio observation fixture. Do not replace the mixer with an ungoverned second audio engine. Verify level normalization, clipping, seamless loops, caption equivalents and player feedback.
+
+**Intermediate implementation gate:** a shooter actually produces a pickup cue, hit sound, combat loop and success/failure sound at runtime; an audio test observes decoded samples or an engine capture from known input. If environment sound capture is unavailable, mark audio target unqualified rather than claiming an authored mixer equals delivered sound.
+
+### GAP-SRC-004: Advanced Godot export is intentionally genre-limited
+\`skeleton/ai/game_builder/advanced_godot_export.py\` states the independently replayable native adapter is only for the \`puzzle\` family and other advanced families fail closed *through that adapter*. Other files, including \`advanced_racing_godot.py\`, offer separate source-level Godot bridges. Do not rewrite this as a blanket statement that Skeleton has no racing or shooter adapter; instead inventory each genre's actual target path and build a coherent capability/quality matrix: what accepts an editor source, what exports runnable GDScript, what plays interactively, and what receives independent hardware testing.
+
+**Integration gate:** every advertised genre receives its own runnable fixture, clear input mapping, game-state schema and import/export path. Unsupported mechanics must be rejected by exact target negotiation; a generic fallback cannot silently degrade the player experience.
+
+### GAP-SRC-005: Alternate \`skeleton/godot/export_100x.py\` is a tiny hash stub
+The inspected file is roughly 480 characters, with a \`GodotExport100x.emit_pack\` method that checks a \`.tscn\` suffix and returns a SHA-256 of the name. Despite its descriptive module banner, it does not emit actual project contents. This is an **observed misleading name-to-capability mismatch**. Do not treat it as the canonical exporter or delete it blindly; find all imports and existing tests, classify as stub/compatibility, consolidate any caller toward the real \`skeleton/forge/game_builder.py\` and target-aware exporter, or explicitly retire via an approved migration and tests.
+
+**Audit test:** call the function and inspect actual return type: it cannot substitute for a \`project.godot\` manifest and a loadable \`.tscn\`. Any assertion that this namespace alone produces a complete Godot pack is a failed documentation/code contract. Fix the product claim, not just the banner.
+
+### GAP-SRC-006: Pure art acceptance is not target rendering
+\`skeleton/game/art_acceptance.py\` is a stdlib-only visual checker over supplied pixel rows/masks and explicitly does not perform GPU rendering or image decoding. It can assess palette/contrast/silhouette over observed pixels, but cannot establish that the current game actually renders those pixels. Preserve the deterministic checker; add frame acquisition through Godot/browser, versioned screenshot provenance, tolerance-calibrated visual changes and a missing-render failure state.
+
+### GAP-SRC-007: Deterministic game runtime is separate from engine certification
+\`skeleton/ai/game_builder/advanced_gameplay_runtime.py\` describes an eight-family integer-only replay/reference engine; it explicitly does not certify native engine, publication or hardware. \`skeleton/game/gameplay/game_vertical_acceptance.py\` verifies gameplay and portable save but excludes device, authorization, publisher and release certification. These can become *reference oracles* for native packages. Build differential input sequences, compare event-level state with actual Godot results under versioned tolerances, and keep scope labels accurate.
+
+### GAP-SRC-008: Native web maze is a real distinct product path
+\`skeleton/ai/game_builder/PLAYABLE_GAME.md\` documents an original offline HTML5 maze: seeded DFS generation, a bounded BFS solve witness, keyboard/touch play, hazard/collectible/exit rules, replay export and separate Python verification. **Do not classify all browser game capability as absent.** Independently execute this existing path on a clean browser, assess its true visual/play quality, and bridge its project, replay, editor, rights and reporting semantics into the unified Studio cockpit. A small complete runnable game can be a better product seed than many unintegrated advanced subsystems.
+
+### GAP-SRC-009: Existing app assembly and secret bootstraps are not blank slates
+\`skeleton/app/assembly.py\` defines a stable service manifest and ingress boundary. \`skeleton/app/setup_runtime.py\` contains idempotent secret bootstrap and a process lock with symlink/inode defenses. \`skeleton/app/installer.py\` is transaction-oriented. Preserve the existing semantics and work on documented *missing integration and target qualification* rather than regenerating a new installer service.
+
+### GAP-SRC-010: Webcrawler authority is layered
+\`skeleton/ai/webcrawler/operations.py\` defines a pure bounded crawl protocol, with conservative limits and unreviewed external material. \`backend/core/dragon_crawler.py\` provides owner-scoped Mongo application state and worker coordination. \`skeleton/ai/webcrawler/operations.py\` does not own a new database/scheduler. New research intelligence must integrate through these existing authorities. A second crawler network service under a new bot name would violate the system's ownership model.
+
+## 17.3 Architecture debt register grounded in the tree
+
+- **Namespace proliferation:** top-level \`skeleton/ai\`, \`skeleton/jeeves\`, \`skeleton/game\`, \`skeleton/forge\`, \`skeleton/world\`, \`skeleton/godot\`, and \`skeleton/simulation\` contain overlapping terminology. The required repair is a tested ownership/call graph, not a mass rename without import parity.
+- **Frameworks versus target adapters:** source-level state machines for animation/audio/combat/quests are valuable if actual game runtime adapters import and use them. Build cross-plane contract proofs before adding more parallel reference families.
+- **Catalog-evidence asymmetry:** thousands of documented systems and test fixtures do not by themselves establish a shipped target. Every production claim needs one artifact whose behavior a person can observe.
+- **Generated mechanical breadth:** equal-sized module cohorts can be legitimate; they can also mask boilerplate. Measure per-domain actual reachable call graph, user-visible behavior and intentionally distinct mechanics, not just file size or manifest cardinality.
+- **Single-game baseline first:** the smallest finished action game plus editable save/preview/export path is the optimum reference point for full-stack migration. Freeze optional expansion while first-install blockers remain unresolved.
+- **Source QA maturity:** the repo itself already distinguishes pure logical acceptance from hardware release. Grokbot should preserve this existing conservative stance while building missing end-to-end evidence.
+- **Security guide drift:** operator instructions that mention broad personal access tokens or old service paths should be audited as a first-install user-safety issue, not pasted into new bots' prompts.
+- **Plan registry synchronization:** no completion tracker may mark BOT tasks landed by finding only their expected filename; require the immutable artifact+work order acceptance packet.
+
+# 18. Bot federation protocol: exact contracts, state machines and handoffs
+
+This section specifies **proposed integration APIs**, not existing endpoints. Before implementation BOT-02 must reconcile names with \`machine/capability_interfaces.json\`, \`machine/state_topology.json\`, \`machine/ai_runtime_schemas.json\`, the Builder Plane, canonical job queue and provider bootstrap. Any field incompatible with an existing authoritative contract must be recorded as an ADR-backed migration, not invented as an independent parallel API.
+
+## 18.1 Core causality and physical-work principles
+
+A bot has three distinct kinds of state: **intended work**, **committed software change**, and **observed user/runtime effect**. These must never be conflated. A proposal is immutable and carries a digest. Admission performs authorization and reserves a finite budget, but admission is not execution. A physical worker can be running after a logical deadline expires; its credit is released only after actual join and reconciliation. A commit may have occurred before the receipt is returned; retry must read back the exact state before applying a second time. A code commit can be valid without achieving the requested game behavior; a successful test can be real but stale relative to a newer source head.
+
+### Work order state transition specification
+
+\`\`\`
+DISCOVERED
+    -> CLASSIFIED (owner, baseline, risk, source objects known)
+    -> PLANNED (frozen acceptance criteria, dependencies, budget)
+    -> ADMITTED (current rights, leases, source head, finite resources)
+    -> EXECUTING (one physical worker token, no competing owner write)
+    -> SOURCE_COMMITTED (remote branch SHA and changed-path manifest)
+    -> FOCUSED_PROVEN (syntax/type/domain/negative checks at exact SHA)
+    -> INTEGRATED_PROVEN (canonical API/CLI/UI and target dependency)
+    -> PLAY_PROVEN (if user gameplay/UX is claimed)
+    -> DEVICE_PROVEN (if physical target is claimed)
+    -> INDEPENDENTLY_VERIFIED
+    -> REVIEW_READY
+    -> MERGE_ELIGIBLE (only when protected rules allow)
+    -> MERGED
+    -> RELEASE_CANDIDATE
+    -> RELEASED (human/authorized approval, artifact provenance)
+\`\`\`
+
+Failure alternatives are \`BLOCKED_PRECONDITION\`, \`INTERRUPTED_RECOVERABLE\`, \`FAILED_TERMINAL\`, \`REJECTED_SECURITY\`, \`REJECTED_RIGHTS\`, \`SUPERSEDED_SOURCE\` and \`CANCELLED_JOIN_PENDING\`. Avoid a single ambiguous “failed” string that conflates code syntax, missing hardware, safety denial, network exhaustion or stale CI. Store a source-specific recovery action for each state. A new worker must not inherit the authority of a predecessor whose lease has not physically closed. A successful child job can never advance a parent beyond its weakest required gate.
+
+### Suggested immutable work-order receipt
+
+~~~json
+{
+  "schema_version": "skeleton.grokbot.work_receipt.v1",
+  "work_id": "BOT-06-W01",
+  "controller": "grokbot",
+  "owner_bot": "BOT-06",
+  "repo": "Apeloff1/Skeleton",
+  "base_commit": "e00bfb0809b34573c2df313ea16e17fd10bead38",
+  "source_commit": null,
+  "actor": {"tenant": "scoped-tenant", "subject": "authorized-owner"},
+  "project": {"id": "project-identity", "revision": 1},
+  "resources": {
+    "admission_id": "immutable-admission",
+    "clock_deadline_s": 900,
+    "max_model_calls": 8,
+    "max_tools": 16,
+    "max_physical_workers": 1,
+    "max_disk_bytes": 1073741824
+  },
+  "authorities": {
+    "source_lease": "branch-and-path-bound-lease",
+    "tool_grant": "signed-finite-grant",
+    "approval_id": null
+  },
+  "changes": {
+    "content_manifest_sha256": null,
+    "changed_paths": [],
+    "branch": null
+  },
+  "evidence": {
+    "focused": [],
+    "integrated": [],
+    "interactive": [],
+    "device": [],
+    "security": [],
+    "rights": []
+  },
+  "status": "PLANNED",
+  "known_holds": ["exact-head-ci", "real-playtest"],
+  "independent_verifier": null
+}
+~~~
+
+Everything shown here is illustrative: there is no implication those exact route fields are already mounted. Empty \`source_commit\` or \`approval_id\` means the source/result remains unapproved. Values such as tenant IDs and paths must be opaque and environment-specific; never copy account credentials into an artifact.
+
+## 18.2 Cross-bot change authority
+
+**BOT-01 to BOT-02:** proposes a migration from an old storage topology to a new schema/epoch, with a reversible plan and quiescence evidence. BOT-02 accepts or blocks the authoritative structure. BOT-12 independently verifies backup and restore.
+
+**BOT-02 to BOT-03:** establishes principal/tenant/project schemas, tool grants, request and memory write identities, epoch and idempotency. BOT-03 may load a model and request tools only under those contracts. BOT-01 verifies runtime/deployment compatibility.
+
+**BOT-03 to BOT-04:** delivers an inference request interface and typed tool-intent parser; the director cannot rely on a model to execute a free-form command as trusted source. Review and planner results include actual model/version receipt and disclosure of omitted context.
+
+**BOT-04 to BOT-05:** submits world/narrative intents under an authorized project revision, keeping specified player agency and campaign goals. BOT-05 returns a structured canon/quest/world diff, not merely text.
+
+**BOT-05 to BOT-06:** defines functional player-visible consequences: an NPC favors the player, a faction attacks, a door unlocks, a skill activates, an economy price changes. BOT-06 must implement these as real game state transitions with input and feedback.
+
+**BOT-06 to BOT-07:** supplies primitive traversal/encounter/resource rules and a formally testable win predicate. BOT-07 cannot generate a terrain/quest configuration unless BOT-06 can solve and actually simulate the essential loop.
+
+**BOT-07 to BOT-08:** outputs scene geometry and entity placeholders with asset briefs, size/LOD constraints, collision/rig requirements, emotional style and target budgets. BOT-08 returns real source artifacts, not a catalog-only label.
+
+**BOT-08 to BOT-09:** supplies licensed content-addressed files and typed scene links. BOT-09 must verify that every required sound/mesh/sprite/animation is included in a compatible exported game and has a runtime reference.
+
+**BOT-09 to BOT-11:** supplies preview/executable metadata, file digest, target status and actual render/play receipts. The frontend must not replace a missing runtime with a mocked success screen.
+
+**BOT-10 to BOT-04:** gives reviewed, scoped evidence observations; the director can use these as inspiration with rights constraints but cannot make the crawler a system prompt or training source.
+
+**BOT-11 to BOT-02:** uses canonical typed commands for edits, saves, collaboration and project identities; a local optimistic UI state is not the durable store.
+
+**BOT-12 to all:** validates product truth; the verifier is independent of the coder and cannot mutate a candidate merely to make its own test pass. If source drift occurs, require reruns at the final source head.
+
+## 18.3 Conflict graph with authoritative locks
+
+Partition write ownership by exact canonical repository paths and domain entities, not only by bot name. Some files (e.g., app assembly, model authority, game project schema, API router) are high-contention integration hubs. A lock must encode the Git source head, branch, path set, project revision (if any), operation ID, lease epoch and real worker identity. Before a bot changes a file it must check whether another bot/PR already owns a competing edit. A conflict is not automatically resolved by choosing the newest timestamp.
+
+Source publication contract: given source head H and admitted change set C, calculate the intended result tree T and ensure H has not moved under the write. Commit immutable T to the bot's branch; if the ref advanced, reconcile against the new head or fail. Never use \`force=true\` to solve a routine collision. If the bot is writing to its own draft branch and lease checks fail, stop and inspect. Distinguish Git working tree existence from GitHub branch acceptance.
+
+### Coordination starvation and fairness
+
+Assign strict \`P0\` service quality capacity to BOT-01/02/03/06/09/12. Reserve one QA slot to keep verification independent of build waves. Use weighted fair queueing within the remaining budget, but no role may hoard write leases while waiting for a model or remote CI. Publish per-bot utilization, blocked duration, tasks ready versus tasks runnable, and net *accepted* features per hour. A bot that produces ten large drafts without functioning core game/playtest is not making ten units of product progress.
+
+## 18.4 Proposed artifact interfaces
+
+| Type | Producer -> consumer | Required fields | Invalidation trigger | Proof |
+|---|---|---|---|---|
+| GameDesignSpec | 04 -> 05/06/07/08/09 | schema, brief digest, genre, scope, loop, target | brief/project revision | feature traces to real gameplay |
+| WorldGraph | 05 -> 06/07/09/11 | world IDs, scene nodes, edges, canon, quests, invariants | canon or scene change | graph reachability and save replay |
+| MechanicsBundle | 06 -> 07/08/09 | actions, parameters, ticks, state, events, assertions | mechanic revision | source state vs target input differential |
+| LevelGenerationPlan | 07 -> 05/06/08 | geometry, seed, required mechanics, routes, entities | source/seed/version change | feasible traversal witness |
+| MediaManifest | 08 -> 09/11 | file digests, license, codecs, skeletal compatibility, budgets | asset or rights change | loaded frames/audio in runtime |
+| BuildManifest | 09 -> 11/12 | toolchain, input hashes, output binaries, target, ABI | source or compiler change | executable replay on target |
+| ResearchObservation | 10 -> 04/05/08 | source, passage, rights, consent, review identity, withdrawal fence | source revision/withdrawal | current citation and legal re-use |
+| UICommand | 11 -> 02/04/05 | principal, project, revision, typed mutation, idempotency | auth/revision change | durable owner receipt and visible effect |
+| ReleaseEvidence | 12 -> maintainer | source, target artifact, checks, gameplay, risk, verifier | any required input change | independent whole-app acceptance |
+| RecoveryManifest | 01 -> 02/03/12 | backup sets, state digests, schema, secrets custody, restore steps | source/state migration | cold restore and replay |
+
+### Game target feature-negotiation contract
+
+~~~yaml
+schema: skeleton.game.target_capabilities.proposal.v1
+target: godot4.desktop
+runtime:
+  requires_actual_engine: true
+  engine_major: 4
+features:
+  keyboard_input: required
+  controller_input: required_for_declared_support
+  save_load: required
+  2d_physics: required
+  runtime_animation: required_if_authoring_animation
+  spatial_audio: requires_media_asset_and_engine
+  multiplayer: unsupported_until_independent_test
+  3d_vehicle_dynamics: unsupported_until_input_and_physics_proof
+  native_device_qualification: independent_gate
+translation_rules:
+  unsupported_essential_feature: reject
+  unsupported_optional_feature: request_explicit_downgrade
+  placeholder_asset: not_release_ready
+proof:
+  static_compile: separate
+  headless_smoke: separate
+  input_driven_play: separate
+  physical_target: separate
+~~~
+
+This is deliberately a proposal; existing Godot exporter and native game profile names must prevail when authoritative. Its purpose is to prevent a visual novel renderer from silently substituting for a physics racing engine.
+
+## 18.5 Release claim grammar
+
+Use language that maps directly to evidence. \`source-defined\`: module/doc exists. \`contract-proven\`: deterministic focused tests executed on exact SHA. \`service-proven\`: live API with real database/engine. \`game-proven\`: actual player-visible input, progression and state. \`target-proven\`: exact physical device/ABI. \`release-approved\`: independent policy and operator signoff. Never use \`complete\`, \`production\`, \`shipped\`, \`first-install-ready\` or \`SOTA\` without a declared scope and documented complete evidence. A model output is a suggestion. A disabled UI button is not a live feature. A hosted Windows smoke test is not a specific owner's laptop test.
+
+# 19. Golden game engineering reference: concrete vertical slices
+
+A complete game is a **finite interactive system** with a working loop, meaningful player decisions, visible/audio feedback, progression/failure, state persistence as promised and a runnable package on a target. The current canonical compiler has a 120-second request-level deadline; build a small authentic game that finishes within admitted budgets before proposing giant procedural campaigns. To meet the 12-bot objective, separate game *design* from *engine output*, but require both to share a single canonical state and proof lineage.
+
+## 19.1 G1 Ash-Tunnel original top-down action shooter
+
+### Design and intended player experience
+A small originally themed top-down salvage game: the player enters a series of industrial chambers, clears enemies, collects salvage, returns to a terminal, chooses a defensive upgrade and completes a final wave. Each chamber includes navigable obstacles, visible enemy telegraphs, a finite ammunition or energy mechanic, resource pickup, damage feedback and restart. The theme, names and artwork are original and parameterized, not copied from an existing game or generated web source. A simple but polished design prioritizes input readability, snappy hit feedback, deliberate enemy strategies and a clear endpoint.
+
+### Minimum source and target object plan
+- **Project:** \`project.godot\`, input actions, save schema, source/rights manifest, scope/spec digest, target version.
+- **Scenes:** start menu, world root, player, enemy, projectile, obstacle/tilemap, pickup, HUD, upgrade console and win/lose.
+- **Scripts:** typed input mapping; fixed-tick movement/aim; collision and damage; encounter wave; inventory/salvage ledger; UI binding; save/load; event bus; terminal upgrade.
+- **Media:** original sprite and frame atlas for player/enemy/projectiles/pickups; simple animation states; hit/pickup/upgrade/win audio; HUD icons and accessible text labels.
+- **State:** deterministic session seed, player HP, position, ammo/energy, salvage, current wave, upgrades, enemy and projectile states, world object/quest ledger and last committed checkpoint.
+- **Proof:** a recorded input sequence completes wave one, earns salvage, buys a permitted upgrade, survives or loses, completes terminal wave, writes an actual save and reloads without duplicating rewards. Headless Godot smoke and input-driven real engine proof are separate.
+
+### Minimal state transition table
+| Event | Preconditions | Committed mutations | Observables | Failure |
+|---|---|---|---|---|
+| START | menu, authorized project | start session with fixed seed | player appears and HUD updates | missing scene/input mapping blocks |
+| MOVE | player alive, valid directional action | player location / tick | character moves/collision respects tile | wall hit does not alter tile |
+| FIRE | ammo > 0, cooldown satisfied | consume ammo, spawn projectile once | muzzle effect, sound, projectile | no ammunition gives clear feedback |
+| ENEMY_HIT | valid projectile collision, alive enemy | reduce HP, consume projectile | enemy hurt animation, damage cue | stale projectile ID ignored |
+| ENEMY_DEATH | HP <= 0, not previously rewarded | remove enemy, grant salvage once | drop, score/HUD change | duplicate event cannot mint salvage |
+| BUY_UPGRADE | at terminal, sufficient earned salvage | subtract salvage, activate one upgrade | stats/HUD visibly change | insufficient balance denies cleanly |
+| SAVE | current source/game schema matches | atomic checkpoint with digest | save indicator and resume slot | partial save not published |
+| LOAD | matching game/source/compatible save | restore committed state | same HP/wave/upgrades/position | incompatible version explicit hold |
+| WIN | final objective met and all dependencies valid | terminal win event and score snapshot | success scene/audio/menu | cannot win with enemy count > 0 |
+| FAIL | HP <= 0 or declared fail condition | terminal fail event, no further damage | defeat screen/restart | no stuck half-alive state |
+
+### Integration handoff sequence
+BOT-04 produces a versioned brief and criterion; BOT-05/07 define chamber progression and objective graph; BOT-06 implements movements, combat, salvage and input; BOT-08 produces visible/audio original assets; BOT-09 packages Godot; BOT-11 offers visual edit and preview; BOT-12 plays and verifies. BOT-02 owns the shared state/event/asset schemas; BOT-03 may propose fixes through typed controlled tools; BOT-01 proves fresh install/engine readiness. Every stage emits exact input/output digests and an explicit blocker on missing dependencies. Do not credit the game as complete if any essential step is placeholder-only.
+
+### Failure-injection specification
+1. Press fire twice before cooldown. Expected one projectile and one decrement.
+2. Hit wall while moving diagonally. Expected no clipped movement or invisible teleport.
+3. Collect the same drop after save/load. Expected no duplicate salvage.
+4. Exit during upgrade transaction. Expected either old state or new state, not half-spent currency.
+5. Delete sprite atlas from export. Expected target preflight failure, not invisible player.
+6. Remove audio decoder. Expected explicit target limitation or failure for required sound.
+7. Run at 30/60/120 FPS. Expected deterministic simulation within declared tolerance.
+8. Kill game during checkpoint. Expected known valid slot or recovered prior save.
+9. Change project source after validation. Expected stale playproof/export invalidated.
+10. Submit forged client win event. Expected rejection absent authoritative objective state.
+11. Use keyboard and declared gamepad. Both must support full loop.
+12. Enable captions/reduced motion. Feedback remains understandable.
+
+## 19.2 G2 original 2D precision platformer
+
+The platformer must have an actual continuous input model, ground collision, jump impulse, gravity, moving platform, hazard, checkpoint, interactive objective, camera and level-end event. A jump route solver can generate suggested input timing, but an *actual engine trace* proves traversability. Keep movement physics fixed-step and controller inputs timestamped to ensure reproducible behavior under frame jitter. Require informative coyote time, jump buffering and forgiving collision within authored bounds, but let the player inspect/tune those values in an editor rather than burying them in a generated script.
+
+### Mandatory obstacles
+- Single jump and release: demonstrate apex and ground recapture.
+- Multi-platform climb: no unreachable gap.
+- Moving platform: both rider attachment and dismount.
+- Hazard gauntlet: damage is visible and checkpoints are fair.
+- Optional collectible: accessible without mandatory extra death.
+- Goal gate: cannot finish before required objective completion.
+- Save/restart: checkpoint resumes with intact collectibles and death count.
+
+**Critical proofs:** player physically traverses a timed path with raw input replay and state snapshots; static topological BFS alone does not prove a physically solvable jump. Visual accessibility must show hazard vs safe platform using shape or animation as well as color. A platformer can be M4 only after the user reaches an actual end scene and returns to menu.
+
+## 19.3 G3 roguelike RPG with persistent world choices
+
+The game combines procedural rooms, controlled encounter progression, combat, an NPC dialogue option that changes a quest, a consumable or crafted item, an inventory, save/reload and at least two endings with distinct world-state predicates. Procedural rooms retain a seed/algorithm version and content digest, so old saves do not silently regenerate into different layouts when the generator changes. NPC knowledge stays bounded by observed events. A quest solver produces reachable paths, and independent runtime play proves at least one path per ending.
+
+### Cross-system dependencies
+- Reward economy depends on enemy and quest event identities; replay cannot double grant.
+- Item crafting depends on source/recipe state and stock; negative inventory is impossible.
+- Dialogue depends on NPC memory/canon and explicit player choice; not arbitrary LLM text.
+- Procedural dungeon placement must honor quest-key access and both win routes.
+- Save contains player, world seed, quest graph, NPC memory, inventory and event ledger.
+- User edits quest via UI; previously committed saves are migrated or explicitly incompatible.
+
+### Mandatory negative cases
+An NPC references an unfound clue; a quest key spawns behind its own locked door; an item is spent twice under concurrent actions; dialogue branch is absent after reload; source design changed but outdated world receipt is reused; a source-owned concept is withdrawn; game update removes an active quest ID. Each must yield an attributable denial or approved migration rather than silent corruption.
+
+## 19.4 G4 exploratory original 3D micro-world
+
+Build a walkable original 3D environment using actual geometry, camera, lighting, materials, colliders, one animated character or NPC, one dialogue, one world interaction, one cinematic cue, sound with captions and an objective. This is the smallest 3D game that can prove the real 3D media and engine pipeline. A logical physics or animation state transition without visible mesh and device-rendered motion does not count. A kinematic-only vehicle attached to the project is not evidence of driving unless an actual steering/braking/lap loop is exercised.
+
+### Independent acceptance
+1. Camera starts in valid position with world visibly rendered and accessible controls.
+2. Player walks between locations without clipping through terrain or objects.
+3. NPC animation responds to conversation and completion event.
+4. Voice/audio if present is sourced and captioned; missing sound is recorded as unsupported.
+5. Lighting/shadows do not make objectives unreadable.
+6. Player uses real interaction prompt, updates quest and reaches ending.
+7. Save/load preserves scene state, character pose/state identity and quest completion.
+8. The game target is independently launched on declared hardware, not only in a source fixture.
+
+## 19.5 G5 vehicle simulator/racing slice
+
+A real driving game needs velocity, lateral motion, steering, brake/traction response, collision, track checkpoints and lap completion under actual controller input. The existing advanced racing source path may already implement a portion of these in Godot; the task is to inventory and qualify it, then repair only failures. A screen that updates an abstract kinematic variable is not sufficient. Disallow source-level simulator state from claiming tire realism or hardware certification unless physically measured.
+
+### Observable route
+Start -> throttle and steer -> encounter obstacle/collision -> correct drift/braking -> reach sequential checkpoint IDs -> complete timed lap -> view finish/results -> restart with same seed -> load recorded trajectory. Capture user input and game telemetry with exact tick timestamps, acceleration, speed, rotation, traction, fuel/damage if enabled, checkpoint order and results. Use source/physics tolerance comparisons, not byte-identical floating-point across unrelated devices. Validate keyboard, gamepad and target-specific input mapping separately. Include collision and out-of-bounds recovery.
+
+## 19.6 G6 strategy / logic puzzle
+
+A turn-based tactics or puzzle target may be small but must be meaningfully interactive: action selection, legal turn/state transition, enemy or puzzle response, visible board, victory and restart. Use the already documented offline HTML5 maze and advanced puzzle native adapter as high-value seeds rather than rebuilding an abstract puzzle engine. Verify every authored action by the independent Python/game reference oracle where applicable; browser client traces are untrusted until verified against the same world digest.
+
+## 19.7 Universal game quality gates
+
+The following thresholds are **acceptance policies to be agreed for a concrete release profile**, not measured claims:
+
+1. Player input is responsive enough for the genre and stays interactive during AI background work.
+2. Required instructions and objective are understandable without reading implementation docs.
+3. The full loop can be completed and restarted by a first-time human tester.
+4. Visible state feedback corresponds to authoritative events, including damage, inventory and quest rewards.
+5. There are no known progression softlocks in golden seeds.
+6. Fatal engine errors, missing project dependencies and broken startup are zero for the claimed run.
+7. Save/load faithfully preserves all promised player/state details.
+8. Source, license, media and toolchain provenance are sufficient for lawful distribution in declared channels.
+9. Performance budget applies to a specified machine and scene, not an abstract claim of “fast.”
+10. AI changes must not regress existing locked acceptance evidence.
+11. Accessibility mode remains viable and retains the same essential objectives.
+12. New game generation is bounded and honest on failure; if the model cannot make the requested game, it returns partial work with exact blockers.
+
+### Instrumentation and evidence dossier
+
+Attach \`gameplay_trace.json\` with immutable package/scene/seed identity, tick IDs, input events, authoritative state diffs and objective states. Attach selected frame screenshots, audio-signal checks where applicable, the headless engine log, target launch command, benchmark hardware profile, input device and finish-state proof. The exact filenames are illustrative until aligned with existing canonical outputs. Store traces under existing artifact/QA authority rather than inventing a new storage service.
+
+### Template: complete-game acceptance test in pseudocode
+
+~~~python
+def verify_playable_game(game_package, target, input_trace, expected):
+    assert package_digest(game_package) == expected.package_digest
+    assert target.is_explicitly_admitted()
+    process = launch_real_game_engine(game_package, target)
+    try:
+        assert process.opened_scene(expected.start_scene)
+        assert process.rendered_nonempty_frame()
+        assert process.accepted_input_device(expected.input_device)
+        for action in input_trace:
+            process.send_timed_action(action)
+            assert process.maintains_control_and_state_invariants()
+        actual = process.read_authoritative_game_state()
+        assert actual.objective == expected.objective
+        assert actual.finished_with_verified_event()
+        assert actual.reward_ledger_has_no_duplicates()
+        assert save_and_reload_roundtrip(process, expected.save_snapshot)
+    finally:
+        process.terminate_and_join()
+    return independently_sign_current_head_trace()
+~~~
+
+This pseudocode is a **test design**, not an executable implementation or a claim those helper functions exist. BOT-09 and BOT-12 must implement it using the real existing Godot/project owner, safe test harness and source-custody rules. An “agent played game” claim must state whether it actually controlled the renderer through inputs or simply replayed source-side moves.
+
