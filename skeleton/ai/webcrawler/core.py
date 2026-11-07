@@ -27,6 +27,7 @@ from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
     HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
     TECHNICAL_MEDIA_TYPES, ASSET_TEXT_MEDIA_TYPES, SUPPLY_CHAIN_TYPES,
+    SCENE_ASSET_TYPES,
     DocumentFormatError, extract_additional_format,
 )
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
@@ -179,6 +180,19 @@ class CrawlPolicy:
         "application/vnd.cyclonedx+json",
         "application/spdx+json",
         "application/vnd.openvex+json",
+        "image/svg+xml",
+        "model/ply",
+        "application/x-ply",
+        "model/off",
+        "text/x-off",
+        "application/x-godot-scene",
+        "text/x-godot-scene",
+        "application/x-unity-scene",
+        "text/x-unity-scene",
+        "model/vnd.usda",
+        "application/x-usda",
+        "text/x-ldraw",
+        "application/x-ldraw",
         "application/rdf+xml",
         "application/geo+json",
         "application/vnd.geo+json",
@@ -485,7 +499,7 @@ def extract_document(
     if ctype in (RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES
                  | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
                  | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES
-                 | SUPPLY_CHAIN_TYPES):
+                 | SUPPLY_CHAIN_TYPES | SCENE_ASSET_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):

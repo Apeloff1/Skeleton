@@ -142,6 +142,14 @@ def implementation_digest():
                 "python_signatures.py",
                 "lexical_signatures.py",
                 "source_structure.py",
+                "svg_inventory.py",
+                "ply_inventory.py",
+                "off_inventory.py",
+                "godot_scene.py",
+                "unity_scene.py",
+                "usda_scene.py",
+                "ldraw_scene.py",
+                "scene_asset_formats.py",
             )
         }
     )

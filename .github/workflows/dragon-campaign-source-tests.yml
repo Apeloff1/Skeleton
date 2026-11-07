@@ -122,6 +122,14 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/python_signatures.py
           python -m py_compile skeleton/ai/webcrawler/lexical_signatures.py
           python -m py_compile skeleton/ai/webcrawler/source_structure.py
+          python -m py_compile skeleton/ai/webcrawler/svg_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/ply_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/off_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/godot_scene.py
+          python -m py_compile skeleton/ai/webcrawler/unity_scene.py
+          python -m py_compile skeleton/ai/webcrawler/usda_scene.py
+          python -m py_compile skeleton/ai/webcrawler/ldraw_scene.py
+          python -m py_compile skeleton/ai/webcrawler/scene_asset_formats.py
           python -m py_compile skeleton/ai/webcrawler/timed_media.py
           python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
           python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
@@ -219,6 +227,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_api_discovery.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_supply_chain.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_source_structure.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_vector_mesh.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_game_scenes.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_ingestion.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v
