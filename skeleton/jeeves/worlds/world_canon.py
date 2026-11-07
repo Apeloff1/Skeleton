@@ -342,6 +342,8 @@ const byChoice = new Map(world.choices.map(c => [c.id, c]));
 let current = world.start;
 let flags = new Set();
 let trace = [];
+let receiptDraft = "";
+let receiptStatus = "";
 const root = document.getElementById("play");
 function element(tag, text) {
   const node = document.createElement(tag);
@@ -370,7 +372,8 @@ function exportReceipt() {
   return JSON.stringify(replayTrace(trace));
 }
 function importReceipt(text) {
-  if (typeof text !== "string" || text.length > 65536) throw Error("session_too_large");
+  if (typeof text !== "string" || new TextEncoder().encode(text).length > 65536)
+    throw Error("session_too_large");
   const receipt = JSON.parse(text);
   if (!receipt || Array.isArray(receipt) || typeof receipt !== "object" ||
       Object.keys(receipt).sort().join(",") !==
@@ -386,6 +389,8 @@ function importReceipt(text) {
   current = expected.scene;
   flags = new Set(expected.flags);
   trace = expected.trace;
+  receiptDraft = text;
+  receiptStatus = "Session restored";
   render();
 }
 function render() {
@@ -420,17 +425,27 @@ function render() {
   field.id = "session-receipt";
   field.rows = 5;
   field.cols = 48;
+  field.value = receiptDraft;
+  field.addEventListener("input", () => { receiptDraft = field.value; });
   label.append(field);
   root.append(label);
   const save = element("button", "Export session");
-  save.addEventListener("click", () => { field.value = exportReceipt(); });
+  save.addEventListener("click", () => {
+    receiptDraft = exportReceipt();
+    receiptStatus = "Session exported";
+    render();
+  });
   root.append(save);
   const load = element("button", "Restore session");
   const status = element("p", "");
   status.setAttribute("role", "status");
+  status.textContent = receiptStatus;
   load.addEventListener("click", () => {
-    try { importReceipt(field.value); }
-    catch (error) { status.textContent = "Restore rejected: " + error.message; }
+    try { importReceipt(receiptDraft); }
+    catch (error) {
+      receiptStatus = "Restore rejected: " + error.message;
+      render();
+    }
   });
   root.append(load, status);
 }
