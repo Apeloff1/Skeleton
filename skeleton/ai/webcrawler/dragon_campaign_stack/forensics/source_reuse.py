@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 
-from ..contracts import CampaignMandate, digest, integer
+from ..contracts import digest, integer
 from ..near_duplicate_audit import SourceSimilarityAudit
 from .frames import FrameSet
 

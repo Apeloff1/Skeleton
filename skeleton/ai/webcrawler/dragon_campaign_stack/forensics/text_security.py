@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from collections import defaultdict
-from hashlib import sha256
-import re
 import unicodedata
 
 from ..contracts import digest, integer
