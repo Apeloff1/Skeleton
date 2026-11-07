@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from .core import FetchResponse
+from .content_coding import BoundedHTTPBody, normalize_content_coding
 from .dns_binding import (
     ResolvedTarget,
     peer_is_planned,
@@ -24,6 +25,51 @@ from .dns_binding import (
 class BoundConnectionError(ConnectionError):
     pass
 
+
+def _coalesce_bounded_link_headers(
+    response_headers: list[tuple[str, str]],
+    normalized_headers: dict[str, str],
+) -> None:
+    """Preserve repeated HTTP Link relations without widening parsing limits.
+
+    Servers commonly emit several Link headers for next-page and feed
+    relations. A plain dict silently loses earlier values. This merges only
+    the harmless discovery *metadata* field, not Cookie, Content-Length,
+    Transfer-Encoding, security headers or status. Malformed and oversized
+    values are ignored; the canonical URL and robots guard still applies to
+    every parsed link before a request can be made.
+    """
+    links = [
+        value for key, value in response_headers
+        if isinstance(key, str) and key.lower() == "link"
+    ]
+    if not links:
+        return
+    if (len(links) > 16 or any(not isinstance(row, str) for row in links)
+            or sum(len(row) for row in links) + 2 * len(links) > 8192):
+        normalized_headers.pop("link", None)
+        return
+    normalized_headers["link"] = ", ".join(links)
+
+
+
+def _coalesce_bounded_xrobots_headers(
+    response_headers: list[tuple[str, str]],
+    normalized_headers: dict[str, str],
+) -> None:
+    """Preserve every site denial; malformed duplicates deny capture/follow."""
+    values = [
+        value for key, value in response_headers
+        if isinstance(key, str) and key.lower() == "x-robots-tag"
+    ]
+    if not values:
+        return
+    if (len(values) > 16 or any(not isinstance(x, str) for x in values)
+            or sum(len(x) for x in values) > 4096
+            or any(any(ord(char) < 32 for char in row) for row in values)):
+        normalized_headers["x-robots-tag"] = "none"
+        return
+    normalized_headers["x-robots-tag"] = ", ".join(values)
 
 class _PinnedHTTPConnection(http.client.HTTPConnection):
     def __init__(self, target: ResolvedTarget, timeout, *, deadline=None):
@@ -100,8 +146,8 @@ class SocketBoundFetcher:
         headers = {
             "Host": host_header,
             "User-Agent": user_agent,
-            "Accept": "text/html,text/plain,application/xhtml+xml;q=0.9",
-            "Accept-Encoding": "identity",
+            "Accept": "text/html,application/xhtml+xml;q=0.9,application/xml;q=0.9,text/plain;q=0.8,application/json;q=0.8,application/pdf;q=0.7,application/epub+zip;q=0.5,*/*;q=0.1",
+            "Accept-Encoding": "gzip, deflate, identity",
             "Connection": "close",
         }
         for key, value in (extra_headers or {}).items():
@@ -181,14 +227,18 @@ class SocketBoundFetcher:
                 raise ValueError("response header bound exceeded")
             if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
                 raise ValueError("ambiguous Content-Length headers")
+            if sum(key.lower() == "content-encoding" for key, _ in response_headers) > 1:
+                raise ValueError("ambiguous Content-Encoding headers")
             out_headers = {key.lower(): value for key, value in response_headers}
+            _coalesce_bounded_link_headers(response_headers, out_headers)
+            _coalesce_bounded_xrobots_headers(response_headers, out_headers)
             if "content-length" in out_headers and "transfer-encoding" in out_headers:
                 raise ValueError("ambiguous response framing")
             if response.status in {301, 302, 303, 307, 308}:
                 body = b""
+                wire_bytes, wire_hash, coding = None, None, "identity"
             else:
-                if out_headers.get("content-encoding", "identity").lower() not in {"identity", ""}:
-                    raise ValueError("encoded crawler response is not admitted")
+                coding = normalize_content_coding(out_headers.get("content-encoding"))
                 length = out_headers.get("content-length")
                 if length is not None:
                     try:
@@ -197,8 +247,7 @@ class SocketBoundFetcher:
                         raise ValueError("invalid Content-Length") from exc
                     if not 0 <= size <= max_bytes:
                         raise ValueError("response exceeds configured byte limit")
-                chunks = []
-                count = 0
+                reader = BoundedHTTPBody(coding, max_bytes=max_bytes)
                 while True:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
@@ -207,19 +256,20 @@ class SocketBoundFetcher:
                     sock = getattr(raw, "_sock", None)
                     if sock is not None:
                         sock.settimeout(remaining)
-                    chunk = response.read1(min(65536, max_bytes + 1 - count))
+                    chunk = response.read1(min(65536, reader.remaining_wire + 1))
                     if not chunk:
                         break
-                    chunks.append(chunk)
-                    count += len(chunk)
-                    if count > max_bytes:
-                        raise ValueError("response exceeds configured byte limit")
-                body = b"".join(chunks)
+                    reader.feed(chunk)
                 if response.length not in {None, 0}:
                     raise ValueError("incomplete response body")
+                body = reader.finish()
+                wire_bytes, wire_hash = reader.wire_bytes, reader.wire_hash
             if time.monotonic() >= deadline:
                 raise TimeoutError("crawler response deadline exceeded")
-            return FetchResponse(target.url, int(response.status), out_headers, body, time.time())
+            return FetchResponse(
+                target.url, int(response.status), out_headers, body, time.time(),
+                wire_bytes=wire_bytes, wire_hash=wire_hash, content_encoding=coding,
+            )
         finally:
             watchdog.cancel()
             watchdog.join()
