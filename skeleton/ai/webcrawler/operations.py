@@ -131,6 +131,7 @@ def implementation_digest():
                 "ico_metadata.py",
                 "tar_inventory.py",
                 "extended_media.py",
+                "api_discovery.py",
             )
         }
     )

@@ -17,6 +17,7 @@ import zlib
 
 from .core import CrawlPolicy, canonicalize_url
 from .discovery_relations import sitemap_language_alternate
+from .api_discovery import API_DISCOVERY_TYPES, APIDiscoveryError, discover_api_pages
 
 
 XML_MEDIA = frozenset({
@@ -27,7 +28,7 @@ XML_MEDIA = frozenset({
 })
 GZIP_MEDIA = frozenset({"application/gzip", "application/x-gzip"})
 JSON_MEDIA = frozenset({"application/feed+json", "application/json"})
-SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA | JSON_MEDIA
+SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA | JSON_MEDIA | API_DISCOVERY_TYPES
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 ATOM_NS = "http://www.w3.org/2005/Atom"
 RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -234,6 +235,20 @@ def parse_structured_discovery(
     canonical = canonicalize_url(document_url)
     if canonical != document_url or not policy.admits(canonical):
         raise DiscoveryError("structured source URL outside immutable crawl scope")
+    if media_type in API_DISCOVERY_TYPES:
+        try:
+            page = discover_api_pages(
+                body, media_type=media_type, document_url=document_url,
+                policy=policy, max_links=min(max_links, 64),
+                max_entries=max_entries,
+            )
+        except APIDiscoveryError as exc:
+            raise DiscoveryError(str(exc)) from exc
+        return StructuredDiscovery(
+            kind=page.kind, links=page.links,
+            examined_entries=page.examined,
+            discarded_entries=page.rejected, capped=page.capped,
+        )
     if media_type in JSON_MEDIA:
         return parse_json_feed(
             body, document_url=document_url, policy=policy,
