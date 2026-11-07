@@ -55,9 +55,22 @@ Commands:
     combat-checkpoints  Replay and verify portable expedition checkpoints
     combat-expedition  Play source-bound tactical expedition with earned rewards
     quest-expedition  Play source-bound quest expeditions and replay
+    quest-checkpoints        Replay portable quest expedition checkpoints
+    quest-decisions          Audit replay-bound expedition decisions
+    quest-expedition-play    Play original quest expeditions interactively
+    quest-expedition-route   Solve replay-bound expedition routes
+    quest-inventory          Inspect earned quest inventory
     quest-author  Author and validate original expedition quests
     quest-campaign  Replay source-authored quest chapters and endings
+    quest-campaign-accept    Audit earned campaign endings
+    quest-campaign-author    Author original quest chapters
+    quest-campaign-play      Play original quest chapters interactively
+    quest-campaign-route     Solve replay-verified campaign routes
     quest-factions  Replay source-bound faction choices and diplomacy
+    quest-factions-accept    Audit source-bound faction decisions
+    quest-factions-author    Author offline faction campaigns
+    quest-factions-play      Interactively play faction campaigns
+    quest-factions-route     Solve legal faction campaign routes
     game-vertical-accept  Verify integrated original-game vertical acceptance
     combat-expedition-audit  Audit replay-bound expedition economy
     combat-expedition-solve  Solve original expedition routes
@@ -122,7 +135,9 @@ Commands:
     scene-mission-board  Inspect replay-derived mission objectives and legal actions
     scene-mission-author  Transactionally edit authored missions and preview play
     scene-mission-route  Solve replayable authored mission ending paths
-    scene-mission-assist  Offer replay-proven non-mutating mission hints\n    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
+    scene-mission-assist  Offer replay-proven non-mutating mission hints
+    scene-mission-liveness Find replayable authored mission softlocks
+    scene-mission-accept Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
     scene-mission-league  Rank completed source-bound mission replays offline
     scene-mission-league-author  Transactionally edit and preview league scoring
@@ -142,15 +157,16 @@ Commands:
     scene-market-fork-accept    Source-bound original-game operator command
     scene-market-fork-play      Source-bound original-game operator command
     scene-market-party-handoff  Source-bound original-game operator command
-    scene-market-party-league-authorSource-bound original-game operator command
-    scene-market-contract-acceptSource-bound offline-market operator command
+    scene-market-party-league-author Source-bound original-game operator command
+    scene-market-contract-accept Source-bound offline-market operator command
     scene-market-party-board    Source-bound offline-market operator command
     scene-market-party-league   Source-bound offline-market operator command
-    scene-market-contract-authorSource-bound offline-market operator command
+    scene-market-contract-author Source-bound offline-market operator command
     scene-market-party-accept   Source-bound offline-market operator command
     scene-market-party-compare  Source-bound offline-market operator command
     scene-market-party-timeline Source-bound offline-market operator command
     scene-market-route-accept    Replay-verified market route acceptance and portability
+    campaign                           Play an original offline grid campaign
     quest                              Source-verified offline gameplay command
     scene-market-party-vault-history   Source-verified offline gameplay command
     scene-weather-play                 Source-verified offline gameplay command
