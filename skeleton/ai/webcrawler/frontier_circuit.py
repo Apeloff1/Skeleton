@@ -28,7 +28,7 @@ _SENSITIVE_PATTERN=re.compile(
     r"(?i)(?:^|[_-])(?:api[_-]?key|token|secret|password|passwd|"
     r"authorization|credential|session|signature|bearer)(?:$|[_-])"
 )
-_DIGITS=re.compile(r"^[0-9]{4,20}$")
+_DIGITS=re.compile(r"^[0-9]{1,20}$")
 _HEX_ID=re.compile(r"^(?:[a-f0-9]{16,64}|[a-f0-9]{8}-[a-f0-9-]{27,})$",re.I)
 _QUERY_PAGE_KEYS=frozenset({"page","p","offset","start","index","cursorpage"})
 _PAGE_MAX=1_000_000
