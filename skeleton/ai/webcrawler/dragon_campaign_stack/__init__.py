@@ -168,4 +168,6 @@ from .evidence_family_stress import (
     stress_test_evidence_families,
 )
 
+from .forensics import AtlasForensics, compose_atlas_forensics, verify_atlas_forensics
+
 __all__ = [name for name in globals() if not name.startswith("_")]
