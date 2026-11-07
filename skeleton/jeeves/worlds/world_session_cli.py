@@ -21,6 +21,8 @@ MAX_INPUT_BYTES = 65536
 
 def _read_bounded(stream: object) -> bytes:
     data = stream.read(MAX_INPUT_BYTES + 1)
+    if type(data) is not bytes:
+        raise CanonError("invalid_session_payload")
     if len(data) > MAX_INPUT_BYTES:
         raise CanonError("session_too_large")
     return data
