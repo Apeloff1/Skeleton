@@ -74,6 +74,10 @@
 - 59. Epic world streaming and persistent scene identity
 - 60. Cinematography and actual audio timelines
 - 61. Multiplayer and canonical collaborative authority
+- 62. Autonomous playtest fleet and experimental gameplay observability
+- 63. Offline-first project custody and save compatibility
+- 64. Bounded production campaign compiler and resource admission
+- 65. Twelve-bot delivery ledger with FRT-049 through FRT-080
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -6795,3 +6799,160 @@ Presence indicators and selection cursors are derived UI conveniences. They neve
 ## 61.4 Native multiplayer proof
 
 Qualify each mode independently: two real local controllers exercising distinct actors; two LAN clients with observed host authority, disconnect/rejoin and exactly-once rewards; two concurrent turn submissions where only one commits to a given turn; and (only if claimed) physical remote service latency/recovery and rights checks. Input traces, game package digests, host source, state and network faults belong to the evidence. Passing local co-op does not certify online play.
+
+# 62. Autonomous playtest fleet and experimental game-quality observability
+
+**Packet:** FRONTIER-62 | **Owner:** BOT-12 with BOT-06 | **Partners:** BOT-03 policy learning, BOT-04 work scheduling, BOT-05 world graph, BOT-07 generation and BOT-11 visual cockpit | **Status:** additional implementation mandate, not proof of an active real-device playtest fleet.
+
+The existing repository contains bounded simulation, play sessions, game recordings, headless Godot boot, game-emulator comparisons and reviewer learning. The critical frontier gap is proving that these systems can evaluate **what a player actually experiences in the game that Skeleton exports**. Do not build a second evaluation application that merely reads project JSON. A real test agent must use a declared controller interface, observe the actual game and retain a complete source- and target-bound evidence chain.
+
+## 62.1 Player test environment identity
+
+A reproducible test environment has an immutable **EnvironmentSpec** view of existing game/test owners: game package digest; project source revision; engine or emulator version/digest; target OS/architecture; input device mapping; screen/audio capture capabilities; initial save/snapshot; RNG algorithm and seed; frame/tick budget; data-retention policy; and physical hardware profile. The test harness must not launch arbitrary game code on the privileged app backend. It uses sandboxed target execution with bounded CPU, memory, process count, filesystem, artifact bytes, and network denied unless specifically required and authorized.
+
+The environment exposes narrow **observation** and **action** interfaces. Observations may include rendered frames, explicitly instrumented game state available only to independent verifier, audio buffers, controller focus, collision contacts, event traces and terminal conditions. Actions include button press/release, analog controls, pointer/touch events, permitted menu operations, bounded waits and reset to an authenticated checkpoint. A bot may not mark itself victorious through a hidden debug mutation when normal players cannot. Instrumentation is isolated from game code, with a disabled/restricted mode for release comparison.
+
+## 62.2 Diverse tester policies, not one optimized oracle
+
+The fleet should include a script-based deterministic sanity walker; bounded path-search agent; novice exploration behavior; expert/high-precision control; accessibility variants; frustration/backtracking detector; malformed/unexpected input adversary; and a held-out game-winning evaluator. Learning-based tester policies remain optional through the existing model/runtime authority and must not be able to modify the target executable or evaluation rubric. Each policy declares its skill assumptions and acceptable observation access. A privileged omniscient quest solver is useful for *logical completeness proof* but must not masquerade as a plausible human player.
+
+A game may be formally solvable yet confusing. Measure map backtracking, repeated interaction attempts, idle time before recognizing goals, failure/recovery burden, camera/occlusion problems, unreadable audiovisual cues, checkpoint scarcity and rage-inducing hit sequences. Conversely an expert winning quickly does not prove the tutorial works for a novice. Sampling balance matters: report tester class, episodes, seeds, initial conditions and coverage. Human participants provide subjective evaluation where appropriate; bots cannot manufacture human enjoyment evidence.
+
+## 62.3 Instrumented coverage of game state
+
+Coverage is semantic, not lines of GDScript. Collect visited reachable locations, interacted entities, quest branch transitions, item production/consumption, NPC encounters, combat state, dialogue choices, save migrations, camera regimes and export/install states. Use source/engine semantic IDs so an event in a reference simulator maps to an actual compiled scene/action. Define a critical coverage set of mandatory mechanics and known fragile dependencies. An explorer can find hidden content, but must not invent an action path by accessing internal state not observable to real players.
+
+Track **path coverage**, **transition coverage**, **goal coverage**, **interaction affordance coverage**, **negative state invariant coverage**, and **performance scenario coverage**. Coverage results include actual input tapes and verified game observations, not generator-estimated percentages. Separate "unexplored" from "infeasible"—the latter requires constrained proof or independently checked reason.
+
+## 62.4 The anti-gaming evaluation design
+
+Lock metrics, game versions, tester code, evaluation window and held-out seeds before candidate generation. Avoid optimizing a game and tester on the same exact repeated tape. A candidate that removes gameplay mechanics may score as easy, but should be rejected by required feature-preservation and baseline invariants. A game with a fake internal win flag must be rejected when no observed player goal is completed. A game with constant high frame rate but missing graphics is not a performance success.
+
+Compare with Pareto-aware criteria: mandatory correctness, accessibility, rights and data safety as noncompensable; then quality, diversity, play duration, visual/audio clarity, frame pacing, repair cost and player satisfaction. Record score variance, confidence, failure family and any evaluator disagreement. Protected oracle code and data live outside the generated project and are changed only through normal reviewed source commits.
+
+## 62.5 Causal playtest incident pipeline
+
+On a failure, store an immutable bug dossier with first divergent tick, initial save, source/game package, controller tape, observed frames/audio/logs and expected invariant. Minimize the failing sequence without changing its causal meaning; check reproducibility on a clean target. Route to the correct existing owner: world design, collision/physics, editor, exporter, audio, local AI, install or toolchain. A proposed repair requires a failing parent, passing candidate and independent neighboring regression. A bot cannot suppress the relevant assertion or mark the failure as "unimportant" merely because the patch is hard.
+
+**Exit:** one actual exported original game played by at least two independent tester classes, with recorded win/lose/retry, one counterexample found and repaired or correctly held, replay/save, physical frame observations and source-bound evidence. Record NOT TESTED for any unavailable target device rather than silently using mock playback.
+
+# 63. Offline-first project custody and semantic save migration
+
+**Packet:** FRONTIER-63 | **Leads:** BOT-01 install/backup, BOT-02 data authority, BOT-05 semantic world, BOT-06 game save, BOT-11 UI | **Verifier:** BOT-12. **Existing source anchors:** skeleton/app/private_game_save.py, offline_game_library_audit.py, offline_game_library_relocation.py, offline_mixed_game_library_continuity.py, offline_signed_game_library_audit.py, installed_tree_custody.py and the declared state topology.
+
+The product must remain useful with network disabled, but offline-first does not mean every local file is a primary database. Source projects, user preferences, model assets, gameplay saves, derived indexes, build artifacts and installation state have distinct authorities and upgrade rules. Consolidate real durable state rather than inventing independent project silos for each editor component.
+
+## 63.1 Authority and restoration map
+
+Create a *source-verified* table for every durable domain with canonical writer, logical store, schema version, data classification, retention, snapshot/backup mechanism, restore and concurrent-write policy. Cover authenticated projects, game semantic graph, player saves, asset rights, game library, tool/run receipts, model manifests, local generation cache, crawler evidence, optional vector indexes, installer state and exported packages. A backup is a consistent cross-domain state, not a copy of arbitrary open SQLite/Mongo/Chroma files while writers are active. For each domain, distinguish rebuildable derived state from irreplaceable authored user content.
+
+A full backup must enumerate dependency graph, content digests, project/user ownership and media rights without embedding sensitive secrets in an ordinary export. Private secrets have their own protected recovery route; never scatter keys into game packages. Export may omit private account/device credentials while remaining adequate to restore the user's creative project with independently re-provisioned identity.
+
+## 63.2 Atomic project edit and power-loss semantics
+
+The user changes a game. The app stages semantic patch + affected asset references + expected parent version under current ownership; a successful commit atomically records its authoritative revision and new content references. Rendered previews, vector indexes, thumbnail caches and native builds are projections reconstructed after commit. If the process dies between stages, restart reports the exact prepared/committed/unknown state. It may garbage-collect uncommitted derived media under retention policy but must not assume unreferenced authoritative bytes are safe to delete before reconciliation.
+
+Idempotent replay must never double-grant an inventory item or double-publish a release artifact. A failed commit must not show a saved badge. Two offline devices edited from the same parent require semantic conflict review. Source revision CAS and dependency-aware merge preserve human changes; a text-based blind Git merge is not sufficient for quest/economy semantics.
+
+## 63.3 Game saves and project history must evolve separately
+
+A published game-save schema has immutable game identity, target-compatible schema/version, event cursor, actor/location/inventory/quest/economy/RNG state and integrity. Project edit history may change while a player remains in a legitimate older published game. Migration is explicit: determine compatible versions, stage copy, check invariants, commit atomically and retain last good save until new load proven. Unknown future schemas or corrupted saves must not be overwritten with a new empty game. Offer quarantined export/repair guidance.
+
+Required stateful negative tests: duplicate event replay, missing chunk after cache eviction, concurrent writes, wrong save version, unsupported downgraded engine, stale source asset, partial migration, disk full, interrupted database snapshot and malicious oversized/deserialization input. Check actual game interaction after restoration rather than only JSON shape.
+
+## 63.4 Portable library and source escrow
+
+An offline game library archive contains project manifest, exact content-addressed source and derived assets allowed by rights, schema/toolchain profile, provenance, available native packages, dependency inventory and integrity proofs. Validate entries and safe extraction before importing into the actual existing library owner. Do not allow path traversal, reparse/symlink escape, executable payload abuse or duplicate ownership. On relocation between disks and OSes, normalize paths only through validated mapping and preserve original source identities. If the original native compiler is unavailable, return the editable source and truthful compiler-readiness message.
+
+User-owned game ideas and source should remain exportable in durable documented forms, rather than only through a closed cloud service. A claimed offline mode must actually open an existing project and continue permitted editing while no network is reachable. AI-only features degrade explicitly if model or guard unavailable, never silently transmit private content to a remote substitute.
+
+## 63.5 Disaster and upgrade acceptance
+
+Prove clean restore after service crash, data-volume migration, lost derived Chroma cache, installation upgrade, game package rollback, project relocation and accidental interruption during export. Recreate services from verified base and restored state in a separate environment; compare canonical source/event counts, media digests, active rights, game saves and independently playable target. An archival file that cannot be restored is not backup evidence. Keep app first-install and release holds separate from successful source-only archive checks.
+
+# 64. Bounded autonomous production as a capability and risk compiler
+
+**Packet:** FRONTIER-64 | **Lead:** BOT-04 director | **Partners:** BOT-02 authority, BOT-03 model, BOT-05/06/07/08 content, BOT-09 export, BOT-11 cockpit, BOT-12 QA. **Source anchors:** director_capability_graph.py, jeeves_production_director.py, game_build_queue.py, and existing ToolExecutionReceipt/ResourceBudget/ContextEnvelope contracts.
+
+The production director must compile a human game request into a chain of finite actual operations. Source file count or number of virtual bot roles is not production capacity. A long planning transcript without a playable output is an insufficient result.
+
+## 64.1 Typed campaign request with cost-and-risk envelope
+
+Every admitted campaign has exact user objective, source snapshot, target profile, desired game experience, forbidden changes, acceptable budget/time, mandatory proof obligations and cancellation/approval policy. Decompose into a DAG of source inspection, semantic design, asset authoring, gameplay implementation, validation, engine build, independent play, packaging and optional publication. Each node declares actual canonical owner, read/write scope, needed dependencies, preconditions, postconditions, reversible/irreversible action class, tool authority, resource reservation and expected artifact.
+
+Use source-sha and project-revision identity to guard every mutation. A bot may refine a proposed scene but may not replace a current player's project or widen external crawler egress without another explicit grant. A report of work complete is not an admissible dependency unless accompanied by authoritative tool and artifact receipts.
+
+## 64.2 Scheduling by physical and semantic constraints
+
+Use actual reserved CPU/RAM/GPU/disk/tool slots and declared per-task time budgets. Prefer tasks on the critical path to the first playable loop: authenticated editor; real local model when required; canonical design; player controller; world condition; media bindings; clean target build. A hundred low-priority generated audio variants cannot starve one engine-boot repair. Media and independent levels can parallelize once interfaces are stable; shared schemas, versioned writer authorities and huge mirrored AI trees require serialized ownership or controlled integration.
+
+If a stage hits memory pressure, model outage, invalid rights, failed source conflict or engine import error, stop dependent work or execute a permitted safe alternate. Do not spawn unlimited retry loops to meet a commit/file quota. A partial candidate may remain useful and editable, but should be labelled source-only, not completed game.
+
+## 64.3 Self-directed iteration within deterministic boundaries
+
+The director may choose experiments under finite constraints: adjust level geometry, propose alternate quest prerequisites, regenerate a rights-approved asset, vary camera frame, compare visual style, modify difficulty or narrow a repair. It must not autonomously promote a new model weight, grant publishing rights, override user locks, disable security gates or alter independent test rubrics. A tool proposal is screened by existing authorization and source semantics. All accepted mutations are reviewable; human intervention can revise the objective and cause dependency-aware replan.
+
+Every iteration produces a comparison against a frozen reference with source/game package identity. Store actual failure modes and use them as evidence for next choices. Use uncertainty and value-of-information to stop low-yield experiments. Avoid re-asking a model the identical question with no new evidence and counting its different prose as an improvement.
+
+## 64.4 Meaningful campaign receipts
+
+A final or intermediate campaign record lists actual source revisions committed, playable capabilities observed, exact engine output, QA failures/repaired regressions, resource consumption, unresolved blockers, review approvals and rollback. It distinguishes *planned*, *generated source*, *compiled*, *played*, *packaged* and *released*. If a model fails before any game mutation, the honest result is a recoverable draft and blocker. A verifier signs a separately generated result rather than the director's own success string.
+
+One end-to-end integration sample should prove: user brief → approved two-room game → original art/audio bound → real Godot controls → bug reproduction and repair → save/load → desktop export → author edits and rebuild. Every step binds stable game and source identities. The same campaign, replayed after a forced process kill, must not apply duplicate project edits or duplicate resource charges.
+
+# 65. Twelve-bot deep execution ledger and next proof-first build packets
+
+**Packet:** FRONTIER-65 | **Coordinator:** Grokbot | **Independent acceptance:** BOT-12 | **Scope:** supplemental tickets FRT-049 to FRT-080, mapped back to the existing P0 queue, 421-volume enterprise plans and the prior FRT-001..048. They describe specific **new proof work**, not code already produced by writing this text.
+
+| Ticket | Bot | Required implementation delta | First adversarial/real proof |
+|---|---|---|---|
+| FRT-049 | BOT-03 | Source-bound consent and project-lineage split for game-review learning | TRAIN/TEST leakage across variants denied |
+| FRT-050 | BOT-03 | Frozen champion/challenger promotion with calibrated abstention | Critical recall regression cannot promote |
+| FRT-051 | BOT-04 | 18-round real-effect classification and receipt reconciliation | Signed journal without physical tool effect stays unqualified |
+| FRT-052 | BOT-03 | Safe shadow reviewer and explicit rollback | Shadow output cannot activate real weights |
+| FRT-053 | BOT-07 | Stable chunk base/delta identity in existing world owner | Regeneration cannot replenish harvested resource |
+| FRT-054 | BOT-05 | Actor promotion between fidelity tiers | Distant NPC becomes same active identity |
+| FRT-055 | BOT-07 | Quest-criticality-aware streaming and visual LOD | Missing collision blocks activation |
+| FRT-056 | BOT-06 | Engine-measured region transition and save/restart | Unique NPC not duplicated after eviction |
+| FRT-057 | BOT-08 | Compiled cutscene time-domain mapping in real Godot | Pause, skip and restore do not duplicate consequence |
+| FRT-058 | BOT-08 | Real waveform/cue files bound to audio schedule | Cue with no decodable bytes cannot pass audio proof |
+| FRT-059 | BOT-11 | Timeline editor source keyframes and exact revision diff | Human-locked shot preserved on regenerate |
+| FRT-060 | BOT-12 | Real camera/audio/subtitle export capture | Missing caption or offscreen speaker fails |
+| FRT-061 | BOT-06 | Same-device local co-op with isolated controllers | Two actors do not mix input or rewards |
+| FRT-062 | BOT-02 | LAN action authority schema with request binding | Client forged inventory mutation denied |
+| FRT-063 | BOT-06 | Turn-based CAS/game replay | Simultaneous turn submission yields one commit |
+| FRT-064 | BOT-11 | Collaborative project edit/merge through existing source owner | Disjoint text edits with semantic quest conflict flagged |
+| FRT-065 | BOT-12 | Real game tester runner with separated instrumentation | Fake win marker cannot certify goal |
+| FRT-066 | BOT-12 | Mixed tester policies and source-bound scorecard | Novice failure not hidden by expert victory |
+| FRT-067 | BOT-12 | Stateful mutation and trace minimization | Remove native collision event; test fails |
+| FRT-068 | BOT-06 | Controller-tick/engine-event/frame alignment | First divergent tick and source rule visible |
+| FRT-069 | BOT-02 | Authoritative backup map with derived/index classification | Restored user content survives cache loss |
+| FRT-070 | BOT-01 | Atomic versioned install-data restore and rollback | Process killed during restore retains old data |
+| FRT-071 | BOT-05 | Game save migration with world event cursor integrity | Duplicate reward/reordered event denied |
+| FRT-072 | BOT-09 | Portable original-game library validation | Unsafe archive/path/file type rejected |
+| FRT-073 | BOT-04 | Finite campaign with resource-aware critical path | Lower-priority media cannot starve first playable |
+| FRT-074 | BOT-02 | Risk/capability decision for every director mutation | Model text cannot self-authorize privileged tool |
+| FRT-075 | BOT-04 | Recoverable handoff/replan after user changes a quest | Stale parent changes never commit |
+| FRT-076 | BOT-12 | Independent evidence classification per campaign | Source-only build never marked playable |
+| FRT-077 | BOT-03 | Actual GGUF inference admitted through current epoch/provider | Mock turn never accepted as real model proof |
+| FRT-078 | BOT-09 | Cross-target native package parity on declared targets | Clean host launches and completes real objective |
+| FRT-079 | BOT-11 | Full creator journey showing stage/holds/real previews | UI cannot display certified on absent evidence |
+| FRT-080 | BOT-12 | Single golden game end-to-end qualification dossier | Unmet rights/device/security/CI hold remains blocked |
+
+## 65.1 Proof contract per ticket
+
+Each ticket starts by verifying current source/PR head and mapping to actual existing owner. Builders record the smallest observed missing behavior, then implement in the canonical module and prove it with a test that fails on the old behavior. Tests must be run on finished code, not invented as success statistics. The changed surface includes type/schema compatibility, source/rights, user permission, functional gameplay, crash recovery, target artifact identity and negative cases relevant to the ticket. The independent verifier inspects exact files, input/output digests, environment, test/engine logs and observed video/frame/audio when relevant.
+
+The first integrated golden game remains the shared artifact across specialists. Its world source, project revision, NPCs, assets, quests, input traces and native packages must refer to the same committed project state. A bot may propose a distinct sample to test one genre, but cannot call dozens of isolated demonstrations one complete game. If dependencies are absent, produce a blocked ticket with exact reason; do not fabricate a target or remove a feature to qualify.
+
+## 65.2 New deep proof ladders
+
+**Learning** passes only with approved data partition, actual training/inference effect where claimed, independent held-out evaluation and no policy/weight self-activation. **World streaming** passes only with source/delta reconstruction, actor continuity and physical engine navigation. **Cinematic** passes only with actual target frames/audio and source-to-observation timing. **Multiplayer** passes each profile separately with authoritative state and adversarial input. **Playtest fleet** passes only when independent input-driven targets are used and regressions can genuinely fail. **Offline custody** passes only when real user project/save/media can be restored and played. **Director** passes only when bounded work yields a real project mutation and independently verified playable output.
+
+The user-facing studio report must separate source-present, integrated, engine-tested, device-tested and release-authorized, by feature and target. Draft source PRs, tool-specific mocks or earlier ancestor CI cannot satisfy final-head release proof. A strong new capability must preserve safety, ownership, original-work rights, ability to undo and export, and stable first install.
+
+## 65.3 Practical ordering for the next real implementation cycle
+
+The first integration wave begins with FRT-074, FRT-069, FRT-073 and FRT-076: authority, storage, orchestration and truthful evidence. Next implement a minimal shared first playable with FRT-068, FRT-065 and FRT-079, then FRT-053/054/055/056 for persistent world depth. Media and cinematic FRT-057..060 depend on real engine bindings, not just source cue lists. Learning FRT-049..052 is safely asynchronous and cannot gate all editing by default. Multiplayer FRT-061..064 is optional after single-player integrity and export work. Complete targeted device/export/legal evidence FRT-077/078/080 before any broader marketing or release claim.
+
+A work packet is "done" only when code and real tests satisfy its exact acceptance under an independently reviewed source head. This blueprint itself does not implement, test, merge, train, deploy or release the described capabilities.
