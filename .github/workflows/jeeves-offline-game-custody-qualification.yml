@@ -39,6 +39,39 @@ jobs:
       - name: Compile all guarded custody entrypoints and tests
         run: |
           python -m compileall -q skeleton/app/offline_install_quarantine.py skeleton/app/offline_signed_game_library_audit.py skeleton/testing/test_app_offline_install_quarantine.py skeleton/testing/test_app_offline_signed_game_library_audit.py skeleton/testing/test_app_offline_signed_game_library_relocation.py skeleton/ai/runtime/production_fabric/product
+      - name: Reproduce first-playable source proof using a generated fixture
+        env:
+          PYTHONPATH: .:backend
+          PYTHONNOUSERSITE: "1"
+        run: |
+          export TMPDIR="$HOME"
+          python - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from skeleton.app.studio_journey import build_first_playable_journey
+          from skeleton.ai.game_builder.playable_world import GameBuildIntent
+          intent = GameBuildIntent(
+              project_id="quarantine-original", title="Original Harbor",
+              subtitle="An original offline adventure", seed=1735,
+              theme="forest", width=9, height=9, levels=1,
+              collectibles_per_level=1, hazards_per_level=0,
+              starting_health=3,
+          )
+          with TemporaryDirectory(prefix="game-custody-proof-", dir=Path.home()) as tmp:
+              try:
+                  result = build_first_playable_journey(
+                      intent, Path(tmp) / "original", authorized=True,
+                  )
+              except Exception as exc:
+                  # This fixture has no user-supplied content or secrets.
+                  print("OFFLINE_SOURCE_PROOF_FAILURE:", type(exc).__name__, str(exc))
+                  if exc.__cause__ is not None:
+                      print("OFFLINE_SOURCE_PROOF_CAUSE:", type(exc.__cause__).__name__, str(exc.__cause__))
+                  raise
+              assert result["offline_gameplay_reexecuted"] is True
+              assert result["release_certified"] is False
+              assert result["native_device_qualified"] is False
+          PY
       - name: Test actual private-custody and signed-game replay
         env:
           PYTHONPATH: .:backend
