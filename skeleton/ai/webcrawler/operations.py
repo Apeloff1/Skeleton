@@ -468,6 +468,20 @@ class CrawlRun:
             for key in ("canonical_url", "fetched_url", "content_hash", "fetched_at", "raw_body_hash"):
                 if provenance.get(key) != source[key]:
                     raise CrawlOperationError("source acquisition identity mismatch")
+            inferred = provenance.get("mime_inferred")
+            declared = provenance.get("declared_content_type")
+            if (type(inferred) is not bool or not isinstance(declared, str)
+                    or len(declared) > 256
+                    or not isinstance(provenance.get("mime_inference_reason"), str)
+                    or (not inferred and declared != source["content_type"])
+                    or (inferred and (
+                        declared not in {
+                            "application/octet-stream", "binary/octet-stream",
+                            "application/zip",
+                        }
+                        or declared == source["content_type"]
+                    ))):
+                raise CrawlOperationError("source MIME inference receipt mismatch")
             if (
                 provenance.get("consent_id") != binding["consent"]["consent_id"]
                 or provenance.get("training_permission") is not False
@@ -922,6 +936,7 @@ class CrawlRun:
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        declared_content_type = ctype
         media = inspect_download_media(
             url, ctype, response.body,
             response.headers.get("content-disposition"),
@@ -1044,6 +1059,9 @@ class CrawlRun:
         observation = asdict(EvidenceObservation.from_document(observed_doc, self.request.query))
         provenance = {
             **doc.provenance,
+            "declared_content_type": declared_content_type,
+            "mime_inferred": media.inferred,
+            "mime_inference_reason": media.reason,
             "binding_digest": _digest(state["binding"]),
             "consent_id": state["binding"]["consent"]["consent_id"],
             "transport_mode": getattr(self.fetcher, "transport_mode", "caller_supplied_transport"),

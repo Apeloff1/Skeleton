@@ -134,6 +134,10 @@ class RealMediaRecoveryTests(unittest.TestCase):
         snap=run.snapshot()
         self.assertEqual(snap["usage"]["documents"],1)
         self.assertEqual(next(iter(snap["sources"].values()))["content_type"],"application/gpx+xml")
+        provenance = next(iter(snap["sources"].values()))["provenance"]
+        self.assertEqual(provenance["declared_content_type"], "application/octet-stream")
+        self.assertTrue(provenance["mime_inferred"])
+        self.assertEqual(provenance["mime_inference_reason"], "finite_xml_prefix_and_extension")
         self.assertTrue(run.search("telemetry")["hits"])
         self.assertFalse(next(iter(snap["sources"].values()))["provenance"]["training_permission"])
         self.assertEqual(CrawlRun.from_snapshot(snap,fetcher=fetcher).snapshot(),snap)
