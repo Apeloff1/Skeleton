@@ -154,6 +154,30 @@ class FirstRunHandoffTests(unittest.TestCase):
                 with self.assertRaises(FirstRunHandoffContractError):
                     validate_source_only_handoff(evidence)
 
+    def test_receipt_envelope_and_release_holds_are_bounded(self):
+        mutations = (
+            lambda e: e.update({f"extra_{i}": i for i in range(65)}),
+            lambda e: e.update({"x" * 97: True}),
+            lambda e: e.update({1: "non-string key"}),
+            lambda e: e.update({"release_holds": sorted(MANDATORY_HOLDS) + [
+                f"OPTIONAL_{i}" for i in range(33)]}),
+            lambda e: e.update({"release_holds": sorted(MANDATORY_HOLDS) + [
+                "x" * 129]}),
+            lambda e: e["runtime_observation"].update({"machine": "x" * 65}),
+            lambda e: e["runtime_observation"].update({"operating_system": "x" * 65}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                evidence = valid_evidence()
+                mutate(evidence)
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
+    def test_bounded_optional_holds_remain_accepted(self):
+        evidence = valid_evidence()
+        evidence["release_holds"].append("ADDITIONAL_SECURITY_REVIEW")
+        validate_source_only_handoff(evidence)
+
     def test_read_only_input(self):
         evidence = valid_evidence()
         original = copy.deepcopy(evidence)
