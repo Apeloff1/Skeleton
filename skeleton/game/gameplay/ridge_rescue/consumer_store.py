@@ -117,6 +117,11 @@ class SlotStore:
                 mode = os.lstat(self.database).st_mode
                 if not stat.S_ISREG(mode):
                     raise StoreError("save database must be a regular file")
+                # A hard-linked SQLite file can be modified through an alias
+                # outside the application-owned save directory. Reject it
+                # before SQLite opens or mutates the shared inode.
+                if os.lstat(self.database).st_nlink != 1:
+                    raise StoreError("hard-linked save database refused")
                 if os.lstat(self.database).st_size > MAX_DATABASE_BYTES:
                     raise StoreError("save database exceeds bounded storage")
             connection = sqlite3.connect(str(self.database), timeout=5, isolation_level=None)
