@@ -27,7 +27,7 @@ from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
     HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
     TECHNICAL_MEDIA_TYPES, ASSET_TEXT_MEDIA_TYPES, SUPPLY_CHAIN_TYPES,
-    SCENE_ASSET_TYPES, PACKAGE_LOCK_TYPES, INTERFACE_TYPES,
+    SCENE_ASSET_TYPES, PACKAGE_LOCK_TYPES, INTERFACE_TYPES, IIIF_DOCUMENT_TYPES,
     GRAPH_ARTIFACT_TYPES, TILED_ARTIFACT_TYPES, ROBOT_SCENE_TYPES,
     DocumentFormatError, extract_additional_format,
 )
@@ -222,6 +222,9 @@ class CrawlPolicy:
         "application/vnd.cyclonedx+json",
         "application/spdx+json",
         "application/vnd.openvex+json",
+        "application/opds+json",
+        "application/vnd.iiif.presentation+json",
+        "application/vnd.openarchives.oai-pmh+xml",
         "application/activity+json",
         "application/vnd.activitystreams+json",
         "image/svg+xml",
@@ -556,7 +559,7 @@ def extract_document(
                  | SUPPLY_CHAIN_TYPES | SCENE_ASSET_TYPES
                  | PACKAGE_LOCK_TYPES | INTERFACE_TYPES
                  | GRAPH_ARTIFACT_TYPES | TILED_ARTIFACT_TYPES
-                 | ROBOT_SCENE_TYPES):
+                 | ROBOT_SCENE_TYPES | IIIF_DOCUMENT_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):
