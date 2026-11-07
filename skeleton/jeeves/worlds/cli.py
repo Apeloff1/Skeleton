@@ -28,9 +28,17 @@ def _read_operation_file(path: str) -> bytes:
         raise CanonError("operation_invalid_path")
     # Bound traversal cost before touching any filesystem descriptor. A hostile
     # input path must not force unbounded syscalls or exceed OS name limits.
-    if len(parts) > 64 or len(os.fsencode(path)) > 4096:
+    # fsencode can reject malformed Unicode on strict-encoding platforms.
+    # Convert it into a stable validation error rather than an uncaught CLI
+    # exception; no custody directory has been opened at this point.
+    try:
+        encoded_path = os.fsencode(path)
+        encoded_parts = tuple(os.fsencode(part) for part in parts)
+    except (UnicodeError, ValueError):
+        raise CanonError("operation_invalid_path") from None
+    if len(parts) > 64 or len(encoded_path) > 4096:
         raise CanonError("operation_path_budget_exceeded")
-    if any(len(os.fsencode(part)) > 255 for part in parts):
+    if any(len(part) > 255 for part in encoded_parts):
         raise CanonError("operation_path_budget_exceeded")
     directory_flags = (os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW |
                        os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0))
