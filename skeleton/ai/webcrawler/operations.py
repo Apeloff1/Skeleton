@@ -163,6 +163,7 @@ def implementation_digest():
                 "godot_hierarchy.py",
                 "unity_hierarchy.py",
                 "usda_hierarchy.py",
+                "openapi_graph.py",
             )
         }
     )

@@ -10,6 +10,7 @@ import json
 import re
 from typing import Any
 
+from .openapi_graph import inspect_openapi_graph, summarize_openapi_graph
 from .research_projection import (
     ResearchFormatError, ResearchProjection, check_text, project_lines,
 )
@@ -99,4 +100,6 @@ def extract_openapi(
                    f"operation: {identifier}; summary: {summary[:512]}; "
                    f"response codes: {','.join(sorted(codes))}")
             lines.append(row)
+    graph=inspect_openapi_graph(source)
+    lines.extend(summarize_openapi_graph(graph))
     return project_lines(lines, title=title, max_chars=max_chars)
