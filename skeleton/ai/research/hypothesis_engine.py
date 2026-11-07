@@ -188,6 +188,11 @@ class HypothesisLedger:
         self._events: dict[str, HypothesisEvidence] = {}
         self._withdrawals: dict[str, str] = {}
 
+    @property
+    def sources(self) -> ResearchSourceRegistry:
+        """Canonical shared custody owner; no authority is transferred."""
+        return self._sources
+
     def register(self, hypothesis: Hypothesis) -> str:
         if not isinstance(hypothesis, Hypothesis):
             raise HypothesisError("typed hypothesis required")

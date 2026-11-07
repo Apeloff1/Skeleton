@@ -169,6 +169,11 @@ class CausalGraph:
         self._max_claims = max_claims
         self._claims: dict[str, CausalClaim] = {}
 
+    @property
+    def sources(self) -> ResearchSourceRegistry:
+        """Canonical shared custody owner; no authority is transferred."""
+        return self._sources
+
     def _verify_source(self, claim: CausalClaim) -> None:
         try:
             source = self._sources.source(claim.source_id)

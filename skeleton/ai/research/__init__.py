@@ -95,3 +95,16 @@ __all__.extend((
     "ClaimKind",
     "InterventionResult",
 ))
+
+from .game_design_probes import (
+    DesignProbePlan,
+    DesignProbePlanner,
+    DesignProbeRequest,
+    ProbeEvidenceStatus,
+    ProbePlanningError,
+)
+
+__all__ += [
+    "DesignProbePlan", "DesignProbePlanner", "DesignProbeRequest",
+    "ProbeEvidenceStatus", "ProbePlanningError",
+]

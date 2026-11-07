@@ -62,3 +62,34 @@ The originally declared `planned:` test paths for VOL-249 and VOL-250 now
 have matching executable regression sources in this draft. This does not
 promote MDM-058, prove model calibration or first-install readiness, or
 retroactively alter the canonical signed source ledger.
+
+## MDM-058 cross-volume game-design probe bridge (VOL-249..252)
+
+The pure `skeleton.ai.research.game_design_probes` planner now composes the
+hypothesis ledger, causal DAG, and the canonical P1-INTEL-03
+`skeleton.intelligence.strategy_registry` control decision for a named
+original-game project and falsifiable metric. It binds both models to the
+**identical** source registry instance. It validates all live source digests,
+retraces both source snapshots before sealing a deterministic SHA-256 receipt,
+bounds candidate/history iteration, and preserves critical-risk verification,
+budget and value-of-information stops. An optional model preview is always
+`SIMULATION_NOT_OBSERVATION`, with explicit opt-in for hypothesized edges and
+no bypass for confounding.
+
+The return object is **non-executable**, even when upstream self-reported
+confidence passes a stopping threshold. No gameplay is modified, no research
+source is ingested automatically, and no authority passes to a provider,
+installer, builder, world runtime, or release decision. Future work requires a
+separately reviewed, policy-bound Jeeves proposal adapter and independent live
+experiment/device evidence. Provenance here is source-custody, **not** proof
+that a claimed empirical observation is genuine.
+
+Focused validation after complete build:
+```sh
+python -m unittest discover -s skeleton/testing -p 'test_game_design_probes.py' -v
+python -m unittest discover -s skeleton/testing -p 'test_ai_git_knowledge.py' -v
+```
+
+The Git knowledge fixture now constructs its synthetic secret marker at
+runtime rather than leaving key-shaped bytes in tracked test source; rejection
+behavior remains covered without exempting any secret-hygiene scanner pattern.
