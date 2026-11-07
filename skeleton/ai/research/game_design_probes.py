@@ -183,7 +183,7 @@ class DesignProbePlanner:
         ):
             raise ProbePlanningError("typed research models required")
         if hypotheses.sources is not sources or causal_graph.sources is not sources:
-            raise ProbePlanningError("models must share exact source registry instance")
+            raise ProbePlanningError("models must share same exact source registry instance")
         self._sources = sources
         self._hypotheses = hypotheses
         self._causal_graph = causal_graph
