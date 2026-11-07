@@ -132,6 +132,12 @@ def implementation_digest():
                 "tar_inventory.py",
                 "extended_media.py",
                 "api_discovery.py",
+                "sbom_graph.py",
+                "sbom_parsing.py",
+                "cyclonedx_documents.py",
+                "spdx_documents.py",
+                "vex_documents.py",
+                "supply_chain_artifacts.py",
             )
         }
     )
