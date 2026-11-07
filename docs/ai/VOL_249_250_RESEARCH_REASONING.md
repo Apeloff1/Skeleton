@@ -107,3 +107,11 @@ with the platform-selected secure temporary root rather than hardcoding a
 container-only path. The socket/SQLite acceptance test remains otherwise
 unchanged, and the full native qualification is required before any readiness
 claim. This test-fixture repair does not attest real-device GGUF behavior.
+
+The GGUF/SQLite custody guard traverses all ancestor directories using
+descriptor-based no-follow access and denies group/other-writable ancestors.
+Consequently test fixtures cannot be placed under `/tmp` merely because the
+leaf is private. The two hosted portability fixtures use `Path.home()` as
+their parent; if that home is not private enough, tests correctly fail without
+loosening `open_trusted_root`. The branch still requires real hardware custody
+and native runtime acceptance before release.
