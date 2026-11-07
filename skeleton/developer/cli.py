@@ -312,9 +312,67 @@ def dev_exit_code(result: Any) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Console-script adapter; never pass a result mapping to sys.exit."""
-    result = run_dev_cli(argv)
+    return run_dev_console(argv)
+
+
+class _StdoutRecorder:
+    """Pass-through stdout wrapper that remembers what a command printed."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.chunks: List[str] = []
+
+    def write(self, data: str) -> int:
+        self.chunks.append(data)
+        return self._inner.write(data)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def text(self) -> str:
+        return "".join(self.chunks)
+
+
+def _already_printed_as_json(printed: str, result: Any) -> bool:
+    """True when ``printed`` ends with a JSON document equal to ``result``."""
+    try:
+        expected = json.loads(json.dumps(result, default=str))
+    except (TypeError, ValueError):
+        return False
+    tail = printed.rstrip()
+    if not tail.endswith(("}", "]")):
+        return False
+    decoder = json.JSONDecoder()
+    starts = [0] + [i + 1 for i, ch in enumerate(tail) if ch == "\n"]
+    for start in starts:
+        if start >= len(tail) or tail[start] not in "{[":
+            continue
+        try:
+            obj, end = decoder.raw_decode(tail, start)
+        except ValueError:
+            continue
+        if end == len(tail):
+            return obj == expected
+    return False
+
+
+def run_dev_console(argv: Optional[List[str]] = None) -> int:
+    """Shared console adapter for ``skeleton dev`` dispatchers.
+
+    Prints the result mapping once: skipped for help, and skipped when the
+    command already emitted the identical mapping as JSON (``--json``), so
+    stdout stays a single parseable document.
+    """
+    recorder = _StdoutRecorder(sys.stdout)
+    previous = sys.stdout
+    sys.stdout = recorder
+    try:
+        result = run_dev_cli(argv)
+    finally:
+        sys.stdout = previous
     if isinstance(result, dict) and result.get("status") != "help_shown":
-        print(json.dumps(result, indent=2, default=str))
+        if not _already_printed_as_json(recorder.text(), result):
+            print(json.dumps(result, indent=2, default=str))
     return dev_exit_code(result)
 
 

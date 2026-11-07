@@ -12,6 +12,7 @@ Registered into the dev command registry as first-class commands.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -62,7 +63,7 @@ class RestoreCommand:
         restored = harness.restore_state(name=parsed.name)
 
         kag = harness.genesis.get("quad")._planes.get("kag")
-        return {
+        payload: Dict[str, Any] = {
             "action": "restore",
             "name": parsed.name,
             "restored": restored,
@@ -72,6 +73,20 @@ class RestoreCommand:
                 "mag_episodes": len(harness.genesis.get("mag")._episodes),
             },
         }
+        if not restored and not _snapshot_exists(parsed.root, parsed.name):
+            # Fail loudly instead of silently restoring nothing.
+            payload["error"] = "snapshot_not_found"
+            print(f"No snapshot named '{parsed.name}'. Run: skeleton dev snapshots", file=sys.stderr)
+        return payload
+
+
+def _snapshot_exists(root: Any, name: str) -> bool:
+    """True when the store holds any plane file for snapshot ``name``."""
+    from skeleton.persistence import SnapshotStore
+
+    store = SnapshotStore(root) if root else SnapshotStore()
+    prefix = f"{name}-"
+    return any(entry["name"] == name or entry["name"].startswith(prefix) for entry in store.list())
 
 
 class SnapshotsCommand:
