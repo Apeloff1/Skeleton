@@ -19,6 +19,10 @@ from .core import CrawlPolicy, canonicalize_url
 from .discovery_relations import sitemap_language_alternate
 from .api_discovery import API_DISCOVERY_TYPES, APIDiscoveryError, discover_api_pages
 from .federated_activity import ACTIVITY_MEDIA_TYPES, ActivityDiscoveryError, discover_activity_page
+from .opds_discovery import OPDS_TYPES, discover_opds
+from .iiif_discovery import IIIF_TYPES, discover_iiif
+from .oai_pmh_discovery import OAI_TYPES, discover_oai_pmh
+from .archive_catalog_common import CatalogDiscoveryError, CatalogAsDocument
 
 
 XML_MEDIA = frozenset({
@@ -29,7 +33,7 @@ XML_MEDIA = frozenset({
 })
 GZIP_MEDIA = frozenset({"application/gzip", "application/x-gzip"})
 JSON_MEDIA = frozenset({"application/feed+json", "application/json"})
-SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA | JSON_MEDIA | API_DISCOVERY_TYPES | ACTIVITY_MEDIA_TYPES
+SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA | JSON_MEDIA | API_DISCOVERY_TYPES | ACTIVITY_MEDIA_TYPES | OPDS_TYPES | IIIF_TYPES | OAI_TYPES
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 ATOM_NS = "http://www.w3.org/2005/Atom"
 RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -236,6 +240,29 @@ def parse_structured_discovery(
     canonical = canonicalize_url(document_url)
     if canonical != document_url or not policy.admits(canonical):
         raise DiscoveryError("structured source URL outside immutable crawl scope")
+    if media_type in (OPDS_TYPES | IIIF_TYPES | OAI_TYPES):
+        try:
+            if media_type in OPDS_TYPES:
+                page = discover_opds(body, document_url=document_url,
+                    policy=policy, max_links=min(max_links,64),
+                    max_entries=min(max_entries,128))
+            elif media_type in IIIF_TYPES:
+                page = discover_iiif(body, document_url=document_url,
+                    policy=policy, max_links=min(max_links,64),
+                    max_entries=min(max_entries,128))
+            else:
+                page = discover_oai_pmh(body, document_url=document_url,
+                    policy=policy, max_links=min(max_links,64),
+                    max_entries=min(max_entries,128))
+        except CatalogAsDocument as exc:
+            raise UnsupportedDiscoveryRoot(str(exc)) from exc
+        except CatalogDiscoveryError as exc:
+            raise DiscoveryError(str(exc)) from exc
+        return StructuredDiscovery(
+            kind=page.kind, links=page.links,
+            examined_entries=page.examined,
+            discarded_entries=page.rejected, capped=page.capped,
+        )
     if media_type in ACTIVITY_MEDIA_TYPES:
         try:
             page = discover_activity_page(
