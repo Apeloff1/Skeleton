@@ -33,6 +33,7 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .link_header_discovery import parse_link_headers
 from .document_formats import DocumentFormatError
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
@@ -81,6 +82,7 @@ def implementation_digest():
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
+                "link_header_discovery.py",
             )
         }
     )
@@ -868,6 +870,15 @@ class CrawlRun:
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        # HTTP Link pagination/feeds use the same exact, metered
+        # canonical worker as HTML links; malformed headers are inert.
+        try:
+            header_links = parse_link_headers(
+                response.headers, base_url=url, policy=self.policy,
+                max_links=16, max_relations=48,
+            ).links
+        except (ValueError, UnicodeError):
+            header_links = ()
         structured_type = ctype in SUPPORTED_MEDIA
         if (
             ctype == "application/octet-stream"
@@ -905,7 +916,7 @@ class CrawlRun:
             if structured_type:
                 self._finish_item(item)
                 admitted = 0
-                for discovered_url in discovery.links:
+                for discovered_url in dict.fromkeys((*discovery.links, *header_links)):
                     if self._enqueue(
                         discovered_url, depth=item["depth"] + 1,
                         parent_url=url,
@@ -934,7 +945,7 @@ class CrawlRun:
         if doc is None:
             return self._event("rejected", now=now, url=url, reason="empty_document")
         if any(source["content_hash"] == doc.content_hash for source in state["sources"].values()):
-            for link in doc.links:
+            for link in dict.fromkeys((*doc.links, *header_links)):
                 self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
             return self._event("duplicate", now=now, url=url, reason=doc.content_hash)
         text_bytes = doc.text.encode("utf-8")
@@ -971,7 +982,7 @@ class CrawlRun:
             "observation": observation,
         }
         state["usage"]["documents"] += 1
-        for link in doc.links:
+        for link in dict.fromkeys((*doc.links, *header_links)):
             self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
         return self._event("captured", now=now, url=url, source_id=source_id)
 
