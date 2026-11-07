@@ -54,6 +54,12 @@ const FORENSIC_STAGE_NAMES = [
   'reverse_source_objective_usage',
   'policy_bound_research_deficit_matrix',
   'untrusted_context_resource_budget',
+  'captured_extraction_quality_diagnostics',
+  'operator_query_rank_support_audit',
+  'captured_origin_redirect_hygiene',
+  'objective_selection_fairness_metrics',
+  'conservative_risky_source_ablation',
+  'script_coverage_lexical_limitations',
   'review_only_forensic_queue',
 ] as const;
 
@@ -360,6 +366,9 @@ export type CrawlAtlasReport = {
     reference_reused_sources: number; consent_renewal_review_due: boolean;
     urgent_research_gaps: number; context_selected_utf8_bytes: number;
     context_budget_exceeded: boolean;
+    extraction_held_sources: number; query_unsupported_objectives: number;
+    origin_review_sources: number; selection_source_dominance_objectives: number;
+    risk_ablated_objectives: number; script_coverage_review_objectives: number;
     critical_review_tasks: number;
     review_queue: {
       task_id: string; risk: 'critical' | 'high' | 'medium' | 'low';
@@ -610,6 +619,12 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !integer(value.forensics.urgent_research_gaps, 32)
       || !integer(value.forensics.context_selected_utf8_bytes, 196608)
       || typeof value.forensics.context_budget_exceeded !== 'boolean'
+      || !integer(value.forensics.extraction_held_sources, 32)
+      || !integer(value.forensics.query_unsupported_objectives, 32)
+      || !integer(value.forensics.origin_review_sources, 32)
+      || !integer(value.forensics.selection_source_dominance_objectives, 32)
+      || !integer(value.forensics.risk_ablated_objectives, 32)
+      || !integer(value.forensics.script_coverage_review_objectives, 32)
       || !integer(value.forensics.review_tasks, 256)
       || !integer(value.forensics.critical_review_tasks, 256)
       || value.forensics.critical_review_tasks > value.forensics.review_tasks

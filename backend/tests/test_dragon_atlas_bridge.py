@@ -154,10 +154,12 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         report = response["report"]
         forensic = report["forensics"]
         self.assertEqual(self.owned_reads, 2)
-        self.assertEqual(len(forensic["stages"]), 20)
+        self.assertEqual(len(forensic["stages"]), 26)
         self.assertEqual(forensic["stages"][0]["name"], "exact_selected_source_custody")
         self.assertEqual(forensic["stages"][12]["name"], "canonical_capture_provenance_posture")
         self.assertEqual(forensic["stages"][18]["name"], "untrusted_context_resource_budget")
+        self.assertEqual(forensic["stages"][19]["name"], "captured_extraction_quality_diagnostics")
+        self.assertEqual(forensic["stages"][24]["name"], "script_coverage_lexical_limitations")
         self.assertEqual(forensic["stages"][-1]["name"], "review_only_forensic_queue")
         self.assertGreaterEqual(forensic["provenance_held_sources"], 0)
         self.assertGreaterEqual(forensic["grounding_deficit_objectives"], 0)
@@ -165,6 +167,13 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(forensic["consent_renewal_review_due"], bool)
         self.assertGreaterEqual(forensic["urgent_research_gaps"], 0)
         self.assertGreaterEqual(forensic["context_selected_utf8_bytes"], 0)
+        for field in (
+            "extraction_held_sources", "query_unsupported_objectives",
+            "origin_review_sources", "selection_source_dominance_objectives",
+            "risk_ablated_objectives", "script_coverage_review_objectives",
+        ):
+            self.assertIsInstance(forensic[field], int)
+            self.assertGreaterEqual(forensic[field], 0)
         self.assertIsInstance(forensic["context_budget_exceeded"], bool)
         self.assertEqual(forensic["source_policy_digest"], report["source_policy"]["digest"])
         self.assertEqual(forensic["atlas_digest"], report["atlas_digest"])

@@ -367,6 +367,12 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
         <Text style={s.small}>
           {report.forensics.context_selected_utf8_bytes} selected UTF-8 bytes · {report.forensics.context_budget_exceeded ? 'context limit review required' : 'within audit context limits'} · {report.forensics.consent_renewal_review_due ? 'consent renewal review due' : 'mandate window not near expiry'}
         </Text>
+        <Text style={s.small}>
+          {report.forensics.extraction_held_sources} extraction holds · {report.forensics.origin_review_sources} URL-origin holds · {report.forensics.query_unsupported_objectives} query-supported objectives missing evidence
+        </Text>
+        <Text style={s.small}>
+          {report.forensics.selection_source_dominance_objectives} source-dominated objectives · {report.forensics.risk_ablated_objectives} objectives emptied by hypothetical risk holds · {report.forensics.script_coverage_review_objectives} language-script coverage reviews
+        </Text>
         <Text style={s.small}>All indicators are unverified review signals, not confirmed attacks, factual errors or rights decisions. The original source text remains restricted by current authenticated capture policy.</Text>
         {report.forensics.review_queue.slice(0, 12).map(item =>
           <View key={item.task_id} style={s.check}>

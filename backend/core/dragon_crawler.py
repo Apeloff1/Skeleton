@@ -1266,6 +1266,12 @@ class DragonCrawlerApplication:
                 "consent_renewal_review_due": forensic.consent.warning == "renewal_review_due",
                 "urgent_research_gaps": len(forensic.gaps.urgent_objectives),
                 "context_selected_utf8_bytes": forensic.context_budget.total_selected_utf8_bytes,
+                "extraction_held_sources": len(forensic.extraction.held_source_ids),
+                "query_unsupported_objectives": len(forensic.query_support.missing_evidence_objectives),
+                "origin_review_sources": len(forensic.origins.review_source_ids),
+                "selection_source_dominance_objectives": len(forensic.selection_fairness.source_dominance_objectives),
+                "risk_ablated_objectives": len(forensic.risk_ablation.objectives_emptied_in_scenario),
+                "script_coverage_review_objectives": len(forensic.script_coverage.review_objectives),
                 "context_budget_exceeded": (
                     forensic.context_budget.over_campaign_evidence_char_limit
                     or forensic.context_budget.over_explicit_context_byte_limit
