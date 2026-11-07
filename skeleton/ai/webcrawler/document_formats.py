@@ -223,6 +223,7 @@ def extract_json(
     stack = [("$", source, 0)]
     nodes = 0
     chars = 0
+    value_clipped = False
     while stack:
         path, value, depth = stack.pop()
         nodes += 1
@@ -252,6 +253,7 @@ def extract_json(
             literal = str(value) if not isinstance(value, str) else value
             if len(literal) > 8192:
                 literal = literal[:8192]
+                value_clipped = True
             line = f"{path}: {literal}"
             chars += len(line)
             if chars > max_chars * 2:
@@ -262,7 +264,7 @@ def extract_json(
         raise DocumentFormatError("JSON record contains no scalar evidence")
     return ExtractedFormat(
         text=text[:max_chars], title=title,
-        links=(), truncated=len(text) > max_chars,
+        links=(), truncated=value_clipped or len(text) > max_chars,
     )
 
 

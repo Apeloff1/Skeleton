@@ -52,8 +52,8 @@ JSON = json.dumps({
     "access_token": "THIS_SHOULD_NEVER_BE_IN_EVIDENCE",
     "url": "https://outside.example.net/forbidden",
 }).encode()
-SOURCE_CODE = b"def simulate_flight(speed):\\n    return speed * 2  # archive velocity rules\\n"
-NDJSON = b'{"id":1,"topic":"archive capture"}\\n{"id":2,"topic":"flight dynamics"}\\n'
+SOURCE_CODE = b"def simulate_flight(speed):\n    return speed * 2  # archive velocity rules\n"
+NDJSON = b'{"id":1,"topic":"archive capture"}\n{"id":2,"topic":"flight dynamics"}\n'
 HTML = b"<html><title>Next chapter</title><body>Archive capture and moving aircraft are described here.</body></html>"
 PAGE = b"<html><head><title>Index</title></head><body>Introduction and archive capture.</body></html>"
 GOOD_ROBOTS = b"User-agent: *\nAllow: /\n"
@@ -257,30 +257,30 @@ class Gain7ParserTest(unittest.TestCase):
 
     def test_source_code_rejects_binary_nul(self):
         with self.assertRaises(DocumentFormatError):
-            extract_source_code("class A:\\x00bad", max_chars=1024, max_links=1)
+            extract_source_code("class A:\x00bad", max_chars=1024, max_links=1)
 
     def test_source_code_rejects_terminal_escape(self):
         with self.assertRaises(DocumentFormatError):
-            extract_source_code("code\\x1b[31m", max_chars=1024, max_links=1)
+            extract_source_code("code\x1b[31m", max_chars=1024, max_links=1)
 
     def test_source_code_rejects_invalid_decoder_replacement_density(self):
         with self.assertRaises(DocumentFormatError):
-            extract_source_code("\\ufffd" * 20, max_chars=1024, max_links=1)
+            extract_source_code("\ufffd" * 20, max_chars=1024, max_links=1)
 
     def test_yaml_config_preserves_content_without_interpreting_tags(self):
-        source = "handler: !!python/object/apply:os.system [false]\\nmode: research"
+        source = "handler: !!python/object/apply:os.system [false]\nmode: research"
         result = self.document(source.encode(), "application/yaml")
         self.assertIn("!!python/object/apply", result.text)
         self.assertFalse(result.provenance["parser_text_truncated"])
         self.assertEqual(result.links, ())
 
     def test_toml_config_retains_inert_settings(self):
-        result = self.document(b"[ai]\\nmode = 'offline'\\n", "application/toml")
+        result = self.document(b"[ai]\nmode = 'offline'\n", "application/toml")
         self.assertIn("offline", result.text)
         self.assertEqual(result.links, ())
 
     def test_rst_reference_docs_are_captured_as_plain_source(self):
-        result = self.document(b"Original Heading\\n===============\\n", "text/x-rst")
+        result = self.document(b"Original Heading\n===============\n", "text/x-rst")
         self.assertIn("Original Heading", result.text)
 
     def test_json_lines_extracts_multiple_records(self):
@@ -292,12 +292,12 @@ class Gain7ParserTest(unittest.TestCase):
 
     def test_json_lines_rejects_malformed_line(self):
         with self.assertRaises(DocumentFormatError):
-            extract_ndjson('{"ok":true}\\n{broken',
+            extract_ndjson('{"ok":true}\n{broken',
                            max_chars=1024, max_links=0)
 
     def test_json_lines_rejects_unbounded_record_count(self):
         with self.assertRaises(DocumentFormatError):
-            extract_ndjson('{"item":1}\\n'*6,
+            extract_ndjson('{"item":1}\n'*6,
                            max_chars=1024, max_links=0, max_records=5)
 
     def test_json_lines_does_not_enqueue_url_fields(self):
