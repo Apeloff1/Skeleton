@@ -3,9 +3,19 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from starlette.routing import Route
+
 import pytest
 
 from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
+
+
+def _ep(request):  # pragma: no cover
+    return None
+
+
+def _app(path: str) -> SimpleNamespace:
+    return SimpleNamespace(routes=[Route(path, _ep)])
 
 
 @pytest.mark.parametrize("path", [
@@ -19,7 +29,7 @@ from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
     "/api/v1/%2573ecrets/{name}",
 ])
 def test_unchartered_secret_routes_are_rejected(path: str) -> None:
-    app = SimpleNamespace(routes=[SimpleNamespace(path=path)])
+    app = _app(path)
     with pytest.raises(RuntimeError, match="cortex secrets"):
         reject_cortex_secret_routes(app)
 
@@ -32,9 +42,7 @@ def test_unchartered_secret_routes_are_rejected(path: str) -> None:
     "/api/v1/secrets-metadata",
 ])
 def test_unrelated_registered_http_routes_still_work(path: str) -> None:
-    reject_cortex_secret_routes(
-        SimpleNamespace(routes=[SimpleNamespace(path=path)])
-    )
+    reject_cortex_secret_routes(_app(path))
 
 
 def test_route_inventory_is_required() -> None:
@@ -43,6 +51,11 @@ def test_route_inventory_is_required() -> None:
     with pytest.raises(RuntimeError, match="uninspectable"):
         reject_cortex_secret_routes(
             SimpleNamespace(routes=[SimpleNamespace(path=None)])
+        )
+    # Duck-typed objects with a str path are not trusted as leaves either.
+    with pytest.raises(RuntimeError, match="uninspectable"):
+        reject_cortex_secret_routes(
+            SimpleNamespace(routes=[SimpleNamespace(path="/api/v1/health")])
         )
 
 

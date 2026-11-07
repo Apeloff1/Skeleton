@@ -1138,8 +1138,13 @@ def create_app() -> Any:
     # Cortex's historical register_routes() contains unchartered GET/POST
     # /api/v1/secrets endpoints. Validate the final assembled HTTP routes,
     # not merely today's static import graph, before exposing the app.
-    from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
+    from skeleton.api.cortex_mount_guard import (
+        CortexRouteGuardMiddleware,
+        reject_cortex_secret_routes,
+    )
     reject_cortex_secret_routes(app)
+    # Re-check at lifespan startup and whenever the (live) route graph changes.
+    app.add_middleware(CortexRouteGuardMiddleware, guarded_app=app)
     return app
 
 

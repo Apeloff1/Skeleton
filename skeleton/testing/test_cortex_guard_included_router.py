@@ -80,8 +80,13 @@ def test_opaque_mount_fails_closed_only_where_secrets_reachable():
     async def opaque(scope, receive, send):  # pragma: no cover
         return None
 
-    ok = Starlette(routes=[Mount("/static", app=opaque)])
+    from starlette.staticfiles import StaticFiles
+
+    ok = Starlette(routes=[Mount("/static", app=StaticFiles(directory=".", check_dir=False))])
     reject_cortex_secret_routes(ok)
+    # Non-static opaque ASGI apps cannot be inspected, so they refuse anywhere.
+    with pytest.raises(RuntimeError, match="uninspectable"):
+        reject_cortex_secret_routes(Starlette(routes=[Mount("/static", app=opaque)]))
     for prefix in ("/", "/api", "/api/v1", "/api/v1/secrets"):
         bad = Starlette(routes=[Mount(prefix, app=opaque)])
         with pytest.raises(RuntimeError):
