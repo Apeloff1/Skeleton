@@ -158,7 +158,7 @@ def audit(root: Path = ROOT) -> list[str]:
         if (root / WORKFLOWS / name).exists():
             failures.append(f"{name}: specialist unexpectedly active")
         try:
-            source = path.read_text(encoding="utf-8")
+            source = _read_reviewed(root, ARCHIVE / name)
             label = re.search(r"^name:\s*(.+?)\s*$", source, re.MULTILINE)
             if not label or "[Specialized]" not in label.group(1):
                 failures.append(f"{name}: missing [Specialized] tag")
