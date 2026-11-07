@@ -42,6 +42,22 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("skeleton/testing --tb=short", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
+    def test_shadow_top_level_trigger_declarations_fail_closed(self):
+        """Reject additional top-level on keys regardless of inline syntax."""
+        baseline = "name: CI\non:\n  pull_request:\njobs:\n  build:\n"
+        self.assertEqual(events(baseline), {"pull_request"})
+        for shadow in (
+            "on: [push]",
+            "on: {push: {}}",
+            "on: # second declaration",
+            "on :",
+            "on : [push]",
+            "on:\t",
+        ):
+            with self.subTest(shadow=shadow):
+                with self.assertRaises(ValueError):
+                    events(baseline + shadow + "\n")
+
     def test_registry_rejects_duplicate_keys_and_unhashable_trigger_profiles(self):
         """Malformed registry inputs must fail closed with diagnostics, not exceptions."""
         with TemporaryDirectory() as temp:
