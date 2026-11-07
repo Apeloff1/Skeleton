@@ -18,6 +18,18 @@ class EmbeddingSearchEvidenceTests(unittest.TestCase):
         self.assertGreater(len(spans),1)
         self.assertTrue(all(evidence.citation(self.catalog,s)["exact_bytes_verified"] for s in spans))
 
+    def test_implicit_overlap_scales_to_small_window_without_losing_custody(self):
+        spans=evidence.passages(self.doc,window_bytes=32)
+        self.assertGreater(len(spans),1)
+        self.assertTrue(all(evidence.citation(self.catalog,s)["exact_bytes_verified"] for s in spans))
+        self.assertEqual(spans,evidence.passages(self.doc,window_bytes=32,overlap_bytes=8))
+
+    def test_explicit_oversized_overlap_fails_closed(self):
+        for invalid in (32,128,True,-1):
+            with self.subTest(overlap=invalid):
+                with self.assertRaises(CognitionError):
+                    evidence.passages(self.doc,window_bytes=32,overlap_bytes=invalid)
+
     def test_source_retrieval_with_real_vector_when_required(self):
         supplied={} if evidence.contract()["mode"]=="lexical" else {"query_vector":(1.,0.),"embedding_model_sha256":MODEL}
         results=evidence.query(self.catalog,"offline",**supplied)
