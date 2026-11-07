@@ -36,6 +36,52 @@ def _inspect(target, archive_pin, manifest):
     ]
 
 
+
+def test_studio_archive_never_accepts_forged_approval_even_with_new_pins(
+    tmp_path, capsys,
+):
+    """A recomputed release and ZIP pin cannot promote a studio source."""
+    from hashlib import sha256
+
+    from skeleton.ai.game_builder.contracts import canonical_digest
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    from skeleton.app.offline_delivery_archive import (
+        OfflineGameArchiveError, _canonical_zip, inspect_offline_game_archive,
+    )
+
+    root, manifest_pin = _build(tmp_path, capsys)
+    original = tmp_path / "original.zip"
+    assert run_app_cli(_package(root, manifest_pin, original)) == 0
+    capsys.readouterr()
+    with ZipFile(original) as bundle:
+        files = {name: bundle.read(name) for name in bundle.namelist()}
+    gate = json.loads(files["studio/consumer_gate.json"])
+    assert gate["evidence"]["approved_for_publication"] is False
+    gate["evidence"]["approved_for_publication"] = True
+    gate["blockers"].remove("approved_for_publication")
+    files["studio/consumer_gate.json"] = _canonical_bytes(gate)
+    release = json.loads(files["release.json"])
+    release["files"]["studio/consumer_gate.json"] = sha256(
+        files["studio/consumer_gate.json"]
+    ).hexdigest()
+    release_body = {key: value for key, value in release.items()
+                    if key != "manifest_digest"}
+    release["manifest_digest"] = canonical_digest(release_body)
+    files["release.json"] = _canonical_bytes(release)
+    forged = _canonical_zip(files)
+    destination = tmp_path / "forged.zip"
+    destination.write_bytes(forged)
+    destination.chmod(0o600)
+    with pytest.raises(OfflineGameArchiveError):
+        inspect_offline_game_archive(
+            destination,
+            expected_archive_sha256=sha256(forged).hexdigest(),
+            expected_manifest_sha256=sha256(files["release.json"]).hexdigest(),
+            authorized=True,
+        )
+
+
+
 def test_deterministic_game_archive_and_independent_read_only_inspection(tmp_path, capsys):
     root, manifest = _build(tmp_path, capsys)
     original_release = (root / "release.json").read_bytes()
