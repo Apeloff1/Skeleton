@@ -186,6 +186,45 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Archive capture methodology", repr(forensic))
         self.assertLessEqual(len(forensic["review_queue"]), 24)
 
+    async def test_operational_preflight_is_exact_snapshot_bound_and_read_only(self):
+        report = (await self.atlas())["report"]
+        ops = report["operations"]
+        self.assertEqual(self.owned_reads, 2)
+        self.assertEqual(ops["source_snapshot_digest"], report["snapshot_digest"])
+        self.assertEqual(ops["run_sequence"], report["run_sequence"])
+        self.assertEqual(len(ops["stages"]), 6)
+        self.assertEqual(ops["stages"][0]["name"], "exact_canonical_event_timeline")
+        self.assertEqual(ops["stages"][-1]["name"],
+                         "review_only_operator_recovery_runbook")
+        self.assertEqual([s["ordinal"] for s in ops["stages"]], list(range(6)))
+        self.assertEqual(ops["observed_resource_samples"], 0)
+        self.assertEqual(ops["hypothetical_work_candidates"], 0)
+        self.assertGreater(ops["inspected_origins"], 0)
+        self.assertTrue(ops["source_text_redacted"])
+        self.assertTrue(ops["read_only"])
+        self.assertFalse(ops["network_executed"])
+        self.assertFalse(ops["physical_worker_fenced"])
+        self.assertFalse(ops["mongo_checkpoint_confirmed"])
+        self.assertFalse(ops["live_robots_permission_granted"])
+        self.assertFalse(ops["automatic_recovery_authorized"])
+        self.assertGreaterEqual(ops["critical_operator_steps"], 1)
+        self.assertTrue(all(action["requires_backend_authority"]
+                            and not action["automatically_executed"]
+                            for action in ops["operator_runbook"]))
+        self.assertNotIn("Archive capture methodology", repr(ops))
+
+    async def test_operational_preflight_source_clock_and_policy_remain_untrusted(self):
+        report = (await self.atlas())["report"]
+        ops = report["operations"]
+        self.assertLessEqual(ops["retained_event_count"], 64)
+        self.assertGreaterEqual(ops["uncertain_bytes"], 0)
+        self.assertGreaterEqual(ops["unresolved_robots_origins"], 0)
+        self.assertTrue(ops["capacity_holds"])
+        self.assertEqual(ops["stages"][0]["ordinal"], 0)
+        self.assertTrue(all(len(item["receipt_digest"]) == 64
+                            and len(item["chain_digest"]) == 64
+                            for item in ops["stages"]))
+
     async def test_actual_backend_bm25_routes_to_second_ranker(self):
         response = await self.atlas(retrieval_mode="lexical_bm25")
         report = response["report"]
