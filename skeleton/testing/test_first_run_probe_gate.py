@@ -63,6 +63,46 @@ class FirstRunProbeGateTests(unittest.TestCase):
         with self.assertRaises(FirstRunGateError):
             check_first_run({"release_ready": lambda: True})
 
+    def test_clock_raises_before_probe_keeps_setup_available(self):
+        calls = []
+        def broken_clock():
+            raise RuntimeError("clock-secret")
+        def probe():
+            calls.append("backend")
+            return True
+        result = check_first_run({"backend": probe}, clock_ns=broken_clock)
+        self.assertEqual(calls, ["backend"])
+        self.assertTrue(result.setup_accessible)
+        self.assertFalse(result.guarded_ai_available)
+        self.assertEqual(result.services[0].reason, "probe-clock-unavailable")
+        self.assertNotIn("clock-secret", str(result.as_dict()))
+
+    def test_clock_raises_after_probe_fails_closed(self):
+        ticks = iter([100_000_000])
+        result = check_first_run({"backend": lambda: True}, clock_ns=lambda: next(ticks))
+        self.assertEqual(result.services[0].state, ServiceState.FAILED)
+        self.assertEqual(result.services[0].reason, "probe-clock-unavailable")
+
+    def test_invalid_clock_type_rejected_without_running_probe(self):
+        with self.assertRaises(FirstRunGateError):
+            check_first_run({}, clock_ns=None)
+
+    def test_boolean_and_backwards_clocks_fail_closed(self):
+        for ticks in ([True, 10], [100, 99], [-1, 100], [100, "bad"]):
+            with self.subTest(ticks=ticks):
+                iterator = iter(ticks)
+                result = check_first_run({"backend": lambda: True},
+                                         clock_ns=lambda: next(iterator))
+                self.assertTrue(result.setup_accessible)
+                self.assertEqual(result.services[0].state, ServiceState.FAILED)
+
+    def test_elapsed_is_bounded_and_integer(self):
+        iterator = iter([0, 10**30])
+        result = check_first_run({"backend": lambda: True},
+                                 clock_ns=lambda: next(iterator))
+        self.assertEqual(result.services[0].elapsed_ms, 86_400_000)
+        self.assertEqual(result.services[0].state, ServiceState.READY)
+
     def test_wizard_integration(self):
         wizard = FirstRunWizard10000x()
         result = wizard.check_services({name: lambda: True for name in NAMES})
