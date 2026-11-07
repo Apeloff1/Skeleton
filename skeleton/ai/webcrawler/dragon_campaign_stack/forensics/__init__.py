@@ -15,6 +15,10 @@ from .active_content import ActiveContentFinding, ActiveContentReport, inspect_a
 from .privacy_signals import PrivacySignal, PrivacySignalReport, inspect_privacy_signals
 from .host_exposure import HostExposure, HostExposureReport, measure_host_exposure
 from .polarity_screen import PolarityReviewLead, PolarityScreen, inspect_polarity_candidates
+from .provenance_posture import ProvenanceFinding, ProvenancePosture, audit_capture_provenance
+from .objective_grounding import ObjectiveGrounding, ObjectiveGroundingReport, inspect_objective_grounding
+from .reference_concentration import CitationConcentration, CitationConcentrationReport, inspect_reference_concentration
+from .consent_horizon import ConsentHorizon, inspect_consent_horizon
 from .trace import ForensicStage, chain_forensic_receipts, verify_forensic_stage_chain
 from .assembly import AtlasForensics, compose_atlas_forensics, verify_atlas_forensics
 

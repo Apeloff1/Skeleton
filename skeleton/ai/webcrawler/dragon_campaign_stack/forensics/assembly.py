@@ -23,6 +23,10 @@ from .active_content import ActiveContentReport, inspect_active_content
 from .privacy_signals import PrivacySignalReport, inspect_privacy_signals
 from .host_exposure import HostExposureReport, measure_host_exposure
 from .polarity_screen import PolarityScreen, inspect_polarity_candidates
+from .provenance_posture import ProvenancePosture, audit_capture_provenance
+from .objective_grounding import ObjectiveGroundingReport, inspect_objective_grounding
+from .reference_concentration import CitationConcentrationReport, inspect_reference_concentration
+from .consent_horizon import ConsentHorizon, inspect_consent_horizon
 from .trace import ForensicStage, ORDER, chain_forensic_receipts, verify_forensic_stage_chain
 
 
@@ -48,6 +52,10 @@ class AtlasForensics:
     privacy: PrivacySignalReport
     exposure: HostExposureReport
     polarity: PolarityScreen
+    provenance: ProvenancePosture
+    grounding: ObjectiveGroundingReport
+    reference_concentration: CitationConcentrationReport
+    consent: ConsentHorizon
     reviews: ForensicReviewQueue
     stages: tuple[ForensicStage, ...]
     report_digest: str
@@ -75,6 +83,10 @@ def _receipts(report: AtlasForensics) -> tuple[tuple[str, str], ...]:
         report.privacy.report_digest,
         report.exposure.report_digest,
         report.polarity.report_digest,
+        report.provenance.posture_digest,
+        report.grounding.report_digest,
+        report.reference_concentration.report_digest,
+        report.consent.report_digest,
         report.reviews.queue_digest,
     )))
 
@@ -83,7 +95,7 @@ def compose_atlas_forensics(
     mandate: CampaignMandate, snapshot: dict[str, object],
     atlas: DragonAtlas, *, now: float, authorized: bool,
 ) -> AtlasForensics:
-    """Build thirteen bounded, deterministic source-fenced review projections."""
+    """Build seventeen bounded, deterministic source-fenced review projections."""
     verify_dragon_atlas_trace(
         mandate, snapshot, atlas, now=now, authorized=authorized,
     )
@@ -107,10 +119,22 @@ def compose_atlas_forensics(
     privacy = inspect_privacy_signals(frames)
     exposure = measure_host_exposure(frames, atlas.workbench.objectives)
     polarity = inspect_polarity_candidates(frames)
+    provenance = audit_capture_provenance(
+        mandate, snapshot, frames, now=now, authorized=authorized,
+    )
+    grounding = inspect_objective_grounding(
+        frames, atlas.workbench.objectives,
+    )
+    concentration = inspect_reference_concentration(frames)
+    consent = inspect_consent_horizon(
+        mandate, frames, now=now, authorized=authorized,
+    )
     reviews = compile_forensic_review_queue(
         frames, security, geometry, reuse, resilience, boilerplate, age,
         echoes=echoes, active=active, privacy=privacy,
         exposure=exposure, polarity=polarity,
+        provenance=provenance, grounding=grounding,
+        concentration=concentration, consent=consent,
     )
     root = AtlasForensics(
         mandate.fingerprint, atlas.run_id, atlas.source_snapshot_digest,
@@ -118,7 +142,8 @@ def compose_atlas_forensics(
         atlas.atlas_digest, frames.frame_set_digest,
         len(frames.frames), len(reuse.selected_sources), security, geometry,
         reuse, resilience, boilerplate, age, echoes, active, privacy,
-        exposure, polarity, reviews, (), "",
+        exposure, polarity, provenance, grounding, concentration, consent,
+        reviews, (), "",
     )
     stages = chain_forensic_receipts(
         root.mandate_digest, root.source_snapshot_digest,

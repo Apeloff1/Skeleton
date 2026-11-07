@@ -23,6 +23,10 @@ ORDER = (
     "privacy_and_secret_exposure",
     "objective_host_concentration",
     "possible_polarity_collisions",
+    "canonical_capture_provenance_posture",
+    "operator_objective_grounding",
+    "selected_reference_concentration",
+    "mandate_consent_horizon",
     "review_only_forensic_queue",
 )
 

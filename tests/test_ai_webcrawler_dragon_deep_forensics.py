@@ -36,12 +36,12 @@ class DeepForensicTests(unittest.TestCase):
         )
         return atlas, rows
 
-    def test_thirteen_stage_trace_replays_without_page_body(self):
+    def test_seventeen_stage_trace_replays_without_page_body(self):
         atlas, _ = self.frames(self.single)
         report = compose_atlas_forensics(
             self.f.mandate, self.single, atlas, now=self.now, authorized=True,
         )
-        self.assertEqual(len(report.stages), 13)
+        self.assertEqual(len(report.stages), 17)
         self.assertEqual(report.stages[-1].name, "review_only_forensic_queue")
         self.assertFalse(report.web_or_model_invoked)
         self.assertFalse(report.source_text_exported)

@@ -21,6 +21,10 @@ from .active_content import ActiveContentReport
 from .privacy_signals import PrivacySignalReport
 from .host_exposure import HostExposureReport
 from .polarity_screen import PolarityScreen
+from .provenance_posture import ProvenancePosture
+from .objective_grounding import ObjectiveGroundingReport
+from .reference_concentration import CitationConcentrationReport
+from .consent_horizon import ConsentHorizon
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,10 @@ def compile_forensic_review_queue(
     privacy: PrivacySignalReport | None = None,
     exposure: HostExposureReport | None = None,
     polarity: PolarityScreen | None = None,
+    provenance: ProvenancePosture | None = None,
+    grounding: ObjectiveGroundingReport | None = None,
+    concentration: CitationConcentrationReport | None = None,
+    consent: ConsentHorizon | None = None,
     max_tasks: int = 256,
 ) -> ForensicReviewQueue:
     from ..contracts import integer
@@ -121,6 +129,30 @@ def compile_forensic_review_queue(
         for row in polarity.leads:
             add("medium", "possible_statement_polarity_collision",
                 (row.left_source_id, row.right_source_id))
+    for item in (provenance, grounding, concentration, consent):
+        if item is not None and item.frame_set_digest != frames.frame_set_digest:
+            raise PermissionError("third-wave forensic receipt is foreign or stale")
+    if provenance:
+        for finding in provenance.findings:
+            for flag in finding.flags:
+                add("high" if flag in ("partial_retained_text",
+                    "preserved_text_hash_requires_review") else "medium",
+                    "capture_provenance:" + flag, (finding.source_id,))
+    if grounding:
+        for item in grounding.objectives:
+            if item.missing_evidence_review:
+                add("high", "operator_objective_lexical_deficit", (), (item.objective_id,))
+            if item.prohibited_term_passages:
+                add("high", "operator_blocked_term_observed", (), (item.objective_id,))
+    if concentration:
+        for item in concentration.source_profiles:
+            if item.repeated_cross_objective_anchors:
+                add("medium", "citation_reuse_across_objectives", (item.source_id,), item.objective_ids)
+        if concentration.repeated_text_hashes_across_sources:
+            add("medium", "identical_selected_passage_content_cross_source",
+                concentration.held_source_ids)
+    if consent and consent.warning == "renewal_review_due":
+        add("high", "mandate_consent_expiry_near")
     ordering = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     ranked = sorted(signals, key=lambda row: (ordering[row[0]], row[1], row[2], row[3]))
     if len(ranked) > max_tasks:
