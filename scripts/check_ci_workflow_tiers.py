@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import errno
 import os
 from pathlib import Path
 import re
@@ -64,6 +65,10 @@ def _read_reviewed(root: Path, relative: Path) -> str:
         if len(payload) > limit:
             raise ValueError(f"oversized CI evidence file: {relative}")
         return payload.decode("utf-8")
+    except OSError as exc:
+        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
+            raise ValueError(f"linked CI evidence path or invalid directory: {relative}") from exc
+        raise
     finally:
         for fd in reversed(descriptors):
             os.close(fd)
