@@ -58,6 +58,8 @@ def _read_reviewed(root: Path, relative: Path) -> str:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
             raise ValueError(f"CI evidence must be a regular file: {relative}")
+        if info.st_nlink != 1:
+            raise ValueError(f"CI evidence must not have hardlink aliases: {relative}")
         if info.st_size > limit:
             raise ValueError(f"oversized CI evidence file: {relative}")
         with os.fdopen(os.dup(fd), "rb") as stream:
