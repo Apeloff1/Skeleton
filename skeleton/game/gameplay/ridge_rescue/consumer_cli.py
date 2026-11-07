@@ -117,6 +117,10 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             if str(create_error) != "save slot already exists":
                 raise
             current = store.load(slot)
+    # A campaign session can replay while its separate action ledger has been
+    # damaged. Refuse interactive play until the complete durable history
+    # replays to the same head; do not silently advance a corrupt ledger.
+    store.audit(slot)
     if ascii_mode is None:
         ascii_mode = os.name == "nt"
     while True:
