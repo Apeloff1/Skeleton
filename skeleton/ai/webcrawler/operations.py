@@ -156,6 +156,7 @@ def implementation_digest():
                 "pylock_documents.py",
                 "package_lock_artifacts.py",
                 "sbom_topology.py",
+                "html_structured_entities.py",
             )
         }
     )

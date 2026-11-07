@@ -136,6 +136,7 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/pylock_documents.py
           python -m py_compile skeleton/ai/webcrawler/package_lock_artifacts.py
           python -m py_compile skeleton/ai/webcrawler/sbom_topology.py
+          python -m py_compile skeleton/ai/webcrawler/html_structured_entities.py
           python -m py_compile skeleton/ai/webcrawler/timed_media.py
           python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
           python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
@@ -238,6 +239,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_ingestion.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_package_lock.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_sbom_topology.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_html_structured_entities.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v
