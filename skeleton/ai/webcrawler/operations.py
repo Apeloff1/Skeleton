@@ -181,6 +181,10 @@ def implementation_digest():
                 "gguf_metadata.py",
                 "onnx_metadata.py",
                 "ml_model_artifacts.py",
+                "tiled_map_contracts.py",
+                "tiled_xml_documents.py",
+                "tiled_json_documents.py",
+                "tiled_artifacts.py",
             )
         }
     )
