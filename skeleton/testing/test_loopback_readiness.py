@@ -22,6 +22,18 @@ class LoopbackReadinessTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 loopback_probe("backend", url)
 
+    def test_malformed_port_is_rejected(self):
+        for url in ("http://127.0.0.1:invalid/health", "http://127.0.0.1:99999/health"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                loopback_probe("backend", url)
+
+    def test_proxy_environment_is_disabled(self):
+        probe = loopback_probe("backend", "http://127.0.0.1:8000/health")
+        with patch("skeleton.install.loopback_readiness.build_opener") as factory:
+            factory.return_value.open.return_value = Response(b'{"service":"backend","ready":true}')
+            self.assertTrue(probe())
+            self.assertEqual(factory.call_args.args[0].proxies, {})
+
     def test_ready_requires_exact_identity(self):
         probe = loopback_probe("backend", "http://127.0.0.1:8000/health")
         for body, expected in [
