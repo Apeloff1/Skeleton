@@ -30,6 +30,18 @@ def _unique_policy_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def _read_reviewed(root: Path, relative: Path) -> str:
+    """Reject linked evidence files and parent directories before reading."""
+    path = root
+    for component in relative.parts:
+        path = path / component
+        if path.is_symlink():
+            raise ValueError(f"linked CI evidence path: {relative}")
+    if not path.is_file():
+        raise ValueError(f"missing CI evidence file: {relative}")
+    return path.read_text(encoding="utf-8")
+
+
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
@@ -66,7 +78,7 @@ def independently_triggered(found: set[str]) -> bool:
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
-        policy = json.loads((root / INDEX).read_text(encoding="utf-8"), object_pairs_hook=_unique_policy_pairs)
+        policy = json.loads(_read_reviewed(root, INDEX), object_pairs_hook=_unique_policy_pairs)
     except (OSError, ValueError, UnicodeError) as exc:
         return [f"cannot read CI tier registry: {exc}"]
     if not isinstance(policy, dict) or policy.get("schema") != SCHEMA:
@@ -117,7 +129,7 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"{path.name}: active workflow must not be a symlink")
             continue
         try:
-            found = events(path.read_text(encoding="utf-8"))
+            found = events(_read_reviewed(root, path.relative_to(root)))
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(
                 f"{path.name}: cannot inspect active workflow ({exc})"
@@ -157,7 +169,7 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"{name}: cannot inspect archived specialist ({exc})")
     for name in reusable:
         try:
-            found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
+            found = events(_read_reviewed(root, WORKFLOWS / name))
             if found != {"workflow_call", "workflow_dispatch"}:
                 failures.append(
                     f"{name}: required reusable workflow must be callable and manually dispatchable, "
@@ -166,20 +178,20 @@ def audit(root: Path = ROOT) -> list[str]:
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: cannot inspect required reusable workflow ({exc})")
         try:
-            archived = (root / ARCHIVE / name).read_text(encoding="utf-8")
+            archived = _read_reviewed(root, ARCHIVE / name)
             if events(archived) != {"workflow_dispatch"}:
                 failures.append(f"{name}: archived predecessor must remain dispatch-only")
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: missing archived reusable predecessor ({exc})")
     for name in core:
         try:
-            found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
+            found = events(_read_reviewed(root, WORKFLOWS / name))
             if "pull_request" not in found:
                 failures.append(f"{name}: core PR trigger missing")
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: cannot inspect active gate ({exc})")
     try:
-        readiness = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
+        readiness = _read_reviewed(root, WORKFLOWS / "merge-readiness.yml")
         if ("name: Merge Readiness" not in readiness
                 or "python -m compileall -q skeleton" not in readiness
                 or "  pull_request:" not in readiness):
@@ -190,7 +202,7 @@ def audit(root: Path = ROOT) -> list[str]:
     except (OSError, UnicodeError) as exc:
         failures.append(f"Merge Readiness missing ({exc})")
     try:
-        backend = (root / WORKFLOWS / "backend-quality.yml").read_text(encoding="utf-8")
+        backend = _read_reviewed(root, WORKFLOWS / "backend-quality.yml")
         # Backend Quality declares defaults.run.working-directory: backend.
         # Scanner commands are correctly relative to that working directory;
         # require the actual invocations rather than impossible backend/backend paths.
