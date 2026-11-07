@@ -25,6 +25,16 @@ def _live_lm(lm) -> bool:
     return int(getattr(lm, "steps", 0) or getattr(lm, "fitted", 0) or 0) >= 0
 
 
+def _slot_mouth(slot):
+    """PFC may be n-gram-only (attn=False); other slots prefer transformer."""
+    if slot is None:
+        return None
+    xf = getattr(slot, "transformer", None)
+    if xf is not None:
+        return xf
+    return getattr(slot, "lm", None)
+
+
 def face_card(neo) -> Dict[str, Any]:
     slots = getattr(neo, "slots", {}) or {}
     xf = getattr(neo, "transformer", None)
@@ -34,7 +44,7 @@ def face_card(neo) -> Dict[str, Any]:
     bpe = getattr(neo, "bpe", None)
     sleep = getattr(neo, "sleep", None)
     faces = {
-        "pfc": _live_lm(getattr(slots.get("pfc"), "transformer", None)),
+        "pfc": _live_lm(_slot_mouth(slots.get("pfc"))),
         "midbrain": _live_lm(getattr(slots.get("midbrain"), "transformer", None)),
         "left": _live_lm(getattr(slots.get("left"), "transformer", None)),
         "right": _live_lm(getattr(slots.get("right"), "transformer", None)),

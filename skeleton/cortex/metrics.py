@@ -62,7 +62,9 @@ def evaluate(neo) -> Dict[str, Any]:
             return float("inf")
 
     slots = getattr(neo, "slots", {}) or {}
-    ppl_pfc = _mouth_ppl(getattr(slots.get("pfc"), "transformer", None))
+    pfc_slot = slots.get("pfc")
+    pfc_mouth = getattr(pfc_slot, "transformer", None) or getattr(pfc_slot, "lm", None)
+    ppl_pfc = _mouth_ppl(pfc_mouth)
     ppl_mid = _mouth_ppl(getattr(slots.get("midbrain"), "transformer", None))
     ppl_rms = _mouth_ppl(getattr(neo, "neo_rms", None))
 

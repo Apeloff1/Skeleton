@@ -1384,16 +1384,17 @@ class TestQueue18:
         from skeleton.cortex.pfc import PrefrontalCortex
         from skeleton.cortex.curriculum import CORE_PAIRS
         pfc = PrefrontalCortex()
-        xf = pfc.transformer
-        assert xf is not None
-        assert xf.n_layers == 1 and xf.n_heads == 1 and xf.d_ff == 0 and xf.ctx == 4
+        # IS hybrid: PFC stays small-scale (n-gram / skip-gram); midbrain owns attn.
+        assert pfc.scale == "small"
+        assert pfc.transformer is None
         texts = [a for a, _ in list(CORE_PAIRS)[:6]]
         ppl = pfc.perplexity(texts)
         assert ppl < 1e8
+        fitted0 = int(getattr(pfc.lm, "fitted", 0) or 0)
         pfc.fit("plan tensor ttk lattice")
-        assert xf.steps >= 1
+        assert int(getattr(pfc.lm, "fitted", 0) or 0) > fitted0
         t = pfc.think("plan tensor ttk", {"era": "extraction_now"})
-        assert "PLAN" in t.text and "DRAFT" in t.text
+        assert "PLAN" in t.text
 
     def test_train_advances_pfc_zaibatsu_mouth(self):
         from skeleton.cortex import JeevesCortex
@@ -1562,6 +1563,7 @@ class TestQueue25:
     def test_surpass_is_neo_decode(self):
         from skeleton.cortex import JeevesCortex
         neo = JeevesCortex()
+        neo.train(epochs=1)  # fitted neo mouth → own-lm (IS hybrid)
         stim = "compile ttk hp dps recipe sim"
         neo.think(stim)
         neo.acquire("left")
@@ -1636,8 +1638,11 @@ class TestQueue28Queue29:
         neo = JeevesCortex()
         assert neo.transformer.tied is True
         assert neo.transformer.Wout is neo.transformer.E
-        before = {s: int(getattr(neo.slots[s].transformer, "steps", 0) or 0) for s in ("pfc", "midbrain", "left", "right")}
+        assert neo.slots["pfc"].transformer is None
+        before_fit = int(getattr(neo.slots["pfc"].lm, "fitted", 0) or 0)
+        before = {s: int(getattr(neo.slots[s].transformer, "steps", 0) or 0) for s in ("midbrain", "left", "right")}
         neo.train(epochs=1)
+        assert int(getattr(neo.slots["pfc"].lm, "fitted", 0) or 0) > before_fit
         for s, n0 in before.items():
             assert neo.slots[s].transformer.steps > n0
         assert neo.transformer.tied is True

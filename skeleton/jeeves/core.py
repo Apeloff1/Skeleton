@@ -205,7 +205,8 @@ class Jeeves:
 
     def think(self, stimulus: str, *, context: dict[str, Any] | None = None):
         """Neocortex think — the model in training, not a chat wrapper."""
-        if not _cortex_can_think(self._cortex):
+        cx = self.cortex  # lazy-init before stub detection
+        if not _cortex_can_think(cx):
             # Observability stub: fall back to local hemispheres (BuilderBrain path).
             from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
             from skeleton.cortex.pfc import PrefrontalCortex
@@ -216,8 +217,15 @@ class Jeeves:
                 stimulus, {**ctx, "left": left.to_dict(), "right": right.to_dict()}
             )
             from types import SimpleNamespace
+            # Build a minimal amalgam so CORTEX-mode ask() can read .text.
+            amalgam = SimpleNamespace(
+                text=f"[PFC] {pfc.text}",
+                kind="amalgam",
+                slot="neo",
+                tags=("neo", "amalgam", "fallback"),
+            )
             trace = SimpleNamespace(
-                left=left, right=right, pfc=pfc, used_own=False, amalgam=None,
+                left=left, right=right, pfc=pfc, used_own=False, amalgam=amalgam,
                 to_dict=lambda: {
                     "left": left.to_dict(), "right": right.to_dict(), "pfc": pfc.to_dict(),
                 },
@@ -226,7 +234,7 @@ class Jeeves:
                 "stimulus": stimulus[:120], "fallback": "local",
             })
             return trace
-        trace = self.cortex.think(stimulus, context)
+        trace = cx.think(stimulus, context)
         self._bus.emit("jeeves.cortex.thought", {
             "fp": trace.fingerprint, "used_own": trace.used_own,
             "hive": trace.hive_value,
@@ -385,7 +393,7 @@ class Jeeves:
         if pack is None:
             from skeleton.forge.eras import compile_era
             pack = compile_era(self.era)
-        cx = self._cortex if _cortex_can_think(self._cortex) else None
+        cx = self.cortex if _cortex_can_think(self.cortex) else None
         plan = BuilderBrain().plan(
             pack, tensor=tensor, reading=reading,
             cortex=cx, last_walk=self.last_walk,
