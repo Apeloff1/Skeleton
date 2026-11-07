@@ -347,9 +347,12 @@ class SlotStore:
                 for position, (number, prior, nxt, raw) in enumerate(rows, 1):
                     if number != position or not isinstance(raw, bytes) or len(raw) > 4096:
                         raise StoreError("save history is malformed")
-                    action = json.loads(raw)
-                    if not isinstance(action, dict) or canonical(action) != raw:
-                        raise StoreError("save history action is not canonical")
+                    try:
+                        action = json.loads(raw)
+                        if not isinstance(action, dict) or canonical(action) != raw:
+                            raise StoreError("save history action is not canonical")
+                    except (ValueError, TypeError, UnicodeError) as exc:
+                        raise StoreError("save history action is not canonical") from exc
                     history.append({"prior_head": prior, "next_head": nxt, "action": action})
                 conn.execute("COMMIT")
             except sqlite3.Error as exc:
