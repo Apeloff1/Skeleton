@@ -32,6 +32,7 @@ from .structured_discovery import (
     DiscoveryError, SUPPORTED_MEDIA, parse_structured_discovery,
     extract_robots_sitemaps,
 )
+from .document_formats import DocumentFormatError
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
 
@@ -77,6 +78,7 @@ def implementation_digest():
                 "research.py",
                 "dragon_mission_quality.py",
                 "structured_discovery.py",
+                "document_formats.py",
             )
         }
     )
@@ -886,35 +888,45 @@ class CrawlRun:
                     policy=self.policy, max_links=128, max_entries=512,
                 )
             except (DiscoveryError, ValueError, UnicodeError):
+                if ctype != "application/json":
+                    self._finish_item(item)
+                    return self._event(
+                        "rejected", now=now, url=url,
+                        reason="structured_discovery_rejected_by_safe_parser",
+                    )
+                # A well-formed non-Feed JSON API document can be retained
+                # as untrusted source evidence, but may never auto-enqueue
+                # URLs from arbitrary JSON keys.
+                structured_type = False
+            if structured_type:
                 self._finish_item(item)
+                admitted = 0
+                for discovered_url in discovery.links:
+                    if self._enqueue(
+                        discovered_url, depth=item["depth"] + 1,
+                        parent_url=url,
+                    ):
+                        admitted += 1
+                # Indexes and feeds are discovery inputs, not trusted captured
+                # documents. The request and response bytes have already been
+                # durably charged through the ordinary canonical transport.
                 return self._event(
-                    "rejected", now=now, url=url,
-                    reason="structured_discovery_rejected_by_safe_parser",
+                    "discovered", now=now, url=url,
+                    reason=f"{discovery.kind}:{admitted}_frontier_links_admitted"
+                    + (":bounded" if discovery.capped else ""),
                 )
-            self._finish_item(item)
-            admitted = 0
-            for discovered_url in discovery.links:
-                if self._enqueue(
-                    discovered_url, depth=item["depth"] + 1,
-                    parent_url=url,
-                ):
-                    admitted += 1
-            # Indexes and feeds are discovery inputs, not trusted captured
-            # documents. The request and response bytes have already been
-            # durably charged through the ordinary canonical transport.
-            return self._event(
-                "discovered", now=now, url=url,
-                reason=f"{discovery.kind}:{admitted}_frontier_links_admitted"
-                + (":bounded" if discovery.capped else ""),
-            )
         self._finish_item(item)
         if not 200 <= response.status < 300 or ctype not in self.policy.allowed_content_types:
             return self._event(
                 "rejected", now=now, url=url, reason=f"http_{response.status}_or_unsupported_type"
             )
-        doc = extract_document(
-            response, item["original_url"], max_links=128, max_text_chars=self.request.max_response_bytes
-        )
+        try:
+            doc = extract_document(
+                response, item["original_url"],
+                max_links=128, max_text_chars=self.request.max_response_bytes,
+            )
+        except (DocumentFormatError, UnicodeError, ValueError):
+            doc = None
         if doc is None:
             return self._event("rejected", now=now, url=url, reason="empty_document")
         if any(source["content_hash"] == doc.content_hash for source in state["sources"].values()):

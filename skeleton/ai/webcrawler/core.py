@@ -23,6 +23,8 @@ from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
+from .document_formats import ADDITIONAL_TYPES, extract_additional_format
+
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
 _ALLOWED_SCHEMES = {"http", "https"}
@@ -90,6 +92,12 @@ class CrawlPolicy:
         "text/html",
         "text/plain",
         "application/xhtml+xml",
+        "text/markdown",
+        "text/x-markdown",
+        "text/csv",
+        "application/csv",
+        "application/json",
+        "application/ld+json",
     )
     allowed_hosts: frozenset[str] | None = None
 
@@ -279,6 +287,12 @@ def extract_document(
         links = parser.links
     elif ctype == "text/plain":
         text = raw
+    elif ctype in ADDITIONAL_TYPES:
+        parsed = extract_additional_format(
+            raw, ctype, max_chars=max_text_chars, max_links=max_links,
+        )
+        text, title = parsed.text, parsed.title
+        links = list(parsed.links)
     else:
         return None
     text = html.unescape(" ".join(text.split())).strip()
