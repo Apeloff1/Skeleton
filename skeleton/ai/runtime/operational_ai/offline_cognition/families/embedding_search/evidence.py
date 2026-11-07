@@ -20,7 +20,9 @@ def query(catalog,text,*,limit=10,query_vector=None,embedding_model_sha256=None)
                             query_vector=query_vector,
                             embedding_model_sha256=embedding_model_sha256)
 
-def passages(document,*,window_bytes=2048,overlap_bytes=128):
+def passages(document,*,window_bytes=2048,overlap_bytes=None):
+    # Delegate implicit overlap selection to the shared bounded evidence engine.
+    # Explicit invalid overlaps must still be rejected, never silently clamped.
     return partition(document,window_bytes=window_bytes,overlap_bytes=overlap_bytes)
 
 def citation(catalog,span,*,quoted_text=None):
