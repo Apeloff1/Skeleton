@@ -10,7 +10,7 @@ import json
 import os
 from pathlib import Path
 import stat
-import secrets
+import tempfile
 
 MAX_SAVE_BYTES = 2_000_000
 
