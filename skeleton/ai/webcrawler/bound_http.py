@@ -25,6 +25,32 @@ class BoundConnectionError(ConnectionError):
     pass
 
 
+def _coalesce_bounded_link_headers(
+    response_headers: list[tuple[str, str]],
+    normalized_headers: dict[str, str],
+) -> None:
+    """Preserve repeated HTTP Link relations without widening parsing limits.
+
+    Servers commonly emit several Link headers for next-page and feed
+    relations. A plain dict silently loses earlier values. This merges only
+    the harmless discovery *metadata* field, not Cookie, Content-Length,
+    Transfer-Encoding, security headers or status. Malformed and oversized
+    values are ignored; the canonical URL and robots guard still applies to
+    every parsed link before a request can be made.
+    """
+    links = [
+        value for key, value in response_headers
+        if isinstance(key, str) and key.lower() == "link"
+    ]
+    if not links:
+        return
+    if (len(links) > 16 or any(not isinstance(row, str) for row in links)
+            or sum(len(row) for row in links) + 2 * len(links) > 8192):
+        normalized_headers.pop("link", None)
+        return
+    normalized_headers["link"] = ", ".join(links)
+
+
 class _PinnedHTTPConnection(http.client.HTTPConnection):
     def __init__(self, target: ResolvedTarget, timeout, *, deadline=None):
         super().__init__(target.host, target.port, timeout=timeout)
@@ -182,6 +208,7 @@ class SocketBoundFetcher:
             if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
                 raise ValueError("ambiguous Content-Length headers")
             out_headers = {key.lower(): value for key, value in response_headers}
+            _coalesce_bounded_link_headers(response_headers, out_headers)
             if "content-length" in out_headers and "transfer-encoding" in out_headers:
                 raise ValueError("ambiguous response framing")
             if response.status in {301, 302, 303, 307, 308}:
