@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, _read_reviewed, audit, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -88,6 +89,27 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(any(
                 "oversized CI evidence file" in problem for problem in audit(root)
             ))
+
+    def test_descriptor_anchored_evidence_custody(self):
+        """File and parent symlinks, traversal and nonregular payloads fail closed."""
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "safe").mkdir()
+            (root / "safe" / "policy.yml").write_text("on:\\n  push:\\n")
+            self.assertIn("push", _read_reviewed(root, Path("safe/policy.yml")))
+            (root / "file-link.yml").symlink_to(root / "safe/policy.yml")
+            (root / "dir-link").symlink_to(root / "safe", target_is_directory=True)
+            for candidate in (Path("file-link.yml"), Path("dir-link/policy.yml"),
+                              Path("../outside"), Path("/etc/passwd"), Path("safe")):
+                with self.subTest(candidate=str(candidate)), self.assertRaises(
+                    (OSError, ValueError)
+                ):
+                    _read_reviewed(root, candidate)
+            if hasattr(os, "mkfifo"):
+                fifo = root / "fifo"
+                os.mkfifo(fifo)
+                with self.assertRaises((OSError, ValueError)):
+                    _read_reviewed(root, Path("fifo"))
 
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
