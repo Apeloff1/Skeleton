@@ -361,6 +361,12 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
         <Text style={s.small}>
           {report.forensics.low_information_passages} low-information passages · {report.forensics.capture_age_held_sources} capture-age holds · {report.forensics.concentrated_objectives.length} objectives with concentrated hosts
         </Text>
+        <Text style={s.small}>
+          {report.forensics.provenance_held_sources} source provenance holds · {report.forensics.grounding_deficit_objectives} lexical objective deficits · {report.forensics.reference_reused_sources} sources reused across objectives · {report.forensics.urgent_research_gaps} urgent research gaps
+        </Text>
+        <Text style={s.small}>
+          {report.forensics.context_selected_utf8_bytes} selected UTF-8 bytes · {report.forensics.context_budget_exceeded ? 'context limit review required' : 'within audit context limits'} · {report.forensics.consent_renewal_review_due ? 'consent renewal review due' : 'mandate window not near expiry'}
+        </Text>
         <Text style={s.small}>All indicators are unverified review signals, not confirmed attacks, factual errors or rights decisions. The original source text remains restricted by current authenticated capture policy.</Text>
         {report.forensics.review_queue.slice(0, 12).map(item =>
           <View key={item.task_id} style={s.check}>

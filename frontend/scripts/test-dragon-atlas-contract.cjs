@@ -10,6 +10,28 @@ const clientPath = path.join(root, 'src/product/crawlerClient.ts');
 const panelPath = path.join(root, 'src/features/Jeeves/CrawlerResearchAtlasPanel.tsx');
 const workspacePath = path.join(root, 'src/features/Jeeves/CrawlerWorkspace.tsx');
 const H = 'a'.repeat(64);
+const FORENSIC_STAGES = [
+  'exact_selected_source_custody',
+  'source_text_security_inspection',
+  'anchored_passage_geometry',
+  'possible_source_reuse',
+  'objective_failure_counterfactual',
+  'source_boilerplate_screening',
+  'bounded_capture_age_analysis',
+  'cross_source_sentence_echoes',
+  'active_content_render_risk',
+  'privacy_and_secret_exposure',
+  'objective_host_concentration',
+  'possible_polarity_collisions',
+  'canonical_capture_provenance_posture',
+  'operator_objective_grounding',
+  'selected_reference_concentration',
+  'mandate_consent_horizon',
+  'reverse_source_objective_usage',
+  'policy_bound_research_deficit_matrix',
+  'untrusted_context_resource_budget',
+  'review_only_forensic_queue',
+];
 let token = 'operator-one', response = null, posts = [];
 class ChatClientError extends Error {
   constructor(message, options = {}) { super(message); Object.assign(this, options); }
@@ -103,9 +125,8 @@ function fixture() {
     forensics: {
       report_digest: H, frame_set_digest: H, atlas_digest: H,
       source_policy_digest: H, retrieval_digest: H,
-      stages: Array.from({length: 13}, (_, ordinal) => ({
-        ordinal, name: ordinal === 0 ? 'exact_selected_source_custody'
-          : ordinal === 12 ? 'review_only_forensic_queue' : 'forensic-' + ordinal,
+      stages: FORENSIC_STAGES.map((name, ordinal) => ({
+        ordinal, name,
         receipt_digest: H, chain_digest: H,
       })),
       selected_passages: 1, selected_sources: 1,
@@ -115,6 +136,10 @@ function fixture() {
       possible_polarity_collisions: 0, low_information_passages: 0,
       capture_age_held_sources: 0, overlap_excess_characters: 0,
       concentrated_objectives: [], review_tasks: 0,
+      provenance_held_sources: 0, grounding_deficit_objectives: 0,
+      reference_reused_sources: 0, consent_renewal_review_due: false,
+      urgent_research_gaps: 0, context_selected_utf8_bytes: 4096,
+      context_budget_exceeded: false,
       critical_review_tasks: 0, review_queue: [],
       source_bodies_redacted: true, human_review_required: true,
       publication_granted: false, training_permission: false,
@@ -223,6 +248,9 @@ test('foreign session, staged digest mismatch and alleged external effects are r
     a => { a.review_operations.human_review_recorded = true; },
     a => { a.forensics.source_bodies_redacted = false; },
     a => { a.forensics.stages.pop(); },
+    a => { a.forensics.stages[14].name = 'forged_stage'; },
+    a => { a.forensics.consent_renewal_review_due = 'yes'; },
+    a => { a.forensics.context_selected_utf8_bytes = 999999; },
     a => { a.forensics.atlas_digest = 'b'.repeat(64); },
     a => { a.forensics.publication_granted = true; },
     a => { a.forensics.critical_review_tasks = 257; },

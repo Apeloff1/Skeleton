@@ -34,6 +34,29 @@ export type SourceExport = { filename: string; media_type: string; content: stri
 const ROOT = '/api/dragon-academy/crawler';
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const HASH = /^[a-f0-9]{64}$/;
+const FORENSIC_STAGE_NAMES = [
+  'exact_selected_source_custody',
+  'source_text_security_inspection',
+  'anchored_passage_geometry',
+  'possible_source_reuse',
+  'objective_failure_counterfactual',
+  'source_boilerplate_screening',
+  'bounded_capture_age_analysis',
+  'cross_source_sentence_echoes',
+  'active_content_render_risk',
+  'privacy_and_secret_exposure',
+  'objective_host_concentration',
+  'possible_polarity_collisions',
+  'canonical_capture_provenance_posture',
+  'operator_objective_grounding',
+  'selected_reference_concentration',
+  'mandate_consent_horizon',
+  'reverse_source_objective_usage',
+  'policy_bound_research_deficit_matrix',
+  'untrusted_context_resource_budget',
+  'review_only_forensic_queue',
+] as const;
+
 const STATUSES = new Set(['queued', 'ready', 'running', 'paused', 'completed', 'cancelled', 'budget_exhausted', 'failed', 'interrupted']);
 export function crawlRequestKey(action: string): string { return 'crawler:' + action + ':' + (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)); }
 function invalid(message: string): never { throw new ChatClientError(message, { kind: 'protocol', retryable: false }); }
@@ -333,6 +356,10 @@ export type CrawlAtlasReport = {
     possible_polarity_collisions: number; low_information_passages: number;
     capture_age_held_sources: number; overlap_excess_characters: number;
     concentrated_objectives: string[]; review_tasks: number;
+    provenance_held_sources: number; grounding_deficit_objectives: number;
+    reference_reused_sources: number; consent_renewal_review_due: boolean;
+    urgent_research_gaps: number; context_selected_utf8_bytes: number;
+    context_budget_exceeded: boolean;
     critical_review_tasks: number;
     review_queue: {
       task_id: string; risk: 'critical' | 'high' | 'medium' | 'low';
@@ -558,13 +585,12 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || value.forensics.atlas_digest !== value.atlas_digest
       || value.forensics.source_policy_digest !== value.source_policy.digest
       || value.forensics.retrieval_digest !== value.retrieval.digest
-      || !Array.isArray(value.forensics.stages) || value.forensics.stages.length !== 13
+      || !Array.isArray(value.forensics.stages)
+      || value.forensics.stages.length !== FORENSIC_STAGE_NAMES.length
       || value.forensics.stages.some((entry, index) =>
         !entry || entry.ordinal !== index
-        || typeof entry.name !== 'string' || entry.name.length > 100
+        || entry.name !== FORENSIC_STAGE_NAMES[index]
         || !HASH.test(entry.receipt_digest) || !HASH.test(entry.chain_digest))
-      || value.forensics.stages[0].name !== 'exact_selected_source_custody'
-      || value.forensics.stages[12].name !== 'review_only_forensic_queue'
       || !integer(value.forensics.selected_passages, 32)
       || !integer(value.forensics.selected_sources, 32)
       || !integer(value.forensics.security_held_passages, 32)
@@ -577,6 +603,13 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || !integer(value.forensics.low_information_passages, 32)
       || !integer(value.forensics.capture_age_held_sources, 32)
       || !integer(value.forensics.overlap_excess_characters, 48000)
+      || !integer(value.forensics.provenance_held_sources, 32)
+      || !integer(value.forensics.grounding_deficit_objectives, 32)
+      || !integer(value.forensics.reference_reused_sources, 32)
+      || typeof value.forensics.consent_renewal_review_due !== 'boolean'
+      || !integer(value.forensics.urgent_research_gaps, 32)
+      || !integer(value.forensics.context_selected_utf8_bytes, 196608)
+      || typeof value.forensics.context_budget_exceeded !== 'boolean'
       || !integer(value.forensics.review_tasks, 256)
       || !integer(value.forensics.critical_review_tasks, 256)
       || value.forensics.critical_review_tasks > value.forensics.review_tasks
