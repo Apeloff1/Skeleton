@@ -53,6 +53,19 @@ class FirstRunReadiness:
 
 SERVICE_ORDER = ("backend", "local_ai", "jeeves", "builder", "game_store")
 MAX_REASON = 160
+MAX_ELAPSED_MS = 86_400_000
+
+
+def _safe_clock_ns(clock: Callable[[], int]) -> int | None:
+    """A broken clock must never make first-run setup inaccessible."""
+    try:
+        value = clock()
+    except Exception:
+        return None
+    # bool is an int subclass but is not a timestamp.
+    if type(value) is not int or value < 0:
+        return None
+    return value
 
 
 def _bounded_reason(value: object) -> str:
@@ -78,6 +91,8 @@ def check_first_run(
     unknown = set(probes).difference(SERVICE_ORDER)
     if unknown:
         raise FirstRunGateError("unknown service probe")
+    if not callable(clock_ns):
+        raise FirstRunGateError("clock must be callable")
     results: list[ServiceResult] = []
     blocked = False
     for name in SERVICE_ORDER:
@@ -96,7 +111,7 @@ def check_first_run(
                                          "probe-not-callable", 0))
             blocked = True
             continue
-        start = clock_ns()
+        start = _safe_clock_ns(clock_ns)
         try:
             outcome = probe()
             state = ServiceState.READY if outcome is True else ServiceState.UNAVAILABLE
@@ -105,7 +120,14 @@ def check_first_run(
             state = ServiceState.FAILED
             # Never expose exception text: it may contain tokens or local paths.
             reason = "probe-raised-" + type(exc).__name__[:48]
-        elapsed = max(0, (clock_ns() - start) // 1_000_000)
+        finish = _safe_clock_ns(clock_ns)
+        if start is None or finish is None or finish < start:
+            # Clock faults are not evidence of a healthy probe. Fail closed.
+            state = ServiceState.FAILED
+            reason = "probe-clock-unavailable"
+            elapsed = 0
+        else:
+            elapsed = min(MAX_ELAPSED_MS, (finish - start) // 1_000_000)
         results.append(ServiceResult(name, state, _bounded_reason(reason), elapsed))
         if state is not ServiceState.READY:
             blocked = True
