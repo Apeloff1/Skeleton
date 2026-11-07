@@ -331,15 +331,18 @@ class SlotStore:
 
     def backup(self, name: str) -> Path:
         """Export a transactionally consistent, fully replayable action history."""
-        from .consumer_backup import build_backup, MAX_BACKUP_BYTES
+        from .consumer_backup import build_backup, MAX_BACKUP_BYTES, MAX_BACKUP_ACTIONS
         name = _slot(name)
         with closing(self._connect()) as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 verified, revision = self._read(conn, name)
+                # Bound corrupt ledger metadata before materializing any rows.
+                if revision > MAX_BACKUP_ACTIONS:
+                    raise StoreError("save history exceeds backup action budget")
                 rows = conn.execute(
                     "SELECT revision, prior_head, next_head, action FROM actions "
-                    "WHERE slot=? ORDER BY revision", (name,),
+                    "WHERE slot=? ORDER BY revision LIMIT ?", (name, MAX_BACKUP_ACTIONS + 1),
                 ).fetchall()
                 if len(rows) != revision:
                     raise StoreError("save history is incomplete")
