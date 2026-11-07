@@ -410,9 +410,16 @@ class SlotStore:
             try:
                 conn.execute("BEGIN")
                 verified, revision = self._read(conn, name)
+                # Audit must obey the same finite replay budget as backup.
+                # Corrupt slot metadata must not trigger an unbounded SELECT,
+                # nor should a mismatched action table be fully materialized.
+                from .consumer_backup import MAX_BACKUP_ACTIONS
+                if revision > MAX_BACKUP_ACTIONS:
+                    raise StoreError("save history exceeds audit action budget")
                 rows = conn.execute(
                     "SELECT revision, prior_head, next_head, action FROM actions "
-                    "WHERE slot=? ORDER BY revision", (name,)
+                    "WHERE slot=? ORDER BY revision LIMIT ?",
+                    (name, MAX_BACKUP_ACTIONS + 1),
                 ).fetchall()
                 conn.execute("COMMIT")
             except sqlite3.Error as exc:
