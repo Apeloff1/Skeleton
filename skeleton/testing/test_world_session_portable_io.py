@@ -42,7 +42,7 @@ class PortableReceiptIOTests(unittest.TestCase):
                     restore_json(world(), payload)
                 self.assertEqual(raised.exception.code, "invalid_session_payload")
         with self.assertRaises(CanonError) as raised:
-            restore_json(world(), b'\\xff')
+            restore_json(world(), bytes([255]))
         self.assertEqual(raised.exception.code, "invalid_json")
 
     def test_source_change_invalidates_receipt(self):
