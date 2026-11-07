@@ -98,6 +98,33 @@ class CrawlPolicy:
         "application/csv",
         "application/json",
         "application/ld+json",
+        "application/x-ndjson",
+        "application/ndjson",
+        "application/jsonl",
+        "text/x-jsonl",
+        "text/x-python",
+        "text/x-c",
+        "text/x-csrc",
+        "text/x-c++src",
+        "text/x-rust",
+        "text/x-go",
+        "text/x-java-source",
+        "text/javascript",
+        "application/javascript",
+        "application/x-javascript",
+        "text/x-typescript",
+        "application/typescript",
+        "text/css",
+        "text/x-rst",
+        "text/x-asciidoc",
+        "text/yaml",
+        "text/x-yaml",
+        "application/yaml",
+        "application/x-yaml",
+        "application/toml",
+        "text/x-toml",
+        "text/x-shellscript",
+        "application/x-sh",
     )
     allowed_hosts: frozenset[str] | None = None
 
@@ -279,6 +306,7 @@ def extract_document(
         raw = response.body.decode("utf-8", errors="replace")
     title = ""
     links: list[str] = []
+    parser_text_truncated = False
     if ctype in {"text/html", "application/xhtml+xml"}:
         parser = _Extractor(max_links=max_links, max_text_chars=max_text_chars)
         parser.feed(raw)
@@ -293,6 +321,7 @@ def extract_document(
         )
         text, title = parsed.text, parsed.title
         links = list(parsed.links)
+        parser_text_truncated = parsed.truncated
     else:
         return None
     text = html.unescape(" ".join(text.split())).strip()
@@ -313,6 +342,7 @@ def extract_document(
         "status": response.status,
         "content_hash": digest,
         "raw_body_hash": hashlib.sha256(response.body).hexdigest(),
+        "parser_text_truncated": parser_text_truncated,
     }
     return CrawlDocument(
         canonical_url=canonical_url,

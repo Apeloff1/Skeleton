@@ -974,7 +974,10 @@ class CrawlRun:
             "content_hash": doc.content_hash,
             "raw_body_hash": doc.provenance["raw_body_hash"],
             "preserved_text_hash": hashlib.sha256(text.encode()).hexdigest(),
-            "text_truncated": len(text.encode()) < len(text_bytes),
+            "text_truncated": (
+                len(text.encode()) < len(text_bytes)
+                or doc.provenance.get("parser_text_truncated") is True
+            ),
             "content_type": doc.content_type,
             "fetched_at": doc.fetched_at,
             "review_state": "unreviewed",
