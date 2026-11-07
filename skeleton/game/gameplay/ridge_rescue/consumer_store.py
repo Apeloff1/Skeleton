@@ -195,6 +195,11 @@ class SlotStore:
                 previous, revision = self._read(conn, name)
                 if previous["head"] != expected_head:
                     raise StoreError("stale save revision")
+                # Never accept a transition that makes the save impossible to
+                # audit or back up under the canonical finite replay budget.
+                from .consumer_backup import MAX_BACKUP_ACTIONS
+                if revision >= MAX_BACKUP_ACTIONS:
+                    raise StoreError("save history action budget exhausted")
                 if action is None:
                     updated = retry_campaign(previous["session"], expected_head=expected_head)
                     event = {"verb": "retry"}
