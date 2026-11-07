@@ -85,7 +85,7 @@ def govern_canonical_origins(
         host = parsed.hostname
         cool = finite(canonical["host_ready"].get(host, 0),
                       "canonical host cooldown")
-        threshold = max(cool, *(float(r["ready_at"]) for r in rows))
+        threshold = min(max(cool, float(r["ready_at"])) for r in rows)
         ready_now = sum(max(cool, float(row["ready_at"])) <= now for row in rows)
         ready_count += ready_now
         robots = canonical["robots"].get(origin)
@@ -114,7 +114,16 @@ def govern_canonical_origins(
             reasons.append("event_clock_integrity_review")
         if canonical["state"] not in ("ready", "running"):
             reasons.append("canonical_state_not_runnable")
-        if reasons:
+        # Missing robots state warrants an explicit robots-only preflight,
+        # not a blanket ban on a hypothetical robots request. Hard failures
+        # (unsettled worker, time integrity or non-runnable state) do prevent
+        # advisory work from being proposed.
+        if set(reasons) & {
+            "previous_remote_outcome_unsettled",
+            "event_clock_integrity_review",
+            "canonical_state_not_runnable",
+            "future_robots_observation",
+        }:
             held_hosts.add(host)
         entries.append(OriginGuard(
             host, origin, len(rows), threshold,
