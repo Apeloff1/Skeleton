@@ -101,6 +101,14 @@ Commands:
     scene-market-play  Play offline market quests with durable checkpoints
     scene-market-author  Edit and preview source-bound trading quests
     scene-market  Play earned-currency trading, crafting and delivery quests
+    scene-market-hours        Play merchant opening-hours campaigns
+    scene-market-hours-play   Interactively play merchant opening-hours campaigns
+    scene-market-hours-accept Verify merchant gameplay replay and custody
+    scene-market-party        Play earned cooperative market campaigns
+    scene-market-party-play   Play cooperative market checkpoints interactively
+    scene-market-party-vault  Manage verified offline cooperative saves
+    scene-market-contract     Play source-bound market contracts
+    scene-market-contract-play Interactively play market contracts
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
@@ -153,6 +161,9 @@ Commands:
     scene-market-route                 Source-verified offline gameplay command
     scene-market-board                 Source-verified offline gameplay command
     scene-push                         Source-verified offline gameplay command
+    scene-push-play                    Interactive verified tile push puzzles
+    scene-push-accept                  Audit earned tile push victory and replay
+    combat-arena                       Play source-bound tactical arena
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -1077,6 +1088,30 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market":
         from skeleton.game.gameplay.scene_market import cli as market_cli
         return market_cli(rest)
+    if cmd == "scene-market-hours":
+        from skeleton.game.gameplay.scene_market_hours import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-hours-play":
+        from skeleton.game.gameplay.scene_market_hours_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-hours-accept":
+        from skeleton.game.gameplay.scene_market_hours_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party":
+        from skeleton.game.gameplay.scene_market_party import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-play":
+        from skeleton.game.gameplay.scene_market_party_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-vault":
+        from skeleton.game.gameplay.scene_market_party_vault import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-contract":
+        from skeleton.game.gameplay.scene_market_contract import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-contract-play":
+        from skeleton.game.gameplay.scene_market_contract_interactive import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "scene-tiles":
         from skeleton.game.gameplay.scene_tile_walk import cli as scene_tiles_cli
         return scene_tiles_cli(rest)
@@ -1188,6 +1223,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-push":
         from skeleton.game.gameplay.scene_tile_push import cli as source_bound_cli
         return source_bound_cli(rest)
+    if cmd == "scene-push-play":
+        from skeleton.game.gameplay.scene_tile_push_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-push-accept":
+        from skeleton.game.gameplay.scene_tile_push_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "combat-arena":
+        from skeleton.game.gameplay.tactical_arena import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
