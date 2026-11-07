@@ -221,7 +221,28 @@ class MongoGuardedActivation:
                     or hello.get("isWritablePrimary") is not True):
                 raise ActivationBlocked("linearizable Mongo replica-set primary required")
             topology_fields = ("setName", "me", "primary", "electionId", "setVersion")
-            initial_topology = tuple(hello.get(field) for field in topology_fields)
+            # Never compare attacker-controlled BSON objects with custom equality.
+            # Mongo hello topology identifiers have a narrow primitive contract;
+            # ObjectId election identifiers are permitted, but arbitrary Python
+            # equality hooks must not decide whether an election occurred.
+            def topology_identity(observation: dict) -> tuple:
+                from bson.objectid import ObjectId
+                values = []
+                for field in topology_fields:
+                    value = observation.get(field)
+                    allowed = (str, type(None)) if field in ("setName", "me", "primary") else (int, type(None))
+                    if field == "electionId":
+                        allowed = (ObjectId, type(None))
+                    if type(value) not in allowed:
+                        raise ActivationBlocked("Mongo topology identity malformed")
+                    if type(value) is str and (not value or len(value) > 512 or not value.isascii()
+                            or any(ord(ch) < 33 or ord(ch) > 126 for ch in value)):
+                        raise ActivationBlocked("Mongo topology identity malformed")
+                    if type(value) is int and not 0 <= value <= 2147483647:
+                        raise ActivationBlocked("Mongo topology identity malformed")
+                    values.append(value)
+                return tuple(values)
+            initial_topology = topology_identity(hello)
             # A replica-set primary can be reachable with authentication
             # disabled. A linearizable epoch on an unauthenticated server
             # cannot establish trusted custody for protected local inference.
@@ -307,7 +328,7 @@ class MongoGuardedActivation:
                 final_auth = await self._database.command("connectionStatus")
             if (type(final_hello) is not dict
                     or final_hello.get("isWritablePrimary") is not True
-                    or tuple(final_hello.get(field) for field in topology_fields)
+                    or topology_identity(final_hello)
                     != initial_topology):
                 raise ActivationBlocked("Mongo primary changed during reviewer attestation")
             final_users = (
@@ -346,7 +367,7 @@ class MongoGuardedActivation:
                 post_epoch_auth = await self._database.command("connectionStatus")
             if (type(post_epoch_hello) is not dict
                     or post_epoch_hello.get("isWritablePrimary") is not True
-                    or tuple(post_epoch_hello.get(field) for field in topology_fields)
+                    or topology_identity(post_epoch_hello)
                     != initial_topology):
                 raise ActivationBlocked("Mongo primary changed during final epoch read")
             post_users = (
