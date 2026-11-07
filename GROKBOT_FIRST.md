@@ -40,6 +40,9 @@
 - 25. Critical-path guarded local AI engineering
 - 26. Concrete playable-game compiler and visual acceptance
 - 27. Repository object census and unresolved unknowns
+- 28. Frontier-comparison laboratory
+- 29. Workable integration contract catalog
+- 30. Twelve-bot executable vertical slices
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -4772,3 +4775,346 @@ Do not automatically declare an LFS/submodule discrepancy an error; investigate 
 A source path named “advanced” may still contain a simulator, proof object, facade or real runtime; inspect its imports and actual side effects before grading. Godot adapters may be genre-specific and have distinct feature coverage, so one adapter's limitation does not negate another. A source queue may be durable on Mongo for some operations and in-process for fallback under limited modes; discover actual current dispatch paths before generalizing. Runtime screenshots do not prove source-and-binary identity without receipts. A GitHub job success does not prove a local-device test. A CI workflow skipped under PR filters is not a pass. An AGENTS.md construction gap marked closed does not prove end-user experience, yet also should not be reopened on speculation.
 
 Any proposed fix should be written as a source-hypothesis test: **Observed:** precise file, line/function, run or artifact. **Impact:** failed user journey. **Minimal repair:** existing canonical owner with bounded behavior. **Negative oracle:** condition that must remain denied. **Proof:** focused test and real integration if needed. **Promotion:** exact final source head and independent approval. Unsupported leaps in reasoning must become investigative tasks, not unapproved PR mutations.
+
+# 28. Frontier-comparison laboratory: reproducible SOTA without misleading wins
+
+Frontier-grade quality must be measured against real tools and locked, interactive tasks. The three relevant published 2026 research baselines are complementary, not interchangeable:
+
+- GameCraft-Bench (Luo et al., June 2026, arXiv:2606.17861) formalizes Engine Grounding, Artifact Completeness and Interactive Verification across 140 Godot tasks and fifteen game families. The point is that plausible scripts and project manifests often fail to become complete interactive games.
+- GameXpert-Bench (Chen et al., August 2026, arXiv:2608.21833) separates GameGen (97 generation tasks across eleven genres), GameFix (100 repair tasks derived from fifty game levels) and GameOpt (seventeen six-turn optimization chains, 102 requests). It emphasizes the entire production lifecycle and cumulative regression safety.
+- GameASG-Bench (Zhang et al., September 2026, arXiv:2609.21293) declares legal player-level interfaces, starting scenarios and core behavior in advance; its 47 browser-native tasks expose how mean check pass rate can be much higher than strict whole-task pass.
+- The official Godot archive as checked on 2026-11-07 lists 4.7.2 as the latest stable patch and 4.8-beta2 as preview, with release 4.8 not stable. Do not silently move production to a beta. Pin versions to real downloadable licensed binaries and prove migration. Source: https://godotengine.org/download/archive/.
+
+These benchmarks are relevant comparison methodology, not evidence that Skeleton has been run on them. Building a locally invented easier test and declaring SOTA would be misleading. The goal is to construct **an independent, reproducible comparison laboratory** with a declared workload, deterministic evaluators, actual Godot/HTML5 target runtimes and separated builder/judge privileges. Whether a specific external benchmark can be redistributed or used commercially must be verified from its current license and dataset terms; do not infer rights from an arXiv abstract.
+
+## 28.1 Benchmark hierarchy and anti-gaming design
+
+**Track C0 — source/contract.** Static compile, type, schema, source ownership and resource/security compliance. It detects malformed output but cannot establish game completeness.
+
+**Track C1 — asset/project completeness.** A package contains all declared scenes, scripts, input maps, executable targets, models, original sprites/meshes, media and manifest/rights. Checker inspects actual bytes and file references, not model prose.
+
+**Track C2 — real runtime.** Launch target under pinned supported Godot or browser, exercise player input, observe state transitions, finish objective, run failure/retry and save/reload. Assertions depend on actual game behavior.
+
+**Track C3 — product usability.** Human-independent UI agent and at least one separate blind reviewer test onboarding, controller response, presentation and accessible feedback. A creator can adjust a design element and see the change in the playable output.
+
+**Track C4 — development process.** Report cost, wall time, number of attempts, repair count, operator intervention, child worker concurrency, failure recovery and source/artifact lineage. A fast but unsafe agent is not superior.
+
+**Track C5 — generalization.** Lock unseen briefs, altered item/quest names, alternative art themes, target differences and minor negative perturbations. A solution trained on benchmark fixtures without transfer does not count as general capability.
+
+The primary game result must be conjunctive: every essential requirement present, executable target starts, player input works, objective is reachable, game state is consistent, and no release-blocking security/license defect. Publish per-condition pass and strict task pass separately. A game can have 95% per-assertion average and still fail if one required victory or input check is broken. Use confidence intervals, workload sizes, censored timeouts, held-out seeds and all failed task IDs, not cherry-picked examples.
+
+## 28.2 Benchmark custody and independent evaluation controls
+
+1. Freeze task source, evaluator version, engine binary digest, runner host capacity and input/seed corpus before an agent starts the game. Give the builder only the stated player-visible interface and permitted development APIs, never hidden evaluator files.
+2. Assign at least one separate verification principal or process to the judge. Its trusted prompts and test predicates must be inaccessible as mutable builder workspace files.
+3. Record an immutable task ID, brief digest, legal capabilities, allowed project target and time/resources. Limit retries; a restart cannot reset cost or failure counts.
+4. Require actual output tree and binary. A text response, project blueprint or static screenshot cannot satisfy C2.
+5. Run public tests for debugging feedback, then frozen hidden/cross-seed tests after candidate is sealed. Preserve the builder's full source revision graph and selected final revision.
+6. Use a deterministic input driver with visible observed state. For Godot, integrate an approved debug/test protocol or frame/controller harness; for browser, exercise real DOM/canvas controls. Do not mutate game variables behind the player's back to pass required outcomes.
+7. When judges use vision or text models, compare against deterministic state or video witness, report disagreements and calibrate against independent humans. Neither one benchmark score nor one human's taste is a universal quality result.
+8. Publish exact cost basis, including model inference time, token counts, local GPU occupancy and compiler/playtest resources. Hidden hosted costs or worker persistence invalidate cost claims.
+9. Re-run against a clean target host, not a dirty developer checkout that supplies missing dependencies through PATH or cached media.
+10. If the agent proposes a fix after failure, require a new final source SHA and rerun the affected task plus cumulative regression set.
+11. Attribute hardware limitations separately from agent defects, but do not count hardware failures as product successes. Unknown becomes a held result with reproducible diagnosis.
+12. Compare to a stable Skeleton baseline on the *same* tasks and machine before claiming improvement. Relative advantage must not cancel security, rights, data loss or accessibility regressions.
+
+## 28.3 Proposed internal benchmark task collection
+
+The following task families are original proposed obligations, not representations of external benchmark datasets:
+
+| Task ID | Family and hidden perturbation | Essential success witness |
+|---|---|---|
+| GB-001 | Top-down shooter, swapped enemy speed and map dimensions | move, aim, attack, earn resource, win and restart |
+| GB-002 | Precision platformer, randomized coyote/buffer timings | real controller traverses ledge and moving platform fairly |
+| GB-003 | Roguelike RPG, alternate seed and loot rarity | quest, inventory, combat and save remains consistent |
+| GB-004 | First-person 3D exploration, camera sensitivity variation | player finds and uses actual 3D interactable |
+| GB-005 | Racing simulation, weather and tire-profile variation | real steering, braking, pit behavior and legitimate lap |
+| GB-006 | Strategy tactics, starting-position permutation | valid turn resolution and reachable winner |
+| GB-007 | Logic puzzle, rearranged switch/wall layout | independent solver+player complete without illegal state mutation |
+| GB-008 | Narrative quest, changed NPC belief and faction history | distinct correct branch, dialogue consistency and ending |
+| GB-009 | Interactive cinematics, interrupted playback and captions | skip/resume control restores player state with no duplicated reward |
+| GB-010 | Audio-heavy action, muted accessibility variant | actual audio and redundant textual/visual event signal |
+| GB-011 | Asset replacement, revoked source and incompatible model | previous approved game remains playable and denied asset excluded |
+| GB-012 | Source-driven editing, agent given stale project revision | conflicts are surfaced and human changes not overwritten |
+| GB-013 | Crash at save checkpoint, repeat transaction | exactly one committed reward and reproducible reload |
+| GB-014 | No-network local game creation | zero unexpected external calls and complete playable package |
+| GB-015 | Cross-target export with unsupported GPU shader | explicit capability denial or operator-approved fallback |
+| GB-016 | Combined build/repair/optimize chain | six source revisions preserve all previously satisfied game behaviors |
+
+Each family must be expanded by multiple original content variants and different target constraints, not by renaming file headers. Define source permissions, input action schema, target machine, expected state witnesses, difficulty envelope and failure conditions in canonical data. Keep evaluator implementation private from the candidate agent. Add adversarial tasks where the safest correct answer is to refuse an impossible target/unsupported license rather than generating deceptive output.
+
+## 28.4 Original game quality rubric
+
+**Player comprehension:** the player can identify goal, constraints, feedback, threats and controls without reading developer code. Measure confusion and misleading cues.
+
+**Mechanic integrity:** actions respond predictably, controls respect physical rules, progression is reachable and failure is attributable to player decisions rather than bugs.
+
+**Aesthetic coherence:** assets belong to a consistent visual language, animation and audio match events, camera and lighting preserve necessary perception, and text remains legible.
+
+**Narrative agency:** when the game promises meaningful choice, divergent actions have witnessed causal differences; there is no invisible forced ending or fabricated NPC memory.
+
+**Completeness:** title, help, main loop, win, lose, retry, save/restart where required, real package and source manifests all work from the installed artifact.
+
+**Performance and accessibility:** target framerate and input latency meet declared envelopes, background model work does not stall the game, and essential information has accessible alternatives.
+
+**Creative differentiation:** a generated game has distinct mechanics and authored content beyond a renamed public tutorial. Originality is not proved by automated similarity alone and must still pass source-rights review.
+
+**Maintenance:** creator can open, inspect, change, test and export the project again after app restart; hidden generator state is not the only way to modify it.
+
+Use an agreed numerical rubric as auxiliary data and retain direct qualitative observations, but hard essential mechanics are not averaged into an aesthetic score. Every new model/renderer/genre release should pass a regression suite of fixed golden projects plus new unseen tasks.
+
+# 29. Workable integration-contract catalog for the twelve-bot federation
+
+The machine architecture already has 86 runtime/acceptance interface edges and a typed schema catalog. This chapter does not create another parallel schema system. It describes **proposed typed interface requirements** for game-specific seams, to be reconciled into the canonical owners before implementation. An exact schema may already exist under another name; BOT-02 must identify and extend that owner rather than minting duplicate IDs.
+
+## 29.1 Product capability and trust envelope
+
+Any externally initiated game action should enter through canonical authentication and project scope. The envelope binds actor, tenant, project/source revision, job and operation ID, idempotency key, finite physical resource budget, deadline, tool/target capability grant and audit context. A browser sends a request; it never becomes the authoritative owner of the source revision or game state merely by including a field. The backend validates principal and route, the engine validates the delegated action, the canonical owner commits and emits a versioned receipt. If the route needs a model, the provider boundary performs admission/architecture acknowledgement before I/O.
+
+**Acceptance:** deny missing/mismatched tenant, expired grant, changed revision, recycled key with changed payload, cost cap exceeded and unsupported action; preserve existing state and produce a stable public error classification. A validated action should return one committed current revision, not a speculative success.
+
+## 29.2 Brief, design and project manifest
+
+A natural-language brief is human input, possibly containing quoted external source, so treat it as untrusted data. The design spec must record scope/genre, required targets, original content intent, core loop, start/win/lose/retry conditions, player verbs, camera, art/audio/accessibility needs and explicit unresolved choices. Existing skeleton.game_design_spec.v1 is a starting contract. A detailed game plan references this immutable brief and pinning identity. On approved revision, invalidation should be targeted: an art palette change need not invalidate unrelated economy source, while a player movement rule change must invalidate play tests that depend on it.
+
+**Acceptance:** a structured game input cannot bypass project owner scope or mutate target/genre outside approved intent. A plan that lacks a win/fail condition cannot be certified as a finished-game plan. Run source-golden tests for shooter, platformer, RPG and one adversarial impossible brief.
+
+## 29.3 World and scene graph
+
+Every spatial game project needs persistent world/scene/object identity, collision/navigation relations, source rights and revision support. A scene reference points to exact asset and script versions, not merely names. A world transition must specify entry/exit spawn, player/inventory transfer, quest-world transfer, save migration and version-compatible target. For 3D, transform coordinate system, units, scale, handedness, material, skin and collision must be explicit.
+
+**Acceptance:** reject orphan scene references, duplicate object IDs, invalid transforms, nonfinite coordinates, missing physical mesh colliders, unregistered portal and old-save incompatible transition. Test a player traveling through two worlds, saving, restarting and returning to an unchanged quest objective.
+
+## 29.4 Player controller and action semantics
+
+A controller contract lists physical inputs, normalized action names, actions per frame/tick, pause/focus semantics, remapping and accessibility. Simulated agents should use the same player-level input path as humans when establishing playable proof. Authoritative gameplay may apply validated input and produce tick-bound state events, but the test harness must not directly set objective success.
+
+**Acceptance:** input-down/up, analog dead zone, keyboard overlap, window focus loss, gamepad disconnect and touch gesture all have deterministic safe transitions. Input replay at different frame pacing should preserve essential state within stated tolerance. Define missing hardware as an unsupported target, not a passing skip.
+
+## 29.5 Gameplay events and side-effect idempotency
+
+Player actions yield events such as move, attack, hit, pickup, craft, quest advance, faction change, reward, save and death. Events need stable IDs, tick ordering, authority, source/rule identity, preconditions and durable receipts for externally relevant consequences. A reward should not appear twice because a frame callback, network client or AI agent retries after a timeout.
+
+**Acceptance:** two identical pickup commands with the same committed event ID yield at most one inventory increment. Changing item cost between initiation and commit requires version-CAS or denial. Crash after reservation but before acknowledgment must reconcile exact authoritative outcome before retry.
+
+## 29.6 Narrative and choice graph
+
+Quest nodes bind objectives, dependencies, actor knowledge, branch predicates, rewards, failure alternatives and endings. A canonical story graph records witnessed player choices, not guessed model summaries. Offscreen NPC belief updates must cite observed game events or declare rumors with uncertainty. A story line cannot retrospectively invent a player having helped a faction.
+
+**Acceptance:** compile a quest dependency graph with independent reachability proof and an actual playthrough. Test unknown actor, unavailable item, missed timed opportunity, source revision after quest start, contradictory canon and two distinct endings. Provide authored repair options rather than silently converting an impossible campaign into a fake completion.
+
+## 29.7 Economy, inventory and crafting
+
+Currencies and resources are bounded quantitative state. Define integer/decimal precision and exact transaction scope; recipes express consumed inputs, produced outputs, stations, time and skills. Shop purchases require verified inventory/currency on current revision, and crafting must not create a free-positive-value cycle unless explicitly permitted as game design. The engine must preserve reward/consumption ordering.
+
+**Acceptance:** negative quantities, overflow, race between purchase/trade, duplicate pickup and kill/resume mid-craft are rejected or reconciled. A long-run simulation must search for inflation, softlocks and dominant exploits. The editor must show actual economic effect when modifying a recipe.
+
+## 29.8 Encounter and progression
+
+Generated encounters require valid spatial spawn, faction/biome/character context, appropriate difficulty, readable telegraph and resource rewards. Progression curves are tied to actual player actions and chosen difficulty, not static text. A mandatory enemy should never spawn inside an unreachable room or permanently disable key progression without repair.
+
+**Acceptance:** seed search with solver and player bots; run unknown/randomized seeds, high/low skill policies, audio/visual cue absence and save after boss defeat. Record difficulty and fairness observations separately from hard reachability proof.
+
+## 29.9 Procedural level and seed
+
+Store algorithm version, input constraints, deterministic seed and output graph digest. Physical reachability, gate-key semantics, authored object preservation and resource availability form the hard generation contract. Large-world streaming divides content into chunks but does not change the canonical global graph.
+
+**Acceptance:** same exact source/algorithm/seed generates same structure; regeneration with a new algorithm declares a migration. For every advertised ending/exit, at least one valid path witness must exist in the authored graph and pass actual controller constraints. A solver route that a human cannot traverse due to collision timing does not count.
+
+## 29.10 Asset and multimedia provenance
+
+An asset record needs source rights, tool/model/import version, content digest, variant, source image/audio/mesh/rig identity, target format and current eligibility. Media created from external references must record how rights were established and how future withdrawal affects it. Logical animation/audio descriptors must be linked to real clips/PCM and target engine events when the user-facing feature requires actual media.
+
+**Acceptance:** malformed SVG/3D/zip/audio content is denied before host execution, giant decompression and symlink races are bounded, unlicensed content not exported, and withdrawn source invalidates descendants including thumbnails and cached material. The exported game actually uses the approved asset bytes.
+
+## 29.11 Rig, animation and root-motion coupling
+
+The animation state machine binds rig bone topology, skin weights, clip duration, root motion, attack windows, transition rules and event notifications. Rendering must show actual object transform/pose, and physics must own collision separately from purely visual root motion where declared. Avoid a state-model implementation that does not affect the final scene.
+
+**Acceptance:** walk/run/jump/attack/death shows correct visible pose and event timings. Save/reload during partial animation, pausing and changing frame rate must not duplicate sound/reward or displace the actor. A rig mismatch must deny publication before a target build.
+
+## 29.12 Audio file, mixer and subtitle coupling
+
+The audio source asset/stream, cue schedule, environment, spatial listener, gain, sample rate, clip length and author rights must be explicit. If local sound synthesis is unsupported, the pipeline can use a verified user-owned clip; it should not claim synthetic audio generation by returning a logical sound descriptor. Captions and alternate visual/text cue are required for essential story or hazard information.
+
+**Acceptance:** in actual Godot/browser game, attacking triggers audible sound with measured bounded loudness, stopping action cancels/finishes cue per design, dynamic music changes on scene state, and muting still leaves essential cues accessible. Audio artifact hashes and visual frame/interaction traces must refer to same game release.
+
+## 29.13 Cinema and camera control
+
+A cinematic timeline specifies scene/shot, target actors, camera, subtitles, audio, player input lock, skip, rewind/pause and final state transfer. An interactive cutscene may branch on canonical story facts, but should not grant gameplay rewards twice when skipped or replayed. Camera safety includes readable gameplay, reduced motion and a valid restoration path.
+
+**Acceptance:** begin, pause, skip, resume, restart during transition and restore old save without deadlock. Screen-reader/caption needs must remain intact. Compare actual rendered frames and camera target movement, not merely JSON timelines.
+
+## 29.14 Godot source and runtime proof
+
+A build manifest commits game design, generated script files, engine version, assets, input map, game target and export settings. Headless Godot boot can be an early gate, but the final acceptance must use a controller driver to interact with game objects, finish/lose/retry and record audio/visual feedback. Independent test data and target binaries are tied to the same source and toolchain digests.
+
+**Acceptance:** code compile/scene import, input→state→frame, save/reopen, byte-identical installed package proof and portable execution. If one target lacks an essential feature, build should return a declared incompatibility unless an explicit user-approved downgrade produces an equivalently playable game.
+
+## 29.15 Web/browser game target
+
+HTML5/browser packaging requires content security boundary, canvas and accessible alternative, keyboard/touch/gamepad handling where promised, persistent local save, image/audio decode, proper focus and no external network dependency when offline is claimed. A browser-rendered desktop wrapper may be valid, but is not automatically native OS game certification.
+
+**Acceptance:** run packaged game in a clean browser, verify no resource 404s or CSP violations, produce frame/input traces, test reload and browser storage, measure actual audio playback after user gesture and separate web from Windows native acceptance.
+
+## 29.16 Native/retro toolchain
+
+A platform profile contains target CPU/ABI, compiler version/hash, permitted SDKs, rights, core/firmware identities, sandbox and memory/ROM constraints. The builder must not quietly acquire proprietary SDKs or firmware. Approved compilers may be installed only via operator-granted provisioner and pinned source. A source manifest that says “console” does not prove a real playable binary.
+
+**Acceptance:** run actual compiler, approved emulator/native target if available, input-driven game and exact export verification. A missing legal SDK or physical hardware keeps that target unqualified while valid other targets remain usable.
+
+## 29.17 Dragon approved research
+
+A research request binds owner/tenant, purpose, host set, page/request/byte budget, consent, rights and expiry before network transport. The canonical crawler records source snapshots and exact passage/claim identities. Review authorization is separate from capture authorization. A source quote must remain inert external text even when it contains malicious instructions.
+
+**Acceptance:** host/redirect/DNS policy, text offset/digest, source revision, review action and withdrawal semantics. Confirm the existing backend route actually invokes the correct campaign owner and that PR #4876 adapter failures are repaired without weakening the policy contract.
+
+## 29.18 Knowledge-to-game derivation
+
+A reviewed source fact may inform an original design decision through a derived reference, not become privileged model instruction or automatically licensed game media. Define the proposal and approval step, original game mechanic representation and transitive source dependency. If the source is withdrawn, queued proposals, accepted but unpublished game revisions and caches must be re-evaluated.
+
+**Acceptance:** lawful capture→review→original game design→implemented mechanic→user-play evidence→source withdrawal invalidation with no unintended removal of unrelated independently sourced content.
+
+## 29.19 Jeeves tool action and project revision
+
+Jeeves receives a versioned view of the game and proposed typed action definitions. A user-authorized edit cannot exceed its scope, and a stale source revision cannot be invisibly overwritten by a previous model turn. A model description of an edit is not an edit; the canonical owner commits structured changes and returns receipt.
+
+**Acceptance:** model selects valid tool, operator accepts exact args hash, side effect commits once, project revision changes, target game behavior reflects it and denial of changed args does nothing. Independent reviewer must not use builder's self-reported “done” as proof.
+
+## 29.20 Installation and local model admission
+
+An installation receipt binds app source, stable private identities, service topology, installed model runtime and safe operations; it must not leak private credential values. Native model activation requires actual pinned bytes, tokenizer/backend and trusted guard, not just a path. Physical workers must be accounted for until joined even when callers time out.
+
+**Acceptance:** clean setup and restart under bounded resources, model corruption/guard missing and Mongo primary failure all reported honestly, no duplicate model download, true local reply and user project state preserved.
+
+## 29.21 Publication, commerce and entitlement
+
+A game release candidate references exact source/artifacts, rights and platform proof; storefront metadata is a presentation of that immutable candidate. If payment features are enabled, atomic settlement and entitlement updates need provider-authenticated idempotent events, with reversal/refund handling. A UI checkout simulation is not delivery.
+
+**Acceptance:** current source/rights validation, download checksum and actual target play; duplicate/forged payments denied, concurrent order settlement linearized, entitlement revocation and audit, no private source leaked by public game listing.
+
+## 29.22 Failure, incident and rollback
+
+A failure record connects operation, source head, detection time, affected owner, severity, last good state, irreversible effects and repair/recovery plan. Recovery is not a blind retry; use authoritative state and idempotency to determine whether the side effect occurred. The system must retain evidence and allow explicit operator continuation.
+
+**Acceptance:** process kill during model, build, save, crawl and install phases; restart and compare ledger/object counts; independently confirm no repeated effect, no lost accepted state and truthful UI. If authority remains uncertain, hold further mutation until reviewed reconciliation.
+
+# 30. Twelve-bot first executable vertical slices and cross-role handoff order
+
+The goal is **twelve coordinated bots shipping one product**, not twelve teams filing impressive but disconnected catalogs. A bot's initial assignment is a narrow, complete executable vertical slice with typed inputs/outputs, a real user effect, adverse proof and ownership reconciliation. These initial slices are launch-path proposals, not executed changes.
+
+| Bot | First implementable slice | Input | Required delivered output | Hard proof |
+|---|---|---|---|---|
+| BOT-01 | guarded local first-run completion | clean approved install | setup, healthy services, verified GGUF, safe recovery | real target host, cold reboot and chat |
+| BOT-02 | unified source+state authority reconciliation | main and candidate PR tree | authoritative graph, exact source refs, missing proofs | architecture validators and mutation fence tests |
+| BOT-03 | model-to-approved-edit execution | project snapshot and real local model | typed proposed edit committed once | real GGUF + tool receipt + replay protection |
+| BOT-04 | single-brief playable studio orchestration | original shooter brief | design→game build→playtest→repair campaign | bounded full tool run with source/proof links |
+| BOT-05 | playable causal quest with alternate ending | authored story/world | valid quest states, NPC memory and real branching | actual player replay of both endings |
+| BOT-06 | complete controller-driven core action | scene/asset/game design | movement, damage, feedback, objective, save | real input/physics/gameplay trace |
+| BOT-07 | generated solvable scene + variation | seed/constraints | graph, target scene, solution witness | valid traversal through multiple seeds |
+| BOT-08 | one integrated audiovisual character | asset brief/game action | real sprite/mesh, rig/animation, audio and cue | actual rendered and audible target runtime |
+| BOT-09 | one polished target export | approved project tree | Godot/web/desktop package and source | clean-host executable player journey |
+| BOT-10 | lawfully cited mechanic inspiration | bounded crawl grant | source→review→original design dependency | live capture and transitive withdrawal |
+| BOT-11 | visible end-to-end creator workbench | authenticated owner | project create/edit/build/play/download journey | browser/controller UX and accessible feedback |
+| BOT-12 | independent playable-release verifier | candidate source, build and briefs | locked independent run and acceptance dossier | source exact-head, real target, negative suite |
+
+## 30.1 Dependency-resolved execution waves
+
+**Wave A — read-only census and authority.** BOT-02 and BOT-12 obtain exact source objects and current PR dependency graph. BOT-01 identifies true setup/runtime missing dependencies; BOT-03 identifies model activation trust. BOT-09 discovers actual Godot/target binary identity. BOT-10 verifies existing Dragon routes/policies rather than adding new network service. No broad parallel mutations until owner conflict map and contracts exist.
+
+**Wave B — protect first install.** BOT-01, BOT-02 and BOT-03 close the live Mongo epoch/guard/bootstrap path through canonical code, with BOT-12 focused evidence. BOT-11 ensures setup remains accessible even while backend/engine unhealthy. This wave is accepted only after real local inference and recovery; it cannot be replaced by another launch script or model data download.
+
+**Wave C — minimum amazing game.** BOT-04 coordinates one original top-down shooter. BOT-06 implements deterministic player/enemy actions. BOT-07 provides solvable levels. BOT-08 ensures real media. BOT-09 compiles and boots the exported game. BOT-05 provides one meaningfully reactive quest/world state. BOT-11 exposes an editable project workspace. BOT-12 runs the game independently from install to victory and restart. The output is a coherent game, not a concatenation of successful library tests.
+
+**Wave D — developer edit/repair loop.** Let Jeeves inspect game source and runtime failure, propose a typed minimal patch, route through human review, commit at current head, compile and replay independent tests. Enforce no hidden file access, no denied rights and no action under stale project revisions.
+
+**Wave E — world/asset depth.** Extend from the proven minimal game into a 3D micro-world with rigging, collision and spatial sound, plus procedural and narrative complexity. All earlier golden projects remain regression fixtures. Adopt new effects only if actual gameplay is better, not merely source volume larger.
+
+**Wave F — broader targets and lawful knowledge.** Qualify more declared exporters, mobile/controller profiles, Dragon research-to-design and marketplace only after relevant rights and payment holds are addressed. Maintain a per-target support matrix, not a global “all platforms” claim.
+
+**Wave G — independent release and ongoing hardening.** BOT-12 rechecks the final source SHA, artifacts, all required workflows and physical device evidence; user explicitly authorizes releases. Reconcile every draft PR and open blocker, then follow policy-managed merges, updates, saves and rollback.
+
+## 30.2 Bot handoff acceptance laws
+
+- Every owned artifact has a unique canonical owner and current source revision.
+- Upstream may propose but cannot force downstream acceptance; incompatible payload produces a documented typed denial.
+- Every refusal includes a user-facing recovery route and a programmer-facing stable error classification without secrets.
+- Critical dependency tests use actual upstream implementation or a true representative approved emulator. Mocks are allowed for unit isolation but cannot elevate end-to-end proof.
+- The receiving bot checks source/rights/identity/expiry and does not trust a prior agent's self-described result.
+- Affected downstream evidence is invalidated on upstream revision, while unrelated stable user edits are preserved.
+- Bot task completion requires remote source artifact and proof; a planning comment without code is not a feature delivery.
+- Parallelism is bounded by path overlap, object authority, physical workers and token/cost budgets, not a configured number of “virtual agents.”
+- BOT-12 cannot be author and independent final verifier of the same risky change.
+- Existing machine gap closure and source-migration signoff cannot be overwritten by the Grokbot document. Their canonical procedures remain authoritative.
+- No bot may promote a source, rights-sensitive content, payment, unpublished game or protected release without explicit authorized review.
+- High throughput is measured in accepted coherent user functionality, not the number of draft PRs.
+
+## 30.3 Concrete acceptance sequence for the first coordinated game
+
+1. Input a new top-down action brief in the product UI as authenticated owner.
+2. Obtain validated game design spec with exact requested fantasy, core loop, target and allowed media/rights.
+3. Build a minimal scene containing player start, traversable arena, three enemies, resource reward, upgrade station and explicit victory/defeat state.
+4. Show a controller input map and actual movement. Verify event path through game runtime, not only local UI highlight.
+5. Attack one enemy, observe collision/damage, visible effect and optional actual sound under correct settings.
+6. Defeat required enemies, earn non-duplicated salvage, spend the salvage at an upgrade station and observe its effect on subsequent gameplay.
+7. Trigger both defeat and victory through independent action traces, with working retry and restart.
+8. Save state before an upgrade and restart game; confirm item, health, quest/wave progress and RNG are preserved accurately.
+9. Ask Jeeves to add one level obstacle, review proposed edit, accept, build and verify that the new obstacle is physically present and navigable.
+10. Introduce a recoverable bug, get a minimal failing trace, review the patch and demonstrate that all prior player actions still succeed.
+11. Compile the actual game package under a pinned engine with complete original source/asset references and rights manifest.
+12. Download/export, run on a clean compatible host, play through and verify the binary/artifact exactly matches the accepted source.
+13. Kill one worker during an asynchronous action and confirm no duplicated build, charge, source mutation or user state loss.
+14. Have BOT-12 independently verify current head, security/rights and gameplay, then record the exact scope of supported target and remaining holds.
+
+## 30.4 Immediate source conflicts requiring explicit disposition
+
+**PR #4875:** broad first-install qualification candidate with shared AI-tree overlays. Determine whether its current source is based on the expected parents, which exact-head jobs ran, whether per-service readiness and real native inference are observed, and whether hardware/device evidence exists. Do not treat its changed-file count as a pass.
+
+**PR #4876:** Dragon Atlas/backend research draft with substantial overlap in the Jeeves mirrors and game-forge directories. Its owner-scoped backend bridge, policy and architecture job failures remain real until evidence shows otherwise. Resolve the first reproducible blocker with smallest safe repair, then rerun changed affected gates. Preserve source rights/withdrawal and merge holds.
+
+**AI migration registry:** staged mirrors with implementation and verification signoffs awaiting current-head proof. Determine source-of-truth for each mapping, compile actual import graph, and require AST/byte parity or explicit recorded exceptions. BOT-02 controls planned cutover, BOT-12 verifies independently.
+
+**Release protection:** repository and workflow policy determine whether a branch can merge. A PR that is Git-mergeable may lack current-head required checks; skip/cancel/pending are not green. The Grokbot planning PR #4880 is documentation-only and intentionally a draft. It must not be used as authorization to mass merge other PRs.
+
+## 30.5 First 36 source-bound tickets
+
+| Ticket | Owning bot | Code/evidence starting point | Output and dependency |
+|---|---|---|---|
+| F-001 | 02 | main tree, machine/architecture.json | exact owner graph; precondition all other mutations |
+| F-002 | 12 | .github workflows and PR current heads | required-check inventory; precondition promotion |
+| F-003 | 01 | skeleton/app/manifest.json + installer | unbroken setup/doctor service graph |
+| F-004 | 02 | machine/state_topology.json | Mongo epoch/writer custody ownership dossier |
+| F-005 | 03 | operational_ai/laptop_runtime | active model/tokenizer/guard acceptance |
+| F-006 | 01 | Compose and guarded readiness docs | isolated safe persistence migration plan |
+| F-007 | 11 | frontend setup and product routes | UI still accessible during engine failure |
+| F-008 | 09 | Godot exporter and target manifests | actual compiler/toolchain support inventory |
+| F-009 | 06 | skeleton/game/gameplay | one complete controller-driven core action |
+| F-010 | 07 | skeleton/game/generation | traversable finite level with seed witness |
+| F-011 | 08 | advanced_animation_runtime and media | rendered visible animation mapping |
+| F-012 | 08 | advanced_audio_runtime and media | actual audible cue in game |
+| F-013 | 04 | forge/game_build_queue.py | bounded game build/repair DAG |
+| F-014 | 12 | first-install physical test harness | clean-host native and browser proof |
+| F-015 | 05 | skeleton/jeeves/worlds | one stateful NPC and reachable quest branch |
+| F-016 | 11 | editor/playable preview | human changes a scene and sees result |
+| F-017 | 03 | tool-runtime source and project memory | authorized source-bound Jeeves edit |
+| F-018 | 12 | gameplay acceptance harness | real input→state→render and win/retry |
+| F-019 | 02 | machine/ai_file_tree.json | staged mirror parity, import and cutover proof |
+| F-020 | 10 | backend/core/dragon_crawler.py | lawful source grant, capture and revocation |
+| F-021 | 10 | PR #4876 bridge paths | authenticated actual Atlas backend projection |
+| F-022 | 04 | game builder repair protocol | failing engine log→reviewed minimal patch |
+| F-023 | 09 | golden game target and export | source+playable binary on clean host |
+| F-024 | 06 | inventory/economy/game mechanics | earned reward, single spend and save |
+| F-025 | 05 | branch/character memory | alternative valid ending replay |
+| F-026 | 07 | generated spatial campaign | multiple seeds preserving solvability |
+| F-027 | 08 | 3D asset pipeline | rigged textured object truly rendered |
+| F-028 | 09 | 3D Godot project | actual 3D navigation/physics target |
+| F-029 | 03 | local model and runtime worker | real memory/pressure/cancellation proof |
+| F-030 | 01 | installer/backup/restore | safe crash/restart and state recovery |
+| F-031 | 11 | account/project collaboration | editor/viewer/owner isolation and accessibility |
+| F-032 | 10 | approved source-to-mechanic | original mechanic with revocation test |
+| F-033 | 12 | corruption and exploit corpus | security/QA regression across source head |
+| F-034 | 09 | package/signing/SBOM | reproducible release-candidate artifact |
+| F-035 | 02 | normalized release evidence registry | exact source and proof chain |
+| F-036 | 12 | final source, target host and artifacts | independently reviewed release packet |
+
+Each F-ticket should expand into actual source, acceptance and release-evidence issues only after source census and overlap review. Do not create 36 redundant modules or PRs purely because this table exists.
