@@ -65,6 +65,7 @@ jobs:
           python -m py_compile tests/test_ai_webcrawler_dragon_wave5.py
           python -m py_compile tests/test_ai_webcrawler_dragon_ops_wave6.py
           python -m py_compile tests/test_ai_webcrawler_dragon_live_discovery.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_gain7.py
           python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
       - name: Execute source-only campaign regressions
         env:
@@ -88,3 +89,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_wave5.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ops_wave6.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_live_discovery.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_gain7.py' -v

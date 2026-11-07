@@ -444,7 +444,7 @@ class CanonicalGain7Test(unittest.TestCase):
             "https://example.com/methods": reply("text/html", PAGE),
         })
 
-    def run(self, *seeds, strategy="fifo", max_depth=1, query="archive"):
+    def make_run(self, *seeds, strategy="fifo", max_depth=1, query="archive"):
         req = CrawlRequest(
             seed_urls=tuple(seeds), allowed_hosts=("example.com",),
             max_depth=max_depth, query=query, max_requests=14,
@@ -472,7 +472,7 @@ class CanonicalGain7Test(unittest.TestCase):
             )
 
     def test_live_markdown_doc_is_captured_as_unreviewed_evidence(self):
-        run = self.run("https://example.com/doc.md")
+        run = self.make_run("https://example.com/doc.md")
         self.tick(run, 1)
         self.tick(run, 3)
         snap = run.snapshot()
@@ -485,7 +485,7 @@ class CanonicalGain7Test(unittest.TestCase):
         CrawlRun.from_snapshot(snap, fetcher=self.transport)
 
     def test_live_markdown_relative_link_fetches_next_document(self):
-        run = self.run("https://example.com/doc.md")
+        run = self.make_run("https://example.com/doc.md")
         self.tick(run, 1)
         self.tick(run, 3)
         self.tick(run, 5)
@@ -493,7 +493,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.assertEqual(len(self.transport.calls), 3)
 
     def test_live_csv_document_is_captured_and_searchable(self):
-        run = self.run("https://example.com/table.csv")
+        run = self.make_run("https://example.com/table.csv")
         self.tick(run, 1)
         self.tick(run, 3)
         snap = run.snapshot()
@@ -503,7 +503,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.assertTrue(run.search("archive")["hits"])
 
     def test_live_json_api_document_retains_no_secret_key_value(self):
-        run = self.run("https://example.com/data.json")
+        run = self.make_run("https://example.com/data.json")
         self.tick(run, 1)
         self.tick(run, 3)
         snap = run.snapshot()
@@ -514,7 +514,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.assertEqual(snap["frontier"], [])
 
     def test_live_http_link_pagination_is_enqueued(self):
-        run = self.run("https://example.com/pagination")
+        run = self.make_run("https://example.com/pagination")
         self.tick(run, 1)
         self.tick(run, 3)
         snap = run.snapshot()
@@ -524,7 +524,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.assertEqual(snap["usage"]["documents"], 1)
 
     def test_live_link_pagination_can_capture_followup(self):
-        run = self.run("https://example.com/pagination")
+        run = self.make_run("https://example.com/pagination")
         self.tick(run, 1)
         self.tick(run, 3)
         self.tick(run, 5)
@@ -535,14 +535,14 @@ class CanonicalGain7Test(unittest.TestCase):
             "text/html", PAGE,
             link='<https://localhost/admin>; rel=next, </page-two>; rel=next',
         )
-        run = self.run("https://example.com/pagination")
+        run = self.make_run("https://example.com/pagination")
         self.tick(run, 1)
         self.tick(run, 3)
         self.assertEqual([x["url"] for x in run.snapshot()["frontier"]],
                          ["https://example.com/page-two"])
 
     def test_live_fifo_keeps_first_seed_first(self):
-        run = self.run("https://example.com/general",
+        run = self.make_run("https://example.com/general",
                        "https://example.com/archive-capture",
                        strategy="fifo")
         self.tick(run, 1)
@@ -551,7 +551,7 @@ class CanonicalGain7Test(unittest.TestCase):
                          "https://example.com/general")
 
     def test_live_balanced_prioritizes_high_affinity_seed(self):
-        run = self.run("https://example.com/general",
+        run = self.make_run("https://example.com/general",
                        "https://example.com/archive-capture",
                        strategy="balanced", query="archive capture")
         self.tick(run, 1)
@@ -564,7 +564,7 @@ class CanonicalGain7Test(unittest.TestCase):
             200, {"content-type": "text/plain"},
             b"User-agent: *\nDisallow: /",
         )
-        run = self.run("https://example.com/archive-capture",
+        run = self.make_run("https://example.com/archive-capture",
                        strategy="balanced")
         self.tick(run, 1)
         self.tick(run, 3)
@@ -572,7 +572,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.assertEqual(run.snapshot()["usage"]["documents"], 0)
 
     def test_live_balanced_snapshot_survives_reopen(self):
-        run = self.run("https://example.com/archive-capture",
+        run = self.make_run("https://example.com/archive-capture",
                        strategy="balanced")
         snap = run.snapshot()
         restored = CrawlRun.from_snapshot(snap, fetcher=self.transport)
@@ -580,7 +580,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.assertEqual(restored.snapshot(), snap)
 
     def test_response_budget_remains_bounded_for_json(self):
-        run = self.run("https://example.com/data.json")
+        run = self.make_run("https://example.com/data.json")
         self.tick(run, 1)
         self.tick(run, 3)
         snap = run.snapshot()
@@ -592,7 +592,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.transport.replies["https://example.com/table.csv"] = reply(
             "text/csv", b"name,data\nAlice,\"unterminated",
         )
-        run = self.run("https://example.com/table.csv")
+        run = self.make_run("https://example.com/table.csv")
         self.tick(run, 1)
         self.tick(run, 3)
         self.assertEqual(run.snapshot()["usage"]["requests"], 2)
@@ -603,14 +603,14 @@ class CanonicalGain7Test(unittest.TestCase):
         self.transport.replies["https://example.com/data.json"] = reply(
             "application/json", b"{broken",
         )
-        run = self.run("https://example.com/data.json")
+        run = self.make_run("https://example.com/data.json")
         self.tick(run, 1)
         self.tick(run, 3)
         self.assertEqual(run.snapshot()["usage"]["documents"], 0)
         self.assertEqual(run.snapshot()["events"][-1]["kind"], "rejected")
 
     def test_expired_consent_rejects_real_capture(self):
-        run = self.run("https://example.com/doc.md")
+        run = self.make_run("https://example.com/doc.md")
         with patch("skeleton.ai.webcrawler.operations.time.time",
                    return_value=self.now + 3700):
             with self.assertRaises(CrawlOperationError):
@@ -620,7 +620,7 @@ class CanonicalGain7Test(unittest.TestCase):
         self.transport.replies["https://example.com/data.json"] = reply(
             "application/octet-stream", b"binary\x00payload",
         )
-        run = self.run("https://example.com/data.json")
+        run = self.make_run("https://example.com/data.json")
         self.tick(run, 1)
         self.tick(run, 3)
         self.assertEqual(run.snapshot()["usage"]["documents"], 0)

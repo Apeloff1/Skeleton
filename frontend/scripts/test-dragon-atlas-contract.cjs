@@ -259,6 +259,18 @@ test('operator sitemap discovery is explicit, bounded and carried into the creat
   assert.match(source, /XML sitemaps, gzip sitemaps, RSS\/Atom feeds or JSON Feed/);
 });
 
+test('gain-of-function crawler formats and balanced dispatch are wired through the operator workspace', () => {
+  const view = fs.readFileSync(workspacePath, 'utf8');
+  const client = fs.readFileSync(clientPath, 'utf8');
+  assert.match(view, /frontier_strategy:\s*balancedFrontier\s*\?\s*'balanced'\s*:\s*'fifo'/);
+  assert.match(view, /value=\{balancedFrontier\}/);
+  assert.match(view, /setBalancedFrontier\(false\)/);
+  assert.match(view, /capture Markdown, CSV and JSON API documents/);
+  assert.match(view, /HTML\/HTTP pagination links/);
+  assert.match(client, /frontier_strategy\?:\s*'fifo'\s*\|\s*'balanced'/);
+  assert.match(client, /canonical bounded frontier scheduling strategy/);
+});
+
 test('panel and surrounding workspace compile as TSX', () => {
   assert.match(transpile(panelPath), /CrawlerResearchAtlasPanel/);
   assert.match(transpile(workspacePath), /CrawlerResearchAtlasPanel/);
