@@ -125,6 +125,7 @@ class CanonicalThrottleTests(unittest.TestCase):
         self.tick(run, at + 2.5)
         self.assertEqual(len(fetcher.calls), 2)
         self.tick(run, at + 5)
+        self.tick(run, at + 7)
         self.assertIn("https://example.com/second", fetcher.calls)
 
     def test_503_conservative_fallback_without_retry_after(self):
