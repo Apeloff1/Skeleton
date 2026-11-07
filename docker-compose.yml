@@ -30,8 +30,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    # Consumer-first default: publish only to loopback. Explicit non-loopback
+    # binding is an operator network-exposure decision, not an install default.
     ports:
-      - "${SKELETON_PORT:-8010}:8001"
+      - "${SKELETON_BIND_HOST:-127.0.0.1}:${SKELETON_PORT:-8010}:8001"
     environment:
       - SKL_ENVIRONMENT=${ENVIRONMENT:-development}
       - SKL_MONGO_URI=${SKL_MONGO_URI:?SKL_MONGO_URI must be set to an authenticated MongoDB URI}
@@ -114,8 +116,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    # API carries authenticated project and engine operations: local-only by default.
     ports:
-      - "${BACKEND_PORT:-8001}:8001"
+      - "${BACKEND_BIND_HOST:-127.0.0.1}:${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
@@ -178,8 +181,9 @@ services:
       target: ${FRONTEND_BUILD_TARGET:-development}
     container_name: tutolage-frontend
     restart: unless-stopped
+    # Browser UI is also local-only by default; explicit host override is opt-in.
     ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+      - "${FRONTEND_BIND_HOST:-127.0.0.1}:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
