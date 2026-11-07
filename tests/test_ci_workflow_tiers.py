@@ -98,6 +98,27 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
+            # An active workflow symlink must never be followed, even when its
+            # target contains a syntactically valid manual-only workflow.
+            # The audit must reject the link rather than accepting a gate
+            # whose actual source can change outside the reviewed inventory.
+            linked = root / ".github/workflows" / "linked-manual.yml"
+            target = root / "external-workflow.yml"
+            target.write_text(
+                "name: External\\non:\\n  workflow_dispatch:\\njobs:\\n",
+                encoding="utf-8",
+            )
+            try:
+                linked.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable on this filesystem")
+            self.assertTrue(any(
+                "linked-manual.yml: active workflow must not be a symlink" in problem
+                for problem in audit(root)
+            ))
+            linked.unlink()
+            target.unlink()
+            self.assertEqual(audit(root), [])
             # An unregistered PR subscriber must fail even if the numeric
             # quota would otherwise have spare capacity.
             evidence.write_text(
