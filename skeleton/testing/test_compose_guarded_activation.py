@@ -154,6 +154,19 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         options.update(overrides)
         return MongoGuardedActivation(**options)
 
+    async def test_role_rotation_between_successful_probes_invalidates_generation(self):
+        self.database.auth["authInfo"]["authenticatedUserRoles"] = [
+            {"db": "admin", "role": "readWrite"},
+        ]
+        gate = self.make()
+        permit = await gate.activate()
+        self.database.auth["authInfo"]["authenticatedUserRoles"] = [
+            {"db": "admin", "role": "read"},
+        ]
+        with self.assertRaises(ActivationBlocked):
+            await gate.assert_active(permit)
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
     async def test_activation_and_rechecks(self):
         gate = self.make()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
