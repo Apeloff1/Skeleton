@@ -168,6 +168,10 @@ def implementation_digest():
                 "usda_hierarchy.py",
                 "openapi_graph.py",
                 "http_freshness.py",
+                "graphql_documents.py",
+                "asyncapi_documents.py",
+                "proto_documents.py",
+                "interface_artifacts.py",
             )
         }
     )

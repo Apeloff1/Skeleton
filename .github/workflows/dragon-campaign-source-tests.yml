@@ -144,6 +144,10 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/usda_hierarchy.py
           python -m py_compile skeleton/ai/webcrawler/openapi_graph.py
           python -m py_compile skeleton/ai/webcrawler/http_freshness.py
+          python -m py_compile skeleton/ai/webcrawler/graphql_documents.py
+          python -m py_compile skeleton/ai/webcrawler/asyncapi_documents.py
+          python -m py_compile skeleton/ai/webcrawler/proto_documents.py
+          python -m py_compile skeleton/ai/webcrawler/interface_artifacts.py
           python -m py_compile skeleton/ai/webcrawler/timed_media.py
           python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
           python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
@@ -252,6 +256,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_scene_graphs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_openapi_graph.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_freshness.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_interface_contracts.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v
