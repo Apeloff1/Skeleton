@@ -29,6 +29,17 @@
 - 14. Release gates, artifact provenance, certification, and rollback
 - 15. Expansion ledger toward one million meaningful words
 - 16. Source and competitive benchmark references
+- 17. Second-pass source census and falsifiable implementation-gap index
+- 18. Bot federation protocol: exact contracts, state machines and handoffs
+- 19. Golden game engineering reference: concrete vertical slices
+- 20. Exact machine-contract reconciliation
+- 21. Integration architecture for authored playable games
+- 22. First-install critical seam
+- 23. Third-pass source-grounded module audit
+- 24. Canonical machine-authority and readiness reconciliation
+- 25. Critical-path guarded local AI engineering
+- 26. Concrete playable-game compiler and visual acceptance
+- 27. Repository object census and unresolved unknowns
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -4448,3 +4459,316 @@ An independent acceptance owner should choose the smallest critical-path next te
 | Windows host not qualified | Fresh hardware install and first-game journey | Treat hosted Windows source CI as device proof |
 | Asset has unreviewed rights | Current explicit provenance/authorization | Remove attribution to make export pass |
 
+# 23. Third-pass source-grounded module audit and implementation evidence
+
+This section corrects the normal failure mode of large AI-assisted project audits: inferring functionality from directory names, and then calling every incomplete path a missing module. The inspection baseline is the main Git tree at e00bfb0809b34573c2df313ea16e17fd10bead38. The GitHub tree endpoint returns accurate immutable tree/object identities for retrieved paths, but the complete skeleton/ tree response is truncated at 70,096 returned entries. Consequently, neither these counts nor a README inventory is a verified complete checkout. The direct git clone attempt from the current container was blocked by DNS resolution of github.com. A true full clone/object census remains an open first task.
+
+## 23.1 Verifiable tree cardinality and source scope
+
+| Mainline subtree | Git tree inspection | Observed file count | Qualification meaning |
+|---|---|---:|---|
+| .github | recursive tree complete | 531 | Workflows and policy assets exist; only executed current-head jobs can establish gating |
+| backend | recursive tree complete | 2,658 | API, gameforge, knowledge and data source families; behavior not inferred from count |
+| frontend | recursive tree complete | 1,011 | Expo route/product workspace plus numerous targeted JS tests; screen-level proof still needed |
+| machine | recursive tree complete | 674 | Machine contracts, accountability, navigation; records do not confer running readiness |
+| tests | recursive tree complete | 2,368 | Tests and fixtures; must inspect which are mocks, source contracts or actual interactive execution |
+| skeleton/ai/agents | recursive tree complete | 9,045 | Jeeves ecosystem and specialist agent objects; verify actual orchestration and host effects |
+| skeleton/ai/runtime | recursive tree complete | 8,854 | Operational AI, cognition, native runtime and gates; actual model/physical pressure tests independent |
+| skeleton/ai/game_builder | recursive tree complete | 457 | Multiple game families and build paths; evaluate each target/genre separately |
+| skeleton/ai/webcrawler | recursive tree complete | 355 | Research transport, extraction, source custody; live grant/route integration separately required |
+| skeleton/game/gameplay | recursive tree complete | 346 | Game loops, campaigns and local play; verify those are exported to target runtimes |
+| skeleton/game/generation | recursive tree complete | 101 | Generation and semantic wrappers; identify the true implementation module for each |
+| skeleton/game/render | recursive tree complete | 25 | Render-contract wrappers and shared reference runtime; does not by itself prove GPU renderer |
+| skeleton/jeeves/worlds | recursive tree complete | 144 | World/campaign/canon/scene authoring; current code quality unknown until owner tests |
+| skeleton/ai/agents/jeeves | child of inspected agents tree | many thousands | Large ecosystem trees often feature source catalogs; one-pass user journey proof still essential |
+
+**Critical interpretation:** the observed mainline is not a toy without code. It is a very large repo with considerable *candidate surface*, notably 4,109 paths under operational_ai/offline_cognition and 1,113 under operational_ai/reliability_fabric inside the AI runtime tree; the huge source breadth may conceal incomplete integration and verification. Avoid sweeping rewrites. The completionist challenge is to turn existing code paths into one current, reproducible product and retire redundant facades only after exact import and semantic parity proof.
+
+## 23.2 Inspected implementation seams, by file identity
+
+**SRC-001 — logical audio is not rendered sound.** In skeleton/ai/game_builder/advanced_audio_runtime.py the module explicitly calls itself a “Source-authored logical audio mixer and finite cue scheduler.” It advances integer-sample timing, supports channels, ducking, spatial gain and bounded action commands, and says “No wave synthesis or sound card access is claimed.” This is genuine state-processing behavior, not a finished playable audio subsystem. BOT-08 must find the actual audio file producer and engine import boundary, then prove that a combat cue is audibly played in the exported target game. Do not rewrite its logical mixer merely to claim new audio generation. Define an explicit handoff from AudioCueState to bound audio bytes/stream, source-license record, playback event and observed capture.
+
+**SRC-002 — animation state is not skeletal rendering.** skeleton/ai/game_builder/advanced_animation_runtime.py advances authored finite animation states, root motion and events. Its own documentation says it “does not render bone meshes, import foreign rigs or execute authored scripts.” BOT-08 and BOT-06 must bridge this model to an actual rig/clip/skin/engine animation graph. Required tests: real jump transition drives appropriate animation; root motion and collision remain consistent; interrupted save and restore preserves current state; human changes rig mappings without losing authored source. Do not label the existing runtime a fake; label it logical-reference-complete but render-bridge-unproven.
+
+**SRC-003 — one Godot adapter explicitly limits its family.** skeleton/ai/game_builder/advanced_godot_export.py describes a playable Godot 4 adapter for original puzzle scenes and says only puzzle is covered by **that adapter**. It includes GDScript authored rules and a separate Python expectation that may be compared to native state. This is more meaningful than a manifest-only export, but the module alone cannot certify all genres. BOT-09 must inventory other per-genre exporters before declaring missing support.
+
+**SRC-004 — other advanced native adapters do exist.** skeleton/ai/game_builder/advanced_racing_godot.py includes a separate original Godot racing GDScript runtime with acceleration, steering, braking, nitro, grip, tire condition, engine damage, fuel, pits, hazards and lap state, including explicit fields for proof parity. Thus a blanket assertion that “racing Godot is absent” would be wrong. The remaining question is target-device playability: actual controller input, real-time collision/traction, multiple frames, packagable graphics/audio, performance, game completion and reproducible save/replay. BOT-06/BOT-09 should qualify existing behavior first and add only missing user-observable layers.
+
+**SRC-005 — several render modules are re-export facades.** skeleton/game/render/render_graph.py re-exports RenderContractError, RenderGraph and RenderPass from flgb_render_runtime; mesh_pipeline.py re-exports MeshArtifact; shader_compilation.py re-exports shader-contract classes. Such files are interfaces, not standalone feature implementations. Audit the shared flgb_render_runtime and callers before proposing a new render service. Ask whether its data model reaches Godot/GPU pixels and whether the product uses the authored artifacts. If not, establish a verified compiler/renderer bridge with proper budget and asset custody rather than inventing a second scene graph.
+
+**SRC-006 — some generation modules are similarly re-export surfaces.** skeleton/game/generation/character_generation.py and encounter_generation.py re-export types/functions from flgb_generation_core. The canonical logic and tests must be traced into their real definitions, not counted again per facade. If the behavior is only a deterministic reference, its proper next maturity stage may be integrated visualization and independent play, not additional factory wrappers.
+
+**SRC-007 — the native HTML maze is a distinct real product path.** skeleton/ai/game_builder/PLAYABLE_GAME.md documents a standalone browser HTML5 maze from a validated design intent, with movement, hazards, score, levels, undo and replay. It is turn-based, not proof of a 3D engine or realtime action combat. Treat it as a legitimate small golden game candidate and verify actual browser gameplay before expanding its claims. Do not replace it with another generic game template; preserve user-owned projects and reuse its source-lineage and game-state patterns where compatible.
+
+**SRC-008 — source migration and repeated ecosystems are a high-risk seam.** The mainline has both skeleton/jeeves/worlds and skeleton/ai/agents/jeeves/worlds; large mirrored AI trees are currently staged under machine/ai_file_tree.json. PRs #4870, #4875 and #4876 overlap many of the same high-cardinality files and game-forge families. Require object-level copy/mirror classification, semantic parity checks, import reachability, one actual owner and explicit cutover signoffs before promotion. Beware a “repair” that merely copies a newer enormous draft tree on top of another with different source pins.
+
+**SRC-009 — source first-install is not a blank page.** skeleton/app/manifest.json already specifies the service topology and first-install docs describe operator setup, local model preparation, protected secrets, and health/doctor. BOT-01 should repair documented breakpoints through existing entrypoints rather than create another installer or write a competing Compose stack. First-install reality depends on source-exact provider bootstrap, real data topology and target hardware.
+
+**SRC-010 — Dragon has separate capture and source truth.** backend/core/dragon_crawler.py uses CORE_DB for owner-scoped durable application operations and delegates crawl objects to skeleton.ai.webcrawler.operations. That authority distinction should survive Atlas growth. The Dragon UI can display a planned campaign without granting transport rights. PR #4876 must not be considered backend-mounted or released solely because a client-side panel and policies exist. A failing adapter job or architecture job is a genuine hold.
+
+## 23.3 Source-level verification questions per subsystem
+
+**Rendering:** Which function emits executable draw calls versus normalized scene/render descriptions? Which actual target engine consumes material, mesh, camera, light and particle contracts? Are frames captured from the packaged game or a Python reference? Does a shader compile in the same graphics API used by the release? Is texture provenance bound to source rights and target compression? Does a material survive source edit and hot reload?
+
+**Animation:** Is a rig real geometry with skin weights? Do poses change mesh vertices in exported game? Do root-motion deltas synchronize collision? Are input-driven attacks and NPC gestures visible? Can transitions be cancelled, reset, serialized and replayed? Does LOD preserve character silhouette?
+
+**Audio:** Is any real PCM/OGG/WAV audio produced or imported? Are loudness, loop seams, decoding and licensing checked? Does the runtime emit cues to a real mixer and sound card? Can browser autoplay policies block first sound? Is there a caption/text fallback? Does voice identity have active consent?
+
+**World and story:** Does a world graph reach the current game scene controller and save state? Are NPC beliefs causally restricted to witnessed facts? Can player decisions cause distinct valid endings in a controller-driven game? Do time, faction and economy state remain consistent across load and version upgrades?
+
+**Gameplay:** Is the input model real keyboard/controller/touch input? Are movement, collision, combat and rewards rendered and deterministic under frame variation? Can a game end and restart? Does enemy AI affect gameplay beyond recorded proposals? Are progress and save files owned by an authoritative game instance?
+
+**Compiler:** Is there one approved target binary/engine receipt? Are generated scripts safe from untrusted code execution? Does the toolchain really exist on the machine? Do export assets load on a clean host? Are source manifests and binary rights complete?
+
+**Research:** Are source rights, purpose and consent current at every asynchronous step? Are page offsets exact? Are citations reverified after revisions? Can source withdrawal propagate to all dependent designs and media? Does any untrusted page content enter system-level prompts? Are DNS/redirect/worker limits observed by network code rather than merely recorded in planner metadata?
+
+**AI:** Has a real GGUF been loaded with the expected tokenizer and chat template, and has one useful output been observed? Are physical workers accounted for after cancellation? Does the source snapshot define exactly what the agent can see? Can tool intents be denied without partial side effects? Are model quality benchmarks independent of authored fixtures?
+
+**Product:** Does the current UI route invoke the canonical API or display local demos? Can a creator recover from a disabled engine without losing unsaved edits? Does the user actually control and inspect bot work? Can a screen reader and controller navigate essential workflows? Do marketplace buttons deliver atomic entitlements or merely represent a planned store?
+
+**Quality and release:** Does each CI check bind to the final source head? Are golden playtests executed on the exported binary? Does a source-scan pass distinguish findings from absent tests? Are negative cases real and representative? Does the release packet include a real physical Windows test where Windows is claimed?
+
+# 24. Canonical machine-authority and product-readiness reconciliation
+
+The root AGENTS.md instructs every AI contributor to read twelve canonical authorities before code mutation. This Grokbot plan is **subordinate** to those machine contracts. It is a completion program and cross-source audit, not an alternative architecture or another AI control plane. BOT-02 must deny any work order that creates undeclared providers, long-running services, capability planes or duplicate owner roots before updating and independently validating those authorities.
+
+## 24.1 Mandatory preflight read sequence
+
+1. machine/manifest.json — active repository and assembly mapping.
+2. machine/architecture.json — zone and canonical runtime/source ownership, architecture tag arch-map/v3.7.
+3. machine/ai_app_construction.json — 27 construction planes, admission, proof and lifecycle policy.
+4. machine/capability_interfaces.json — 86 declared runtime and acceptance relationships; every edge has a contract.
+5. machine/state_topology.json — ten physical stores, 27 state domains and 24 state flows; trust derived vs authoritative.
+6. machine/ai_runtime_schemas.json — typed canonical provider-neutral records and cross-record invariants.
+7. machine/ai_capabilities.json — ten registered product capability IDs with separate implementation states.
+8. machine/ai_implementation_handoff.json — fourteen P0 gap handoff entries and established owner paths.
+9. machine/ai_closure_evidence.json — evidence and closure decisions; fourteen recorded entries.
+10. machine/enterprise_ai_superiority.json — comparator and superior-system proof rules, separate from implementation.
+11. machine/enterprise_ai_implementation_notes_index.json — L00–L13 implementation dossier policy for 421 volumes.
+12. docs/AI_APP_CONSTRUCTION_MANUAL.md — human explanation of assembly, boundaries and validators.
+
+**Conformance baseline:** machine/ai_app_construction.json declares 17 construction gaps as “closed” in its machine register, and machine/ai_closure_evidence.json has 14 matching evidence entries marked closed. This is not contradictory to a recorded unqualified consumer installation: the closed machine construction gaps describe a narrower source/contract maturity than a fresh Windows laptop with active guarded inference, user-flow gameplay and qualified delivery. The planner must preserve these historical closed statuses unless a specific live regression requires reopening under the canonical process. Do not relabel every already-closed architecture gap as open merely because a production feature remains unavailable. Instead open a separate **product integration/qualification** task referencing the historical closure contract and current missing acceptance evidence.
+
+## 24.2 Registered capability maturity snapshots
+
+| Registered capability | Source-declared implementation state | What remains to prove before claiming finished product |
+|---|---|---|
+| assistant.text | partial | actual configured provider + protected context, real response, durable chat, target install |
+| assistant.retrieval_grounded | partial | authorized source, citation verification, revocation/revision handling on current runtime |
+| assistant.tool_read | partial | actual governed tool execution, owner scope, typed receipt and negative test |
+| assistant.tool_write | partial | approval/idempotency, physical side-effect, rollback and independent verification |
+| assistant.artifact_qa | partial | real ingested artifact with scan/extract and truthful evidence result |
+| media.image_generate | present_transport_partial_product | real image bytes/artifact and rights, user-visible studio use, exact target confirmation |
+| media.image_edit | present_transport_partial_product | source-authorized edit, preserved original/rights, real output and roundtrip |
+| media.speech_synthesis | present_transport_partial_product | real audio, source and consent, safe output artifact and in-game playback |
+| assistant.background_agent | partial | durable bounded worker authority, recovery, application side effects and operator control |
+| game.native_delivery | present_source_delivery_partial_native_release | actual approved target executable plus source/lesson/custody and device qualification |
+
+**Crosswalk discipline:** never create a new “media generator” service to bypass media.image_generate or media.speech_synthesis readiness. Never let a gameplay agent call raw provider SDK in a feature module; route credential-bearing activations through skeleton/provider_runtime.py as AGENTS.md requires. Existing backend/core/ai_provider.py is compatibility-only. An instruction-bearing page retrieved by Dragon is evidence, not a higher-priority role.
+
+## 24.3 State topology authority routing
+
+The 27 logical domains in machine/state_topology.json include backend-core-app-state, backend-seeded-content, backend-swarm-scratch, engine-mongo-state, backend-rag-local-chroma, optional-vector-index, canonical-operation-state, operation-event-stream, in-process-retrieval-memory, manual-memory-snapshots, cognitive-execution-ledger, tool-idempotency-ledger, human-approval-ledger, execution-usage-ledger, final-ai-result-ledger, conversation-thread-state, conversation-message-state, verification-receipt-ledger, governance-lifecycle-registry, canonical-ai-memory-records, local-reference-provenance, jeeves-game-learning-workspace, dragon-crawler-application, backend-curiosity-file-state, dragon-reviewed-design-knowledge, dragon-conversation-micro-projection and dragon-practice-state.
+
+These are **not** 27 databases that must all be copied. The canonical topology assigns each logical domain to a physical store and role. Chroma and process memory are rebuildable where declared derived. SQLite receipts may be authoritative for a specific operation only under its canonical owner. The Dragon micro-projection is not a second canonical transcript; it is a discardable projection of committed message refs. Snapshot files are not replacements for live backup/restore. The build plan must use each domain's declared migration, retention, backup and consistency semantics instead of deriving authority from whichever data directory a developer finds first.
+
+### Concrete reconciliation protocol
+
+For each state domain, require its existing manifest owner, current runtime writers, read path, source-of-truth role, schema/version, backup/restore format, index/projection dependencies and migration proof. Compare runtime observed writers with machine/state_topology; mismatches become an authority incident, not an excuse to copy state blindly. When repairing one domain, quiesce and fence only as supported by the active architecture; no destructive operation is allowed merely because an AI agent asserts it is safe.
+
+After any restored or migrated primary state, validate tenant/object identity, ordering, canonical digests and current rights before reconstructing derived caches. Replay uncertain tool execution only through the committed idempotency ledger. Replay chat only from the canonical message/operation records, not from model transcripts in temporary client memory. Restore financial entitlement ledgers before allowing charge retry or paid export. Resume user game sessions from committed game state and versioned save migration, never from a model summary.
+
+## 24.4 Existing schema vocabulary and non-duplication rule
+
+The runtime schema catalog already names OperationEnvelope, ResourceBudget, ConversationThread, ConversationMessage, ContextSegment, ContextEnvelope, AIExecutionRequest, AgentTurn, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderResponse, ToolExecutionRequest, ToolExecutionReceipt, MemoryRecord, VerificationReceipt, AIExecutionResult, DelegatedAuthority, EngineExecutionCommand, StreamEvent, AIError, ProviderRequest, RouteDecision, EvidenceReference, ToolCallProposal, ArtifactRecord, ReleaseEvidence, AdmissionDecision and many additional related types. The Grokbot work-order shape is a **planning projection**, not a replacement for these runtime records. Production entities must extend/reuse current records only after canonical contract changes. A model cannot directly mint an OperationEnvelope or DelegatedAuthority; authenticated deterministic owners create or validate them and grant only finite capabilities.
+
+### Cross-record proof clauses
+
+- Tenant and actor lineages must remain linked across message, operation, execution, tool, memory, verification and result.
+- ContextEnvelope digest must bind exact model-visible source snapshot used by the relevant AgentTurn.
+- Offered tool definitions must contain each later ProviderToolCall tool_id; unknown tools fail before execution.
+- Argument digest for executed tool calls must match the originating model proposal after canonical normalization and operator approval.
+- AIExecutionResult must reference verification for the same candidate/result lineage.
+- Assistant messages must reference the canonical execution result, not arbitrary text supplied by browser or provider.
+- A completed StreamEvent only references an operation after its durable AIExecutionResult exists.
+- ResourceBudget token/time/cost/physical-worker reservations must be finite and cannot be widened by downstream model decisions.
+- A source or project revision change invalidates the exact proofs that depend on its digest, without destroying unrelated reviewed state.
+- A bot that cannot prove exact owner authority must stop and return an admissible failure with no side effect.
+
+## 24.5 Cross-bot exact ownership map from canonical planes
+
+| Primary bot | Existing planes/interfaces principally affected | Required partner review |
+|---|---|---|
+| 01 Install | deployment-release, configuration-secrets, resilience, data-persistence, engine-api | 02,03,12 |
+| 02 Architecture | foundation, identity, data-persistence, jobs-durability, artifact-files, governance | all affected owners |
+| 03 AI | model-provider, model-routing, prompt-context, memory, retrieval, cost-capacity | 02,04,12 |
+| 04 Director | orchestration, reasoning-verification, tool-runtime, jobs-durability | 02,03,05,06,12 |
+| 05 Worlds | product/domain game state via canonical project owner, not a new runtime plane | 02,06,07,09 |
+| 06 Gameplay | product game state, simulation, declared tool/build interfaces | 02,05,07,09,12 |
+| 07 Procedural | existing generation/build domains and artifact authority | 02,05,06,08,09 |
+| 08 Media | existing media provider and artifact-files authority, scene/render contracts | 02,03,06,09 |
+| 09 Export | deployment-release, artifact-files, tool-runtime, engine-api | 01,02,06,08,12 |
+| 10 Dragon | retrieval, governance, feedback-learning, data-persistence and existing capture owner | 02,03,04,11,12 |
+| 11 Product | product-experience, application-api, identity and declared views of every source | owners of affected records |
+| 12 Assurance | observability, evaluation, security-safety, resilience and release acceptance | independent of code author |
+
+These mappings are conceptual responsibility allocations for work planning. They do not transfer authority away from the machine contract. If a work order's desired source change implies a new plane, BOT-02 must explicitly change and validate the canonical machine graph *before* feature code lands. No undocumented service, database, model executor or direct vendor-SDK call may slip in under “bleeding edge.”
+
+# 25. Critical-path guarded local AI engineering implementation
+
+The most urgent missing customer experience is not another advanced model feature. It is a stable end-to-end application in which a fresh laptop can activate a real local model behind the required security/authority guard, create/edit a game and recover from failure. The following is a design proposal to be verified against final source and current PR heads; it does not pretend that unexecuted new code exists.
+
+## 25.1 Shared epoch activation sequence
+
+**Step A — discover current writers.** Inventory backend/core/conversations and its writer classes; engine memory repositories and their separately selected Mongo logical databases; administrative/scripted writers; old Docker images; alternate project APIs; job workers; import paths; and direct database clients. Record exact deployment principal, auth domain, code SHA and database permission profile per writer. Distinguish source presence from registered active writer; system integrity requires both.
+
+**Step B — map shared epoch identity.** Define one explicit canonical source-epoch authority accessible to both backend and engine without unbounded backend code imports into engine images. Pin the same Mongo replica-set deployment and verified epoch collection identity, with a bounded authenticated interface to verify writer custody. The backend and engine may retain separate historical data databases, but epoch fencing must not be split across independent collections merely because both are named similarly.
+
+**Step C — establish trusted bootstrap.** The engine's local provider must load valid architectural acknowledgement, independently managed reviewer, current source reader and tokenizer attestation tied to the actual GGUF backend. Read required files and state from trusted application composition, not arbitrary user request or environment strings with disable toggles. If a trusted dependency cannot be activated, return the established public readiness code rather than raw exception or prompt-bearing stderr. Do not silently switch to hosted inference.
+
+**Step D — preserve live data before authority migration.** Quiescence must be verified at the deployment boundary and through writer leases/DB permissions, not inferred from a process sleep or an operator checkbox. Take consistent backups of both existing logical databases, conversation threads and messages; record object digests, tenant counts, indexes, migration revision and all ambiguous/in-flight records. Write an irreversible-recovery warning before altering any owner collection. Historical unconfirmed records remain quarantined, not auto-initialized or erased.
+
+**Step E — migrate and fence.** Under explicit authorized maintenance, make epoch records for eligible existing identities through a versioned idempotent migration. Reject stale writer tokens and mixed-version deployments that cannot enforce epoch in mutation transaction/readback. Require primary-bound linearizable reads where the policy depends on them. In degraded replica-set conditions, deny protected inference/mutation and preserve recovery. Test writer revocation and repair from persisted records after abrupt restart.
+
+**Step F — activate inference only on observed trust.** Prove the backend and engine see the same authority with current epoch, real protected reader and verified tokenizer. Then activate actual GGUF under finite memory/token/worker budgets and observe a real conversation turn using the canonical ingress. The receipt must bind active model bytes, source SHA, prompt/context projection identity, operator principal, final output and successful acknowledgement. Missing physical GPU or real model is a hold, not a synthetic pass.
+
+### Required negative acceptance matrix
+
+| Failure | Expected safe result | Persistence expectation |
+|---|---|---|
+| Backend connects to different epoch collection | deny guarded AI and dependent protected writes | old tenant and chat state untouched |
+| Mongo standalone without required primary semantics | protected guard cannot claim readiness | no invented epoch or blind migration |
+| Engine lacks backend writer-custody proof | deny provider activation | present actionable code, not raw internal trace |
+| Reviewer missing or policy untrusted | deny local provider | keep model installation and previous sessions |
+| Tokenizer does not match active model | block admission | no output counted as trusted completion |
+| Writer lease expired but process still running | physical capacity retained, stale write denied | no duplicate reservation or commit |
+| Old backend version attempts chat mutation | fence/quarantine | historical messages not silently rewritten |
+| Shutdown during epoch migration | restart into explicit reconciliation | backup, journal and pre-migration records preserved |
+| Client resubmits same idempotency key with changed request | reject mismatch | no repeat AI inference or side effects |
+| User edits source during model turn | stale tool proposal denied/revalidated | canonical source remains newer revision |
+
+### Probe ordering
+
+Validate architecture and active machine receipts first, then safe Mongo topology, then source epoch/writer custody, then reviewer/tokenizer, then actual GGUF, then user chat, and finally tool-authorized game work. Starting with a costly model acquisition when the guard is missing only wastes resources. In the first-install UI, show each dependency with separate observed state and recovery instructions; never communicate “ready” from successful weight download.
+
+## 25.2 Chroma migration design without data loss
+
+The recorded mismatch is pinned Chroma's /data persistence against a named volume previously mounted at /chroma/chroma. Treat both old /data container layer and the old volume as potentially meaningful. A dual-backup is mandatory before any mount/layout change. The workflow should stop writers, preserve old container and volume identities, perform a bounded consistent copy/backup with SQLite journals, verify digest and logical collection counts, and stage a new durable /data mount. Rebuild derived vector projections only from authoritative source where policy allows; never overwrite original isolated snapshots to make a test pass.
+
+A real acceptance case must remove/recreate only the **new test** Chroma container after a migration and show all intended vectors/metadata remain queryable. Include changes to index version and source rights and demonstrate deletion/revocation in rebuilt caches. If contents conflict or it is unclear which source is newer, stop for human reconciliation with both copies retained. The ordinary app default can still work with bounded lexical retrieval; do not block an otherwise safe first-run setup on optional Chroma.
+
+## 25.3 Installer transaction model
+
+Treat installation as a staged transaction with explicitly irreversible boundaries. Phases: inspect host, inspect existing install, authenticate/digest source packages, verify disk and capacity, prepare private secrets, establish immutable stable IDs, stage images/dependencies, create/verify data volumes, apply schema migrations with backup, start frontend independently, start backend and engine under valid dependencies, verify per-service health, configure optional runtime/model, exercise first-user and first-game journey, publish installed-version receipt.
+
+The installer may detect and recommend Docker/WSL/driver repairs, but should not change host privileges or managed unrelated containers automatically. A failed stage returns clear correctable steps and retains the last known good data. A resumed run must not regenerate private service identities, duplicate indexes, double-pull model weights or reset a used owner account. When the product intentionally runs without AI weights, the UI distinguishes “app usable” from “AI unavailable,” preserving source editing and honest preview/doctor behavior.
+
+### Physical laptop acceptance dossier
+
+Record Windows build, CPU architecture, RAM and free disk class, WSL distribution/kernel, Docker Desktop/Compose versions, Python/runtime and model GGUF identity, Godot executable, service topology, published ports, and source exact SHA. Do not put machine serial numbers, personal files or private network addresses into public evidence. Exercise install, suspend, restart, local model response, game build and interactive play, safe uninstall/repair and restore. One hosted Windows installer job can support source quality; it cannot replace this full target proof.
+
+# 26. Concrete playable-game compiler, runtime and visual acceptance
+
+A “build” result is a graph of typed project objects, source code, assets, executable target and test observations. The builder must keep the natural-language brief immutable and distinguish source synthesis from verified gameplay. Current README describes deterministic Godot generation, a bounded repair loop and core-loop marker; treat those as valuable starting points and go beyond them with actual controller-driven play and source-bound runtime evidence.
+
+## 26.1 Canonical seven-handoff pipeline (design proposal)
+
+**H1 brief → game design specification.** Freeze requested genre, fantasy, player verbs, objective, target, accessibility, offline requirement and finite scope. Make all assumed constraints explicit. Failure: unbounded “make any game” request cannot become an uncontrolled multi-month campaign without operator consent. Success: validated versioned design with testable game-loop acceptance.
+
+**H2 design → simulation/scene/world IR.** Build typed actors, collision shapes, gameplay rules, inventories, enemies, levels, world state, quest graph, asset requirements and start/win/lose predicates. Define RNG algorithm and seed. Failure: missing player/controller, unwinnable story branch or unsupported required target semantics blocks next stage. Success: deterministic graph with solvability witnesses where applicable.
+
+**H3 IR → original asset and media requirements.** Materialize meshes/sprites, textures, fonts, animations, sound cues, music/cinematic cues and player UI where the brief needs them. Keep original authorship, rights and source refs. Failure: an AudioCueState without PCM or audible engine event is incomplete when game requires sound. Success: actual media bytes or explicit declared fallback loaded by target.
+
+**H4 IR/assets → engine-specific source.** Use pinned stable Godot/toolchain and versioned script/source schema to create scene tree, input map, signals and gameplay code. Failure: unsupported engine feature or import ambiguity blocks rather than silently dropping a necessary verb. Success: inspectable and buildable original project including all assets.
+
+**H5 engine source → playable proof.** Boot actual engine and record runtime version, startup logs, interactive inputs, frames and game-state changes. Must show player movement, mechanic actuation, objective progression, failure feedback and win/restart; only an optional structural smoke may rely on a printed marker. Success: independent game player completes declared goal using real input.
+
+**H6 playable proof → quality and repair.** Compare to baseline on held-out seeds, input latency, frame pacing, collision, audio, quest fairness and accessibility. Human/model-independent play review can reject dull or confusing games without asserting objective defect. Use bounded minimal repairs with source current-head guard; every repair invalidates affected receipts and reruns tests.
+
+**H7 approved candidate → export/release.** Emit actual target package plus editable source, rights manifest, engine digest, save compatibility and player-accessibility settings. Run the installed/exported game on a clean compatible host. Failure: download prepared but not delivered, unverified executable, unresolved license or missing target launch evidence stays held. Success: code/source and actual game are separately verifiably available.
+
+## 26.2 Input-driven acceptance trace design
+
+Define a **test-only** normalized controller trace bound to actual engine/application state. It is not another canonical runtime authority or a substitute for engine state; it is evidence. Required fields in every recorded step: game project digest; executable digest; engine version; time/tick; input device; normalized button/axis action; previous and next relevant state digest; observed player transform; objective/health/inventory change; captured frame/audio artifact refs where applicable; and assertion outcome.
+
+The trace driver must interact through the real game's declared input API, not mutate the internal gameplay state directly as a shortcut. If a deterministic fixture injects state for testing, label it setup and perform at least one independent non-cheating full playthrough. To verify a finishable shooter, the test moves, aims, fires, observes enemy hit, receives earned salvage, purchases upgrade, completes waves and restarts. To verify a platformer, it moves through colliders, jumps over a hazard, lands on platform, reaches exit and preserves progress after save/reopen. To verify RPG, it obtains a quest, updates relevant world and inventory state, chooses a branch and returns to save.
+
+### Controller-to-game correctness predicates
+
+- Movement input changes player transform in the intended direction under collision bounds; movement stops after key release and UI focus loss.
+- Attack input spawns a real permitted hit/hurt action, consumes appropriately capped resources, triggers animation/effect/audio and changes enemy health only upon valid collision.
+- Player damage respects invulnerability/recovery and updates HUD/inventory feedback with a corresponding observed state transition.
+- Quest completion requires a real witnessed action, not a model or generated script claiming a flag.
+- Victory requires objective predicates, and defeat respects health/time/other declared failure conditions; both show recoverable end-state UI.
+- Save atomically captures player, world, quest, RNG and versioned asset references; restore matches canonical checkpoint even after crash.
+- New engine target or code revision invalidates old runtime proof unless the exact compatibility policy accepts it with tested coverage.
+- If a bot cannot physically run the actual game, the work order stays at source or integration maturity; it cannot self-certify M4/M5.
+
+## 26.3 Visual and audible production proof
+
+Three kinds of evidence must remain separate: (a) a logical cue/animation/camera model, (b) a transformed asset or source file, and (c) the target runtime producing actual pixels/audio in response to game events. An animation state machine can be correct without imported skeletons; an audio cue scheduler can be correct without wave synthesis; a renderer contract can be correct without GPU draw calls. The final full-game target requires the bridge all the way to (c) for declared media.
+
+**Art:** inspect at least one frame with an actual actor sprite/mesh, readable HUD and environment. For 3D, prove geometry normals, material and lighting under target renderer. Expose render provenance and handle missing textures safely. **Animation:** show idle-to-move, attack/hit, death/restart transitions through real engine and compare state to model. **Sound:** capture actual played audio after gameplay event with clipping/volume/caption checks. **Cinematic:** show skip, pause, cue alignment, camera target preservation and safe return to controls. **Accessibility:** duplicate critical feedback across text/shape/audio as applicable, with reduced motion/captions and remapping.
+
+## 26.4 Genre-specific acceptance beyond source-file generation
+
+**Top-down shooter:** baseline must support free movement, aim, enemy collision, ammo/heat if used, visible projectiles or hit effects, actual damage and score/loot, wave progression, resource sink, victory, defeat and restart. Advanced layer adds meaningful enemy tactics, environmental hazards, upgrades and multiple weapons without invalidating the baseline.
+
+**Precision platformer:** baseline must handle fixed-step collision, jump buffer, coyote time, moving platforms, hazards, checkpoints and goal. Advanced layer adds climbing, grappling, wall jump and expressive character animation only after the basic jump engine is verified at varied framerates.
+
+**Roguelike RPG:** baseline must offer seed-bound level, movement, combat/encounter, inventory, dialogue and one quest with valid ending. Advanced layer adds procedural economy, social world, branching progression and permanent death/retry under explicit rules.
+
+**3D exploration:** baseline needs actual move/camera, mesh collider, interactive NPC, quest item and complete objective, with spatial audio/animation where required. Advanced layer adds rigged companions, climbing, weather, ecosystem and streaming without destroying frame pacing.
+
+**Racing:** baseline needs actual player steering/throttle/brake, defined track, collision or boundary behavior, checkpoint/lap validation, finish and restart. Existing advanced_racing_godot.py may implement native GDScript logic; it must be tested rather than assumed absent. Advanced layer adds tire/weather physics, opponent AI, pits and force feedback under specific target capability checks.
+
+**Strategy/puzzle:** baseline must expose valid interactive moves, state transition rules, loss/win or solvability, hints/reset and audit of chosen path. Advanced layer adds multiple intelligent opponent policies and procedural generators without unfair impossible states.
+
+**Cross-genre:** a genre kit is accepted only if its distinctive mechanic is executable and observable. Renaming a HUD or changing a seed is not an additional genre. Human/AI agents must actually play the result through the declared engine target.
+
+## 26.5 Cross-bot game production handoff gates
+
+BOT-04 freezes brief and plan; BOT-05 checks canon and quest reachability; BOT-06 establishes observable mechanics; BOT-07 emits solvable spatial variation; BOT-08 provides playable media/animation/audio assets; BOT-09 compiles and runs an actual engine; BOT-11 exposes human editing and preview controls; BOT-12 independently validates game quality, user journey, origin rights, accessibility and release evidence. BOT-01/02/03 enforce operating environment, source state and protected model tooling. At each handoff, owner publishes an exact artifact digest and acceptance predicate. A downstream owner can reject incompatible inputs but cannot silently mutate upstream authoritative state to make tests pass. Revisions replay only the affected dependency subgraph.
+
+# 27. Repository object-census execution and unresolved unknowns
+
+## 27.1 Required complete clone/object procedure
+
+When a trusted environment has GitHub network access, perform a complete full-history or explicitly scoped source clone from the approved owner repository, recording the remote URL, target branch, exact commit SHA, object completeness and any LFS/submodule limitation. Use safe detached checkout for investigation, not a persistent write-capable runtime before admission. In this environment, direct git access failed DNS resolution and has **not** been reclassified as success. The GitHub API tree inspections are strong current-source evidence for queried trees, but cannot replace all needed blobs, Git history or executable tests.
+
+Suggested read-only source-census commands to execute on a network-capable checked-out host:
+
+~~~bash
+git remote -v
+git rev-parse --show-toplevel
+git rev-parse HEAD
+git status --porcelain=v1
+git fsck --full --no-reflogs
+git ls-tree -r --full-tree HEAD | wc -l
+git ls-files -z | python -c 'import sys; print(len(sys.stdin.buffer.read().split(b"\0"))-1)'
+git submodule status --recursive
+git lfs ls-files
+~~~
+
+Do not automatically declare an LFS/submodule discrepancy an error; investigate expected source ownership and rights. A count from a truncated recursive GitHub API response must be labeled a lower bound. Count code/fixtures/assets/docs/workflows separately. Verify if any directories contain generated caps/redundant mirrors without testing their loaded/executed role. Compute syntax, import/dependency and call-edge coverage independently from path names. Read all launch entrypoints, route mounting, worker dispatch, actual compiler and filesystem operations before declaring a feature missing.
+
+## 27.2 Exhaustive inspection order for large trees
+
+1. Repository metadata: remote, branch protections where permitted, main head, Git tree, license and AGENTS.md. Confirm current PR #4880 is documentation-only and note its draft status.
+2. Machine constitution: all mandatory twelve documents, exact architecture zones, state domains, typed records, ten capabilities, 17 closed construction gaps and required enterprise proof.
+3. Default first install: Docker/engine/backend/frontend/Chroma, installer/doctor/setup, private secrets, data restoration and actual model activation.
+4. Product frontend: Expo router route graph, auth scopes, Jeeves chat, game learning, crawler, game editor, build status and publishing.
+5. API: backend/server.py and mounted routes; skeleton/api/server.py/create_app, engine client, authenticated tool/queue boundaries and response schemas.
+6. Game: forge/game_builder, game_build_queue, advanced genre exporters, game/gameplay and game/generation, Godot and HTML5 bundles, actual render/audio integration.
+7. Native AI: runtime model/operational AI, SQLite, guard, tokenizer, model installer, pressure supervisor and real source agent.
+8. Dragon: frontend crawler, backend/core/dragon_crawler.py, core webcrawler, source rights and backend Atlas bridge.
+9. Assurance: workflows, required checks, security scans, live game tests, physical device and head/current artifact receipts.
+10. Overlay candidates: PRs #4870/#4872/#4875/#4876 and other current draft PRs; compare changed paths, source pins, dependency heads and expected cutover.
+11. Historical acceptance: source-backed tests, expected vs actually observed behavior, legacy archive, schema/gate drift and test fixture limitations.
+12. Human value: time-to-first-playable, difficulty of editor changes, quality of produced games, asset polish, accessibility, user trust and disaster recovery.
+
+## 27.3 Unknowns that must not be upgraded to facts
+
+A source path named “advanced” may still contain a simulator, proof object, facade or real runtime; inspect its imports and actual side effects before grading. Godot adapters may be genre-specific and have distinct feature coverage, so one adapter's limitation does not negate another. A source queue may be durable on Mongo for some operations and in-process for fallback under limited modes; discover actual current dispatch paths before generalizing. Runtime screenshots do not prove source-and-binary identity without receipts. A GitHub job success does not prove a local-device test. A CI workflow skipped under PR filters is not a pass. An AGENTS.md construction gap marked closed does not prove end-user experience, yet also should not be reopened on speculation.
+
+Any proposed fix should be written as a source-hypothesis test: **Observed:** precise file, line/function, run or artifact. **Impact:** failed user journey. **Minimal repair:** existing canonical owner with bounded behavior. **Negative oracle:** condition that must remain denied. **Proof:** focused test and real integration if needed. **Promotion:** exact final source head and independent approval. Unsupported leaps in reasoning must become investigative tasks, not unapproved PR mutations.
