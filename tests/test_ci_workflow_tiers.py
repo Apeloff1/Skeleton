@@ -111,6 +111,30 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaises((OSError, ValueError)):
                     _read_reviewed(root, Path("fifo"))
 
+    def test_linked_evidence_diagnostics_are_stable(self):
+        """A linked parent and a linked file report custody failure, not success."""
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            trusted = root / "trusted"
+            trusted.mkdir()
+            (trusted / "policy.yml").write_text("on:\\n  push:\\n", encoding="utf-8")
+            self.assertIn("push", _read_reviewed(root, Path("trusted/policy.yml")))
+            for name, target, is_dir in (
+                ("linked-file.yml", trusted / "policy.yml", False),
+                ("linked-parent", trusted, True),
+            ):
+                link = root / name
+                try:
+                    link.symlink_to(target, target_is_directory=is_dir)
+                except (OSError, NotImplementedError):
+                    self.skipTest("symlinks unavailable on this filesystem")
+                path = Path(name) / "policy.yml" if is_dir else Path(name)
+                with self.subTest(path=str(path)), self.assertRaisesRegex(
+                    (OSError, ValueError), "linked CI evidence path"
+                ):
+                    _read_reviewed(root, path)
+                link.unlink()
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
