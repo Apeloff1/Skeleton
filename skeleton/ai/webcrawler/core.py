@@ -28,7 +28,7 @@ from .document_formats import (
     HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
     TECHNICAL_MEDIA_TYPES, ASSET_TEXT_MEDIA_TYPES, SUPPLY_CHAIN_TYPES,
     SCENE_ASSET_TYPES, PACKAGE_LOCK_TYPES, INTERFACE_TYPES,
-    GRAPH_ARTIFACT_TYPES, TILED_ARTIFACT_TYPES,
+    GRAPH_ARTIFACT_TYPES, TILED_ARTIFACT_TYPES, ROBOT_SCENE_TYPES,
     DocumentFormatError, extract_additional_format,
 )
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
@@ -182,6 +182,12 @@ class CrawlPolicy:
         "text/patch",
         "application/vnd.citationstyles.csl+json",
         "application/x-csl+json",
+        "model/urdf+xml",
+        "application/x-urdf+xml",
+        "model/sdf+xml",
+        "application/x-sdf+xml",
+        "application/x-mjcf+xml",
+        "model/mjcf+xml",
         "application/x-tiled-tmx+xml",
         "text/x-tiled-tmx",
         "application/x-tiled-tsx+xml",
@@ -547,7 +553,8 @@ def extract_document(
                  | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES
                  | SUPPLY_CHAIN_TYPES | SCENE_ASSET_TYPES
                  | PACKAGE_LOCK_TYPES | INTERFACE_TYPES
-                 | GRAPH_ARTIFACT_TYPES | TILED_ARTIFACT_TYPES):
+                 | GRAPH_ARTIFACT_TYPES | TILED_ARTIFACT_TYPES
+                 | ROBOT_SCENE_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):

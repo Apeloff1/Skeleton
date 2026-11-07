@@ -29,6 +29,7 @@ from .package_lock_artifacts import PACKAGE_LOCK_TYPES, extract_package_lock
 from .interface_artifacts import INTERFACE_TYPES, extract_interface_artifact
 from .graph_artifacts import GRAPH_ARTIFACT_TYPES, extract_graph_artifact
 from .tiled_artifacts import TILED_ARTIFACT_TYPES, extract_tiled_artifact
+from .robot_scene_artifacts import ROBOT_SCENE_TYPES, extract_robot_scene
 
 
 MARKDOWN_TYPES = frozenset({"text/markdown", "text/x-markdown"})
@@ -54,7 +55,7 @@ ADDITIONAL_TYPES = (
     | RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
     | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES | SUPPLY_CHAIN_TYPES
     | SCENE_ASSET_TYPES | PACKAGE_LOCK_TYPES | INTERFACE_TYPES
-    | GRAPH_ARTIFACT_TYPES | TILED_ARTIFACT_TYPES
+    | GRAPH_ARTIFACT_TYPES | TILED_ARTIFACT_TYPES | ROBOT_SCENE_TYPES
 )
 
 _MD_LINK = re.compile(
@@ -349,6 +350,15 @@ def extract_additional_format(
     raw: str, media_type: str, *, max_chars: int,
     max_links: int,
 ) -> ExtractedFormat:
+    if media_type in ROBOT_SCENE_TYPES:
+        try:
+            row=extract_robot_scene(raw,media_type,max_chars=max_chars,max_links=max_links)
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return ExtractedFormat(
+            text=row.text,title=row.title,links=(),truncated=row.truncated,
+            body_executed=False,reference_trusted=False,
+        )
     if media_type in TILED_ARTIFACT_TYPES:
         try:
             row=extract_tiled_artifact(raw,media_type,max_chars=max_chars,max_links=max_links)

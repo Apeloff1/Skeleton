@@ -185,6 +185,11 @@ def implementation_digest():
                 "tiled_xml_documents.py",
                 "tiled_json_documents.py",
                 "tiled_artifacts.py",
+                "robot_xml_guard.py",
+                "urdf_documents.py",
+                "sdf_documents.py",
+                "mjcf_documents.py",
+                "robot_scene_artifacts.py",
             )
         }
     )
