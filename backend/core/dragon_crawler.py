@@ -1420,6 +1420,7 @@ class DragonCrawlerApplication:
             max_total_bytes=body.get("max_bytes", 8 * 1024 * 1024),
             min_host_delay_seconds=1.0,
             discover_sitemaps=body.get("discover_sitemaps", False),
+            frontier_strategy=body.get("frontier_strategy", "fifo"),
         )
         now = _now()
         expiry = now + timedelta(hours=24)

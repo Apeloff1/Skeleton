@@ -28,7 +28,7 @@ export type SourceFreshness = {
   capture_age_seconds: number; valid_until: string; remote_freshness_verified: false;
 };
 export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean; use_policy?: SourceUsePolicy; freshness?: SourceFreshness };
-export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; consent: true; rights_acknowledged: true };
+export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced'; consent: true; rights_acknowledged: true };
 export type CrawlCommand = { idempotency_key: string; expected_version: number };
 export type SourceExport = { filename: string; media_type: string; content: string; content_digest: string; session_id: string; source_id: string };
 const ROOT = '/api/dragon-academy/crawler';
@@ -139,6 +139,7 @@ export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlS
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
+  if (body.frontier_strategy !== undefined && !['fifo', 'balanced'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
   if (body.discover_sitemaps !== undefined && typeof body.discover_sitemaps !== 'boolean') throw new ChatClientError('Sitemap discovery must be explicitly enabled or disabled.', { kind: 'validation' });
   if (body.seeds.length < 1 || body.seeds.length > 16 || new Set(body.seeds).size !== body.seeds.length || body.consent !== true || body.rights_acknowledged !== true) throw new ChatClientError('Provide distinct seed URLs and acknowledge capture rights.', { kind: 'validation' });
   for (const seed of body.seeds) { let url: URL; try { url = new URL(seed); } catch { throw new ChatClientError('Enter complete http or https seed URLs, one per line.', { kind: 'validation' }); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || seed.length > 2048) throw new ChatClientError('Use http or https URLs without embedded credentials.', { kind: 'validation' }); }

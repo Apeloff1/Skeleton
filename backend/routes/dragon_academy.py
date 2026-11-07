@@ -2612,6 +2612,7 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
     discover_sitemaps: bool = Field(default=False, strict=True)
+    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced)$")
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 

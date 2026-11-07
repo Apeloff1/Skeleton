@@ -32,6 +32,7 @@ from .structured_discovery import (
     DiscoveryError, SUPPORTED_MEDIA, parse_structured_discovery,
     extract_robots_sitemaps,
 )
+from .frontier_scheduler import choose_frontier
 from .document_formats import DocumentFormatError
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
@@ -79,6 +80,7 @@ def implementation_digest():
                 "dragon_mission_quality.py",
                 "structured_discovery.py",
                 "document_formats.py",
+                "frontier_scheduler.py",
             )
         }
     )
@@ -132,6 +134,7 @@ class CrawlRequest:
     max_total_bytes: int = 8388608
     min_host_delay_seconds: float = 1.0
     discover_sitemaps: bool = False
+    frontier_strategy: str = "fifo"
 
     def __post_init__(self):
         if not isinstance(self.seed_urls, (tuple, list)) or not 1 <= len(self.seed_urls) <= 16:
@@ -161,6 +164,10 @@ class CrawlRequest:
         _number(self.min_host_delay_seconds, 0.25, 30, "host delay")
         if type(self.discover_sitemaps) is not bool:
             raise CrawlOperationError("sitemap discovery requires an explicit boolean")
+        if type(self.frontier_strategy) is not str or self.frontier_strategy not in (
+            "fifo", "balanced",
+        ):
+            raise CrawlOperationError("unknown bounded crawl frontier strategy")
 
     @classmethod
     def from_dict(cls, value):
@@ -737,13 +744,10 @@ class CrawlRun:
 
     def _step(self, now):
         state = self._state
-        item = next(
-            (
-                row
-                for row in state["frontier"]
-                if max(row["ready_at"], state["host_ready"].get(urlsplit(row["url"]).hostname, 0)) <= now
-            ),
-            None,
+        item, _selection = choose_frontier(
+            state["frontier"], sources=state["sources"],
+            host_ready=state["host_ready"], query=self.request.query,
+            now=now, strategy=self.request.frontier_strategy,
         )
         if item is None:
             return None
