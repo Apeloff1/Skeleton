@@ -114,7 +114,10 @@ def extract_xml_evidence(
                 title = value[:512]
             row = f"{path}: {value}"
             total += len(row) + 1
-            if total > max_chars * 2:
+            # The retained budget is a truncation target, not a parse error.
+            # Keep the inspection finite even when the caller requests a tiny
+            # preview of a moderately sized, valid XML source.
+            if total > min(2_097_152, max_chars * 8 + 16384):
                 raise XMLDocumentError("XML text projection exceeds parse budget")
             lines.append(row)
         for child in reversed(children):
