@@ -155,6 +155,7 @@ def implementation_digest():
                 "go_mod_documents.py",
                 "pylock_documents.py",
                 "package_lock_artifacts.py",
+                "sbom_topology.py",
             )
         }
     )

@@ -165,12 +165,21 @@ def project_sbom(
             or not 1 <= len(kind) <= 128 or type(max_items) is not int
             or not 1 <= max_items <= _MAX_NODES):
         raise ResearchFormatError("invalid SBOM text projection")
+    from .sbom_topology import inspect_sbom_topology
+    topology = inspect_sbom_topology(graph)
     lines=[
         f"External software inventory: {kind} (unreviewed, not verified)",
         f"Components: {len(graph.components)}; dependencies: {len(graph.dependencies)}",
         f"Roots: {len(graph.roots)}; unresolved references: {len(graph.unresolved_references)}",
         f"Cycle-affected or cyclic nodes: {graph.cyclic_nodes}",
         f"Max declared dependency outdegree: {graph.highest_outdegree}",
+        f"True cycle member nodes: {topology.truly_cyclic_nodes}; "
+        f"cycle strongly-connected groups: {topology.cyclic_strong_components}",
+        f"Longest finite dependency component chain: {topology.longest_condensed_chain}",
+        f"Maximum transitive dependencies: {topology.maximum_transitive_dependencies}",
+        f"Maximum reverse dependency impact: {topology.maximum_reverse_impact}",
+        f"Source roots reachable components: {topology.root_reachable_nodes}",
+        f"Dependency topology fingerprint SHA256: {topology.topology_digest}",
         f"License fields missing: {graph.license_unknown}",
         f"Artifact checksum declarations: {graph.hashes_declared}",
         f"Graph fingerprint SHA256: {graph.graph_digest}",
