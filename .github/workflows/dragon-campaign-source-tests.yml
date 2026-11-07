@@ -11,6 +11,8 @@ on:
       - "skeleton/ai/webcrawler/frontier_scheduler.py"
       - "skeleton/ai/webcrawler/link_header_discovery.py"
       - "skeleton/ai/webcrawler/bound_http.py"
+      - "skeleton/ai/webcrawler/content_coding.py"
+      - "tests/test_ai_webcrawler_dragon_http_coding.py"
       - "tests/test_ai_webcrawler_dragon_gain7.py"
       - "tests/test_ai_webcrawler_dragon_campaign_stack.py"
       - "tests/test_ai_webcrawler_dragon_campaign_depth.py"
@@ -61,6 +63,8 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/core.py
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/bound_http.py
+          python -m py_compile skeleton/ai/webcrawler/content_coding.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_http_coding.py
           python -m py_compile tests/test_ai_webcrawler_dragon_campaign_stack.py
           python -m py_compile tests/test_ai_webcrawler_dragon_campaign_depth.py
           python -m py_compile tests/test_ai_webcrawler_dragon_atlas.py
@@ -103,3 +107,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ops_wave6.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_live_discovery.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_gain7.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v

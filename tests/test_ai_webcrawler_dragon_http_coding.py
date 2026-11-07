@@ -203,5 +203,87 @@ class CanonicalCompressedCrawler(unittest.TestCase):
         self.assertEqual(run.snapshot()["usage"]["failures"], 1)
 
 
+
+class SocketBoundCodingTransportTests(unittest.TestCase):
+    """Verify the actual socket-bound entrypoint with a strictly synthetic socket."""
+
+    def scripted(self, raw, coding="gzip", duplicated=False):
+        from unittest.mock import MagicMock, patch
+        from skeleton.ai.webcrawler.bound_http import SocketBoundFetcher
+        from skeleton.ai.webcrawler.dns_binding import ResolvedTarget
+
+        class Response:
+            status = 200
+            length = 0
+            fp = None
+
+            def __init__(self):
+                self.chunks = [
+                    raw[index:index + 9] for index in range(0, len(raw), 9)
+                ]
+
+            def getheaders(self):
+                rows = [
+                    ("Content-Type", "text/html"),
+                    ("Content-Encoding", coding),
+                    ("Content-Length", str(len(raw))),
+                ]
+                if duplicated:
+                    rows.append(("CONTENT-ENCODING", coding))
+                return rows
+
+            def read1(self, requested):
+                if not self.chunks:
+                    return b""
+                value = self.chunks.pop(0)
+                if len(value) > requested:
+                    self.chunks.insert(0, value[requested:])
+                    return value[:requested]
+                return value
+
+        connection = MagicMock()
+        connection.getresponse.return_value = Response()
+        target = ResolvedTarget(
+            "http://example.com/archive", "example.com", 80, ("93.184.215.14",),
+        )
+        with patch("skeleton.ai.webcrawler.bound_http.resolve_target", return_value=target), patch(
+            "skeleton.ai.webcrawler.bound_http._PinnedHTTPConnection", return_value=connection,
+        ):
+            fetcher = SocketBoundFetcher(
+                timeout_seconds=3, allowed_hosts=frozenset({"example.com"}),
+            )
+            result = fetcher.fetch_once(
+                target.url, user_agent="Dragon-Crawler-Test", max_bytes=4096,
+            )
+        return result, connection
+
+    def test_production_transport_decodes_gzip_and_deflate(self):
+        for coding in ("gzip", "deflate"):
+            with self.subTest(coding=coding):
+                raw = encode(HTML, coding)
+                result, connection = self.scripted(raw, coding)
+                self.assertEqual(result.body, HTML)
+                self.assertEqual(result.wire_bytes, len(raw))
+                self.assertEqual(result.wire_hash, hashlib.sha256(raw).hexdigest())
+                self.assertEqual(result.content_encoding, coding)
+                self.assertEqual(
+                    connection.request.call_args.kwargs["headers"]["Accept-Encoding"],
+                    "gzip, deflate, identity",
+                )
+                connection.close.assert_called_once()
+
+    def test_actual_transport_rejects_duplicate_content_encoding(self):
+        with self.assertRaisesRegex(ValueError, "ambiguous Content-Encoding"):
+            self.scripted(encode(HTML, "gzip"), duplicated=True)
+
+    def test_actual_transport_rejects_decompression_bomb(self):
+        with self.assertRaises(ContentCodingError):
+            self.scripted(encode(b"B" * 20000, "gzip"))
+
+    def test_actual_transport_rejects_truncated_compressed_body(self):
+        with self.assertRaises(ContentCodingError):
+            self.scripted(encode(HTML, "gzip")[:-4])
+
+
 if __name__ == "__main__":
     unittest.main()
