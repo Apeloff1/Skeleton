@@ -111,6 +111,37 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaises((OSError, ValueError)):
                     _read_reviewed(root, Path("fifo"))
 
+    def test_hardlinked_evidence_cannot_alias_reviewed_registry_or_workflow(self):
+        """An inode shared with an unreviewed path is not immutable evidence."""
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "machine").mkdir()
+            (root / ".github/workflows").mkdir(parents=True)
+            registry = root / "machine/ci_workflow_tiers.json"
+            registry.write_text(
+                (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            alias = root / "registry-alias.json"
+            try:
+                os.link(registry, alias)
+            except (OSError, NotImplementedError):
+                self.skipTest("hardlinks unavailable on this filesystem")
+            self.assertTrue(any(
+                "hardlink aliases" in problem for problem in audit(root)
+            ))
+            alias.unlink()
+            workflow = root / ".github/workflows/extra.yml"
+            workflow.write_text("on:\\n  workflow_dispatch:\\njobs:\\n", encoding="utf-8")
+            alias = root / "workflow-alias.yml"
+            os.link(workflow, alias)
+            with self.assertRaisesRegex(ValueError, "hardlink aliases"):
+                _read_reviewed(root, Path(".github/workflows/extra.yml"))
+            alias.unlink()
+            self.assertIn("workflow_dispatch", _read_reviewed(
+                root, Path(".github/workflows/extra.yml")
+            ))
+
     def test_linked_evidence_diagnostics_are_stable(self):
         """A linked parent and a linked file report custody failure, not success."""
         with TemporaryDirectory() as temp:
