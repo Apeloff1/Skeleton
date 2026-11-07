@@ -19,6 +19,7 @@ from skeleton.ai.webcrawler.document_formats import (
     DocumentFormatError, extract_markdown, extract_csv,
     extract_json, extract_additional_format, extract_source_code, extract_ndjson,
 )
+from skeleton.ai.webcrawler.bound_http import _coalesce_bounded_link_headers
 from skeleton.ai.webcrawler.frontier_scheduler import choose_frontier
 from skeleton.ai.webcrawler.link_header_discovery import parse_link_headers
 from skeleton.ai.webcrawler.operations import (
@@ -396,6 +397,46 @@ class LinkHeaderTest(unittest.TestCase):
     def test_link_header_alternate_json_feed(self):
         result = self.parse('</feed.json>; rel=alternate; type="application/feed+json"')
         self.assertEqual(result.links, ("https://example.com/feed.json",))
+
+
+class RepeatedLinkTransportTest(unittest.TestCase):
+    def test_two_link_headers_survive_finite_transport_normalization(self):
+        pairs = [
+            ("Link", "</part-2>; rel=next"),
+            ("LINK", "</feed.json>; rel=alternate; type=application/feed+json"),
+        ]
+        normalized = {k.lower(): v for k, v in pairs}
+        _coalesce_bounded_link_headers(pairs, normalized)
+        self.assertIn("</part-2>", normalized["link"])
+        self.assertIn("</feed.json>", normalized["link"])
+        report = parse_link_headers(
+            normalized, base_url="https://example.com/current",
+            policy=CrawlPolicy(allowed_hosts=frozenset({"example.com"})),
+        )
+        self.assertEqual(report.links, (
+            "https://example.com/part-2", "https://example.com/feed.json",
+        ))
+
+    def test_oversized_link_header_is_discarded_not_dispatched(self):
+        pairs = [("Link", "</x>; rel=next") for _ in range(18)]
+        normalized = {"link": "</unsafe>; rel=next"}
+        _coalesce_bounded_link_headers(pairs, normalized)
+        self.assertNotIn("link", normalized)
+
+    def test_oversized_single_link_header_is_discarded(self):
+        pairs = [("Link", "A" * 9000)]
+        normalized = {"link": "A" * 9000}
+        _coalesce_bounded_link_headers(pairs, normalized)
+        self.assertNotIn("link", normalized)
+
+    def test_unrelated_response_framing_fields_are_not_modified(self):
+        pairs = [
+            ("Content-Length", "42"),
+            ("Link", "</next>; rel=next"),
+        ]
+        headers = {"content-length": "42", "link": "</next>; rel=next"}
+        _coalesce_bounded_link_headers(pairs, headers)
+        self.assertEqual(headers["content-length"], "42")
 
 
 class FrontierSchedulingTest(unittest.TestCase):

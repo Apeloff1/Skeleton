@@ -5,6 +5,13 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/webcrawler/dragon_campaign_stack/**"
+      - "skeleton/ai/webcrawler/operations.py"
+      - "skeleton/ai/webcrawler/core.py"
+      - "skeleton/ai/webcrawler/document_formats.py"
+      - "skeleton/ai/webcrawler/frontier_scheduler.py"
+      - "skeleton/ai/webcrawler/link_header_discovery.py"
+      - "skeleton/ai/webcrawler/bound_http.py"
+      - "tests/test_ai_webcrawler_dragon_gain7.py"
       - "tests/test_ai_webcrawler_dragon_campaign_stack.py"
       - "tests/test_ai_webcrawler_dragon_campaign_depth.py"
       - "tests/test_ai_webcrawler_dragon_atlas.py"
@@ -48,6 +55,12 @@ jobs:
       - name: Compile the completed Dragon campaign stack
         run: |
           python -m compileall -q skeleton/ai/webcrawler/dragon_campaign_stack
+          python -m py_compile skeleton/ai/webcrawler/document_formats.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_scheduler.py
+          python -m py_compile skeleton/ai/webcrawler/link_header_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/core.py
+          python -m py_compile skeleton/ai/webcrawler/operations.py
+          python -m py_compile skeleton/ai/webcrawler/bound_http.py
           python -m py_compile tests/test_ai_webcrawler_dragon_campaign_stack.py
           python -m py_compile tests/test_ai_webcrawler_dragon_campaign_depth.py
           python -m py_compile tests/test_ai_webcrawler_dragon_atlas.py
