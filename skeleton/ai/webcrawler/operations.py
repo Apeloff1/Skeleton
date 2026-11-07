@@ -28,6 +28,9 @@ from .core import (
     extract_document,
 )
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
+from .structured_discovery import (
+    DiscoveryError, SUPPORTED_MEDIA, parse_structured_discovery,
+)
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
 
@@ -72,6 +75,7 @@ def implementation_digest():
                 "dns_binding.py",
                 "research.py",
                 "dragon_mission_quality.py",
+                "structured_discovery.py",
             )
         }
     )
@@ -846,6 +850,51 @@ class CrawlRun:
                 robots["text"] = "User-agent: *\nDisallow: /"
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        structured_type = ctype in SUPPORTED_MEDIA
+        if (
+            ctype == "application/octet-stream"
+            and urlsplit(url).path.lower().endswith(".xml.gz")
+            and response.body.startswith(b"\\x1f\\x8b")
+        ):
+            # A bounded gzip sitemap may be served as generic octet-stream,
+            # but no other opaque binary document is ever parsed as XML.
+            ctype = "application/gzip"
+            structured_type = True
+        if structured_type:
+            if response.status != 200:
+                self._finish_item(item)
+                return self._event(
+                    "rejected", now=now, url=url,
+                    reason="structured_response_http_status_not_200",
+                )
+            try:
+                discovery = parse_structured_discovery(
+                    response.body,
+                    media_type=ctype, document_url=url,
+                    policy=self.policy, max_links=128, max_entries=512,
+                )
+            except (DiscoveryError, ValueError, UnicodeError):
+                self._finish_item(item)
+                return self._event(
+                    "rejected", now=now, url=url,
+                    reason="structured_discovery_rejected_by_safe_parser",
+                )
+            self._finish_item(item)
+            admitted = 0
+            for discovered_url in discovery.links:
+                if self._enqueue(
+                    discovered_url, depth=item["depth"] + 1,
+                    parent_url=url,
+                ):
+                    admitted += 1
+            # Indexes and feeds are discovery inputs, not trusted captured
+            # documents. The request and response bytes have already been
+            # durably charged through the ordinary canonical transport.
+            return self._event(
+                "discovered", now=now, url=url,
+                reason=f"{discovery.kind}:{admitted}_frontier_links_admitted"
+                + (":bounded" if discovery.capped else ""),
+            )
         self._finish_item(item)
         if not 200 <= response.status < 300 or ctype not in self.policy.allowed_content_types:
             return self._event(
