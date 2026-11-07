@@ -10,6 +10,7 @@ on:
       - "skeleton/ai/webcrawler/document_formats.py"
       - "skeleton/ai/webcrawler/frontier_scheduler.py"
       - "skeleton/ai/webcrawler/link_header_discovery.py"
+      - "skeleton/ai/webcrawler/structured_discovery.py"
       - "skeleton/ai/webcrawler/bound_http.py"
       - "skeleton/ai/webcrawler/content_coding.py"
       - "tests/test_ai_webcrawler_dragon_http_coding.py"
@@ -61,6 +62,7 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/document_formats.py
           python -m py_compile skeleton/ai/webcrawler/frontier_scheduler.py
           python -m py_compile skeleton/ai/webcrawler/link_header_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/structured_discovery.py
           python -m py_compile skeleton/ai/webcrawler/core.py
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/bound_http.py
