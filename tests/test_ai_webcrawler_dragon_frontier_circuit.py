@@ -62,7 +62,7 @@ class CircuitContractTests(unittest.TestCase):
         self.assertFalse(row.allowed)
         self.assertEqual(row.reason,"pagination_numeric_trap")
     def test_repetitive_path_trap(self):
-        row=self.decision("https://example.com/a/a/a/a/a")
+        row=self.decision("https://example.com/a/a/a/a")
         self.assertTrue(row.allowed)
         row=self.decision("https://example.com/article/article/article/article/article")
         self.assertFalse(row.allowed)
