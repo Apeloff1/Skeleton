@@ -5,7 +5,28 @@ Complements the policy mediator in :mod:`skeleton.security.generated_code_sandbo
 (which decides *whether* an effect is granted) with the enforcement layer
 that *contains* it.
 """
+from .corpus import (
+    ATTACK_SEEDS,
+    BENIGN_SEEDS,
+    CorpusGateError,
+    CorpusReport,
+    FuzzCase,
+    Seed,
+    assert_gate,
+    evaluate,
+    fuzz,
+)
 from .errors import *  # noqa: F403
+from .executor import (
+    AuditIntegrityError,
+    AuditLog,
+    ExecutorConfigError,
+    ExecutorPolicy,
+    GuardedExecutor,
+    ToolOutcome,
+    ToolRequest,
+    ToolSpec,
+)
 from .fs import FsJail, JailPolicy, check_relative
 from .injection import InjectionReport, detect, guard, quarantine
 from .process import ProcessLimits, ProcessResult, run_isolated, scrub_env
@@ -21,6 +42,9 @@ from .sanitizers import (
 )
 
 __all__ = [
+    "ATTACK_SEEDS", "BENIGN_SEEDS", "AuditIntegrityError", "AuditLog", "CorpusGateError", "CorpusReport",
+    "ExecutorConfigError", "ExecutorPolicy", "FuzzCase", "GuardedExecutor", "Seed", "ToolOutcome",
+    "ToolRequest", "ToolSpec", "assert_gate", "evaluate", "fuzz",
     "FsJail", "InjectionReport", "JailPolicy", "ProcessLimits", "ProcessResult",
     "check_relative", "detect", "escape_html", "guard", "hidden_characters", "quarantine",
     "redact_secrets", "run_isolated", "safe_json_loads", "sanitize_filename",
