@@ -58,3 +58,53 @@ from .evidence_contracts import (
     synthesize,
     validate_reproduction,
 )
+
+# VOL-249/250: authority-neutral bounded inquiry and causal simulation.
+from .hypothesis_engine import (
+    EvidenceDirection,
+    EvidenceMode,
+    Hypothesis,
+    HypothesisAssessment,
+    HypothesisComparison,
+    HypothesisError,
+    HypothesisEvidence,
+    HypothesisLedger,
+)
+from .causal_knowledge import (
+    CausalClaim,
+    CausalGraph,
+    CausalGraphSnapshot,
+    CausalKnowledgeError,
+    ClaimKind,
+    InterventionResult,
+)
+
+__all__.extend((
+    "EvidenceDirection",
+    "EvidenceMode",
+    "Hypothesis",
+    "HypothesisAssessment",
+    "HypothesisComparison",
+    "HypothesisError",
+    "HypothesisEvidence",
+    "HypothesisLedger",
+    "CausalClaim",
+    "CausalGraph",
+    "CausalGraphSnapshot",
+    "CausalKnowledgeError",
+    "ClaimKind",
+    "InterventionResult",
+))
+
+from .game_design_probes import (
+    DesignProbePlan,
+    DesignProbePlanner,
+    DesignProbeRequest,
+    ProbeEvidenceStatus,
+    ProbePlanningError,
+)
+
+__all__ += [
+    "DesignProbePlan", "DesignProbePlanner", "DesignProbeRequest",
+    "ProbeEvidenceStatus", "ProbePlanningError",
+]

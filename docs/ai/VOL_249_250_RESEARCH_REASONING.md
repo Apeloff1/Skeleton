@@ -93,3 +93,17 @@ python -m unittest discover -s skeleton/testing -p 'test_ai_git_knowledge.py' -v
 The Git knowledge fixture now constructs its synthetic secret marker at
 runtime rather than leaving key-shaped bytes in tracked test source; rejection
 behavior remains covered without exempting any secret-hygiene scanner pattern.
+
+## Canonical research mirror and host-portable native CI
+
+The four research namespace files are byte-identical at
+`skeleton/research` and `skeleton/ai/research` as required by the
+canonical AI-tree parity gate. The PR adds a byte comparison in the exact-head
+research workflow. **Existing unrelated AI-tree drift elsewhere in the main
+baseline remains a separate merge blocker**; no AI-tree waiver is inferred.
+
+The flight-HTTP acceptance fixture now uses `tempfile.TemporaryDirectory`
+with the platform-selected secure temporary root rather than hardcoding a
+container-only path. The socket/SQLite acceptance test remains otherwise
+unchanged, and the full native qualification is required before any readiness
+claim. This test-fixture repair does not attest real-device GGUF behavior.
