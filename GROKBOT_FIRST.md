@@ -70,6 +70,10 @@
 - 55. Character foundry: identity, motion and expression
 - 56. Autonomous gameplay debugging and minimal repair
 - 57. Cross-platform playable compilation and legal target qualification
+- 58. Protected game learning and model promotion
+- 59. Epic world streaming and persistent scene identity
+- 60. Cinematography and actual audio timelines
+- 61. Multiplayer and canonical collaborative authority
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -6655,3 +6659,139 @@ Build a **legal-original-game target matrix** for source, compiled image, emulat
 A release candidate carries: source SHA and project revision, target profile, engine/toolchain bytes, build outputs and digests, media/source rights, SBOM, dependency/license scan, malware gate status, playable end-state trace, save-schema compatibility, performance profile, human approval, rollback and support limitations. No agent or PR description can waive a missing gate. An original game may be usable offline without storefront integration, but public commercial distribution requires extra entitlement, signing and legal decisions.
 
 **Exit case:** one original game is both playable and editable in source, tested in actual Godot on a declared desktop target, and separately compiled/played under SDL2 if dual-target support is claimed. Show clean-host launch and player completion. Record any nonqualified targets explicitly. Additional genres can be promoted one at a time based on the same evidence chain.
+
+# 58. Protected game learning and model promotion: from actual gameplay to better game creation
+
+**Work packet:** FRONTIER-58 | **Lead:** BOT-03 | **Co-leads:** BOT-04 orchestration, BOT-06 play, BOT-10 legal evidence, BOT-12 independent evaluation | **Status:** PROPOSED qualification/connection work, not evidence of any deployed new weights.
+
+**Observed source anchors:** skeleton/ai/game_builder/game_model_promotion.py, game_reviewer_optimizer.py, game_18round_evolution.py, game_18round_runtime.py, game_18round_shadow_sandbox.py, game_training_flow.py and skeleton/jeeves/game_learning.py. The existing model-promotion path describes a real input-feature *classifier*, not an LLM; the optimizer selects on TRAIN/VALIDATION and limits TEST to the frozen winner. The 18-round journal is candid that its receipts do not prove live inference, crawling, new data or actual weight training. Preserve this crucial separation: advisory game-reviewer or policy adaptation is not proof of improved foundational GGUF parameters.
+
+## 58.1 Declare distinct learning lanes and their authorities
+
+**Lane A — Gameplay policy learning.** Learn a bounded policy that chooses finite actions for a real, explicitly versioned game environment. Inputs include game artifact digest, controller schema, initial save, action/observation history, rewards, termination and allowed experiment budget. The owner is the existing game-learning runtime. Output can be a tested navigation/agent policy, but a successful policy has not necessarily learned how to write games, passed a physical native test, or fine-tuned a language model.
+
+**Lane B — Defect and quality reviewer learning.** Train a calibrated classifier on independently labelled gameplay traces, design/asset/rights evidence and known bugs. Its output helps choose which projects deserve further playtest. It cannot replace actual engine execution or certify release. Use per-family false-green rates: a reviewer that recognizes many cosmetic issues but misses one critical save-corruption family is inappropriate for critical decision authority even if aggregate accuracy rises.
+
+**Lane C — Optional local model-weight adaptation.** Actual changes to a language/vision/audio model must use the canonical provider/training owner, admitted hardware and model bytes, rightfully collected data, frozen independent tests, staged/rollback artifacts, and explicit activation authority. A "hyperweight" or shadow reviewer-policy reference is not a new LLM checkpoint. The training system must refuse to infer training completed merely because a signed round was appended.
+
+Every lane uses its actual existing schema and persistence owner; names in this chapter are design categories, not authorization to create another learner database or privileged agent hierarchy.
+
+## 58.2 Training-data custody and partition strategy
+
+A project-derived training example contains source project/revision, origin and allowed use, initial game state, relevant input trace, target engine version, true observed result, human or independent oracle label, and content digest. Split by game *lineage*, not by row: color variants, rewrites, remixes or procedural seeds of the same mission cannot be allowed to leak from TRAIN to TEST. Genre and engine coverage are reported separately, and a long corpus of tiny maze variants cannot certify a 3D role-playing game reviewer.
+
+Protect user-owned source and media under existing governance. A publicly readable source is not automatic commercial reuse or model-training permission. A Dragon research summary marked research-only cannot become gradient data. Any applicable consent, licenses, retention, withdrawal and data-class constraints follow samples into datasets, derived model candidates and evaluation artifacts. If retroactive machine unlearning cannot be established, describe the real containment/retirement behavior instead of claiming exact deletion from learned parameters.
+
+For critical labels, use actual reproducible evidence. Examples include unreachable objectives, duplicate item grant, stale project state, collision mismatch, broken action bindings, frame stalls, misleading tutorial, inaccessible cues, script import failure, unplayable export, corrupted save and unauthorized source asset. Synthetic examples help cover corners, but should not replace varied actual games and human annotations for subjective quality.
+
+## 58.3 Frozen evaluation and calibrated abstention
+
+Pre-register feature extraction, baseline champion, candidate class, training budget, hyperparameters, seed, partition digests, critical defect taxonomy, uncertainty threshold and qualified use cases. The candidate search may inspect only TRAIN and VALIDATION; sealed TEST is revealed to the frozen selected model under the current promotion contract. Existing PromotionStandard already expresses bounded accuracy, critical recall, calibration, generalization and regression controls—respect the active file, do not rewrite the policy after seeing outcomes.
+
+Use project-level and defect-family confusion matrices, confidence intervals, precision/recall for critical defects, calibration/Brier score, abstention rates and out-of-domain labels. A review model that is uncertain about an unknown genre should abstain rather than give confident green. New evaluation evidence must bind exact model/feature extractor, project source, tester, scorer, toolchain and dataset. If a model or rubric changes, expire the affected verdicts.
+
+Stage reviewers in shadow mode first. Compare frozen candidate to current champion on newly produced games and independent play traces without granting live mutation or release rights. Champion rollback must be a finite, tested decision. No classifier output grants new capability, tool access, tenant access, source rights or model-provider weight activation.
+
+## 58.4 Eighteen-round evolution, source-grounded physical effects
+
+Partition rounds by effect type: planning/priority; deterministic data transformation; sandbox computation; actual admitted inference; actual rights-approved network capture; actual authorized training; native game execution; human approval; active promotion. A signed journal event establishes only its own custody. To claim a real external effect, require the corresponding physical tool/network/engine/model receipt, with operation identity and current authorization. This prevents a multi-step reasoning chain from being interpreted as independent actual work.
+
+An optimization round can propose better replay seeding, counterexample selection, probability ordering or model routing and still be a valuable planning result. It is not a training run until a trusted process used real training data and produced real checkpoint bytes. It is not crawl evidence without transport/capture records. It is not quality superiority without held-out comparisons. Respect existing idle, thermal, privacy and source-license conditions and do not activate new weights behind an operator's back.
+
+## 58.5 Learning must improve a playable user journey
+
+Close the loop: capture a real bug or design weakness; derive valid label and minimal trace; suggest a bounded project/tool mutation; create a new candidate project revision; run actual engine tests; compare gameplay on held-out inputs; let a human and deterministic gates accept or reject. The verifier must detect score gaming such as removing all enemies, changing the victory predicate or weakening collision to obtain a higher "completion" rate. Preserve test oracle and user's hard requirements. Increasing an advisory classifier's confidence alone is never proof that the game improved.
+
+Mandatory negatives: project lineage leakage; revoked training consent; fabricated labelled trace; hyperparameter selection on TEST; missing tokenizer/model identity; shadow proposal attempting real release; tenant-crossing dataset join; promotion after a source-policy change; optimizer that degrades critical bug recall; and replay that double-commits rewards. A real model outage should leave deterministic gameplay operational and make its training/assistant functionality honestly unavailable.
+
+# 59. Epic world streaming and persistent scene identity under bounded hardware
+
+**Work packet:** FRONTIER-59 | **Lead:** BOT-07/BOT-05 | **Partners:** BOT-06 gameplay, BOT-08 rendering, BOT-09 export, BOT-11 editor, BOT-12 acceptance. **Inspected source anchors:** advanced_procedural_world_runtime.py, game_frontier_studio_epic_lod.py, game_frontier_studio_production_recipes.py and game_frontier_studio_epic_route_graph.py. The existing procedural runtime uses integer-coordinate portable terrain with rebuild/save_deltas/snapshot policies; the visual LOD allocator fairly distributes a hard 8192-instance budget without inventing collision/nav geometry. Its controls must be preserved.
+
+## 59.1 Addressable hierarchy without eager massive instantiation
+
+Define stable world → epoch → region → district → scene → chunk → entity identity. Each generated chunk is specified by canonical project/world, integer cell coordinates, terrain-law version, seed/RNG algorithm, approved source assets and locked human-authored overrides. A content-addressed base represents repeatable procedural content. State mutations such as harvested deposits, opened gates, player buildings, faction decisions and NPC memories live as committed events or versioned deltas under the existing game authority, not in a mutable random seed.
+
+The stated hierarchy of 100 chapters / 1000 acts / 9999 scenes is an addressable creative project structure. Each position has an independent maturity state—reserved, authored, composed, compiled, playtested or target-qualified. Empty positions do not count as shipped scenes, and a catalog cardinality does not imply that many independent playable games exist. Lazy generation produces only approved content needed for the current project and target while preserving exact source canon and rights.
+
+Integer world cells should map to local render/physics coordinates via explicit coordinate frames. Moving the floating origin cannot move the canonical actor, change its quest history or duplicate region ownership. Cross-world portals are atomic identity-preserving transfers; if load or policy validation fails, the player remains at a safe authoritative location. A world archive must retain enough source and event data to reconstruct observed player consequences, not all hypothetical untouched terrain.
+
+## 59.2 Simulation fidelity tiers and actor promotion
+
+**Active region:** actual player controls, real physics/collision, nearby NPC decisions, critical quest triggers, audiovisual fidelity and responsive save interactions. **Adjacent region:** lower-frequency AI/nav and prefetch with enough data to preserve nearby impending events. **Remote region:** aggregate deterministic society/economy/time evolution or frozen source snapshot with event cursor.
+
+Promoting an actor remote→active reconstructs the *same* identity, location, inventory, goals, witnessed memory, commitments and causal ancestry, not a newly generated duplicate. Demoting active→remote commits necessary state before freeing expensive physics, GPU or decoded media. Use source revisions and bounded leases so two workers never claim a single region simultaneously. A late remote simulation result cannot overwrite newer active gameplay. Replaying the same seed without accepted events must not replenish mined resources or restore defeated unique enemies.
+
+NPCs do not gain omniscient knowledge simply by moving to a cheaper tier; preserve their observed information and permitted rumor propagation. A distant merchant may pursue a recorded trip through a coarse spatial route, but cannot instantaneously teleport across world regions to make a schedule appear plausible.
+
+## 59.3 Semantics-priority streaming and cost-aware LOD
+
+Streaming priority combines player predicted motion, camera visibility, current quest relevance, active character interactions, collision readiness, navigation, rights validity, source availability and physical capacity. A mission-critical bridge cannot be rendered as traversable before its collision representation is ready. A high-resolution texture may be absent temporarily, but the mandatory clue and accessible cue must remain readable.
+
+Asset readiness stages map through existing build and artifact owners: planned; deriving/importing; validated; simulation-ready; rendering-ready; active; evicting; retained as base+delta. Each transition has finite CPU/RAM/GPU/disk budgets and revocation behavior. Background Jeeves generation cannot consume all available GPU memory and starve a player. Fair-share LOD of multi-layer scenes builds on the actual epic_lod algorithm rather than ignoring its represented-layer guarantee.
+
+Use texture/mesh/animation LOD, bounded GPU upload, asset prefetch, spatial chunk priority and cache eviction, but never alter underlying quest, collision or economy semantics as a side effect of visual simplification. A withdrawn media source invalidates applicable export rights even if the cache still holds rendered bytes.
+
+## 59.4 Procedural variety versus mere combinatorial indexing
+
+The user's "quintillions of variations" ambition must be expressed as a measured design space. The meaningful axes are objective architecture, player verbs, route constraints, NPC/faction causality, progression, environment, encounter pacing, visual style and ending dependencies. A large product of options may contain mechanically near-identical states. Analyze distinct reachable experiences, not just seed count. Validate representative generated projects across held-out seeds with actual engine navigation, resource availability and human quality sampling.
+
+Lock important human-authored worlds and scene identities. Regenerate only affected neighborhoods and re-solve dependent navigation/mission feasibility when a terrain rule changes. If one changed bridge collapses a critical path, the generator must explain the dependency and propose a repair instead of overwriting the human's authored story with a new random quest.
+
+## 59.5 Scene acceptance under real pressure
+
+Create a playable multi-layer world containing surface, cave and elevated sky/vertical sections; at least one named unique NPC, scarce item and quest whose state crosses chunk boundaries. Have the player traverse several regions, harvest, build, save, teleport, restart and return. Assert the same identities, inventories and world event cursor despite cache eviction. Remove one derived chunk cache and prove its regeneration from approved base+committed deltas. Inject a competing lease, partial demotion, source-rights withdrawal and GPU pressure. Record actual frame spikes, memory and streaming latency. A screenshot of 8192 logical instances is not the proof of physical traversability.
+
+# 60. Cinematography and audio: compile commands into real time-aligned media
+
+**Work packet:** FRONTIER-60 | **Lead:** BOT-08 | **Partners:** BOT-05 narrative, BOT-06 engine, BOT-09 export, BOT-11 editor, BOT-12 audiovisual proof. **Observed anchors:** modular_scene_compositor.py explicitly produces a render-command model, not an actual video/audio asset. advanced_audio_runtime.py schedules and ducks source-authored cue state in integer samples without creating sound-card output. Maintain these truthful descriptions and add verified real engine adapters, not inflated capability names.
+
+## 60.1 Multi-clock timeline grammar
+
+A playable cinematic contains canonical scene/revision, actor identities, camera shot path, actor animation action/clip, dialogue/caption cues, soundtrack/FX cue, optional player decision, lighting/environment changes and state-changing postconditions. Distinguish *game logical ticks*, *scene timeline*, *animation-local frames*, *audio sample time* and *wall-clock capture time*. The mapping is explicit; slow motion, pause, scene load, audio device interruption and skipped dialogue cannot be solved by assuming all clocks match.
+
+Events carry identity and idempotency. Replaying a camera move or subtitle is safe; replaying a unique reward is not. The world owner commits actual gameplay consequences, while the scene compositor and mixer are derived presentations. Skipping a cutscene must apply its required authored end state once and release controls. A save during a cutscene resumes at a compatible checkpoint or a declared safe state, not a half-applied reward plus looped camera.
+
+## 60.2 Camera direction as constrained geometry
+
+Shots specify target actor, narrative purpose, frame composition, lens/FOV, acceptable pan/zoom, occlusion/collision rules, safe subtitle region, scene coordinate transform and reduced-motion alternative. A candidate shot generator can optimize visibility and dramatic clarity using geometry-aware search, but must validate with the actual renderer and target screen formats. An over-the-shoulder conversation with the speaking NPC permanently outside frame is a bug even if the numerical camera track is well-formed.
+
+Human editors can lock accepted keyframes and regenerate only surrounding segments. Keep voice, gestures, camera and narrative canon in one versioned timeline but separate runtime source owners. The compiler should emit real target-camera nodes/animations and report missing character/rig/cue dependencies before build. An LLM recommendation about camera beauty is not proof that the exported scene renders.
+
+## 60.3 Real mixer buses, stems and accessible cues
+
+The logical AudioCueState must bind to validated PCM/OGG/WAV or another supported decodable source, mixer bus, sample rate, channels, amplitude, loop, attenuation and rights record. Admitted original music and sound stems may use layered arrangements and dynamic transitions; avoid latency-critical neural synthesis in the gameplay frame loop. Measure audio buffer underruns, clipped levels, subtitle timing and priority ducking under paused and resumed play. If an audio provider is absent, the editor may produce a cue plan but cannot claim actual generated music.
+
+Voice requires source and identity consent. Subtitle-only output remains a valid supported fallback when voice cannot be produced, and essential game information must not depend solely on sound. A mute or reduced-motion setting cannot erase key gameplay choices. Media revocation and edits invalidate downstream render/audio exports by source dependency.
+
+## 60.4 Interactive cinematics and source-to-observation parity
+
+A cutscene with a player branch records the actual input event, allowed choice, game-rule consequence, new scene state, cue changes and save cursor. If the player skips, correct canonical consequences remain. If the player pauses or controller disconnects, no hidden selection is committed. Camera/body transforms and audio cues derive from committed scene state and do not independently grant inventory or alter quest flags.
+
+The studio timeline needs actual preview playback and track editing, including a source-diff view. Test original conversation, one action reveal and two branches through real engine frames, mixer capture or clearly labelled engine-buffer evidence, subtitles and controller transitions. Test skipping before/after the consequence, saving mid-shot, switching locale and restoring after crash. A textual render-command list cannot qualify the video/audio feature.
+
+# 61. Multiplayer and creator collaboration: separate gameplay replication from project authority
+
+**Work packet:** FRONTIER-61 | **Lead:** BOT-06 with BOT-02 | **Partners:** BOT-05, BOT-09, BOT-11, BOT-12. **Observed source boundary:** advanced_engine_bindings.py lists advanced_networking_runtime as an original reference engine module; no such registration alone proves deployed public multiplayer. No new privileged game server is authorized here.
+
+## 61.1 Explicit target profiles
+
+Order support by concrete proof: offline single-player; same-device local co-op; LAN-host-authoritative; asynchronous turn-based; and optional remote hosted play if separately approved. Each target declares actor identity, authoritative world owner, controller/action grammar, tick/turn ordering, event persistence, join/leave, save, disconnect, network permissions, cost, abuse policy and native runner. An exported game's host is not necessarily the app backend, and the source file must not silently create privileged public internet infrastructure.
+
+For local co-op, input binding and player ownership remain separate. For LAN or hosted play, clients submit *intents*, never final inventory rewards or victory decisions. Host validates movement, quest changes and economy under the game rules. A turn-based game may use ordered action log and compare-and-swap; a real-time game may use prediction/interpolation with authoritative rollback/reconciliation. Deterministic lockstep cannot be assumed correct across arbitrary physics/toolchains.
+
+## 61.2 Network action consistency and security
+
+A remote input carries session/principal, source game package identity, sequence, tick, finite payload, bounded timing and replay guard. The authoritative host validates membership, rates, state version, action preconditions and actual effects. Attack cases include packet replay, duplicate join, cheating inventory, reordered attack, disconnect during reward, simultaneous key pickup, split-brain host and client state divergence. A malicious client must not mint unique rewards or overwrite another player's save.
+
+Session chat, user-created assets and multiplayer names have separately scoped privacy/content/rights controls. In-game text is not an administrative tool call. An offline game remains playable when networking is disabled if offline single-player support is part of the target contract. Remote hosted mode must have real service, authenticated deployment and tested recovery, not a local source demo masquerading as a globally available game.
+
+## 61.3 Collaborative authoring uses semantic CAS
+
+Co-authors change one canonical project source through actor grants, versioned proposals, semantic conflict detection and audit. CRDT text can help collaborative descriptions, but it is not independent authority over world events, licensed media or public release. Two users can change different lines that jointly invalidate quest solvability; run the game IR/constraint verifier before commit. A user offline draft re-enters with its original parent revision and must be rebased/reviewed if the canonical project advanced.
+
+Presence indicators and selection cursors are derived UI conveniences. They never disclose private files, cross-tenant source or hidden tool permissions. Changing account or project fences stale async responses and clears previous private preview projections.
+
+## 61.4 Native multiplayer proof
+
+Qualify each mode independently: two real local controllers exercising distinct actors; two LAN clients with observed host authority, disconnect/rejoin and exactly-once rewards; two concurrent turn submissions where only one commits to a given turn; and (only if claimed) physical remote service latency/recovery and rights checks. Input traces, game package digests, host source, state and network faults belong to the evidence. Passing local co-op does not certify online play.
