@@ -79,8 +79,15 @@ def _read_reviewed(root: Path, relative: Path) -> str:
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
-    starts = [i for i, line in enumerate(lines) if line == "on:"]
-    if len(starts) != 1:
+    # A second top-level trigger, including inline or whitespace-suffixed
+    # syntax, must not hide behind the single reviewed multiline block.
+    # YAML permits several spellings that would otherwise escape exact matching.
+    candidates = [
+        (i, line) for i, line in enumerate(lines)
+        if re.match(r"^on\s*:", line)
+    ]
+    starts = [i for i, line in candidates if line == "on:"]
+    if len(candidates) != 1 or len(starts) != 1:
         raise ValueError("workflow requires exactly one literal multiline 'on:' trigger")
     found: set[str] = set()
     for line in lines[starts[0] + 1:]:
