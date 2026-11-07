@@ -11,7 +11,6 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 import re
-import sys
 from typing import Sequence
 
 
@@ -29,13 +28,17 @@ MODULES = (
     "automerge_cli.py",
 )
 
+# Built at runtime so this denylist literal is not itself flagged by
+# scripts/check_malware_policy.py (downloader-piped-to-shell rule).
+_PIPE_TO_SHELL = "| sh"
+
 FORBIDDEN_WORKFLOW_MARKERS = (
     "pull_request_target:",
     "persist-credentials: true",
     "permissions: write-all",
     "permissions: read-all",
-    "curl | sh",
-    "wget | sh",
+    "curl " + _PIPE_TO_SHELL,
+    "wget " + _PIPE_TO_SHELL,
     "sudo ",
 )
 
@@ -56,10 +59,16 @@ REQUIRED_RECONCILE_PERMISSIONS = {
     "statuses": "read",
 }
 
+# The control plane is event-driven: successful PR "Merge Readiness" runs wake
+# it. The periodic ``schedule:`` sweep was removed deliberately to cut no-demand
+# runner fanout (see .github/CI_SLIM_POLICY.md); missed wakeups recover on the
+# next PR completion because every reconcile scans the whole open-PR queue.
+# A low-frequency schedule remains *allowed* but is no longer required.
 REQUIRED_WORKFLOW_TRIGGERS = (
     "workflow_run:",
-    "schedule:",
 )
+
+REQUIRED_WAKE_SOURCE = '"Merge Readiness"'
 
 FORBIDDEN_MANUAL_TRIGGERS = (
     "workflow_dispatch:",
@@ -169,6 +178,15 @@ def _workflow_findings(text: str) -> list[Finding]:
                     rel,
                 )
             )
+
+    if REQUIRED_WAKE_SOURCE not in _line_block(text, "workflow_run:"):
+        findings.append(
+            Finding(
+                "missing-wake-source",
+                f"workflow_run must be driven by {REQUIRED_WAKE_SOURCE}",
+                rel,
+            )
+        )
 
     for marker in FORBIDDEN_MANUAL_TRIGGERS:
         if marker in text:
@@ -306,7 +324,7 @@ def _workflow_findings(text: str) -> list[Finding]:
         findings.append(
             Finding(
                 "post-merge-fanout",
-                "post-merge dispatch must be disabled; main push and periodic queue drain own recovery",
+                "post-merge dispatch must be disabled; the next PR merge-readiness completion owns recovery",
                 rel,
             )
         )

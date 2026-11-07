@@ -32,6 +32,11 @@ import { startTunnelHeartbeat, stopTunnelHeartbeat } from '../src/utils/tunnelHe
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
 import { LocaleProvider } from '../src/i18n';
 
+// Route-level fallback: expo-router renders this for errors thrown by any
+// route without its own ErrorBoundary export (the class boundaries below
+// remain the last line of defence).
+export { RouteErrorFallback as ErrorBoundary } from '../src/foundation/RouteErrorFallback';
+
 // Auxiliary diagnostics may not make importing the app itself fatal.
 try { installCrashTrace(); } catch {}
 try { installMemoryGuard(); } catch {}
