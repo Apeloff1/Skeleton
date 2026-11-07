@@ -13,6 +13,8 @@ import hashlib
 import re
 from urllib.parse import parse_qsl, unquote, urlsplit
 
+from .frontier_antichain import vet_url_antichain
+
 _MAX_SEEN=512
 _MAX_FAMILY_VARIANTS=24
 _MAX_QUERY_PAIRS=32
@@ -110,6 +112,12 @@ def evaluate_frontier_candidate(
     if hazard:
         return FrontierCircuitDecision(
             False,hazard,_fingerprint((candidate[:4096],())),0,max_variants,
+        )
+    antichain = vet_url_antichain(candidate, seen=seen, frontier=frontier)
+    if not antichain.allowed:
+        return FrontierCircuitDecision(
+            False, antichain.reason, antichain.structural_digest,
+            antichain.known_path_variants, max_variants,
         )
     family=_family(candidate)
     identity=_fingerprint(family)

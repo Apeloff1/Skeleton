@@ -17,6 +17,8 @@ import math
 import re
 from urllib.parse import unquote, urlsplit
 
+from .frontier_coverage import measure_frontier_coverage
+
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
 _MAX_ROWS = 512
@@ -46,7 +48,7 @@ def choose_frontier(
     frontier: list[dict], *, sources: dict, host_ready: dict,
     query: str, now: float, strategy: str = "fifo",
 ) -> tuple[dict | None, FrontierDecision | None]:
-    if strategy not in ("fifo", "balanced"):
+    if strategy not in ("fifo", "balanced", "coverage"):
         raise ValueError("unknown bounded frontier scheduling algorithm")
     if (not isinstance(frontier, list) or len(frontier) > _MAX_ROWS
             or not isinstance(sources, dict)
@@ -92,7 +94,7 @@ def choose_frontier(
         return None, None
     if strategy == "fifo":
         index, row, host, overlap, score, _due = eligible[0]
-    else:
+    elif strategy == "balanced":
         index, row, host, overlap, score, _due = min(
             eligible,
             key=lambda x: (
@@ -100,6 +102,22 @@ def choose_frontier(
                 x[5], x[2], x[1]["url"], x[0],
             ),
         )
+    else:
+        ranked = []
+        for candidate in eligible:
+            ordinal, row, host, overlap, _score, due = candidate
+            scorecard = measure_frontier_coverage(
+                row["url"], sources=sources, query=query,
+                depth=row["depth"], attempts=row["attempts"],
+            )
+            ranked.append((scorecard.score, due, ordinal, candidate))
+        _coverage, _due, _ordinal, selected = min(
+            ranked, key=lambda x: (
+                -x[0], x[1], x[3][2], x[3][1]["url"], x[2],
+            ),
+        )
+        index, row, host, overlap, score, _due = selected
+        score = _coverage
     return row, FrontierDecision(
         url=row["url"], host=host, eligible_urls=len(eligible),
         host_captured_documents=counted[host],

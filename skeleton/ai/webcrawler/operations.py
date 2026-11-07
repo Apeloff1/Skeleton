@@ -91,6 +91,8 @@ def implementation_digest():
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
+                "frontier_coverage.py",
+                "frontier_antichain.py",
                 "link_header_discovery.py",
                 "content_coding.py",
                 "archive_documents.py",
@@ -274,7 +276,7 @@ class CrawlRequest:
         if type(self.discover_sitemaps) is not bool:
             raise CrawlOperationError("sitemap discovery requires an explicit boolean")
         if type(self.frontier_strategy) is not str or self.frontier_strategy not in (
-            "fifo", "balanced",
+            "fifo", "balanced", "coverage",
         ):
             raise CrawlOperationError("unknown bounded crawl frontier strategy")
 

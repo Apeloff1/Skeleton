@@ -87,6 +87,8 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/research_projection.py
           python -m py_compile skeleton/ai/webcrawler/research_artifacts.py
           python -m py_compile skeleton/ai/webcrawler/discovery_relations.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_coverage.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_antichain.py
           python -m py_compile skeleton/ai/webcrawler/warc_catalog.py
           python -m py_compile skeleton/ai/webcrawler/har_documents.py
           python -m py_compile skeleton/ai/webcrawler/patch_documents.py
@@ -270,6 +272,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_sbom_topology.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_html_structured_entities.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_frontier_circuit.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_coverage_frontier.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_antichain.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_topology.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_scene_graphs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_openapi_graph.py' -v
