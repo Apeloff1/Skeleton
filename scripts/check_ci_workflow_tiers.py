@@ -46,7 +46,7 @@ def _read_reviewed(root: Path, relative: Path) -> str:
         raise ValueError("descriptor-anchored CI evidence reads unsupported")
     limit = 1024 * 1024
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    file_flags = os.O_RDONLY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
     descriptors: list[int] = []
     try:
         descriptors.append(os.open(root, directory_flags))
