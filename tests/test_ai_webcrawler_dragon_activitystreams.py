@@ -49,6 +49,20 @@ def direct(doc, *, mime="application/activity+json", max_links=32):
 
 
 class ActivityCollectionTests(unittest.TestCase):
+    def test_unhashable_type_fields_are_rejected_or_ignored(self):
+        bad = {**PAGE, "type": ["OrderedCollectionPage"]}
+        with self.assertRaises(ActivityDiscoveryError):
+            direct(bad)
+        bad = {**PAGE, "orderedItems": [
+            {"type": ["Article"], "url": "/notes/unsafe", "to": PUBLIC},
+            {"type": "Article", "url": "/notes/safe", "to": PUBLIC},
+        ]}
+        self.assertEqual(direct(bad).links, (
+            "https://example.com/community/collection?page=2",
+            "https://example.com/community/collection?page=0",
+            "https://example.com/notes/safe",
+        ))
+
     def test_public_navigation_excludes_private_actor_and_cross_origin(self):
         result = direct(PAGE)
         self.assertEqual(result.links, (

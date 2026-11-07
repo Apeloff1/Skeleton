@@ -30,7 +30,8 @@ def discover_iiif(
     if type(max_entries) is not int or not 1 <= max_entries <= MAX_ENTRIES:
         raise CatalogDiscoveryError("IIIF collection item capacity invalid")
     doc = load_json_catalog(body)
-    if doc.get("@context") not in _CONTEXT:
+    context = doc.get("@context")
+    if not isinstance(context, str) or context not in _CONTEXT:
         raise CatalogDiscoveryError("unsupported or external IIIF context")
     kind = doc.get("type")
     if kind == "Manifest":
@@ -44,7 +45,8 @@ def discover_iiif(
     for entry in items:
         if not isinstance(entry, dict):
             raise CatalogDiscoveryError("invalid IIIF collection entry")
-        if entry.get("type") in _CHILDREN:
+        kind = entry.get("type")
+        if isinstance(kind, str) and kind in _CHILDREN:
             out.add(entry.get("id"))
     for direction in ("next", "prev"):
         value = doc.get(direction)

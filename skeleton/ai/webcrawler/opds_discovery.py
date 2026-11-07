@@ -20,6 +20,12 @@ def _rel(value: object) -> frozenset[str]:
     return frozenset(value.casefold().split())
 
 
+def _mime_type(value: object) -> str:
+    if not isinstance(value, str) or len(value) > 128:
+        raise CatalogDiscoveryError("unbounded or invalid OPDS link MIME type")
+    return value.split(";", 1)[0].strip().casefold()
+
+
 def discover_opds(
     body: bytes, *, document_url: str, policy: CrawlPolicy,
     max_links: int = 32, max_entries: int = 128,
@@ -48,16 +54,19 @@ def discover_opds(
             raise CatalogDiscoveryError("invalid OPDS navigation link object")
         if not (_rel(item.get("rel")) & _NAV_REL):
             continue
-        if (item.get("type") or "").split(";", 1)[0].strip().casefold() != "application/opds+json":
+        if _mime_type(item.get("type", "")) != "application/opds+json":
             out.add(None)
             continue
         out.add(item.get("href"))
     for item in navigation:
         if not isinstance(item, dict):
             raise CatalogDiscoveryError("invalid OPDS navigation record")
-        for link in item.get("links", []):
+        targets = item.get("links", [])
+        if not isinstance(targets, list) or len(targets) > 64:
+            raise CatalogDiscoveryError("invalid OPDS navigation target list")
+        for link in targets:
             if not isinstance(link, dict):
                 raise CatalogDiscoveryError("invalid OPDS navigation target")
-            if (link.get("type") or "").split(";", 1)[0].strip().casefold() == "application/opds+json":
+            if _mime_type(link.get("type", "")) == "application/opds+json":
                 out.add(link.get("href"))
     return out.report("opds_public_catalog")

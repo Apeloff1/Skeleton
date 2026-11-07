@@ -95,6 +95,43 @@ def oai_xml(token="cursor_A1b2c3"):
     ).encode()
 
 
+class MalformedCatalogTypeTests(unittest.TestCase):
+    def test_json_nonfinite_exponent_denied(self):
+        from skeleton.ai.webcrawler.archive_catalog_common import load_json_catalog
+        with self.assertRaises(CatalogDiscoveryError):
+            load_json_catalog(b'{"metadata":{"title":"Sample"},"score":1e309}')
+
+    def test_opds_mime_object_and_nested_link_container_denied(self):
+        malformed = {**OPDS, "links": [{"rel": "next", "type": {"bad": "x"},
+                                          "href": "/catalog?page=2"}]}
+        with self.assertRaises(CatalogDiscoveryError):
+            discover_opds(json.dumps(malformed).encode(), document_url=ROOT, policy=POLICY)
+        malformed = {**OPDS, "navigation": [{"links": {"href": "/catalog"}}]}
+        with self.assertRaises(CatalogDiscoveryError):
+            discover_opds(json.dumps(malformed).encode(), document_url=ROOT, policy=POLICY)
+
+    def test_iiif_unhashable_jsonld_context_and_item_types_denied_or_omitted(self):
+        malformed = {**IIIF_COLLECTION, "@context": ["bad"]}
+        with self.assertRaises(CatalogDiscoveryError):
+            discover_iiif(json.dumps(malformed).encode(), document_url=IIIF, policy=POLICY)
+        malformed = {**IIIF_COLLECTION, "items": [
+            {"type": ["Manifest"], "id": MANIFEST},
+            {"type": "Manifest", "id": MANIFEST},
+        ]}
+        row = discover_iiif(json.dumps(malformed).encode(), document_url=IIIF, policy=POLICY)
+        self.assertEqual(row.links, (MANIFEST,
+            "https://example.com/iiif/collection?page=2"))
+
+    def test_iiif_manifest_wrong_context_type_and_infinite_duration_denied(self):
+        bad = {**IIIF_MANIFEST, "@context": {"evil": "context"}}
+        with self.assertRaises(ResearchFormatError):
+            extract_iiif_manifest(json.dumps(bad))
+        bad = json.loads(json.dumps(IIIF_MANIFEST))
+        bad["items"][1]["duration"] = 1e309
+        with self.assertRaises(ResearchFormatError):
+            extract_iiif_manifest(json.dumps(bad))
+
+
 class OPDSTests(unittest.TestCase):
     def test_navigation_without_ebook_downloads(self):
         row=discover_opds(json.dumps(OPDS).encode(),document_url=ROOT,policy=POLICY)

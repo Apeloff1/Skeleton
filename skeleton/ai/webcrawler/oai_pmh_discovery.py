@@ -115,6 +115,8 @@ def discover_oai_pmh(
         raise CatalogDiscoveryError("multiple OAI-PMH cursors")
     out = LinkCollector(source=source, policy=policy, max_links=max_links)
     if rows:
+        if len(rows[0]) or len(rows[0].attrib) > 8:
+            raise CatalogDiscoveryError("invalid OAI-PMH resumption token structure")
         token = (rows[0].text or "").strip()
         if token:
             if _TOKEN.fullmatch(token) is None:

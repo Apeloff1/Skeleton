@@ -8,9 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
-from .core import CrawlPolicy, canonicalize_url
+# core -> document_formats -> iiif_manifest_documents -> this module.
+# Never import core during module initialization: it is not yet complete.
+if TYPE_CHECKING:
+    from .core import CrawlPolicy
 
 MAX_BODY = 1_048_576
 MAX_ENTRIES = 256
@@ -50,6 +55,13 @@ def _constant(_value: str) -> None:
     raise CatalogDiscoveryError("nonfinite catalog number")
 
 
+def _finite_float(value: str) -> float:
+    result = float(value)
+    if not math.isfinite(result):
+        raise CatalogDiscoveryError("nonfinite floating-point catalog number")
+    return result
+
+
 def load_json_catalog(raw: bytes) -> dict:
     if type(raw) is not bytes or not 1 <= len(raw) <= MAX_BODY:
         raise CatalogDiscoveryError("catalog byte limit exceeded")
@@ -59,6 +71,7 @@ def load_json_catalog(raw: bytes) -> dict:
         data = json.loads(
             raw.decode("utf-8-sig", errors="strict"),
             object_pairs_hook=_object, parse_constant=_constant,
+            parse_float=_finite_float,
         )
     except (UnicodeError, RecursionError, ValueError) as exc:
         raise CatalogDiscoveryError("invalid finite JSON catalog") from exc
@@ -70,6 +83,8 @@ def load_json_catalog(raw: bytes) -> dict:
 def catalog_source(url: str, policy: CrawlPolicy) -> str:
     if not isinstance(policy, CrawlPolicy) or not isinstance(url, str):
         raise CatalogDiscoveryError("missing immutable catalog policy")
+    from .core import canonicalize_url
+
     try:
         canonical = canonicalize_url(url)
     except (ValueError, UnicodeError) as exc:
@@ -86,6 +101,8 @@ def candidate_link(
         return None
     if any(c.isspace() for c in value):
         return None
+    from .core import canonicalize_url
+
     try:
         url = canonicalize_url(value, base=source)
         left, right = urlsplit(source), urlsplit(url)

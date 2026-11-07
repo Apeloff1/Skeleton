@@ -6,6 +6,8 @@ context dereferencing occurs here. This is a finite *source assertion*.
 """
 from __future__ import annotations
 
+import math
+
 from .archive_catalog_common import CatalogDiscoveryError, load_json_catalog
 from .research_projection import (
     ResearchFormatError, ResearchProjection, check_text, project_lines,
@@ -37,7 +39,9 @@ def extract_iiif_manifest(
         document = load_json_catalog(raw.encode("utf-8"))
     except CatalogDiscoveryError as exc:
         raise ResearchFormatError(str(exc)) from exc
-    if document.get("@context") not in _CONTEXTS or document.get("type") != "Manifest":
+    context = document.get("@context")
+    if (not isinstance(context, str) or context not in _CONTEXTS
+            or document.get("type") != "Manifest"):
         raise ResearchFormatError("source is not a supported IIIF v3 Manifest")
     items = document.get("items")
     if not isinstance(items, list) or not 1 <= len(items) <= 256:
@@ -66,7 +70,8 @@ def extract_iiif_manifest(
                 raise ResearchFormatError("IIIF Canvas dimensions invalid")
             visual += 1
         if duration is not None:
-            if (type(duration) not in (int,float)
+            if (type(duration) not in (int, float)
+                    or not math.isfinite(duration)
                     or not 0 < duration <= 86400):
                 raise ResearchFormatError("IIIF Canvas duration invalid")
             timed += 1
