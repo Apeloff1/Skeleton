@@ -125,8 +125,18 @@ class LaptopFlow:
                     "schema": REVIEW_SCHEMA, "world_id": world_id,
                     "source_digest": new_digest, "review_note": review_note,
                 }
-                # A previously approved digest is invalid after the source
-                # publication. Review is committed only after canonical bytes.
+                # Revoke any earlier approval before publishing a new revision.
+                # Digest-only custody otherwise permits approval replay when an
+                # author edits A -> B -> A and the second review write fails.
+                # The world lease excludes concurrent readers and writers here.
+                try:
+                    os.unlink(self._names(world_id)[0], dir_fd=fd)
+                except FileNotFoundError:
+                    pass
+                else:
+                    os.fsync(fd)
+                # If publication or review custody is interrupted, no previous
+                # approval can be resurrected by restoring matching source bytes.
                 self.worlds._write(fd, world_id + ".json", canonical(revised))
                 self.worlds._write(fd, self._names(world_id)[0], canonical(review))
                 return {
