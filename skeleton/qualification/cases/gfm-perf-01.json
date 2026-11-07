@@ -1,0 +1,17 @@
+{
+  "id": "GFM-PERF-01",
+  "gate": "perf",
+  "title": "Chunk streaming latency budget",
+  "todo_ref": "P3: chunk streaming",
+  "severity": "sev2",
+  "params": {
+    "metric": "chunk_load",
+    "budgets_ms": {
+      "p50": 8,
+      "p95": 16,
+      "p99": 33
+    },
+    "min_samples": 200
+  },
+  "requires_hardware": false
+}

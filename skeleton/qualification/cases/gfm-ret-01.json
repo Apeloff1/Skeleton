@@ -1,0 +1,16 @@
+{
+  "id": "GFM-RET-01",
+  "gate": "retention",
+  "title": "Observability retention policy",
+  "todo_ref": "P3: observability/retention",
+  "severity": "sev2",
+  "params": {
+    "min_days": {
+      "traces": 14,
+      "metrics": 90,
+      "audit": 365
+    },
+    "pii_max_days": 30
+  },
+  "requires_hardware": false
+}
