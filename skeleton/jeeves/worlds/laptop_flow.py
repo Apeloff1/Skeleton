@@ -202,7 +202,15 @@ class LaptopFlow:
             if exc.code == "not_found":
                 raise CanonError("review_required") from None
             raise
-        self._validate_review(review, world)
+        try:
+            self._validate_review(review, world)
+        except CanonError as exc:
+            # An interrupted source publication may leave a valid review of
+            # the previous revision. Treat that as absent authorization, not
+            # as an approval and not as an unhandled compiler exception.
+            if exc.code == "review_stale_source":
+                raise CanonError("review_required") from None
+            raise
         return world, review
 
     @staticmethod
