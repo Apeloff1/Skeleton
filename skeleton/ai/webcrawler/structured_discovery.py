@@ -154,6 +154,39 @@ def _entries(root: ET.Element, kind: str):
                 break
 
 
+
+def _feed_page_links(root: ET.Element, kind: str):
+    """Yield only document-level RFC 5005 next-page relations, never entries.
+
+    Feed-level pagination is a discoverable URL hint, not a redirect, content
+    provenance, verified knowledge or authority to request unseeded hosts.
+    """
+    if kind == "atom_feed":
+        containers = (root,)
+        allowed_tags = {(ATOM_NS, "link"), ("", "link")}
+    elif kind == "rss_feed":
+        containers = (
+            node for node in root if _local(node.tag) == ("", "channel")
+        )
+        # RSS extension link is specifically the Atom namespace. Ordinary
+        # RSS channel <link> is a homepage, not a pagination instruction.
+        allowed_tags = {(ATOM_NS, "link")}
+    else:
+        return
+    for container in containers:
+        for child in container:
+            if _local(child.tag) not in allowed_tags:
+                continue
+            if child.attrib.get("rel", "").strip().lower() != "next":
+                continue
+            media = child.attrib.get("type", "").strip().lower()
+            if media and media not in (
+                "application/rss+xml", "application/atom+xml",
+                "application/feed+json", "application/xml", "text/xml",
+            ):
+                continue
+            yield child.attrib.get("href", "").strip()
+
 def parse_structured_discovery(
     body: bytes, *, media_type: str, document_url: str, policy: CrawlPolicy,
     max_links: int = 128, max_entries: int = 512,
@@ -227,6 +260,29 @@ def parse_structured_discovery(
             capped = True
             break
         links.append(normalized)
+    # RFC 5005 feed-page relations are a real, finite discovery input.
+    # They are never accepted through an alternate network client: the
+    # canonical worker subsequently applies robots and per-host admission.
+    for value in _feed_page_links(root, kind):
+        if examined >= max_entries:
+            capped = True
+            break
+        examined += 1
+        if not value or len(value.encode("utf-8")) > 4096:
+            rejected += 1
+            continue
+        try:
+            page = canonicalize_url(value, base=canonical)
+            if page == canonical or not policy.admits(page) or page in seen:
+                raise ValueError("feed pagination outside source scope")
+        except (ValueError, UnicodeError):
+            rejected += 1
+            continue
+        seen.add(page)
+        if len(links) >= max_links:
+            capped = True
+            break
+        links.append(page)
     return StructuredDiscovery(
         kind=kind, links=tuple(links), examined_entries=examined,
         discarded_entries=rejected, capped=capped,
@@ -360,6 +416,30 @@ def parse_json_feed(
             capped = True
             break
         links.append(candidate)
+    # JSON Feed 1/1.1 defines top-level next_url for paginated archives.
+    # Content fields and arbitrary URL keys remain inert and cannot enqueue.
+    if "next_url" in data:
+        if examined >= max_entries:
+            capped = True
+        else:
+            examined += 1
+            raw_next = data["next_url"]
+            if (not isinstance(raw_next, str) or not raw_next
+                    or len(raw_next.encode("utf-8")) > 4096):
+                rejected += 1
+            else:
+                try:
+                    page = canonicalize_url(raw_next, base=canonical)
+                    if page == canonical or not policy.admits(page) or page in seen:
+                        raise ValueError("JSON Feed page is outside source scope")
+                except (ValueError, UnicodeError):
+                    rejected += 1
+                else:
+                    seen.add(page)
+                    if len(links) >= max_links:
+                        capped = True
+                    else:
+                        links.append(page)
     return StructuredDiscovery(
         kind="json_feed", links=tuple(links),
         examined_entries=examined,
