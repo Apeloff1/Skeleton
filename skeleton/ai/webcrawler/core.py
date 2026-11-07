@@ -23,7 +23,10 @@ from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
-from .document_formats import ADDITIONAL_TYPES, extract_additional_format
+from .document_formats import (
+    ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
+    DocumentFormatError, extract_additional_format,
+)
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
 from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
 from .html_semantics import HTMLSemanticError, extract_html_semantics
@@ -138,6 +141,19 @@ class CrawlPolicy:
         "application/gpx+xml",
         "application/vnd.google-earth.kml+xml",
         "application/pdf",
+        "text/vtt",
+        "application/x-subrip",
+        "text/srt",
+        "text/calendar",
+        "application/ics",
+        "application/x-research-info-systems",
+        "text/ris",
+        "application/x-bibtex",
+        "text/x-bibtex",
+        "application/x-ipynb+json",
+        "application/vnd.jupyter",
+        "application/n-triples",
+        "application/n-quads",
         "application/toml",
         "text/x-toml",
         "text/x-shellscript",
@@ -375,10 +391,20 @@ def extract_document(
     match = re.search(r"charset=([^;\s]+)", response.headers.get("content-type", ""), re.IGNORECASE)
     if match:
         charset = match.group(1).strip("\"'")
-    try:
-        raw = response.body.decode(charset, errors="replace")
-    except (LookupError, UnicodeError):
-        raw = response.body.decode("utf-8", errors="replace")
+    if ctype in RESEARCH_ARTIFACT_TYPES:
+        # Parser-specific syntax and citations must not be silently altered by
+        # replacement decoding or unsupported source charset declarations.
+        if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):
+            raise DocumentFormatError("research artifact requires UTF-8")
+        try:
+            raw = response.body.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise DocumentFormatError("invalid UTF-8 research artifact") from exc
+    else:
+        try:
+            raw = response.body.decode(charset, errors="replace")
+        except (LookupError, UnicodeError):
+            raw = response.body.decode("utf-8", errors="replace")
     title = ""
     links: list[str] = []
     parser_text_truncated = False

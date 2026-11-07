@@ -99,6 +99,13 @@ def implementation_digest():
                 "pdf_worker.py",
                 "office_suites.py",
                 "robots_rate.py",
+                "research_projection.py",
+                "research_artifacts.py",
+                "timed_media.py",
+                "calendar_documents.py",
+                "bibliography_documents.py",
+                "notebook_documents.py",
+                "rdf_documents.py",
             )
         }
     )

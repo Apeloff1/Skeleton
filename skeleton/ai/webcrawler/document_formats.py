@@ -16,6 +16,9 @@ import math
 import re
 from typing import Any
 
+from .research_artifacts import RESEARCH_ARTIFACT_TYPES, extract_research_artifact
+from .research_projection import ResearchFormatError
+
 
 MARKDOWN_TYPES = frozenset({"text/markdown", "text/x-markdown"})
 CSV_TYPES = frozenset({"text/csv", "application/csv"})
@@ -36,7 +39,7 @@ SOURCE_CODE_TYPES = frozenset({
     "text/x-shellscript", "application/x-sh",
 })
 ADDITIONAL_TYPES = (
-    MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES | NDJSON_TYPES | SOURCE_CODE_TYPES
+    MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES | NDJSON_TYPES | SOURCE_CODE_TYPES | RESEARCH_ARTIFACT_TYPES
 )
 
 _MD_LINK = re.compile(
@@ -331,6 +334,18 @@ def extract_additional_format(
     raw: str, media_type: str, *, max_chars: int,
     max_links: int,
 ) -> ExtractedFormat:
+    if media_type in RESEARCH_ARTIFACT_TYPES:
+        try:
+            row = extract_research_artifact(
+                raw, media_type, max_chars=max_chars, max_links=max_links,
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return ExtractedFormat(
+            text=row.text, title=row.title, links=row.links,
+            truncated=row.truncated, body_executed=False,
+            reference_trusted=False,
+        )
     if media_type in MARKDOWN_TYPES:
         return extract_markdown(raw, max_chars=max_chars, max_links=max_links)
     if media_type in CSV_TYPES:

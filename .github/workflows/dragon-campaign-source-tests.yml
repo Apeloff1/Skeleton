@@ -84,6 +84,13 @@ jobs:
         run: |
           python -m compileall -q skeleton/ai/webcrawler/dragon_campaign_stack
           python -m py_compile skeleton/ai/webcrawler/document_formats.py
+          python -m py_compile skeleton/ai/webcrawler/research_projection.py
+          python -m py_compile skeleton/ai/webcrawler/research_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/timed_media.py
+          python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
+          python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
+          python -m py_compile skeleton/ai/webcrawler/notebook_documents.py
+          python -m py_compile skeleton/ai/webcrawler/rdf_documents.py
           python -m py_compile skeleton/ai/webcrawler/frontier_scheduler.py
           python -m py_compile skeleton/ai/webcrawler/link_header_discovery.py
           python -m py_compile skeleton/ai/webcrawler/structured_discovery.py
@@ -157,6 +164,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ops_wave6.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_live_discovery.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_gain7.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_research_formats.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_research_ingestion.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v
