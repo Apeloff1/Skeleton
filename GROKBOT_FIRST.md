@@ -51,6 +51,11 @@
 - 36. Guarded local intelligence, adaptive capacity and context
 - 37. Living worlds, gameplay and procedural generation
 - 38. Full media pipeline, rendering and game audio
+- 39. Dragon Atlas research-to-game knowledge transfer
+- 40. Target compilers, playable delivery, rights and release
+- 41. Twelve-bot handoff ledger and end-user proof
+- 42. Frontier research portfolio
+- 43. Execution-ready 24-packet backlog
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -5911,3 +5916,201 @@ A cinematic director compiles camera shots, actor pose, sound, light and dialogu
 ## 38.6 Engine acceptance hierarchy
 
 The six rungs are **bytes exist → import succeeds → runtime binding exists → actual image/sound/motion observed → survives save/rebuild/export → rights, performance and accessibility qualified**. Record each rung with source/game/package/toolchain digest. Measure actual frame pacing, shader stalls, draw calls, memory, loading spikes, audible underruns and input responsiveness on declared hardware and workloads. Do not invent FPS or media quality results before real measurements.
+
+# 39. Dragon Atlas research-to-game knowledge transfer and revocable evidence
+
+**Work packet:** GROK-39 | **Lead:** BOT-10 | **Policy:** BOT-02 | **Retrieval:** BOT-03 | **World and design:** BOT-05 | **Frontend:** BOT-11 | **Verifier:** BOT-12.
+
+The source already has backend/core/dragon_crawler.py and skeleton/ai/webcrawler operations. Current draft PR #4876 contains additional Dragon Atlas work, but its existence, narrow passing jobs or planned UI do not establish a fully qualified live-network backend bridge. The goal is a deeply capable, owner-scoped, rights-aware research system that turns legitimate evidence into original game design without making an unrestricted crawler or treating remote text as trusted instructions.
+
+## 39.1 Research authority and campaign constraints
+
+Every campaign is an explicitly authorized purpose with tenant/actor, project, finite source allowlist or safe discovery scope, network rights, robots/terms policy, retention, privacy class, maximum requests/bytes/time/redirects, concurrency, deadline, transport identity and source withdrawal rule. Distinguish lawful public read access from authorization to store, train on, reproduce or redistribute the source. Do not assume a site is reusable in commercial games because it is publicly accessible.
+
+The crawl plan is non-authoritative until its canonical network tool admits each actual request. Resolve final addresses through a guarded resolver; defend against DNS rebinding, redirects to private/link-local/loopback/metadata endpoints, credential-bearing URLs and unexpected proxy behavior. Re-evaluate scope after every redirect and at connection time. A page's text or links cannot increase tool authority, fetch hidden account data or authorize a new network destination. Bound compressed and expanded body bytes, parser memory, charset fallback, file count, recursion, browser processes and concurrent active requests. Dynamic rendering, authentication and form submission require stronger separately declared grants than ordinary page retrieval.
+
+A persistent crawl job uses finite leases and idempotent capture identities. If the worker crashes after transport but before indexing, restart queries source-custody receipts and neither duplicates side effects nor fabricates a fetched response. If robots or source rules change, stop future captures and retain only legitimately permitted evidence under the current policy. The crawler may summarize denied targets as unavailable, but it cannot bypass a denial by routing through a model or a hidden browser.
+
+## 39.2 Source identity, exact citations and trust labels
+
+Every evidence item records original and final source identity, fetched representation digest, retrieval time, parser/extractor version, source offsets, claim/citation anchor, rights state, tenant, data class, document revision and revocation status. A normalized text projection retains an offset map to original captured bytes wherever accurate citation is promised. HTML stripping, deduplication, OCR and chunking must not invent offset fidelity. If a transform loses source location, mark its citation as approximate or ineligible under the claim policy.
+
+Retrieval scores are evidence-selection hints, not proof of truth. A sourced claim needs support from the cited passage and qualification of conflicts, freshness and uncertainty. Maintain provenance through embedding, summarization, memory and project derivation. An old summary cannot override a later source withdrawal; embedding similarity cannot grant new source permissions. Pages that say "ignore previous instructions" remain untrusted data. ContextCompiler retains explicit trust and token boundaries so untrusted source content never becomes system policy or tool execution permission.
+
+A research result can be **captured**, **extracted**, **verified**, **reviewed**, **approved for inspiration**, **bound to design**, **invalidated** or **removed/retained under policy**. These are distinct claims. Crawler UI must expose the actual state and operator decisions, not just attractive excerpt cards.
+
+## 39.3 Safe source-to-creation derivation
+
+Transfer only approved source material into a **DesignKnowledgeCandidate** under the existing domain owner. Include source references, grounded claims, uncertainty, allowed uses, human review, original creative transformation and dependencies on derived quests/world facts/assets. Distinguish factual research (e.g., architecture of an era) from protected fictional expression, trademarked identity, commercial artwork, proprietary source or copyrighted level layouts. A rights-cleared mechanics inspiration can inform an original design; copying a third-party game world and changing its name is not a valid original production path.
+
+Revocation is a graph operation: identify source-dependent design assertions, generated assets, media caches, gameplay rule choices, build packages and publication references. Then quarantine, remove, regenerate or request human review according to rights/contract. A disappeared source cannot be silently replaced with model memory. If a derived fact is no longer verified, either downgrade its confidence or remove the dependent claim. Unrelated project content survives safely.
+
+**Required end-to-end proof:** owner approves a bounded research campaign; real approved-source capture produces bytes, provenance and citation; human selects a legitimate insight; Jeeves translates it into a novel editable game mechanic; generated level changes; the result appears in a running game; source is subsequently withdrawn; the exact affected derived project/export is invalidated, while unrelated game progress and assets remain intact.
+
+## 39.4 Atlas adversarial and quality campaign
+
+Attack cases: chained redirect into a private subnet; DNS rebinding; site terms denial; infinite link graph; zip/decompression bomb; crafted charset offsets; web page asking to execute arbitrary code; forged citation; incompatible license; credential-bearing link; cross-tenant source ID; duplicated campaign idempotency key with changed parameters; browser crash; revised document invalidating old source lines; and content that tries to rewrite the project's accepted instructions. Assert **zero unauthorized transport and mutation**, bounded cleanup and accurate denial receipts.
+
+Measure useful approved insights per authorized request, citation precision, source diversity, freshness, rights revalidation, human approval/rejection, withdrawal propagation, cost and downstream game impact. Hundreds of scraped pages are not progress if none become usable accurate and legal design knowledge. A safely denied campaign can be correct, not failed productivity.
+
+# 40. Target compilers, playable delivery, rights and versioned release
+
+**Work packet:** GROK-40 | **Lead:** BOT-09 | **Partners:** BOT-01, BOT-02, BOT-06, BOT-08, BOT-11, BOT-12.
+
+A complete output includes editable original project source, actual target package, known rights and an independently played executable. Existing Godot puzzle/racing and native maze paths are starting points, not global proof for every genre/OS. The export owner must inventory the precise implementation and accepted target list before proposing any new adapter.
+
+## 40.1 Target support is an explicit contract
+
+Define per-target toolchain identity/digest, supported OS/architecture, exact engine/export templates, graphics/audio/input capabilities, source syntax limitations, required assets, save format, package format, signing, resource ceiling and clean-host runner. A checked box in a manifest cannot substitute for an installed Godot binary. A successful Python unit test does not certify an executable that reaches a real player.
+
+Build admission verifies the toolchain and required assets and rejects unsupported source features. Lower semantic IR into engine-specific scene/resources, scripts, input maps, compiled shaders, audio buses, UI and saved-state adapters. Generated code executes inside controlled build/engine runners with explicit permissions; authored game scripts do not gain the app's privileged tool credentials. Build receipts bind source revision and its dependency/rights graph, target, compiler, environment, output digests, scan results and actual runtime proof.
+
+All package publication is atomic. Incomplete build, corrupted source manifest or failed import stays quarantined without overwriting the last good game. Each target has separately versioned acceptance evidence. A source-only project can be a legitimate delivered source artifact, but must be labeled **not native-play certified** if no actual playable target was observed.
+
+## 40.2 Real engine and player input evidence
+
+A target tester should inject genuine equivalent input events through supported engine interfaces and observe the game, rather than call only the same pure Python functions from which the exporter generated scripts. Bind traces to exact package digest, engine/toolchain, game seed, initial save, controller action/tick, observed player transform, relevant state digest, completion predicates, captured frames, audio and resource usage. Include keyboard, controller and touch where declared.
+
+Test spawn, movement, interaction, collision, attack or puzzle action, damage or failure, retry, pause, objective completion, save, process termination, restore and ending. A printed "core loop complete" marker is at most a smoke indicator unless observed state and interactive inputs independently support it. For graphics, use target-compatible frame capture and tolerances. For audio, identify engine-buffer proof versus physical device sound. For UI, test accessible navigation as well as happy path.
+
+Run the exported package from a clean directory without secretly importing development checkout code or data. Test a Windows package on real Windows hardware where Windows is claimed; hosted Windows CI remains valuable but does not certify installation on supported customer hardware. A browser build must honor asset loading, origin, storage permissions and offline behavior actually available in the target browser. Console/retro exports need separately lawful toolchain/firmware boundaries; unsupported proprietary targets remain explicit holds.
+
+## 40.3 Production, store, payment and entitlement integrity
+
+A public release artifact binds project, source revision, immutable package, SBOM/dependency licenses, media rights, policy scan, signer, version, target, support matrix, exact current-head checks, human release decision, rollback plan and custody log. User ownership and project privacy follow the canonical identity/rights plane. An asset that was licensed only for prototype use cannot silently become commercial.
+
+Purchase intent, payment provider callback, entitlement publication and refund/revoke handling use the existing canonical transactional/idempotency authority. A frontend button cannot grant entitlement. Validate signature, amount/currency/plan/owner, duplicate callbacks, reorderings, expired sessions, partial settlements and recovered uncertain outcomes before any delivery decision. Do not add a parallel purchase ledger or allow generated game logic to touch privileged commerce credentials.
+
+Offline self-export and commercial storefront publication are distinct states. A playable private source/game package may be valid even when the payment subsystem is unavailable. A commercial release cannot be approved by the successful game compile alone.
+
+## 40.4 Upgrade and rollback as creator safety
+
+Preserve local project source, rights, game saves, secrets and model configuration across valid application upgrades. Stage migration with backup, compare source/model/toolchain revisions and verify recovered state before moving the active pointer. A broken new exported game must not overwrite the last known good signed package. Downgrade limitations are explicit. Rollbacks create new durable release events rather than pretending a prior publication never occurred.
+
+Physical acceptance must include first run, second launch, update, restart mid-export, rollback, new project creation, old project restore and safe uninstall. Preserve user data unless a specifically authorized deletion is performed. An agent can prepare a release and evidence packet but cannot grant itself unlimited repository merge, payment or publication rights.
+
+# 41. Twelve-bot build sequence, cross-domain handoff receipts and end-user proof
+
+**Work packet:** GROK-41 | **Coordinator:** Grokbot | **Independent reviewer:** BOT-12 | **Authority:** canonical project and repository owners, not this document.
+
+## 41.1 First shared game before parallel expansion
+
+Do not measure progress by spawning independent bot work against twelve incompatible targets. First produce one original two-room puzzle-adventure accepted on a real target. It must include editable brief, source-bound design, controllable character, visible art, at least one moving character, audible interaction cues, quest/interaction loop, win/lose, alternate choice consequence, save/restart, actual runtime play and clean export. The model-assisted workflow must preserve human approval, source revision and bounded task authority. Only after this full path works should bots fan out into broader genres, more complex simulation and multiple export profiles.
+
+| Packet | Lead | Required user-observable deliverable | Consuming verifier |
+|---|---|---|---|
+| EX-401 | BOT-01 | Setup accessible in degraded mode, valid real local model after trusted guard | BOT-11, BOT-12 |
+| EX-402 | BOT-02 | Current-head owner/writer/authority map, no duplicate state or model executors | Every affected bot |
+| EX-403 | BOT-03 | Real admitted local model turn with source/tokenizer/provider identity | BOT-04, BOT-12 |
+| EX-404 | BOT-04 | Durable finite create/edit/test production campaign | BOT-05, BOT-11 |
+| EX-405 | BOT-05 | One editable causal world and solvable quest graph | BOT-06, BOT-09 |
+| EX-406 | BOT-06 | Controller-to-engine input and gameplay proof with save/retry | BOT-09, BOT-12 |
+| EX-407 | BOT-07 | Fixed-seed feasible generated level and selective rebuild proof | BOT-06, BOT-12 |
+| EX-408 | BOT-08 | Real original media in the actual running game | BOT-06, BOT-09 |
+| EX-409 | BOT-09 | Clean-target playable package and editable project source | BOT-11, BOT-12 |
+| EX-410 | BOT-10 | Authorized research/citation/withdrawal-to-design journey | BOT-05, BOT-12 |
+| EX-411 | BOT-11 | Human cockpit with approve, edit, inspect, undo, build and recover | BOT-12 |
+| EX-412 | BOT-12 | Independent exact-head, adversarial, device and release-proof dossier | Human release authority |
+
+These are work planning IDs, not declarations that these implementations are missing. Before coding, locate and reconcile any existing equivalent under the current PR heads. Do not recreate already complete source owners. Work on the same integrated game project and exchange real typed receipts. Dependency-bound sequencing is more useful than twelve simultaneous fabricated "complete" reports.
+
+## 41.2 Exact handoff envelope
+
+A bot handoff must reference work ID, source branch and commit SHA, parent/dependency SHA, project revision, authenticated actor/tenant, affected canonical plane, exact touched files/owner, policy/schema versions, tool manifest, authorization scope, input/output digests, pending work, verification commands and results, runtime observation, negative tests, repair/rollback, remaining holds and independent acceptance decision. An unsigned summary without a matching source revision is only a report.
+
+The receiver validates that source inputs and grants are current. If policy, toolchain, rights or project source changed, invalidate affected proofs by dependency rather than recycling ancestor successes or throwing away unrelated evidence. A partial CI success can be retained as narrow evidence while exact-head release stays held. A bot must not count its own successful assertion as a test pass.
+
+## 41.3 Failure-injection integrated journeys
+
+**JG-41-A, Fresh device:** clean supported Windows laptop, staged installer, stable secrets, Mongo state, optional Chroma, UI reachable without AI, guarded provider activated with real GGUF/tokenizer/reviewer/epoch, first user chat, first game. Repeat with absent weights, invalid model and engine outage; distinguish safe degraded app from provider readiness.
+
+**JG-41-B, Game from brief:** user requests, previews and approves an original playable slice. Build in real engine; edit one rule while agent work is underway; collect independent controller trace; win/lose/restart; export; test package without checkout dependencies. Verify source revision, asset rights and save consistency.
+
+**JG-41-C, Crash and replay:** kill processes at prepared, committed, projected, compiled and published boundaries for game edit, tool call, media artifact, model execution, crawler capture, save and release. Replay neither duplicates effects nor invents success. Unknown external outcome requires reconciliation.
+
+**JG-41-D, Adversarial input:** source document and website prompt injection, cross-tenant operation, path/symlink replacement, compressed payload, poisoned cache, malicious generated script, forged test results and fake model readiness. Assert bounded denial before protected side effects and no lost canonical user state.
+
+**JG-41-E, Quality:** compare held-out gameplay on identical seeds and engine versions across baseline and candidate. Measure actual objective reachability, input responsiveness, gameplay bugs, visual/audio correctness, performance, user acceptance and accepted improvement. Protect accessibility and safety as noncompensable.
+
+**JG-41-F, Governance:** user approval expires, grant revokes, research source withdraws, backend is unavailable, agent cancels while a physical worker runs, payment confirmation duplicates. Preserve human control, truthful status and recoverable committed project.
+
+## 41.4 Evidence hierarchy and noncompensable acceptance
+
+Each capability has four fields: **present in source**, **integrated into current runtime**, **tested in actual user journey**, **certified on supported target**. Source check count, model tokens, word count, LOC and number of bots do not change the truth of these fields. Tests are labeled source-compile, deterministic unit, mock integration, real service integration, interactive target, physical device and release certification. If a field lacks evidence, write UNKNOWN or BLOCKED. P95/P99 performance claims require fixed workloads, sample sizes and real hardware profile; do not invent a target FPS or inference speed to create a marketing success.
+
+Required zero-tolerance gates include unauthorized tenant access, bypassed tool approval, false public readiness, invalid rights, unreconciled external side effects, known incompatible saves and false target certification. Quality can improve, but it cannot compensate for failure in these gates. A draft PR and source-only file count are construction evidence, not release authority.
+
+# 42. Frontier research portfolio with explicit safety and superiority criteria
+
+**Work packet:** GROK-42 | **Status:** optional research after the first verified end-to-end game; all new capabilities must map to current canonical planes before implementation.
+
+## 42.1 Neural-symbolic design synthesis
+
+Combine model-generated design hypotheses with typed constraints, causal plan search and executable test oracles. Rather than a free-text "make the best RPG", produce structural alternatives backed by solvability witnesses and predicted resource budgets. Learn from failed actual engine playtests by counterexample search. A candidate is superior only if held-out playable completion, creativity and editability improve without violating architecture, rights, data security or performance. Record exactly which constraints caused a generated alternative to be selected or rejected.
+
+## 42.2 High-scale streamed worlds
+
+Represent regions as deterministic content-addressed generation cells with tiered simulation fidelity, stable event ancestry and budgeted asset streaming. Distant areas update at coarse granularity; high-detail gameplay is promoted near the player without forgetting important state. Teleports, revisits and late-loaded quests must not introduce contradictory history. Treat "quintillions of variations" as a mathematical design-space assertion that requires distinct valid states and measured playable diversity, not proof from random strings. Benchmark memory, stream latency, persistence size and user experience.
+
+## 42.3 Multimodal consistency and generative character systems
+
+Investigate image/style/mesh/rig/animation/audio pipelines that preserve one original character across views, costumes, lighting, animation poses and dialogue. Model identity and asset rights must be durable. Explore constrained retopology, inverse kinematics, root-motion repair, procedural facial expression and consistent voice only with authorized training/input. A beautiful video or render with no editable rig or controller integration remains a media preview, not a gameplay feature.
+
+## 42.4 Playtest intelligence and adversarial quality optimization
+
+Run heterogeneous testers: novice exploration, expert mastery, speedrun, accessibility, intentionally unexpected inputs, recovery and adversarial abuse. Ensure the generated game cannot rewrite its own test oracle; use independent scripts, locked held-out levels and periodic human comparison. Find dead ends, softlocks, untelegraphed attacks, stale quest flags, unfair RNG, confusing tutorials and nonfunctional interaction affordances. Reward verified reproducible defects and accepted fixes, not arbitrary crashes or cosmetic score inflation.
+
+## 42.5 Adaptive local model portfolio and policy-preserving acceleration
+
+Candidate optimizations include specialized local model routing, prompt prefix reuse, model KV offload, constrained decoding, speculative generation, optional micro-model planning and media pipelines. Require measured wins under real physical CPU/GPU/disk budgets, privacy/tenant cache isolation, verified tokenizer and model identity, constrained authority and retained baseline path. Model switching must not lose tool permissions or silently add network access. Large-context summarization does not justify forgetting human-approved project constraints.
+
+## 42.6 Intelligent creator tools
+
+Add a model-assisted design linter that points to specific project nodes and actual game traces: bad objective communication, mismatched tutorial instructions, inaccessible color/audio-only cues, economy contradictions, conflicting controls, narrative dead ends and heavy asset budgets. Recommendations remain reversible alternatives and cannot rewrite artist preference without approval. Explainers identify proof strength and uncertainty; subjective design judgments remain appropriately uncertain.
+
+## 42.7 Causal debugging and minimal repair
+
+A reproducible gameplay bug is represented by exact game package, engine version, source revision, seed, prior save, input trace and actual failure observation. Run trace minimization, dependency-aware source bisect, candidate patch and independent regression. A "fix" that deletes the failing mechanic or changes the test oracle is rejected. Repair confidence distinguishes stable code defect, flaky environment, missing evidence and unsupported engine capability. The useful output is a genuine playable correction with rollback.
+
+## 42.8 Creator autonomy ladder
+
+Expose graduated policy-bound authority: advice; artifact draft; sandbox build; proposed project patch; approved canonical project mutation; independently tested local export; authorized public release. All levels use existing identity/tool grants and transaction records; a model cannot promote itself. The editor shows real running physical workers, requests for approval, costs, source rights and rollback consequences. Emergency stop denies new admission and drains or fences current work with truthful unknown-outcome handling.
+
+**Research promotion law:** retain a controlled reference path, preregister workload/model/scorer/hardware/budgets, obtain independent exact-head superiority evidence, preserve source/release holds, and ship only a proven user benefit. Reject research that only increases feature count or apparent sophistication.
+
+# 43. Execution-ready backlog: next 24 source-bound engineering packets
+
+This is a new **integration workload index**, not a restart of the 301 existing work orders or 42 historically completed P0 construction records. Each ticket must first be mapped to current canonical owners and overlapping live PRs. Its initial goal is a narrow falsifiable product improvement, not generating arbitrary files to meet a quota.
+
+| Ticket | Lead | Tangible build and proof | First dependency |
+|---|---|---|---|
+| FRT-001 | BOT-02 | Current-head source/owner/interface/writer reconciliation with exact tree identities | Existing authority graph |
+| FRT-002 | BOT-05 | Versioned design-to-game semantic graph consumed by current editor/compiler | FRT-001 |
+| FRT-003 | BOT-05 | CAS-based human/agent patch and undo with semantic invalidation | FRT-002 |
+| FRT-004 | BOT-07 | Seed-locked feasible generated level with unreachable-level negatives | FRT-002 |
+| FRT-005 | BOT-06 | Real Godot controller-to-win/lose/retry trace | FRT-002 |
+| FRT-006 | BOT-08 | Actual art/rig/audio in the same playable game | FRT-005 |
+| FRT-007 | BOT-03 | Trusted real local GGUF inference via canonical provider/epoch | Existing guard/install repair |
+| FRT-008 | BOT-04 | Bounded recoverable build-and-repair campaign modifying one game | FRT-003,007 |
+| FRT-009 | BOT-10 | Real approved research capture → grounded citation → reversible design derivation | Backend source/transport policy |
+| FRT-010 | BOT-09 | Actual clean-target package from exported playable source | FRT-005,006 |
+| FRT-011 | BOT-01 | Fresh Windows 11/WSL2 first install and safe degraded mode | Existing installer |
+| FRT-012 | BOT-11 | Authenticated creator cockpit: approve/edit/undo/preview/export/recover | FRT-003,008 |
+| FRT-013 | BOT-12 | Independent exact-head failure/rights/authority/device verdict | FRT-005–012 |
+| FRT-014 | BOT-06 | Bounded NPC observation and world event causality replay | FRT-002 |
+| FRT-015 | BOT-08 | Engine-captured root-motion/rig/animation fidelity | FRT-006 |
+| FRT-016 | BOT-09 | Real multi-target clean-host launch matrix | FRT-010 |
+| FRT-017 | BOT-07 | Incremental generation with full-rebuild equivalence | FRT-003 |
+| FRT-018 | BOT-12 | Held-out genre/game-quality and anti-gaming suite | FRT-005 |
+| FRT-019 | BOT-03 | Real capacity pressure, cancellation and recovery with physical model | FRT-007 |
+| FRT-020 | BOT-04 | Human edit during generation with conflict-aware replan | FRT-008 |
+| FRT-021 | BOT-10 | Source withdrawal invalidation through project, media and export | FRT-009,010 |
+| FRT-022 | BOT-05 | Solvable quests and two causally distinct observed endings | FRT-005,014 |
+| FRT-023 | BOT-11 | Accessible authoring across disabled-AI and restart paths | FRT-011,012 |
+| FRT-024 | BOT-12 | Full first-install → real AI → authored game → export → rollback qualification | All critical packets |
+
+**Packet execution algorithm:** retrieve the current-head exact files and source/owner map; identify equivalent already-implemented behavior; run the smallest reproducer for an observed gap; choose an integration patch in the proper canonical owner; produce real code/fixtures/scripts and a test that demonstrably fails before the repair; test the completed patch and meaningful negative cases; record actual head SHAs and artifact digests; preserve every unproven native/security/release condition; send a type-checked handoff to the next owner. Do not fabricate test execution or measure success in file count alone.
+
+**Strict 12-bot coordination:** BOT-02 blocks unauthorized architecture change, BOT-01 controls first-install prerequisites, BOT-03 controls model/provider fidelity, BOT-04 coordinates execution, BOT-05/06/07/08 produce the actual game, BOT-09 packages it, BOT-10 produces legal research evidence, BOT-11 proves creator interaction, and BOT-12 independently challenges the whole path. The coordinating Grokbot may sequence and report these receipts but is not a substitute for the owners' actual code and target proof.
+
+**Evidence ledger rule:** use separate source, integration, interactive-engine, physical-device and release-qualified states. Existing PR #4880 remains **documentation-only**. This batch must not be mistaken for built features, test results or permission to merge any draft. The one-million-word target remains open; continue adding genuinely source-bound implementation detail while implementation of the accepted work packets takes precedence over volume inflation.
