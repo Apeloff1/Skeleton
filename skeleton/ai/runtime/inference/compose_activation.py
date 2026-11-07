@@ -52,6 +52,32 @@ class ActivationPermit:
     tokenizer_digest: str
 
 
+def _role_custody(auth: object) -> tuple[tuple[str, str], ...]:
+    """Bind role rotation without granting authorization from a status probe."""
+    if type(auth) is not dict or type(auth.get("authInfo")) is not dict:
+        raise ActivationBlocked("Mongo role custody unavailable")
+    info = auth["authInfo"]
+    if "authenticatedUserRoles" not in info:
+        return ()
+    roles = info["authenticatedUserRoles"]
+    if type(roles) is not list or len(roles) > 64:
+        raise ActivationBlocked("Mongo role custody malformed")
+    pairs: list[tuple[str, str]] = []
+    for role in roles:
+        if type(role) is not dict:
+            raise ActivationBlocked("Mongo role custody malformed")
+        db, name = role.get("db"), role.get("role")
+        if (type(db) is not str or type(name) is not str
+                or not db or not name or len(db) > 128 or len(name) > 128
+                or not db.isascii() or not name.isascii()
+                or any(ord(ch) < 33 or ord(ch) > 126 for ch in db + name)):
+            raise ActivationBlocked("Mongo role custody malformed")
+        pairs.append((db, name))
+    if len(set(pairs)) != len(pairs):
+        raise ActivationBlocked("Mongo role custody duplicated")
+    return tuple(sorted(pairs))
+
+
 class MongoGuardedActivation:
     """Owner-scoped barrier with exact native artifact and Mongo epoch binding.
 
@@ -230,6 +256,7 @@ class MongoGuardedActivation:
             # swap must require explicit operator reactivation, even if the
             # epoch happens to have the same numeric value.
             auth_identity = tuple(sorted((user["db"], user["user"]) for user in users))
+            role_identity = _role_custody(auth)
             # The backend and engine may use different logical databases on
             # the same Mongo server. A seqlock in one database does not fence
             # canonical writes in another database or another client.
@@ -298,7 +325,7 @@ class MongoGuardedActivation:
                            for user in final_users)
                     or len({(user["db"], user["user"]) for user in final_users}) != len(final_users)
                     or tuple(sorted((user["db"], user["user"]) for user in final_users))
-                    != auth_identity):
+                    != auth_identity or _role_custody(final_auth) != role_identity):
                 raise ActivationBlocked("Mongo principal changed during reviewer attestation")
             # A canonical writer may enter WRITING while the reviewer signs.
             # A second linearizable read is required after that await.
@@ -337,7 +364,7 @@ class MongoGuardedActivation:
                            for user in post_users)
                     or len({(user["db"], user["user"]) for user in post_users}) != len(post_users)
                     or tuple(sorted((user["db"], user["user"]) for user in post_users))
-                    != auth_identity):
+                    != auth_identity or _role_custody(post_epoch_auth) != role_identity):
                 raise ActivationBlocked("Mongo principal changed during final epoch read")
             self._verify_backend()
             return final_epoch, auth_identity
