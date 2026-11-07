@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from itertools import combinations
-from hashlib import sha256
 import re
 import unicodedata
 
@@ -28,7 +27,7 @@ _STOP = frozenset(("and", "the", "are", "was", "were", "this", "that", "for",
 class PolarityReviewLead:
     left_source_id: str
     right_source_id: str
-    shared_terms: tuple[str, ...]
+    shared_term_set_digest: str
     left_negative: bool
     right_negative: bool
     overlap_term_count: int
@@ -78,8 +77,8 @@ def inspect_polarity_candidates(
                 if len(shared) < min_shared_terms:
                     continue
                 # Stable best-overlap lead only; no arbitrary factual judgment.
-                tokens = tuple(sorted(shared)[:16])
-                candidate = (len(shared), tokens, left_neg, right_neg)
+                term_seal = digest(tuple(sorted(shared)))
+                candidate = (len(shared), term_seal, left_neg, right_neg)
                 if best is None or candidate[0] > best[0]:
                     best = candidate
         if best:

@@ -58,7 +58,7 @@ class ForensicSourceTests(unittest.TestCase):
     def test_empty_campaign_keeps_human_review_and_no_false_truth_claim(self):
         atlas = self.atlas()
         result = self.report(self.fixture.empty, atlas)
-        self.assertEqual(len(result.stages), 8)
+        self.assertEqual(len(result.stages), 13)
         self.assertEqual(result.selected_anchor_count, 0)
         self.assertEqual(result.reviews.tasks[0].reason, "no_selected_evidence")
         self.assertEqual(result.resilience.objectives[0].selected_sources, 0)
@@ -146,7 +146,7 @@ class ForensicSourceTests(unittest.TestCase):
         observed = {code for item in scan.findings for code in item.rule_codes}
         self.assertIn("instruction_override", observed)
         self.assertIn("role_spoof", observed)
-        self.assertTrue(scan.held_source_ids)
+        self.assertTrue(scan.held_sources)
         self.assertFalse(scan.clean_text_safe_for_model)
         self.assertFalse(scan.reviewed_or_authorized)
 
@@ -298,6 +298,11 @@ class ForensicSourceTests(unittest.TestCase):
             ("objective_failure_counterfactual", report.resilience.report_digest),
             ("source_boilerplate_screening", report.boilerplate.report_digest),
             ("bounded_capture_age_analysis", report.freshness.report_digest),
+            ("cross_source_sentence_echoes", report.echoes.report_digest),
+            ("active_content_render_risk", report.active_content.report_digest),
+            ("privacy_and_secret_exposure", report.privacy.report_digest),
+            ("objective_host_concentration", report.exposure.report_digest),
+            ("possible_polarity_collisions", report.polarity.report_digest),
             ("review_only_forensic_queue", report.reviews.queue_digest),
         )
         verify_forensic_stage_chain(

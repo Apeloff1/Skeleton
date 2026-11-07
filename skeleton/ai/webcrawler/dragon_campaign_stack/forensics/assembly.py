@@ -18,6 +18,11 @@ from .objective_resilience import ObjectiveResilience, analyze_objective_resilie
 from .boilerplate import BoilerplateReport, inspect_boilerplate
 from .freshness import CaptureAgeReport, inspect_capture_age
 from .review_triage import ForensicReviewQueue, compile_forensic_review_queue
+from .sentence_echo import SentenceEchoReport, inspect_sentence_echoes
+from .active_content import ActiveContentReport, inspect_active_content
+from .privacy_signals import PrivacySignalReport, inspect_privacy_signals
+from .host_exposure import HostExposureReport, measure_host_exposure
+from .polarity_screen import PolarityScreen, inspect_polarity_candidates
 from .trace import ForensicStage, ORDER, chain_forensic_receipts, verify_forensic_stage_chain
 
 
@@ -38,6 +43,11 @@ class AtlasForensics:
     resilience: ObjectiveResilience
     boilerplate: BoilerplateReport
     freshness: CaptureAgeReport
+    echoes: SentenceEchoReport
+    active_content: ActiveContentReport
+    privacy: PrivacySignalReport
+    exposure: HostExposureReport
+    polarity: PolarityScreen
     reviews: ForensicReviewQueue
     stages: tuple[ForensicStage, ...]
     report_digest: str
@@ -60,6 +70,11 @@ def _receipts(report: AtlasForensics) -> tuple[tuple[str, str], ...]:
         report.resilience.report_digest,
         report.boilerplate.report_digest,
         report.freshness.report_digest,
+        report.echoes.report_digest,
+        report.active_content.report_digest,
+        report.privacy.report_digest,
+        report.exposure.report_digest,
+        report.polarity.report_digest,
         report.reviews.queue_digest,
     )))
 
@@ -68,7 +83,7 @@ def compose_atlas_forensics(
     mandate: CampaignMandate, snapshot: dict[str, object],
     atlas: DragonAtlas, *, now: float, authorized: bool,
 ) -> AtlasForensics:
-    """Build eight bounded, deterministic source-fenced review projections."""
+    """Build thirteen bounded, deterministic source-fenced review projections."""
     verify_dragon_atlas_trace(
         mandate, snapshot, atlas, now=now, authorized=authorized,
     )
@@ -87,15 +102,23 @@ def compose_atlas_forensics(
         mandate, snapshot, frames, atlas.workbench.objectives,
         now=now, authorized=authorized,
     )
+    echoes = inspect_sentence_echoes(frames)
+    active = inspect_active_content(frames)
+    privacy = inspect_privacy_signals(frames)
+    exposure = measure_host_exposure(frames, atlas.workbench.objectives)
+    polarity = inspect_polarity_candidates(frames)
     reviews = compile_forensic_review_queue(
         frames, security, geometry, reuse, resilience, boilerplate, age,
+        echoes=echoes, active=active, privacy=privacy,
+        exposure=exposure, polarity=polarity,
     )
     root = AtlasForensics(
         mandate.fingerprint, atlas.run_id, atlas.source_snapshot_digest,
         atlas.policies.policy_digest, atlas.retrieval.fusion_digest,
         atlas.atlas_digest, frames.frame_set_digest,
         len(frames.frames), len(reuse.selected_sources), security, geometry,
-        reuse, resilience, boilerplate, age, reviews, (), "",
+        reuse, resilience, boilerplate, age, echoes, active, privacy,
+        exposure, polarity, reviews, (), "",
     )
     stages = chain_forensic_receipts(
         root.mandate_digest, root.source_snapshot_digest,

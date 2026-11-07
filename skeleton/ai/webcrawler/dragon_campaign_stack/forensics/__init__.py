@@ -10,6 +10,11 @@ from .objective_resilience import ObjectiveSensitivity, ObjectiveResilience, ana
 from .boilerplate import BoilerplateFinding, BoilerplateReport, inspect_boilerplate
 from .freshness import CaptureAgeFinding, CaptureAgeReport, inspect_capture_age
 from .review_triage import ForensicReviewTask, ForensicReviewQueue, compile_forensic_review_queue
+from .sentence_echo import SentenceEcho, SentenceEchoReport, inspect_sentence_echoes
+from .active_content import ActiveContentFinding, ActiveContentReport, inspect_active_content
+from .privacy_signals import PrivacySignal, PrivacySignalReport, inspect_privacy_signals
+from .host_exposure import HostExposure, HostExposureReport, measure_host_exposure
+from .polarity_screen import PolarityReviewLead, PolarityScreen, inspect_polarity_candidates
 from .trace import ForensicStage, chain_forensic_receipts, verify_forensic_stage_chain
 from .assembly import AtlasForensics, compose_atlas_forensics, verify_atlas_forensics
 

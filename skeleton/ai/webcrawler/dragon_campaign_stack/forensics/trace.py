@@ -18,6 +18,11 @@ ORDER = (
     "objective_failure_counterfactual",
     "source_boilerplate_screening",
     "bounded_capture_age_analysis",
+    "cross_source_sentence_echoes",
+    "active_content_render_risk",
+    "privacy_and_secret_exposure",
+    "objective_host_concentration",
+    "possible_polarity_collisions",
     "review_only_forensic_queue",
 )
 

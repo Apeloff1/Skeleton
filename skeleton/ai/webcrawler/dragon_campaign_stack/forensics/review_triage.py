@@ -16,6 +16,11 @@ from .source_reuse import SourceReuseReport
 from .objective_resilience import ObjectiveResilience
 from .boilerplate import BoilerplateReport
 from .freshness import CaptureAgeReport
+from .sentence_echo import SentenceEchoReport
+from .active_content import ActiveContentReport
+from .privacy_signals import PrivacySignalReport
+from .host_exposure import HostExposureReport
+from .polarity_screen import PolarityScreen
 
 
 @dataclass(frozen=True)
@@ -48,7 +53,12 @@ def compile_forensic_review_queue(
     frames: FrameSet, security: TextSecurityReport, geometry: AnchorGeometry,
     reuse: SourceReuseReport, resilience: ObjectiveResilience,
     boilerplate: BoilerplateReport, age: CaptureAgeReport,
-    *, max_tasks: int = 256,
+    *, echoes: SentenceEchoReport | None = None,
+    active: ActiveContentReport | None = None,
+    privacy: PrivacySignalReport | None = None,
+    exposure: HostExposureReport | None = None,
+    polarity: PolarityScreen | None = None,
+    max_tasks: int = 256,
 ) -> ForensicReviewQueue:
     from ..contracts import integer
     integer(max_tasks, "review task count", 1, 256)
@@ -87,6 +97,30 @@ def compile_forensic_review_queue(
             add("high", "source_capture_age_exceeded", row.stale_capture_ids, (row.objective_id,))
         if row.unknown_capture_ids:
             add("high", "source_capture_time_unverified", row.unknown_capture_ids, (row.objective_id,))
+    # Extension inputs must be anchored to the same exact private frame set.
+    for item in (echoes, active, privacy, exposure, polarity):
+        if item is not None and item.frame_set_digest != frames.frame_set_digest:
+            raise PermissionError("deep forensic findings reference foreign evidence")
+    if echoes:
+        for row in echoes.echoes:
+            add("high" if row.cross_host else "medium",
+                "repeated_sentence_provenance_unverified", row.source_ids)
+    if active:
+        for row in active.findings:
+            for code in row.rule_codes:
+                add("high", "active_content:" + code, (row.source_id,))
+    if privacy:
+        for row in privacy.findings:
+            for code in row.rule_codes:
+                add("critical", "privacy_or_credential:" + code, (row.source_id,))
+    if exposure:
+        for row in exposure.by_objective:
+            if row.objective_id in exposure.concentration_review_objectives:
+                add("medium", "host_selection_concentration", (), (row.objective_id,))
+    if polarity:
+        for row in polarity.leads:
+            add("medium", "possible_statement_polarity_collision",
+                (row.left_source_id, row.right_source_id))
     ordering = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     ranked = sorted(signals, key=lambda row: (ordering[row[0]], row[1], row[2], row[3]))
     if len(ranked) > max_tasks:
