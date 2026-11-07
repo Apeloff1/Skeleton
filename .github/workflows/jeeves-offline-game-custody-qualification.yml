@@ -84,7 +84,13 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
           export TMPDIR="$HOME"
+          # These existing provenance fixtures are defined in separate test
+          # modules, not conftest.py. Register them explicitly for this
+          # focused selection; no test is skipped or silently substituted.
           python -m pytest -q --maxfail=1 \
+            -p skeleton.testing.test_app_offline_archive_signature \
+            -p skeleton.testing.test_app_offline_signed_progress_migration \
+            -p skeleton.testing.test_app_offline_policy_signed_progress_migration \
             skeleton/testing/test_app_offline_install_quarantine.py \
             skeleton/testing/test_app_offline_delivery_archive.py \
             skeleton/testing/test_app_offline_signed_game_library_audit.py \
