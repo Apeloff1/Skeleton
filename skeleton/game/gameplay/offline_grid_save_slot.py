@@ -10,7 +10,7 @@ import json
 import os
 from pathlib import Path
 import stat
-import tempfile
+import secrets
 
 MAX_SAVE_BYTES = 2_000_000
 
@@ -33,13 +33,29 @@ def _directory(path: Path) -> Path:
     return parent
 
 
-def _check_slot(path: Path) -> None:
+def _check_slot(name: str, dfd: int) -> None:
     try:
-        info = path.lstat()
+        info = os.stat(name, dir_fd=dfd, follow_symlinks=False)
     except FileNotFoundError:
         return
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-        raise SaveSlotError("save slot must be a regular unlinked file")
+        raise SaveSlotError("save slot must be a regular single-link file")
+
+
+def _open_parent(path: Path) -> tuple[int, Path]:
+    if path.name in ("", ".", "..") or path.name != os.path.basename(path):
+        raise SaveSlotError("invalid slot filename")
+    parent = _directory(path)
+    if parent != path.parent.absolute():
+        raise SaveSlotError("save parent must not contain symlinks")
+    if not hasattr(os, "supports_dir_fd") or os.open not in os.supports_dir_fd:
+        raise SaveSlotError("descriptor-relative saves unavailable on this platform")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    dfd = os.open(parent, flags)
+    if os.stat(parent).st_ino != os.fstat(dfd).st_ino or os.stat(parent).st_dev != os.fstat(dfd).st_dev:
+        os.close(dfd)
+        raise SaveSlotError("save parent changed during open")
+    return dfd, parent
 
 
 def write_slot(path: Path, snapshot: object) -> None:
@@ -54,36 +70,40 @@ def write_slot(path: Path, snapshot: object) -> None:
     parent = _directory(path)
     if parent != path.parent.absolute():
         raise SaveSlotError("save parent must not contain symlinks")
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    dfd = os.open(parent, flags)
-    temporary = None
+    dfd, parent = _open_parent(path)
+    temporary = ".campaign-" + secrets.token_hex(16) + ".tmp"
+    created = False
     try:
-        _check_slot(path)
-        fd, temporary = tempfile.mkstemp(prefix=".campaign-", suffix=".tmp", dir=parent)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                os.fchmod(stream.fileno(), 0o600)
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            _check_slot(path)
-            os.replace(temporary, path)
-            temporary = None
-            os.fsync(dfd)
-        finally:
-            if temporary is not None:
-                try:
-                    os.unlink(temporary)
-                except FileNotFoundError:
-                    pass
+        _check_slot(path.name, dfd)
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                     getattr(os, "O_NOFOLLOW", 0), 0o600, dir_fd=dfd)
+        created = True
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        _check_slot(path.name, dfd)
+        before = os.fstat(dfd)
+        after = os.stat(parent, follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise SaveSlotError("save parent changed before publication")
+        os.rename(temporary, path.name, src_dir_fd=dfd, dst_dir_fd=dfd)
+        created = False
+        os.fsync(dfd)
     finally:
+        if created:
+            os.unlink(temporary, dir_fd=dfd)
         os.close(dfd)
 
 
 def read_slot(path: Path) -> object:
     path = Path(path)
-    _check_slot(path)
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    dfd, _ = _open_parent(path)
+    try:
+        _check_slot(path.name, dfd)
+        fd = os.open(path.name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=dfd)
+    finally:
+        os.close(dfd)
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > MAX_SAVE_BYTES:
