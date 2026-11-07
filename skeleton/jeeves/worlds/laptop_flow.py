@@ -97,6 +97,53 @@ class LaptopFlow:
             raise CanonError("review_stale_source")
         return True
 
+    def preview_edit(self, world_id: str, expected_digest: str, operation: Any) -> dict[str, Any]:
+        """Reviewable, side-effect-free typed edit with exact source CAS.
+
+        The candidate is never approved or published by preview. A reviewer must
+        subsequently submit the identical operation against the original digest.
+        """
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                current = self._world(fd, world_id)
+                if digest(current) != expected_digest:
+                    raise CanonError("stale_source")
+                candidate = edit(current, operation)
+                candidate_digest = digest(candidate)
+                if candidate_digest == expected_digest:
+                    raise CanonError("review_requires_change")
+                before = {kind: {item["id" if kind != "endings" else "scene"]: item
+                         for item in current[kind]}
+                          for kind in ("scenes", "choices", "endings")}
+                after = {kind: {item["id" if kind != "endings" else "scene"]: item
+                        for item in candidate[kind]}
+                         for kind in ("scenes", "choices", "endings")}
+                changes = {}
+                for kind in ("scenes", "choices", "endings"):
+                    changes[kind] = {
+                        "added": sorted(after[kind].keys() - before[kind].keys()),
+                        "removed": sorted(before[kind].keys() - after[kind].keys()),
+                        "modified": sorted(k for k in before[kind].keys() & after[kind].keys()
+                                           if before[kind][k] != after[kind][k]),
+                    }
+                return {
+                    "schema": "jeeves.world.review_preview.v1",
+                    "world_id": world_id,
+                    "source_digest": expected_digest,
+                    "candidate_digest": candidate_digest,
+                    "changes": changes,
+                    "proof": prove(candidate).as_dict(),
+                    "reviewed": False,
+                    "published": False,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def review(self, world_id: str, expected_digest: str, operation: Any,
                review_note: str) -> dict[str, Any]:
         """Publish an explicitly reviewed edit under one canonical writer lease.
