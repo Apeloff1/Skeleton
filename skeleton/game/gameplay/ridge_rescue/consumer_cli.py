@@ -137,7 +137,12 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
         # Terminal input may contain pasted Unicode or control characters. Reject
         # all controls (including pasted newlines/tabs) rather than normalizing them into a valid
         # action, especially where two players share one authoritative slot.
-        if (not isinstance(raw, str) or len(raw) > MAX_TERMINAL_INPUT or
+        if not isinstance(raw, str):
+            # A damaged/non-text terminal adapter must not spin forever on
+            # repeated None/bytes returns. Exit with the last durable save.
+            write("Input stream unavailable; saved progress preserved.")
+            break
+        if (len(raw) > MAX_TERMINAL_INPUT or
                 any(ord(ch) < 32 or ord(ch) == 127 for ch in raw) or
                 any(0xD800 <= ord(ch) <= 0xDFFF for ch in raw)):
             write("Unavailable command; no turn was consumed.")
