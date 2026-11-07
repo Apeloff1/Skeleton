@@ -21,6 +21,7 @@ from .core import CrawlPolicy, canonicalize_url
 XML_MEDIA = frozenset({
     "application/xml", "text/xml", "application/rss+xml",
     "application/atom+xml",
+    "application/opml+xml", "text/x-opml",
 })
 GZIP_MEDIA = frozenset({"application/gzip", "application/x-gzip"})
 JSON_MEDIA = frozenset({"application/feed+json", "application/json"})
@@ -141,6 +142,12 @@ def _entries(root: ET.Element, kind: str):
                     if _local(child.tag) == ("", "link"):
                         yield (child.text or "").strip()
                         break
+    elif kind == "opml_outline":
+        # The safe-tree node/depth budget has already been enforced globally.
+        for entry in root.iter("outline"):
+            if entry.get("type", "").lower() not in ("rss", "atom", "feed"):
+                continue
+            yield (entry.get("xmlUrl") or "").strip()
     elif kind == "atom_feed":
         for entry in root:
             if _local(entry.tag) not in ((ATOM_NS, "entry"), ("", "entry")):
@@ -221,6 +228,8 @@ def parse_structured_discovery(
         kind = "rss_feed"
     elif local == "feed" and namespace in ("", ATOM_NS):
         kind = "atom_feed"
+    elif local == "opml" and namespace == "":
+        kind = "opml_outline"
     else:
         raise UnsupportedDiscoveryRoot("unsupported XML discovery root")
     seen = set()
@@ -238,7 +247,7 @@ def parse_structured_discovery(
         try:
             # Sitemap loc elements must be absolute; Atom and RSS are
             # allowed document-relative links subject to the same admission.
-            if kind.startswith("sitemap_"):
+            if kind.startswith("sitemap_") or kind == "opml_outline":
                 split = urlsplit(value)
                 if split.scheme not in ("http", "https") or not split.netloc:
                     raise ValueError("relative sitemap location")

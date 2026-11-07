@@ -13,6 +13,7 @@ on:
       - "skeleton/ai/webcrawler/structured_discovery.py"
       - "tests/test_ai_webcrawler_dragon_text_sitemaps.py"
       - "tests/test_ai_webcrawler_dragon_redirect_semantics.py"
+      - "tests/test_ai_webcrawler_dragon_opml_catalog.py"
       - "skeleton/ai/webcrawler/bound_http.py"
       - "skeleton/ai/webcrawler/content_coding.py"
       - "skeleton/ai/webcrawler/archive_documents.py"
@@ -88,6 +89,7 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/structured_discovery.py
           python -m py_compile tests/test_ai_webcrawler_dragon_text_sitemaps.py
           python -m py_compile tests/test_ai_webcrawler_dragon_redirect_semantics.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_opml_catalog.py
           python -m py_compile skeleton/ai/webcrawler/core.py
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/bound_http.py
@@ -168,3 +170,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_robots_rate.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_text_sitemaps.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_redirect_semantics.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_opml_catalog.py' -v
