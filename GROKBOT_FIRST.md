@@ -302,3 +302,1217 @@ Every 12-bot cycle: obtain exact branch refs; update discrepancy registry; selec
 **Source of truth:** Git object+receipt > executed test > verified runtime artifact > PR description > README > planning metadata > agent statement. Disagreeing lower-priority records become a tracked discrepancy, not silently rewritten truth.
 
 ---
+
+# 11. Detailed twelve-bot backlog and technical design dossiers
+
+These work orders are **proposed completeness obligations**, not claims that a feature is absent or unfinished until exact source/runtime evidence identifies its current maturity. Each task must be reconciled with an existing owner and PR before editing. Work IDs remain stable across revisions and are meant to drive GitHub issues, artifact manifests and test plans. Detailed source authority and exact accepted interfaces are to be concretized from the full clone, never invented. All baseline/test results are UNKNOWN until evidenced.
+
+## BOT-01 — First install, hardware, native recovery and deployment
+
+**Primary owner boundary:** skeleton/app, scripts/install_app.py, scripts/windows, docker-compose.yml, machine/ai_first_install.json. **Default priority:** P0. **Coordination edges:** 01->02/03/11/12. **Integration contract:** bot 01 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-01-W01 — Clean-host installation transaction
+
+**Capability and expected mechanism.** Stage preflight, private configuration, dependency installation, volumes, service boot, readiness and atomic install receipt. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Interrupted staging must preserve old installation and demand an explicit resumable action. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Windows/WSL2 and Linux fresh installs with reboot at each transaction boundary. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W02 — Trusted sealed-context guard startup
+
+**Capability and expected mechanism.** Connect common Mongo epoch, backend writer authority, bounded reviewer, tokenizer attestation and canonical engine without runtime bypass. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing verifier, unsigned policy, unknown writer or insufficient privileges blocks inference. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Real backend-engine-Mongo-replica integration with adversarial stale-writer traces. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W03 — Replicated Mongo epoch custody
+
+**Capability and expected mechanism.** Establish replica-set authority, primary-bound read concern, idempotent migrations, persisted epoch and writer fencing. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Primary transition or split epoch cannot admit writes or create divergent histories. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent mutation and primary loss/recovery on two real application processes. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W04 — Chroma persistence reconciliation
+
+**Capability and expected mechanism.** Inventory legacy container /data and named volume, backup both, compare digests and migrate into qualified durable mount. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown divergent histories are quarantined; do not recreate/remove old container. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Backups restored to isolated volume and exact query/readback equivalence independently checked. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W05 — First-run setup isolation
+
+**Capability and expected mechanism.** Serve setup UI independent of Mongo/backend/guard/AI readiness and show exact categorized failure. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Setup never claims inference, payments, crawler or model availability from service health alone. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Disable each dependent service and verify setup renders and guides actionable recovery. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W06 — Windows standalone installer
+
+**Capability and expected mechanism.** Package pinned Python, launcher, signed manifest, safe uninstall, repair and first-start UI. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never silently remove state, leak private passwords or claim a hardware run from hosted CI. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Exact-head hosted Windows build followed by physical Windows 11 laptop install, repair, upgrade, rollback. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W07 — WSL2 and Docker alignment
+
+**Capability and expected mechanism.** Detect WSL distro, architecture, Docker integration, file mount paths, ports, DNS and CPU/IO quotas. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Refuse invalid ABI and absent daemon instead of attempting privileged auto-installs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cold launch, Docker reset, WSL restart, sleep/wake and browser-origin smoke. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W08 — Offline install artifact
+
+**Capability and expected mechanism.** Package pinned application images, runtime, opt-in models, legal toolchains, checksums and licenses as staged bundle. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing optional model never triggers hidden online fetching or fallback. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fully disconnected install with explicit negative cases and local GGUF inference. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W09 — Resource preflight estimator
+
+**Capability and expected mechanism.** Probe real RAM, VRAM, disk, swap, CPU, thermal signals, cgroup and model footprint before admission. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No speculative capacity overcommit; unknown telemetry means conservative limited mode. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Low-RAM, disk-full, GPU-unavailable and competing-worker pressure benchmark. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W10 — Native GGUF first conversation
+
+**Capability and expected mechanism.** Guide user through source-approved model, hash, template, runtime, owner state and durable chat. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalid artifact, missing tokenizer or absent guard fails closed with safe diagnosis. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** End-to-end live model reply, cancellation, reopen, token count and unchanged existing sessions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W11 — State and credential initialization
+
+**Capability and expected mechanism.** Create private durable secrets, owner setup, service credentials, permissions and index bootstrap once. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No shared admin password, first-user elevation or secret echo in logs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fresh and repeated install compare stable identity/secret bytes with no plaintext leak. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W12 — Upgrade migration manager
+
+**Capability and expected mechanism.** Version manifests, schema migrations, backup snapshots, compatibility mapping, app and model updates. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsafe downgrade or unsupported source state blocks before mutation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Historical installation upgrade, state graph hash comparison and cold restore. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W13 — Installer rollback and repair
+
+**Capability and expected mechanism.** Reconstruct component state by receipts without deleting external Docker assets. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Failure halfway through package replacement retains known-good launcher and data. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Kill process during extract, configure, service boot and finalize; inspect recovery. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W14 — Startup supervision
+
+**Capability and expected mechanism.** Bind service health, dependency order, jittered bounded retries, failure categories and authenticated readiness. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Infinite restart loops and force-recreation under data uncertainty forbidden. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Restart engine/backend/Mongo individually and validate truthful health transitions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W15 — Operating system lifecycle
+
+**Capability and expected mechanism.** Manage suspend/resume, shutdown, power loss and local-network change with durable worker join. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Interrupted tasks remain pending or terminal until physical worker outcome known. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Target laptop lid close/reopen, WSL termination and corrupted-cache reproduction. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W16 — User data backup control
+
+**Capability and expected mechanism.** Define complete backup of Mongo, SQLite, Chroma, assets, keys, manifests and saves with compatible consistency points. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Partial snapshot is not presented as recoverable; do not rotate keys during backup. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Offline restore into clean host with per-object checksum and logical integrity queries. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W17 — Runtime model manager
+
+**Capability and expected mechanism.** List verified model profiles, download/provision, storage accounting, choose active model, rollback selection. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never overwrite old checkpoint or silently convert model template. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Test switching chat/coding profile while preserving established receipts and sessions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W18 — GPU driver and ABI qualification
+
+**Capability and expected mechanism.** Detect native provider backends, architecture, driver, Vulkan/Metal/CUDA options and fallback CPU admission. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A mounted binary path is not proof of ABI; no implicit arbitrary executable. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Per-device executable smoke and memory-pressure proof of selected backend. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W19 — Dependency update pipeline
+
+**Capability and expected mechanism.** Pin image digest, Python/npm dependency set, runtime build inputs, SBOM and vulnerability status. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unreviewed transitive dependency cannot silently promote release. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Rebuild image with exact source head, compare staged receipts and independent dependency gate. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W20 — Engine and compiler installer
+
+**Capability and expected mechanism.** Offer pinned Godot and user-authorized optional SDKs/cores with explicit provenance and legal boundaries. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No unauthorized firmware/ROM/SDK downloads or root privilege. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Actual Godot headless boot and licensed optional native target smoke. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W21 — Service diagnostics archive
+
+**Capability and expected mechanism.** Produce bounded redacted sanitized support packet containing service status, versions, source head and failing gate. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Omit prompts, secret values and raw captured pages. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reviewer can reproduce failure from sanitized artifact while secret canary tests stay clean. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W22 — Real release channels
+
+**Capability and expected mechanism.** Define nightly/beta/stable attested manifest, update and support policy. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown binary signing provenance blocks stable artifact. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Signed source-exact installer, independent QA and rollback practice. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W23 — Install accessibility
+
+**Capability and expected mechanism.** Make setup keyboard navigable, localized, reduced-motion and screen-reader legible. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Recovery prompts cannot require mouse-only or network access. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Accessibility audit including failed-backend state and mobile-width browser. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W24 — Targeted installation endurance
+
+**Capability and expected mechanism.** Sustain repeated upgrade/repair/reboot cycles on constrained laptop. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No SQLite journal leakage, data loss, handle leak or cumulative model download. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** 20-cycle qualification with snapshots and independent metrics. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-01 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-02 — Canonical architecture, ownership, state, schemas and integrity
+
+**Primary owner boundary:** machine/architecture.json, machine/ai_file_tree.json, skeleton/app, skeleton/api, backend/core, skeleton/provenance. **Default priority:** P0. **Coordination edges:** 02->all. **Integration contract:** bot 02 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-02-W01 — Repository source/object census
+
+**Capability and expected mechanism.** Enumerate tracked files, Git objects, submodules, LFS, generated routes, canonical providers, all open PR overlays. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Partial search results must be labeled partial and never imply complete audit. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Independently count and hash full tree against pinned main and candidate refs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W02 — Single-authority topology
+
+**Capability and expected mechanism.** Assign one owner per storage mutation, workspace, ledger, AI provider, game editor, renderer and export. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Duplicate live writer must be quarantined or converted into read-only facade. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Build endpoint-to-owner map and prove side-effect path from UI/API/CLI. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W03 — Domain entity schema registry
+
+**Capability and expected mechanism.** Version Project, World, Scene, Asset, Actor, Quest, Build, Capture, Model, WorkOrder, Receipt and Rights. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown versions and nondeterministic coercion rejected before mutation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Backward/forward compatibility fixtures plus normalized serialization roundtrip. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W04 — Event journal determinism
+
+**Capability and expected mechanism.** Define event IDs, idempotency, ordered append, transactional snapshots and source digest commitments. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Lost or reordered events cannot produce false accepted state. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cold replay of varied game/crawl/bot histories produces identical state digest. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W05 — Workspace branch and revision system
+
+**Capability and expected mechanism.** Enable project edit isolation, snapshots, merge, semantic conflicts, undo/redo and restoration. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Last writer cannot silently replace a newer revision. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent editor/model mutations with revision compare-and-swap. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W06 — Model-to-command authority bridge
+
+**Capability and expected mechanism.** Compile proposed tool actions into typed, validated, scoped deterministic commands. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Prompt injection or generated JSON cannot mint a capability or grant. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Property tests on malformed tool outputs, grants and parser boundaries. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W07 — Cross-store identity and epoch
+
+**Capability and expected mechanism.** Bind backend Mongo, engine Mongo, SQLite and asset storage to consistent tenant/project/epoch. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Quiescence assertion does not imply known writers stopped. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Mixed-version writer fencing, restart and replica-set failure suites. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W08 — Physical-resource reservation ledger
+
+**Capability and expected mechanism.** Account CPU, GPU, RAM, disk, network and worker capacity with lease ownership and actual join. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Timeout cannot release a physically running native process. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Double-booking and cancellation race stress with bounded physical resources. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W09 — Immutable artifact content store
+
+**Capability and expected mechanism.** Use content digests, immutable storage refs, provenance, per-tenant ACL and consistent lifecycle. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** GC cannot delete live referenced content or expose another tenant. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Corrupted-object, dedup/refcount and concurrent publication tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W10 — Rights and source lineage graph
+
+**Capability and expected mechanism.** Propagate attribution, license, consent, source origin, revocation and dependency invalidation. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalidated rights cannot survive in cached recommendations or exports. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Transitive withdrawal through derived mechanic, asset, knowledge and model inputs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W11 — Game snapshot schema
+
+**Capability and expected mechanism.** Represent world/scene/quest, actor, economy, RNG, AI, controller, audio and save compatibility. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown action/entity or mismatched level seed blocks recovery. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Stable save/replay across cold restart and committed migration. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W12 — Canonical build dependency DAG
+
+**Capability and expected mechanism.** Track source edits -> generated assets -> Godot project -> playtest -> package -> release. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Stale downstream proof cannot remain valid after source change. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Single-file mutation invalidation reaches exactly affected proofs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W13 — API and CLI parity
+
+**Capability and expected mechanism.** Unify public route schemas, command errors, identity, limits, pagination and idempotency. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No shadow ownership via duplicate API entrypoints. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Property-based CLI vs authenticated HTTP side-by-side comparison. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W14 — Eventual consistency disclosure
+
+**Capability and expected mechanism.** Classify linearizable, snapshot and eventual reads; expose stale/unknown state intentionally. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Uncertain currency/entitlement/auth state never treated as confirmed. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Network partition tests for each observable consistency contract. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W15 — Type-safe extension registry
+
+**Capability and expected mechanism.** Register plugins, genres, codecs, engines and resource adapters by explicit versioned capabilities. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** New plugin cannot bypass sandbox, network, payment or content policy. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Unknown capability schema rejection and signed package import tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W16 — Schema migration engine
+
+**Capability and expected mechanism.** Plan monotonic migration revisions, backups, readback and interrupted replay. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Migration does not fabricate missing records or silently rewrite history. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Mid-migration process kill, restart, drift and downgrade tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W17 — Multi-tenant authorization graph
+
+**Capability and expected mechanism.** Enforce scoped principal roles, project grants, group membership and least privilege. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Cross-tenant lookup must not reveal object existence by timing or error. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fuzz endpoints, jobs, exports and caches with owner/tenant swaps. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W18 — Audit and privacy lifecycle
+
+**Capability and expected mechanism.** Configure retention, export, tombstones, erasure eligibility and historical evidence custody. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Delete request cannot erase unrelated tenants or preserve withdrawn source in retrieval. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cascaded deletion and recovery policy tests over all stores. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W19 — Package and artifact interchange
+
+**Capability and expected mechanism.** Encode stable typed manifests for worlds, assets, builds, mods and external toolchains. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Path traversal, zip bombs and unsupported codec fail before side effects. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Import/export roundtrip on mixed-size original user-owned projects. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W20 — Dependency-aware GC
+
+**Capability and expected mechanism.** Remove expired bytes and checkpoints only after committed ownership and legal hold checks. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Race between writer and collector cannot delete active artifacts. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fault injection around publication, lease release and object retirement. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W21 — Query planner and indexes
+
+**Capability and expected mechanism.** Offer bounded world, spatial, graph and text search using declared indexes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Query complexity cap must prevent memory exhaustion and cross-project leakage. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Large synthetic-world benchmarks, index rebuild and low-memory fault cases. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W22 — Semantic mirror and facade retirement
+
+**Capability and expected mechanism.** Reconcile 182 mapped files, 181 native owners, import routes, AST/byte parity and cutover signoffs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Staged mirror not authoritative while signed cutover missing. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Exact-head AI-tree validator, semantic parity and independent evidence. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W23 — Architecture lint and dependency banlist
+
+**Capability and expected mechanism.** Prevent forbidden imports, bypasses, cyclical services, hidden providers and duplicate app creation. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Inadmissible dependency cannot be excused as mere compatibility. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Static dependency graph plus runtime import/route trace. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W24 — Formal ownership and decision log
+
+**Capability and expected mechanism.** Require ADR for authority changes, source migrations and irreversible behavior changes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No assistant may silently edit state-owner contract in another bot's lane. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** ADR to code to test and signoff linked at final SHA. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-02 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-03 — Jeeves native intelligence, cognition, resource fabric and tool supervision
+
+**Primary owner boundary:** skeleton/ai/runtime, skeleton/ai/model_runtime, skeleton/ai/training, skeleton/ai/agents/jeeves. **Default priority:** P0/P1. **Coordination edges:** 03->01/02/04/10/12. **Integration contract:** bot 03 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-03-W01 — Real local inference activation
+
+**Capability and expected mechanism.** Wire verified GGUF runtime, model digest, tokenizer, template, backend and guarded engine. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never claim model quality from provisioned file alone. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Live response/cancellation/cold restart on installed laptop. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W02 — Adaptive hardware admission
+
+**Capability and expected mechanism.** Plan context, batch, threads, GPU offload, RAM/VRAM, swap and disk spill from measured signals. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Overcommit, thermal overload and unknown system memory fail into conservative limits. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Sustained inference under CPU/GPU/swap pressure and physical worker audit. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W03 — Durable instruction hierarchy
+
+**Capability and expected mechanism.** Keep system, user, tools and external evidence roles separate with provenance and finite serialization. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Role delimiter injection and untrusted page text never become privileged. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Native GGUF adversarial test with exact serialized token frames. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W04 — Model tool planner
+
+**Capability and expected mechanism.** Parse typed JSON tool intents, schema check, dry-run and require scoped grants. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalid or ambiguous action has no side effect. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Adversarial tool argument corpus through real owner APIs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W05 — Live token stream and commit protocol
+
+**Capability and expected mechanism.** Deliver incremental output with ordered chunk IDs, cancel and final durable checkpoint. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Partial output never authorizes a code commit or release. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Backpressure, client disconnect and retry replay without duplicate inference. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W06 — Long-context relevance manager
+
+**Capability and expected mechanism.** Budget instructions, source facts, history, task plans and summaries with verifiable omission metadata. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never silently drop an active grant or confuse prior tenant history. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Long project conversation retrieval + position-swap stress. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W07 — Project-scoped durable memory
+
+**Capability and expected mechanism.** Store reviewed facts/preferences, code decisions, correction history and explicit retention policy. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Source revocation removes eligibility without rewriting unrelated chat. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Memory restart, selective erase and stale-snapshot tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W08 — Multi-model capability routing
+
+**Capability and expected mechanism.** Route optional specialized small/large local and hosted models by explicit policy and measured task ability. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Offline user never silently sends data to remote host. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Each configured route records model identity and privacy decision. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W09 — Native execution spine recovery
+
+**Capability and expected mechanism.** Persist request, lease, action, receipt and cold restart, with exactly-once committed side effects. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Timed-out worker retains physical slot; uncertain result blocks replay. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Kill child during token, patch, tool and commit phases. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W10 — Model output validation firewall
+
+**Capability and expected mechanism.** Check schema, token/control delimiters, UTF-8, max output, finiteness, budgets and typed constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalid finish/tool shape denied before owner mutation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fuzz tokenizer, model output and tool parse with zero unsafe mutations. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W11 — Source-bound coding agent
+
+**Capability and expected mechanism.** Supply authorized source snapshots, patch proposals and exact file hash custody. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No arbitrary filesystem, shell command or unreviewed auto-apply. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Generate/edit code, apply only after user grant, run real diff/test. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W12 — Independent review deliberation
+
+**Capability and expected mechanism.** Use separately configured finite critical reviewer on same immutable candidate and source. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Mere repeated sampling by same model is not represented as independent. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Review disagreement and failed-attestation trace. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W13 — Creative/game-design specialty profiles
+
+**Capability and expected mechanism.** Register bounded game systems roles with genre/engine domain constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No profile may invent compiler/toolchain readiness. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Compare game design outputs on fixed held-out brief families. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W14 — Retrieval + knowledge synthesis
+
+**Capability and expected mechanism.** Fuse lexical, embeddings, graph, reviewed notes and source-cited retrieval. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Withdrawn or unlicensed text must be excluded before prompt formation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Source dependency revocation with RAG cache invalidation. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W15 — Agent planning with checkpoints
+
+**Capability and expected mechanism.** Turn broad goals into atomic tasks, expected artifacts, budgets and evidence gates. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Infinite loops, deadlocks and unbounded tool costs terminate honestly. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interrupt and resume multi-step game editing campaign without repeats. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W16 — Model candidate evaluation
+
+**Capability and expected mechanism.** Test code generation, debugging, visual reasoning, narrative and tool correctness separately. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** One aggregate win rate cannot certify every game family. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Held-out tasks, real engine evaluation and error taxonomies. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W17 — On-device inference optimization
+
+**Capability and expected mechanism.** Profile KV cache quantization, prompt reuse, prefill, microbatching and speculative decode where safe. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Speedup claim needs measured TTFT and output correctness tradeoff. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reproducible low/medium/high spec device benchmark. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W18 — Optional multimodal perception
+
+**Capability and expected mechanism.** Admit image, sound, frame, log and scene graph observations through typed bounded readers. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** External binary cannot execute or smuggle privileged instructions. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Real visual bug detection from Godot screenshot with verified image custody. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W19 — Private network listener hardening
+
+**Capability and expected mechanism.** Enforce loopback origin, bearer, host, CORS, finite reads and anti-CSRF where relevant. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No unauthorized remote access to local project prompts or model. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** HTTP Host/Origin and token abuse on localhost and LAN adversaries. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W20 — Native adapter training
+
+**Capability and expected mechanism.** Support explicit licensed datasets, preprocessing, isolation, validation and real weight/adapter changes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A Q-learning game policy update is not transformer weight training. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Parameter delta, held-out gain and reproducible checkpoint lineage. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W21 — Preference optimization lifecycle
+
+**Capability and expected mechanism.** Gather operator consent, preference pairs, judge blinding and regression tests. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never contaminate held-out test data or silently train on crawler pages. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Model comparison on previously unseen original game tasks. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W22 — Context and tool budget accounting
+
+**Capability and expected mechanism.** Attribute tokens, tool calls, CPU seconds, GPU bytes, deadline and storage to exact work. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No work that exceeds grant or hides pending physical costs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent stress of 12 bots with conservative admission. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W23 — Explainable agent trace
+
+**Capability and expected mechanism.** Show plan, selected evidence, proposed mutations, tool admission and validation without private prompt leak. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Redact secrets; do not expose raw proprietary source in public logs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reviewer reconstructs a safe high-level action chain from receipt. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W24 — Inference security isolation
+
+**Capability and expected mechanism.** Separate untrusted model/runtime process from host secrets and arbitrary file writing. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsafe model file or executable cannot escape admitted sandbox. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Malicious weight/archive/runtime tests and permission scans. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W25 — Quality-aware abstention
+
+**Capability and expected mechanism.** Teach assistant to report unknown and request missing source authority instead of fabricating success. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No hallucinated API route, game build or tool result presented as observed. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Blind golden defects where correct behavior is explicit abstention. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-03 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-04 — Game studio director, hierarchical agent orchestration and production planning
+
+**Primary owner boundary:** skeleton/ai/agents/jeeves, skeleton/forge, skeleton/automation, skeleton/jeeves. **Default priority:** P1. **Coordination edges:** 04->02/03/05/06/07/08/09/11/12. **Integration contract:** bot 04 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-04-W01 — Brief-to-design charter
+
+**Capability and expected mechanism.** Transform natural language into versioned scope, genre, fantasy, core loop, technology and target profiles. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unresolved choices become operator-reviewable assumptions, not invented commitments. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Brief edits regenerate impacted spec only while preserving approved choices. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W02 — Role-specialist virtual studio
+
+**Capability and expected mechanism.** Provide producer, designer, engineer, writer, level artist, animator, sound designer, QA and build roles. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Specialists do not self-approve their own release, rights or security outcomes. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Multi-role rehearsal with separated source, critique and adoption evidence. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W03 — Plan DAG and milestone synthesis
+
+**Capability and expected mechanism.** Decompose game design into stable ordered artifacts with acceptance tests and dependencies. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Plans are finite, coherent and cannot skip a critical playable dependency. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Complete small 2D game graph with traceable source-to-export path. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W04 — Authoritative tool invocation
+
+**Capability and expected mechanism.** Bind each AI action to typed game-editor/compiler API and explicit grant. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Text-only completions and hallucinated tools never mutate source. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Execute authorized edit/build/review/export from real user workbench. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W05 — Iterative creative prototyping
+
+**Capability and expected mechanism.** Generate multiple coherent candidates, compare gameplay and adopt chosen implementation. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Candidate selection cannot silently overwrite approved content. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Blind playtest comparison with retained screenshots, metrics and reason. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W06 — Playable-first production scheduling
+
+**Capability and expected mechanism.** Prioritize input, scene, feedback, victory/defeat and build before optional lore catalog. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Deadline pressure cannot create a shell game of metadata-only completion. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Timed game-jam brief produces a finishable build. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W07 — Agent-driven diagnostic repair
+
+**Capability and expected mechanism.** Capture real compiler/engine/gameplay failure and propose targeted bounded patch. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never declare repaired based solely on successful code generation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Inject real collision/quest/save bug, replay before and after. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W08 — Studio asset brief pipeline
+
+**Capability and expected mechanism.** Convert design/scene rules to structured art, animation, audio and license briefs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Media request cannot bypass content rights or source provenance. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Art bundle matches actual run-time rig/scene/use requirements. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W09 — Production board observability
+
+**Capability and expected mechanism.** Expose current milestone, blocked dependencies, owner, cost, evidence and next action. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** UI never fabricates progress by counting drafted documentation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Refresh live work graph while process and network faults occur. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W10 — Human-in-the-loop approval
+
+**Capability and expected mechanism.** Offer diff, predicted change scope, reversible preview and explicit consent per risk class. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No unattended destructive edit, spend or publication from agent intent. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Human rejects a proposal and history remains unchanged. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W11 — Adversarial design critique
+
+**Capability and expected mechanism.** Check loop quality, pacing, difficulty, novelty, retention ethics and player agency. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Model self-critique alone cannot establish enjoyment. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Compare against actual human/game-agent observations and issue false-positive analysis. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W12 — Production memory and art continuity
+
+**Capability and expected mechanism.** Record approved style bible, design laws, canon, team decisions and asset reuse. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Memory invalidation occurs on rights withdrawal or project branch. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Regenerate one level without losing character art consistency. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W13 — Cross-role conflict reconciliation
+
+**Capability and expected mechanism.** Apply semantic merge for story, code, assets and economy with audit of disputed edits. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Conflicting authorities never silently last-write-wins. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Simultaneous writers trigger bounded conflict review. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W14 — Campaign planning at scale
+
+**Capability and expected mechanism.** Coordinate chapters, acts, scenes and large quest networks with content-percentage gates. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A thousand empty scene manifests count as zero realized content. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Source-backed playable campaign sample and topology solver. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W15 — Design-to-engine trace
+
+**Capability and expected mechanism.** Maintain mapping from original brief to concrete script, scene, asset and test. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing requirement trace blocks completion. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Bidirectional trace drill from gameplay feature to design/user acceptance. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W16 — Auto playtester commissioning
+
+**Capability and expected mechanism.** Invoke independent game player with private rubric, input actions and screenshots. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Builder cannot alter judge rubric or claim from canned input. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Repeatable counterexample gameplay trace and repair loop. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W17 — User-controlled creativity slider
+
+**Capability and expected mechanism.** Offer style, novelty, fidelity, complexity and safety targets with explicit budget/quality tradeoff. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Feature changes cannot override data/license constraints. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Same seed/profile comparison on diverse briefs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W18 — Integrated level pacing director
+
+**Capability and expected mechanism.** Coordinate encounters, loot, narrative beats, travel and rest windows with measurable challenge. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Director cannot produce required inaccessible quest/room. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Simulated player policies detect pacing softlocks. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W19 — Persistent project campaigns
+
+**Capability and expected mechanism.** Resume multi-week plans with durable tasks, per-step receipts and bounded context recovery. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Replanning does not repeat succeeded financial/build/crawl actions. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cold resume campaign after multiple source revisions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W20 — Genre-specific production kits
+
+**Capability and expected mechanism.** Define minimal complete ARPG, platformer, shooter, strategy, RPG, simulator and puzzle packages. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsupported engine variants declared upfront. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** At least one real finished golden game in each claimed genre. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W21 — Project-wide refactoring steward
+
+**Capability and expected mechanism.** Plan scene/entity ID changes, import updates and save migrations as coherent transactions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never leave broken cross-module references or accidental schema drift. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Safe rename/refactor of in-use quest, NPC and world asset. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W22 — Autonomous workload fairness
+
+**Capability and expected mechanism.** Schedule 12 bots with admission and priorities respecting physical worker/branch restrictions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No noisy role can starve core install, compiler or QA. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reproducible fairness/cancellation run under CPU pressure. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W23 — Reconciliation with backlog truth
+
+**Capability and expected mechanism.** Cross-reference 421 volumes/42 P0 tasks to real current source/evidence. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Already-built work should be improved, not recoded as duplicate system. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Gap registry lists implemented vs documented vs candidate with citations. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W24 — Final game design signoff
+
+**Capability and expected mechanism.** Produce independent review-ready release rationale, open limitations and test proofs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No role may self-certify overall product or origin rights. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Human operator sees precise satisfied and unsatisfied journeys. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-04 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-05 — Causal worlds, narrative lattice, canon, characters and social simulation
+
+**Primary owner boundary:** skeleton/ai/agents/jeeves/worlds, skeleton/game/world, skeleton/forge. **Default priority:** P1/P2. **Coordination edges:** 05->02/04/06/07/08. **Integration contract:** bot 05 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-05-W01 — Multiworld spatial scene graph
+
+**Capability and expected mechanism.** Represent worlds, maps, regions, portals, coordinates and layered traversal in canonical graph. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Orphan transitions and invalid parent-child cycles denied. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Load, visit, save and replay five connected world locations. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W02 — Longform story hierarchy
+
+**Capability and expected mechanism.** Support prologue, chapters, acts, scenes, interlude and multiple endings with meaningful causality. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Capacity for 100/1000/9999 is not a promise that content is meaningful. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Validate scene substance, narrative objectives and game transitions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W03 — Consequence and choice ledger
+
+**Capability and expected mechanism.** Bind decisions to characters, quests, faction state and story endings with causal effects. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Player action cannot retroactively change witnessed history unnoticed. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Two seeded runs reach distinct endings with traceable witness events. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W04 — NPC motivations and emotions
+
+**Capability and expected mechanism.** Model goals, trust, needs, memory, beliefs and character development separately. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Agent knowledge cannot exceed observed game state by default. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** NPC revises behavior appropriately after player betrayal or help. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W05 — Faction diplomacy and politics
+
+**Capability and expected mechanism.** Support treaties, wars, reputation, trade, territorial control and resource pressure. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Conflicts cannot bypass world-law, save or quest authority. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Multi-faction simulation with post-restart deterministic history. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W06 — Economy and markets
+
+**Capability and expected mechanism.** Model resource extraction, prices, producers, sinks, barter and scarcity with constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Reject impossible minting, negative budgets and circular free rewards. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Long-horizon economy tests for inflation/exploit and player viability. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W07 — Quest graph and recovery
+
+**Capability and expected mechanism.** Express objectives, dependencies, time gates, failure, alternative route and completion witness. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Softlocks and unreachable required keys invalidate generation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Model-check small quest topology and agent-play representative campaign. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W08 — Dialogue-state compiler
+
+**Capability and expected mechanism.** Generate branching dialogue anchored to exact actor knowledge, relationship and choice state. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Dialogue cannot claim a fact unknown to speaker or incompatible with canon. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interactive dialogue replay under changing game state. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W09 — Temporal mechanics
+
+**Capability and expected mechanism.** Track calendars, weather, seasons, daily NPC schedules and causal time rules. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Time travel or save changes cannot break temporal ordering without explicit rules. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Roundtrip schedule under save/load, pause, fast travel and replay. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W10 — Environmental storytelling
+
+**Capability and expected mechanism.** Place interactive clues, locations, collectibles, sound and visuals supporting plot. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Clues must exist in exported playable scene not only source prose. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Player obtains clue through actual interaction and quest updates. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W11 — Ecology, biomes and habitats
+
+**Capability and expected mechanism.** Model food webs, terrain, hazards, settlement influences and biome transitions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Ecosystem cannot generate impossible essential resources or impassable default path. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Seeded 1000-tick ecology stability and traversal test. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W12 — Character arc planner
+
+**Capability and expected mechanism.** Track setup, disruption, agency, change and payoff per character. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Character scenes without progression do not qualify as arc beats. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Narrative consistency rubric on divergent playthroughs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W13 — Lore contradiction graph
+
+**Capability and expected mechanism.** Compare new facts against approved canon and provenance, return localized conflicts. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Canon cannot silently overwrite signed player history. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Inject contradicting faction origin and verify explicit review. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W14 — Multiending satisfiability
+
+**Capability and expected mechanism.** Ensure all advertised endings have reachable and distinct requirements. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Arbitrarily named copies of same terminal scene are not distinct. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Solver witnesses and controller-driven replays for each ending. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W15 — World event director
+
+**Capability and expected mechanism.** Create dynamic bounded events from state predicates and budgeted randomness. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Events cannot destroy mandatory quest entity without a recovery path. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Event stress includes cancellation/replay and critical quest preservation. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W16 — Cross-world migration
+
+**Capability and expected mechanism.** Preserve inventories, quest flags, companion state, physics profile and rights across transitions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Duplicate avatars and identity drift cause denial. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** World portal journey twice, including network interruption and recovery. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W17 — Save compatibility mapping
+
+**Capability and expected mechanism.** Migrate campaign state and actor IDs across content releases. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing old state is quarantined instead of fabricated. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Save in old campaign, update content, resume with identical confirmed choices. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W18 — Cultural worldbuilding toolkit
+
+**Capability and expected mechanism.** Generate original religions, customs, design languages, settlements and languages as fiction. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Avoid plagiarism and unsupported real-world cultural appropriation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Human review of generated lore plus source provenance checks. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W19 — Social relationship simulation
+
+**Capability and expected mechanism.** Network reputation, friendships, rivalries, trust, rumor propagation and cooperative goals. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Social edges must remain finite and appropriately scoped. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Small-town simulation yields interpretable relationship changes. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W20 — Moral choice and player agency
+
+**Capability and expected mechanism.** Support tradeoffs and lasting player-visible consequences without manipulative dark patterns. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Director cannot fake meaningful choice where actions converge indistinguishably. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Paired alternative input traces and outcome comparison. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W21 — Dynamic world continuity editor
+
+**Capability and expected mechanism.** Permit human changes to canon with impact prediction, diff and explicit migration. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Approved canon cannot be regenerated away casually. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Editing capital-city status propagates to scenes, dialogue, routes and saves. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W22 — Localization-aware storytelling
+
+**Capability and expected mechanism.** Support tone, pronouns, world-specific grammar and longform narrative translation memory. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Localized text cannot leak spoiler state or misrepresent game rules. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Multi-language dialogue functional playtest with captions and UI fit. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W23 — NPC offscreen simulation
+
+**Capability and expected mechanism.** Run schedules and faction events efficiently without simulating irrelevant full scenes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Event catch-up cannot replay duplicate economy/quest commits. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Travel far away then return; world state consistent and resource bounded. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W24 — World debugging and time travel
+
+**Capability and expected mechanism.** Expose causal inspection, state snapshot diffs and controlled deterministic rewind. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Undo of irreversible out-of-world action forbidden. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Rewind user game action without reverting payment/source rights evidence. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-05 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-06 — Gameplay, mechanics, combat, physics, navigation and competitive systems
+
+**Primary owner boundary:** skeleton/game/gameplay, skeleton/ai/game_builder, skeleton/forge. **Default priority:** P1. **Coordination edges:** 06->02/05/07/08/09/12. **Integration contract:** bot 06 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-06-W01 — Real core game loop
+
+**Capability and expected mechanism.** Implement title/start, control, objective, feedback, win/lose, restart and exit in actual target runtime. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A printed CORE_LOOP_OK marker without input does not satisfy interactive acceptance. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Live controller script completes shooter/platformer/roguelike. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W02 — Input abstraction and remapping
+
+**Capability and expected mechanism.** Support keyboard, mouse, gamepad, touch, rebinding, focus and assistive alternatives. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsupported or disconnected device fails visibly without stuck movement. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Browser and Godot input replay, keyboard-only UI and controller hotplug. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W03 — Deterministic fixed timestep
+
+**Capability and expected mechanism.** Separate tick simulation, render interpolation, collision and consistent seeds. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Variable FPS must not change core state beyond declared numerical tolerance. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cross-FPS replay at 30/60/120 and slow machine conditions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W04 — 2D and 3D locomotion
+
+**Capability and expected mechanism.** Include grounded jumps, sprint, dash, swim, climb, flight, camera and navigation options. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Movement states cannot pass through colliders or permanently disable controls. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Golden controller traces traverse all declared movement verbs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W05 — Combat architecture
+
+**Capability and expected mechanism.** Define attack windows, hitboxes, hurtboxes, projectiles, damage, armor, status and recovery. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Infinite attack loop, unearned hits and invincibility exploits denied. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Real combat against moving adversary, victory and defeat paths. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W06 — Enemy AI behavior trees
+
+**Capability and expected mechanism.** Support patrol, investigate, engage, retreat, pursue and contextual action with finite compute budget. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** AI does not read hidden player data unless game rules explicitly allow. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Trace adversary decisions across cover, obstacles and concealment. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W07 — Tactical action planning
+
+**Capability and expected mechanism.** GOAP, utility scoring, hierarchical tasks and fallback policies for advanced NPCs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Expensive planning cannot starve interactive frame budget. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** High actor-count and unexpected environment stress. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W08 — Encounter generator
+
+**Capability and expected mechanism.** Place enemies, hazards, rewards and objectives according to readable challenge constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Cannot spawn opponents inside walls, inaccessible rooms or on player without warning. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Agent-run encounter fairness and difficulty curves. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W09 — Progression and build system
+
+**Capability and expected mechanism.** Implement XP, skills, levels, equipment and respec with testable character math. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Negative resources or dominant exploits cannot bypass progression. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Diverse seeded build trajectories finish campaign. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W10 — Inventory/ownership model
+
+**Capability and expected mechanism.** Support slots, weight, durability, stacking, equipment, loot and atomic transfers. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Crash cannot duplicate item, lose committed currency or cross tenant. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent pickup, drop, craft, trade and save stress. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W11 — Crafting and resource chains
+
+**Capability and expected mechanism.** Define recipes, prerequisites, stations, crafting time and economy sinks. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Reject zero-cost cycles producing unlimited valuable resources. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Graph solver for crafting chains and runtime completion. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W12 — Vehicle movement and racing
+
+**Capability and expected mechanism.** Implement actual steering, traction, throttle, collision, checkpoint and lap behavior. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Kinematic visual demo is not claimed as driving simulation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interactive lap completion with controller, collisions and braking. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W13 — Stealth detection and cover
+
+**Capability and expected mechanism.** Model line-of-sight, audibility, alert state, cover and decoy stimuli. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Player must receive explainable feedback and adversaries respect occlusion. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Stealth route completed and detected under controlled action traces. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W14 — Puzzle and maze runtime
+
+**Capability and expected mechanism.** Generate solvable puzzles, visible feedback, hints, progress and reset. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsolvable seed blocked or shipped with explicit impossible-state evidence. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Solver witnesses and blind human player completion. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W15 — Platformer collision precision
+
+**Capability and expected mechanism.** Handle coyote time, jump buffers, ledges, moving platforms and one-way surfaces. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No physics clipping, jitter or invisible collisions that destroy fairness. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interactive platformer route with recorded jump timings. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W16 — Strategy and simulation turn engine
+
+**Capability and expected mechanism.** Support action phases, pathing, economy, unit orders and deterministic conflict resolution. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Illegal turn transitions and double moves rejected. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Seeded strategy battle with reproducible outcomes. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W17 — Cooperative multiplayer base
+
+**Capability and expected mechanism.** Use authoritative tick state, sessions, identity, reconciliation and deterministic rollback where appropriate. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Client cannot grant own items, warp, or impersonate other player. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Two-client latency/drop test with reconnect and state parity. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W18 — Save and reload of live game
+
+**Capability and expected mechanism.** Persist player, physics, inventory, quest, RNG, world time, AI and pending events atomically. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Duplicate or partial saves never become silently preferred. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Kill game during checkpoint and verify correct subsequent load. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W19 — Dynamic difficulty and assist
+
+**Capability and expected mechanism.** Adapt challenge with declared ranges, choices and accessibility preferences. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invisible unfair adjustments or removal of meaningful outcomes prohibited. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Distinct difficulty settings reach valid win/lose loops. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W20 — Gameplay analytics with consent
+
+**Capability and expected mechanism.** Track input-derived failure patterns, completion curves and navigation bottlenecks. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No analytics without consent, raw personal data or hidden network telemetry. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Offline no-telemetry proof and deletion/export functional test. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W21 — Exploit and balance solver
+
+**Capability and expected mechanism.** Model combat effectiveness, loot rarity, experience and economy under varied bot policies. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Failure to find an exploit is not proof none exists; report search envelope. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Property tests plus Monte Carlo seeded optimization study. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W22 — High-agent-count performance
+
+**Capability and expected mechanism.** Bound physics, pathfinding, memory and rendering with LOD/culling and job budget. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Degraded mode must remain playable instead of dropping essential gameplay updates. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** 10/100/1000 actor load bench per supported target. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W23 — Audio/visual gameplay feedback
+
+**Capability and expected mechanism.** Couple gameplay event bus to HUD, animation, sound, VFX and accessibility cues. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing effects detected by interaction-level checks not ignored as cosmetic. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Attack and objective trigger visible and audible actual runtime response. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W24 — Anti-cheat and authority hardening
+
+**Capability and expected mechanism.** Protect multiplayer score, movement, rewards and shared inventories. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Client-provided state is not treated as authoritative. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Forged network commands and replayed reward transactions denied. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W25 — Mechanic portability contracts
+
+**Capability and expected mechanism.** State exact Godot/web/native capability requirements and fallback behavior per mechanic. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Export cannot silently omit essential player actions. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cross-target feature-negotiation and live game parity suite. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-06 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
