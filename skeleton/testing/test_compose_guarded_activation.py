@@ -24,7 +24,7 @@ class FakeDatabase:
         self.hello = {"setName": "rs0", "isWritablePrimary": True}
         self.auth = {"authInfo": {"authenticatedUsers": [
             {"user": "guarded-owner", "db": "admin"},
-        ]}}
+        ], "authenticatedUserRoles": []}}
         self.error = None
 
     async def command(self, command: str):
