@@ -99,6 +99,31 @@ class WorkflowTierTests(unittest.TestCase):
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
+            # All reviewed evidence must be ordinary checkout files, including
+            # archived gates and the registry (not only active YAML files).
+            archive_gate = root / ".github/workflows-archive" / registry["specialized_manual_only"][0]
+            registry_file = root / "machine/ci_workflow_tiers.json"
+            for reviewed in (archive_gate, registry_file):
+                with self.subTest(linked_evidence=str(reviewed)):
+                    original = reviewed.read_text(encoding="utf-8")
+                    target = root / ("outside-" + reviewed.name)
+                    target.write_text(original, encoding="utf-8")
+                    reviewed.unlink()
+                    try:
+                        reviewed.symlink_to(target)
+                    except (OSError, NotImplementedError):
+                        reviewed.write_text(original, encoding="utf-8")
+                        target.unlink()
+                        self.skipTest("symlinks unavailable on this filesystem")
+                    try:
+                        self.assertTrue(any(
+                            "linked CI evidence path" in problem for problem in audit(root)
+                        ))
+                    finally:
+                        reviewed.unlink()
+                        reviewed.write_text(original, encoding="utf-8")
+                        target.unlink()
+            self.assertEqual(audit(root), [])
             reusable = root / ".github/workflows" / registry["required_reusable_workflows"][0]
             reusable_original = reusable.read_text()
             reusable.write_text(reusable_original.replace("  workflow_call:", "  pull_request:"))
