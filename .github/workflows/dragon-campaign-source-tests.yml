@@ -102,6 +102,15 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/obj_documents.py
           python -m py_compile skeleton/ai/webcrawler/gltf_documents.py
           python -m py_compile skeleton/ai/webcrawler/asset_formats.py
+          python -m py_compile skeleton/ai/webcrawler/webp_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/flac_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/ogg_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/mp4_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/glb_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/stl_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/ico_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/tar_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/extended_media.py
           python -m py_compile skeleton/ai/webcrawler/timed_media.py
           python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
           python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
@@ -187,6 +196,15 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_technical_ingestion.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_rss1_landmarks.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_multimodal_assets.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_webp.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_flac.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ogg.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_mp4.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_glb.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_stl.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ico.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_tar.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_media.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v

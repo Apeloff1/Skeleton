@@ -122,6 +122,15 @@ def implementation_digest():
                 "obj_documents.py",
                 "gltf_documents.py",
                 "asset_formats.py",
+                "webp_metadata.py",
+                "flac_metadata.py",
+                "ogg_metadata.py",
+                "mp4_metadata.py",
+                "glb_metadata.py",
+                "stl_metadata.py",
+                "ico_metadata.py",
+                "tar_inventory.py",
+                "extended_media.py",
             )
         }
     )
