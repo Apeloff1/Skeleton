@@ -31,6 +31,44 @@ class AtomicReviewTests(unittest.TestCase):
         self.flow = LaptopFlow(self.temp.name)
         self.initial = self.flow.propose(BRIEF)["source_digest"]
 
+    def test_preview_is_deterministic_and_does_not_publish_or_approve(self):
+        first = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        second = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        self.assertEqual(first, second)
+        self.assertEqual(first["changes"]["scenes"]["modified"], ["opening"])
+        self.assertFalse(first["published"])
+        self.assertFalse(first["reviewed"])
+        self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"], self.initial)
+        self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+        reviewed = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        self.assertEqual(reviewed["source_digest"], first["candidate_digest"])
+
+    def test_preview_rejects_stale_source_and_invalid_edit_without_writes(self):
+        for expected, operation, error in (
+            ("f" * 64, OPERATION, "stale_source"),
+            (self.initial, {"action": "remove_scene", "value": {"id": "opening"}},
+             "unknown_choice_source"),
+        ):
+            with self.subTest(error=error):
+                with self.assertRaises(CanonError):
+                    self.flow.preview_edit(BRIEF["id"], expected, operation)
+                self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"], self.initial)
+                self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+    def test_preview_fails_closed_when_writer_lease_is_held(self):
+        import os
+        fd = self.flow.worlds._directory()
+        try:
+            self.flow._lock(fd, BRIEF["id"])
+            try:
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+                self.assertEqual(raised.exception.code, "lease_busy")
+            finally:
+                os.unlink(BRIEF["id"] + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def test_review_approves_exact_published_revision(self):
         result = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
         self.assertTrue(result["reviewed"])
