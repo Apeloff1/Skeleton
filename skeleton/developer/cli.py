@@ -41,6 +41,8 @@ def dev_help_text() -> str:
         --json            Output as JSON
         --watch, -w       Continuous monitoring
         --interval        Watch interval in seconds (default: 5)
+        --deepen          STU-TOOLS deepened health report
+        --gates           STU-TOOLS fail-closed health gates
 
     skeleton dev visualize [options]
         Blueprint and topology visualization
@@ -48,6 +50,36 @@ def dev_help_text() -> str:
         --topology, -t    Show as JSON topology
         --compact, -c     Compact text output
         --save, -s        Save output to file
+        --deepen          STU-TOOLS deepened visualize report
+        --gates           STU-TOOLS fail-closed visualize gates
+
+    skeleton dev doctor [options]
+        STU-TOOLS doctor / cockpit deepen
+        --gates           Fail-closed doctor gates
+        --card            Path to doctor card JSON
+        --json            JSON output
+
+    skeleton dev cockpit [options]
+        STU-TOOLS cockpit deepen / gates
+        --gates           Fail-closed cockpit gates
+        --retune          Auto-retune out-of-range knobs
+        --knobs           JSON knob object
+
+    skeleton dev bridge [options]
+        Doctor ↔ cockpit bridge plan
+        --apply           Apply proposed clamps
+        --card            Doctor card JSON
+
+    skeleton dev regen [options]
+        STU-TOOLS weakest-surface regenerate
+        --apply           Apply (default dry-run)
+        --artefacts       JSON file of path->content
+        --allow-empty     Allow empty regen plans
+
+    skeleton dev stu-tools [options]
+        Full STU-TOOLS pipeline (health/visualize/doctor/regen)
+        --paths           Comma list of paths
+        --apply-regen     Apply regen mutations
 
     skeleton dev extension <name> [options]
         Generate boilerplate for new subsystems

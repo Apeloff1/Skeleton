@@ -104,16 +104,40 @@ class WizardCommand:
 
 
 class HealthCommand:
-    """skeleton dev health — Subsystem health dashboard."""
+    """skeleton dev health — Subsystem health dashboard (+ STU-TOOLS deepen/gates)."""
 
     def __call__(self, args: List[str]) -> Dict[str, Any]:
         parser = argparse.ArgumentParser(prog="skeleton dev health")
         parser.add_argument("--json", action="store_true", help="Output as JSON")
         parser.add_argument("--watch", "-w", action="store_true", help="Continuous monitoring")
         parser.add_argument("--interval", type=int, default=5, help="Watch interval in seconds")
+        parser.add_argument("--deepen", action="store_true", help="STU-TOOLS deepened health report")
+        parser.add_argument("--gates", action="store_true", help="STU-TOOLS fail-closed health gates")
         parsed = parser.parse_args(args)
         from skeleton.developer.wizard import SubsystemExplorer
         explorer = SubsystemExplorer()
+        if parsed.gates or parsed.deepen:
+            from skeleton.developer.health_gates import run_health_gates
+            from skeleton.developer.health_deepen import deepen_health_report, render_health_deep
+            if parsed.gates:
+                result = run_health_gates(explorer=explorer)
+            else:
+                result = deepen_health_report(explorer=explorer)
+            if parsed.json:
+                print(json.dumps(result, indent=2, default=str))
+            else:
+                if parsed.gates:
+                    from skeleton.developer.gate_verdict import gate_table
+                    verdict = result.get("verdict") or {}
+                    # gate_table needs Verdict — print banner + JSON subset
+                    print(result.get("banner") or verdict.get("banner") or "")
+                    print(json.dumps({"ok": result.get("ok"), "blocking": verdict.get("blocking")}, indent=2))
+                else:
+                    try:
+                        print(render_health_deep(result))
+                    except Exception:
+                        print(json.dumps(result, indent=2, default=str))
+            return result
         if parsed.watch:
             import time
             try:
@@ -141,7 +165,7 @@ class HealthCommand:
 
 
 class VisualizeCommand:
-    """skeleton dev visualize — Blueprint and topology visualization."""
+    """skeleton dev visualize — Blueprint and topology visualization (+ STU-TOOLS deepen/gates)."""
 
     def __call__(self, args: List[str]) -> Dict[str, Any]:
         parser = argparse.ArgumentParser(prog="skeleton dev visualize")
@@ -149,6 +173,8 @@ class VisualizeCommand:
         parser.add_argument("--topology", "-t", action="store_true", help="Show topology as JSON")
         parser.add_argument("--compact", "-c", action="store_true", help="Compact output")
         parser.add_argument("--save", "-s", help="Save output to file")
+        parser.add_argument("--deepen", action="store_true", help="STU-TOOLS deepened visualize report")
+        parser.add_argument("--gates", action="store_true", help="STU-TOOLS fail-closed visualize gates")
         parsed = parser.parse_args(args)
         from skeleton.developer.wizard import BlueprintVisualizer
         if parsed.blueprint:
@@ -159,6 +185,25 @@ class VisualizeCommand:
             forge.instantiate(bp, "sink", "output")
             bp.connect(("input", "out"), ("process", "in"))
             bp.connect(("process", "out"), ("output", "in"))
+            if parsed.gates or parsed.deepen:
+                from skeleton.developer.visualize_gates import run_visualize_gates
+                from skeleton.developer.visualize_deepen import deepen_visualize_report, render_visualize_deep
+                result = run_visualize_gates(bp) if parsed.gates else deepen_visualize_report(bp, compact=parsed.compact)
+                if parsed.json if hasattr(parsed, "json") else False:
+                    print(json.dumps(result, indent=2, default=str))
+                elif parsed.gates:
+                    print(result.get("banner") or "")
+                    print(json.dumps({"ok": result.get("ok"), "blocking": (result.get("verdict") or {}).get("blocking")}, indent=2))
+                else:
+                    try:
+                        print(render_visualize_deep(result))
+                    except Exception:
+                        print(json.dumps(result, indent=2, default=str))
+                if parsed.save:
+                    Path(parsed.save).write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+                    result = dict(result)
+                    result["saved_to"] = parsed.save
+                return result
             visualizer = BlueprintVisualizer()
             output = visualizer.render_topology(bp) if parsed.topology else visualizer.render(bp, compact=parsed.compact)
             if parsed.save:
@@ -167,6 +212,129 @@ class VisualizeCommand:
             print(output)
             return {"blueprint": bp.name, "components": len(bp.components), "wires": len(bp.wires)}
         return {"error": "No blueprint specified. Use --blueprint <name>"}
+
+
+
+class DoctorCommand:
+    """skeleton dev doctor — STU-TOOLS doctor/cockpit deepen + fail-closed gates."""
+
+    def __call__(self, args: List[str]) -> Dict[str, Any]:
+        parser = argparse.ArgumentParser(prog="skeleton dev doctor")
+        parser.add_argument("--json", action="store_true", help="Output as JSON")
+        parser.add_argument("--gates", action="store_true", help="Run fail-closed doctor gates")
+        parser.add_argument("--card", type=str, help="Path to doctor card JSON")
+        parsed = parser.parse_args(args)
+        card = None
+        if parsed.card:
+            card = json.loads(Path(parsed.card).read_text(encoding="utf-8"))
+        if parsed.gates:
+            from skeleton.developer.doctor_gates import run_doctor_gates
+            result = run_doctor_gates(card=card)
+        else:
+            from skeleton.developer.doctor_deepen import deepen_doctor_report, render_doctor_deep
+            result = deepen_doctor_report(card=card)
+        if parsed.json or parsed.gates:
+            if parsed.gates and not parsed.json:
+                print(result.get("banner") or "")
+            print(json.dumps(result if parsed.json else {"ok": result.get("ok"), "banner": result.get("banner")}, indent=2, default=str) if parsed.gates and not parsed.json else json.dumps(result, indent=2, default=str))
+        else:
+            from skeleton.developer.doctor_deepen import render_doctor_deep
+            print(render_doctor_deep(result))
+        return result
+
+
+class RegenCommand:
+    """skeleton dev regen — STU-TOOLS weakest-surface regenerate plan/apply."""
+
+    def __call__(self, args: List[str]) -> Dict[str, Any]:
+        parser = argparse.ArgumentParser(prog="skeleton dev regen")
+        parser.add_argument("--json", action="store_true", help="Output as JSON")
+        parser.add_argument("--apply", action="store_true", help="Apply regenerations (default dry-run)")
+        parser.add_argument("--artefacts", type=str, help="JSON object of path->content")
+        parser.add_argument("--allow-empty", action="store_true", help="Allow empty regen plans")
+        parsed = parser.parse_args(args)
+        artefacts = {"stubs/ok.gd": "extends Node\nfunc _ready() -> void:\n    pass\n"}
+        if parsed.artefacts:
+            artefacts = json.loads(Path(parsed.artefacts).read_text(encoding="utf-8"))
+        from skeleton.developer.weakest_regenerate import run_weakest_regenerate
+        result = run_weakest_regenerate(
+            artefacts=artefacts,
+            dry_run=not parsed.apply,
+            allow_empty=parsed.allow_empty,
+        )
+        print(json.dumps(result, indent=2, default=str))
+        return result
+
+
+class StuToolsCommand:
+    """skeleton dev stu-tools — full STU-TOOLS pipeline (health/visualize/doctor/regen)."""
+
+    def __call__(self, args: List[str]) -> Dict[str, Any]:
+        parser = argparse.ArgumentParser(prog="skeleton dev stu-tools")
+        parser.add_argument("--json", action="store_true", help="Output as JSON")
+        parser.add_argument("--paths", type=str, default="health,visualize,doctor,regen", help="Comma paths")
+        parser.add_argument("--apply-regen", action="store_true", help="Apply regen (default dry-run)")
+        parser.add_argument("--ci-bundle", action="store_true", help="CI bundle with cockpit+bridge+coverage")
+        parsed = parser.parse_args(args)
+        if parsed.ci_bundle:
+            from skeleton.developer.stu_tools_report import run_stu_tools_ci_bundle
+            result = run_stu_tools_ci_bundle(
+                paths=[p.strip() for p in parsed.paths.split(",") if p.strip()],
+            )
+        else:
+            from skeleton.developer.stu_tools_pipeline import run_stu_tools_pipeline
+            result = run_stu_tools_pipeline(
+                paths=[p.strip() for p in parsed.paths.split(",") if p.strip()],
+                dry_run_regen=not parsed.apply_regen,
+            )
+        if parsed.json:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            print(result.get("gate_table") or result.get("banner") or "")
+            print(json.dumps({"ok": result.get("ok"), "banner": result.get("banner"), "paths": result.get("paths")}, indent=2))
+        return result
+
+
+
+class CockpitCommand:
+    """skeleton dev cockpit — STU-TOOLS cockpit deepen + fail-closed gates."""
+
+    def __call__(self, args: List[str]) -> Dict[str, Any]:
+        parser = argparse.ArgumentParser(prog="skeleton dev cockpit")
+        parser.add_argument("--json", action="store_true", help="Output as JSON")
+        parser.add_argument("--gates", action="store_true", help="Run fail-closed cockpit gates")
+        parser.add_argument("--retune", action="store_true", help="Auto-retune out-of-range knobs")
+        parser.add_argument("--knobs", type=str, help="JSON object of knob values")
+        parsed = parser.parse_args(args)
+        knobs = json.loads(parsed.knobs) if parsed.knobs else None
+        if parsed.gates or parsed.retune:
+            from skeleton.developer.cockpit_gates import run_cockpit_gates
+            result = run_cockpit_gates(knobs, auto_retune=parsed.retune)
+        else:
+            from skeleton.developer.cockpit_deepen import deepen_cockpit_report, render_cockpit_deep
+            result = deepen_cockpit_report(knobs)
+        if parsed.json or parsed.gates or parsed.retune:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            from skeleton.developer.cockpit_deepen import render_cockpit_deep
+            print(render_cockpit_deep(result))
+        return result
+
+
+class BridgeCommand:
+    """skeleton dev bridge — doctor↔cockpit bridge plan/gates."""
+
+    def __call__(self, args: List[str]) -> Dict[str, Any]:
+        parser = argparse.ArgumentParser(prog="skeleton dev bridge")
+        parser.add_argument("--json", action="store_true", help="Output as JSON")
+        parser.add_argument("--apply", action="store_true", help="Apply proposed clamps")
+        parser.add_argument("--card", type=str, help="Doctor card JSON path")
+        parsed = parser.parse_args(args)
+        card = json.loads(Path(parsed.card).read_text(encoding="utf-8")) if parsed.card else None
+        from skeleton.developer.doctor_cockpit_bridge import run_doctor_cockpit_bridge
+        result = run_doctor_cockpit_bridge(doctor_card=card, apply=parsed.apply)
+        print(json.dumps(result, indent=2, default=str))
+        return result
 
 
 class ExtensionCommand:
@@ -261,6 +429,11 @@ _dev_registry.register("scaffold", ScaffoldCommand())
 _dev_registry.register("wizard", WizardCommand())
 _dev_registry.register("health", HealthCommand())
 _dev_registry.register("visualize", VisualizeCommand())
+_dev_registry.register("doctor", DoctorCommand())
+_dev_registry.register("cockpit", CockpitCommand())
+_dev_registry.register("bridge", BridgeCommand())
+_dev_registry.register("regen", RegenCommand())
+_dev_registry.register("stu-tools", StuToolsCommand())
 _dev_registry.register("extension", ExtensionCommand())
 _dev_registry.register("snapshot", SnapshotCommand())
 _dev_registry.register("restore", RestoreCommand())
