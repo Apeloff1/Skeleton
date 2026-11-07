@@ -121,8 +121,17 @@ def main(argv: list[str] | None = None) -> int:
                 if not parts or len(parts) > 2:
                     print("Enter a command and optional target.", file=sys.stderr)
                     continue
-                kind = parts[0]
-                target = parts[1] if len(parts) == 2 else ""
+                # Single-key keyboard controls map to canonical replay commands.
+                # Reject arguments on shortcuts rather than silently changing intent.
+                keys = {"w": "north", "a": "west", "s": "south", "d": "east"}
+                if parts[0].lower() in keys:
+                    if len(parts) != 1:
+                        print("Movement shortcuts do not accept targets.", file=sys.stderr)
+                        continue
+                    kind, target = "move", keys[parts[0].lower()]
+                else:
+                    kind = parts[0]
+                    target = parts[1] if len(parts) == 2 else ""
                 try:
                     session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
                 except GameplayContractError as exc:
