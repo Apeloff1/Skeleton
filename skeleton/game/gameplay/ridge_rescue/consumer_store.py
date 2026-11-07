@@ -236,8 +236,14 @@ class SlotStore:
         # An export must not bless a snapshot whose durable action ledger has
         # been altered independently of the replayable session. Audit before
         # publishing any portable artifact; failures leave no export behind.
-        self.audit(name)
+        audited = self.audit(name)
         verified = self.load(name)
+        # Another process can advance this slot after audit but before load.
+        # Never publish a newer, unaudited revision under an older audit.
+        # Fail closed rather than treating two independent reads as one snapshot.
+        if (verified["head"] != audited["head"] or
+                verified["revision"] != audited["revision"]):
+            raise StoreError("save changed during export audit; retry export")
         bundle = export_campaign(verified["session"])
         if verify_export(bundle)["head"] != verified["head"]:
             raise StoreError("portable export did not replay")
