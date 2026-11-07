@@ -403,6 +403,42 @@ def install_application(
                 )
             )
 
+    # A successful Compose launch is not evidence that the protected runtime is
+    # usable. Preserve readiness/API failures as required failures while
+    # independently reporting whether the setup route is still accessible.
+    # Never start additional services or infer backend/AI readiness here.
+    if full_start_ok and any(
+        phase.name in ("readiness", "critical-api-routes") and not phase.ok
+        for phase in phases
+    ):
+        from skeleton.app.health import probe_local_setup
+
+        frontend = manifest.service("frontend")
+        if frontend.depends_on:
+            phases.append(InstallPhase(
+                "setup-ui-availability", False,
+                "setup UI independence is unqualified; protected runtime remains unhealthy",
+                required=False,
+            ))
+        else:
+            probe = probe_local_setup(
+                replace(
+                    frontend,
+                    public_url=host_urls.get("frontend", frontend.public_url),
+                    health_path="/setup",
+                ),
+                timeout=2.0,
+            )
+            phases.append(InstallPhase(
+                "setup-ui-availability", probe.ok,
+                (
+                    "setup route available; protected runtime remains unhealthy"
+                    if probe.ok
+                    else "setup route unavailable; inspect frontend logs; protected runtime remains unhealthy"
+                ),
+                required=False,
+            ))
+
     return InstallReceipt(root=root, phases=tuple(phases))
 
 
