@@ -175,7 +175,7 @@ class MongoGuardedActivation:
         self._phase = ActivationPhase.BLOCKED
         self._generation = 0
         self._epoch_at_activation: int | None = None
-        self._auth_at_activation: tuple[tuple[str, str], ...] | None = None
+        self._auth_at_activation: tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]] | None = None
         self._lock = asyncio.Lock()
 
     @property
@@ -204,14 +204,14 @@ class MongoGuardedActivation:
         except Exception:
             raise ActivationBlocked("native model/tokenizer identity unavailable") from None
 
-    async def _probe(self) -> tuple[int, tuple[tuple[str, str], ...]]:
+    async def _probe(self) -> tuple[int, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]]: 
         try:
             async with asyncio.timeout(_MAX_TOTAL_AUTHORITY_SECONDS):
                 return await self._probe_bounded()
         except TimeoutError:
             raise ActivationBlocked("guarded activation authority timed out") from None
 
-    async def _probe_bounded(self) -> tuple[int, tuple[tuple[str, str], ...]]:
+    async def _probe_bounded(self) -> tuple[int, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]]: 
         try:
             async with asyncio.timeout(_MAX_PROBE_SECONDS):
                 hello = await self._database.command("hello")
@@ -369,7 +369,7 @@ class MongoGuardedActivation:
                     != auth_identity or _role_custody(post_epoch_auth) != role_identity):
                 raise ActivationBlocked("Mongo principal changed during final epoch read")
             self._verify_backend()
-            return final_epoch, auth_identity
+            return final_epoch, (auth_identity, role_identity)
         except ActivationBlocked:
             raise
         except ReviewerCustodyError:
