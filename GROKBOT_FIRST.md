@@ -65,6 +65,11 @@
 - 50. Physical QoS, mixed-load scheduling and device economics
 - 51. Product maturity graph and dependency-first completion
 - 52. Next 24 executable engineering tickets
+- 53. Neural-symbolic original-game design and solver witnesses
+- 54. Real-time adaptive game direction and fairness
+- 55. Character foundry: identity, motion and expression
+- 56. Autonomous gameplay debugging and minimal repair
+- 57. Cross-platform playable compilation and legal target qualification
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -6430,3 +6435,223 @@ These 24 tickets extend existing FRT-001..024. They are planning records until a
 **S0 preflight:** read all AGENTS.md mandatory contracts; fetch active exact PR heads and file paths; map tickets to existing canonical owners; retain old data; classify observed versus proposed behavior. **S1 implement:** first repair an actual critical-path failure and make one vertical-slice operation traverse real source paths. **S2 integrate:** compare source semantics to actual game engine and studio UI; capture typed receipts. **S3 test when complete:** run architecture validators, focused negatives, actual engine play, clean target export and crash/restart acceptance. **S4 reconcile:** update source/contract only through authorized process; preserve unrelated good work; rebase without mixing conflicting AI trees. **S5 certify or hold:** independent exact-head verdict, clear unresolved gaps, no inferred install/model/native readiness.
 
 **Completion rule:** this document extends an indexed engineering constitution. Its sections and work orders are not executable features, not a native qualification report and not release authority. Prioritize real accepted game-building behavior over word count, while continuing meaningful source-grounded blueprint expansion toward the user's separate one-million-word document goal.
+
+# 53. Neural-symbolic original-game design compiler: constraint witnesses, not optimistic prose
+
+**Batch ID:** FRONTIER-53 | **Lead:** BOT-05 and BOT-07 | **Partners:** BOT-03, BOT-04, BOT-06, BOT-09, BOT-12 | **Existing anchors:** skeleton/forge/game_design_spec.py, skeleton/forge/game_frontier_studio_document.py, skeleton/ai/game_builder/advanced_procedural_world_planner.py, skeleton/ai/game_builder/advanced_procedural_world_runtime.py, skeleton/game/generation/original_world_tenfold_compiler.py and the bounded editor/quest generators.
+
+**Source-derived qualification note:** original_world_tenfold_compiler.py reports 1,024,000 spatial foundations and 12,288,000 composed configurations, explicitly calling itself a bounded topological reference runtime. Those are addressable design configurations, not twelve million separately played, attractive or native-certified games. The frontier objective is to **prove difficult design properties on selected generated instances and ship them in a real player-controlled target**, not merely raise combinatorial counts. Existing canonical project and generator owners retain all state authority; the neural-symbolic layer is an admitted design/validation strategy within them.
+
+## 53.1 Formalize a game as a typed transition system
+
+For an admitted bounded gameplay slice, define a semantic tuple: entity registry E, world/topology graph G, player action grammar A, initial state s0, transition function T(s,a), observation function O(s), constraints C, resource invariants R, terminal predicate W, failure/recovery predicate F, and a versioned RNG policy P. Project-specific designers author E/G/A/C/W/F through the established editor schemas; a generative model can propose candidate descriptions, but only the deterministic parser/validator can materialize executable rule types. This boundary prevents an LLM's fantasy prose from silently becoming game behavior.
+
+Separate **hard constraints**, **user preferences**, **mechanical affordances**, and **presentation constraints**. Hard constraints include property ownership, type-safety, stable source IDs, valid target capabilities, reachable mandatory objectives, bounded resource consumption, no unauthorized cross-scene teleport, rights clearance and save-migration compatibility. Preferences include atmospheric tone, challenge, surprise and art style. Mechanical affordances describe which player verbs are physically expressible by the selected controller and engine. Presentation constraints require sufficient signals that players can perceive state-changing actions; a formally solvable puzzle with an invisible required switch is not playable quality.
+
+Each rule has immutable identity, origin, revision, owner, allowed mutation footprint and proof obligations. Quantities carry units and bounded ranges; coordinate transforms declare frame; inventories enforce nonnegative integer or strictly defined decimal semantics; rule priorities specify deterministic conflict order. Unsupported target semantics produce compile-time diagnostics rather than a silent loss of fidelity. Keep a boundary between proof-oriented logical abstraction and actual physical engine behavior: a navigation witness in a discretized graph is necessary for many puzzles but not sufficient to show collision and locomotion feasibility in Godot.
+
+## 53.2 Design proposal → declarative solver input → witness
+
+The model first emits a schema-constrained, reviewable **DesignCandidate** with rule IDs, constraints, objectives, choices, expected events and target. The constraint compiler deterministically lowers only admitted portions into a bounded solver representation. Candidate techniques include shortest-path or strongly connected component analysis for topology, finite-domain CP-SAT for tile placement and resources, SMT for small typed arithmetic/ordering rules, temporal-logic model checking for mandatory quest progression and symbolic planning for precondition/effect sequences. None should become an unconditional heavyweight dependency; select the smallest justified solver and respect source/toolchain licensing and finite CPU/memory budgets.
+
+A solver result is not merely yes/no. **SAT** requires a witness: ordered actions, initial conditions, consumed resources, intermediate logical states and reached terminal predicate. **UNSAT** requires an inspectable conflict core or an independently checked reason to the extent supported by the solver; a model-authored explanation alone is not a proof. **UNKNOWN/TIMEOUT** is not satisfiable, and the producer must not silently relax requirements. Record the precise abstraction scope: time horizon, maximum state count, hidden variables, randomized transition policy, solver binary identity and optional assumptions. For negative results without a formal unsat core, produce minimized counterexample or bounded search exhaustion evidence, explicitly not a global impossibility proof.
+
+Example constrained dungeon: five rooms; the player can interact with a locked northern door only after collecting one of two valid keys; a potion can sustain a poisonous corridor; combat is optional but dangerous; and at least two player approaches reach a real end condition. Prove that every required item is obtainable before its consuming edge, no generated room blocks the exit, and mandatory combat does not require more health than achievable under declared mechanics. Then compile and play both paths in the target engine. A graph witness that passes through an inaccessible platform is rejected by the physical driver even if its symbolic sequence is valid.
+
+## 53.3 Counterexample-guided iterative synthesis (CEGIS)
+
+Use a bounded **propose → validate → counterexample → minimal revise → validate** loop. The model generates candidate gameplay structure; deterministic analyzers find contradictions, unreachable objectives, unsafe prerequisites or unsupported target operations; the system returns a *small, source-anchored* counterexample with exact rule IDs. The repair proposal must address the counterexample without violating previously established invariants. The loop is limited by ResourceBudget, repair count and diminishing expected value. Avoid unrestricted backtracking that rewrites the whole game every time a single door condition is wrong.
+
+Maintain a **constraint provenance map**: user hard requirement, inferred default, licensed source, engine limitation, explicit human override or generated design choice. When UNSAT, preferentially revise low-authority inferred defaults; preserve user requirements unless the user approves changes. A model cannot make an impossible quest "solvable" by adding an unseen infinite key or disabling damage without recording that design change. Ask human approval for any relaxation that materially changes player goals, difficulty class or story causality. Accepted edits produce new source revisions and invalidate precise dependent witnesses, rather than clearing an entire library or pretending the old proof still applies.
+
+Counterexample minimization should identify the smallest rule set or shortest action sequence that reproduces a failure. Use solver-native unsat cores where available, delta-debugging where not, and replay the result through a separately implemented evaluator. Store genuine minimized failures in a held-out corpus; do not train a candidate on the same examples and immediately claim generalization. The model may propose a "repair" to the tester, but cannot mutate the oracle.
+
+## 53.4 Narrative, economy and physics solver domains
+
+**Narrative:** prove branch reachability, prerequisites, mutually exclusive choices, irreversible consequences, essential NPC survival or alternatives, bounded quest completion and at least two genuinely distinct endings. Represent a story choice as a state-affecting transition; alternative prose alone is not a different ending. A generative story director can optimize drama while preserving consistency of player knowledge and world chronology.
+
+**Economy:** check source/sink conservation, maximum exploit loops, crafting component feasibility, price bounds, idempotent purchase and ownership rules, and resource availability for mandatory progression. Use integer inventories or exact decimals per existing game semantics. Do not grant a key item twice on reload to solve a progression dead end. Permit non-conservative magic systems only when explicit source/sink rules explain them.
+
+**Movement:** derive traversal constraints from actual target controller motion, collision geometry, jump envelope, slope friction and platform timing. A pure graph solver is a prefilter; the final feasibility witness must be checked against engine-implemented actions, including analog gamepad and accessible alternatives. Support variable physics time steps by declaring tolerance and authoritative event endpoints.
+
+**World simulation:** verify region transitions, stable NPC identities, resource transfer, faction/rumor causality and compatible save serialization after time skips. The solver need not enumerate every long-term world state; specify bounded assumptions, symbolic abstractions and property-based campaigns covering far-field aggregate transitions.
+
+## 53.5 Incremental proof invalidation and explainability
+
+A proof is keyed by the exact project source revision, semantic node dependencies, solver/verification version, target runtime physics profile, constraint policy and RNG scheme. A palette edit should not invalidate mandatory quest solvability unless it affects a gameplay cue or accessibility requirement. A jump-height change invalidates route proofs that rely on jump reachability but not a separate dialogue-only graph. A source-rights withdrawal invalidates affected eligible exports independent of logical solvability. An updated game engine may invalidate physical witness tolerances even when symbolic rules are unchanged.
+
+Provide a developer-visible **why-valid/why-invalid** report: accepted user requirements; solver abstraction; witness actions; covered essential paths; unsolved constraints; dependent source nodes; next exact test; and expected mutation surface. Reports must distinguish "proved under this finite abstraction" from "tested on the native engine" and "approved as enjoyable by players". Expose machine-readable evidence for BOT-12 and a human explanation for BOT-11 without allowing free-form model text to forge the verifier's verdict.
+
+## 53.6 Deep acceptance suite
+
+Construct five adversarial design fixtures: (1) physically unreachable jump with an apparently valid room graph; (2) key placed behind its own locked door; (3) quest reward awarded twice through two competing event paths; (4) a required NPC whose death creates an unavoidable softlock; (5) a generated level whose navigation witness disappears after a human edits collision. Add a sixth nonnegative case: two valid story endings with independent real-play traces. The suite fails if the solver claims SAT on invalid states, the compiler silently alters a hard requirement, an UNKNOWN is promoted, a cache reuses stale physics proof, or an actual exported game cannot replay the accepted witness.
+
+**Exit:** one end-to-end generated scenario, human-editable through current project authority, with solver proof, Godot executable, independent input trace and game-save continuation. Then extend the constrained domain family; don't inflate the catalog before a real vertical slice exists.
+
+# 54. Real-time adaptive game direction: causal control, fairness and narrative dramaturgy
+
+**Batch:** FRONTIER-54 | **Lead:** BOT-06 | **Partners:** BOT-05 authoring, BOT-03 offline AI, BOT-04 orchestration, BOT-08 media, BOT-12 evaluation. **Existing anchors:** advanced_quest_director_runtime.py, advanced_gameplay_runtime.py, skeleton/forge/world_events_v1, skeleton/ai/game_builder/director_capability_graph.py and the game-learning paths.
+
+The repository's director_capability_graph.py already declares finite DeviceTier budgets (retro, handheld, mobile, desktop, high_end), a registered dependency graph and a clear disclaimer that an implemented adapter does not grant external permissions or prove proprietary engine integration. Preserve those semantics. The requested advance is not a second privileged real-time AI scheduler. It is a **game-owned, deterministic, player-fair encounter and narrative director** using existing engine capabilities, with slower AI advisers confined to asynchronous bounded proposals. Creative direction must never require a network round trip inside the player's critical frame loop.
+
+## 54.1 Control loop and authoritative actuators
+
+Build a fixed-cadence director that reads bounded **observables**: player progress, objective states, resource levels, recent damage, repeated failures, input skill hints, navigation confusion signals, pacing, visibility/audibility of threats, current NPC/faction rules and local performance pressure. Its admissible **actuators** are explicitly designed game variables such as enemy spawn mix, optional hint timing, ambient intensity, patrol aggression within authored bounds, checkpoint support, music tension or optional event order. It cannot secretly change awarded currency, invalidate a prior player choice, forge a win, teleport an item or change rights/policy.
+
+Define **hard invariants** before optimization: mandatory path remains reachable; current quest prerequisites remain valid; no unfair unavoidable attack is inserted without a declared mechanic; player-selected difficulty/accessibility ceiling is preserved; spawned enemies have a valid collision/navigation location; frame/CPU/audio budgets remain bounded. For deterministic replay, director action proposals become typed events with policy version, observations, seed and accepted decision. Replay uses recorded accepted decisions, not an unrepeatable new model call.
+
+A rational director separates state estimation from action selection. A short-term detector identifies repeated failure or excessive ease using robust evidence windows rather than reacting to one hit. A medium-term policy adjusts pacing while respecting cooldown and hysteresis. A long-term story planner may propose optional plot beats between scenes and requires a validity check against the world-canon graph. No one layer may override a committed user action.
+
+## 54.2 Player modeling and concept drift
+
+Player estimates are **local task observations**, not diagnoses about a real person. Useful dimensions: command fluency, hazard recognition, optional exploration frequency, reaction-time distribution for the game, repeated-route loops, apparent preference for stealth versus direct combat, tutorial completion and whether accessible alternatives are activated. Store only necessary project/session-scoped signals under current governance and retention. Avoid inferring health, protected traits or personality labels. Allow players to disable adaptive challenge and inspect major gameplay adaptations.
+
+Use calibrated uncertainty intervals and minimum sample counts. A novice may intentionally experiment and an expert may roleplay incompetence; a single failed room cannot permanently downgrade difficulty. Maintain a counterfactual baseline: what would the unadapted policy have spawned? Evaluate whether adaptations genuinely improve comprehension/engagement without decreasing player autonomy. Record activation reasons in a bounded developer-facing director trace. Expose user-friendly explanations for meaningful difficulty or hint changes.
+
+## 54.3 Fairness-preserving encounter pacing
+
+For a multi-room action-adventure, build a phase model **anticipation → encounter → peak → recovery → exploration → reveal** with authored optional variations. A pressure estimator combines recent combat intensity, current health/resources, environmental hazards, time since last checkpoint and win/loss history. The director uses finite, constraint-checked action choices with a cooldown to avoid oscillation. Audio/lighting may convey pressure but cannot substitute for an actual gameplay transition. A generated boss phase must give a perceivable telegraph, legitimate defensive response and bounded resource demand.
+
+Define "no unfair surprise" operationally: every unavoidable damage source needs a demonstrated response window under the declared device/control accessibility profile, or a safe alternative. If the current scene is unplayable because of a known geometry bug, the director must not attempt to hide it with easier enemies and claim a quality improvement; escalate a deterministic repair ticket.
+
+## 54.4 Async LLM advisor without game-loop dependency
+
+An admitted Jeeves model can suggest encounter variants, hints, NPC lines, camera cues or optional world events from a **redacted, bounded and source-versioned** snapshot. The response is a proposal only. A deterministic compiler validates schema and source revision; safety/rights and user policy apply; accepted actions are queued for a safe tick boundary or future scene. If the model is slow, cancelled, offline, out of tokens or wrong about the game, the director continues via authored deterministic policy. Speculative LLM text never becomes a privileged rule script at runtime.
+
+This separation allows richer creative behavior without making player input depend on GPU-heavy inference. Record proposal provenance and renderer/audio dependencies; the world source revision change fences stale suggestions. Never allow a model to call a restricted tool on behalf of an NPC simply because the narrative asks it to.
+
+## 54.5 Controlled experiments and quality proof
+
+Run identical source, seed, player policy and hardware profile under **director disabled**, **bounded deterministic director**, and **AI-advised bounded director**. Pre-register completion, unfair damage, softlocks, game-state drift, player comprehension, accessibility, time-to-goal, frame spikes and fun/novelty review. Randomize experimental order and collect multiple runs. Optimize Pareto-safely; a mean satisfaction improvement does not excuse any newly introduced mandatory softlock, privilege leak or catastrophic performance regression.
+
+Negative tests: alternating rapid win/loss causes no difficulty oscillation; pausing never accidentally advances encounter schedule; save/restart doesn't double-spawn unique enemies; model outage leaves combat functional; source revision drift denies proposal; missing audio does not hide mandatory attack cue; an accessibility route stays solvable after adaptation; replay of accepted events is stable. Publish an independent tester video/input trace for at least one adaptive encounter, not only source metrics.
+
+# 55. High-fidelity character foundry: identity, geometry, motion and expression
+
+**Batch:** FRONTIER-55 | **Lead:** BOT-08 | **Partners:** BOT-05 canon/story, BOT-06 physics/runtime, BOT-03 admitted media, BOT-09 export, BOT-11 editors, BOT-12 visual proof. **Existing anchors:** skeleton/ai/game_builder/advanced_animation_runtime.py, advanced_engine_bindings.py, skeleton/forge/game_frontier_studio.py, frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx and character generation facades pointing into actual shared cores.
+
+advanced_animation_runtime.py is explicitly a finite animation state and root-motion reference; it does not render skinned bone meshes or import foreign rigs. A high-fidelity character builder must link that proven logical state to actual geometry and rendered behavior, while preserving human editability, platform budgets, rights and character continuity.
+
+## 55.1 Canonical character identity without overfitting to text prompts
+
+A character contains a stable original identity, project ownership, age-appropriate role where relevant, narrative canon, faction, silhouette proportions, high-level facial/garment motifs, color and material palette, expression vocabulary, articulation rig, voice policy and permitted authored variations. The **CharacterBible** is a versioned concept grouping under the established project/canon authority, not an independent celebrity/identity database. Human-authored choices and project lore are high priority; a model should not drift hair, outfit identity or facial landmarks when generating a new pose. Each reference is source/rights reviewed and traceable.
+
+Represent variation with constrained parameters and a stable base identity: view, pose, lighting, costume layer, damage state, seasonal garment, emotion, weather and LOD. A random seed without explicit semantic controls is inadequate for consistency. Distinguish intentional in-world change (aging, injury, changed armor) from accidental output drift. Approval of a new appearance creates a canon revision and invalidates only dependent assets. The user can lock silhouette, palette, anatomy, emblem, and face markers at different levels of strictness.
+
+Do not claim likeness, voice or appearance rights from a generated output alone. A real person's identifiable reference image or voice sample requires appropriate permission and processing scope. Original fictional voice identities must be checked for consent and rights where applicable, with revocation and alternative voice/caption routes. When external image and audio providers are not installed, build from lawful user-supplied or procedural source and mark unavailable generative features honestly.
+
+## 55.2 3D mesh and rig validation sequence
+
+Pipeline: **design → base mesh → topology/UV/material → rig hierarchy → skin weights → authored motion → retarget → physics/contact → engine import → actual runtime capture → target LOD/export**. The source artifact is not erased when creating a target-specific optimized derivative. Require mesh unit/up-axis convention, vertex and primitive bounds, manifold/winding checks where required, UV mapping, tangent normals, material channels/colorspace, skeleton joint IDs, parent acyclicity, inverse bind transforms and normalized skin weights. Where automatic rigging fails, retain an editor-correctable diagnostic rather than fabricate a working skeletal mesh.
+
+A runtime skeleton mapping must connect exact authored logical action states to target animation tree and bone transforms. Validate bind-pose compatibility and root hierarchy, disallow zero-length or nonfinite transforms, reject missing mandatory bone mappings and carry semantic attachment points for hands, eyes, hit zones, equipped items and prop sockets. Clip retargeting may require pose correction or proportion-aware IK; test out-of-scale characters and nonhuman rigs with explicit supported profiles rather than assuming all humanoid mappings generalize.
+
+For the player's moves, define root-motion policy: either physics/controller owns root displacement and animation follows, or authorized root motion contributes within collision checks. Never let both accumulate displacement independently. High-speed attacks need correct hitbox synchronization; foot contact should reflect actual ground and avoid perceptible foot skating; ledge traversal must not teleport the collision body through obstacles.
+
+## 55.3 Facial animation, lip sync and emotional continuity
+
+Define expression as authored action parameters, not arbitrary emotion inferred about real users. Blendshape or skeletal face controls map dialogue phonemes/visemes, gaze, eyelid motion and authored expression cues into target frame transforms under bounded magnitudes. Voice output and phoneme alignment use real decodable audio with source/consent; text-only dialogue uses deterministic approximate mouth or subtitle presentation, honestly labeled. A facial expression cannot override a confirmed plot beat or cause an illegal NPC action.
+
+Cinematic shots require robust eye line, pose and speech synchronization; avoid mouth moving during silence, uncontrolled blinking across cuts, geometry clipping and gaze through obstructing objects. Test transitions between a neutral state, surprise, dialogue, pain, locomotion and cinematic close-up. Performance tiers may drop facial detail while preserving required emotional cues and captions.
+
+## 55.4 Cloth, hair, equipment and environment
+
+Soft-body cloth/hair simulation should be optional and bounded by target hardware. Design deterministic or repeatable fallback rigged motion for mobile/retro/CPU-only targets. Simulated garments are constrained by skeleton, collisions and authored attachment; changing equipment must preserve item ownership and source license, not spontaneously add in-game inventory. Weather/wind may affect material presentation while maintaining game-level collision and quest consistency.
+
+Asset constraints: helmet clips not through hair, weapon grip targets match the rig, capes do not obscure mandatory visual cues, footwear/terrain contacts remain readable, facial shading stable under light changes and LOD collapse avoids dropping the essential quest indicator. Consider physics delta scaling, material reflections, hair transparency/alpha sorting and skin-tone gamut compatibility without overfitting to one reference capture. Adaptive LOD uses actual measured frame cost and user settings; do not use speculative "neural rendering" if unavailable in the target engine.
+
+## 55.5 2D animation consistency
+
+For pixel or 2D vector games, preserve character identity across directions, frames, motion poses, facial variants, palette swaps and UI portraits. A sprite atlas needs stable pivot/scale, collision/hitbox synchronization and frame order. Validate UV padding and gutters to prevent tile bleeding, alpha/premultiplication artifacts, animation event alignment and pixel-grid behavior. Procedural animation may blend skeletal 2D joints with frame animation where the target supports it, but the same logical gameplay action must have one authoritative event interpretation.
+
+Any generative inpainting/variation step retains original image, region mask, model settings and rights chain. A tool should not alter the whole sprite when the artist approved only a hand adjustment. Human fine-tuning and version comparison must remain available when AI media is disabled.
+
+## 55.6 Character acceptance suite on real gameplay
+
+Create one small, originally authored character with at least idle, walk, run, jump, land, attack, hurt and interaction states; one equipment change and one dialogue gesture. Bind authored rig/animation actions into a real Godot target; record controller inputs, root/collision state and frames; verify item sockets, visual state, clip timing, game hit event and pause/save/resume. Inject missing bone, malformed skin weights, incompatible retarget, broken hitbox alignment, corrupt texture, unauthorized voice asset and unsupported shader; these must fail at the correct gate. Repeat on at least two different target performance profiles where those profiles are claimed supported.
+
+**Exit:** not merely "character generated" but a real, playable, consistent character with source-editable identity and capture-backed motion/rights receipts. Character variety can scale only after consistency and reuse controls pass.
+
+# 56. Autonomous gameplay debugger: causal fault localization and minimal verified repair
+
+**Batch:** FRONTIER-56 | **Lead:** BOT-06 + BOT-04 | **Independent tester:** BOT-12 | **Sources:** skeleton/forge/repair.py, skeleton/forge/godot_emit.py, skeleton/forge/playtest.py, skeleton/jeeves/game_comparison_counterfactual.py and actual game studio clients.
+
+The existing forge repair scaffold is policy gated and bounded. The existing playtest gate actually boots Godot headlessly. The existing counterfactual comparison path documents bounded controlled-input experiments over independently approved native game workers. Build on these legitimate primitives. The next frontier is **repairing a reproducible game behavior failure from actual engine evidence, changing the smallest authoritative source rule, and rerunning independent play**, not automatically rewriting an exporter to make a static test pass.
+
+## 56.1 Observability substrate and bug dossier
+
+A bug is a concrete trace: user-visible symptom; source/game revision and package hash; engine/toolchain version; initial game save; seed and RNG policy; controller events including press/hold/release; relevant world event identifiers; scene/input/animation state; frame/audio capture references; server/editor/engine logs; hardware/OS profile; first observed mismatch and expected invariant. The dossier is attached to the existing issue/project operation; it does not create a new autonomous bug database. Sensitive user data is redacted and retention follows governance policy.
+
+Avoid collecting unlimited video, private filesystem paths or entire model contexts. Store bounded, content-addressed segments with source scope and event intervals. If reproduction depends on a host race, record the uncertain timing and attempt controlled reruns; do not counterfeit deterministic exactness. Distinguish an engine crash from a dead-end quest, perceptual invisibility, bad UI input mapping or network projection delay. Test assertions must refer to actual observed behavior rather than a model's preferred narrative.
+
+## 56.2 Causal localization through dependency and counterfactuals
+
+First classify the failure: design constraint, semantic state transition, exporter mapping, engine script/signal, collision/physics, asset/renderer, audiovisual synchronization, saved-state migration, UI projection, target packaging or environmental/toolchain defect. Use the source-to-engine provenance graph to reduce scope to candidate rule IDs and files. The verifier can replay a held-out trace at parent/candidate revisions and compare divergence tick and affected state. A binary search through changed project revisions is useful only when a stable reproducer exists and the dependency graph supports it.
+
+Counterfactual actions: replace one controller event, change one scene rule under an isolated test revision, disable a single optional asset cue, rerun with a known-good engine build, or swap only a source/target adapter. The objective is to isolate a necessary/sufficient causal factor while minimizing unrelated mutations. Confounded experiments (different hardware, policy, toolchain and seed simultaneously) cannot establish cause; keep variables pinned or report inconclusive. A model can rank hypotheses, but evidence from actually executed alternatives determines validity.
+
+When bisecting exported artifacts, compare their actual executable digests. A compiler log from one game package cannot prove another package's behavior. A stale frontend frame may be a transport or cache bug; don't "fix" gameplay logic merely to satisfy the UI.
+
+## 56.3 Repair proposal as a typed, reversible mutation
+
+A repair proposal binds failure dossier, source parent digest, changed semantic nodes or exact code files, preconditions, expected behavior and regression set. It declares whether the patch is a game-design revision, emitter/adapter change or canonical product code change. Only allowed tool scopes can apply it; generated arbitrary code must be scanned and sandboxed. The agent cannot modify the test oracle, remove the requirement, suppress engine logs or expand timeouts indefinitely as a "fix". It cannot permanently relax safety, rights or trust policy to get green checks.
+
+Prefer the **smallest semantic fix** measured by affected dependency closure, not necessarily fewest text lines. Repairing a missing collision signal may involve one script and one scene import plus a test; copying the entire canonical emitted scaffold may be safe in some known cases but must not erase user modifications. Compare an upstream emitter fix to a one-off game patch; repair the correct owner so future generated games inherit the behavior when appropriate.
+
+Bound iterative attempts, build minutes, model tokens, changed files, generated assets and number of failed or inconclusive tests. Preserve all accepted project revisions and reversible artifacts; on exhaustion return the known failure and a partial proposed diff, not an invented success state.
+
+## 56.4 Independent repair verifier and mutation testing
+
+Require the originally failing trace to fail on the parent, pass on the repaired candidate, and remain stable across independently selected seeds or representative neighboring scenarios. Add negative regression checks for adjacent mechanics and human-approved behaviors. Mutation testing intentionally reintroduces the defect, disables one engine signal, changes a quest reward or removes a collision mapping; the test suite must then fail. If the result still passes after removing the feature, it is not a genuine verification of that feature.
+
+For flaky outcomes, run a pre-registered repeat plan and classify unstable environment versus nondeterministic bug. Record false-positive rate and regression scope; avoid model self-scoring. A high-confidence repair can still require human review if it changes gameplay difficulty, narrative causality, source ownership or commercial release behavior. Each accepted repair creates a new source/project revision, invalidating affected exact-head and game evidence.
+
+## 56.5 Browser/editor and native debugging trace linkage
+
+The existing GamePlayViewport can send authenticated inputs and display server-side game frames; the toolchain also supports exported Godot artifacts. Keep distinct test identities for the two runtimes and provide a debugging bridge rather than assuming their frames are equivalent. Show a source-time timeline of player inputs, world event commits, editor transformations and engine frames. A human can jump to the first divergent tick, highlight a source rule and inspect candidate patch with clear before/after behavior. A bug report initiated from the UI must not gain permission to read a different project or run unrestricted tools.
+
+## 56.6 Exit campaign
+
+Take three real seeded failures: one unreachable platform/door, one duplicated reward on save/replay and one missing audiovisual action cue. Reproduce each using a real game/input driver; locate a causal source; apply bounded repair to the canonical owner; rerun headless import, interactive play, save/restart and clean-target build. At least one test must be able to fail if the candidate reverts to the old bug. Preserve a candidate failure if the repaired game is not independently winnable. Release holds remain until exact-head target proof succeeds.
+
+# 57. Cross-platform playable compiler: lawful targets, native performance and clean-room evidence
+
+**Batch:** FRONTIER-57 | **Lead:** BOT-09 | **Partners:** BOT-01, BOT-02, BOT-05, BOT-06, BOT-08, BOT-12. **Source anchors:** skeleton/ai/game_builder/desktop_native_export.py, dual_runtime_export.py, skeleton/forge/godot_emit.py, skeleton/forge/playtest.py, skeleton/jeeves/game_console_build.py, skeleton/jeeves/game_desktop_export.py and existing distinct genre-specific Godot adapters.
+
+desktop_native_export.py explicitly produces C11/SDL2 sources, CMake and a sealed manifest for original games while disclaiming compiler, runtime, installer, signing keys or runnable .exe presence. This is a valid source-delivery feature, not a contradiction; the next step is to build and test actual outputs on declared targets. Do not discard this original native path merely to claim everything is Godot, and do not equate any source emitter with a tested executable.
+
+## 57.1 Target capability algebra
+
+Treat target support as a **typed set of guarantees**, not a marketing label. A target profile includes machine architecture, OS/version, runtime/engine version and digest, script/code language, input devices, graphics/audio capability, storage/save semantics, memory/frame ceilings, rights/licensing constraints, package/export format, executable signing and clean-runner proof. The source game IR declares required capabilities. Build admissibility computes an explicit compatibility relation: a game is eligible only when every required semantic operation is supported by the target (or the user has approved a specific semantics-preserving degradation with new acceptance). Generic "works on mobile" is not meaningful without declared touch UI, asset budgets, sandbox and hardware evidence.
+
+Separate platform-independent gameplay rules from target-specific input/render/packaging. A 2D browser maze, an SDL2 desktop maze, a Godot 3D RPG and lawful retro/homebrew source target may share objective/inventory/quest notions but require distinct native drivers. Portable behavior must be proven per game+target, not inferred from sibling build success. A valid output declares one or more supported targets and can honestly reject others.
+
+## 57.2 Deterministic lowering and build manifest
+
+Each admitted build records exact game source revision, semantic IR digest, compiler/emitter version, game rules, dependencies and rights, target SDK/engine digest, selected features, generated paths, build environment and output digest. Lowering produces editable target source and independent target manifest. Generated executable code cannot receive production service credentials or unrestricted network access; the build runner operates within an admitted sandbox and finite CPU/RAM/disk/time. Active-content scanning applies to generated game scripts and binaries as appropriate.
+
+Where reproducibility is feasible, compare byte-for-byte outputs from fixed inputs and pinned toolchain. Where nondeterministic build metadata or native linking prevents bitwise equality, declare the expected variation and require semantic/gameplay parity plus provenance equivalence. Build artifacts use atomic staging and publication, with backup/rollback; an interrupted compiler cannot overwrite the previous successfully tested package. A fresh target runner should launch without access to development checkout source.
+
+## 57.3 Godot production path
+
+Inventory existing puzzle/racing/platformer/shooter/farming/survival/tactics/defense/other Godot adapters and map each to a target feature/genre matrix. For each claimed supported genre, run import, parse, real scene boot, controller-to-gameplay trace, save/restart, media proof, native export templates and clean target launch. The existing headless gate is the starting proof for engine boot, not final completion. Verify input maps, scene node references, autoload identity, graphics/audio import, collision and exported resource paths against the engine version actually shipped.
+
+On Windows and Linux, distinguish host-native binaries from running a headless engine inside a container. On mobile, require actual platform build, touch/controller behavior and device constraints; do not infer mobile from shared source. Browser Godot/WebGL paths require separate asset/network/browser storage and CPU/GPU proof. Unsupported engine features must return actionable errors rather than silently strip required gameplay.
+
+## 57.4 C11/SDL2 native path
+
+For original source-driven games, use the existing CMake + SDL2 project and verify an actual available compiler, SDK, runtime link, input event path and platform package. Portable core rules can be cross-checked against the semantic reference test but must be executed in the native binary. Test controlled keyboard/gamepad input, frame state, collision/win/retry, save path, clean install and asset decoding. Packaging must include redistributable libraries with legitimate licenses and target architecture. A compilation success on one Linux CI container does not prove a Windows .exe or macOS app was produced.
+
+If an SDK is unavailable, return source-only artifact status with a toolchain report. Do not synthesize fake executable names or claim build performance from source language. A "dual runtime" manifest means two independently verified targets only after each target is compiled and played; a single shared receipt cannot certify both.
+
+## 57.5 Retro/homebrew legality and device constraints
+
+Retro and pre-2000 target profiles must preserve legal provenance: independently licensed toolchains, original game content, no unlicensed BIOS/ROM extraction or proprietary SDK bypass, explicit emulator/hardware identity and per-target limits. Static source generation for a platform is not proof that approved hardware or a legitimate emulator can run it. Different targets have incompatible display resolution, palette, input timing, audio channels, memory, cartridge/save layout and CPU scheduling; enforce constraints before export.
+
+Build a **legal-original-game target matrix** for source, compiled image, emulator boot, input-driven play, native hardware and distributable package with separate evidence. When an actual toolchain/device is unavailable, retain source delivery and mark executable/device proof absent. Tests on game inspiration or public domain materials do not grant permission to reuse third-party games as commercial assets.
+
+## 57.6 Full publication receipt
+
+A release candidate carries: source SHA and project revision, target profile, engine/toolchain bytes, build outputs and digests, media/source rights, SBOM, dependency/license scan, malware gate status, playable end-state trace, save-schema compatibility, performance profile, human approval, rollback and support limitations. No agent or PR description can waive a missing gate. An original game may be usable offline without storefront integration, but public commercial distribution requires extra entitlement, signing and legal decisions.
+
+**Exit case:** one original game is both playable and editable in source, tested in actual Godot on a declared desktop target, and separately compiled/played under SDL2 if dual-target support is claimed. Show clean-host launch and player completion. Record any nonqualified targets explicitly. Additional genres can be promoted one at a time based on the same evidence chain.
