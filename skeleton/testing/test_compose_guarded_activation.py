@@ -222,6 +222,34 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
         self.assertIsNone(gate._epoch_at_activation)
 
+    async def test_executable_topology_equality_denied_before_reviewer(self):
+        class ForgedElection:
+            def __eq__(self, other):
+                return True
+
+        self.database.hello["electionId"] = ForgedElection()
+        with self.assertRaisesRegex(ActivationBlocked, "topology identity malformed"):
+            await self.make().activate()
+        self.assertEqual(self.reviewer.challenge_count, 0)
+        self.assertEqual(self.inventory.call_count, 0)
+
+    async def test_invalid_topology_set_version_denied(self):
+        for version in (True, -1, 2147483648, "7"):
+            with self.subTest(version=version):
+                self.database.hello["setVersion"] = version
+                with self.assertRaisesRegex(ActivationBlocked, "topology identity malformed"):
+                    await self.make().activate()
+        self.assertEqual(self.reviewer.challenge_count, 0)
+
+    async def test_topology_rotation_after_reviewer_denied(self):
+        self.database.hello["setVersion"] = 7
+        async def rotate(_payload):
+            self.database.hello["setVersion"] = 8
+        self.reviewer.on_challenge = rotate
+        with self.assertRaisesRegex(ActivationBlocked, "primary changed"):
+            await self.make().activate()
+        self.assertEqual(self.make().phase, ActivationPhase.BLOCKED)
+
     async def test_activation_and_rechecks(self):
         gate = self.make()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
