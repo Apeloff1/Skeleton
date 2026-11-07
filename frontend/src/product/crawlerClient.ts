@@ -34,6 +34,14 @@ export type SourceExport = { filename: string; media_type: string; content: stri
 const ROOT = '/api/dragon-academy/crawler';
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const HASH = /^[a-f0-9]{64}$/;
+const OPERATION_STAGE_NAMES = [
+  'exact_canonical_event_timeline',
+  'per_origin_robots_and_cooldown_safety',
+  'physical_worker_restart_and_cas_witness',
+  'measured_resource_capacity_envelope',
+  'opaque_bounded_dispatch_preflight',
+  'review_only_operator_recovery_runbook',
+] as const;
 const FORENSIC_STAGE_NAMES = [
   'exact_selected_source_custody',
   'source_text_security_inspection',
@@ -379,6 +387,24 @@ export type CrawlAtlasReport = {
     publication_granted: false; training_permission: false;
     network_or_model_invoked: false;
   };
+  operations: {
+    report_digest: string; source_snapshot_digest: string; run_sequence: number;
+    stages: CrawlAtlasStage[];
+    retained_event_count: number; historical_events_incomplete: boolean;
+    event_clock_integrity_review: boolean; pending_dispatch: boolean;
+    uncertain_bytes: number; inspected_origins: number;
+    unresolved_robots_origins: number; stale_robots_origins: number;
+    observed_resource_samples: number; hypothetical_work_candidates: number;
+    capacity_holds: string[]; critical_operator_steps: number;
+    operator_runbook: {
+      code: string; priority: 'critical' | 'high' | 'medium' | 'advisory';
+      requires_backend_authority: true; automatically_executed: false;
+    }[];
+    physical_worker_fenced: false; mongo_checkpoint_confirmed: false;
+    live_robots_permission_granted: false; network_executed: false;
+    source_text_redacted: true; read_only: true;
+    automatic_recovery_authorized: false;
+  };
   evidence_family_stress: {
     stress_digest: string; policy_digest: string; retrieval_digest: string;
     robustness_digest: string; similarity_digest: string;
@@ -648,7 +674,46 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || value.forensics.publication_granted !== false
       || value.forensics.training_permission !== false
       || value.forensics.network_or_model_invoked !== false
-      || !value.evidence_family_stress
+      || !value.operations
+       || !HASH.test(value.operations.report_digest)
+       || value.operations.source_snapshot_digest !== value.snapshot_digest
+       || value.operations.run_sequence !== value.run_sequence
+       || !Array.isArray(value.operations.stages)
+       || value.operations.stages.length !== OPERATION_STAGE_NAMES.length
+       || value.operations.stages.some((entry, index) =>
+         !entry || entry.ordinal !== index || entry.name !== OPERATION_STAGE_NAMES[index]
+         || !HASH.test(entry.receipt_digest) || !HASH.test(entry.chain_digest))
+       || !integer(value.operations.retained_event_count, 64)
+       || typeof value.operations.historical_events_incomplete !== 'boolean'
+       || typeof value.operations.event_clock_integrity_review !== 'boolean'
+       || typeof value.operations.pending_dispatch !== 'boolean'
+       || !integer(value.operations.uncertain_bytes, 33_554_432)
+       || !integer(value.operations.inspected_origins, 32)
+       || !integer(value.operations.unresolved_robots_origins, 32)
+       || !integer(value.operations.stale_robots_origins, 32)
+       || !integer(value.operations.observed_resource_samples, 32)
+       || !integer(value.operations.hypothetical_work_candidates, 4)
+       || !Array.isArray(value.operations.capacity_holds)
+       || value.operations.capacity_holds.length > 32
+       || value.operations.capacity_holds.some(code => typeof code !== 'string'
+         || !/^[a-z][a-z0-9_]{2,95}$/.test(code))
+       || !integer(value.operations.critical_operator_steps, 48)
+       || !Array.isArray(value.operations.operator_runbook)
+       || value.operations.operator_runbook.length > 16
+       || value.operations.operator_runbook.some(item =>
+         !item || typeof item.code !== 'string'
+         || !/^[a-z][a-z0-9_]{2,95}$/.test(item.code)
+         || !['critical', 'high', 'medium', 'advisory'].includes(item.priority)
+         || item.requires_backend_authority !== true
+         || item.automatically_executed !== false)
+       || value.operations.physical_worker_fenced !== false
+       || value.operations.mongo_checkpoint_confirmed !== false
+       || value.operations.live_robots_permission_granted !== false
+       || value.operations.network_executed !== false
+       || value.operations.source_text_redacted !== true
+       || value.operations.read_only !== true
+       || value.operations.automatic_recovery_authorized !== false
+       || !value.evidence_family_stress
       || !HASH.test(value.evidence_family_stress.stress_digest)
       || value.evidence_family_stress.policy_digest !== value.source_policy.digest
       || value.evidence_family_stress.retrieval_digest !== value.retrieval.digest

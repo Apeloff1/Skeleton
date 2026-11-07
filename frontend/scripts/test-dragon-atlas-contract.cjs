@@ -10,6 +10,14 @@ const clientPath = path.join(root, 'src/product/crawlerClient.ts');
 const panelPath = path.join(root, 'src/features/Jeeves/CrawlerResearchAtlasPanel.tsx');
 const workspacePath = path.join(root, 'src/features/Jeeves/CrawlerWorkspace.tsx');
 const H = 'a'.repeat(64);
+const OPERATION_STAGES = [
+  'exact_canonical_event_timeline',
+  'per_origin_robots_and_cooldown_safety',
+  'physical_worker_restart_and_cas_witness',
+  'measured_resource_capacity_envelope',
+  'opaque_bounded_dispatch_preflight',
+  'review_only_operator_recovery_runbook',
+];
 const FORENSIC_STAGES = [
   'exact_selected_source_custody',
   'source_text_security_inspection',
@@ -154,6 +162,27 @@ function fixture() {
       publication_granted: false, training_permission: false,
       network_or_model_invoked: false,
     },
+    operations: {
+      report_digest: H, source_snapshot_digest: H, run_sequence: 1,
+      stages: OPERATION_STAGES.map((name, ordinal) => ({
+        ordinal, name, receipt_digest: H, chain_digest: H,
+      })),
+      retained_event_count: 0, historical_events_incomplete: false,
+      event_clock_integrity_review: false, pending_dispatch: false,
+      uncertain_bytes: 0, inspected_origins: 2,
+      unresolved_robots_origins: 2, stale_robots_origins: 0,
+      observed_resource_samples: 0, hypothetical_work_candidates: 0,
+      capacity_holds: ['no_measured_resource_telemetry'],
+      critical_operator_steps: 1,
+      operator_runbook: [{
+        code: 'complete_durable_restart_fence', priority: 'critical',
+        requires_backend_authority: true, automatically_executed: false,
+      }],
+      physical_worker_fenced: false, mongo_checkpoint_confirmed: false,
+      live_robots_permission_granted: false, network_executed: false,
+      source_text_redacted: true, read_only: true,
+      automatic_recovery_authorized: false,
+    },
     evidence_family_stress: {
       stress_digest: H, policy_digest: H, retrieval_digest: H,
       robustness_digest: H, similarity_digest: H,
@@ -263,6 +292,17 @@ test('foreign session, staged digest mismatch and alleged external effects are r
     a => { a.forensics.stages[24].name = 'forged_source_security_stage'; },
     a => { a.forensics.extraction_held_sources = -1; },
     a => { a.forensics.risk_ablated_objectives = 1.5; },
+    a => { a.operations.stages[1].name = 'untrusted_authorization_override'; },
+    a => { a.operations.stages.pop(); },
+    a => { a.operations.source_snapshot_digest = 'b'.repeat(64); },
+    a => { a.operations.hypothetical_work_candidates = 500; },
+    a => { a.operations.physical_worker_fenced = true; },
+    a => { a.operations.mongo_checkpoint_confirmed = true; },
+    a => { a.operations.live_robots_permission_granted = true; },
+    a => { a.operations.network_executed = true; },
+    a => { a.operations.source_text_redacted = false; },
+    a => { a.operations.operator_runbook[0].automatically_executed = true; },
+    a => { a.operations.capacity_holds = ['ATTACKER_CONTEXT']; },
     a => { a.forensics.atlas_digest = 'b'.repeat(64); },
     a => { a.forensics.publication_granted = true; },
     a => { a.forensics.critical_review_tasks = 257; },

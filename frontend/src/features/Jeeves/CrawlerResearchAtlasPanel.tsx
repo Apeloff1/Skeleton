@@ -385,6 +385,29 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
           </View>)}
         {!report.forensics.review_tasks && <Text style={s.small}>No additional forensic holds in the currently selected passages. Absence of findings does not establish safety or truth.</Text>}
       </Section>
+      <Section title="Operational preflight and recovery barriers">
+        <Text style={s.small}>
+          {report.operations.stages.length} integrity gates · {report.operations.retained_event_count} event receipts · {report.operations.inspected_origins} canonical origins · {report.operations.hypothetical_work_candidates} hypothetical candidates
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>
+          <Metric title="Unresolved robots" value={report.operations.unresolved_robots_origins}
+            caption={report.operations.stale_robots_origins + ' stale cache(s)'} />
+          <Metric title="Uncertain bytes" value={report.operations.uncertain_bytes}
+            caption={report.operations.pending_dispatch ? 'Unsettled request' : 'No pending dispatch'} />
+          <Metric title="Recovery priorities" value={report.operations.critical_operator_steps}
+            caption="Operator action only" />
+          <Metric title="Resource samples" value={report.operations.observed_resource_samples}
+            caption="Measured host telemetry" />
+        </View>
+        <Text style={s.small}>
+          {report.operations.historical_events_incomplete ? 'Event history incomplete' : 'Retained event window intact'} · {report.operations.event_clock_integrity_review ? 'Clock integrity review due' : 'No timestamp anomaly found in retained events'} · {report.operations.capacity_holds.length} capacity hold(s)
+        </Text>
+        {report.operations.operator_runbook.slice(0, 12).map((item, i) =>
+          <Text key={item.code + i} style={item.priority === 'critical' ? s.error : s.small}>
+            {readable(item.priority)} · {readable(item.code)} · needs backend authorization
+          </Text>)}
+        <Text style={s.small}>No worker was fenced, no Mongo checkpoint was confirmed and no network access was granted. A new authenticated canonical admission is mandatory before any action.</Text>
+      </Section>
       <Section title="Evidence-family collapse and apparent support">
         <Text style={s.small}>
           {report.evidence_family_stress.selected_source_records} selected source records · {report.evidence_family_stress.exact_content_families} unique captured-text families · {report.evidence_family_stress.possible_near_duplicate_clusters} possible lexical family clusters
