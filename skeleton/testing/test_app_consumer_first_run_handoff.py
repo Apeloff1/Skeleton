@@ -39,6 +39,32 @@ def valid_evidence():
 
 
 class FirstRunHandoffTests(unittest.TestCase):
+    def test_canonical_identifier_and_python_version_acceptance(self):
+        for project_id in ("offline-first-playable", "world:act_01", "A", "x" * 128):
+            with self.subTest(project_id=project_id):
+                evidence = valid_evidence()
+                evidence["project_id"] = project_id
+                validate_source_only_handoff(evidence)
+        for version in ("3.11.9", "3.12.0", "3.13.10"):
+            with self.subTest(version=version):
+                evidence = valid_evidence()
+                evidence["runtime_observation"]["python"] = version
+                validate_source_only_handoff(evidence)
+
+    def test_identifier_and_version_regex_do_not_accept_escapes(self):
+        for project_id in ("x\\\\Z", "x\\\\d", "x\\n", "x/y"):
+            with self.subTest(project_id=project_id):
+                evidence = valid_evidence()
+                evidence["project_id"] = project_id
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+        for version in ("3x12x0", "3.12", "v3.12.0", "3.12.0-extra"):
+            with self.subTest(version=version):
+                evidence = valid_evidence()
+                evidence["runtime_observation"]["python"] = version
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
     def test_valid_source_only_evidence(self):
         evidence = valid_evidence()
         self.assertIsNone(validate_source_only_handoff(evidence))
