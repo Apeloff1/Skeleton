@@ -26,6 +26,7 @@ from urllib.robotparser import RobotFileParser
 from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
     HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
+    TECHNICAL_MEDIA_TYPES,
     DocumentFormatError, extract_additional_format,
 )
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
@@ -168,6 +169,14 @@ class CrawlPolicy:
         "text/patch",
         "application/vnd.citationstyles.csl+json",
         "application/x-csl+json",
+        "application/geo+json",
+        "application/vnd.geo+json",
+        "application/openapi+json",
+        "application/vnd.oai.openapi+json",
+        "application/schema+json",
+        "application/vnd.schema+json",
+        "text/tab-separated-values",
+        "application/tsv",
         "application/toml",
         "text/x-toml",
         "text/x-shellscript",
@@ -411,7 +420,8 @@ def extract_document(
     if match:
         charset = match.group(1).strip("\"'")
     if ctype in (RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES
-                 | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES):
+                 | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
+                 | TECHNICAL_MEDIA_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):

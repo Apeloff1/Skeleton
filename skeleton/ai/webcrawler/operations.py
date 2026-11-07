@@ -111,6 +111,11 @@ def implementation_digest():
                 "har_documents.py",
                 "patch_documents.py",
                 "csl_documents.py",
+                "geojson_documents.py",
+                "openapi_documents.py",
+                "jsonschema_documents.py",
+                "tsv_documents.py",
+                "technical_documents.py",
             )
         }
     )
