@@ -84,6 +84,7 @@ def implementation_digest():
                 "frontier_scheduler.py",
                 "link_header_discovery.py",
                 "content_coding.py",
+                "archive_documents.py",
             )
         }
     )

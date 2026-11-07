@@ -13,6 +13,8 @@ on:
       - "skeleton/ai/webcrawler/structured_discovery.py"
       - "skeleton/ai/webcrawler/bound_http.py"
       - "skeleton/ai/webcrawler/content_coding.py"
+      - "skeleton/ai/webcrawler/archive_documents.py"
+      - "tests/test_ai_webcrawler_dragon_archive_documents.py"
       - "tests/test_ai_webcrawler_dragon_http_coding.py"
       - "tests/test_ai_webcrawler_dragon_feed_pagination.py"
       - "tests/test_ai_webcrawler_dragon_gain7.py"
@@ -67,6 +69,8 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/bound_http.py
           python -m py_compile skeleton/ai/webcrawler/content_coding.py
+          python -m py_compile skeleton/ai/webcrawler/archive_documents.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_archive_documents.py
           python -m py_compile tests/test_ai_webcrawler_dragon_http_coding.py
           python -m py_compile tests/test_ai_webcrawler_dragon_feed_pagination.py
           python -m py_compile tests/test_ai_webcrawler_dragon_campaign_stack.py
@@ -113,3 +117,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_gain7.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v

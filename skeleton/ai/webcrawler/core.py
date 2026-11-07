@@ -24,6 +24,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
 from .document_formats import ADDITIONAL_TYPES, extract_additional_format
+from .archive_documents import ARCHIVE_TYPES, extract_archive_document
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -121,6 +122,9 @@ class CrawlPolicy:
         "text/x-yaml",
         "application/yaml",
         "application/x-yaml",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.oasis.opendocument.text",
+        "application/epub+zip",
         "application/toml",
         "text/x-toml",
         "text/x-shellscript",
@@ -295,10 +299,59 @@ def _source_score(url: str, text: str, status: int) -> float:
     return max(0.0, min(1.0, score))
 
 
+
+def _archive_document_response(
+    response: FetchResponse, canonical_url: str, ctype: str,
+    text: str, title: str, links: list[str], truncated: bool,
+) -> CrawlDocument:
+    """Construct source receipts identically to ordinary text extraction."""
+    text = html.unescape(" ".join(text.split())).strip()
+    if not text:
+        raise ValueError("archived source contains no text")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return CrawlDocument(
+        canonical_url=canonical_url,
+        fetched_url=response.url,
+        title=title[:1000],
+        text=text,
+        content_type=ctype,
+        content_hash=digest,
+        fetched_at=response.fetched_at,
+        source_score=_source_score(canonical_url, text, response.status),
+        provenance={
+            "schema": "skeleton.ai.crawl.provenance.v1",
+            "canonical_url": canonical_url,
+            "fetched_url": response.url,
+            "fetched_at": response.fetched_at,
+            "status": response.status,
+            "content_hash": digest,
+            "raw_body_hash": response.wire_hash or hashlib.sha256(response.body).hexdigest(),
+            "decoded_body_hash": hashlib.sha256(response.body).hexdigest(),
+            "wire_bytes": response.wire_bytes if response.wire_bytes is not None else len(response.body),
+            "content_encoding": response.content_encoding,
+            "parser_text_truncated": truncated,
+        },
+        links=tuple(links),
+    )
+
+
 def extract_document(
     response: FetchResponse, canonical_url: str, *, max_links: int = 500, max_text_chars: int = 1_000_000
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
+    if ctype in ARCHIVE_TYPES:
+        extracted = extract_archive_document(
+            response.body, ctype, max_chars=max_text_chars,
+        )
+        text = extracted.text
+        title = extracted.title
+        links = list(extracted.links)
+        parser_text_truncated = extracted.truncated
+        # Source encoding is binary: do not decode ZIP bytes as plain text.
+        return _archive_document_response(
+            response, canonical_url, ctype, text, title,
+            links, parser_text_truncated,
+        )
     charset = "utf-8"
     match = re.search(r"charset=([^;\s]+)", response.headers.get("content-type", ""), re.IGNORECASE)
     if match:
