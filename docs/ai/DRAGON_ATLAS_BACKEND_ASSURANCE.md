@@ -43,3 +43,13 @@ owner-authorized real-backend route tests. Skipped, cancelled, mocked, stale,
 ancestor, or merge-ref-only evidence is not a substitute for final-head passes.
 Never infer live-network, physical-worker, first-install or release approval
 from deterministic source fixtures.
+
+## Cross-plane source-head attribution
+
+The Dragon campaign source, Dragon Atlas frontend, and Jeeves integrated
+qualifiers must also checkout `github.event.pull_request.head.sha` and assert
+`git rev-parse HEAD` matches that immutable event SHA before executing
+untrusted PR code. The default GitHub PR merge ref is distinct from the source
+head; merge simulation requires its own explicitly labelled check and may not
+substitute for source-head evidence. These workflows retain read-only
+credentials and their independent validation scopes.
