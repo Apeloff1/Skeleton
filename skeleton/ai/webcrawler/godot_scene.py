@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter
 import re
 from .research_projection import ResearchFormatError, ResearchProjection, check_text, project_lines
+from .godot_hierarchy import inspect_godot_hierarchy
+from .scene_topology import summarize_scene_topology
 
 GODOT_TYPES=frozenset({"application/x-godot-scene","text/x-godot-scene"})
 _HEADER=re.compile(r"^\[gd_scene\s+[^\]\r\n]{0,512}\]$")
@@ -61,5 +63,6 @@ def extract_godot_scene(
         "Resource classes: "+(", ".join(f"{key}={count}" for key,count in sorted(resources.items())) or "[none]"),
         "Example node labels: "+", ".join(names[:16]),
         "Scripts, resources, shaders, file paths and imports: not loaded",
+        *summarize_scene_topology(inspect_godot_hierarchy(raw)),
     ]
     return project_lines(output,title="Godot scene inventory",max_chars=max_chars)

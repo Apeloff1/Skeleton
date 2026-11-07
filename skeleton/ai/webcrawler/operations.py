@@ -159,6 +159,8 @@ def implementation_digest():
                 "sbom_topology.py",
                 "html_structured_entities.py",
                 "frontier_circuit.py",
+                "scene_topology.py",
+                "godot_hierarchy.py",
             )
         }
     )
