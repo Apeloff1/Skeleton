@@ -2611,6 +2611,7 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_documents: int = Field(default=16, ge=1, le=64, strict=True)
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
+    discover_sitemaps: bool = Field(default=False, strict=True)
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 

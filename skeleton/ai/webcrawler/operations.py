@@ -30,6 +30,7 @@ from .core import (
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
 from .structured_discovery import (
     DiscoveryError, SUPPORTED_MEDIA, parse_structured_discovery,
+    extract_robots_sitemaps,
 )
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
@@ -128,6 +129,7 @@ class CrawlRequest:
     max_response_bytes: int = 524288
     max_total_bytes: int = 8388608
     min_host_delay_seconds: float = 1.0
+    discover_sitemaps: bool = False
 
     def __post_init__(self):
         if not isinstance(self.seed_urls, (tuple, list)) or not 1 <= len(self.seed_urls) <= 16:
@@ -155,6 +157,8 @@ class CrawlRequest:
         ):
             _integer(getattr(self, name), low, high, name)
         _number(self.min_host_delay_seconds, 0.25, 30, "host delay")
+        if type(self.discover_sitemaps) is not bool:
+            raise CrawlOperationError("sitemap discovery requires an explicit boolean")
 
     @classmethod
     def from_dict(cls, value):
@@ -848,13 +852,21 @@ class CrawlRun:
                 )
             else:
                 robots["text"] = "User-agent: *\nDisallow: /"
+            if self.request.discover_sitemaps and robots["text"]:
+                for sitemap_url in extract_robots_sitemaps(
+                    robots["text"], origin=origin, policy=self.policy,
+                    max_sitemaps=8,
+                ):
+                    # Explicit host-scope opt-in. Metadata roots do not
+                    # bypass depth, robots or network byte reservations.
+                    self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
         structured_type = ctype in SUPPORTED_MEDIA
         if (
             ctype == "application/octet-stream"
             and urlsplit(url).path.lower().endswith(".xml.gz")
-            and response.body.startswith(b"\\x1f\\x8b")
+            and response.body[:2] == bytes((31, 139))
         ):
             # A bounded gzip sitemap may be served as generic octet-stream,
             # but no other opaque binary document is ever parsed as XML.

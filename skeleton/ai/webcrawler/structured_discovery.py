@@ -79,6 +79,8 @@ def _xml_bytes(body: bytes, media_type: str, url: str) -> bytes:
         body = result
     if len(body) > MAX_XML_BYTES or not body:
         raise DiscoveryError("structured document exceeds bounded XML size")
+    if 0 in body:
+        raise DiscoveryError("NUL bytes cannot appear in UTF-8 discovery XML")
     if _FORBIDDEN.search(body):
         raise DiscoveryError("DTD and entity declarations are not accepted")
     # No alternate character set is required for crawled link identity.
@@ -222,3 +224,47 @@ def parse_structured_discovery(
         kind=kind, links=tuple(links), examined_entries=examined,
         discarded_entries=rejected, capped=capped,
     )
+
+def extract_robots_sitemaps(
+    robots_text: str, *, origin: str, policy: CrawlPolicy,
+    max_sitemaps: int = 8,
+) -> tuple[str, ...]:
+    """Opt-in same-origin sitemap seeds from an already metered robots receipt.
+
+    Robots Sitemap lines are untrusted hints, never a fetch grant. Future
+    requests must pass the canonical worker robots, DNS and budget checks.
+    """
+    if (not isinstance(robots_text, str)
+            or len(robots_text.encode("utf-8")) > 65536
+            or not isinstance(policy, CrawlPolicy)
+            or type(max_sitemaps) is not int
+            or not 1 <= max_sitemaps <= 16):
+        raise ValueError("invalid bounded robots sitemap extraction")
+    parsed_origin = urlsplit(origin)
+    if not parsed_origin.hostname or parsed_origin.scheme not in ("http", "https"):
+        raise DiscoveryError("robots origin is not canonical")
+    found: list[str] = []
+    seen: set[str] = set()
+    for line in robots_text.splitlines():
+        if len(line) > 4096:
+            continue
+        key, sep, candidate = line.partition(":")
+        if not sep or key.strip().casefold() != "sitemap":
+            continue
+        candidate = candidate.split("#", 1)[0].strip()
+        try:
+            url = canonicalize_url(candidate)
+        except (ValueError, UnicodeError):
+            continue
+        p = urlsplit(url)
+        if (p.hostname != parsed_origin.hostname
+                or p.scheme != parsed_origin.scheme
+                or not p.path.lower().endswith((".xml", ".xml.gz"))
+                or not policy.admits(url)
+                or url in seen):
+            continue
+        found.append(url)
+        seen.add(url)
+        if len(found) >= max_sitemaps:
+            break
+    return tuple(found)

@@ -1419,6 +1419,7 @@ class DragonCrawlerApplication:
             max_response_bytes=524288,
             max_total_bytes=body.get("max_bytes", 8 * 1024 * 1024),
             min_host_delay_seconds=1.0,
+            discover_sitemaps=body.get("discover_sitemaps", False),
         )
         now = _now()
         expiry = now + timedelta(hours=24)
