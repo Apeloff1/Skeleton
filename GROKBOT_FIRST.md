@@ -43,6 +43,7 @@
 - 28. Frontier-comparison laboratory
 - 29. Workable integration contract catalog
 - 30. Twelve-bot executable vertical slices
+- 31. Exact-head CI incident triage and repair order
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -71,7 +72,7 @@ Interpretation classes: **OBSERVED** means directly inspected source/document/pa
 | backend/core/dragon_crawler.py | Scoped Mongo crawl operations, leases, budgets, worker handles | Prove legal/technical transport, source grant, real backend bridge and withdrawal |
 | frontend/src/features/Jeeves/CrawlerWorkspace.tsx | Crawler workspace, authentication controls and frontend state machinery | Browser-driven authenticated capture/review and denied-action tests |
 | PR #4875 | Broad first-install candidate, 1,860 changed paths at observed head 646526a88f3406d4a9c3b0c253417ccdabdc919a | Candidate != merged/certified; evaluate latest exact head and failing gates |
-| PR #4876 | Dragon research/Atlas draft, 1,981 changed paths including large shared AI-tree overlays; head 14d8613cc2a9e7f465b8817623f5b78ad782d9a3 | Maintain draft and security holds; separately inspect adapter and architecture failures |
+| PR #4876 | Dragon research/Atlas draft, 1,981 changed paths including large shared AI-tree overlays; head 14d8613cc2a9e7f465b8817623f5b78ad782d9a3 | Current-head targeted adapter/mirror checks succeeded; draft, broad skipped checks and deployment/release holds remain |
 | PR #4870 | AI mirror reconciliation stack, 1,667 changed paths | Determine canonical source, semantic parity and source pin breakage |
 | PR #4872 | First-install and backend/native bridge patch set | Test independently and reconcile into approved integration head |
 | PR #4686 | Very large offline cognition/reliability source candidate | Validate true runtime behavior; casebook quantity does not certify native operation |
@@ -116,7 +117,7 @@ A **first-install-ready** release must meet J-01, J-02, J-03, J-05, J-06, J-11, 
 5. **Game completeness:** mainline README describes Godot 4 generation and CORE_LOOP_OK proof but says sprites, meshes, audio, complete input-driven play, multiplayer and driving simulation are not finished. Code for any of these on draft heads must be evaluated as candidates until real adoption and proof.
 6. **Quality confounds:** simulation traces, model judging and source-side fixtures alone do not prove player enjoyment, comprehensible feedback or export-ready polish. Require independent play, human reports and improvement tests.
 7. **AI migration custody:** staged mirrors and unsigned implementation+verification signoffs create accidental split brain risk. Complete exact source object and semantic parity audits before cutover.
-8. **Dragon Atlas integration:** PR #4876 explicitly remains draft with open backend-adapter, architecture, backend-integration and release holds. A UI panel or import does not prove a mounted route; verify policy and actual backend wiring.
+8. **Dragon Atlas integration:** PR #4876 remains draft; its latest-head targeted backend adapter and mirror checks succeeded on 2026-11-07, superseding earlier failed runs. Deployment-matched authenticated Mongo/transport and release qualification remain unverified.
 9. **Native laptop workbench:** source docs describe genuine GGUF/SQLite paths and distinguish native receipt quality from input-driven studio integration. Bridge tools only via approved, finite, authenticated contracts.
 10. **Payments/marketplace:** checkout and premium upgrade lack atomic settlement and verified entitlement delivery. Preserve holds until webhook replay, concurrent settlement and consumer recovery are proven.
 11. **Historical security:** readiness docs report historical secret findings and frontend dependency advisory. Triage every real secret, rotate if necessary and reject blanket suppression.
@@ -4444,7 +4445,7 @@ Simulate a pre-existing modified \`.env\` containing a legitimate private Mongo 
 
 ## 22.4 Exact-head qualification and physical acceptance
 
-The validation path must record the source SHA for every test run and its mandatory job. A PR may be mergeable in Git's conflict sense while still failing security, design, target-runtime or release evidence. A sibling job passing does not certify failed architecture or policy checks. Owner-scoped Dragon Atlas failures in PR #4876 must be reproduced and resolved with focused tests before declaring its backend bridge qualified. PR #4875 may be a substantial integrated candidate but remains a candidate until its **current** exact head has the required independent checks and physical target evidence.
+The validation path must record the source SHA for every test run and its mandatory job. A PR may be mergeable in Git's conflict sense while still failing security, design, target-runtime or release evidence. A sibling job passing does not certify failed architecture or policy checks. Owner-scoped Dragon Atlas failures on older PR #4876 heads were superseded by successful targeted source checks at head 14d8613c; live backend/Mongo and broader required checks still need independent qualification. PR #4875 may be a substantial integrated candidate but remains a candidate until its **current** exact head has the required independent checks and physical target evidence.
 
 An independent acceptance owner should choose the smallest critical-path next test at each stage. Example: if source architecture conformance fails, repair that before long device tests; if a model cannot activate because guard is missing, verify guard integration before downloading new weights; if Godot game compiles but player cannot fire, repair input-to-project wiring before generating another catalog of encounter definitions.
 
@@ -5070,7 +5071,7 @@ The goal is **twelve coordinated bots shipping one product**, not twelve teams f
 
 **PR #4875:** broad first-install qualification candidate with shared AI-tree overlays. Determine whether its current source is based on the expected parents, which exact-head jobs ran, whether per-service readiness and real native inference are observed, and whether hardware/device evidence exists. Do not treat its changed-file count as a pass.
 
-**PR #4876:** Dragon Atlas/backend research draft with substantial overlap in the Jeeves mirrors and game-forge directories. Its owner-scoped backend bridge, policy and architecture job failures remain real until evidence shows otherwise. Resolve the first reproducible blocker with smallest safe repair, then rerun changed affected gates. Preserve source rights/withdrawal and merge holds.
+**PR #4876:** Dragon Atlas/backend research draft with substantial Jeeves mirror and game-forge overlap. Earlier adapter/policy/architecture failures occurred on ancestor heads; current head 14d8613c passes targeted backend, campaign, frontend and mirror jobs. Preserve draft, broad skipped-check, source-rights, deployment and release holds.
 
 **AI migration registry:** staged mirrors with implementation and verification signoffs awaiting current-head proof. Determine source-of-truth for each mapping, compile actual import graph, and require AST/byte parity or explicit recorded exceptions. BOT-02 controls planned cutover, BOT-12 verifies independently.
 
@@ -5118,3 +5119,92 @@ The goal is **twelve coordinated bots shipping one product**, not twelve teams f
 | F-036 | 12 | final source, target host and artifacts | independently reviewed release packet |
 
 Each F-ticket should expand into actual source, acceptance and release-evidence issues only after source census and overlap review. Do not create 36 redundant modules or PRs purely because this table exists.
+
+# 31. November 7 exact-head CI triage and source-grounded repair queue
+
+This register corrects earlier sections and replaces ancestor failure speculation with current evidence. Each recorded result binds to a particular GitHub commit SHA and workflow run; after the head changes it becomes historical. All release and rights/security holds remain intact. This document plans work and does not implement these repairs.
+
+## 31.1 Candidate states and chronological accuracy
+
+| Candidate | Reviewed exact head | Most important observed status |
+|---|---|---|
+| PR #4876 Dragon Atlas | 14d8613cc2a9e7f465b8817623f5b78ad782d9a3 | Targeted Dragon backend adapter, campaign source, frontend, integrated mirror, native SQLite and workflow security jobs SUCCESS; draft; broad App Foundation, Backend Quality, Merge Readiness, Malware and Artifact Policy SKIPPED |
+| PR #4875 first-install | 646526a88f3406d4a9c3b0c253417ccdabdc919a | Fifteen individual workflows SUCCESS including Windows Installer, backend, guarded local source, and malware; composite Merge Readiness FAILED |
+| PR #4880 planning document | 877fafd515a3521aa97dc156bb85f568139e9072 prior to this update | Repository Hygiene and Secret Scanning SUCCESS; other documentation-filtered workflows SKIPPED; draft |
+
+The older PR #4876 backend adapter run 42330942316 was against head f0b328315825e53368637c85f9275bb8d6422178. Its failing test job raised CrawlOperationError: source MIME inference receipt mismatch in 31 of 38 tests during fixture snapshot reconstruction. The fixture was a synthetic legacy source that did not supply the optional MIME extension. The inspected CrawlRun.from_snapshot validator requires the complete three-field MIME receipt only when any field of the extension is present. It is important to preserve this fail-closed behavior; should such regression recur, repair the fixture to omit all new fields for true legacy data or provide all three coherent fields, never teach the validator to admit inconsistent content. The latest-head targeted adapter run is successful, so that ancestor failure should not be reported as current.
+
+The older PR #4876 integrated mirror run 42331436570 was against head e60701e8f0813ea6a9ca01d04c8d2396011eaba6. The validator then found missing mirrored Jeeves world modules, missing forge subfamilies, three missing audio-extension paths and unclassified skeleton/mass_build and skeleton/perf_profiler roots. The current-head integrated mirror run succeeded. These historical details remain useful as a regression counterexample, but the present task is deployment-matched Mongo/backend bridge verification and required broad workflow coverage, not replaying obsolete repair instructions.
+
+Success on a source-level adapter or mirror test does not establish authorized live capture, external network safety under deployment, Mongo primary race behavior, runtime worker custody or a release-certified Dragon app. PR #4876 remains a draft. No GitHub branch status, code review or UI badge may convert skipped mandatory checks into passes.
+
+## 31.2 First-install PR #4875: current composite gate failure
+
+The current Merge Readiness workflow for PR #4875 is run 42370464271 at head 646526a88f3406d4a9c3b0c253417ccdabdc919a. In this run, Canonical Domain Suite shards 0, 1, 2, 3 and 6 failed, shards 5 and 7 were cancelled, and shard 4 succeeded. The final Merge Readiness aggregate failed. Lint Type Security, PR Automation Tests, Quarantine Policy, frontend, backend, Docker, GameForge and other independent jobs had successful outcomes. Current-head Windows Installer and first-install source qualification also passed as hosted checks, not as a physical target-laptop installation.
+
+### CI-4875-001: unmounted scene evacuation public commands
+
+**Observed:** Domain shard 3, skeleton/testing/test_scene_evacuation_cli.py, expects six command families: scene-evacuation, scene-evacuation-board, scene-evacuation-author, scene-evacuation-accept, scene-evacuation-solve and scene-evacuation-play. Their demo routes return 1 rather than expected 0; public CLI help omits these commands; malformed source returns 1 rather than controlled exit 2. Direct inspection of skeleton/__main__.py at the candidate head found no string occurrence of scene-evacuation, making missing public dispatch a strong and specifically testable hypothesis.
+
+**Smallest repair:** find the actual already-existing domain CLI implementations and register them through the canonical skeleton.__main__ routing/help table rather than generating a new simulation or weakening tests. Verify a bounded JSON success response, exact required result fields and normalized denied-input error without leaked traceback. Preserve current CLI command names and other valid routes. Focused execution: python -m pytest skeleton/testing/test_scene_evacuation_cli.py -q, followed by help/dispatch smoke for all registered commands. CLI success is still below independent Godot game play qualification.
+
+### CI-4875-002: scene-market-party dispatch returns error
+
+**Observed:** Domain shard 0, skeleton/testing/test_scene_market_party_route.py::test_cli_demo_and_main_dispatch, asserts that the scene-market-party-route demo returns 0 but observes 1. The same candidate skeleton/__main__.py contains this command name, so absent registration is **not established** as the root cause.
+
+**Smallest repair:** execute the direct command, capture safe stderr, trace its dispatch function and its imported domain implementation. Determine whether input validation, route wiring, source fixtures or current backend state causes the actual nonzero result. Repair the first canonical contract violation; do not insert a test-only canned response. Retain the invalid session-json negative path and verify successful demo source, terminal witness and proper rejection classification.
+
+### CI-4875-003: story event ancestry changes on CAS resume
+
+**Observed:** Domain shard 3, skeleton/testing/test_harbor_crafting_salvage_story.py::test_story_cas_resume_preserves_previous_events, fails because the first event after resumable story progression differs from the original first acknowledged event. A final correct ending would not excuse rewriting the committed event's digest, tick or sequence.
+
+**Smallest repair:** inspect build_salvage_story, resume_salvage_story and verify_salvage_story. Compare frozen source, request, exact expected_digest and historical events byte-for-byte. If changed schema legitimately changes event identity, migrate through an explicitly reviewed versioned path, not an implicit overwrite. Preserve acknowledged prior events and append newly committed events only. Test stale digest denial, forged event rejection, partial campaign resume, clean replay and crash recovery. Owner: world/narrative BOT-05 with BOT-02 and BOT-12 independent custody review.
+
+### CI-4875-004: native source-only SQLite batch is incorrectly held or test contract stale
+
+**Observed:** Domain shard 1, two skeleton/testing/test_jeeves_native_batch.py tests expect source-only committed batch and cold replay, but CLI returns status held, error_class ContractViolation, exit 2, and explicitly records native_device_qualified=false and release_certified=false.
+
+**Smallest repair:** inspect the active source-only admission policy, exact branch/lease grant and the test fixture's signed source identity. If real source-only work may be committed without hardware certification, admit only that limited operation and retain explicit native/device/release holds. If a newly required grant is genuinely absent, correct the authorized fixture and expected outcome. Never bypass device qualification or falsely set a release flag to appease the test. Prove durable SQLite cold reopen, no repeated work and denied unauthorized operations.
+
+### CI-4875-005: retrieval passage overlap/window contract mismatch
+
+**Observed:** Domain shard 1, skeleton/testing/test_offline_cognition_embedding_search_evidence.py tests test_attribution_not_semantic_claim and test_deterministic_ranking raise CognitionError: overlap must be smaller than passage window.
+
+**Smallest repair:** locate the actual typed overlap/window owner, inspect units and config defaults and determine whether the fixture or cross-layer constructor supplies an impossible window. Maintain the requirement overlap strictly less than passage window. Fix a safe default or adjust a fixture to legal parameters based on current contract; test equality, oversize, zero/negative and normal passage retrieval. Keep exact source offset/evidence provenance and do not confuse deterministic lexical ordering with verified semantic truth.
+
+### CI-4875-006: embedded NUL in canonical world operation path
+
+**Observed:** Domain shard 2, skeleton/testing/test_jeeves_world_canon_operation_custody.py::test_rejects_embedded_nul_and_empty_path, encounters raw ValueError: embedded null byte. A NUL path must remain forbidden, but the intended public denial should be normalized before operating system functions receive it.
+
+**Smallest repair:** validate type, normalization and forbidden bytes before path conversion or descriptor calls. Raise the canonical stable denial and guarantee zero filesystem mutation. Test NUL, empty path, parent traversal, symlink race and non-string input. Do not treat this as permission to open more paths.
+
+### CI-4875-007: scripted demo stdin and forged terminal protection
+
+**Observed:** Domain shard 2, skeleton/testing/test_scene_campaign_script_demo.py::test_scripted_demo_cannot_read_stdin_or_forge_terminal raises SystemExit(2), requiring comparison with the intended public CLI API.
+
+**Smallest repair:** trace parser and demo source, determine whether this is a valid fail-closed denial poorly represented by a wrapper or an actual behavior regression. Keep hostile stdin unconsumed and model-authored fake terminal state unaccepted. Normalize the CLI error contract where required. Prove bounded response, no private input read and zero forged completion.
+
+### CI-4875-008: offline source pin and season duplicate-replay denial
+
+**Observed:** Domain shard 6, skeleton/testing/test_app_offline_mixed_library_epoch_successor.py::test_cli_fails_closed_without_pin fails with SystemExit(2). Separately skeleton/testing/test_harbor_crafting_season.py::test_missing_win_or_duplicate_replay_is_rejected fails the expected rejection regex.
+
+**Smallest repair:** inspect the precise negative path and public exception/exit expectations. Keep missing trusted source pin and duplicate unearned season win as hard denials. Repair only incompatible public wrapping or actual validation errors, never weaken the proof or ignore duplicate rewards. Verify exact unchanged epoch, source identity, event count, reward and replay sequence before/after denial.
+
+## 31.3 Dependency-ordered next validation
+
+1. Freeze PR #4875 latest exact head, compare branch overlap and confirm this run's source identities.
+2. Reproduce all listed failed tests with the exact current source. Capture first failure and localized owner, not just the failed test name.
+3. Fix public CLI command discovery and safe error semantics first. These unblock several independent game-demo and route tests without requiring new runtime services.
+4. Repair immutable story event ancestry and season replay correctness next, treating acknowledged game state as protected user data.
+5. Reconcile native batch/source pin admission and retrieval passage bounds without bypassing guards. Distinguish correct denial from accidental wrapper mismatch.
+6. Run focused positive and hostile-case suites, then all eight canonical domain shards. Cancelled shards are not qualified.
+7. Rerun exact-head Merge Readiness and every required independent workflow affected by the new patch. Verify composite success before even considering merge.
+8. Keep physical Windows 11/WSL2, Docker, actual GGUF guarded chat, real game-engine player input, data recovery, signing and launch acceptance separately held until observed.
+
+The suggested repair owners are BOT-09 for public CLI, BOT-05 for story CAS, BOT-06 for gameplay replay, BOT-03 for native batch/retrieval, BOT-02 for filesystem/epoch authority, BOT-04 for scripted campaign and BOT-12 for independent final-head proof. Source ownership remains determined by the machine authority, not by this suggested human scheduling table.
+
+## 31.4 Preservation of current good evidence
+
+A current-head successful Dragon Atlas backend source test is meaningful and should not be discarded merely because a prior fixture was broken. A current-head failed composite domain test is equally meaningful and should not be hidden by successful installer or secret-scan siblings. No bot may relabel a completed check under an ancestor SHA as current-head success, infer an unexecuted physical target test, waive source rights, modify required CI to skip failing functionality, or merge a deliberately held draft because a plan includes it.
+
+The primary implementation objective remains one safely installable and controllable AI game studio that can create, edit, genuinely play, diagnose, repair and export original games. Operational source-level green checks are necessary but not equivalent to that user-level achievement.
