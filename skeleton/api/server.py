@@ -1164,10 +1164,10 @@ def create_app() -> Any:
     # Realtime transport (ADR-realtime-transport, #4101): canonical SSE stream
     # GET /api/v1/events + POST /api/v1/presence, hub lifecycle owned here.
     from skeleton.api.realtime_routes import router as realtime_router
-    from skeleton.realtime import RealtimeHub, sealed_principal_authorizer
+    from skeleton.realtime import RealtimeHub, realtime_limits_from_env, sealed_principal_authorizer
     # Hub default is deny-all; the gate-verified principal opens channels and
     # per-event owner / job-grant checks decide delivery (Jenkins S1-1).
-    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer)
+    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer, **realtime_limits_from_env())
     app.state.realtime_hub = realtime_hub
     app.state.realtime_unsubscribe = None
     app.include_router(realtime_router, prefix="/api/v1")

@@ -185,7 +185,28 @@ async def ready(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.get("/metrics")
 async def metrics(state=Depends(_state)) -> Dict[str, Any]:
-    return _require(state.metrics, "Metrics").snapshot()
+    snapshot = _require(state.metrics, "Metrics").snapshot()
+    return _without_public_realtime(snapshot)
+
+
+def _without_public_realtime(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop ``realtime.*`` series when ``/metrics`` is a public dev surface.
+
+    With ``SKELETON_PUBLIC_DEV_SURFACES`` on, ``/api/v1/metrics`` bypasses the
+    gate; realtime counters then stay behind the sealed
+    ``/api/v1/events/slo`` (Jenkins #4128 Sev3).
+    """
+    from skeleton.api.server import _public_dev_surfaces_enabled
+
+    if not _public_dev_surfaces_enabled() or not isinstance(snapshot, dict):
+        return snapshot
+    out: Dict[str, Any] = {}
+    for section, values in snapshot.items():
+        if isinstance(values, dict):
+            out[section] = {k: v for k, v in values.items() if not str(k).startswith("realtime.")}
+        else:
+            out[section] = values
+    return out
 
 
 @router.get("/genesis")
