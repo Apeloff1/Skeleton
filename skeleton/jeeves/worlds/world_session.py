@@ -64,3 +64,29 @@ def restore(source: Any, receipt: Any) -> dict[str, Any]:
     if canonical(item) != canonical(expected):
         raise CanonError("session_state_mismatch")
     return expected
+
+
+MAX_RECEIPT_BYTES = 65536
+
+
+def export_json(source: Any, choice_ids: Any) -> bytes:
+    """Export a portable, bounded receipt without persisting unreviewed state."""
+    payload = canonical(replay(source, choice_ids))
+    if len(payload) > MAX_RECEIPT_BYTES:
+        raise CanonError("session_too_large")
+    return payload
+
+
+def restore_json(source: Any, payload: Any) -> dict[str, Any]:
+    """Parse an untrusted portable receipt with duplicate-key and size checks.
+
+    The browser and Python runtimes use the same receipt schema.  UTF-8 byte
+    bounds are applied before JSON decoding to prevent oversized allocations.
+    """
+    from skeleton.jeeves.worlds.world_canon import strict_json
+
+    if type(payload) is not bytes:
+        raise CanonError("invalid_session_payload")
+    if len(payload) > MAX_RECEIPT_BYTES:
+        raise CanonError("session_too_large")
+    return restore(source, strict_json(payload))
