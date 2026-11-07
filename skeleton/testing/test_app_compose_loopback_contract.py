@@ -17,8 +17,12 @@ class ConsumerLoopbackComposeTests(unittest.TestCase):
             ("frontend", "FRONTEND_PORT"),
         ):
             with self.subTest(service=service):
-                section = text.split("\\n  " + service + ":\\n", 1)[1]
-                section = section.split("\\n  ", 1)[0]
+                lines = text.splitlines()
+                start = lines.index("  " + service + ":")
+                end = next((i for i in range(start + 1, len(lines))
+                            if lines[i].startswith("  ") and not lines[i].startswith("    ")),
+                           len(lines))
+                section = "\n".join(lines[start:end])
                 self.assertIn(
                     '      - "127.0.0.1:${' + port + ':-',
                     section,
