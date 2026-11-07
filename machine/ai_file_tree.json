@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "repository mass-build slice and source inventory plane",
+      "reason": "Build-batch package and recorded source slices remain at their present top-level source path; classification is retention only, not approval to run unreviewed generated workloads, AI-tree cutover, or release."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7327,6 +7332,11 @@
       "path": "skeleton/parse",
       "owner": "package/parsing compatibility boundary",
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/perf_profiler",
+      "owner": "legacy application/runtime performance diagnostic compatibility plane",
+      "reason": "Existing top-level allocation, clock, frame and load-timing APIs remain available to consumers; AI runtime observability is separately owned under skeleton/ai/runtime/observability. Explicit import inversion, behavior parity and regression qualification are required before migration."
     },
     {
       "path": "skeleton/persist",
@@ -7772,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 162,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
