@@ -9,6 +9,7 @@ robots, DNS/socket egress, cumulative budgets and consent before fetching.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import re
 from urllib.parse import urlsplit
 import xml.etree.ElementTree as ET
@@ -22,7 +23,8 @@ XML_MEDIA = frozenset({
     "application/atom+xml",
 })
 GZIP_MEDIA = frozenset({"application/gzip", "application/x-gzip"})
-SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA
+JSON_MEDIA = frozenset({"application/feed+json", "application/json"})
+SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA | JSON_MEDIA
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 ATOM_NS = "http://www.w3.org/2005/Atom"
 MAX_XML_BYTES = 1_048_576
@@ -166,6 +168,11 @@ def parse_structured_discovery(
     canonical = canonicalize_url(document_url)
     if canonical != document_url or not policy.admits(canonical):
         raise DiscoveryError("structured source URL outside immutable crawl scope")
+    if media_type in JSON_MEDIA:
+        return parse_json_feed(
+            body, document_url=document_url, policy=policy,
+            max_links=max_links, max_entries=max_entries,
+        )
     document = _xml_bytes(body, media_type, document_url)
     root = _safe_tree(document)
     namespace, local = _local(root.tag)
@@ -268,3 +275,94 @@ def extract_robots_sitemaps(
         if len(found) >= max_sitemaps:
             break
     return tuple(found)
+
+def _no_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    record: dict[str, object] = {}
+    for name, value in pairs:
+        if name in record:
+            raise DiscoveryError("duplicate JSON Feed object key")
+        record[name] = value
+    return record
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise DiscoveryError("non-finite JSON Feed content is invalid")
+
+
+def parse_json_feed(
+    body: bytes, *, document_url: str, policy: CrawlPolicy,
+    max_links: int = 128, max_entries: int = 512,
+) -> StructuredDiscovery:
+    """Discover canonical item links from JSON Feed 1/1.1, never item content.
+
+    Also recognizes application/json when an explicit seed or queued URL
+    produces a well-formed, versioned JSON Feed. Full JSON is parsed into a
+    finite in-memory structure, but only bounded URLs are projected out.
+    """
+    if not isinstance(policy, CrawlPolicy):
+        raise TypeError("canonical immutable crawl policy required")
+    if (not isinstance(body, bytes) or len(body) == 0
+            or len(body) > MAX_XML_BYTES):
+        raise DiscoveryError("JSON Feed body exceeds the finite parse limit")
+    if (type(max_links) is not int or not 1 <= max_links <= MAX_DISCOVERY_LINKS
+            or type(max_entries) is not int or not 1 <= max_entries <= 1024):
+        raise ValueError("invalid JSON Feed discovery bounds")
+    canonical = canonicalize_url(document_url)
+    if canonical != document_url or not policy.admits(canonical):
+        raise DiscoveryError("JSON Feed URL is outside crawl source scope")
+    try:
+        decoded = body.decode("utf-8-sig", errors="strict")
+        data = json.loads(
+            decoded, object_pairs_hook=_no_duplicate_json_keys,
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (UnicodeError, RecursionError, json.JSONDecodeError) as exc:
+        raise DiscoveryError("unparseable bounded JSON Feed") from exc
+    if (
+        not isinstance(data, dict)
+        or data.get("version") not in (
+            "https://jsonfeed.org/version/1",
+            "https://jsonfeed.org/version/1.1",
+        )
+        or not isinstance(data.get("items"), list)
+        or len(data["items"]) > 4096
+    ):
+        raise DiscoveryError("unsupported or oversized JSON Feed document")
+    links = []
+    seen = set()
+    rejected = 0
+    capped = False
+    examined = 0
+    for item in data["items"]:
+        if examined >= max_entries:
+            capped = True
+            break
+        examined += 1
+        if not isinstance(item, dict):
+            rejected += 1
+            continue
+        raw = item.get("url") or item.get("external_url")
+        if not isinstance(raw, str) or not raw or len(raw.encode("utf-8")) > 4096:
+            rejected += 1
+            continue
+        try:
+            candidate = canonicalize_url(raw, base=canonical)
+            if candidate == canonical or not policy.admits(candidate):
+                raise ValueError("unadmitted JSON Feed item URL")
+        except (ValueError, UnicodeError):
+            rejected += 1
+            continue
+        if candidate in seen:
+            rejected += 1
+            continue
+        seen.add(candidate)
+        if len(links) >= max_links:
+            capped = True
+            break
+        links.append(candidate)
+    return StructuredDiscovery(
+        kind="json_feed", links=tuple(links),
+        examined_entries=examined,
+        discarded_entries=rejected,
+        capped=capped,
+    )

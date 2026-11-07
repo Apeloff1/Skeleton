@@ -206,9 +206,22 @@ class _Extractor(HTMLParser):
             self.skip += 1
         if tag == "title":
             self.in_title = True
-        if tag == "a" and not self.skip:
-            href = dict(attrs).get("href")
-            if href and len(self.links) < self.max_links and len(href) <= 4096:
+        if tag in ("a", "link") and not self.skip:
+            attributes = dict(attrs)
+            href = attributes.get("href")
+            eligible = tag == "a"
+            if tag == "link":
+                rel = set((attributes.get("rel") or "").lower().split())
+                mime = (attributes.get("type") or "").lower().split(";", 1)[0].strip()
+                eligible = (
+                    "next" in rel
+                    or ("alternate" in rel and mime in (
+                        "application/rss+xml", "application/atom+xml",
+                        "application/feed+json", "application/xml", "text/xml",
+                    ))
+                )
+            if (eligible and href and len(self.links) < self.max_links
+                    and len(href) <= 4096):
                 self.links.append(href)
 
     def handle_endtag(self, tag: str) -> None:
