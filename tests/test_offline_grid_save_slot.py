@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -54,6 +56,32 @@ class SaveSlotTests(unittest.TestCase):
             slot.write_text("{corrupt", encoding="utf-8")
             with self.assertRaises(json.JSONDecodeError):
                 read_slot(slot)
+
+    def test_real_cli_play_quit_and_run_save_slot(self):
+        """Exercise the real CLI entrypoint, not a simulated save writer."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slot = root / "slot.json"
+            process = subprocess.run(
+                [sys.executable, "-m", "scripts.game.offline_grid_campaign",
+                 "play", "--save-slot", str(slot)],
+                input="quit\\n", text=True, capture_output=True, timeout=30,
+            )
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertTrue(slot.is_file())
+            saved = read_slot(slot)
+            self.assertIsInstance(saved, dict)
+            self.assertEqual(json.loads(process.stdout.splitlines()[-1])["save"], saved)
+            commands = root / "commands.json"
+            commands.write_text("[]", encoding="utf-8")
+            second = subprocess.run(
+                [sys.executable, "-m", "scripts.game.offline_grid_campaign",
+                 "run", "--commands", str(commands), "--resume", str(slot),
+                 "--save-slot", str(slot)],
+                text=True, capture_output=True, timeout=30,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(json.loads(second.stdout)["save"], read_slot(slot))
 
     def test_parent_symlink_denied(self):
         with tempfile.TemporaryDirectory() as tmp:
