@@ -27,6 +27,7 @@ from .document_formats import ADDITIONAL_TYPES, extract_additional_format
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
 from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
 from .html_semantics import HTMLSemanticError, extract_html_semantics
+from .pdf_documents import PDF_MEDIA_TYPE, extract_pdf_document
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -132,6 +133,7 @@ class CrawlPolicy:
         "application/x-xml",
         "application/gpx+xml",
         "application/vnd.google-earth.kml+xml",
+        "application/pdf",
         "application/toml",
         "text/x-toml",
         "text/x-shellscript",
@@ -346,6 +348,11 @@ def extract_document(
     response: FetchResponse, canonical_url: str, *, max_links: int = 500, max_text_chars: int = 1_000_000
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
+    if ctype == PDF_MEDIA_TYPE:
+        pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars))
+        return _archive_document_response(
+            response, canonical_url, ctype, pdf.text, pdf.title, [], pdf.truncated,
+        )
     if ctype in ARCHIVE_TYPES:
         extracted = extract_archive_document(
             response.body, ctype, max_chars=max_text_chars,

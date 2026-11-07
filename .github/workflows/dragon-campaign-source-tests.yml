@@ -19,6 +19,9 @@ on:
       - "skeleton/ai/webcrawler/capture_rights.py"
       - "skeleton/ai/webcrawler/html_semantics.py"
       - "skeleton/ai/webcrawler/media_probe.py"
+      - "skeleton/ai/webcrawler/pdf_documents.py"
+      - "skeleton/ai/webcrawler/pdf_worker.py"
+      - "tests/test_ai_webcrawler_dragon_pdf_documents.py"
       - "tests/test_ai_webcrawler_dragon_media_probe.py"
       - "tests/test_ai_webcrawler_dragon_html_semantics.py"
       - "tests/test_ai_webcrawler_dragon_capture_rights.py"
@@ -68,6 +71,8 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
+      - name: Install pinned guarded PDF parser
+        run: python -m pip install --disable-pip-version-check "pypdf==7.0.0"
       - name: Compile the completed Dragon campaign stack
         run: |
           python -m compileall -q skeleton/ai/webcrawler/dragon_campaign_stack
@@ -85,6 +90,9 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/capture_rights.py
           python -m py_compile skeleton/ai/webcrawler/html_semantics.py
           python -m py_compile skeleton/ai/webcrawler/media_probe.py
+          python -m py_compile skeleton/ai/webcrawler/pdf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/pdf_worker.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_pdf_documents.py
           python -m py_compile tests/test_ai_webcrawler_dragon_media_probe.py
           python -m py_compile tests/test_ai_webcrawler_dragon_html_semantics.py
           python -m py_compile tests/test_ai_webcrawler_dragon_capture_rights.py
@@ -143,3 +151,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_capture_rights.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_html_semantics.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_media_probe.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_pdf_documents.py' -v

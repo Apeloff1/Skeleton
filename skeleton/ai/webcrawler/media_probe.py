@@ -16,6 +16,7 @@ _ARCHIVES = {
     ".odt": "application/vnd.oasis.opendocument.text",
     ".epub": "application/epub+zip",
 }
+_PDF = {".pdf": "application/pdf"}
 _XML = {
     ".xml": "application/xml",
     ".gpx": "application/gpx+xml",
@@ -46,6 +47,10 @@ def inspect_download_media(
     if declared not in _SOURCE_TYPES:
         return MediaDecision(declared, False, "declared_media_kept")
     path = urlsplit(url).path.lower()
+    if path.endswith(".pdf"):
+        if body.startswith(b"%PDF-"):
+            return MediaDecision("application/pdf", True, "pdf_magic_and_extension")
+        return MediaDecision(declared, False, "pdf_magic_missing")
     for extension, result in _ARCHIVES.items():
         if path.endswith(extension):
             if body[:4] == b"PK\x03\x04":

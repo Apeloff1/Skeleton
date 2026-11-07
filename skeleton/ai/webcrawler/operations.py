@@ -94,6 +94,8 @@ def implementation_digest():
                 "capture_rights.py",
                 "html_semantics.py",
                 "media_probe.py",
+                "pdf_documents.py",
+                "pdf_worker.py",
             )
         }
     )
