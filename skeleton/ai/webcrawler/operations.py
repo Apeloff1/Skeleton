@@ -922,7 +922,10 @@ class CrawlRun:
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-        media = inspect_download_media(url, ctype, response.body)
+        media = inspect_download_media(
+            url, ctype, response.body,
+            response.headers.get("content-disposition"),
+        )
         if media.inferred:
             # Only the effective parser type changes. Original raw bytes,
             # requested URL, wire digest and source policy remain unchanged.

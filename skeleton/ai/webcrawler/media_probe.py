@@ -8,6 +8,7 @@ Unknown/bad signatures remain unsupported binary rather than inert evidence.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from urllib.parse import urlsplit
 
 
@@ -40,9 +41,14 @@ class MediaDecision:
 
 def inspect_download_media(
     url: str, declared_type: str, body: bytes,
+    content_disposition: str | None = None,
 ) -> MediaDecision:
     if (
         not isinstance(url, str) or len(url) > 4096
+        or (content_disposition is not None and (
+            not isinstance(content_disposition, str)
+            or len(content_disposition) > 1024
+        ))
         or type(declared_type) is not str or len(declared_type) > 256
         or type(body) is not bytes or len(body) > 2_097_152
     ):
@@ -51,6 +57,17 @@ def inspect_download_media(
     if declared not in _SOURCE_TYPES:
         return MediaDecision(declared, False, "declared_media_kept")
     path = urlsplit(url).path.lower()
+    # RFC 6266 filename is an untrusted format hint, never a host/rights grant.
+    # Only a simple basename plus a matching magic signature is sufficient.
+    if content_disposition:
+        match = re.fullmatch(
+            r'(?is)attachment\s*;\s*filename\s*=\s*(?:"([a-z0-9_. -]{1,128})"|([a-z0-9_.-]{1,128}))\s*',
+            content_disposition.strip(),
+        )
+        if match:
+            hint = (match.group(1) or match.group(2)).lower()
+            if hint not in (".", "..") and not hint.startswith("."):
+                path = hint
     if path.endswith(".pdf"):
         if body.startswith(b"%PDF-"):
             return MediaDecision("application/pdf", True, "pdf_magic_and_extension")

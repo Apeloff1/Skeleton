@@ -52,6 +52,25 @@ def _coalesce_bounded_link_headers(
     normalized_headers["link"] = ", ".join(links)
 
 
+
+def _coalesce_bounded_xrobots_headers(
+    response_headers: list[tuple[str, str]],
+    normalized_headers: dict[str, str],
+) -> None:
+    """Preserve every site denial; malformed duplicates deny capture/follow."""
+    values = [
+        value for key, value in response_headers
+        if isinstance(key, str) and key.lower() == "x-robots-tag"
+    ]
+    if not values:
+        return
+    if (len(values) > 16 or any(not isinstance(x, str) for x in values)
+            or sum(len(x) for x in values) > 4096
+            or any(any(ord(char) < 32 for char in row) for row in values)):
+        normalized_headers["x-robots-tag"] = "none"
+        return
+    normalized_headers["x-robots-tag"] = ", ".join(values)
+
 class _PinnedHTTPConnection(http.client.HTTPConnection):
     def __init__(self, target: ResolvedTarget, timeout, *, deadline=None):
         super().__init__(target.host, target.port, timeout=timeout)
@@ -127,7 +146,7 @@ class SocketBoundFetcher:
         headers = {
             "Host": host_header,
             "User-Agent": user_agent,
-            "Accept": "text/html,text/plain,application/xhtml+xml;q=0.9",
+            "Accept": "text/html,application/xhtml+xml;q=0.9,application/xml;q=0.9,text/plain;q=0.8,application/json;q=0.8,application/pdf;q=0.7,application/epub+zip;q=0.5,*/*;q=0.1",
             "Accept-Encoding": "gzip, deflate, identity",
             "Connection": "close",
         }
@@ -212,6 +231,7 @@ class SocketBoundFetcher:
                 raise ValueError("ambiguous Content-Encoding headers")
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
+            _coalesce_bounded_xrobots_headers(response_headers, out_headers)
             if "content-length" in out_headers and "transfer-encoding" in out_headers:
                 raise ValueError("ambiguous response framing")
             if response.status in {301, 302, 303, 307, 308}:

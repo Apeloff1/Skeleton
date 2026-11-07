@@ -89,6 +89,27 @@ class SitePolicyFetcher:
         return FetchResponse(url, 200, headers, body, time.time())
 
 
+class RepeatedRobotsHeaderTests(unittest.TestCase):
+    def test_repeated_site_denials_cannot_be_overwritten(self):
+        from skeleton.ai.webcrawler.bound_http import _coalesce_bounded_xrobots_headers
+        headers={"x-robots-tag":"index"}
+        _coalesce_bounded_xrobots_headers([
+            ("X-Robots-Tag","noarchive"),("X-Robots-Tag","nofollow"),
+        ],headers)
+        rights=source_capture_rights(headers,PAGE,media_type="text/html")
+        self.assertFalse(rights.retain)
+        self.assertFalse(rights.follow)
+
+    def test_oversized_robots_metadata_denies_capture(self):
+        from skeleton.ai.webcrawler.bound_http import _coalesce_bounded_xrobots_headers
+        headers={}
+        _coalesce_bounded_xrobots_headers([
+            ("x-robots-tag","index"*1000),
+            ("x-robots-tag","noarchive"),
+        ],headers)
+        self.assertEqual(headers["x-robots-tag"],"none")
+
+
 class CanonicalSiteRightsTests(unittest.TestCase):
     def create(self, fetcher):
         at = time.time()

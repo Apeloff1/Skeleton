@@ -71,6 +71,28 @@ class MediaProbeTests(unittest.TestCase):
         )
         self.assertTrue(row.inferred)
 
+    def test_download_filename_recovers_real_docx_format(self):
+        row=inspect_download_media(
+            "https://example.com/download?id=1",
+            "application/octet-stream",b"PK\x03\x04zip",
+            'attachment; filename="flight_manual.docx"',
+        )
+        self.assertTrue(row.inferred)
+        self.assertEqual(row.effective_type,DOCX)
+
+    def test_download_filename_does_not_enable_executables_or_traversal(self):
+        for hint in (
+            'attachment; filename="../../escape.docx"',
+            'attachment; filename="evil.exe"',
+            'attachment; filename="a.docx"; x=y',
+        ):
+            with self.subTest(hint=hint):
+                row=inspect_download_media(
+                    "https://example.com/download",
+                    "application/octet-stream",b"PK\x03\x04zip",hint,
+                )
+                self.assertFalse(row.inferred)
+
     def test_bad_contracts_raise(self):
         for value in (None, 1, b"binary"):
             with self.assertRaises(ValueError):
