@@ -135,6 +135,22 @@ def _isolated_setup_recovery_command(manifest: object, *, hot: bool) -> tuple[st
     return (*command[:up_index + 1], "--no-deps", *command[up_index + 1:])
 
 
+def _probe_setup_route(frontend: object, url: str) -> bool:
+    """Best-effort setup availability; never replace a protected-stack failure.
+
+    Probe errors must not abort receipt publication. Do not retain exception
+    messages, which can include private hostnames, paths or credentials.
+    """
+    from skeleton.app.health import probe_local_setup
+
+    try:
+        return bool(probe_local_setup(
+            replace(frontend, public_url=url, health_path="/setup"), timeout=2.0,
+        ).ok)
+    except (OSError, ValueError, TypeError, KeyError, TimeoutError):
+        return False
+
+
 def install_application(
     root: Path | None = None,
     *,
@@ -364,22 +380,15 @@ def install_application(
                 )
             )
             if recovery.ok:
-                from skeleton.app.health import probe_local_setup
-
-                probe = probe_local_setup(
-                    replace(
-                        frontend,
-                        public_url=host_urls.get("frontend", frontend.public_url),
-                        health_path="/setup",
-                    ),
-                    timeout=2.0,
+                setup_available = _probe_setup_route(
+                    frontend, host_urls.get("frontend", frontend.public_url),
                 )
                 phases.append(
                     InstallPhase(
-                        "setup-ui-availability", probe.ok,
+                        "setup-ui-availability", setup_available,
                         (
                             "local setup route answered directly; backend and AI remain unavailable"
-                            if probe.ok
+                            if setup_available
                             else "setup route unavailable; inspect frontend logs"
                         ),
                         required=False,
@@ -443,8 +452,6 @@ def install_application(
         phase.name in ("readiness", "critical-api-routes") and not phase.ok
         for phase in phases
     ):
-        from skeleton.app.health import probe_local_setup
-
         frontend = manifest.service("frontend")
         if frontend.depends_on:
             phases.append(InstallPhase(
