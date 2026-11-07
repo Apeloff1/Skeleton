@@ -38,7 +38,7 @@ jobs:
           python -m pip install --disable-pip-version-check "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0" "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3" "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2" "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
       - name: Compile all guarded custody entrypoints and tests
         run: |
-          python -m compileall -q skeleton/app/offline_install_quarantine.py skeleton/app/offline_signed_game_library_audit.py skeleton/testing/test_app_offline_install_quarantine.py skeleton/testing/test_app_offline_signed_game_library_audit.py skeleton/testing/test_app_offline_signed_game_library_relocation.py skeleton/ai/runtime/production_fabric/product
+          python -m compileall -q skeleton/app/offline_install_quarantine.py skeleton/app/offline_signed_game_library_audit.py skeleton/ai/game_builder/dual_runtime_verify.py skeleton/testing/test_app_offline_install_quarantine.py skeleton/testing/test_app_offline_signed_game_library_audit.py skeleton/testing/test_app_offline_signed_game_library_relocation.py skeleton/testing/test_dual_runtime_verify.py skeleton/testing/test_app_studio_journey.py skeleton/ai/runtime/production_fabric/product
       - name: Reproduce first-playable source proof using a generated fixture
         env:
           PYTHONPATH: .:backend
@@ -82,7 +82,9 @@ jobs:
           python -m pytest -q --maxfail=1 \
             skeleton/testing/test_app_offline_install_quarantine.py \
             skeleton/testing/test_app_offline_signed_game_library_audit.py \
-            skeleton/testing/test_app_offline_signed_game_library_relocation.py
+            skeleton/testing/test_app_offline_signed_game_library_relocation.py \
+            skeleton/testing/test_dual_runtime_verify.py \
+            skeleton/testing/test_app_studio_journey.py
       - name: Prove single offline API dispatcher compatibility
         env:
           PYTHONPATH: .:backend

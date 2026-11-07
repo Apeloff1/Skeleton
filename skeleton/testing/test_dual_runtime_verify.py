@@ -33,6 +33,65 @@ def package(tmp_path: Path) -> tuple[Path, str]:
     return root, sha256((root / "release.json").read_bytes()).hexdigest()
 
 
+
+def test_studio_schema_cannot_be_invented_without_governed_metadata(package):
+    from skeleton.ai.game_builder.contracts import canonical_digest
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    root, _ = package
+    release = root / "release.json"
+    manifest = json.loads(release.read_text(encoding="utf-8"))
+    manifest["schema"] = "skeleton.game_builder.studio_package.v1"
+    body = {key: value for key, value in manifest.items()
+            if key != "manifest_digest"}
+    manifest["manifest_digest"] = canonical_digest(body)
+    release.write_bytes(_canonical_bytes(manifest))
+    with pytest.raises(DualRuntimeVerificationError, match="missing governed studio metadata"):
+        verify_exported_package(
+            root, expected_manifest_sha256=sha256(release.read_bytes()).hexdigest(),
+            authorized=True,
+        )
+
+
+def test_studio_schema_never_accepts_forged_publication_holds(tmp_path):
+    from skeleton.ai.game_builder.contracts import canonical_digest
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    from skeleton.ai.game_builder.original_game_studio import (
+        export_studio_run, run_original_game_studio,
+    )
+    intent = GameBuildIntent(
+        project_id="studio-hold-replay", title="Original Test",
+        subtitle="Strict source release holds", seed=1735,
+        levels=1, width=9, height=9, collectibles_per_level=1,
+        hazards_per_level=0, starting_health=3,
+    )
+    run = run_original_game_studio(
+        intent, authorized=True, mirror_attempts=64, companion_practice_games=0,
+    )
+    root = export_studio_run(run, str(tmp_path / "studio"), authorized=True)
+    release = root / "release.json"
+    pin = sha256(release.read_bytes()).hexdigest()
+    assert verify_exported_package(
+        root, expected_manifest_sha256=pin, authorized=True,
+    )["release_certified"] is False
+
+    gate_file = root / "studio" / "consumer_gate.json"
+    gate = json.loads(gate_file.read_text(encoding="utf-8"))
+    gate["evidence"]["approved_for_publication"] = True
+    gate["blockers"] = [x for x in gate["blockers"] if x != "approved_for_publication"]
+    gate_file.write_bytes(_canonical_bytes(gate))
+    manifest = json.loads(release.read_text(encoding="utf-8"))
+    manifest["files"]["studio/consumer_gate.json"] = sha256(gate_file.read_bytes()).hexdigest()
+    body = {key: value for key, value in manifest.items()
+            if key != "manifest_digest"}
+    manifest["manifest_digest"] = canonical_digest(body)
+    release.write_bytes(_canonical_bytes(manifest))
+    with pytest.raises(DualRuntimeVerificationError, match="studio release and approval holds"):
+        verify_exported_package(
+            root, expected_manifest_sha256=sha256(release.read_bytes()).hexdigest(),
+            authorized=True,
+        )
+
+
 def test_offline_export_replays_canonical_winning_game(package):
     root, pin = package
     receipt = verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)

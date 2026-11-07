@@ -32,6 +32,21 @@ _REQUIRED = frozenset({
 })
 
 
+
+_STUDIO_SCHEMA = "skeleton.game_builder.studio_package.v1"
+_STUDIO_FILES = frozenset({
+    "studio/pipeline.json", "studio/jeeves_dragon_tools.json",
+    "studio/executed_tool_receipts.json", "studio/mirror_room.json",
+    "studio/consumer_gate.json", "studio/companion_mirror_room.json",
+    "studio/companion_almanac.json", "studio/companion_practice.json",
+})
+_STUDIO_RELEASE_HOLDS = (
+    "rights_reviewed", "human_playtested", "platform_hardware_tested",
+    "accessibility_reviewed", "localization_reviewed",
+    "malware_scan_passed", "code_signed", "platform_permission_verified",
+    "approved_for_publication",
+)
+
 class DualRuntimeVerificationError(ValueError):
     """A published package is untrusted, inconsistent, or unsupported."""
 
@@ -284,6 +299,47 @@ def _assert_original_root(root: str | Path | int, descriptor: int) -> None:
         os.close(current)
 
 
+
+def _validate_studio_metadata(
+    files: dict[str, bytes], manifest: dict[str, object],
+) -> None:
+    """Constrain the explicitly admitted studio source schema, without release authority."""
+    if not _STUDIO_FILES <= files.keys():
+        raise DualRuntimeVerificationError("missing governed studio metadata")
+    pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+    consumer = _json(files["studio/consumer_gate.json"], _MAX_MANIFEST)
+    mirror_cohort = _json(files["studio/companion_mirror_room.json"], _MAX_MANIFEST)
+    almanac = _json(files["studio/companion_almanac.json"], _MAX_MANIFEST)
+    practice = _json(files["studio/companion_practice.json"], _MAX_MANIFEST)
+    if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+            or pipeline.get("project_id") != manifest.get("project_id")
+            or pipeline.get("not_automatically_published") is not True
+            or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
+            or not isinstance(pipeline.get("stages"), list)
+            or not pipeline["stages"]):
+        raise DualRuntimeVerificationError("invalid studio pipeline source")
+    evidence = consumer.get("evidence")
+    if (consumer.get("schema") != "skeleton.game_builder.consumer_review.v1"
+            or consumer.get("status") != "release-blocked"
+            or consumer.get("not_a_legal_opinion") is not True
+            or type(evidence) is not dict
+            or any(evidence.get(name) is not True for name in (
+                "original_source", "canonical_proof", "mirror_passed",
+            ))
+            or any(evidence.get(name) is not False
+                   for name in _STUDIO_RELEASE_HOLDS)
+            or consumer.get("blockers") != list(_STUDIO_RELEASE_HOLDS)):
+        raise DualRuntimeVerificationError("studio release and approval holds not satisfied")
+    if (mirror_cohort.get("native_hardware_playtests") is not False
+            or mirror_cohort.get("copyright_similarity_cleared") is not False
+            or almanac.get("parent_world_digest") != manifest.get("world_digest")
+            or almanac.get("human_playtests") is not False
+            or almanac.get("trained_model_weights") is not False
+            or practice.get("not_model_training") is not True
+            or practice.get("not_imported_game_expression") is not True):
+        raise DualRuntimeVerificationError("unsupported studio evidence promotion")
+
+
 def verify_exported_package(
     root: str | Path | int, *, expected_manifest_sha256: str, authorized: bool,
 ) -> dict[str, object]:
@@ -313,7 +369,10 @@ def verify_exported_package(
         manifest = _json(release, _MAX_MANIFEST)
         if release != _canonical_bytes(manifest):
             raise DualRuntimeVerificationError("noncanonical release JSON")
-        if manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1":
+        schema = manifest.get("schema")
+        if type(schema) is not str or schema not in (
+            "skeleton.game_builder.dual_runtime_package.v1", _STUDIO_SCHEMA,
+        ):
             raise DualRuntimeVerificationError("unsupported release schema")
         digest = manifest.get("manifest_digest")
         body = {key: value for key, value in manifest.items()
@@ -322,7 +381,11 @@ def verify_exported_package(
             raise DualRuntimeVerificationError("release manifest digest mismatch")
         if (manifest.get("automatic_publication") is not False
                 or manifest.get("godot_hardware_tested") is not False
-                or manifest.get("proof_status") != "python-simulated-winning-actions"):
+                or manifest.get("proof_status") != "python-simulated-winning-actions"
+                or any(manifest.get(flag) is True for flag in (
+                    "release_certified", "rights_certified",
+                    "native_device_qualified",
+                ))):
             raise DualRuntimeVerificationError("unsupported release authority claim")
         declared = manifest.get("files")
         if type(declared) is not dict or not 1 <= len(declared) <= _MAX_FILES:
@@ -346,6 +409,8 @@ def verify_exported_package(
             files[path] = payload
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package changed during verification")
+        if schema == _STUDIO_SCHEMA:
+            _validate_studio_metadata(files, manifest)
         if files["godot/proof.json"] != files["proof/verified_solution.json"]:
             raise DualRuntimeVerificationError("browser and Godot proofs differ")
         native = _json(files["godot/world.json"], _MAX_BYTES)
