@@ -170,4 +170,13 @@ from .evidence_family_stress import (
 
 from .forensics import AtlasForensics, compose_atlas_forensics, verify_atlas_forensics
 
+# Six-stage source-bound operational safety and replay qualification.
+from .ops_timeline import TimelineEvent, OperationalTimeline, inspect_operational_timeline
+from .ops_host_governor import OriginGuard, HostGovernor, govern_canonical_origins
+from .ops_recovery import RecoveryWitness, RecoveryHandshake, assess_restart_handshake
+from .ops_capacity import CapacityEnvelope, recommend_ops_capacity
+from .ops_dispatch_envelope import ProposedWorkFingerprint, DispatchEnvelope, prepare_dispatch_envelope
+from .ops_runbook import OperatorRunbookStep, OperatorRunbook, compile_operator_runbook
+from .ops_plane import OperationalStage, OperationalAssurance, compose_operational_assurance, verify_operational_assurance
+
 __all__ = [name for name in globals() if not name.startswith("_")]
