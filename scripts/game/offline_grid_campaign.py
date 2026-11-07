@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import stat
 import sys
+import tempfile
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.offline_grid_campaign import Campaign, Command, Session
@@ -38,12 +39,40 @@ def _read(path: Path) -> object:
         os.close(fd)
 
 
+def _write_save(path: Path, snapshot: dict) -> None:
+    """Publish a complete replay-verifiable save without replacing an existing slot.
+
+    The destination directory must already exist. The temporary file is
+    synced before a same-directory hard-link publishes the slot atomically.
+    """
+    data = (json.dumps(snapshot, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=False, allow_nan=False) + "\\n").encode("utf-8")
+    if len(data) > MAX_READ:
+        raise ValueError("save exceeds byte budget")
+    fd, temporary = tempfile.mkstemp(prefix=".grid-save-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)
+        if hasattr(os, "O_DIRECTORY"):
+            directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        os.unlink(temporary)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("inspect", "run", "play", "solve"))
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--commands", type=Path)
     parser.add_argument("--resume", type=Path)
+    parser.add_argument("--out-save", type=Path, help="Atomically create a new replay-verifiable save slot")
     parser.add_argument("--view-width", type=int, default=11)
     parser.add_argument("--view-height", type=int, default=9)
     parser.add_argument("--accessible", action="store_true")
@@ -55,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         campaign = Campaign.load(_read(args.source))
         camera = viewport(Session.new(campaign), args.view_width, args.view_height)
         if args.operation == "solve":
-            if args.commands or args.resume or not args.goal_ending:
+            if args.commands or args.resume or args.out_save or not args.goal_ending:
                 raise ValueError("solve requires goal and forbids commands/resume")
             from skeleton.game.gameplay.grid_playthrough_route import plan_playthrough
             result = plan_playthrough(
@@ -67,8 +96,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.goal_ending is not None or args.max_nodes != 1024 or args.max_depth != 64:
             raise ValueError("route options require solve")
         if args.operation == "inspect":
-            if args.commands or args.resume:
-                raise ValueError("inspect does not accept commands or resume")
+            if args.commands or args.resume or args.out_save:
+                raise ValueError("inspect does not accept commands, resume or save output")
             session = Session.new(campaign)
             print(json.dumps({"source_digest": campaign.source_digest, "map": session.render(),
                               "viewport": camera.record(),
@@ -99,7 +128,9 @@ def main(argv: list[str] | None = None) -> int:
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
             print()
-            print(json.dumps({"save": session.snapshot(), "map": session.render(),
+            if args.out_save is not None:
+            _write_save(args.out_save, session.snapshot())
+        print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
                              sort_keys=True))
             return 0
