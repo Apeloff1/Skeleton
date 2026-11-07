@@ -65,7 +65,7 @@ class SaveSlotTests(unittest.TestCase):
             process = subprocess.run(
                 [sys.executable, "-m", "scripts.game.offline_grid_campaign",
                  "play", "--save-slot", str(slot)],
-                input="quit\\n", text=True, capture_output=True, timeout=30,
+                input="quit\n", text=True, capture_output=True, timeout=30,
             )
             self.assertEqual(process.returncode, 0, process.stderr)
             self.assertTrue(slot.is_file())
