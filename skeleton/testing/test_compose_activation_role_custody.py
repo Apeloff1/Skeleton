@@ -7,8 +7,13 @@ from skeleton.ai.runtime.inference.compose_activation import (
 
 
 class MongoRoleCustodyTests(unittest.TestCase):
-    def test_missing_optional_roles_remain_observation_only(self):
-        self.assertEqual(_role_custody({"authInfo": {}}), ())
+    def test_missing_role_inventory_fails_closed(self):
+        for auth in ({"authInfo": {}}, {"authInfo": {"authenticatedUserRoles": None}}, {}):
+            with self.subTest(auth=auth), self.assertRaisesRegex(ActivationBlocked, "role custody"):
+                _role_custody(auth)
+
+    def test_explicit_empty_role_inventory_is_not_missing(self):
+        self.assertEqual(_role_custody({"authInfo": {"authenticatedUserRoles": []}}), ())
 
     def test_order_independent_role_identity(self):
         roles = [{"db": "admin", "role": "read"}, {"db": "local", "role": "write"}]
