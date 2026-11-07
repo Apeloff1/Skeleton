@@ -104,8 +104,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"Rejected: {exc}", file=sys.stderr)
             print()
             if args.save_slot is not None:
-            write_slot(args.save_slot, session.snapshot())
-        print(json.dumps({"save": session.snapshot(), "map": session.render(),
+                write_slot(args.save_slot, session.snapshot())
+            print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
                              sort_keys=True))
             return 0
@@ -114,11 +114,13 @@ def main(argv: list[str] | None = None) -> int:
         raw_commands = _read(args.commands)
         if not isinstance(raw_commands, list) or len(raw_commands) > 4096:
             raise ValueError("invalid command batch")
-        session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+        session = Session.restore(campaign, read_slot(args.resume)) if args.resume else Session.new(campaign)
         for item in raw_commands:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")
             session = session.step(Command(**item))
+        if args.save_slot is not None:
+            write_slot(args.save_slot, session.snapshot())
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                           "viewport": viewport(session, args.view_width, args.view_height).record()},
                          sort_keys=True))
