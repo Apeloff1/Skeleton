@@ -56,6 +56,10 @@
 - 41. Twelve-bot handoff ledger and end-user proof
 - 42. Frontier research portfolio
 - 43. Execution-ready 24-packet backlog
+- 44. Consumer first-install and reversible upgrade transaction
+- 45. Creator cockpit and coherent AI editing workspace
+- 46. Forge-to-engine action semantics and real gameplay parity
+- 47. Multi-scale living-world simulation and large RPG state
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -6114,3 +6118,170 @@ This is a new **integration workload index**, not a restart of the 301 existing 
 **Strict 12-bot coordination:** BOT-02 blocks unauthorized architecture change, BOT-01 controls first-install prerequisites, BOT-03 controls model/provider fidelity, BOT-04 coordinates execution, BOT-05/06/07/08 produce the actual game, BOT-09 packages it, BOT-10 produces legal research evidence, BOT-11 proves creator interaction, and BOT-12 independently challenges the whole path. The coordinating Grokbot may sequence and report these receipts but is not a substitute for the owners' actual code and target proof.
 
 **Evidence ledger rule:** use separate source, integration, interactive-engine, physical-device and release-qualified states. Existing PR #4880 remains **documentation-only**. This batch must not be mistaken for built features, test results or permission to merge any draft. The one-million-word target remains open; continue adding genuinely source-bound implementation detail while implementation of the accepted work packets takes precedence over volume inflation.
+
+# 44. Consumer first-install and upgrade as a reversible transaction
+
+**Packet:** DEEP-44 | **Lead:** BOT-01 | **Partners:** BOT-02 state/rights, BOT-03 local inference, BOT-09 toolchains, BOT-11 setup UI, BOT-12 independent device acceptance. **Source anchors inspected on main:** skeleton/app/first_install.py, skeleton/app/installer.py, skeleton/app/studio_readiness.py, skeleton/app/manifest.json, frontend/src/features/Setup/AppSetupWorkspace.tsx and the named offline install/recovery paths under skeleton/app. **Authority:** the already declared app/installation/identity/deployment owners; do not create a replacement installer.
+
+The first-install acceptance bar is unusual for an AI game studio: the user must be able to install the product even when neither a large GGUF nor the native game compiler is available. First install succeeds at a progressively capable local operating state; higher features are admitted only after authenticated evidence, rather than guessed from installed files. This distinction is already visible in the inspected setup UI, which gives host commands for installation, configuring the installation owner, local model provisioning and app doctor. Treat that as an initial operator surface, not proof of a seamless consumer wizard. The highest-value extension is **a reversible, state-aware installer with a truthful first-playable journey**, not a second set of install scripts.
+
+## 44.1 Host capability inventory before mutation
+
+The install session starts with read-only host inspection and persists an operator-visible preflight report. The report includes supported OS/build/architecture, available logical CPU topology, RAM and pressure class, GPU vendor and safe measurable memory ceiling, system and temporary disk capacity, filesystem behavior, permission model, WSL and Docker availability where appropriate, virtualization prerequisites, network mode, power state, existing installs and known data roots. Hardware IDs, usernames, raw environment strings and private network addresses are not eligible for unredacted public issue reports. Distinguish **observed**, **declared**, **unknown**, **unsupported**, **operator-action-required** and **rejected**; a missing GPU does not mean the application cannot run in CPU-only mode, while a missing required durable data store can block protected write functionality.
+
+Capacity computation must reserve headroom for OS, database, browser/editor, native toolchain, asset build cache, model runtime, KV and spill. Initial minimums are target-profile decisions backed by physical tests; do not derive universal gigabyte figures from LLM guesses. Choose bounded nonoverlapping paths for application, private credentials, model weights, durable user data, temporary build workers, cache and game-library exports. A detected older version must be handled as an upgrade candidate, not a new empty install. Reject filesystem locations that are unsafe under the platform's link/reparse-point and permission rules.
+
+Preflight performs no privilege escalation or irreversible host changes. Installer-recommended driver/WSL/Docker repairs are separately authorized human tasks. If a host cannot satisfy a declared full-game target, offer a truthful restricted mode: source browsing/editor, deterministic reference game previews or CPU-only local inference where physically feasible. A feature manifest advertises actual active capabilities rather than a global "installed" boolean.
+
+## 44.2 Install transaction journal and monotonic stage identity
+
+Use the existing installation custody/reconciliation owner to represent a single install transaction with immutable transaction ID, target source version, source/package digest, host profile, old installed state, stage receipts, migration decision and rollback route. The explanatory stage sequence is:
+
+**I-00 Discover:** read-only host and existing-data inventory. **I-01 Resolve:** architecture/source bundle and permitted offline dependencies. **I-02 Trust:** verify signature/digest/source policy and executable/active-content safety. **I-03 Capacity:** pre-reserve adequate bounded disk and allowed file roots. **I-04 Credentials:** create or reuse stable private application identities, never log them. **I-05 Stage:** place content in a new private immutable staging root, not the live installation. **I-06 Data backup:** consistent snapshots and schema/version/provenance records of all authoritative stores. **I-07 Migrate:** versioned, idempotent schema cutover under supported writer fences. **I-08 Services:** start database/engine/backend/frontend according to declared dependency order. **I-09 Verify:** authenticated protected health, route registry and operation readiness. **I-10 Studio:** prove an original real local game workflow for declared target; admit optional GGUF only after its independent guard. **I-11 Commit:** atomically switch the installed-version pointer, record evidence and preserve rollback assets within retention.
+
+These labels are a specification for mapping existing real install logic, not permission to introduce conflicting state enums or user data stores. Stage receipts are versioned with precondition/source digests, allowed mutations, observed outputs, warnings and compensation. A completed stage must remain idempotent after power loss; rerun reads the receipt and validates its postcondition before deciding whether it needs to act again. A stage cannot generate new production secrets merely because a previous response was lost. If an old install is still actively serving, perform a supported quiesce/fence and verify writer state before migration, not a process sleep.
+
+External installers and package managers may have unknown outcomes; reconcile their actual state before retries. On any failure, preserve prior user data and produce a plain-language exact recovery action, including paths to retained backups without disclosing secrets in a published report. A partial new runtime must not use the prior primary data store with incompatible schema. Checkpoint ordering must survive forced kill, disk-full and interrupted atomic rename.
+
+## 44.3 Canonical database and local derived-index recovery
+
+The machine/state_topology.json contract distinguishes primary Mongo authoritative domains, derived retrieval/vector stores, local process state and scoped SQLite receipts. Reuse each domain's declared consistency, migration, backup and retention semantics. Preserve independent identities of backend and engine Mongo logical databases where configured, while proving shared epoch and writer custody for protected cross-component operations. Do not create a "fresh clean database" behind the user's existing chat or project directory.
+
+The known Chroma persistence risk—old /chroma/chroma versus pinned /data—requires nondestructive dual-source inspection before any mount change. Stop affected writers, identify container layer and volume contents, capture consistent snapshots with SQLite journal awareness, verify checksums and logical collection counts, stage migration to the intended current mount and independently query representative vectors/metadata after container recreation. Derived indexes may be rebuilt only from retained authoritative sources with current rights. Conflicting old/new Chroma contents trigger manual reconciliation; do not guess the newest source from filesystem modification time alone. If optional Chroma cannot be recovered safely, the app can expose an explicitly degraded lexical/reference mode where policy permits rather than destroy historical data to satisfy readiness.
+
+Migration acceptance includes duplicate tenant IDs, interrupted batch, old process attempting to write, wrong replica-set topology, unknown schema version, driver downgrade, cache/state mismatch and missing backup. The fail-closed result protects authoritative state while keeping help/diagnostics reachable.
+
+## 44.4 Local inference bootstrap as a separate verified capability
+
+The inspected setup workspace already says downloading pinned weights alone does not make chat ready. Implement and prove the stronger chain: model download or offline import → byte size/digest verification → declared runtime/CPU/GPU compatibility → tokenizer and chat-template identity → architecture/policy bootstrap → reviewer and shared source epoch → canonical engine/provider admission → first authentic response → tool-authorized game edit. Each dependency has its own observed timestamp, scope, producer and recoverable failure reason. A valid offline source-only install must never silently activate an external provider or transmit project data to fetch "better" model performance.
+
+A physical GGUF run needs actual model load, controlled memory profile, resource reservations, context and tokenizer attestation and bounded cancellation/recovery. Avoid inferring readiness from CLI --version or fixture success. If the model is too large for hardware, show smaller compatible profiles with their measured tradeoffs; never thrash virtual memory until the host becomes unusable. Persist model identity as source artifact with tested runtime compatibility so a later app upgrade does not replace known-good weights accidentally.
+
+## 44.5 Router, service and UI readiness matrix
+
+skeleton/app/first_install.py contains critical_backend_route_report, which checks observed live /api/health/registry critical_routes rather than trusting a 200 /health. That is a useful fail-closed seam. Extend product readiness consumers to distinguish registered routes, authenticated feature availability, correct principal scope, data stores, engine/provider, model and native toolchains. Public readiness returns no private details or authorization rights. Backend route presence is not proof that the route's implementation succeeds; exercise authenticated requests and selected denial probes separately.
+
+The setup screen should be a progressive dashboard with host prerequisites, installed service state, missing actions, exact failing source of truth, repair command, safe recheck and last observed time. Keep setup UI usable even when engine, backend or model is unhealthy. No model or game build is required for browsing read-only setup. Buttons that claim "Repair" must actually route to an existing admitted repair operation or explicitly show a copyable host step; decorative controls or unbounded shell execution are not sufficient.
+
+Required device matrix: first clean install; pre-existing data; upgrade with prior user project; missing Docker; unavailable model; wrong architecture; offline package; corrupted downloaded artifact; full disk; interrupted migration; invalid owner credentials; stale engine; bad Chroma mount; valid model but untrusted reviewer; UI reachable under backend outage; complete target game playable; source-preserving uninstall/repair. Record OS/versions and exact code/package digests. Release remains held wherever physical Windows/WSL2 or native GGUF proof is absent.
+
+# 45. Creator cockpit: one coherent editing, simulation and AI-production workspace
+
+**Packet:** DEEP-45 | **Lead:** BOT-11 | **Partners:** BOT-02 identity, BOT-04 orchestration, BOT-05 worlds, BOT-06 game runtime, BOT-08 media, BOT-09 exporter, BOT-12 accessibility/acceptance. **Inspected main source surfaces:** frontend/src/features/Jeeves/GamePlayViewport.tsx, GameFrontierAuthoringPanel.tsx, GameStudioReadinessPanel.tsx, WorkspaceController.ts, GameStudioAssistantPanel.tsx, CrawlerWorkspace.tsx, and the game/product clients. The current frontend has many specialist panels; the completion task is to assemble them into a comprehensible creator's experience without suppressing advanced functions or inventing frontend authority.
+
+## 45.1 Intent-preserving creator workflow
+
+A creator opens a project and sees six persistent conceptual domains: **Design**, **World**, **Play**, **Assets**, **Build**, and **Proof**. These are navigational views over existing records, not six new data stores. The global header shows project name and revision, authenticated owner, dirty/committed state, active finite AI jobs, current target, capability availability, save/recovery status and conflicting proposals. A context side pane shows selected scene/entity/asset, provenance, dependencies, validation errors, editable properties and expected downstream impact. A bottom activity surface provides real operation events, logs and evidence—not freeform model "progress thoughts" disconnected from durable state.
+
+For novices, offer an assisted happy path: describe game → review options → create editable first scene → play with real controls → inspect issues → modify → rebuild → export. For experts, preserve granular typed editors, constraints, scene hierarchy, world event timeline, raw source view, input map, shader/asset inspector, performance traces, build graph and cause/effect debugging. Novice mode may hide complexity but must never produce a separate lower-integrity project variant. Project switching cancels or fences stale views; it does not silently cancel physical work or publish another project's mutation.
+
+## 45.2 One authoritative project/session projection
+
+Frontend local state is a UI projection: selection, open tabs, scroll, draft input, unsaved patch and ephemeral render cache. Canonical project revision, tool action results, play state, chat transcript and work progress come from the declared backend/engine authority. The inspected WorkspaceController already has a single-writer observable store, canonical-thread references, transport progress, retry fencing and injectable transport/storage. Extend these good patterns, rather than building a disconnected editor chat that assumes replies are durable.
+
+Every async request carries actor/session epoch, project ID, expected project revision and finite cancellation token. An auth change, project switch, source revision mismatch or user cancellation must fence stale results before React state mutation. Do not let an earlier network response replace a newer project view or resurrect private data from a previous account. On reconnect, request authoritative state and event cursor, merge only accepted local drafts and preserve explicit conflicts. A frontend toast saying "saved" should appear only after the actual owner acknowledged a committed revision.
+
+Dirty work recovery needs an authenticated local draft queue encrypted or otherwise protected according to platform/data class, bounded retention and explicit logout behavior. A browser's localStorage is not an authoritative source; offline edits are local proposals until replayed through CAS and rights checks. If a device restarts mid-edit, show "unsubmitted draft" versus "committed revision" unambiguously. Multiple open tabs/devices must detect conflicting edits and let the user inspect semantic diffs before merge.
+
+## 45.3 Semantic game editors instead of static forms
+
+The world editor should support scene-tree navigation, hierarchy and layers, brushes, entity placement, terrain/topology, collision affordances, tile/sprite and mesh binding, prefab instances, triggers, quests, dialogue, weather and cinematic timeline, while preserving real canonical operation IDs. The inspected GameFrontierAuthoringPanel exposes a large catalogue of terrain/structure/encounter operations over a live authenticated project. A long toolbar list is not sufficient usability: operations need searchable taxonomy, tooltips, typed parameters, preview, constraints, undo and actual compilation. Distinguish geometry operations that affect engine scenes from descriptive projections that propose content.
+
+For each edit show exact impacted nodes and dependent outputs. Editing a door collision shape can affect navigation, quest feasibility, physics, animation and player playtest. The build graph should preview affected cost and tests before commit. An agent proposing 100 operations presents a summarized grouped diff and the ability to inspect any individual mutation. A "bulk apply" must still be an authorized finite transaction with all mandatory preconditions; failed partial application returns a stable rollback/recovery record.
+
+Timeline UX needs multiple synchronized views: world story chronology, playable simulation ticks, animation clips, audio cues and cinematic track; never conflate logical game tick with real audio sample time or browser wall clock. Each view shows source origin and engine mapping where available. Users can scrub previews without mutating authoritative game state; a "commit at tick" action is a separate explicit test or game operation.
+
+## 45.4 Live play viewport fidelity and input ownership
+
+GamePlayViewport.tsx already maps keyboard and Gamepad controls to authenticated runtime play requests and handles recordings. That provides a concrete path toward a full studio cockpit. The next step is proving the viewport is synchronized with actual packaged engine state and the input mapping used by release. An authenticated server-side play session and a native Godot executable are not necessarily equivalent; expose their proof levels and map authoritative state/logic differences instead of declaring them identical.
+
+Input capture must handle focus, key-repeat, browser shortcuts, gamepad connect/disconnect, axis deadzones, touch control accessibility, pause/background events and fast release of held buttons. If the viewport loses focus, bounded release input must reach the authoritative session without spuriously continuing player movement; if network drops, clearly suspend or use a separately admitted offline local simulation mode. Never mutate canonical inventory or quest state directly from DOM key handlers. Session identity and recording permission must be scoped to the active project and actor.
+
+Replay UX shows exact source/game package, engine/version, seed, initial save, input trace, known nondeterministic tolerances, observed frames/audio and completion status. User can compare two play runs, jump to divergent ticks, inspect quest/world diffs, and create a bug repro linked to source. A local animated approximation may help editor responsiveness but must be labeled "preview" when it does not use the final runtime path.
+
+## 45.5 AI-assisted editing with inspectable autonomy
+
+Jeeves appears alongside the selected project object and may draft a proposal, produce alternative designs, explain a dependency, request a scoped tool operation or interpret a failed playtest. Do not implement "AI magic" as client-side direct provider calls. Every tool-bearing operation routes through current canonical ToolManifest/ToolExecutionRequest/Receipt and project revision CAS. The operator sees what data will be read, the exact files or entities to change, resource budget, deadline, expected side effects, reversibility and postconditions. A suggested action cannot become an approved action because a model writes "approved" in its reply.
+
+Support steerable execution: pause after design; ask for a visual proof; redirect focus to collision; replace a source asset; request smaller target; inspect a candidate before committing. Steering must create an authorized new operation/revision decision. A bot running on an obsolete source revision must be forced to re-evaluate before writing. The UI shows **planned**, **running**, **blocked**, **awaiting approval**, **verifying**, **committed**, **rejected** and **reconciling unknown outcome** using canonical status mappings.
+
+Human agency acceptance: an artist can override colors, textures, poses and dialogue without regeneration wiping changes; a designer can keep a disliked but intentional mechanic; and a user can disable AI while continuing to edit and play already built games. Any automatic regeneration must declare how it treats manual edits and use stable semantic IDs to avoid overwriting them.
+
+## 45.6 Accessibility, internationalization and large projects
+
+Keyboard-only navigation, screen reader labels, contrast, text scaling, reduced-motion animations, controller navigable command palette, remappable keys and game-specific accessible cues must work from setup to export. An accessibility editor should check not just panel WCAG-like properties but the game being authored: color-only puzzles, tiny timed inputs, flashing effects, captions and alternate interaction routes. Localization is versioned project content with string IDs, length/layout budgets, plural rules, subtitles and right-to-left handling where supported. The app should not invent unsupported language support; a translated label with broken gameplay text is not a complete locale.
+
+Large project performance needs virtualized scene trees, lazy inspector panels, indexed search, bounded media thumbnails, progressive loading, selective build statuses and memory-aware 3D previews. Do not push thousands of full prefab documents into one React state object or render all scenes to show an outline. Client cache must honor tenant/revision invalidation and memory pressure, and it should never retain deleted private artifacts across logout.
+
+## 45.7 Creator cockpit acceptance matrix
+
+Run actual authenticated user journeys in web and supported native interface: create project; author world; create/delete character; connect a quest; edit collider; preview movement; save/restart; agent proposes edit; reject one and approve another; play; encounter a bug; inspect real trace; fix; export; reopen old project; switch account while a request is in flight; lose network; reconnect with local draft; use keyboard-only navigation and a gamepad. Test on a realistic large synthetic project and on an actual small exported game. Each button/field must either execute a bound operation or clearly be a read-only/proposed feature. The independent tester may record intermediate screenshots, but they do not replace observed authoritative actions.
+
+# 46. Product runtime seam: source-level forge operations versus engine-executed gameplay
+
+**Packet:** DEEP-46 | **Lead:** BOT-06 | **Partners:** BOT-05 world/IR, BOT-07 generators, BOT-08 media, BOT-09 export, BOT-12 verification. **Source anchors:** skeleton/forge/game_frontier_studio.py describes declarative portable editing that returns proposals for canonical Godot/engine confirmation; GameFrontierAuthoringPanel and gamePlayClient consume authored and play state; multiple Godot adapters exist. The hard work is proving the actual lowering and runtime equivalence, not inventing more symbolic operations.
+
+## 46.1 One action, multiple representations, one semantics
+
+An action such as "player picks up key and unlocks door" may appear in a semantic world graph, a forge edit, an exported GDScript event, an engine signal, a UI log, and a saved-game event. These representations must agree on stable action identity, preconditions, side effects, idempotency and replay behavior. Define an **ActionSemanticsWitness** as a test receipt (not a new independent source of truth) mapping semantic rule ID → compiled source/scene nodes → real input event → observed engine state change → persisted world event → visual/audio output. Any missing link is a qualification gap.
+
+Create an engine mapping registry under the established exporter/target owner. Each supported operation declares what it lowers to, target feature requirements, unsupported cases, parameter bounds, emitted scripts/resources, runtime state readback and verification driver. Never generate an operation silently as a no-op; if a target cannot express a semantic rule, block that export or produce a user-approved explicit approximation with changed design spec and fresh tests.
+
+## 46.2 Typed event-compiler protocol
+
+For each authored event, validate trigger, condition, action, target and value against the real schema (game_frontier_studio.py already defines bounded StudioEvent types and finite trigger/action sets). Compile only validated safe symbols, not free-form model text that becomes GDScript or arbitrary shell command. Bind scene-node identities and user-authored rights. Escape strings and identifiers for the target language, enforce limits on recursion/iterations and reject unsupported foreign code execution. Target code runs with game's own permissions, not the app's service secrets.
+
+Event example: a collision trigger checks an inventory key; it consumes or retains the key according to authored semantics, opens a door once, emits a quest flag and audible cue, and produces a SaveEvent. On repeated collision or replay after restart, no duplicate item grant occurs. The same semantic rule evaluated by the deterministic reference model and Godot driver must produce equivalent state under the declared event ordering. Engine frames are independently captured so "open door" visibly changed geometry/collision.
+
+## 46.3 Player controller input-to-physics translation
+
+Normalize gamepad/keyboard/touch input to a stable input action schema with device origin, timestamp/tick, action phase, analog amplitude and remapping profile. Distinguish "pressed", "held", "released" and "repeated"; one frame of an action must not be mistaken for indefinite hold. Godot input processing and physics fixed ticks must define sampling, interpolation and authoritative event commit boundaries. For networked or remote previews, specify buffering, sequence and latency bounds without assuming deterministic remote frame timing.
+
+Collision/locomotion tests exercise jump buffer, slope, moving platform, portal crossing, constrained trigger volumes and player-camera occlusion for relevant genre. A reference algorithm may differ from actual Godot physics; define allowed tolerances and ensure tests detect material gameplay differences. Falling through a bridge, continuing motion after control release, wrong collision masks and input duplication must fail independent play checks.
+
+## 46.4 Simulation versus exported runtime parity suite
+
+Build an independent set of golden action traces for supported systems: quest flag, item grant/consume, door unlock, NPC notice/rumor, damage, save/reload, dialogue choice, timed trigger, puzzle mechanism and movement. Each trace specifies initial semantic state, source/target versions, step sequence, expected high-level invariants and observed native state. Run the same trace through the reference simulator and an exported Godot session. Compare state at explicit synchronization points, not merely final text. Differences may reveal an exporter bug, reference bug, unmodeled engine behavior or an unjustified assumption; record diagnosis and smallest patch owner.
+
+Require three divergence tests that are capable of failing the suite: alter one GDScript transition, remove one collision signal and change an inventory amount in the native side. The harness should reject all three. A suite that still passes after severing the engine adapter is not integration proof. Capture source SHA, toolchain executable hash, exported game digest, test driver and observed state/frame artifacts to prevent stale green receipts.
+
+## 46.5 Cross-target semantics and unsupported capabilities
+
+Define a target capability subset of the common game IR. An HTML maze, a 2D Godot RPG and a 3D native racing game may share goal/state concepts but not the same input/physics/renderer semantics. Compile-to-web or console adapters must explicitly declare which events, media, save methods, controllers and safety restrictions they support. Unsupported events are hard errors or reviewed degradations, never empty stubs disguised as success. Stable core mechanics are more important than nominally supporting every engine under one generic interface.
+
+When comparing engines, classify **bitwise deterministic**, **logical equivalent**, **perceptually equivalent** and **unsupported** behavior, with appropriate tolerance and proof. Physics may be logically equivalent despite frame timing differences; a color-only UI that hides a required goal is not perceptually equivalent for accessibility. The common semantics contract must preserve enough information to test these distinctions.
+
+# 47. Simulation architecture for deep RPG, sandbox and multi-world games
+
+**Packet:** DEEP-47 | **Lead:** BOT-05 | **Partners:** BOT-06 deterministic action engine, BOT-07 procedural generation, BOT-08 audiovisual world, BOT-09 save/export, BOT-12 simulation proof. **Status:** PROPOSED deeper integration over existing quest, scene, world-event and game-mechanics modules. Do not treat these features as absent merely because their target proof is unverified.
+
+## 47.1 Multi-scale world time and causality
+
+Separate gameplay fixed tick, world-calendar step, background simulation epoch, cinematic presentation time and real-world monotonic task clock. Each subsystem documents conversion and pause rules. Sleeping at an inn may advance world calendar and jobs but not duplicate combat input; a cutscene may pause player control but not the whole simulation if the design requests real-time background activity. Clock changes must be committed as typed world events and followed by deterministic dependent updates.
+
+Simulation partitions: active high-fidelity region (per-frame entities and physics), adjacent regions (lower-frequency path/economy AI), distant regions (aggregate deterministic transitions), dormant authored states (reconstructed by seed and event summaries). Promotion between fidelity tiers has a reconciliation rule: commitments from coarse simulation become concrete entities/events with stable IDs and conserved resources. A travelling trader must not appear in two regions because both generated it during independent activation. Streaming regions must preserve ordered causal transactions and authority fences.
+
+## 47.2 Regional society, economy and faction dynamics
+
+Model economic resources as typed stock-flow systems with production, consumption, transfer, prices, scarcity and conservation invariants. Player purchases, quest rewards, crafting and NPC trades interact with one canonical currency/item ledger for the game session. A market stall selling a rare item must actually reduce stock; a crafted item must consume declared components; a faction embargo must alter supply routes and gameplay. Inflation and dynamic pricing are optional authored features, not excuses for chaotic untestable behavior.
+
+Faction state includes reputation by actor/group, witnessed events, treaties, trade access, hostility, territory, goals and conflict rules. NPC rumors inherit observation and reliability. Simulate city logistics and ownership with deterministic event outcomes where practical. Prevent negative inventory, item duplication, unbounded prices, infinite trade arbitrage and social effects from hidden omniscience. Procedural regions must satisfy minimum resources for mandatory quests, or provide a verified migration/fallback path.
+
+## 47.3 Quest planner and encounter director as bounded search
+
+World and mission generation use hierarchical structures: chapters → acts → scenes → quests → encounters → atomic actions. For each goal, derive a causal plan with preconditions, resource budgets, alternative routes, fail/softlock recovery and witnessed completion. Use typed predicate graphs and bounded search (graph algorithms, constraint solvers or simulation) for feasibility; no unbounded recursive model call loop. High-level authored creativity remains human-editable and source-provenant. An NPC plan cannot change a quest condition simply because the player took an unexpected route.
+
+An encounter director adapts enemy mix, recovery windows and environmental pressure based on observable play state with explicit fairness ceilings. It may adjust pacing but must not rewrite signed world history, player inventory or irreversible choices. Record adaptation inputs and policy version for replay and quality evaluation. Prevent feedback loops where higher difficulty causes lower player health, causing an even harder encounter. Use bounded hysteresis and opt-out policies, especially for accessibility.
+
+## 47.4 World navigation, routes and spatial consistency
+
+Stable location IDs, canonical coordinate frames, local origins and transform composition govern portals, floating islands, dungeons, vehicles and multiverse transitions. A route can exist semantically while being physically blocked by collision/terrain; both graph and engine traversal must be checked. Crossing a portal should preserve player identity, inventory, time and required quest state while changing allowed world context. Failed loads retain the original safe location and one authoritative transfer outcome.
+
+Pathfinding must reflect terrain slope, climb/jump ability, doors, current faction access, environmental hazards, moving obstacles and dynamic costs. Use hierarchical nav meshes/graphs to bound enormous maps and replan only affected regions when terrain changes. For a 3D world, verticality and collision shape matter; two polygons connected in a map do not guarantee the player can traverse the actual scene. Independent agent input traces verify at least one feasible route for mandatory scenes.
+
+## 47.5 Save, replay and massive variation correctness
+
+Use stable seeds for authored environmental variation with explicit RNG stream version, but treat meaningful persistent world mutations as durable events. A world can have a huge procedural possibility space without storing every realized state. Content-addressed generated regions and aggregate snapshots reduce storage while preserving observed consequences. A save must retain required event ancestry and rights-aware media references; garbage collection cannot remove a dependency still needed by a live save or approved export.
+
+Acceptance campaigns: 10,000 or more simulated offscreen steps within a declared bounded test envelope; deterministic replay under fixed seed/implementation; no duplicate unique IDs across streamed regions; no negative conserved resources; two causally distinct endings; player transfer across regions while save/reload occurs; NPC knowledge restricted to observations; economy updates during world-clock jumps; late quest edit invalidates dependent missions but not all unrelated art. These are proposed tests, not results. Report memory, CPU, storage and actual user-visible quality, not just the number of procedural configurations.
+
