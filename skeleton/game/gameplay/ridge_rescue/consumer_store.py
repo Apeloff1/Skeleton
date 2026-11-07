@@ -233,6 +233,10 @@ class SlotStore:
 
     def export(self, name: str) -> Path:
         name = _slot(name)
+        # An export must not bless a snapshot whose durable action ledger has
+        # been altered independently of the replayable session. Audit before
+        # publishing any portable artifact; failures leave no export behind.
+        self.audit(name)
         verified = self.load(name)
         bundle = export_campaign(verified["session"])
         if verify_export(bundle)["head"] != verified["head"]:
