@@ -167,6 +167,37 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             await gate.assert_active(permit)
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
+    async def test_role_rotation_during_reviewer_challenge_denies(self):
+        async def rotate(_payload):
+            self.database.auth["authInfo"]["authenticatedUserRoles"] = [
+                {"db": "admin", "role": "read"},
+            ]
+        self.reviewer.on_challenge = rotate
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "principal changed"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
+    async def test_role_rotation_during_final_epoch_read_denies(self):
+        original = self.epoch.read_epoch
+        calls = 0
+
+        async def rotating_epoch(**kwargs):
+            nonlocal calls
+            calls += 1
+            result = await original(**kwargs)
+            if calls == 2:
+                self.database.auth["authInfo"]["authenticatedUserRoles"] = [
+                    {"db": "admin", "role": "read"},
+                ]
+            return result
+
+        self.epoch.read_epoch = rotating_epoch
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "principal changed"):
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+
     async def test_activation_and_rechecks(self):
         gate = self.make()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
