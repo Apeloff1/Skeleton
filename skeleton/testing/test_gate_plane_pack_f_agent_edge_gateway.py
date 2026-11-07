@@ -253,6 +253,9 @@ SERVER_PY_ALLOWED_LINES = frozenset({
     # Realtime hub limits moved to skeleton/realtime/limits.py by Walt's #4253.
     "from skeleton.realtime import RealtimeHub, realtime_limits_from_env, sealed_principal_authorizer",
     "realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer, **realtime_limits_from_env())",
+    # Original lines #4253 replaces (removed side of its server.py diff).
+    "from skeleton.realtime import RealtimeHub, sealed_principal_authorizer",
+    "realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer)",
 })
 _SERVER_PY_FORBIDDEN_TOKENS = ("on_event", "lifespan", "startup", "shutdown")
 
