@@ -4,6 +4,9 @@ Usage:
     python -m skeleton <command> [options]
 
 Commands:
+    setup       First-run setup: local config, readiness checks, next steps
+                Use `setup --check` to report without writing anything
+    doctor      Check this install and explain how to fix problems (--live, --json)
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     run         Start the skeleton runtime / GameForge vision run
     forge       Blueprint compilation and materialization
@@ -497,6 +500,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd = args[0]
     rest = args[1:]
+    if cmd == "setup":
+        from skeleton.app.onboarding import run_setup_cli
+        return run_setup_cli(rest)
+    if cmd == "doctor":
+        from skeleton.app.onboarding import run_doctor_cli
+        return run_doctor_cli(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)
@@ -526,7 +535,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
     if cmd in ("help", "-h", "--help"): print(__doc__); return 0
-    print(f"Unknown command: {cmd}"); print(__doc__); return 1
+    from skeleton.app.onboarding import suggest_command
+    from skeleton.app.runtime.audit_parse import main_cli_help_commands
+    hint = suggest_command(cmd, main_cli_help_commands())
+    print(f"Unknown command: {cmd}" + (f". Did you mean `{hint}`?" if hint else ""))
+    print("Run `python -m skeleton help` to see all commands.")
+    return 1
 
 
 if __name__ == "__main__":
