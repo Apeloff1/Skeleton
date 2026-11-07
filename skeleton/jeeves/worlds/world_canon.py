@@ -335,8 +335,10 @@ _PLAYER_JS = r"""
 "use strict";
 const model = JSON.parse(document.getElementById("world-data").textContent);
 const world = model.world;
+const sourceDigest = model.proof.source_digest;
 const byId = new Map(world.scenes.map(s => [s.id, s]));
 const ending = new Map(world.endings.map(e => [e.scene, e.label]));
+const byChoice = new Map(world.choices.map(c => [c.id, c]));
 let current = world.start;
 let flags = new Set();
 let trace = [];
@@ -345,6 +347,46 @@ function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
   return node;
+}
+function replayTrace(ids) {
+  if (!Array.isArray(ids) || ids.length > 512) throw Error("invalid_session_trace");
+  let scene = world.start;
+  const acquired = new Set();
+  for (const id of ids) {
+    if (typeof id !== "string" || !/^[a-z][a-z0-9_-]{0,47}$/.test(id))
+      throw Error("invalid_session_choice");
+    const choice = byChoice.get(id);
+    if (!choice || ending.has(scene) || choice.from !== scene ||
+        !choice.requires.every(f => acquired.has(f)))
+      throw Error("invalid_session_transition");
+    choice.grants.forEach(f => acquired.add(f));
+    scene = choice.to;
+  }
+  return {schema: "jeeves.world.session.v1", source_digest: sourceDigest,
+    scene, flags: Array.from(acquired).sort(), trace: ids.slice(),
+    ended: ending.has(scene)};
+}
+function exportReceipt() {
+  return JSON.stringify(replayTrace(trace));
+}
+function importReceipt(text) {
+  if (typeof text !== "string" || text.length > 65536) throw Error("session_too_large");
+  const receipt = JSON.parse(text);
+  if (!receipt || Array.isArray(receipt) || typeof receipt !== "object" ||
+      Object.keys(receipt).sort().join(",") !==
+      "ended,flags,scene,schema,source_digest,trace")
+    throw Error("invalid_session_fields");
+  if (receipt.schema !== "jeeves.world.session.v1" ||
+      receipt.source_digest !== sourceDigest) throw Error("session_stale_source");
+  const expected = replayTrace(receipt.trace);
+  if (JSON.stringify(receipt.trace) !== JSON.stringify(expected.trace) ||
+      JSON.stringify(receipt.flags) !== JSON.stringify(expected.flags) ||
+      receipt.scene !== expected.scene || receipt.ended !== expected.ended)
+    throw Error("session_state_mismatch");
+  current = expected.scene;
+  flags = new Set(expected.flags);
+  trace = expected.trace;
+  render();
 }
 function render() {
   root.replaceChildren();
@@ -359,20 +401,38 @@ function render() {
       current = world.start; flags = new Set(); trace = []; render();
     });
     root.append(restart);
-    return;
+  } else {
+    const choices = world.choices.filter(c => c.from === current &&
+      c.requires.every(f => flags.has(f)));
+    for (const choice of choices) {
+      const button = element("button", choice.label);
+      button.addEventListener("click", () => {
+        for (const flag of choice.grants) flags.add(flag);
+        trace.push(choice.id);
+        current = choice.to;
+        render();
+      });
+      root.append(button);
+    }
   }
-  const choices = world.choices.filter(c => c.from === current &&
-    c.requires.every(f => flags.has(f)));
-  for (const choice of choices) {
-    const button = element("button", choice.label);
-    button.addEventListener("click", () => {
-      for (const flag of choice.grants) flags.add(flag);
-      trace.push(choice.id);
-      current = choice.to;
-      render();
-    });
-    root.append(button);
-  }
+  const label = element("label", "Portable session receipt");
+  const field = document.createElement("textarea");
+  field.id = "session-receipt";
+  field.rows = 5;
+  field.cols = 48;
+  label.append(field);
+  root.append(label);
+  const save = element("button", "Export session");
+  save.addEventListener("click", () => { field.value = exportReceipt(); });
+  root.append(save);
+  const load = element("button", "Restore session");
+  const status = element("p", "");
+  status.setAttribute("role", "status");
+  load.addEventListener("click", () => {
+    try { importReceipt(field.value); }
+    catch (error) { status.textContent = "Restore rejected: " + error.message; }
+  });
+  root.append(load, status);
 }
 render();
 """.strip()
