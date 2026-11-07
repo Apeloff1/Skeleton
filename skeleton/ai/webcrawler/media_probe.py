@@ -39,6 +39,46 @@ class MediaDecision:
     external_network_authority: bool = False
 
 
+def valid_media_receipt(
+    effective_type: object,
+    declared_type: object,
+    inferred: object,
+    reason: object,
+) -> bool:
+    """Validate optional stored MIME provenance without trusting source text.
+
+    Legacy snapshots omit all three extension fields and are admitted by the
+    calling snapshot validator. A present receipt is indivisible, and only
+    media_probe's finite, explicitly recognized decisions are accepted.
+    This checks stored metadata consistency, not an unavailable raw body.
+    """
+    if (
+        type(effective_type) is not str
+        or type(declared_type) is not str
+        or not 0 < len(declared_type) <= 256
+        or type(inferred) is not bool
+        or type(reason) is not str
+    ):
+        return False
+    if inferred:
+        if declared_type not in _SOURCE_TYPES or declared_type == effective_type:
+            return False
+        expected = {
+            "pdf_magic_and_extension": set(_PDF.values()),
+            "finite_archive_magic_and_extension": set(_ARCHIVES.values()),
+            "finite_xml_prefix_and_extension": set(_XML.values()),
+        }
+        return effective_type in expected.get(reason, ())
+    if declared_type != effective_type:
+        return False
+    if declared_type in _SOURCE_TYPES:
+        return reason in {
+            "pdf_magic_missing", "archive_magic_missing",
+            "xml_magic_missing", "unsupported_binary_media",
+        }
+    return reason == "declared_media_kept"
+
+
 def inspect_download_media(
     url: str, declared_type: str, body: bytes,
     content_disposition: str | None = None,

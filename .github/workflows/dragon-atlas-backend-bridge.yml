@@ -5,6 +5,11 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "backend/core/dragon_crawler.py"
+      - "skeleton/ai/webcrawler/core.py"
+      - "skeleton/ai/webcrawler/operations.py"
+      - "skeleton/ai/webcrawler/media_probe.py"
+      - "tests/test_ai_webcrawler_dragon_atlas.py"
+      - "tests/test_ai_webcrawler_dragon_mime_custody.py"
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_atlas_bridge.py"
       - "skeleton/ai/webcrawler/dragon_campaign_stack/**"
@@ -27,6 +32,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Prove exact source head identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Supported Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -42,8 +52,16 @@ jobs:
         run: |
           python -m py_compile backend/core/dragon_crawler.py
           python -m py_compile backend/tests/test_dragon_atlas_bridge.py
+          python -m py_compile skeleton/ai/webcrawler/operations.py
+          python -m py_compile skeleton/ai/webcrawler/media_probe.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_mime_custody.py
       - name: Verify actual read-only application adapter with forged storage races
         env:
           PYTHONPATH: ".:backend:tests"
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m unittest discover -s backend/tests -p 'test_dragon_atlas_bridge.py' -v
+      - name: Verify legacy and forged media provenance remains fail closed
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_mime_custody.py' -v
