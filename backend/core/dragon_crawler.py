@@ -682,6 +682,9 @@ class DragonCrawlerApplication:
             ResearchObjective, SourcePolicyDecision, ReviewEffort,
             compose_dragon_atlas, verify_dragon_atlas_trace,
         )
+        from skeleton.ai.webcrawler.dragon_campaign_stack.forensics import (
+            compose_atlas_forensics, verify_atlas_forensics,
+        )
 
         row = await self._owned(scope, identifier)
         snapshot, _ = self._campaign_authority(row)
@@ -735,6 +738,15 @@ class DragonCrawlerApplication:
         )
         verify_dragon_atlas_trace(
             mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
+        )
+        # Forensic analysis consumes only the authenticated exact-source Atlas
+        # and emits metadata-only, review-held receipts. Never include Frame text.
+        forensic = compose_atlas_forensics(
+            mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
+        )
+        verify_atlas_forensics(
+            mandate, snapshot, atlas, forensic,
+            now=_now().timestamp(), authorized=True,
         )
         # A second authenticated Mongo read fences revision/policy races.
         # Consumers still MUST recheck both sources and consent before use.
@@ -1216,6 +1228,52 @@ class DragonCrawlerApplication:
                 "actual_dispatches": 0,
                 "resource_sample_required": atlas.pressure is None,
                 "externally_authorized": False,
+            },
+            "forensics": {
+                "report_digest": forensic.report_digest,
+                "frame_set_digest": forensic.frame_set_digest,
+                "atlas_digest": forensic.atlas_digest,
+                "source_policy_digest": forensic.source_policy_digest,
+                "retrieval_digest": forensic.retrieval_digest,
+                "stages": [
+                    {
+                        "ordinal": entry.number,
+                        "name": entry.name,
+                        "receipt_digest": entry.receipt_digest,
+                        "chain_digest": entry.chain_digest,
+                    } for entry in forensic.stages
+                ],
+                "selected_passages": forensic.selected_anchor_count,
+                "selected_sources": forensic.selected_source_count,
+                "security_held_passages": forensic.security.held_passages,
+                "security_held_sources": len(forensic.security.held_sources),
+                "active_content_held_sources": len(forensic.active_content.held_source_ids),
+                "privacy_held_sources": len(forensic.privacy.held_source_ids),
+                "cross_host_sentence_echoes": forensic.echoes.cross_host_echo_count,
+                "source_reuse_components": len(forensic.reuse.components),
+                "possible_polarity_collisions": len(forensic.polarity.leads),
+                "low_information_passages": forensic.boilerplate.possible_padding_passage_count,
+                "capture_age_held_sources": len(forensic.freshness.held_source_ids),
+                "overlap_excess_characters": forensic.geometry.total_overlap_excess_characters,
+                "concentrated_objectives": forensic.exposure.concentration_review_objectives,
+                "review_tasks": len(forensic.reviews.tasks),
+                "critical_review_tasks": forensic.reviews.severe_count,
+                "review_queue": [
+                    {
+                        "task_id": item.task_id,
+                        "risk": item.risk,
+                        "reason": item.reason,
+                        "source_ids": item.source_ids,
+                        "objective_ids": item.objective_ids,
+                        "model_may_decide": False,
+                    }
+                    for item in forensic.reviews.tasks[:24]
+                ],
+                "source_bodies_redacted": True,
+                "human_review_required": True,
+                "publication_granted": False,
+                "training_permission": False,
+                "network_or_model_invoked": False,
             },
             "scorecard": {
                 "digest": atlas.scorecard.scorecard_digest,
