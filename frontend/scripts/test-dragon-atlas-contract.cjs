@@ -256,7 +256,7 @@ test('operator sitemap discovery is explicit, bounded and carried into the creat
   assert.match(source, /discover_sitemaps:\s*discoverSitemaps/);
   assert.match(source, /setDiscoverSitemaps\(false\)/);
   assert.match(source, /value=\{discoverSitemaps\}/);
-  assert.match(source, /XML sitemaps, gzip sitemaps or RSS\/Atom feeds/);
+  assert.match(source, /XML sitemaps, gzip sitemaps, RSS\/Atom feeds or JSON Feed/);
 });
 
 test('panel and surrounding workspace compile as TSX', () => {
