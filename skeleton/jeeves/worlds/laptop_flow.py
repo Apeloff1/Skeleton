@@ -99,18 +99,45 @@ class LaptopFlow:
 
     def review(self, world_id: str, expected_digest: str, operation: Any,
                review_note: str) -> dict[str, Any]:
+        """Publish an explicitly reviewed edit under one canonical writer lease.
+
+        Source CAS, proof, and review custody share a single lock. A concurrent
+        editor cannot slip a revision between publication and approval. If the
+        second durable write fails, the source remains unapproved (fail closed).
+        """
         _id(world_id, "world_id")
         _text(review_note, "review_note", 512)
         if len(review_note.strip()) < 8:
             raise CanonError("review_note_too_short")
-        current = self.worlds.read(world_id)
-        if digest(current) != expected_digest:
-            raise CanonError("stale_source")
-        revised = edit(current, operation)
-        if digest(revised) == expected_digest:
-            raise CanonError("review_requires_change")
-        new_digest = self.worlds.publish(revised, expected_digest=expected_digest)
-        return self.approve_current(world_id, new_digest, review_note)
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                current = self._world(fd, world_id)
+                if digest(current) != expected_digest:
+                    raise CanonError("stale_source")
+                revised = edit(current, operation)
+                new_digest = digest(revised)
+                if new_digest == expected_digest:
+                    raise CanonError("review_requires_change")
+                proof = prove(revised).as_dict()
+                review = {
+                    "schema": REVIEW_SCHEMA, "world_id": world_id,
+                    "source_digest": new_digest, "review_note": review_note,
+                }
+                # A previously approved digest is invalid after the source
+                # publication. Review is committed only after canonical bytes.
+                self.worlds._write(fd, world_id + ".json", canonical(revised))
+                self.worlds._write(fd, self._names(world_id)[0], canonical(review))
+                return {
+                    "world_id": world_id, "source_digest": new_digest,
+                    "review_digest": digest(review), "proof": proof,
+                    "reviewed": True,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def approve_current(self, world_id: str, expected_digest: str,
                         review_note: str) -> dict[str, Any]:
