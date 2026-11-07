@@ -172,6 +172,11 @@ def implementation_digest():
                 "asyncapi_documents.py",
                 "proto_documents.py",
                 "interface_artifacts.py",
+                "graph_topology.py",
+                "graphml_documents.py",
+                "gexf_documents.py",
+                "dot_documents.py",
+                "graph_artifacts.py",
             )
         }
     )

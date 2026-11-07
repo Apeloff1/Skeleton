@@ -28,6 +28,7 @@ from .document_formats import (
     HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
     TECHNICAL_MEDIA_TYPES, ASSET_TEXT_MEDIA_TYPES, SUPPLY_CHAIN_TYPES,
     SCENE_ASSET_TYPES, PACKAGE_LOCK_TYPES, INTERFACE_TYPES,
+    GRAPH_ARTIFACT_TYPES,
     DocumentFormatError, extract_additional_format,
 )
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
@@ -180,6 +181,12 @@ class CrawlPolicy:
         "text/patch",
         "application/vnd.citationstyles.csl+json",
         "application/x-csl+json",
+        "application/graphml+xml",
+        "application/x-graphml+xml",
+        "application/gexf+xml",
+        "application/x-gexf+xml",
+        "text/vnd.graphviz",
+        "text/x-dot",
         "application/vnd.graphql.introspection+json",
         "application/graphql-response+json",
         "application/vnd.asyncapi+json",
@@ -516,7 +523,8 @@ def extract_document(
                  | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
                  | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES
                  | SUPPLY_CHAIN_TYPES | SCENE_ASSET_TYPES
-                 | PACKAGE_LOCK_TYPES | INTERFACE_TYPES):
+                 | PACKAGE_LOCK_TYPES | INTERFACE_TYPES
+                 | GRAPH_ARTIFACT_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):

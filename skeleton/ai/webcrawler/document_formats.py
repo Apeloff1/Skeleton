@@ -27,6 +27,7 @@ from .supply_chain_artifacts import SUPPLY_CHAIN_TYPES, extract_supply_chain_art
 from .scene_asset_formats import SCENE_ASSET_TYPES, extract_scene_asset
 from .package_lock_artifacts import PACKAGE_LOCK_TYPES, extract_package_lock
 from .interface_artifacts import INTERFACE_TYPES, extract_interface_artifact
+from .graph_artifacts import GRAPH_ARTIFACT_TYPES, extract_graph_artifact
 
 
 MARKDOWN_TYPES = frozenset({"text/markdown", "text/x-markdown"})
@@ -52,6 +53,7 @@ ADDITIONAL_TYPES = (
     | RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
     | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES | SUPPLY_CHAIN_TYPES
     | SCENE_ASSET_TYPES | PACKAGE_LOCK_TYPES | INTERFACE_TYPES
+    | GRAPH_ARTIFACT_TYPES
 )
 
 _MD_LINK = re.compile(
@@ -346,6 +348,15 @@ def extract_additional_format(
     raw: str, media_type: str, *, max_chars: int,
     max_links: int,
 ) -> ExtractedFormat:
+    if media_type in GRAPH_ARTIFACT_TYPES:
+        try:
+            row=extract_graph_artifact(raw,media_type,max_chars=max_chars,max_links=max_links)
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return ExtractedFormat(
+            text=row.text,title=row.title,links=(),truncated=row.truncated,
+            body_executed=False,reference_trusted=False,
+        )
     if media_type in INTERFACE_TYPES:
         try:
             row = extract_interface_artifact(
