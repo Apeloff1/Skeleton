@@ -667,7 +667,26 @@ class JeevesCortex:
         if blob.get("bpe"):
             from skeleton.cortex.bpe import BytePairEncoder
             self.bpe = BytePairEncoder.from_snapshot(blob["bpe"])
+        self._relink_bpe()
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
+
+    def _relink_bpe(self) -> None:
+        """Point every owned mouth at the cortex BPE (as __init__ does).
+
+        load() restores transformers (fresh objects without ``bpe``) and the
+        encoder itself after the early link, so without this the neo mouth
+        keeps the pre-load encoder and slot mouths fall back to word ids.
+        """
+        bpe = getattr(self, "bpe", None)
+        if bpe is None:
+            return
+        for xf in (getattr(self, "transformer", None), getattr(self, "neo_rms", None)):
+            if xf is not None:
+                xf.bpe = bpe
+        for port in (getattr(self, "slots", {}) or {}).values():
+            xf = getattr(port, "transformer", None)
+            if xf is not None:
+                xf.bpe = bpe
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
         """Read the shared bus's bounded replay window without a second log."""
