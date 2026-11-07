@@ -17,6 +17,7 @@ import re
 from .source_lineage import ResearchLineageError, ResearchSourceRegistry, SourceStatus
 
 _ID = re.compile(r"^[A-Za-z][A-Za-z0-9._:-]{1,127}$")
+_VARIABLE = re.compile(r"^[A-Za-z][A-Za-z0-9._:-]{0,127}$")
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -25,7 +26,8 @@ class CausalKnowledgeError(ValueError):
 
 
 def _identity(value: object, field: str) -> str:
-    if not isinstance(value, str) or not _ID.fullmatch(value):
+    pattern = _VARIABLE if field in ("cause", "effect", "intervention variable") else _ID
+    if not isinstance(value, str) or not pattern.fullmatch(value):
         raise CausalKnowledgeError(field + " requires stable bounded identity")
     return value
 
